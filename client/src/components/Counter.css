@@ -1,0 +1,50 @@
+.counter-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 320px;
+  margin: 2rem auto;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.counter-card h2 {
+  font-size: 1.125rem;
+  color: #1a252f;
+  margin-bottom: 1rem;
+}
+
+.counter-value {
+  font-size: 4rem;
+  font-weight: 700;
+  color: #2563eb;
+  margin-bottom: 1.5rem;
+}
+
+.tap-btn {
+  width: 100%;
+  padding: 0.875rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.tap-btn:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.tap-btn:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
+.counter-note {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
