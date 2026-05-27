@@ -1,0 +1,42 @@
+# node modules
+node_modules/ 
+*/node_modules/ 
+server/node_modules/ 
+client/node_modules/ 
+**/node_modules/** 
+
+# env
+.env 
+.env.local
+.env.*.local
+
+# builds
+dist/ 
+build/ 
+web-build/
+
+# expo
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+android/
+ios/
+
+# AI assistant
+.claude/
+AGENTS.md
+CLAUDE.md
+
+# OS file
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
