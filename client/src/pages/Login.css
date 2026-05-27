@@ -1,0 +1,297 @@
+@import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+/* ================================================
+   OAMS — Login.css  |  Dark green, matches App.css
+   ================================================ */
+
+/* ── Page root ── */
+.login-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  background: #0a0f0a;
+  /* same subtle radial glow as the hero */
+  background-image:
+    radial-gradient(ellipse 70% 50% at 20% 10%,  rgba(34,197,94,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 90%,  rgba(34,197,94,0.06) 0%, transparent 60%);
+  position: relative;
+}
+
+/* ── Theme-toggle button (top-right) ── */
+.login-theme-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 300;
+  background: rgba(17,22,18,0.85);
+  border: 1px solid rgba(34,197,94,0.18);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s;
+}
+.login-theme-btn:hover {
+  background: rgba(34,197,94,0.12);
+  border-color: rgba(34,197,94,0.4);
+}
+
+.login-theme-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0.75) sepia(1) hue-rotate(80deg) saturate(2);
+  transition: filter 0.2s;
+}
+.login-theme-btn:hover .login-theme-icon {
+  filter: brightness(1) sepia(1) hue-rotate(80deg) saturate(3);
+}
+
+/* ── Centred column ── */
+.login-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+
+/* ── Logos row ── */
+.login-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.login-pnc-logo {
+  height: 75px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(34,197,94,0.2));
+}
+
+.login-oams-logo {
+  height: 75px;
+  width: auto;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 0   rgba(255,255,255,0.85))
+    drop-shadow(1px  0  0 rgba(255,255,255,0.85))
+    drop-shadow(-1px 0  0 rgba(255,255,255,0.85))
+    drop-shadow(0  1px  0 rgba(255,255,255,0.85))
+    drop-shadow(0 -1px  0 rgba(255,255,255,0.85));
+}
+
+/* ── University name ── */
+.login-university-name {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+/* ── Card ── */
+.login-card {
+  width: 50%;
+  background: #111612;
+  border: 1px solid rgba(34,197,94,0.2);
+  border-radius: 18px;
+  padding: 36px 36px 32px;
+  box-shadow:
+    0 4px 32px rgba(0,0,0,0.45),
+    0 0 0 1px rgba(34,197,94,0.06);
+}
+
+/* ── Card header ── */
+.login-card-header {
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.login-card-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: "Inter", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #f0fdf4;
+  margin-bottom: 6px;
+} 
+
+
+.login-sparkle-icon {
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+.login-card-desc {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.login-card-hint {
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+/* ── Form ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.login-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #d1fae5;
+  text-align: left;
+}
+
+
+/* Input wrapper (icon + field) */
+.login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 13px;
+  color: #4b5563;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.login-input {
+  width: 100%;
+  background: #0d1410;
+  border: 1px solid rgba(34,197,94,0.2);
+  border-radius: 10px;
+  padding: 11px 14px 11px 40px;
+  font-size: 0.9rem;
+  color: #f0fdf4;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+}
+.login-input::placeholder { color: #374151; }
+.login-input:focus {
+  border-color: rgba(34,197,94,0.55);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.1);
+}
+
+/* ── Submit button ── */
+.login-btn-submit {
+  width: 100%;
+  padding: 13px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(180deg, #22c55e, #00a63e);
+  color: #fff;
+  font-size: 0.97rem;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  box-shadow: 0 3px 18px rgba(34,197,94,0.32);
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  margin-top: 4px;
+}
+.login-btn-submit:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(34,197,94,0.42);
+}
+.login-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Loading state inside submit */
+.login-btn-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.login-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Demo accounts box ── */
+.login-demo-box {
+  background: rgba(30,58,138,0.18);
+  border: 1px solid rgba(59,130,246,0.22);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.login-demo-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #93c5fd;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.login-demo-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.login-demo-list li {
+  font-size: 0.78rem;
+  color: #60a5fa;
+}
+
+.login-demo-list li::before {
+  content: '• ';
+}
+
+.login-demo-list strong {
+  color: #93c5fd;
+}
+
+.login-demo-password {
+  font-size: 0.75rem;
+  color: #3b82f6;
+  text-align: left;
+}
+
+/* ── Footer copyright ── */
+.login-footer-copy {
+  font-size: 0.78rem;
+  color: #374151;
+  text-align: center;
+  margin-top: 28px;
+}

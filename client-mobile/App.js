@@ -3,7 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import axios from "axios";
 
 // IMPORTANT: Replace with your computer's local IP, not localhost
-const API = "http://192.168.100.2:5000/api";
+// const API = "http://192.168.100.2:5000/api";
+// IMPORTANT: Update to your PC's current IPv4 LAN address
+const API = "http://YOUR_PC_IP_HERE:5000/api";
 
 export default function App() {
   const [count, setCount] = useState(0);
