@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Sparkles } from 'lucide-react';
@@ -11,14 +11,42 @@ import pncLogo from '../assets/Pnc-Logo.png';
 // @ts-ignore
 import oamsLogo from '../assets/oams_logo.png';
 // @ts-ignore
-import darkModeIcon from '../assets/darkmode_icon.png';
+import darkModeIcon from '../assets/darkmode_icon.png'; // Crescent moon icon
+// @ts-ignore
+import sunIcon from '../assets/sun_icon.png'; // Sun icon (optional, use if available)
 
 export default function Login() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const { login } = useAuth();
   const navigate  = useNavigate();
+
+  // Initialize theme from localStorage on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('oams_theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.body.classList.add('dark-mode');
+    } else {
+      setIsDarkMode(false);
+      document.body.classList.remove('dark-mode');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    
+    if (newDarkMode) {
+      document.body.classList.add('dark-mode');
+      localStorage.setItem('oams_theme', 'dark');
+    } else {
+      document.body.classList.remove('dark-mode');
+      localStorage.setItem('oams_theme', 'light');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,8 +85,16 @@ export default function Login() {
     <div className="login-root">
 
       {/* ── Dark-mode toggle (top-right) ── */}
-      <button className="login-theme-btn" aria-label="Toggle theme">
-        <img src={darkModeIcon} alt="Theme" className="login-theme-icon" />
+      <button 
+        className="login-theme-btn" 
+        aria-label="Toggle theme"
+        onClick={toggleTheme}
+      >
+        <img 
+          src={isDarkMode ? sunIcon : darkModeIcon} 
+          alt={isDarkMode ? "Light Mode" : "Dark Mode"} 
+          className="login-theme-icon" 
+        />
       </button>
 
       <div className="login-wrapper">

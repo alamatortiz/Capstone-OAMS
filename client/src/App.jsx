@@ -1,5 +1,6 @@
 import './App.css'
 import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 
 // Logo imports — copy these files into src/assets/
 import oamsLogo from './assets/oams_logo.png'
@@ -13,6 +14,7 @@ import chasLogo from './assets/CHAS.png'
 
 // Icon imports — copy these files into src/assets/
 import darkModeIcon    from './assets/darkmode_icon.png'
+import sunIcon         from './assets/sun_icon.png'
 import personsIcon     from './assets/persons_icon.png'
 import nextIcon        from './assets/next_icon.png'
 import queueIcon       from './assets/Queue_Management.png'
@@ -38,6 +40,34 @@ const features = [
 
 function App() {
   const navigate = useNavigate()
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('oams_theme')
+    return savedTheme === 'dark'
+  })
+
+  // Sync external system (DOM) with the current React state
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode')
+    } else {
+      document.body.classList.remove('dark-mode')
+    }
+  }, [isDarkMode])
+
+
+  const toggleTheme = () => {
+    const newDarkMode = !isDarkMode
+    setIsDarkMode(newDarkMode)
+    
+    if (newDarkMode) {
+      document.body.classList.add('dark-mode')
+      localStorage.setItem('oams_theme', 'dark')
+    } else {
+      document.body.classList.remove('dark-mode')
+      localStorage.setItem('oams_theme', 'light')
+    }
+  }
+
   const goToLogin = () => navigate('/login')
 
   return (
@@ -50,8 +80,16 @@ function App() {
           <img src={oamsLogo} alt="OAMS Logo" className="nav-logo-img" />
         </div>
         <div className="navbar-actions">
-          <button className="icon-btn" aria-label="Dark Mode">
-            <img src={darkModeIcon} alt="Dark Mode" className="icon-btn-img" />
+          <button 
+            className="icon-btn" 
+            aria-label="Toggle theme"
+            onClick={toggleTheme}
+          >
+            <img 
+              src={isDarkMode ? sunIcon : darkModeIcon} 
+              alt={isDarkMode ? "Light Mode" : "Dark Mode"} 
+              className="icon-btn-img" 
+            />
           </button>
           {/* Sign In #1 — Navbar */}
           <button className="btn-signin" onClick={goToLogin}>
@@ -127,7 +165,7 @@ function App() {
         </p>
         {/* Sign In #3 — CTA Banner */}
         <button className="btn-cta" onClick={goToLogin}>
-          Sign In Now <img src={nextIcon} alt="" className="btn-icon-img btn-icon-img--white" />
+          Sign In Now <img src={nextIcon} alt="" className="btn-icon-img" />
         </button>
       </section>
 

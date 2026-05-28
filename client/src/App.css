@@ -1,18 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 /* ================================================
-   OAMS — App.css  |  Desktop-first, dark green
+   OAMS — App.css  |  Light mode default, dark green accent
    ================================================ */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }
 
+/* ── LIGHT MODE (DEFAULT) ── */
 body {
-  background: #0a0f0a;
-  color: #f0fdf4;
+  background: #ffffff;
+  color: #1f2937;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   -webkit-font-smoothing: antialiased;
-  min-width: 1280px;          /* desktop baseline */
+  min-width: 1280px;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* ── DARK MODE VARIANT ── */
+body.dark-mode {
+  background: #0a0f0a;
+  color: #f0fdf4;
 }
 
 /* ── Root ── */
@@ -20,6 +28,11 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
+  background: #ffffff;
+  transition: background 0.3s;
+}
+
+body.dark-mode .oams-root {
   background: #0a0f0a;
 }
 
@@ -31,12 +44,18 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 14px 48px;
-  background: rgba(17, 22, 18, 0.85);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
   z-index: 200;
-  border-bottom: 1px solid rgba(34, 197, 94, 0.12);
+  border-bottom: 1px solid rgba(34, 197, 94, 0.15);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+body.dark-mode .navbar {
+  background: rgba(17, 22, 18, 0.85);
+  border-bottom-color: rgba(34, 197, 94, 0.12);
 }
 
 /* Navbar brand (PNC + OAMS) */
@@ -65,6 +84,16 @@ body {
     drop-shadow(-1px 0 0 rgba(255,255,255,0.85))
     drop-shadow(0 1px 0 rgba(255,255,255,0.85))
     drop-shadow(0 -1px 0 rgba(255,255,255,0.85));
+  transition: filter 0.3s;
+}
+
+body.dark-mode .nav-logo-img {
+  filter:
+    drop-shadow(0 0 0 rgba(255,255,255,0.85))
+    drop-shadow(1px 0 0 rgba(255,255,255,0.85))
+    drop-shadow(-1px 0 0 rgba(255,255,255,0.85))
+    drop-shadow(0 1px 0 rgba(255,255,255,0.85))
+    drop-shadow(0 -1px 0 rgba(255,255,255,0.85));
 }
 
 .navbar-actions {
@@ -76,7 +105,7 @@ body {
 .icon-btn {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: #666666;
   font-size: 1.25rem;
   cursor: pointer;
   padding: 7px;
@@ -86,7 +115,20 @@ body {
   align-items: center;
   justify-content: center;
 }
-.icon-btn:hover { color: #22c55e; background: rgba(34,197,94,0.1); }
+
+.icon-btn:hover {
+  color: #22c55e;
+  background: rgba(34,197,94,0.1);
+}
+
+body.dark-mode .icon-btn {
+  color: #94a3b8;
+}
+
+body.dark-mode .icon-btn:hover {
+  color: #22c55e;
+  background: rgba(34,197,94,0.1);
+}
 
 /* Dark mode / settings icon inside navbar button */
 .icon-btn-img {
@@ -127,7 +169,6 @@ body {
   width: 18px;
   height: 18px;
   object-fit: contain;
-  /* invert to white so it's visible on dark-bg buttons */
   filter: brightness(0) invert(1);
 }
 
@@ -140,6 +181,11 @@ body {
   align-items: center;
   text-align: center;
   padding: 96px 48px 112px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+  transition: background 0.3s;
+}
+
+body.dark-mode .hero-section {
   background:
     radial-gradient(ellipse 65% 55% at 50% 0%,
       rgba(34, 197, 94, 0.09) 0%, transparent 72%);
@@ -169,7 +215,16 @@ body {
   height: 120px;
   width: auto;
   object-fit: contain;
-  /* visible white stroke/outline via multi-layer shadow */
+  filter:
+    drop-shadow(0 0 0 rgba(255,255,255,0.85))
+    drop-shadow(1px 0 0 rgba(255,255,255,0.85))
+    drop-shadow(-1px 0 0 rgba(255,255,255,0.85))
+    drop-shadow(0 1px 0 rgba(255,255,255,0.85))
+    drop-shadow(0 -1px 0 rgba(255,255,255,0.85));
+  transition: filter 0.3s;
+}
+
+body.dark-mode .hero-logo-img {
   filter:
     drop-shadow(0 0 0 rgba(255,255,255,0.85))
     drop-shadow(1px 0 0 rgba(255,255,255,0.85))
@@ -182,19 +237,29 @@ body {
   font-size: 4.25rem;
   font-weight: 800;
   font-family: "Inter", sans-serif;
-  color: #f0fdf4;
+  color: #1f2937;
   line-height: 1.12;
   max-width: 920px;
   margin-bottom: 24px;
   letter-spacing: -0.01em;
+  transition: color 0.3s;
+}
+
+body.dark-mode .hero-title {
+  color: #f0fdf4;
 }
 
 .hero-subtitle {
   font-size: 1.2rem;
-  color: #94a3b8;
+  color: #6b7280;
   max-width: 680px;
   line-height: 1.75;
   margin-bottom: 40px;
+  transition: color 0.3s;
+}
+
+body.dark-mode .hero-subtitle {
+  color: #94a3b8;
 }
 
 .btn-hero {
@@ -224,6 +289,13 @@ body {
    ================================================ */
 .features-section {
   padding: 0 80px 100px;
+  margin-top: 75px;
+  background: #ffffff;
+  transition: background 0.3s;
+}
+
+body.dark-mode .features-section {
+  background: #0a0f0a;
 }
 
 .section-title {
@@ -231,17 +303,27 @@ body {
   font-size: 2.1rem;
   font-weight: 800;
   font-family: "Inter", sans-serif;
-  color: #f0fdf4;
+  color: #1f2937;
   margin-bottom: 44px;
+  transition: color 0.3s;
+}
+
+body.dark-mode .section-title {
+  color: #f0fdf4;
 }
 
 .section-subtitle {
   text-align: center;
-  color: #94a3b8;
+  color: #6b7280;
   font-size: 1rem;
   max-width: 640px;
   margin: -28px auto 52px;
   line-height: 1.75;
+  transition: color 0.3s;
+}
+
+body.dark-mode .section-subtitle {
+  color: #94a3b8;
 }
 
 /* 4 columns on desktop */
@@ -254,12 +336,18 @@ body {
 }
 
 .feature-card {
-  background: #111612;
-  border: 1px solid rgba(34,197,94,0.18);
+  background: #f9fafb;
+  border: 1px solid rgba(34,197,94,0.15);
   border-radius: 16px;
   padding: 32px 28px 48px;
-  transition: border-color 0.25s, transform 0.2s, box-shadow 0.2s;
+  transition: border-color 0.25s, transform 0.2s, box-shadow 0.2s, background 0.3s;
 }
+
+body.dark-mode .feature-card {
+  background: #111612;
+  border-color: rgba(34,197,94,0.18);
+}
+
 .feature-card:hover {
   border-color: rgba(34,197,94,0.48);
   transform: translateY(-4px);
@@ -279,7 +367,6 @@ body {
   margin-right: auto;
 }
 
-
 .feature-icon-img {
   width: 56px;
   height: 56px;
@@ -294,15 +381,25 @@ body {
 .feature-title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #f0fdf4;
+  color: #1f2937;
   margin-bottom: 10px;
   text-align: center;
+  transition: color 0.3s;
+}
+
+body.dark-mode .feature-title {
+  color: #f0fdf4;
 }
 
 .feature-desc {
   font-size: 0.9rem;
-  color: #64748b;
+  color: #6b7280;
   line-height: 1.65;
+  transition: color 0.3s;
+}
+
+body.dark-mode .feature-desc {
+  color: #64748b;
 }
 
 /* ================================================
@@ -310,6 +407,12 @@ body {
    ================================================ */
 .colleges-section {
   padding: 0 80px 100px;
+  background: #ffffff;
+  transition: background 0.3s;
+}
+
+body.dark-mode .colleges-section {
+  background: #0a0f0a;
 }
 
 /* 3 × 2 grid, fixed desktop column width */
@@ -326,14 +429,25 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 18px;
-  background: #111612;
-  border: 1px solid rgba(34,197,94,0.18);
+  background: #f9fafb;
+  border: 1px solid rgba(34,197,94,0.15);
   border-radius: 16px;
   padding: 36px 24px 40px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.25s, transform 0.2s, box-shadow 0.2s;
+  transition: border-color 0.25s, transform 0.2s, box-shadow 0.2s, background 0.3s;
 }
+
+body.dark-mode .college-card {
+  background: #111612;
+  border-color: rgba(34,197,94,0.18);
+}
+
+body.dark-mode .college-logo {
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)) drop-shadow(0 0 10px rgba(255,255,255,0.08));
+}
+
+
 .college-card:hover {
   border-color: rgba(34,197,94,0.48);
   transform: translateY(-3px);
@@ -346,10 +460,12 @@ body {
   height: 110px;
   object-fit: contain;
   border-radius: 50%;
-  mix-blend-mode: lighten;
-  filter: drop-shadow(0 0 8px rgba(255,255,255,0.08));
-  transition: transform 0.2s;
+  /* Keep the original logo colors; just enhance contrast per theme */
+  mix-blend-mode: normal;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.08)) drop-shadow(0 0 10px rgba(34,197,94,0.12));
+  transition: transform 0.2s, filter 0.3s;
 }
+
 .college-card:hover .college-logo {
   transform: scale(1.06);
 }
@@ -358,9 +474,14 @@ body {
   font-size: 0.97rem;
   font-family: "Akt", sans-serif;
   font-weight: 700;
-  color: #f0fdf4;
+  color: #1f2937;
   line-height: 1.45;
   max-width: 220px;
+  transition: color 0.3s;
+}
+
+body.dark-mode .college-name {
+  color: #f0fdf4;
 }
 
 /* ================================================
@@ -390,7 +511,6 @@ body {
   width: 64px;
   height: 64px;
   object-fit: contain;
-  /* brighten on the green banner */
   filter: brightness(0) invert(1);
 }
 
@@ -439,8 +559,14 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 28px 48px;
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid rgba(34,197,94,0.15);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+body.dark-mode .footer {
   background: rgba(17,22,18,0.85);
-  border-top: 1px solid rgba(34,197,94,0.1);
+  border-top-color: rgba(34,197,94,0.1);
 }
 
 .footer-brand { display: flex; align-items: center; }
@@ -462,16 +588,21 @@ body {
   height: 36px;
   width: auto;
   object-fit: contain;
-  /* visible white stroke/outline via multi-layer shadow */
   filter:
     drop-shadow(0 0 0 rgba(255,255,255,0.85))
     drop-shadow(1px 0 0 rgba(255,255,255,0.85))
     drop-shadow(-1px 0 0 rgba(255,255,255,0.85))
     drop-shadow(0 1px 0 rgba(255,255,255,0.85))
     drop-shadow(0 -1px 0 rgba(255,255,255,0.85));
+  transition: filter 0.3s;
 }
 
 .footer-copy {
   font-size: 0.82rem;
+  color: #6b7280;
+  transition: color 0.3s;
+}
+
+body.dark-mode .footer-copy {
   color: #64748b;
 }
