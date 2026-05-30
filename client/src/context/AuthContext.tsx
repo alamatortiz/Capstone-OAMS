@@ -6,6 +6,7 @@ type UserData = {
   name: string;
   email: string;
   role: Role;
+  studentId?: string;
 };
 
 type AuthContextValue = {
@@ -24,6 +25,11 @@ function guessRoleFromEmail(email: string): Role {
 }
 
 function guessNameFromEmail(email: string): string {
+  const lowerEmail = email.toLowerCase();
+  if (lowerEmail === 'student@pnc.edu.ph') {
+    return 'John Doe';
+  }
+
   const localPart = email.split('@')[0];
   if (!localPart) return 'User';
   // Turn `first.last` or `first_last` into `First Last`
@@ -33,6 +39,14 @@ function guessNameFromEmail(email: string): string {
     .filter(Boolean)
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
     .join(' ');
+}
+
+function guessStudentIdFromEmail(email: string): string | undefined {
+  const lowerEmail = email.toLowerCase();
+  if (lowerEmail === 'student@pnc.edu.ph') {
+    return '2300000';
+  }
+  return undefined;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -63,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: guessNameFromEmail(email),
       email,
       role,
+      studentId: guessStudentIdFromEmail(email),
     };
 
     localStorage.setItem('oams_user', JSON.stringify(nextUser));
