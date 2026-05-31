@@ -63,7 +63,7 @@ body.dark-mode .login-theme-btn:hover {
 }
 
 body.dark-mode .login-theme-icon {
-  filter: brightness(1) sepia(1) hue-rotate(80deg) saturate(3);
+  filter: brightness(1) sepia(1) saturate(7) hue-rotate(0deg);
 }
 
 .login-theme-btn:hover .login-theme-icon {
@@ -71,7 +71,7 @@ body.dark-mode .login-theme-icon {
 }
 
 body.dark-mode .login-theme-btn:hover .login-theme-icon {
-  filter: brightness(1.1) sepia(1) hue-rotate(45deg) saturate(2);
+  filter: brightness(1.1) sepia(1) saturate(7) hue-rotate(0deg);
 }
 
 /* ── Centred column ── */

@@ -135,11 +135,23 @@ body.dark-mode .icon-btn:hover {
   width: 22px;
   height: 22px;
   object-fit: contain;
+  /* default icon tint (dark icon / initial state) */
   filter: brightness(0.7) sepia(1) hue-rotate(80deg) saturate(2);
   transition: filter 0.2s;
 }
+
+/* When the navbar is in dark mode, the toggle shows the SUN icon.
+   Tint it yellow (#fbbf24). */
+body.dark-mode .icon-btn-img {
+  filter: brightness(1) sepia(1) saturate(6) hue-rotate(0deg);
+}
+
 .icon-btn:hover .icon-btn-img {
   filter: brightness(1) sepia(1) hue-rotate(80deg) saturate(3);
+}
+
+body.dark-mode .icon-btn:hover .icon-btn-img {
+  filter: brightness(1.1) sepia(1) saturate(6) hue-rotate(0deg);
 }
 
 .btn-signin {
@@ -456,11 +468,10 @@ body.dark-mode .college-logo {
 
 /* College seal logos — round, consistent size */
 .college-logo {
-  width: 110px;
-  height: 110px;
+  width: 170px;
+  height: 170px;
   object-fit: contain;
   border-radius: 50%;
-  /* Keep the original logo colors; just enhance contrast per theme */
   mix-blend-mode: normal;
   filter: drop-shadow(0 6px 10px rgba(0,0,0,0.08)) drop-shadow(0 0 10px rgba(34,197,94,0.12));
   transition: transform 0.2s, filter 0.3s;
@@ -471,12 +482,12 @@ body.dark-mode .college-logo {
 }
 
 .college-name {
-  font-size: 0.97rem;
+  font-size: 1.15rem;
   font-family: "Akt", sans-serif;
   font-weight: 700;
   color: #1f2937;
   line-height: 1.45;
-  max-width: 220px;
+  max-width: 240px;
   transition: color 0.3s;
 }
 

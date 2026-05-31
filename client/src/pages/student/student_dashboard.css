@@ -650,10 +650,27 @@ body {
   }
 }
 
+.banner-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-start;
+}
+
+.banner-ccs-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block; 
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+}
+
 .banner-title {
   font-size: 1.875rem;
   font-weight: 700;
-  margin-bottom: 0.25rem;
+  margin: 0;
+  line-height: 1.1;
   text-align: justify;
   text-justify: inter-word;
 }

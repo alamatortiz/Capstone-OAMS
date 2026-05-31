@@ -8,7 +8,9 @@ import { getCollegeLogo } from '../../data/collegeLogo';
 
 import ucLogo from '../../assets/Pnc-Logo.png';
 import oamsLogo from '../../assets/oams_logo.png';
+import ccsLogo from '../../assets/CCS.png';
 import './student_dashboard.css';
+
 
 // Sidebar Icons
 const HomeIcon = () => (
@@ -529,7 +531,11 @@ export default function StudentDashboard() {
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
               <p className="banner-greeting">Good day! 👋</p>
-              <h1 className="banner-title">{user?.name ?? 'John Doe'}</h1>
+              <div className="banner-title-row">
+                <img src={ccsLogo} alt="CCS Logo" className="banner-ccs-logo" />
+                <h1 className="banner-title">{user?.name ?? 'John Doe'}</h1>
+              </div>
+
               <div className="banner-badges">
                 <span className="badge">Student Portal</span>
                 <span className="badge">AY 2025–2026</span>
@@ -805,3 +811,4 @@ export default function StudentDashboard() {
     </div>
   );
 }
+
