@@ -32,6 +32,7 @@ function guessNameFromEmail(email: string): string {
 
   const localPart = email.split('@')[0];
   if (!localPart) return 'User';
+
   // Turn `first.last` or `first_last` into `First Last`
   const cleaned = localPart.replace(/[_\.]+/g, ' ');
   return cleaned

@@ -1,6 +1,8 @@
 import './App.css'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { applyTheme, getSavedTheme } from './utils/theme'
+
 
 // Logo imports — copy these files into src/assets/
 import oamsLogo from './assets/oams_logo.png'
@@ -40,33 +42,19 @@ const features = [
 
 function App() {
   const navigate = useNavigate()
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('oams_theme')
-    return savedTheme === 'dark'
-  })
+  const [isDarkMode, setIsDarkMode] = useState(() => getSavedTheme() === 'dark')
 
-  // Sync external system (DOM) with the current React state
+  // Apply the saved theme on first render, and keep DOM in sync
   useEffect(() => {
-    if (isDarkMode) {
-      document.body.classList.add('dark-mode')
-    } else {
-      document.body.classList.remove('dark-mode')
-    }
+    applyTheme(isDarkMode ? 'dark' : 'light')
   }, [isDarkMode])
-
 
   const toggleTheme = () => {
     const newDarkMode = !isDarkMode
     setIsDarkMode(newDarkMode)
-    
-    if (newDarkMode) {
-      document.body.classList.add('dark-mode')
-      localStorage.setItem('oams_theme', 'dark')
-    } else {
-      document.body.classList.remove('dark-mode')
-      localStorage.setItem('oams_theme', 'light')
-    }
+    applyTheme(newDarkMode ? 'dark' : 'light')
   }
+
 
   const goToLogin = () => navigate('/login')
 

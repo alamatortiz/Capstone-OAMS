@@ -4,8 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { applyTheme, getSavedTheme } from '../utils/theme';
+
 // @ts-ignore
 import './Login.css';
+
 // @ts-ignore
 import pncLogo from '../assets/Pnc-Logo.png';
 // @ts-ignore
@@ -19,33 +22,20 @@ export default function Login() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(getSavedTheme() === 'dark');
   const { login } = useAuth();
   const navigate  = useNavigate();
 
-  // Initialize theme from localStorage on mount
+  // Apply saved theme on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('oams_theme');
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
-      document.body.classList.add('dark-mode');
-    } else {
-      setIsDarkMode(false);
-      document.body.classList.remove('dark-mode');
-    }
+    applyTheme(getSavedTheme());
+    setIsDarkMode(getSavedTheme() === 'dark');
   }, []);
 
   const toggleTheme = () => {
     const newDarkMode = !isDarkMode;
     setIsDarkMode(newDarkMode);
-    
-    if (newDarkMode) {
-      document.body.classList.add('dark-mode');
-      localStorage.setItem('oams_theme', 'dark');
-    } else {
-      document.body.classList.remove('dark-mode');
-      localStorage.setItem('oams_theme', 'light');
-    }
+    applyTheme(newDarkMode ? 'dark' : 'light');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

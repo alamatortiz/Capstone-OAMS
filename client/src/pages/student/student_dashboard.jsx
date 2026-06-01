@@ -10,6 +10,8 @@ import ucLogo from '../../assets/Pnc-Logo.png';
 import oamsLogo from '../../assets/oams_logo.png';
 import ccsLogo from '../../assets/CCS.png';
 import './student_dashboard.css';
+import { applyTheme, getSavedTheme } from '../../utils/theme';
+
 
 
 // Sidebar Icons
@@ -221,15 +223,8 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => {
-    try {
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) return savedTheme === 'dark';
-      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    } catch {
-      return true;
-    }
-  });
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
+
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -252,16 +247,10 @@ export default function StudentDashboard() {
     scrollToBottom();
   }, [messages]);
 
-  // Keep DOM and localStorage in sync with `isDark` without setting state inside effect
   useEffect(() => {
-    const theme = isDark ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem('theme', theme);
-    } catch {
-      // ignore
-    }
+    applyTheme(isDark ? 'dark' : 'light');
   }, [isDark]);
+
 
   const handleLogout = () => {
     logout();
@@ -311,8 +300,13 @@ export default function StudentDashboard() {
   };
 
   const toggleDarkMode = () => {
-    setIsDark(prev => !prev);
+    setIsDark((prev) => {
+      const next = !prev;
+      applyTheme(next ? 'dark' : 'light');
+      return next;
+    });
   };
+
 
   const navItems = [
     { icon: HomeIcon, label: 'Dashboard', path: '/student/dashboard' },
