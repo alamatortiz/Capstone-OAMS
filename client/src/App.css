@@ -324,20 +324,6 @@ body.dark-mode .section-title {
   color: #f0fdf4;
 }
 
-.section-subtitle {
-  text-align: center;
-  color: #6b7280;
-  font-size: 1rem;
-  max-width: 640px;
-  margin: -28px auto 52px;
-  line-height: 1.75;
-  transition: color 0.3s;
-}
-
-body.dark-mode .section-subtitle {
-  color: #94a3b8;
-}
-
 /* 4 columns on desktop */
 .features-grid {
   display: grid;
@@ -421,11 +407,15 @@ body.dark-mode .feature-desc {
   padding: 0 80px 100px;
   background: #ffffff;
   transition: background 0.3s;
+  text-align: center;
 }
+
 
 body.dark-mode .colleges-section {
   background: #0a0f0a;
+  text-align: center;
 }
+
 
 /* 3 × 2 grid, fixed desktop column width */
 .colleges-grid {
