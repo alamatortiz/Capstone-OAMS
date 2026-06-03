@@ -7,6 +7,7 @@ import Login from './pages/Login.tsx'
 import { AuthProvider } from './context/AuthContext.tsx'
 import StudentDashboard from './pages/student/student_dashboard.jsx'
 import ProfessorDashboard from './pages/professor/professor_dashboard.jsx'
+import AdminDashboard from './pages/admin/admin_dashboard.jsx'
 import { QueueProvider } from './contexts/QueueProvider.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -24,9 +25,13 @@ createRoot(document.getElementById('root')).render(
             {/* Professor dashboard routes */}
             <Route path="/professor/dashboard" element={<ProfessorDashboard />} />
 
+            {/* Admin dashboard routes */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
             {/* Backward-compatible TEMP UI-testing routes */}
             <Route path="/student-dashboard" element={<StudentDashboard />} />
             <Route path="/professor-dashboard" element={<ProfessorDashboard />} />
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
         </BrowserRouter>
       </QueueProvider>
