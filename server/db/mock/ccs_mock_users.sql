@@ -1,6 +1,6 @@
 -- =========================================================================
 -- OAMS CCS Pilot Module - Mock Users Dataset
--- Path: server/db/mock/01_ccs_mock_users.sql
+-- Path: server/db/mock/ccs_mock_users.sql
 -- Description: Sets up CCS department, admin, 10 faculty, and 100 students
 --              using programmatic stored procedures to guarantee accuracy.
 -- =========================================================================
