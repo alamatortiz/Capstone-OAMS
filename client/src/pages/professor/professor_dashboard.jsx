@@ -468,10 +468,10 @@ export default function ProfessorDashboard() {
             {stats.map((stat) => (
               <Link key={stat.title} to={stat.link} className="stat-card-link">
                 <div className="stat-card">
+                  <div className={`stat-icon ${stat.bgColor}`}>
+                    <stat.icon />
+                  </div>
                   <div className="stat-header">
-                    <div className={`stat-icon ${stat.bgColor}`}>
-                      <stat.icon />
-                    </div>
                     <ChevronRightIcon />
                   </div>
                   <p className="stat-value">{stat.value}</p>
