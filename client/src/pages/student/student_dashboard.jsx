@@ -12,8 +12,6 @@ import ccsLogo from '../../assets/CCS.png';
 import './student_dashboard.css';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 
-
-
 // Sidebar Icons
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -143,12 +141,14 @@ const ChevronRightIcon = () => (
 );
 
 const AlertCircleIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="12" y1="8" x2="12" y2="12"></line>
     <line x1="12" y1="16" x2="12.01" y2="16"></line>
   </svg>
 );
+
+
 
 const BellIcon = () => (
   <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -543,11 +543,11 @@ export default function StudentDashboard() {
             {stats.map((stat) => (
               <Link key={stat.title} to={stat.link} className="stat-card-link">
                 <div className="stat-card">
+                  <div className={`stat-icon ${stat.bgColor}`}>
+                    <stat.icon />
+                  </div>
                   <div className="stat-header">
-                    <div className={`stat-icon ${stat.bgColor}`}>
-                      <stat.icon />
-                    </div>
-                    <ChevronRightIcon />
+                    <ChevronRightIcon className="stat-chevron" />
                   </div>
                   <p className="stat-value">{stat.value}</p>
                   <p className="stat-title">{stat.title}</p>
@@ -567,17 +567,20 @@ export default function StudentDashboard() {
               {quickActions.map((action, index) => (
                 <Link key={action.title} to={action.link} className="quick-action-link">
                   <div className="quick-action-card">
-                    <div className="action-header">
+                    <div className="action-main">
                       <div className={`action-icon action-gradient-${index + 1}`}>
                         <action.icon />
                       </div>
-                      <span className="action-badge">{action.badge}</span>
-                    </div>
-                    <h3 className="action-title">{action.title}</h3>
-                    <p className="action-description">{action.description}</p>
-                    <div className="action-cta">
-                      <span>Open</span>
-                      <ChevronRightIcon />
+
+                      <div className="action-body">
+                        <span className="action-badge action-badge-right">{action.badge}</span>
+                        <h3 className="action-title">{action.title}</h3>
+                        <p className="action-description">{action.description}</p>
+                        <div className="action-cta">
+                          <span>Open</span>
+                          <ChevronRightIcon />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -805,4 +808,3 @@ export default function StudentDashboard() {
     </div>
   );
 }
-
