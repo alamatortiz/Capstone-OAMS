@@ -1,96 +1,153 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import api from "../utils/api";
 
-type Role = 'student' | 'professor' | 'admin';
+type Role = "student" | "faculty" | "admin";
 
 type UserData = {
-  name: string;
-  email: string;
+  userId: number;
+  schoolId: string;
   role: Role;
-  studentId?: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  departmentName?: string;
+  studentNumber?: string;
+  course?: string;
+  yearLevel?: number;
+  employeeId?: string;
+  specialization?: string;
+  position?: string;
 };
 
 type AuthContextValue = {
   user: UserData | null;
-  login: (email: string, password: string) => Promise<void>;
+  token: string | null;
+  isLoading: boolean;
+  login: (emailOrSchoolId: string, password: string) => Promise<void>;
   logout: () => void;
+  isAuthenticated: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function guessRoleFromEmail(email: string): Role {
-  const lower = email.toLowerCase();
-  if (lower.startsWith('admin@')) return 'admin';
-  if (lower.startsWith('professor@')) return 'professor';
-  return 'student';
-}
-
-function guessNameFromEmail(email: string): string {
-  const lowerEmail = email.toLowerCase();
-  if (lowerEmail === 'student@pnc.edu.ph') {
-    return 'John Doe';
-  }
-
-  const localPart = email.split('@')[0];
-  if (!localPart) return 'User';
-
-  // Turn `first.last` or `first_last` into `First Last`
-  const cleaned = localPart.replace(/[_\.]+/g, ' ');
-  return cleaned
-    .split(' ')
-    .filter(Boolean)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(' ');
-}
-
-function guessStudentIdFromEmail(email: string): string | undefined {
-  const lowerEmail = email.toLowerCase();
-  if (lowerEmail === 'student@pnc.edu.ph') {
-    return '2300000';
-  }
-  return undefined;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserData | null>(() => {
-    const raw = localStorage.getItem('oams_user');
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as UserData;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState<UserData | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Start loading to check session
 
-  const login = async (email: string, password: string) => {
-    // Stubbed auth (no backend in this repo).
-    // - Any password works (your Login page says: Password: any)
-    // - Role auto-detected by email prefix
+  const isAuthenticated = useMemo(() => !!user && !!token, [user, token]);
 
-    if (!email || !password) {
-      throw new Error('Missing credentials');
-    }
+  const saveAuthData = useCallback((user: UserData, token: string) => {
+    localStorage.setItem("oams_user", JSON.stringify(user));
+    localStorage.setItem("oams_token", token);
+    setUser(user);
+    setToken(token);
+  }, []);
 
-    // simulate latency
-    await new Promise((r) => setTimeout(r, 250));
+  const clearAuthData = useCallback(() => {
+    localStorage.removeItem("oams_user");
+    localStorage.removeItem("oams_token");
+    setUser(null);
+    setToken(null);
+  }, []);
 
-    const role = guessRoleFromEmail(email);
-    const nextUser: UserData = {
-      name: guessNameFromEmail(email),
-      email,
-      role,
-      studentId: guessStudentIdFromEmail(email),
+  // On app load, check for existing token and fetch user data
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const storedToken = localStorage.getItem("oams_token");
+      if (storedToken) {
+        setToken(storedToken);
+        // Try to fetch user data with the stored token
+        try {
+          const response = await api.get("/auth/me", {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          });
+
+          const raw = response.data.user;
+          const normalized: UserData = {
+            userId: raw.user_id,
+            schoolId: raw.school_id,
+            role: raw.role,
+            firstName: raw.first_name,
+            lastName: raw.last_name,
+            name: `${raw.first_name} ${raw.last_name}`,
+            email: raw.email,
+            departmentName: raw.department_name ?? undefined,
+            studentNumber: raw.student_number ?? undefined,
+            course: raw.course ?? undefined,
+            yearLevel: raw.year_level ?? undefined,
+            employeeId: raw.employee_id ?? undefined,
+            specialization: raw.specialization ?? undefined,
+            position: raw.position ?? undefined,
+          };
+          saveAuthData(normalized, storedToken);
+        } catch (error) {
+          console.error("Failed to restore session:", error);
+          clearAuthData(); // Clear invalid token
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
     };
+    initializeAuth();
+  }, [saveAuthData, clearAuthData]);
 
-    localStorage.setItem('oams_user', JSON.stringify(nextUser));
-    setUser(nextUser);
+  const login = async (emailOrSchoolId: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await api.post("/auth/login", {
+        emailOrSchoolId: emailOrSchoolId, // Ensure key name matches backend expectation
+        password,
+      });
+      const raw = response.data.user;
+      const normalized: UserData = {
+        userId: raw.user_id,
+        schoolId: raw.school_id,
+        role: raw.role,
+        firstName: raw.first_name,
+        lastName: raw.last_name,
+        name: `${raw.first_name} ${raw.last_name}`, // ← dashboards use user.name
+        email: raw.email,
+        departmentName: raw.department_name ?? undefined,
+        studentNumber: raw.student_number ?? undefined,
+        course: raw.course ?? undefined,
+        yearLevel: raw.year_level ?? undefined,
+        employeeId: raw.employee_id ?? undefined,
+        specialization: raw.specialization ?? undefined,
+        position: raw.position ?? undefined,
+      };
+      saveAuthData(normalized, response.data.token);
+    } catch (error) {
+      console.error("Login API error:", error);
+      // Handle specific error messages from backend if needed
+      throw error; // Re-throw to be caught by the calling component (e.g., Login.tsx)
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem('oams_user');
-    setUser(null);
+    clearAuthData();
+    // Optionally, inform the backend about logout if session management is needed there
+    api
+      .post("/auth/logout")
+      .catch((error) => console.error("Logout error:", error));
   };
 
-  const value = useMemo<AuthContextValue>(() => ({ user, login, logout }), [user]);
+  const value = useMemo(
+    () => ({ user, token, isLoading, login, logout, isAuthenticated }),
+    [user, token, isLoading, isAuthenticated, login, logout], // Include login and logout in dependency array
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -98,8 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return ctx;
 }
-

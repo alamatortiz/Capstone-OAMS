@@ -1,4 +1,21 @@
 services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: Akosimatt123
+      MYSQL_DATABASE: oams_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/oams_db.sql:/docker-entrypoint-initdb.d/oams_db.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   server:
     build: ./server
     ports:
@@ -8,6 +25,15 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=Akosimatt123
+      - DB_NAME=oams_db
+      - JWT_SECRET=your_jwt_secret_here
+      - JWT_EXPIRES_IN=24h
+    depends_on:
+      db:
+        condition: service_healthy
 
   client:
     build: ./client
@@ -16,5 +42,10 @@ services:
     volumes:
       - ./client:/app
       - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
     depends_on:
       - server
+
+volumes:
+  mysql_data:
