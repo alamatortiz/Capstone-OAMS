@@ -341,32 +341,35 @@ VALUES
 
 -- 1. Student Account
 INSERT INTO users (user_id, school_id, password, role, status) 
-VALUES (101, '2026-00001', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
-VALUES (104, '2026-00004', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
-VALUES (105, '2026-00005', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
+VALUES (101, '2026-00001', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active'),
+ (104, '2026-00004', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active'),
+ (105, '2026-00005', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active'),
+ (108, '2026-00006', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active'),
+ (109, '2026-00007', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
 
 -- 2. Faculty Account
 INSERT INTO users (user_id, school_id, password, role, status) 
-VALUES (102, '2026-00002', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active');
+VALUES (102, '2026-00002', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active'),
+ (106, '2026-00008', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active'),
+ (107, '2026-00009', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active');
 
 -- 3. Administrator Account
 INSERT INTO users (user_id, school_id, password, role, status) 
 VALUES (103, '2026-00003', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'admin', 'active');
 
-
-
-
 -- 1. Link Student Profile (Matches John Ortiz context)
 INSERT INTO students (student_id, student_number, first_name, last_name, course, year_level, email, department_id)
-VALUES (101, '2300544', 'Alvin Matthew', 'Ortiz', 'Information Technology', 3, 'ortiz@pnc.edu.ph', 1001);
-VALUES (104, '2302494', 'Luiz Gabriel', 'Rosales', 'Information Technology', 3, 'rosales@pnc.edu.ph', 1001);
-VALUES (105, 'SN-2026-00003', 'Joaquin Aaron', 'Recio', 'Information Technology', 3, 'recio@pnc.edu.ph', 1001);
+VALUES (101, '2300544', 'Alvin Matthew', 'Ortiz', 'Information Technology', 3, 'ortiz@pnc.edu.ph', 1001),
+ (104, '2302494', 'Luiz Gabriel', 'Rosales', 'Information Technology', 3, 'rosales@pnc.edu.ph', 1001),
+ (105, 'SN-2026-00003', 'Joaquin Aaron', 'Recio', 'Information Technology', 3, 'recio@pnc.edu.ph', 1001),
+ (108, 'SN-2026-00004', 'Joaquin Aaron', 'Recio', 'Information Technology', 3, 'recio@pnc.edu.ph', 2001),
+ (109, 'SN-2026-00005', 'Joaquin Aaron', 'Recio', 'Information Technology', 3, 'recio@pnc.edu.ph', 3001);
 
 -- 2. Link Faculty Profile
 INSERT INTO faculty (faculty_id, employee_id, first_name, last_name, specialization, email, department_id)
-VALUES (102, 'EMP-2026-002', 'Patrick', 'Ogalesco', 'Web and Mobile Applications', 'ogalesco.maria@pnc.edu.ph', 1001);
-VALUES (106, 'EMP-2026-003', 'Marvin', 'Bicua', 'Database Management', 'bicua.maria@pnc.edu.ph', 1001);
-VALUES (107, 'EMP-2026-004', 'Janus Raymond', 'Tan', 'Backend Development', 'tan.maria@pnc.edu.ph', 1001);
+VALUES (102, 'EMP-2026-002', 'Patrick', 'Ogalesco', 'Web and Mobile Applications', 'ogalesco.maria@pnc.edu.ph', 1001),
+ (106, 'EMP-2026-003', 'Marvin', 'Bicua', 'Database Management', 'bicua.maria@pnc.edu.ph', 1001),
+ (107, 'EMP-2026-004', 'Janus Raymond', 'Tan', 'Backend Development', 'tan.maria@pnc.edu.ph', 1001);
 
 -- 3. Link Admin Profile
 INSERT INTO administrators (admin_id, employee_id, first_name, last_name, position, email, department_id)
