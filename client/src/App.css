@@ -135,7 +135,6 @@ body.dark-mode .icon-btn:hover {
   width: 22px;
   height: 22px;
   object-fit: contain;
-  /* default icon tint (dark icon / initial state) */
   filter: brightness(0.7) sepia(1) hue-rotate(80deg) saturate(2);
   transition: filter 0.2s;
 }
@@ -324,7 +323,6 @@ body.dark-mode .section-title {
   color: #f0fdf4;
 }
 
-/* 4 columns on desktop */
 .features-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -410,12 +408,23 @@ body.dark-mode .feature-desc {
   text-align: center;
 }
 
+.colleges-description {
+  max-width: 900px;
+  margin: 0 auto 40px;
+  color: #6b7280;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  transition: color 0.3s;
+}
+
+body.dark-mode .colleges-description {
+  color: #94a3b8;
+}
 
 body.dark-mode .colleges-section {
   background: #0a0f0a;
   text-align: center;
 }
-
 
 /* 3 × 2 grid, fixed desktop column width */
 .colleges-grid {
@@ -458,8 +467,9 @@ body.dark-mode .college-logo {
 
 /* College seal logos — round, consistent size */
 .college-logo {
-  width: 170px;
-  height: 170px;
+  width: 360px;
+  height: 360px;
+
   object-fit: contain;
   border-radius: 50%;
   mix-blend-mode: normal;
