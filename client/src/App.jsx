@@ -166,8 +166,12 @@ function App() {
       {/* ── Serving All Colleges ── */}
       <section className="colleges-section">
         <h2 className="section-title">Serving All Colleges</h2>
+        <p className="colleges-description">
+          Our system serves all six colleges of the University of Cabuyao (Pamantasan ng Cabuyao), providing seamless automation and management solutions.
+        </p>
 
         <div className="colleges-grid">
+
           {colleges.map((c) => (
             <div className="college-card" key={c.name}>
               <img src={c.logo} alt={c.name} className="college-logo" />
