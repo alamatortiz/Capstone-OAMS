@@ -8,7 +8,7 @@ const fetchUserProfile = async (userId, role) => {
     query = `
       SELECT u.user_id, u.school_id, u.role, u.status,
              s.student_number, s.first_name, s.last_name, s.course, s.year_level, s.email, s.department_id,
-             d.department_name
+             d.department_name, d.department_abbreviation
       FROM users u
       JOIN students s ON u.user_id = s.student_id
       LEFT JOIN departments d ON s.department_id = d.department_id
@@ -18,7 +18,7 @@ const fetchUserProfile = async (userId, role) => {
     query = `
       SELECT u.user_id, u.school_id, u.role, u.status,
              f.employee_id, f.first_name, f.last_name, f.specialization, f.email, f.department_id,
-             d.department_name
+             d.department_name, d.department_abbreviation
       FROM users u
       JOIN faculty f ON u.user_id = f.faculty_id
       LEFT JOIN departments d ON f.department_id = d.department_id
@@ -28,7 +28,7 @@ const fetchUserProfile = async (userId, role) => {
     query = `
       SELECT u.user_id, u.school_id, u.role, u.status,
              a.employee_id, a.first_name, a.last_name, a.position, a.email, a.department_id,
-             d.department_name
+             d.department_name, d.department_abbreviation
       FROM users u
       JOIN administrators a ON u.user_id = a.admin_id
       LEFT JOIN departments d ON a.department_id = d.department_id
@@ -94,11 +94,9 @@ const login = async (req, res) => {
           `Account ${user.status}`,
         ],
       );
-      return res
-        .status(403)
-        .json({
-          error: `Your account is currently ${user.status}. Please contact the administrator.`,
-        });
+      return res.status(403).json({
+        error: `Your account is currently ${user.status}. Please contact the administrator.`,
+      });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);

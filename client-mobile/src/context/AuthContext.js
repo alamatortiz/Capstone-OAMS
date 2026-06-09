@@ -24,6 +24,7 @@ import api from "../../utils/api"; // Assuming a similar API setup to web
  * @property {string} lastName
  * @property {string} email
  * @property {string} [departmentName]
+ * @property {string} [departmentAbbreviation]
  * @property {string} [studentNumber]
  * @property {string} [course]
  * @property {number} [yearLevel]

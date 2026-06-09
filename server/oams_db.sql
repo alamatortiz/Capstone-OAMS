@@ -5,6 +5,7 @@ USE oams_db;
 CREATE TABLE departments (
     department_id INT AUTO_INCREMENT PRIMARY KEY,
     department_name VARCHAR(100) NOT NULL,
+    department_abbreviation VARCHAR(100) NOT NULL,
     office_location VARCHAR(100)
 );
 
@@ -328,12 +329,21 @@ TRUNCATE TABLE administrators;
 TRUNCATE TABLE users;
 SET FOREIGN_KEY_CHECKS = 1;
 
-
--- STEP A: INSERT BASE ACCOUNT CREDENTIALS (Password: password123)
+-- Insert the Departments
+INSERT INTO departments (department_id, department_name, department_abbreviation, office_location)
+VALUES 
+(1001, 'College of Computing Studies', 'CCS', 'PNC Main Bldg. 2nd Floor'),
+(2001, 'College of Business, Accountancy and Administration', 'CBAA', 'PNC Main Bldg. 2nd Floor'),
+(3001, 'College of Education', 'COED', 'PNC Main Bldg. 2nd Floor'),
+(4001, 'College of Engineering', 'COE', 'PNC Main Bldg. 2nd Floor'),
+(5001, 'College of Arts and Sciences', 'CAS', 'PNC Main Bldg. 2nd Floor'),
+(6001, 'College of Health and Allied Sciences', 'CHAS', 'PNC Main Bldg. 2nd Floor');
 
 -- 1. Student Account
 INSERT INTO users (user_id, school_id, password, role, status) 
 VALUES (101, '2026-00001', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
+VALUES (104, '2026-00004', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
+VALUES (105, '2026-00005', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
 
 -- 2. Faculty Account
 INSERT INTO users (user_id, school_id, password, role, status) 
@@ -345,16 +355,20 @@ VALUES (103, '2026-00003', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQ
 
 
 
--- STEP B: INSERT MATCHING CHILD IDENTITY PROFILE TABLES
 
 -- 1. Link Student Profile (Matches John Ortiz context)
 INSERT INTO students (student_id, student_number, first_name, last_name, course, year_level, email, department_id)
-VALUES (101, 'SN-2026-00001', 'John', 'Ortiz', 'Information Technology', 3, 'ortiz@pnc.edu.ph', NULL);
+VALUES (101, '2300544', 'Alvin Matthew', 'Ortiz', 'Information Technology', 3, 'ortiz@pnc.edu.ph', 1001);
+VALUES (104, '2302494', 'Luiz Gabriel', 'Rosales', 'Information Technology', 3, 'rosales@pnc.edu.ph', 1001);
+VALUES (105, 'SN-2026-00003', 'Joaquin Aaron', 'Recio', 'Information Technology', 3, 'recio@pnc.edu.ph', 1001);
 
 -- 2. Link Faculty Profile
 INSERT INTO faculty (faculty_id, employee_id, first_name, last_name, specialization, email, department_id)
-VALUES (102, 'EMP-2026-002', 'Prof. Maria', 'Santos', 'Web and Mobile Applications', 'santos.maria@pnc.edu.ph', NULL);
+VALUES (102, 'EMP-2026-002', 'Patrick', 'Ogalesco', 'Web and Mobile Applications', 'ogalesco.maria@pnc.edu.ph', 1001);
+VALUES (106, 'EMP-2026-003', 'Marvin', 'Bicua', 'Database Management', 'bicua.maria@pnc.edu.ph', 1001);
+VALUES (107, 'EMP-2026-004', 'Janus Raymond', 'Tan', 'Backend Development', 'tan.maria@pnc.edu.ph', 1001);
 
 -- 3. Link Admin Profile
 INSERT INTO administrators (admin_id, employee_id, first_name, last_name, position, email, department_id)
-VALUES (103, 'ADM-2026-003', 'Admin', 'Superuser', 'System Registrar Office', 'admin.oams@pnc.edu.ph', NULL);
+VALUES (103, 'ADM-2026-003', 'Admin', 'Superuser', 'System Registrar Office', 'admin.oams@pnc.edu.ph', 1001);
+

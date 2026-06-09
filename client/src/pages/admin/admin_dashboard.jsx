@@ -1,33 +1,44 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from "react";
 
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from "../../context/AuthContext";
 
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from "react-router-dom";
 
-import ucLogo from '../../assets/Pnc-Logo.png';
-import oamsLogo from '../../assets/oams_logo.png';
-import ccsLogo from '../../assets/CCS.png';
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
+import ccsLogo from "../../assets/CCS.png";
 
-import './admin_dashboard.css';
-import { applyTheme, getSavedTheme } from '../../utils/theme';
+import "./admin_dashboard.css";
+import { applyTheme, getSavedTheme } from "../../utils/theme";
 
-import editIcon from '../../assets/edit_icon.png';
-import deleteIcon from '../../assets/delete_icon.png';
+import editIcon from "../../assets/edit_icon.png";
+import deleteIcon from "../../assets/delete_icon.png";
 
 // AI Chatbot Icons
 const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </svg>
 );
 
 const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <line x1="22" y1="2" x2="11" y2="13"></line>
     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
 );
-
 
 // Sidebar Icons
 const HomeIcon = () => (
@@ -101,7 +112,13 @@ const UserIcon = () => (
 );
 
 const SunIcon = () => (
-  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="sun-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="5"></circle>
     <line x1="12" y1="1" x2="12" y2="3"></line>
     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -115,28 +132,52 @@ const SunIcon = () => (
 );
 
 const MoonIcon = () => (
-  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="moon-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 
 // Dashboard Content Icons
 const ClockIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
 
 const FileTextIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
     <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
 );
 
 const UsersIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -145,7 +186,13 @@ const UsersIcon = () => (
 );
 
 const BellIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
   </svg>
@@ -153,7 +200,15 @@ const BellIcon = () => (
 
 // Admin Management Icons
 const UserManagementIcon = () => (
-  <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="tool-icon-svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     {/* User */}
     <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
     <circle cx="9" cy="7" r="4"></circle>
@@ -162,7 +217,14 @@ const UserManagementIcon = () => (
     <circle cx="19" cy="6" r="2"></circle>
 
     {/* Outer ring */}
-    <circle cx="19" cy="6" r="2.8" fill="none" stroke="currentColor" strokeWidth="1.2"></circle>
+    <circle
+      cx="19"
+      cy="6"
+      r="2.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+    ></circle>
 
     {/* Gear inner marks */}
     <path d="M19 4l1 1"></path>
@@ -172,10 +234,16 @@ const UserManagementIcon = () => (
   </svg>
 );
 
-
-
 const DataManagementIcon = () => (
-  <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="tool-icon-svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <ellipse cx="12" cy="5" rx="8" ry="3" />
     <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
     <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
@@ -187,29 +255,35 @@ const DataManagementIcon = () => (
   </svg>
 );
 
-
-
 const QueueAnalyticsIcon = () => (
   <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/>
+    <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z" />
   </svg>
 );
 
 const SyncIcon = () => (
   <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
   </svg>
 );
 
 // Quick Action Icons
 const QRCodeIcon = () => (
   <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 17h2v2h-2zM19 13h2v2h-2z"/>
+    <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 17h2v2h-2zM19 13h2v2h-2z" />
   </svg>
 );
 
 const HostQueueIcon = () => (
-  <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="tool-icon-svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -217,22 +291,41 @@ const HostQueueIcon = () => (
   </svg>
 );
 
-
 const ChevronRightIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <polyline points="9 18 15 12 9 6"></polyline>
   </svg>
 );
 
 const CheckIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
 
 const AlertIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M12 9v4"></path>
     <path d="M12 17h.01"></path>
     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -240,7 +333,13 @@ const AlertIcon = () => (
 );
 
 const PlusIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <line x1="12" y1="5" x2="12" y2="19"></line>
     <line x1="5" y1="12" x2="19" y2="12"></line>
   </svg>
@@ -252,37 +351,49 @@ export default function AdminDashboard() {
   const [messages, setMessages] = useState([
     {
       id: 1,
-      type: 'bot',
+      type: "bot",
       text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
       timestamp: new Date(),
     },
   ]);
 
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
 
-    if (lowerInput.includes('user') || lowerInput.includes('admin') || lowerInput.includes('account')) {
-      return 'You can manage user accounts from the Admin Management section (User Management). What would you like to do?';
+    if (
+      lowerInput.includes("user") ||
+      lowerInput.includes("admin") ||
+      lowerInput.includes("account")
+    ) {
+      return "You can manage user accounts from the Admin Management section (User Management). What would you like to do?";
     }
-    if (lowerInput.includes('document') || lowerInput.includes('certificate') || lowerInput.includes('approval')) {
-      return 'For document-related concerns, check Pending Requested Documents and use Documents tools from the navigation.';
+    if (
+      lowerInput.includes("document") ||
+      lowerInput.includes("certificate") ||
+      lowerInput.includes("approval")
+    ) {
+      return "For document-related concerns, check Pending Requested Documents and use Documents tools from the navigation.";
     }
-    if (lowerInput.includes('queue') || lowerInput.includes('waiting') || lowerInput.includes('host')) {
-      return 'You can review and host queues from the dashboard widgets. For queue operations, use the Queue section in the sidebar.';
+    if (
+      lowerInput.includes("queue") ||
+      lowerInput.includes("waiting") ||
+      lowerInput.includes("host")
+    ) {
+      return "You can review and host queues from the dashboard widgets. For queue operations, use the Queue section in the sidebar.";
     }
-    if (lowerInput.includes('announcement') || lowerInput.includes('notice')) {
-      return 'Use Announcement Management to create and manage announcements. Tell me what announcement you want to post.';
+    if (lowerInput.includes("announcement") || lowerInput.includes("notice")) {
+      return "Use Announcement Management to create and manage announcements. Tell me what announcement you want to post.";
     }
 
-    if (lowerInput.includes('help') || lowerInput.includes('support')) {
-      return 'I can help with user management, document approvals, queue hosting/analytics, and announcement management. What are you working on?';
+    if (lowerInput.includes("help") || lowerInput.includes("support")) {
+      return "I can help with user management, document approvals, queue hosting/analytics, and announcement management. What are you working on?";
     }
 
     return "That’s a great question. Tell me what module you’re trying to use (User Management, Data Management, Queue Analytics, or Announcements).";
@@ -290,22 +401,22 @@ export default function AdminDashboard() {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (inputValue.trim() === '') return;
+    if (inputValue.trim() === "") return;
 
     const userMessage = {
       id: messages.length + 1,
-      type: 'user',
+      type: "user",
       text: inputValue,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputValue('');
+    setInputValue("");
 
     setTimeout(() => {
       const botResponse = {
         id: messages.length + 2,
-        type: 'bot',
+        type: "bot",
         text: generateBotResponse(userMessage.text),
         timestamp: new Date(),
       };
@@ -320,153 +431,227 @@ export default function AdminDashboard() {
   // --- existing code below ---
 
   const { user: authUser, logout } = useAuth();
-  const user = authUser ?? {
-    name: 'Demo Admin',
-    role: 'admin',
-    college: 'College of Computing Studies (CCS)',
-    employeeId: 'ADM-2021-999',
-  };
+  const user = authUser
+    ? {
+        ...authUser,
+        college: authUser.departmentName ?? "N/A College",
+        employeeId: authUser.employeeId ?? "N/A Student Number",
+        departmentAbbrev: authUser.departmentAbbrev,
+      }
+    : {
+        name: "Admin",
+        role: "admin",
+        college: "",
+        employeeId: "",
+        departmentAbbrev: "",
+      };
 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
 
   useEffect(() => {
-    applyTheme(isDark ? 'dark' : 'light');
+    applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
-      applyTheme(next ? 'dark' : 'light');
+      applyTheme(next ? "dark" : "light");
       return next;
     });
   };
 
   const navItems = [
-    { icon: HomeIcon, label: 'Dashboard', path: '/admin/dashboard' },
-    { icon: QueueIconNav, label: 'Queue', path: '/admin/queue' },
-    { icon: CalendarIconNav, label: 'Appointments', path: '/admin/appointments' },
-    { icon: DocumentIconNav, label: 'Documents', path: '/admin/documents' },
-    { icon: HistoryIconNav, label: 'Transactions', path: '/admin/transactions' },
+    { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
+    { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/admin/appointments",
+    },
+    { icon: DocumentIconNav, label: "Documents", path: "/admin/documents" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/admin/transactions",
+    },
   ];
 
   const stats = [
     {
-      title: 'Active Queues',
-      value: '12',
-      description: 'Across all colleges',
+      title: "Active Queues",
+      value: "12",
+      description: "Across all colleges",
       icon: ClockIcon,
-      bgColor: 'bg-blue-50'
+      bgColor: "bg-blue-50",
     },
     {
-      title: 'Pending Documents',
-      value: '28',
-      description: 'Awaiting processing',
+      title: "Pending Documents",
+      value: "28",
+      description: "Awaiting processing",
       icon: FileTextIcon,
-      bgColor: 'bg-orange-50'
+      bgColor: "bg-orange-50",
     },
     {
-      title: 'Faculty Available',
-      value: '45',
-      description: 'Today',
+      title: "Faculty Available",
+      value: "45",
+      description: "Today",
       icon: UsersIcon,
-      bgColor: 'bg-emerald-50'
+      bgColor: "bg-emerald-50",
     },
     {
-      title: 'Announcements',
-      value: '2',
-      description: 'Published',
+      title: "Announcements",
+      value: "2",
+      description: "Published",
       icon: BellIcon,
-      bgColor: 'bg-purple-50'
+      bgColor: "bg-purple-50",
     },
   ];
 
   const adminTools = [
     {
       icon: UserManagementIcon,
-      iconColor: 'bg-orange-500',
-      title: 'User Management',
-      description: 'Manage user accounts'
+      iconColor: "bg-orange-500",
+      title: "User Management",
+      description: "Manage user accounts",
     },
     {
       icon: DataManagementIcon,
-      iconColor: 'bg-purple-500',
-      title: 'Data Management',
-      description: 'Configure settings'
+      iconColor: "bg-purple-500",
+      title: "Data Management",
+      description: "Configure settings",
     },
     {
       icon: QueueAnalyticsIcon,
-      iconColor: 'bg-blue-600',
-      title: 'Queue Analytics',
-      description: 'Performance metrics'
+      iconColor: "bg-blue-600",
+      title: "Queue Analytics",
+      description: "Performance metrics",
     },
     {
       icon: SyncIcon,
-      iconColor: 'bg-cyan-500',
-      title: 'Pinnacle Sync',
-      description: 'Data synchronization'
+      iconColor: "bg-cyan-500",
+      title: "Pinnacle Sync",
+      description: "Data synchronization",
     },
   ];
 
   const quickActions = [
     {
       icon: QRCodeIcon,
-      iconColor: 'bg-green-500',
-      title: 'Scan Document',
-      description: 'Verify QR codes and view document details'
+      iconColor: "bg-green-500",
+      title: "Scan Document",
+      description: "Verify QR codes and view document details",
     },
     {
       icon: HostQueueIcon,
-      iconColor: 'bg-blue-500',
-      title: 'Host Queue',
-      description: 'Manage and host student queues'
+      iconColor: "bg-blue-500",
+      title: "Host Queue",
+      description: "Manage and host student queues",
     },
   ];
 
   const announcements = [
     {
-      title: 'System Maintenance Notice',
-      description: 'The OAMS system will undergo scheduled maintenance on March 29, 2026, from 12:00 AM to 6:00 AM.',
-      tag: 'important',
-      date: '3/28/2026'
+      title: "System Maintenance Notice",
+      description:
+        "The OAMS system will undergo scheduled maintenance on March 29, 2026, from 12:00 AM to 6:00 AM.",
+      tag: "important",
+      date: "3/28/2026",
     },
     {
-      title: 'Enrollment Period Reminder',
-      description: 'Second Semester enrollment period: April 1-15, 2026. Please prepare all necessary documents.',
-      tag: 'reminder',
-      date: '3/25/2026'
+      title: "Enrollment Period Reminder",
+      description:
+        "Second Semester enrollment period: April 1-15, 2026. Please prepare all necessary documents.",
+      tag: "reminder",
+      date: "3/25/2026",
     },
   ];
 
   const pendingDocuments = [
-    { name: 'Juan Dela Cruz', document: 'Certificate of Grades', college: 'CCS', date: '3/28/2026', status: 'pending' },
-    { name: 'Maria Santos', document: 'Good Moral Certificate', college: 'CBAA', date: '3/29/2026', status: 'processing' },
-    { name: 'Pedro Garcia', document: 'Certificate of Enrollment', college: 'COE', date: '3/30/2026', status: 'pending' },
+    {
+      name: "Juan Dela Cruz",
+      document: "Certificate of Grades",
+      college: "CCS",
+      date: "3/28/2026",
+      status: "pending",
+    },
+    {
+      name: "Maria Santos",
+      document: "Good Moral Certificate",
+      college: "CBAA",
+      date: "3/29/2026",
+      status: "processing",
+    },
+    {
+      name: "Pedro Garcia",
+      document: "Certificate of Enrollment",
+      college: "COE",
+      date: "3/30/2026",
+      status: "pending",
+    },
   ];
 
   const hostedQueues = [
-    { name: 'Subject Enrollment', college: 'CCS', code: 'CCS-REG-044', status: 'Active', count: '5 waiting' },
-    { name: 'Payment Processing', college: 'CBAA', code: 'CBAA-CSH-025', status: 'Active', count: '8 waiting' },
-    { name: 'Document Request', college: 'COE', code: 'COE-DOC-017', status: 'Active', count: '3 waiting' },
+    {
+      name: "Subject Enrollment",
+      college: "CCS",
+      code: "CCS-REG-044",
+      status: "Active",
+      count: "5 waiting",
+    },
+    {
+      name: "Payment Processing",
+      college: "CBAA",
+      code: "CBAA-CSH-025",
+      status: "Active",
+      count: "8 waiting",
+    },
+    {
+      name: "Document Request",
+      college: "COE",
+      code: "COE-DOC-017",
+      status: "Active",
+      count: "3 waiting",
+    },
   ];
 
   const facultyAvailability = [
-    { name: 'Prof. Maria Santos', college: 'CCS', status: 'Available', time: 'Next: 10:00 AM - 11:00 AM' },
-    { name: 'Dr. Roberto Cruz', college: 'CBAA', status: 'Available', time: 'Next: 2:00 PM - 3:00 PM' },
-    { name: 'Dr. Carmen Ramos', college: 'COE', status: 'Busy', time: 'Next: 3:00 PM - 4:00 PM' },
-    { name: 'Engr. Pedro Villanueva', college: 'COE', status: 'Available', time: 'Next: 1:00 PM - 2:00 PM' },
+    {
+      name: "Prof. Maria Santos",
+      college: "CCS",
+      status: "Available",
+      time: "Next: 10:00 AM - 11:00 AM",
+    },
+    {
+      name: "Dr. Roberto Cruz",
+      college: "CBAA",
+      status: "Available",
+      time: "Next: 2:00 PM - 3:00 PM",
+    },
+    {
+      name: "Dr. Carmen Ramos",
+      college: "COE",
+      status: "Busy",
+      time: "Next: 3:00 PM - 4:00 PM",
+    },
+    {
+      name: "Engr. Pedro Villanueva",
+      college: "COE",
+      status: "Available",
+      time: "Next: 1:00 PM - 2:00 PM",
+    },
   ];
 
   return (
     <div className="admin-dashboard-with-sidebar">
       {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? 'open' : ''}`}>
+      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
           <div className="chat-container">
             <div className="chat-header">
@@ -481,7 +666,10 @@ export default function AdminDashboard() {
             </div>
             <div className="chat-messages">
               {messages.map((message) => (
-                <div key={message.id} className={`message message-${message.type}`}>
+                <div
+                  key={message.id}
+                  className={`message message-${message.type}`}
+                >
                   <div className="message-content">{message.text}</div>
                 </div>
               ))}
@@ -506,7 +694,7 @@ export default function AdminDashboard() {
           </div>
         )}
         <button
-          className={`chat-fab ${chatOpen ? 'hidden' : ''}`}
+          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
           onClick={() => setChatOpen(true)}
           aria-label="Open chat"
         >
@@ -514,19 +702,23 @@ export default function AdminDashboard() {
         </button>
       </div>
       {/* Sidebar */}
-      <aside className={`admin-dashboard-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`admin-dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-inner">
           {/* Logo Section */}
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="logo-img oams-logo-img"
+              />
             </div>
-            <button 
+            <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -544,10 +736,10 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="user-college-wrapper">
-              <p className="user-college-text">{user?.college ?? 'College of Computing Studies (CCS)'}</p>
+              <p className="user-college-text">
+                {user?.college} ({user?.departmentAbbrev})
+              </p>
             </div>
-
-
           </div>
 
           {/* Navigation */}
@@ -570,10 +762,7 @@ export default function AdminDashboard() {
 
           {/* Logout Button */}
           <div className="sidebar-logout">
-            <button 
-              className="logout-btn"
-              onClick={handleLogout}
-            >
+            <button className="logout-btn" onClick={handleLogout}>
               <LogOutIcon />
               <span>Logout</span>
             </button>
@@ -586,18 +775,22 @@ export default function AdminDashboard() {
         <div className="mobile-header-content">
           <div className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="logo-img oams-logo-img"
+            />
           </div>
           <div className="mobile-header-actions">
-            <button 
+            <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
-            <button 
+            <button
               className="sidebar-toggle"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               aria-label="Toggle sidebar"
@@ -621,11 +814,14 @@ export default function AdminDashboard() {
 
               <div className="banner-badges">
                 <div className="welcome-admin-badge">
-                  <img src={ccsLogo} alt="CCS Logo" className="welcome-admin-logo" />
+                  <img
+                    src={ccsLogo}
+                    alt="CCS Logo"
+                    className="welcome-admin-logo"
+                  />
                   <span className="badge">Administrator</span>
                 </div>
               </div>
-
             </div>
           </div>
 
@@ -652,7 +848,9 @@ export default function AdminDashboard() {
                 <AlertIcon />
                 <div className="section-title-admin-text">
                   <h2>Admin Management</h2>
-                  <p className="section-subtitle">System administration and configuration tools</p>
+                  <p className="section-subtitle">
+                    System administration and configuration tools
+                  </p>
                 </div>
               </div>
             </div>
@@ -678,7 +876,9 @@ export default function AdminDashboard() {
                 <CheckIcon />
                 <div className="section-title-admin-text">
                   <h2>Quick Actions</h2>
-                  <p className="section-subtitle">Access frequently used admin tools</p>
+                  <p className="section-subtitle">
+                    Access frequently used admin tools
+                  </p>
                 </div>
               </div>
             </div>
@@ -696,7 +896,6 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-
           </section>
 
           {/* Announcement Management Section */}
@@ -716,11 +915,19 @@ export default function AdminDashboard() {
                 <div key={idx} className="announcement-item">
                   <div className="announcement-content">
                     <h4 className="announcement-title">{announcement.title}</h4>
-                    <p className="announcement-description">{announcement.description}</p>
+                    <p className="announcement-description">
+                      {announcement.description}
+                    </p>
 
                     <div className="announcement-important-date">
-                      <span className={`announcement-tag tag-${announcement.tag}`}>{announcement.tag}</span>
-                      <span className="announcement-date">{announcement.date}</span>
+                      <span
+                        className={`announcement-tag tag-${announcement.tag}`}
+                      >
+                        {announcement.tag}
+                      </span>
+                      <span className="announcement-date">
+                        {announcement.date}
+                      </span>
                     </div>
                   </div>
 
@@ -729,17 +936,29 @@ export default function AdminDashboard() {
                       type="button"
                       className="btn-announcement-icon btn-announcement-edit"
                       aria-label={`Edit announcement: ${announcement.title}`}
-                      onClick={() => console.log('edit announcement', announcement)}
+                      onClick={() =>
+                        console.log("edit announcement", announcement)
+                      }
                     >
-                      <img className="btn-announcement-icon-img" src={editIcon} alt="" />
+                      <img
+                        className="btn-announcement-icon-img"
+                        src={editIcon}
+                        alt=""
+                      />
                     </button>
                     <button
                       type="button"
                       className="btn-announcement-icon btn-announcement-delete"
                       aria-label={`Delete announcement: ${announcement.title}`}
-                      onClick={() => console.log('delete announcement', announcement)}
+                      onClick={() =>
+                        console.log("delete announcement", announcement)
+                      }
                     >
-                      <img className="btn-announcement-icon-img" src={deleteIcon} alt="" />
+                      <img
+                        className="btn-announcement-icon-img"
+                        src={deleteIcon}
+                        alt=""
+                      />
                     </button>
                   </div>
                 </div>
@@ -753,7 +972,9 @@ export default function AdminDashboard() {
             <section className="pending-documents-section">
               <div className="card-header-admin">
                 <h3>Pending Requested Documents</h3>
-                <a href="#" className="view-all-link">View All <ChevronRightIcon /></a>
+                <a href="#" className="view-all-link">
+                  View All <ChevronRightIcon />
+                </a>
               </div>
               <div className="documents-list">
                 {pendingDocuments.map((doc, idx) => (
@@ -761,12 +982,18 @@ export default function AdminDashboard() {
                     <div className="document-info">
                       <p className="document-name">{doc.name}</p>
                       <p className="document-type">{doc.document}</p>
-<div className="document-meta-row">
-                        <span className={`document-college college-${doc.college}`}>{doc.college}</span>
+                      <div className="document-meta-row">
+                        <span
+                          className={`document-college college-${doc.college}`}
+                        >
+                          {doc.college}
+                        </span>
                         <span className="document-date">{doc.date}</span>
                       </div>
                     </div>
-                    <span className={`document-badge badge-${doc.status}`}>{doc.status}</span>
+                    <span className={`document-badge badge-${doc.status}`}>
+                      {doc.status}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -776,18 +1003,28 @@ export default function AdminDashboard() {
             <section className="hosted-queues-section">
               <div className="card-header-admin">
                 <h3>Current Hosted Queues</h3>
-                <a href="#" className="view-all-link">Manage <ChevronRightIcon /></a>
+                <a href="#" className="view-all-link">
+                  Manage <ChevronRightIcon />
+                </a>
               </div>
-              <p className="section-desc">Active queues across all departments</p>
+              <p className="section-desc">
+                Active queues across all departments
+              </p>
               <div className="queues-list">
                 {hostedQueues.map((queue, idx) => (
                   <div key={idx} className="queue-item">
                     <div className="queue-info">
                       <p className="queue-name">{queue.name}</p>
-                      <p className="queue-code">{queue.college} • {queue.code}</p>
+                      <p className="queue-code">
+                        {queue.college} • {queue.code}
+                      </p>
                     </div>
                     <div className="queue-status-info">
-                      <span className={`queue-badge badge-${queue.status.toLowerCase()}`}>{queue.status}</span>
+                      <span
+                        className={`queue-badge badge-${queue.status.toLowerCase()}`}
+                      >
+                        {queue.status}
+                      </span>
                       <span className="queue-count">{queue.count}</span>
                     </div>
                   </div>
@@ -800,12 +1037,16 @@ export default function AdminDashboard() {
           <section className="faculty-availability-section">
             <div className="card-header-admin">
               <h3>Faculty Availability Today</h3>
-              <a href="#" className="view-all-link">View All Faculty <ChevronRightIcon /></a>
+              <a href="#" className="view-all-link">
+                View All Faculty <ChevronRightIcon />
+              </a>
             </div>
             <div className="faculty-grid">
               {facultyAvailability.map((faculty, idx) => (
                 <div key={idx} className="faculty-card">
-                  <div className={`faculty-indicator ${faculty.status.toLowerCase()}`}></div>
+                  <div
+                    className={`faculty-indicator ${faculty.status.toLowerCase()}`}
+                  ></div>
                   <p className="faculty-name">{faculty.name}</p>
                   <p className="faculty-college">{faculty.college}</p>
                   <p className="faculty-time">{faculty.time}</p>

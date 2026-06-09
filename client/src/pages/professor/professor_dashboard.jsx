@@ -236,13 +236,16 @@ export default function ProfessorDashboard() {
   const user = authUser
     ? {
         ...authUser,
-        college: authUser.departmentName ?? "College of Computing Studies",
+        college: authUser.departmentName ?? "N/A College",
+        employeeId: authUser.employeeId ?? "N/A Student Number",
+        departmentAbbrev: authUser.departmentAbbrev,
       }
     : {
-        name: "Student",
-        role: "student",
-        college: "College of Computing Studies",
-        studentId: "",
+        name: "Faculty",
+        role: "faculty",
+        college: "",
+        employeeId: "",
+        departmentAbbrev: "",
       };
 
   const navigate = useNavigate();
@@ -536,19 +539,15 @@ export default function ProfessorDashboard() {
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
               <p className="banner-greeting">
-                Welcome back, {user?.name?.split(" ")[0]}! 👋
+                Welcome back, Prof. {user?.name?.split(" ")[0]}! 👋
               </p>
               <div className="banner-title-row">
                 <img src={ccsLogo} alt="CCS Logo" className="banner-ccs-logo" />
-                <h1 className="banner-title">
-                  {user?.college ?? "College of Computing Studies"}
-                </h1>
+                <h1 className="banner-title">{user?.college ?? ""}</h1>
               </div>
               <div className="banner-badges">
                 <span className="badge">Professor Portal</span>
-                <span className="badge">
-                  {user?.employeeId ?? "EMP-2020-000"}
-                </span>
+                <span className="badge">{user?.employeeId ?? ""}</span>
               </div>
             </div>
           </div>

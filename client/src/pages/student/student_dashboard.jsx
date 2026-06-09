@@ -311,15 +311,19 @@ export default function StudentDashboard() {
   const user = authUser
     ? {
         ...authUser,
-        college: authUser.course ?? "College of Computing Studies",
+        college: authUser.departmentName ?? "N/A College",
         studentNumber: authUser.studentNumber ?? "N/A Student Number",
+        departmentAbbrev: authUser.departmentAbbrev ?? "N/A Abbreviation",
+        course: authUser.course ?? "N/A Course",
       }
     : {
         name: "Student",
         role: "student",
-        college: "College of Computing Studies",
+        college: "",
         studentId: "",
         studentNumber: "N/A Student Number",
+        departmentAbbrev: "",
+        course: "",
       };
   const { getActiveQueues } = useQueue();
 
@@ -609,7 +613,7 @@ export default function StudentDashboard() {
 
             <div className="user-college-wrapper">
               <p className="user-college-text">
-                {user?.college ?? "College of Computing Studies"}
+                {user?.college} ({user?.departmentAbbrev})
               </p>
             </div>
           </div>

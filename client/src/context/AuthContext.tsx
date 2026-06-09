@@ -19,6 +19,7 @@ type UserData = {
   lastName: string;
   email: string;
   departmentName?: string;
+  departmentAbbrev?: string;
   studentNumber?: string;
   course?: string;
   yearLevel?: number;
@@ -81,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             name: `${raw.first_name} ${raw.last_name}`,
             email: raw.email,
             departmentName: raw.department_name ?? undefined,
+            departmentAbbrev: raw.department_abbreviation ?? undefined,
             studentNumber: raw.student_number ?? undefined,
             course: raw.course ?? undefined,
             yearLevel: raw.year_level ?? undefined,
@@ -119,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: `${raw.first_name} ${raw.last_name}`, // ← dashboards use user.name
         email: raw.email,
         departmentName: raw.department_name ?? undefined,
+        departmentAbbrev: raw.department_abbreviation ?? undefined,
         studentNumber: raw.student_number ?? undefined,
         course: raw.course ?? undefined,
         yearLevel: raw.year_level ?? undefined,
