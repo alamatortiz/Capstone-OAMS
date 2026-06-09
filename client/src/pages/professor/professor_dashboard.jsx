@@ -1,14 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from "react";
 
-import { useAuth } from '../../context/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from "../../context/AuthContext";
+import { Link, useNavigate } from "react-router-dom";
 
-import ucLogo from '../../assets/Pnc-Logo.png';
-import oamsLogo from '../../assets/oams_logo.png';
-import ccsLogo from '../../assets/CCS.png';
-import './professor_dashboard.css';
-import { applyTheme, getSavedTheme } from '../../utils/theme';
-
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
+import ccsLogo from "../../assets/CCS.png";
+import "./professor_dashboard.css";
+import { applyTheme, getSavedTheme } from "../../utils/theme";
 
 // Sidebar Icons
 const HomeIcon = () => (
@@ -82,7 +81,13 @@ const UserIcon = () => (
 );
 
 const SunIcon = () => (
-  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="sun-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="5"></circle>
     <line x1="12" y1="1" x2="12" y2="3"></line>
     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -96,14 +101,26 @@ const SunIcon = () => (
 );
 
 const MoonIcon = () => (
-  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="moon-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 
 // Dashboard Content Icons
 const CalendarIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
     <line x1="16" y1="2" x2="16" y2="6"></line>
     <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -112,7 +129,13 @@ const CalendarIcon = () => (
 );
 
 const UsersIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -121,48 +144,88 @@ const UsersIcon = () => (
 );
 
 const FileTextIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
     <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
 );
 
 const CheckCircleIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
 
 const ChevronRightIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <polyline points="9 18 15 12 9 6"></polyline>
   </svg>
 );
 
 const ClockIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
 
-
-
 const ActivityIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
   </svg>
 );
 
 const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </svg>
 );
 
 const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <line x1="22" y1="2" x2="11" y2="13"></line>
     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
@@ -170,31 +233,36 @@ const SendIcon = () => (
 
 export default function ProfessorDashboard() {
   const { user: authUser, logout } = useAuth();
-  const user = authUser ?? {
-    name: 'John Doe II',
-    role: 'professor',
-    college: 'College of Computing Studies (CCS)',
-    employeeId: 'EMP-2020-0000',
-  };
+  const user = authUser
+    ? {
+        ...authUser,
+        college: authUser.departmentName ?? "College of Computing Studies",
+      }
+    : {
+        name: "Student",
+        role: "student",
+        college: "College of Computing Studies",
+        studentId: "",
+      };
 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
 
   const [messages, setMessages] = useState([
     {
       id: 1,
-      type: 'bot',
-      text: 'Hello! 👋 I\'m your OAMS Assistant. How can I help you today?',
-      timestamp: new Date()
-    }
+      type: "bot",
+      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
+      timestamp: new Date(),
+    },
   ]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -202,167 +270,180 @@ export default function ProfessorDashboard() {
   }, [messages]);
 
   useEffect(() => {
-    applyTheme(isDark ? 'dark' : 'light');
+    applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
-
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (inputValue.trim() === '') return;
+    if (inputValue.trim() === "") return;
 
     const userMessage = {
       id: messages.length + 1,
-      type: 'user',
+      type: "user",
       text: inputValue,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
     setMessages([...messages, userMessage]);
-    setInputValue('');
+    setInputValue("");
 
     setTimeout(() => {
       const botResponse = {
         id: messages.length + 2,
-        type: 'bot',
+        type: "bot",
         text: generateBotResponse(inputValue),
-        timestamp: new Date()
+        timestamp: new Date(),
       };
-      setMessages(prev => [...prev, botResponse]);
+      setMessages((prev) => [...prev, botResponse]);
     }, 600);
   };
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
-    
-    if (lowerInput.includes('appointment')) {
-      return 'You have 8 pending appointments, with 3 scheduled for today. Visit the Appointments section to manage them.';
-    } else if (lowerInput.includes('student')) {
-      return 'You currently have 15 student requests awaiting your response. Check the Appointments section for more details.';
-    } else if (lowerInput.includes('document')) {
-      return 'You have 6 documents pending review. Visit the Documents section to review and approve them.';
-    } else if (lowerInput.includes('schedule') || lowerInput.includes('office hours')) {
-      return 'Your office hours are Monday to Friday, 8:00 AM - 5:00 PM, and Saturday 8:00 AM - 12:00 PM. You can view all details in the Dashboard.';
-    } else if (lowerInput.includes('help') || lowerInput.includes('support')) {
-      return 'I can help you with appointment management, student requests, document reviews, and office hours. What would you like assistance with?';
+
+    if (lowerInput.includes("appointment")) {
+      return "You have 8 pending appointments, with 3 scheduled for today. Visit the Appointments section to manage them.";
+    } else if (lowerInput.includes("student")) {
+      return "You currently have 15 student requests awaiting your response. Check the Appointments section for more details.";
+    } else if (lowerInput.includes("document")) {
+      return "You have 6 documents pending review. Visit the Documents section to review and approve them.";
+    } else if (
+      lowerInput.includes("schedule") ||
+      lowerInput.includes("office hours")
+    ) {
+      return "Your office hours are Monday to Friday, 8:00 AM - 5:00 PM, and Saturday 8:00 AM - 12:00 PM. You can view all details in the Dashboard.";
+    } else if (lowerInput.includes("help") || lowerInput.includes("support")) {
+      return "I can help you with appointment management, student requests, document reviews, and office hours. What would you like assistance with?";
     } else {
-      return 'That\'s a great question! For more detailed assistance, please visit the respective section or contact the OAMS support team.';
+      return "That's a great question! For more detailed assistance, please visit the respective section or contact the OAMS support team.";
     }
   };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
-      applyTheme(next ? 'dark' : 'light');
+      applyTheme(next ? "dark" : "light");
       return next;
     });
   };
 
-
   const navItems = [
-    { icon: HomeIcon, label: 'Dashboard', path: '/professor/dashboard' },
-    { icon: QueueIconNav, label: 'Queue', path: '/professor/queue' },
-    { icon: CalendarIconNav, label: 'Appointments', path: '/professor/appointments' },
-    { icon: DocumentIconNav, label: 'Documents', path: '/professor/documents' },
-    { icon: HistoryIconNav, label: 'Transactions', path: '/professor/transactions' },
+    { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
+    { icon: QueueIconNav, label: "Queue", path: "/professor/queue" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/professor/appointments",
+    },
+    { icon: DocumentIconNav, label: "Documents", path: "/professor/documents" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/professor/transactions",
+    },
   ];
 
   const stats = [
     {
-      title: 'Pending Appointments',
-      value: '8',
-      description: '3 for today',
+      title: "Pending Appointments",
+      value: "8",
+      description: "3 for today",
       icon: CalendarIcon,
-      bgColor: 'bg-blue-50',
-      link: '/professor/appointments'
+      bgColor: "bg-blue-50",
+      link: "/professor/appointments",
     },
     {
-      title: 'Student Requests',
-      value: '15',
-      description: 'Awaiting response',
+      title: "Student Requests",
+      value: "15",
+      description: "Awaiting response",
       icon: UsersIcon,
-      bgColor: 'bg-emerald-50',
-      link: '/professor/appointments'
+      bgColor: "bg-emerald-50",
+      link: "/professor/appointments",
     },
     {
-      title: 'Documents',
-      value: '6',
-      description: 'To review',
+      title: "Documents",
+      value: "6",
+      description: "To review",
       icon: FileTextIcon,
-      bgColor: 'bg-orange-50',
-      link: '/professor/documents'
+      bgColor: "bg-orange-50",
+      link: "/professor/documents",
     },
     {
-      title: 'Completed',
-      value: '47',
-      description: 'This month',
+      title: "Completed",
+      value: "47",
+      description: "This month",
       icon: CheckCircleIcon,
-      bgColor: 'bg-purple-50',
-      link: '/professor/transactions'
+      bgColor: "bg-purple-50",
+      link: "/professor/transactions",
     },
   ];
 
   const upcomingAppointments = [
     {
       id: 1,
-      student: 'Juan Dela Cruz',
-      purpose: 'Thesis consultation',
-      time: 'Today, 2:00 PM',
-      status: 'confirmed'
+      student: "Juan Dela Cruz",
+      purpose: "Thesis consultation",
+      time: "Today, 2:00 PM",
+      status: "confirmed",
     },
     {
       id: 2,
-      student: 'Maria Santos',
-      purpose: 'Grade inquiry',
-      time: 'Today, 3:30 PM',
-      status: 'confirmed'
+      student: "Maria Santos",
+      purpose: "Grade inquiry",
+      time: "Today, 3:30 PM",
+      status: "confirmed",
     },
     {
       id: 3,
-      student: 'Pedro Garcia',
-      purpose: 'Academic advising',
-      time: 'Tomorrow, 10:00 AM',
-      status: 'pending'
+      student: "Pedro Garcia",
+      purpose: "Academic advising",
+      time: "Tomorrow, 10:00 AM",
+      status: "pending",
     },
   ];
 
   const recentActivity = [
     {
       id: 1,
-      title: 'New appointment request from Maria Santos',
-      dot: 'dot-green'
+      title: "New appointment request from Maria Santos",
+      dot: "dot-green",
     },
     {
       id: 2,
-      title: 'Document submitted for review',
-      dot: 'dot-blue'
+      title: "Document submitted for review",
+      dot: "dot-blue",
     },
     {
       id: 3,
-      title: 'Appointment completed with Juan Dela Cruz',
-      dot: 'dot-purple'
+      title: "Appointment completed with Juan Dela Cruz",
+      dot: "dot-purple",
     },
   ];
 
   return (
     <div className="dashboard-with-sidebar">
       {/* Sidebar */}
-      <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-inner">
           {/* Logo Section */}
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="logo-img oams-logo-img"
+              />
             </div>
-            <button 
+            <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -376,12 +457,14 @@ export default function ProfessorDashboard() {
               </div>
 
               <div className="user-info-content">
-                <p className="user-name-large">John Doe II</p>
+                <p className="user-name-large">{user.name ?? "Professor"}</p>
                 <span className="user-role-badge">Professor</span>
               </div>
             </div>
             <div className="user-college-wrapper">
-              <p className="user-college-text">{user?.college ?? 'College of Computing Studies (CCS)'}</p>
+              <p className="user-college-text">
+                {user?.college ?? "College of Computing Studies (CCS)"}
+              </p>
             </div>
           </div>
 
@@ -405,10 +488,7 @@ export default function ProfessorDashboard() {
 
           {/* Logout Button */}
           <div className="sidebar-logout">
-            <button 
-              className="logout-btn"
-              onClick={handleLogout}
-            >
+            <button className="logout-btn" onClick={handleLogout}>
               <LogOutIcon />
               <span>Logout</span>
             </button>
@@ -421,18 +501,22 @@ export default function ProfessorDashboard() {
         <div className="mobile-header-content">
           <div className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="logo-img oams-logo-img"
+            />
           </div>
           <div className="mobile-header-actions">
-            <button 
+            <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
-            <button 
+            <button
               className="sidebar-toggle"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               aria-label="Toggle sidebar"
@@ -451,14 +535,20 @@ export default function ProfessorDashboard() {
             <div className="banner-backdrop banner-backdrop-1"></div>
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
-              <p className="banner-greeting">Welcome back, {user?.name?.split(' ')[0]}! 👋</p>
+              <p className="banner-greeting">
+                Welcome back, {user?.name?.split(" ")[0]}! 👋
+              </p>
               <div className="banner-title-row">
                 <img src={ccsLogo} alt="CCS Logo" className="banner-ccs-logo" />
-                <h1 className="banner-title">{user?.college ?? 'John Doe II'}</h1>
+                <h1 className="banner-title">
+                  {user?.college ?? "College of Computing Studies"}
+                </h1>
               </div>
               <div className="banner-badges">
                 <span className="badge">Professor Portal</span>
-                <span className="badge">{user?.employeeId ?? 'EMP-2020-000'}</span>
+                <span className="badge">
+                  {user?.employeeId ?? "EMP-2020-000"}
+                </span>
               </div>
             </div>
           </div>
@@ -492,21 +582,39 @@ export default function ProfessorDashboard() {
             </div>
             <div className="appointments-card">
               <div className="appointments-list">
-                {upcomingAppointments.filter(apt => apt.time.includes('Today')).map((apt) => (
-                  <div key={apt.id} className="appointment-item">
-                    <div className="appointment-icon">
-                      <UsersIcon />
+                {upcomingAppointments
+                  .filter((apt) => apt.time.includes("Today"))
+                  .map((apt) => (
+                    <div key={apt.id} className="appointment-item">
+                      <div className="appointment-icon">
+                        <UsersIcon />
+                      </div>
+                      <div className="appointment-details">
+                        <p
+                          className="appointment-student"
+                          style={{ textAlign: "justify" }}
+                        >
+                          {apt.student}
+                        </p>
+                        <p
+                          className="appointment-purpose"
+                          style={{ textAlign: "justify" }}
+                        >
+                          {apt.purpose}
+                        </p>
+                      </div>
+                      <div className="appointment-time-status">
+                        <p className="appointment-time">
+                          {apt.time.split(", ")[1]}
+                        </p>
+                        <span
+                          className={`appointment-badge status-${apt.status}`}
+                        >
+                          {apt.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="appointment-details">
-                      <p className="appointment-student" style={{ textAlign: 'justify' }}>{apt.student}</p>
-                      <p className="appointment-purpose" style={{ textAlign: 'justify' }}>{apt.purpose}</p>
-                    </div>
-                    <div className="appointment-time-status">
-                      <p className="appointment-time">{apt.time.split(', ')[1]}</p>
-                      <span className={`appointment-badge status-${apt.status}`}>{apt.status}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </section>
@@ -544,11 +652,17 @@ export default function ProfessorDashboard() {
               <div className="hours-grid">
                 <div>
                   <p className="hours-label">Weekdays</p>
-                  <p className="hours-time">Monday – Friday: 8:00 AM – 5:00 PM</p>
+                  <p className="hours-time">
+                    Monday – Friday: 8:00 AM – 5:00 PM
+                  </p>
                 </div>
                 <div>
                   <p className="hours-label">Weekend</p>
-                  <p className="hours-time">Saturday: 8:00 AM – 12:00 PM<br />Sunday: Closed</p>
+                  <p className="hours-time">
+                    Saturday: 8:00 AM – 12:00 PM
+                    <br />
+                    Sunday: Closed
+                  </p>
                 </div>
               </div>
             </div>
@@ -565,13 +679,13 @@ export default function ProfessorDashboard() {
       )}
 
       {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? 'open' : ''}`}>
+      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
           <div className="chat-container">
             <div className="chat-header">
               <h3>OAMS Assistant</h3>
-              <button 
-                className="chat-close-btn" 
+              <button
+                className="chat-close-btn"
                 onClick={() => setChatOpen(false)}
                 aria-label="Close chat"
               >
@@ -580,10 +694,11 @@ export default function ProfessorDashboard() {
             </div>
             <div className="chat-messages">
               {messages.map((message) => (
-                <div key={message.id} className={`message message-${message.type}`}>
-                  <div className="message-content">
-                    {message.text}
-                  </div>
+                <div
+                  key={message.id}
+                  className={`message message-${message.type}`}
+                >
+                  <div className="message-content">{message.text}</div>
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -596,8 +711,8 @@ export default function ProfessorDashboard() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="chat-send-btn"
                 aria-label="Send message"
               >
@@ -606,8 +721,8 @@ export default function ProfessorDashboard() {
             </form>
           </div>
         )}
-        <button 
-          className={`chat-fab ${chatOpen ? 'hidden' : ''}`}
+        <button
+          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
           onClick={() => setChatOpen(true)}
           aria-label="Open chat"
         >

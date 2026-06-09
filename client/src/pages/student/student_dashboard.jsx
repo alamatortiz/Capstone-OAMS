@@ -1,16 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from "react";
 
-import { useAuth } from '../../context/AuthContext';
-import { useQueue } from '../../contexts/QueueContext';
+import { useAuth } from "../../context/AuthContext";
+import { useQueue } from "../../contexts/QueueContext";
 
-import { Link, useNavigate } from 'react-router-dom';
-import { getCollegeLogo } from '../../data/collegeLogo';
+import { Link, useNavigate } from "react-router-dom";
+import { getCollegeLogo } from "../../data/collegeLogo";
 
-import ucLogo from '../../assets/Pnc-Logo.png';
-import oamsLogo from '../../assets/oams_logo.png';
-import ccsLogo from '../../assets/CCS.png';
-import './student_dashboard.css';
-import { applyTheme, getSavedTheme } from '../../utils/theme';
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
+import ccsLogo from "../../assets/CCS.png";
+import "./student_dashboard.css";
+import { applyTheme, getSavedTheme } from "../../utils/theme";
 
 // Sidebar Icons
 const HomeIcon = () => (
@@ -84,7 +84,13 @@ const UserIcon = () => (
 );
 
 const SunIcon = () => (
-  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="sun-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="5"></circle>
     <line x1="12" y1="1" x2="12" y2="3"></line>
     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -98,21 +104,39 @@ const SunIcon = () => (
 );
 
 const MoonIcon = () => (
-  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="moon-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 
 // Dashboard Content Icons
 const ClockIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
 
 const CalendarIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
     <line x1="16" y1="2" x2="16" y2="6"></line>
     <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -121,44 +145,80 @@ const CalendarIcon = () => (
 );
 
 const FileTextIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
     <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
 );
 
 const CheckCircleIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
 
 const ChevronRightIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <polyline points="9 18 15 12 9 6"></polyline>
   </svg>
 );
 
 const AlertCircleIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="12" y1="8" x2="12" y2="12"></line>
     <line x1="12" y1="16" x2="12.01" y2="16"></line>
   </svg>
 );
 
-
-
 const BellIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
   </svg>
 );
 
 const ListIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <line x1="8" y1="6" x2="21" y2="6"></line>
     <line x1="8" y1="12" x2="21" y2="12"></line>
     <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -169,20 +229,38 @@ const ListIcon = () => (
 );
 
 const ActivityIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
   </svg>
 );
 
 const GraduationCapIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21.21 15.89A10 10 0 1 1 8.11 2.05"></path>
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
 
 const TimerIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="13" r="8"></circle>
     <path d="M12 9v4l3 2"></path>
     <path d="M7 2h10"></path>
@@ -190,20 +268,38 @@ const TimerIcon = () => (
 );
 
 const MegaphoneIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
     <polyline points="9 22 9 12 15 12 15 22"></polyline>
   </svg>
 );
 
 const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </svg>
 );
 
 const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <line x1="22" y1="2" x2="11" y2="13"></line>
     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
@@ -212,35 +308,42 @@ const SendIcon = () => (
 export default function StudentDashboard() {
   // Demo fallback data (for UI testing without depending on Auth backend values)
   const { user: authUser, logout } = useAuth();
-  const user = authUser ?? {
-    name: 'John Doe',
-    role: 'student',
-    college: 'College of Computing Studies (CCS)',
-    studentId: '2300000',
-  };
+  const user = authUser
+    ? {
+        ...authUser,
+        college: authUser.course ?? "College of Computing Studies",
+        studentNumber: authUser.studentNumber ?? "N/A Student Number",
+      }
+    : {
+        name: "Student",
+        role: "student",
+        college: "College of Computing Studies",
+        studentId: "",
+        studentNumber: "N/A Student Number",
+      };
   const { getActiveQueues } = useQueue();
 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
 
   const [messages, setMessages] = useState([
     {
       id: 1,
-      type: 'bot',
-      text: 'Hello! 👋 I\'m your OAMS Assistant. How can I help you today?',
-      timestamp: new Date()
-    }
+      type: "bot",
+      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
+      timestamp: new Date(),
+    },
   ]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
   const activeQueues = getActiveQueues();
   const mostRecentQueue = activeQueues[0];
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -248,193 +351,244 @@ export default function StudentDashboard() {
   }, [messages]);
 
   useEffect(() => {
-    applyTheme(isDark ? 'dark' : 'light');
+    applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
-
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (inputValue.trim() === '') return;
+    if (inputValue.trim() === "") return;
 
     const userMessage = {
       id: messages.length + 1,
-      type: 'user',
+      type: "user",
       text: inputValue,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
     setMessages([...messages, userMessage]);
-    setInputValue('');
+    setInputValue("");
 
     setTimeout(() => {
       const botResponse = {
         id: messages.length + 2,
-        type: 'bot',
+        type: "bot",
         text: generateBotResponse(inputValue),
-        timestamp: new Date()
+        timestamp: new Date(),
       };
-      setMessages(prev => [...prev, botResponse]);
+      setMessages((prev) => [...prev, botResponse]);
     }, 600);
   };
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
-    
-    if (lowerInput.includes('queue') || lowerInput.includes('position')) {
-      return mostRecentQueue 
+
+    if (lowerInput.includes("queue") || lowerInput.includes("position")) {
+      return mostRecentQueue
         ? `You're currently at position ${mostRecentQueue.position} in the ${mostRecentQueue.service} queue. Estimated wait time is ${mostRecentQueue.estimatedWaitTime}.`
-        : 'You don\'t have any active queues. Would you like to join one?';
-    } else if (lowerInput.includes('appointment')) {
-      return 'You have 2 upcoming appointments this week. Visit the Appointments section to view or schedule more.';
-    } else if (lowerInput.includes('document')) {
-      return 'You have 5 documents on file, with 2 pending approval. Check your Documents section for details.';
-    } else if (lowerInput.includes('service') || lowerInput.includes('help')) {
-      return 'I can help you with queue information, appointments, documents, announcements, and more. What would you like to know?';
+        : "You don't have any active queues. Would you like to join one?";
+    } else if (lowerInput.includes("appointment")) {
+      return "You have 2 upcoming appointments this week. Visit the Appointments section to view or schedule more.";
+    } else if (lowerInput.includes("document")) {
+      return "You have 5 documents on file, with 2 pending approval. Check your Documents section for details.";
+    } else if (lowerInput.includes("service") || lowerInput.includes("help")) {
+      return "I can help you with queue information, appointments, documents, announcements, and more. What would you like to know?";
     } else {
-      return 'That\'s a great question! For more detailed assistance, please visit the respective section in the dashboard or contact your college office.';
+      return "That's a great question! For more detailed assistance, please visit the respective section in the dashboard or contact your college office.";
     }
   };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
-      applyTheme(next ? 'dark' : 'light');
+      applyTheme(next ? "dark" : "light");
       return next;
     });
   };
 
-
   const navItems = [
-    { icon: HomeIcon, label: 'Dashboard', path: '/student/dashboard' },
-    { icon: QueueIconNav, label: 'Queue', path: '/student/queue' },
-    { icon: CalendarIconNav, label: 'Appointments', path: '/student/appointments' },
-    { icon: DocumentIconNav, label: 'Documents', path: '/student/documents' },
-    { icon: HistoryIconNav, label: 'Transactions', path: '/student/transactions' },
+    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/student/appointments",
+    },
+    { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/student/transactions",
+    },
   ];
 
   const stats = [
-    { 
-      title: 'Queue Position', 
-      value: mostRecentQueue ? String(mostRecentQueue.position) : '0',
-      description: activeQueues.length > 0 ? `Waiting in ${activeQueues.length} queue${activeQueues.length > 1 ? 's' : ''}` : 'No active queues',
+    {
+      title: "Queue Position",
+      value: mostRecentQueue ? String(mostRecentQueue.position) : "0",
+      description:
+        activeQueues.length > 0
+          ? `Waiting in ${activeQueues.length} queue${activeQueues.length > 1 ? "s" : ""}`
+          : "No active queues",
       icon: ClockIcon,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 dark:bg-blue-950',
-      link: '/student/queue-status' 
+      color: "text-blue-600",
+      bgColor: "bg-blue-50 dark:bg-blue-950",
+      link: "/student/queue-status",
     },
-    { 
-      title: 'Appointments',
-      value: '2',
-      description: 'Upcoming this week',
+    {
+      title: "Appointments",
+      value: "2",
+      description: "Upcoming this week",
       icon: CalendarIcon,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950',
-      link: '/student/appointments' 
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50 dark:bg-emerald-950",
+      link: "/student/appointments",
     },
-    { 
-      title: 'Documents',
-      value: '5',
-      description: '2 pending approval',
+    {
+      title: "Documents",
+      value: "5",
+      description: "2 pending approval",
       icon: FileTextIcon,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50 dark:bg-orange-950',
-      link: '/student/documents' 
+      color: "text-orange-600",
+      bgColor: "bg-orange-50 dark:bg-orange-950",
+      link: "/student/documents",
     },
-    { 
-      title: 'Completed',
-      value: '12',
-      description: 'Total transactions',
+    {
+      title: "Completed",
+      value: "12",
+      description: "Total transactions",
       icon: CheckCircleIcon,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50 dark:bg-purple-950',
-      link: '/student/transactions' 
+      color: "text-purple-600",
+      bgColor: "bg-purple-50 dark:bg-purple-950",
+      link: "/student/transactions",
     },
   ];
 
   const quickActions = [
     {
-      title: 'Avail Service',
-      description: 'Browse available office services and join a queue instantly.',
+      title: "Avail Service",
+      description:
+        "Browse available office services and join a queue instantly.",
       icon: ListIcon,
-      link: '/student/avail-service',
-      gradient: 'from-emerald-500 to-green-600',
-      badge: '6 Services',
+      link: "/student/avail-service",
+      gradient: "from-emerald-500 to-green-600",
+      badge: "6 Services",
     },
     {
-      title: 'Queue Tracking',
-      description: 'View detailed analytics and history of all your queue activities.',
+      title: "Queue Tracking",
+      description:
+        "View detailed analytics and history of all your queue activities.",
       icon: ActivityIcon,
-      link: '/student/queue-tracking',
-      gradient: 'from-cyan-500 to-blue-600',
-      badge: 'Analytics',
+      link: "/student/queue-tracking",
+      gradient: "from-cyan-500 to-blue-600",
+      badge: "Analytics",
     },
     {
-      title: 'Appointment Booking',
-      description: 'Schedule appointments with professors and view available slots.',
+      title: "Appointment Booking",
+      description:
+        "Schedule appointments with professors and view available slots.",
       icon: CalendarIcon,
-      link: '/student/appointment-booking',
-      gradient: 'from-indigo-500 to-purple-600',
-      badge: 'New Slots',
+      link: "/student/appointment-booking",
+      gradient: "from-indigo-500 to-purple-600",
+      badge: "New Slots",
     },
     {
-      title: 'Announcements',
-      description: 'Stay updated with the latest notices from all colleges.',
+      title: "Announcements",
+      description: "Stay updated with the latest notices from all colleges.",
       icon: MegaphoneIcon,
-      link: '/student/announcements',
-      gradient: 'from-violet-500 to-purple-600',
-      badge: '2 Pinned',
+      link: "/student/announcements",
+      gradient: "from-violet-500 to-purple-600",
+      badge: "2 Pinned",
     },
     {
-      title: 'Professor Schedules',
-      description: 'Check faculty consultation hours and room availability.',
+      title: "Professor Schedules",
+      description: "Check faculty consultation hours and room availability.",
       icon: GraduationCapIcon,
-      link: '/student/professor-schedules',
-      gradient: 'from-sky-500 to-blue-600',
-      badge: '13 Faculty',
+      link: "/student/professor-schedules",
+      gradient: "from-sky-500 to-blue-600",
+      badge: "13 Faculty",
     },
     {
-      title: 'View Queue Status',
-      description: 'Track your real-time position across all active queues.',
+      title: "View Queue Status",
+      description: "Track your real-time position across all active queues.",
       icon: TimerIcon,
-      link: '/student/queue-status',
-      gradient: 'from-rose-500 to-pink-600',
+      link: "/student/queue-status",
+      gradient: "from-rose-500 to-pink-600",
       badge: `${activeQueues.length} Active`,
     },
   ];
 
   const pinnedAnnouncements = [
-    { id: '1', title: 'Enrollment Period for Second Semester', college: 'College of Computing Studies (CCS)', date: '2026-03-25' },
-    { id: '2', title: 'System Maintenance Notice', college: 'All Departments', date: '2026-03-26' },
+    {
+      id: "1",
+      title: "Enrollment Period for Second Semester",
+      college: "College of Computing Studies (CCS)",
+      date: "2026-03-25",
+    },
+    {
+      id: "2",
+      title: "System Maintenance Notice",
+      college: "All Departments",
+      date: "2026-03-26",
+    },
   ];
 
   const recentActivity = [
-    { id: 1, type: 'queue', title: 'Joined Queue at Registrar', time: '10 minutes ago', status: 'active', college: 'College of Computing Studies' },
-    { id: 2, type: 'appointment', title: 'Appointment with Prof. Santos', time: 'Tomorrow, 2:00 PM', status: 'confirmed', college: 'College of Computing Studies' },
-    { id: 3, type: 'document', title: 'Good Moral Certificate', time: '2 days ago', status: 'processing', college: 'College of Computing Studies' },
+    {
+      id: 1,
+      type: "queue",
+      title: "Joined Queue at Registrar",
+      time: "10 minutes ago",
+      status: "active",
+      college: "College of Computing Studies",
+    },
+    {
+      id: 2,
+      type: "appointment",
+      title: "Appointment with Prof. Santos",
+      time: "Tomorrow, 2:00 PM",
+      status: "confirmed",
+      college: "College of Computing Studies",
+    },
+    {
+      id: 3,
+      type: "document",
+      title: "Good Moral Certificate",
+      time: "2 days ago",
+      status: "processing",
+      college: "College of Computing Studies",
+    },
   ];
 
-  const queueProgress = mostRecentQueue ? ((mostRecentQueue.totalInQueue - mostRecentQueue.position) / mostRecentQueue.totalInQueue) * 100 : 0;
+  const queueProgress = mostRecentQueue
+    ? ((mostRecentQueue.totalInQueue - mostRecentQueue.position) /
+        mostRecentQueue.totalInQueue) *
+      100
+    : 0;
 
   return (
     <div className="dashboard-with-sidebar">
       {/* Sidebar */}
-      <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-inner">
           {/* Logo Section */}
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="logo-img oams-logo-img"
+              />
             </div>
-            <button 
+            <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -448,13 +602,15 @@ export default function StudentDashboard() {
               </div>
 
               <div className="user-info-content">
-                <p className="user-name-large">{user?.name ?? 'Student'}</p>
+                <p className="user-name-large">{user?.name ?? "Student"}</p>
                 <span className="user-role-badge">Student</span>
               </div>
             </div>
 
             <div className="user-college-wrapper">
-              <p className="user-college-text">{user?.college ?? 'College of Computing Studies'}</p>
+              <p className="user-college-text">
+                {user?.college ?? "College of Computing Studies"}
+              </p>
             </div>
           </div>
 
@@ -478,10 +634,7 @@ export default function StudentDashboard() {
 
           {/* Logout Button */}
           <div className="sidebar-logout">
-            <button 
-              className="logout-btn"
-              onClick={handleLogout}
-            >
+            <button className="logout-btn" onClick={handleLogout}>
               <LogOutIcon />
               <span>Logout</span>
             </button>
@@ -494,18 +647,22 @@ export default function StudentDashboard() {
         <div className="mobile-header-content">
           <div className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="logo-img oams-logo-img"
+            />
           </div>
           <div className="mobile-header-actions">
-            <button 
+            <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
-            <button 
+            <button
               className="sidebar-toggle"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               aria-label="Toggle sidebar"
@@ -527,13 +684,15 @@ export default function StudentDashboard() {
               <p className="banner-greeting">Good day! 👋</p>
               <div className="banner-title-row">
                 <img src={ccsLogo} alt="CCS Logo" className="banner-ccs-logo" />
-                <h1 className="banner-title">{user?.name ?? 'John Doe'}</h1>
+                <h1 className="banner-title">{user?.name ?? "Student"}</h1>
               </div>
 
               <div className="banner-badges">
                 <span className="badge">Student Portal</span>
                 <span className="badge">AY 2025–2026</span>
-                <span className="badge">{user?.studentId}</span>
+                <span className="badge">
+                  {user?.studentNumber ?? "Student Number"}
+                </span>
               </div>
             </div>
           </div>
@@ -561,21 +720,33 @@ export default function StudentDashboard() {
           <section className="quick-actions-section">
             <div className="section-header">
               <h2>Quick Actions</h2>
-              <span className="section-count">{quickActions.length} features available</span>
+              <span className="section-count">
+                {quickActions.length} features available
+              </span>
             </div>
             <div className="quick-actions-grid">
               {quickActions.map((action, index) => (
-                <Link key={action.title} to={action.link} className="quick-action-link">
+                <Link
+                  key={action.title}
+                  to={action.link}
+                  className="quick-action-link"
+                >
                   <div className="quick-action-card">
                     <div className="action-main">
-                      <div className={`action-icon action-gradient-${index + 1}`}>
+                      <div
+                        className={`action-icon action-gradient-${index + 1}`}
+                      >
                         <action.icon />
                       </div>
 
                       <div className="action-body">
-                        <span className="action-badge action-badge-right">{action.badge}</span>
+                        <span className="action-badge action-badge-right">
+                          {action.badge}
+                        </span>
                         <h3 className="action-title">{action.title}</h3>
-                        <p className="action-description">{action.description}</p>
+                        <p className="action-description">
+                          {action.description}
+                        </p>
                         <div className="action-cta">
                           <span>Open</span>
                           <ChevronRightIcon />
@@ -604,11 +775,19 @@ export default function StudentDashboard() {
                 </div>
                 <div className="card-content">
                   <div className="queue-service-info">
-                    <img src={getCollegeLogo(mostRecentQueue.college)} alt={mostRecentQueue.college} className="college-logo" />
+                    <img
+                      src={getCollegeLogo(mostRecentQueue.college)}
+                      alt={mostRecentQueue.college}
+                      className="college-logo"
+                    />
                     <div className="queue-service-details">
                       <div className="service-row">
-                        <p className="service-name">{mostRecentQueue.service}</p>
-                        <span className="queue-number">{mostRecentQueue.queueNumber}</span>
+                        <p className="service-name">
+                          {mostRecentQueue.service}
+                        </p>
+                        <span className="queue-number">
+                          {mostRecentQueue.queueNumber}
+                        </span>
                       </div>
                       <p className="college-name">{mostRecentQueue.college}</p>
                     </div>
@@ -623,7 +802,9 @@ export default function StudentDashboard() {
                       <p className="stat-label">Waiting</p>
                     </div>
                     <div className="queue-stat">
-                      <p className="stat-num-sm">{mostRecentQueue.estimatedWaitTime}</p>
+                      <p className="stat-num-sm">
+                        {mostRecentQueue.estimatedWaitTime}
+                      </p>
                       <p className="stat-label">Est. Wait</p>
                     </div>
                   </div>
@@ -633,7 +814,10 @@ export default function StudentDashboard() {
                       <span>{Math.round(queueProgress)}%</span>
                     </div>
                     <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${queueProgress}%` }}></div>
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${queueProgress}%` }}
+                      ></div>
                     </div>
                   </div>
                   <Link to="/student/queue-status" className="primary-btn">
@@ -671,7 +855,11 @@ export default function StudentDashboard() {
               </div>
               <div className="card-content announcements-content">
                 {pinnedAnnouncements.map((ann) => (
-                  <Link key={ann.id} to="/student/announcements" className="announcement-item">
+                  <Link
+                    key={ann.id}
+                    to="/student/announcements"
+                    className="announcement-item"
+                  >
                     <div className="announcement-icon">
                       <AlertCircleIcon />
                     </div>
@@ -679,7 +867,11 @@ export default function StudentDashboard() {
                       <p className="announcement-title">{ann.title}</p>
                       <p className="announcement-college">{ann.college}</p>
                       <p className="announcement-date">
-                        {new Date(ann.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {new Date(ann.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </p>
                     </div>
                     <span className="announcement-badge">Important</span>
@@ -706,16 +898,18 @@ export default function StudentDashboard() {
                 {recentActivity.map((activity) => (
                   <div key={activity.id} className="activity-item">
                     <div className={`activity-icon activity-${activity.type}`}>
-                      {activity.type === 'queue' && <ClockIcon />}
-                      {activity.type === 'appointment' && <CalendarIcon />}
-                      {activity.type === 'document' && <FileTextIcon />}
+                      {activity.type === "queue" && <ClockIcon />}
+                      {activity.type === "appointment" && <CalendarIcon />}
+                      {activity.type === "document" && <FileTextIcon />}
                     </div>
                     <div className="activity-details">
                       <p className="activity-title">{activity.title}</p>
                       <p className="activity-college">{activity.college}</p>
                       <p className="activity-time">{activity.time}</p>
                     </div>
-                    <span className={`activity-badge activity-status-${activity.status}`}>
+                    <span
+                      className={`activity-badge activity-status-${activity.status}`}
+                    >
                       {activity.status}
                     </span>
                   </div>
@@ -731,7 +925,9 @@ export default function StudentDashboard() {
                 <AlertCircleIcon />
                 Service Hours
               </h3>
-              <p className="hours-subtitle">Office operating hours for all colleges</p>
+              <p className="hours-subtitle">
+                Office operating hours for all colleges
+              </p>
             </div>
             <div className="hours-grid">
               <div>
@@ -740,7 +936,11 @@ export default function StudentDashboard() {
               </div>
               <div>
                 <p className="hours-label">Weekends</p>
-                <p className="hours-time">Saturday: 8:00 AM – 12:00 PM<br />Sunday: Closed</p>
+                <p className="hours-time">
+                  Saturday: 8:00 AM – 12:00 PM
+                  <br />
+                  Sunday: Closed
+                </p>
               </div>
             </div>
           </div>
@@ -756,13 +956,13 @@ export default function StudentDashboard() {
       )}
 
       {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? 'open' : ''}`}>
+      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
           <div className="chat-container">
             <div className="chat-header">
               <h3>OAMS Assistant</h3>
-              <button 
-                className="chat-close-btn" 
+              <button
+                className="chat-close-btn"
                 onClick={() => setChatOpen(false)}
                 aria-label="Close chat"
               >
@@ -771,10 +971,11 @@ export default function StudentDashboard() {
             </div>
             <div className="chat-messages">
               {messages.map((message) => (
-                <div key={message.id} className={`message message-${message.type}`}>
-                  <div className="message-content">
-                    {message.text}
-                  </div>
+                <div
+                  key={message.id}
+                  className={`message message-${message.type}`}
+                >
+                  <div className="message-content">{message.text}</div>
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -787,8 +988,8 @@ export default function StudentDashboard() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="chat-send-btn"
                 aria-label="Send message"
               >
@@ -797,8 +998,8 @@ export default function StudentDashboard() {
             </form>
           </div>
         )}
-        <button 
-          className={`chat-fab ${chatOpen ? 'hidden' : ''}`}
+        <button
+          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
           onClick={() => setChatOpen(true)}
           aria-label="Open chat"
         >

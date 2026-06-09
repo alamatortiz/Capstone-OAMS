@@ -1,18 +1,15 @@
-CREATE DATABASE oams_db;
+-- CREATE DATABASE oams_db;
 USE oams_db;
 -- DROP DATABASE oams_db;
---------------------------------------------------
 -- 1. DEPARTMENTS
---------------------------------------------------
 CREATE TABLE departments (
     department_id INT AUTO_INCREMENT PRIMARY KEY,
     department_name VARCHAR(100) NOT NULL,
     office_location VARCHAR(100)
 );
 
---------------------------------------------------
+
 -- 2. PARENT USERS  (MODIFIED)
---------------------------------------------------
 -- Added: status, login tracking, external auth fields for Pinnacle/SSO
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -26,9 +23,8 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
---------------------------------------------------
+
 -- 3. CHILD USER TABLES
---------------------------------------------------
 CREATE TABLE students (
     student_id INT PRIMARY KEY,
     student_number VARCHAR(20) UNIQUE,
@@ -67,9 +63,8 @@ CREATE TABLE administrators (
     FOREIGN KEY (department_id) REFERENCES departments(department_id)
 );
 
---------------------------------------------------
+
 -- 4. USER ACCOUNT MANAGEMENT  (NEW)
---------------------------------------------------
 CREATE TABLE user_sessions (
     session_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -94,9 +89,7 @@ CREATE TABLE login_logs (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
---------------------------------------------------
 -- 5. SERVICES & REQUIREMENTS
---------------------------------------------------
 CREATE TABLE services (
     service_id INT AUTO_INCREMENT PRIMARY KEY,
     service_name VARCHAR(100),
@@ -116,10 +109,10 @@ CREATE TABLE service_requirements (
     FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE
 );
 
---------------------------------------------------
+
 -- 6. QUEUE SLOT MANAGEMENT  (NEW)
 -- NOTE: For QUEUEING, not appointments. Controls capacity per service window.
---------------------------------------------------
+
 CREATE TABLE queue_slots (
     slot_id INT AUTO_INCREMENT PRIMARY KEY,
     service_id INT NOT NULL,
@@ -135,9 +128,9 @@ CREATE TABLE queue_slots (
     FOREIGN KEY (admin_id) REFERENCES administrators(admin_id)
 );
 
---------------------------------------------------
+
 -- 7. QUEUE SYSTEM  (MODIFIED)
---------------------------------------------------
+
 -- Added: slot_id, tracking timestamps, notes
 CREATE TABLE queues (
     queue_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -169,9 +162,9 @@ CREATE TABLE queue_status_logs (
     FOREIGN KEY (changed_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
---------------------------------------------------
+
 -- 8. APPOINTMENT SYSTEM
---------------------------------------------------
+
 CREATE TABLE appointments (
     appointment_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT,
@@ -185,9 +178,9 @@ CREATE TABLE appointments (
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id)
 );
 
---------------------------------------------------
+
 -- 9. DOCUMENT PROCESSING
---------------------------------------------------
+
 CREATE TABLE document_requests (
     request_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT,
@@ -219,9 +212,9 @@ CREATE TABLE qr_tracking_logs (
     FOREIGN KEY (scanned_by) REFERENCES users(user_id)
 );
 
---------------------------------------------------
+
 -- 10. AI-POWERED CHAT SYSTEM  (NEW)
---------------------------------------------------
+
 CREATE TABLE chat_sessions (
     session_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NULL,
@@ -255,9 +248,9 @@ CREATE TABLE chatbot_knowledge_base (
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
 );
 
---------------------------------------------------
+
 -- 11. FAQ
---------------------------------------------------
+
 CREATE TABLE faqs (
     faq_id INT AUTO_INCREMENT PRIMARY KEY,
     question TEXT,
@@ -267,9 +260,9 @@ CREATE TABLE faqs (
     FOREIGN KEY (department_id) REFERENCES departments(department_id)
 );
 
---------------------------------------------------
+
 -- 12. EXTERNAL SYNC (Pinnacle Microservice)  (NEW)
---------------------------------------------------
+
 CREATE TABLE external_sync_logs (
     sync_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -284,9 +277,9 @@ CREATE TABLE external_sync_logs (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
---------------------------------------------------
+
 -- 13. DATA ADMIN MANAGEMENT  (NEW)
---------------------------------------------------
+
 -- Audit trail for all admin actions
 CREATE TABLE audit_logs (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -313,9 +306,9 @@ CREATE TABLE system_settings (
     FOREIGN KEY (updated_by) REFERENCES administrators(admin_id)
 );
 
---------------------------------------------------
+
 -- 14. NOTIFICATIONS
---------------------------------------------------
+
 CREATE TABLE notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -324,3 +317,44 @@ CREATE TABLE notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
+
+
+-- Clear any existing log test records to isolate our live trial
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE login_logs;
+TRUNCATE TABLE students;
+TRUNCATE TABLE faculty;
+TRUNCATE TABLE administrators;
+TRUNCATE TABLE users;
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+-- STEP A: INSERT BASE ACCOUNT CREDENTIALS (Password: password123)
+
+-- 1. Student Account
+INSERT INTO users (user_id, school_id, password, role, status) 
+VALUES (101, '2026-00001', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
+
+-- 2. Faculty Account
+INSERT INTO users (user_id, school_id, password, role, status) 
+VALUES (102, '2026-00002', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active');
+
+-- 3. Administrator Account
+INSERT INTO users (user_id, school_id, password, role, status) 
+VALUES (103, '2026-00003', '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'admin', 'active');
+
+
+
+-- STEP B: INSERT MATCHING CHILD IDENTITY PROFILE TABLES
+
+-- 1. Link Student Profile (Matches John Ortiz context)
+INSERT INTO students (student_id, student_number, first_name, last_name, course, year_level, email, department_id)
+VALUES (101, 'SN-2026-00001', 'John', 'Ortiz', 'Information Technology', 3, 'ortiz@pnc.edu.ph', NULL);
+
+-- 2. Link Faculty Profile
+INSERT INTO faculty (faculty_id, employee_id, first_name, last_name, specialization, email, department_id)
+VALUES (102, 'EMP-2026-002', 'Prof. Maria', 'Santos', 'Web and Mobile Applications', 'santos.maria@pnc.edu.ph', NULL);
+
+-- 3. Link Admin Profile
+INSERT INTO administrators (admin_id, employee_id, first_name, last_name, position, email, department_id)
+VALUES (103, 'ADM-2026-003', 'Admin', 'Superuser', 'System Registrar Office', 'admin.oams@pnc.edu.ph', NULL);
