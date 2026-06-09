@@ -29,4 +29,3 @@ export function getCollegeLogo(collegeName) {
   if (!collegeName) return CCS;
   return COLLEGE_LOGOS[collegeName] || CCS;
 }
-

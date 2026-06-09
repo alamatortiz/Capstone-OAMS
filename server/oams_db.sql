@@ -374,4 +374,3 @@ VALUES (102, 'EMP-2026-002', 'Patrick', 'Ogalesco', 'Web and Mobile Applications
 -- 3. Link Admin Profile
 INSERT INTO administrators (admin_id, employee_id, first_name, last_name, position, email, department_id)
 VALUES (103, 'ADM-2026-003', 'Admin', 'Superuser', 'System Registrar Office', 'admin.oams@pnc.edu.ph', 1001);
-

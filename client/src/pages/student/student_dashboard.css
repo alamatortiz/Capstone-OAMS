@@ -1707,13 +1707,21 @@ body {
 
 .hours-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 5rem;
+  row-gap: 1rem;
+  align-items: start;
 }
 
-@media (min-width: 768px) {
+.hours-grid > div {
+  margin: 0 auto;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
   .hours-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 }
 
