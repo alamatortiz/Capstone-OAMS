@@ -12,7 +12,6 @@ type Role = "student" | "faculty" | "admin";
 
 type UserData = {
   userId: number;
-  schoolId: string;
   role: Role;
   name: string;
   firstName: string;
@@ -75,7 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const raw = response.data.user;
           const normalized: UserData = {
             userId: raw.user_id,
-            schoolId: raw.school_id,
             role: raw.role,
             firstName: raw.first_name,
             lastName: raw.last_name,
@@ -114,7 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const raw = response.data.user;
       const normalized: UserData = {
         userId: raw.user_id,
-        schoolId: raw.school_id,
         role: raw.role,
         firstName: raw.first_name,
         lastName: raw.last_name,

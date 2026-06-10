@@ -6,7 +6,7 @@ const fetchUserProfile = async (userId, role) => {
   let query = "";
   if (role === "student") {
     query = `
-      SELECT u.user_id, u.school_id, u.role, u.status,
+      SELECT u.user_id, u.role, u.status,
              s.student_number, s.first_name, s.last_name, s.course, s.year_level, s.email, s.department_id,
              d.department_name, d.department_abbreviation
       FROM users u
@@ -16,7 +16,7 @@ const fetchUserProfile = async (userId, role) => {
     `;
   } else if (role === "faculty") {
     query = `
-      SELECT u.user_id, u.school_id, u.role, u.status,
+      SELECT u.user_id, u.role, u.status,
              f.employee_id, f.first_name, f.last_name, f.specialization, f.email, f.department_id,
              d.department_name, d.department_abbreviation
       FROM users u
@@ -26,7 +26,7 @@ const fetchUserProfile = async (userId, role) => {
     `;
   } else if (role === "admin") {
     query = `
-      SELECT u.user_id, u.school_id, u.role, u.status,
+      SELECT u.user_id, u.role, u.status,
              a.employee_id, a.first_name, a.last_name, a.position, a.email, a.department_id,
              d.department_name, d.department_abbreviation
       FROM users u
@@ -55,12 +55,12 @@ const login = async (req, res) => {
 
   try {
     const userQuery = `
-      SELECT u.user_id, u.school_id, u.password, u.role, u.status
+      SELECT u.user_id, u.password, u.role, u.status
       FROM users u
       LEFT JOIN students s ON u.user_id = s.student_id
       LEFT JOIN faculty f ON u.user_id = f.faculty_id
       LEFT JOIN administrators a ON u.user_id = a.admin_id
-      WHERE u.school_id = ? OR s.email = ? OR f.email = ? OR a.email = ?
+      WHERE s.student_number = ? OR f.employee_id = ? OR a.employee_id = ? OR s.email = ? OR f.email = ? OR a.email = ? 
       LIMIT 1
     `;
 
@@ -69,11 +69,13 @@ const login = async (req, res) => {
       emailOrSchoolId,
       emailOrSchoolId,
       emailOrSchoolId,
+      emailOrSchoolId,
+      emailOrSchoolId,
     ]);
 
     if (users.length === 0) {
       await pool.query(
-        `INSERT INTO login_logs (user_id, school_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
          VALUES (NULL, ?, ?, ?, 'failed', 'User not found')`,
         [emailOrSchoolId, ipAddress, userAgent],
       );
@@ -84,7 +86,7 @@ const login = async (req, res) => {
 
     if (user.status !== "active") {
       await pool.query(
-        `INSERT INTO login_logs (user_id, school_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
          VALUES (?, ?, ?, ?, 'failed', ?)`,
         [
           user.user_id,
@@ -102,7 +104,7 @@ const login = async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       await pool.query(
-        `INSERT INTO login_logs (user_id, school_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
          VALUES (?, ?, ?, ?, 'failed', 'Incorrect password')`,
         [user.user_id, emailOrSchoolId, ipAddress, userAgent],
       );
@@ -111,7 +113,6 @@ const login = async (req, res) => {
 
     const tokenPayload = {
       userId: user.user_id,
-      schoolId: user.school_id,
       role: user.role,
     };
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
@@ -123,7 +124,7 @@ const login = async (req, res) => {
       [user.user_id],
     );
     await pool.query(
-      `INSERT INTO login_logs (user_id, school_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+      `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
        VALUES (?, ?, ?, ?, 'success', NULL)`,
       [user.user_id, emailOrSchoolId, ipAddress, userAgent],
     );

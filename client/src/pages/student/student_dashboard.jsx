@@ -8,25 +8,24 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
-import ccsLogo from "../../assets/CCS.png";
+
 import "./student_dashboard.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
 
-// Sidebar Icons
+// ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
     <polyline points="9 22 9 12 15 12 15 22"></polyline>
   </svg>
 );
-
 const QueueIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
-
 const CalendarIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -35,7 +34,6 @@ const CalendarIconNav = () => (
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
-
 const DocumentIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -44,7 +42,6 @@ const DocumentIconNav = () => (
     <line x1="9" y1="15" x2="15" y2="15"></line>
   </svg>
 );
-
 const HistoryIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
@@ -52,7 +49,6 @@ const HistoryIconNav = () => (
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36"></path>
   </svg>
 );
-
 const LogOutIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -60,7 +56,6 @@ const LogOutIcon = () => (
     <line x1="21" y1="12" x2="9" y2="12"></line>
   </svg>
 );
-
 const MenuIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -68,21 +63,18 @@ const MenuIcon = () => (
     <line x1="3" y1="18" x2="21" y2="18"></line>
   </svg>
 );
-
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
-
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
     <circle cx="12" cy="7" r="4"></circle>
   </svg>
 );
-
 const SunIcon = () => (
   <svg
     className="sun-icon"
@@ -102,7 +94,6 @@ const SunIcon = () => (
     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
   </svg>
 );
-
 const MoonIcon = () => (
   <svg
     className="moon-icon"
@@ -115,7 +106,7 @@ const MoonIcon = () => (
   </svg>
 );
 
-// Dashboard Content Icons
+// ─── Dashboard Content Icons ──────────────────────────────────────────────────
 const ClockIcon = () => (
   <svg
     className="icon"
@@ -128,7 +119,6 @@ const ClockIcon = () => (
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
-
 const CalendarIcon = () => (
   <svg
     className="icon"
@@ -143,7 +133,6 @@ const CalendarIcon = () => (
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
-
 const FileTextIcon = () => (
   <svg
     className="icon"
@@ -156,7 +145,6 @@ const FileTextIcon = () => (
     <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
 );
-
 const CheckCircleIcon = () => (
   <svg
     className="icon"
@@ -169,7 +157,6 @@ const CheckCircleIcon = () => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
-
 const ChevronRightIcon = () => (
   <svg
     className="icon"
@@ -181,7 +168,6 @@ const ChevronRightIcon = () => (
     <polyline points="9 18 15 12 9 6"></polyline>
   </svg>
 );
-
 const AlertCircleIcon = () => (
   <svg
     className="icon"
@@ -197,7 +183,6 @@ const AlertCircleIcon = () => (
     <line x1="12" y1="16" x2="12.01" y2="16"></line>
   </svg>
 );
-
 const BellIcon = () => (
   <svg
     className="icon"
@@ -210,7 +195,6 @@ const BellIcon = () => (
     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
   </svg>
 );
-
 const ListIcon = () => (
   <svg
     className="icon"
@@ -227,7 +211,6 @@ const ListIcon = () => (
     <line x1="3" y1="18" x2="3.01" y2="18"></line>
   </svg>
 );
-
 const ActivityIcon = () => (
   <svg
     className="icon"
@@ -239,7 +222,6 @@ const ActivityIcon = () => (
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
   </svg>
 );
-
 const GraduationCapIcon = () => (
   <svg
     className="icon"
@@ -252,7 +234,6 @@ const GraduationCapIcon = () => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
-
 const TimerIcon = () => (
   <svg
     className="icon"
@@ -266,7 +247,6 @@ const TimerIcon = () => (
     <path d="M7 2h10"></path>
   </svg>
 );
-
 const MegaphoneIcon = () => (
   <svg
     className="icon"
@@ -279,7 +259,6 @@ const MegaphoneIcon = () => (
     <polyline points="9 22 9 12 15 12 15 22"></polyline>
   </svg>
 );
-
 const ChatIcon = () => (
   <svg
     className="icon"
@@ -291,7 +270,6 @@ const ChatIcon = () => (
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </svg>
 );
-
 const SendIcon = () => (
   <svg
     className="icon"
@@ -305,8 +283,24 @@ const SendIcon = () => (
   </svg>
 );
 
+// ─── Static pinned announcements (no announcements table yet) ─────────────────
+const PINNED_ANNOUNCEMENTS = [
+  {
+    id: "1",
+    title: "Enrollment Period for Second Semester",
+    college: "College of Computing Studies (CCS)",
+    date: "2026-03-25",
+  },
+  {
+    id: "2",
+    title: "System Maintenance Notice",
+    college: "All Departments",
+    date: "2026-03-26",
+  },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
-  // Demo fallback data (for UI testing without depending on Auth backend values)
   const { user: authUser, logout } = useAuth();
   const user = authUser
     ? {
@@ -325,13 +319,14 @@ export default function StudentDashboard() {
         departmentAbbrev: "",
         course: "",
       };
-  const { getActiveQueues } = useQueue();
 
+  const { getActiveQueues } = useQueue();
   const navigate = useNavigate();
+
+  // ── UI state ──────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
-
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -343,99 +338,52 @@ export default function StudentDashboard() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  const activeQueues = getActiveQueues();
-  const mostRecentQueue = activeQueues[0];
+  // ── Dashboard data state ──────────────────────────────────────────────────
+  const [dashStats, setDashStats] = useState(null);
+  const [dashLoading, setDashLoading] = useState(true);
+  const [dashError, setDashError] = useState(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // ── Fetch dashboard stats from backend ───────────────────────────────────
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    applyTheme(isDark ? "dark" : "light");
-  }, [isDark]);
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (inputValue.trim() === "") return;
-
-    const userMessage = {
-      id: messages.length + 1,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
+    const fetchStats = async () => {
+      try {
+        setDashLoading(true);
+        const res = await api.get("/student/dashboard-stats");
+        setDashStats(res.data);
+      } catch (err) {
+        console.error("Failed to fetch dashboard stats:", err);
+        setDashError("Could not load dashboard data.");
+      } finally {
+        setDashLoading(false);
+      }
     };
-    setMessages([...messages, userMessage]);
-    setInputValue("");
 
-    setTimeout(() => {
-      const botResponse = {
-        id: messages.length + 2,
-        type: "bot",
-        text: generateBotResponse(inputValue),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botResponse]);
-    }, 600);
-  };
+    if (authUser) fetchStats();
+  }, [authUser]);
 
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
+  // ── Derived values from API response ─────────────────────────────────────
+  const apiQueue = dashStats?.activeQueue ?? null;
+  // Fallback to QueueContext (for locally-joined queues before page refresh)
+  const contextQueues = getActiveQueues();
+  const mostRecentQueue = apiQueue ?? contextQueues[0] ?? null;
+  const activeQueueCount =
+    dashStats?.stats?.activeQueueCount ?? contextQueues.length;
 
-    if (lowerInput.includes("queue") || lowerInput.includes("position")) {
-      return mostRecentQueue
-        ? `You're currently at position ${mostRecentQueue.position} in the ${mostRecentQueue.service} queue. Estimated wait time is ${mostRecentQueue.estimatedWaitTime}.`
-        : "You don't have any active queues. Would you like to join one?";
-    } else if (lowerInput.includes("appointment")) {
-      return "You have 2 upcoming appointments this week. Visit the Appointments section to view or schedule more.";
-    } else if (lowerInput.includes("document")) {
-      return "You have 5 documents on file, with 2 pending approval. Check your Documents section for details.";
-    } else if (lowerInput.includes("service") || lowerInput.includes("help")) {
-      return "I can help you with queue information, appointments, documents, announcements, and more. What would you like to know?";
-    } else {
-      return "That's a great question! For more detailed assistance, please visit the respective section in the dashboard or contact your college office.";
-    }
-  };
+  const queueProgress = mostRecentQueue
+    ? ((mostRecentQueue.totalInQueue - mostRecentQueue.position) /
+        mostRecentQueue.totalInQueue) *
+      100
+    : 0;
 
-  const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
-  };
-
-  const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
-    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
-    {
-      icon: CalendarIconNav,
-      label: "Appointments",
-      path: "/student/appointments",
-    },
-    { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
-    {
-      icon: HistoryIconNav,
-      label: "Transactions",
-      path: "/student/transactions",
-    },
-  ];
-
+  // ── Stats cards (live values) ─────────────────────────────────────────────
   const stats = [
     {
       title: "Queue Position",
-      value: mostRecentQueue ? String(mostRecentQueue.position) : "0",
-      description:
-        activeQueues.length > 0
-          ? `Waiting in ${activeQueues.length} queue${activeQueues.length > 1 ? "s" : ""}`
+      value: dashLoading ? "—" : String(dashStats?.stats?.queuePosition ?? 0),
+      description: dashLoading
+        ? "Loading..."
+        : activeQueueCount > 0
+          ? `Waiting in ${activeQueueCount} queue${activeQueueCount > 1 ? "s" : ""}`
           : "No active queues",
       icon: ClockIcon,
       color: "text-blue-600",
@@ -444,8 +392,14 @@ export default function StudentDashboard() {
     },
     {
       title: "Appointments",
-      value: "2",
-      description: "Upcoming this week",
+      value: dashLoading
+        ? "—"
+        : String(dashStats?.stats?.appointments?.upcoming ?? 0),
+      description: dashLoading
+        ? "Loading..."
+        : dashStats?.stats?.appointments?.pending > 0
+          ? `${dashStats.stats.appointments.pending} pending approval`
+          : "No pending appointments",
       icon: CalendarIcon,
       color: "text-emerald-600",
       bgColor: "bg-emerald-50 dark:bg-emerald-950",
@@ -453,8 +407,14 @@ export default function StudentDashboard() {
     },
     {
       title: "Documents",
-      value: "5",
-      description: "2 pending approval",
+      value: dashLoading
+        ? "—"
+        : String(dashStats?.stats?.documents?.total ?? 0),
+      description: dashLoading
+        ? "Loading..."
+        : dashStats?.stats?.documents?.pending > 0
+          ? `${dashStats.stats.documents.pending} pending approval`
+          : "All documents processed",
       icon: FileTextIcon,
       color: "text-orange-600",
       bgColor: "bg-orange-50 dark:bg-orange-950",
@@ -462,7 +422,7 @@ export default function StudentDashboard() {
     },
     {
       title: "Completed",
-      value: "12",
+      value: dashLoading ? "—" : String(dashStats?.stats?.completed ?? 0),
       description: "Total transactions",
       icon: CheckCircleIcon,
       color: "text-purple-600",
@@ -471,6 +431,7 @@ export default function StudentDashboard() {
     },
   ];
 
+  // ── Quick actions (badge for active queues is now live) ───────────────────
   const quickActions = [
     {
       title: "Avail Service",
@@ -521,64 +482,102 @@ export default function StudentDashboard() {
       icon: TimerIcon,
       link: "/student/queue-status",
       gradient: "from-rose-500 to-pink-600",
-      badge: `${activeQueues.length} Active`,
+      badge: `${activeQueueCount} Active`,
     },
   ];
 
-  const pinnedAnnouncements = [
+  // ── Recent activity (live from API, fallback to empty) ────────────────────
+  const recentActivity = dashStats?.recentActivity ?? [];
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+  useEffect(() => {
+    applyTheme(isDark ? "dark" : "light");
+  }, [isDark]);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (inputValue.trim() === "") return;
+    const userMessage = {
+      id: messages.length + 1,
+      type: "user",
+      text: inputValue,
+      timestamp: new Date(),
+    };
+    setMessages([...messages, userMessage]);
+    setInputValue("");
+    setTimeout(() => {
+      const botResponse = {
+        id: messages.length + 2,
+        type: "bot",
+        text: generateBotResponse(inputValue),
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botResponse]);
+    }, 600);
+  };
+
+  const generateBotResponse = (userInput) => {
+    const lowerInput = userInput.toLowerCase();
+    if (lowerInput.includes("queue") || lowerInput.includes("position")) {
+      return mostRecentQueue
+        ? `You're currently at position ${mostRecentQueue.position} in the ${mostRecentQueue.service} queue. Estimated wait: ${mostRecentQueue.estimatedWaitTime}.`
+        : "You don't have any active queues. Would you like to join one?";
+    } else if (lowerInput.includes("appointment")) {
+      const count = dashStats?.stats?.appointments?.upcoming ?? 0;
+      return `You have ${count} upcoming appointment${count !== 1 ? "s" : ""} this week. Visit the Appointments section for details.`;
+    } else if (lowerInput.includes("document")) {
+      const total = dashStats?.stats?.documents?.total ?? 0;
+      const pending = dashStats?.stats?.documents?.pending ?? 0;
+      return `You have ${total} document${total !== 1 ? "s" : ""} on file${pending > 0 ? `, with ${pending} pending approval` : ""}.`;
+    } else if (lowerInput.includes("service") || lowerInput.includes("help")) {
+      return "I can help you with queue information, appointments, documents, announcements, and more. What would you like to know?";
+    } else {
+      return "That's a great question! For more detailed assistance, please visit the respective section or contact your college office.";
+    }
+  };
+
+  const toggleDarkMode = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      applyTheme(next ? "dark" : "light");
+      return next;
+    });
+  };
+
+  const navItems = [
+    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
-      id: "1",
-      title: "Enrollment Period for Second Semester",
-      college: "College of Computing Studies (CCS)",
-      date: "2026-03-25",
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/student/appointments",
     },
+    { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
     {
-      id: "2",
-      title: "System Maintenance Notice",
-      college: "All Departments",
-      date: "2026-03-26",
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/student/transactions",
     },
   ];
 
-  const recentActivity = [
-    {
-      id: 1,
-      type: "queue",
-      title: "Joined Queue at Registrar",
-      time: "10 minutes ago",
-      status: "active",
-      college: "College of Computing Studies",
-    },
-    {
-      id: 2,
-      type: "appointment",
-      title: "Appointment with Prof. Santos",
-      time: "Tomorrow, 2:00 PM",
-      status: "confirmed",
-      college: "College of Computing Studies",
-    },
-    {
-      id: 3,
-      type: "document",
-      title: "Good Moral Certificate",
-      time: "2 days ago",
-      status: "processing",
-      college: "College of Computing Studies",
-    },
-  ];
-
-  const queueProgress = mostRecentQueue
-    ? ((mostRecentQueue.totalInQueue - mostRecentQueue.position) /
-        mostRecentQueue.totalInQueue) *
-      100
-    : 0;
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="dashboard-with-sidebar">
       {/* Sidebar */}
       <aside className={`dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-inner">
-          {/* Logo Section */}
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
@@ -598,19 +597,16 @@ export default function StudentDashboard() {
             </button>
           </div>
 
-          {/* User Info - New Layout */}
           <div className="sidebar-user-section">
             <div className="user-top-row">
               <div className="user-avatar-large">
                 <UserIcon />
               </div>
-
               <div className="user-info-content">
                 <p className="user-name-large">{user?.name ?? "Student"}</p>
                 <span className="user-role-badge">Student</span>
               </div>
             </div>
-
             <div className="user-college-wrapper">
               <p className="user-college-text">
                 {user?.college} ({user?.departmentAbbrev})
@@ -618,7 +614,6 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Navigation */}
           <nav className="sidebar-nav">
             <div className="nav-items">
               {navItems.map((item) => (
@@ -636,7 +631,6 @@ export default function StudentDashboard() {
             </div>
           </nav>
 
-          {/* Logout Button */}
           <div className="sidebar-logout">
             <button className="logout-btn" onClick={handleLogout}>
               <LogOutIcon />
@@ -680,6 +674,13 @@ export default function StudentDashboard() {
       {/* Main Content */}
       <main className="dashboard-main">
         <div className="student-dashboard">
+          {/* Error banner */}
+          {dashError && (
+            <div className="dash-error-banner">
+              <AlertCircleIcon /> {dashError}
+            </div>
+          )}
+
           {/* Welcome Banner */}
           <div className="welcome-banner">
             <div className="banner-backdrop banner-backdrop-1"></div>
@@ -687,10 +688,18 @@ export default function StudentDashboard() {
             <div className="banner-content">
               <p className="banner-greeting">Good day! 👋</p>
               <div className="banner-title-row">
-                <img src={ccsLogo} alt="CCS Logo" className="banner-ccs-logo" />
+                <img
+                  src={
+                    new URL(
+                      `../../assets/${user?.departmentAbbrev || "CCS"}.png`,
+                      import.meta.url,
+                    ).href
+                  }
+                  alt="College Logo"
+                  className="banner-ccs-logo"
+                />
                 <h1 className="banner-title">{user?.name ?? "Student"}</h1>
               </div>
-
               <div className="banner-badges">
                 <span className="badge">Student Portal</span>
                 <span className="badge">AY 2025–2026</span>
@@ -712,7 +721,11 @@ export default function StudentDashboard() {
                   <div className="stat-header">
                     <ChevronRightIcon className="stat-chevron" />
                   </div>
-                  <p className="stat-value">{stat.value}</p>
+                  <p
+                    className={`stat-value ${dashLoading ? "stat-loading" : ""}`}
+                  >
+                    {stat.value}
+                  </p>
                   <p className="stat-title">{stat.title}</p>
                   <p className="stat-description">{stat.description}</p>
                 </div>
@@ -742,7 +755,6 @@ export default function StudentDashboard() {
                       >
                         <action.icon />
                       </div>
-
                       <div className="action-body">
                         <span className="action-badge action-badge-right">
                           {action.badge}
@@ -858,7 +870,7 @@ export default function StudentDashboard() {
                 </Link>
               </div>
               <div className="card-content announcements-content">
-                {pinnedAnnouncements.map((ann) => (
+                {PINNED_ANNOUNCEMENTS.map((ann) => (
                   <Link
                     key={ann.id}
                     to="/student/announcements"
@@ -882,8 +894,7 @@ export default function StudentDashboard() {
                   </Link>
                 ))}
                 <Link to="/student/announcements" className="secondary-btn">
-                  <BellIcon />
-                  View All Announcements
+                  <BellIcon /> View All Announcements
                 </Link>
               </div>
             </div>
@@ -898,27 +909,39 @@ export default function StudentDashboard() {
               </Link>
             </div>
             <div className="activity-card">
-              <div className="activity-list">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="activity-item">
-                    <div className={`activity-icon activity-${activity.type}`}>
-                      {activity.type === "queue" && <ClockIcon />}
-                      {activity.type === "appointment" && <CalendarIcon />}
-                      {activity.type === "document" && <FileTextIcon />}
+              {dashLoading ? (
+                <div className="activity-list">
+                  <p className="activity-loading">Loading activity...</p>
+                </div>
+              ) : recentActivity.length === 0 ? (
+                <div className="activity-list">
+                  <p className="activity-empty">No recent activity yet.</p>
+                </div>
+              ) : (
+                <div className="activity-list">
+                  {recentActivity.map((activity) => (
+                    <div key={activity.id} className="activity-item">
+                      <div
+                        className={`activity-icon activity-${activity.type}`}
+                      >
+                        {activity.type === "queue" && <ClockIcon />}
+                        {activity.type === "appointment" && <CalendarIcon />}
+                        {activity.type === "document" && <FileTextIcon />}
+                      </div>
+                      <div className="activity-details">
+                        <p className="activity-title">{activity.title}</p>
+                        <p className="activity-college">{activity.college}</p>
+                        <p className="activity-time">{activity.time}</p>
+                      </div>
+                      <span
+                        className={`activity-badge activity-status-${activity.status}`}
+                      >
+                        {activity.status}
+                      </span>
                     </div>
-                    <div className="activity-details">
-                      <p className="activity-title">{activity.title}</p>
-                      <p className="activity-college">{activity.college}</p>
-                      <p className="activity-time">{activity.time}</p>
-                    </div>
-                    <span
-                      className={`activity-badge activity-status-${activity.status}`}
-                    >
-                      {activity.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
