@@ -8,10 +8,11 @@ import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/student_dashboard.jsx";
 import QueuePage from "./pages/student/queue.jsx";
 import AppointmentsPage from "./pages/student/appointments.jsx";
+import DocumentsPage from "./pages/student/documents.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
-import ProtectedRoute from "./components/ProtectedRoute.tsx"; // Import ProtectedRoute
+import ProtectedRoute from "./components/ProtectedRoute.tsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -24,8 +25,7 @@ createRoot(document.getElementById("root")).render(
             <Route
               path="/unauthorized"
               element={<div>Unauthorized</div>}
-            />{" "}
-            {/* NEW: Unauthorized Page */}
+            />
             {/* Protected Routes */}
             <Route
               element={
@@ -34,15 +34,13 @@ createRoot(document.getElementById("root")).render(
                 />
               }
             >
-              {" "}
-              {/* Generic user route for logged in users */}
-              <Route path="/dashboard" element={<StudentDashboard />} />{" "}
-              {/* Default logged in dashboard (e.g., student) */}
+              <Route path="/dashboard" element={<StudentDashboard />} />
             </Route>
             <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
               <Route path="/student/dashboard" element={<StudentDashboard />} />
               <Route path="/student/queue" element={<QueuePage />} />
               <Route path="/student/appointments" element={<AppointmentsPage />} />
+              <Route path="/student/documents" element={<DocumentsPage />} />
             </Route>
             <Route element={<ProtectedRoute allowedRoles={["faculty"]} />}>
               <Route
@@ -57,6 +55,7 @@ createRoot(document.getElementById("root")).render(
             <Route path="/student-dashboard" element={<StudentDashboard />} />
             <Route path="/student-queue" element={<QueuePage />} />
             <Route path="/student-appointments" element={<AppointmentsPage />} />
+            <Route path="/student-documents" element={<DocumentsPage />} />
             <Route
               path="/professor-dashboard"
               element={<ProfessorDashboard />}
