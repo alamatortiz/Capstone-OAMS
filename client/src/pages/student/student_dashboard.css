@@ -1277,6 +1277,11 @@ body {
   transition: color 0.3s ease;
 }
 
+/* Ensure service text stays visible in dark mode */
+[data-theme="dark"] .service-name {
+  color: #ffffff;
+}
+
 .queue-number {
   background: var(--primary-color);
   color: white;
