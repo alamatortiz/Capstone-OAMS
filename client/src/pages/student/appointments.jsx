@@ -545,7 +545,7 @@ export default function AppointmentsPage() {
           <div className="appointments-header">
             <div className="header-content">
               <Link to="/student/dashboard" className="back-link">
-                <ChevronLeftIcon />
+                <span className="back-link-left-glyph">{'<'}</span>
                 <span className="back-link-text">Dashboard</span>
               </Link>
 

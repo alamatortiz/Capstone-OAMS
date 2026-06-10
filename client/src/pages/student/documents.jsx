@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ucLogo from '../../assets/Pnc-Logo.png';
 import oamsLogo from '../../assets/oams_logo.png';
 import { toast } from 'sonner';
 import './documents.css';
+import "../../App.css";
+
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 import { COLLEGES } from '../../data/colleges';
 
@@ -173,6 +175,19 @@ const AlertCircleIcon = () => (
   </svg>
 );
 
+const ChatIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+  </svg>
+);
+
+const SendIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="22" y1="2" x2="11" y2="13"></line>
+    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+  </svg>
+);
+
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function DocumentsPage() {
   const { user: authUser, logout } = useAuth();
@@ -225,6 +240,19 @@ export default function DocumentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ type: '', college: '', purpose: '', copies: '1' });
 
+  // ── AI Chatbot State ────────────────────────────────────────────────────
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      type: 'bot',
+      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you with your documents?",
+      timestamp: new Date(),
+    },
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const messagesEndRef = useRef(null);
+
   const documentTypes = [
     'Good Moral Certificate',
     'Transcript of Records',
@@ -240,6 +268,10 @@ export default function DocumentsPage() {
   useEffect(() => {
     applyTheme(isDark ? 'dark' : 'light');
   }, [isDark]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const toggleDarkMode = () => {
@@ -276,6 +308,61 @@ export default function DocumentsPage() {
     setDialogOpen(false);
     setFormData({ type: '', college: '', purpose: '', copies: '1' });
     toast.success('Document request submitted successfully!');
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (inputValue.trim() === '') return;
+
+    const userMessage = {
+      id: messages.length + 1,
+      type: 'user',
+      text: inputValue,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    const nextInput = inputValue;
+    setInputValue('');
+
+    setTimeout(() => {
+      const botResponse = {
+        id: messages.length + 2,
+        type: 'bot',
+        text: generateBotResponse(nextInput),
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botResponse]);
+    }, 600);
+  };
+
+  const generateBotResponse = (userInput) => {
+    const lowerInput = userInput.toLowerCase();
+    const activeCount = documents.filter(
+      (d) => d.status !== 'claimed' && d.status !== 'rejected'
+    ).length;
+    const readyCount = documents.filter((d) => d.status === 'ready').length;
+    const pendingCount = documents.filter((d) => d.status === 'pending').length;
+
+    if (lowerInput.includes('document') || lowerInput.includes('tracking')) {
+      return pendingCount > 0
+        ? `You have ${pendingCount} pending document request(s). You currently have ${activeCount} active request(s). If you need help, tell me the document type or tracking number.`
+        : readyCount > 0
+          ? `You have ${readyCount} document(s) ready for pickup. Tell me which one you're looking for and I can guide you.`
+          : `Right now you have no pending requests. You have ${activeCount} active request(s). Want to request a new document?`;
+    }
+
+    if (lowerInput.includes('status') || lowerInput.includes('where') || lowerInput.includes('progress')) {
+      return activeCount > 0
+        ? `You have ${activeCount} active request(s). Use the list to check each document's current status and estimated completion.`
+        : 'You have no active requests right now. You can request a document using the "Request Document" button.';
+    }
+
+    if (lowerInput.includes('request') || lowerInput.includes('apply') || lowerInput.includes('new')) {
+      return 'To request a document, click "Request Document", choose the document type and college, then enter the purpose. Want help choosing what to request?';
+    }
+
+    return 'I can help with document requests, tracking, and statuses. Try asking: "What is my document status?" or "How do I request a document?"';
   };
 
   const getStatusColor = (status) => {
@@ -668,6 +755,58 @@ export default function DocumentsPage() {
           </section>
         </div>
       </main>
+
+      {/* AI Chatbot Widget */}
+      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
+        {chatOpen && (
+          <div className="chat-container">
+            <div className="chat-header">
+              <h3>OAMS Assistant</h3>
+              <button
+                className="chat-close-btn"
+                onClick={() => setChatOpen(false)}
+                aria-label="Close chat"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="chat-messages">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`message message-${message.type}`}
+                >
+                  <div className="message-content">{message.text}</div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+            <form className="chat-input-form" onSubmit={handleSendMessage}>
+              <input
+                type="text"
+                className="chat-input"
+                placeholder="Ask me anything..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="chat-send-btn"
+                aria-label="Send message"
+              >
+                <SendIcon />
+              </button>
+            </form>
+          </div>
+        )}
+        <button
+          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
+          onClick={() => setChatOpen(true)}
+          aria-label="Open chat"
+        >
+          <ChatIcon />
+        </button>
+      </div>
     </div>
   );
 }
