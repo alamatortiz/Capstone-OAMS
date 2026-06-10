@@ -9,6 +9,7 @@ import StudentDashboard from "./pages/student/student_dashboard.jsx";
 import QueuePage from "./pages/student/queue.jsx";
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
+import TransactionsPage from "./pages/student/transactions.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
@@ -41,6 +42,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="/student/queue" element={<QueuePage />} />
               <Route path="/student/appointments" element={<AppointmentsPage />} />
               <Route path="/student/documents" element={<DocumentsPage />} />
+              <Route path="/student/transactions" element={<TransactionsPage />} />
             </Route>
             <Route element={<ProtectedRoute allowedRoles={["faculty"]} />}>
               <Route
@@ -56,6 +58,8 @@ createRoot(document.getElementById("root")).render(
             <Route path="/student-queue" element={<QueuePage />} />
             <Route path="/student-appointments" element={<AppointmentsPage />} />
             <Route path="/student-documents" element={<DocumentsPage />} />
+            <Route path="/student-transactions" element={<TransactionsPage />} />
+
             <Route
               path="/professor-dashboard"
               element={<ProfessorDashboard />}
