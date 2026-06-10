@@ -7,6 +7,7 @@ import Login from "./pages/Login.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/student_dashboard.jsx";
 import QueuePage from "./pages/student/queue.jsx";
+import AppointmentsPage from "./pages/student/appointments.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
@@ -41,6 +42,7 @@ createRoot(document.getElementById("root")).render(
             <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
               <Route path="/student/dashboard" element={<StudentDashboard />} />
               <Route path="/student/queue" element={<QueuePage />} />
+              <Route path="/student/appointments" element={<AppointmentsPage />} />
             </Route>
             <Route element={<ProtectedRoute allowedRoles={["faculty"]} />}>
               <Route
@@ -54,6 +56,7 @@ createRoot(document.getElementById("root")).render(
             {/* Backward-compatible TEMP UI-testing routes, to be removed later */}
             <Route path="/student-dashboard" element={<StudentDashboard />} />
             <Route path="/student-queue" element={<QueuePage />} />
+            <Route path="/student-appointments" element={<AppointmentsPage />} />
             <Route
               path="/professor-dashboard"
               element={<ProfessorDashboard />}
