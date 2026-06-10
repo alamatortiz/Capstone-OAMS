@@ -7,6 +7,13 @@
 
 html { scroll-behavior: smooth; }
 
+/* ── RESET ALL HEADING TAGS ── */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  padding: 0;
+  line-height: 1.2;
+}
+
 /* ── LIGHT MODE (DEFAULT) ── */
 body {
   background: #ffffff;
@@ -296,6 +303,27 @@ body.dark-mode .hero-subtitle {
 }
 
 /* ================================================
+   GLOBAL SECTION TITLE STYLES
+   ================================================ */
+.section-title {
+  text-align: center;
+  font-size: 2.1rem;
+  font-weight: 800;
+  font-family: "Inter", sans-serif;
+  color: #1f2937;
+  margin-bottom: 44px;
+  margin-top: 0;
+  padding: 0;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  transition: color 0.3s;
+}
+
+body.dark-mode .section-title {
+  color: #f0fdf4;
+}
+
+/* ================================================
    KEY FEATURES
    ================================================ */
 .features-section {
@@ -307,20 +335,6 @@ body.dark-mode .hero-subtitle {
 
 body.dark-mode .features-section {
   background: #0a0f0a;
-}
-
-.section-title {
-  text-align: center;
-  font-size: 2.1rem;
-  font-weight: 800;
-  font-family: "Inter", sans-serif;
-  color: #1f2937;
-  margin-bottom: 44px;
-  transition: color 0.3s;
-}
-
-body.dark-mode .section-title {
-  color: #f0fdf4;
 }
 
 .features-grid {
@@ -458,7 +472,6 @@ body.dark-mode .college-logo {
   filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)) drop-shadow(0 0 10px rgba(255,255,255,0.08));
 }
 
-
 .college-card:hover {
   border-color: rgba(34,197,94,0.48);
   transform: translateY(-3px);
@@ -469,7 +482,6 @@ body.dark-mode .college-logo {
 .college-logo {
   width: 360px;
   height: 360px;
-
   object-fit: contain;
   border-radius: 50%;
   mix-blend-mode: normal;
