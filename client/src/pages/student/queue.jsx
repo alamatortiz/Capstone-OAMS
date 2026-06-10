@@ -150,8 +150,6 @@ const generateQueueData = (college, service) => {
   };
 };
 
-
-
 export default function QueuePage() {
   const { user: authUser, logout } = useAuth();
   const navigate = useNavigate();

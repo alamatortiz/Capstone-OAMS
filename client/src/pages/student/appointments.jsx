@@ -120,9 +120,9 @@ const CalendarIcon = () => (
   </svg>
 );
 
-const ChevronRightIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="9 18 15 12 9 6"></polyline>
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 
@@ -545,9 +545,10 @@ export default function AppointmentsPage() {
           <div className="appointments-header">
             <div className="header-content">
               <Link to="/student/dashboard" className="back-link">
-                <ChevronRightIcon className="back-icon" />
-                Dashboard
+                <ChevronLeftIcon />
+                <span className="back-link-text">Dashboard</span>
               </Link>
+
               <div className="header-title-row">
                 <div className="header-icon">
                   <CalendarIcon />
@@ -695,8 +696,9 @@ export default function AppointmentsPage() {
               <h2>
                 <ClockIcon />
                 Upcoming Appointments
+              
+                <span className="badge">{upcomingAppointments.length}</span>
               </h2>
-              <span className="badge">{upcomingAppointments.length}</span>
             </div>
 
             {upcomingAppointments.length > 0 ? (
