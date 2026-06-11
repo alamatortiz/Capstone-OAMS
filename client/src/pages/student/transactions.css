@@ -797,9 +797,13 @@ body {
   content: none;
 }
 
+.filter-select {
+  padding-right: 2.25rem;
+}
+
 .filter-select svg {
   position: absolute;
-  right: 1.75rem;
+  right: 0.9rem;
   width: 1rem;
   height: 1rem;
   top: 50%;
