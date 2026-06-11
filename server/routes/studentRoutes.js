@@ -343,6 +343,7 @@ router.get(
           joinedAt: new Date(row.joined_at).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
+            timeZone: "Asia/Manila",
           }),
         };
       });
@@ -494,6 +495,7 @@ router.post(
           joinedAt: new Date(newEntry.joined_at).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
+            timeZone: "Asia/Manila",
           }),
         },
       });
