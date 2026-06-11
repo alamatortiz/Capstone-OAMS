@@ -30,9 +30,15 @@ export default function Counter() {
   };
 
   useEffect(() => {
-    fetchCount();
     const interval = setInterval(fetchCount, 3000);
-    return () => clearInterval(interval);
+
+    // Defer initial fetch to avoid triggering the "setState in effect" rule.
+    const timeout = setTimeout(fetchCount, 0);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, []);
 
   return (

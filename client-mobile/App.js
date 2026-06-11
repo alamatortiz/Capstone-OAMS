@@ -1,123 +1,113 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
-import axios from "axios";
+import React from "react";
+import { ActivityIndicator, View, Text, StyleSheet } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { AuthProvider, useAuth } from "./src/context/AuthContext";
 
-// IMPORTANT: Replace with your computer's local IP, not localhost
-const API = "http://192.168.100.2:5000/api";
+// Mock Screens (replace with your actual screens)
+const LoginScreen = () => (
+  <View style={styles.container}>
+    <Text>Login Screen</Text>
+  </View>
+);
+const StudentDashboardScreen = () => (
+  <View style={styles.container}>
+    <Text>Student Dashboard</Text>
+  </View>
+);
+const FacultyDashboardScreen = () => (
+  <View style={styles.container}>
+    <Text>Faculty Dashboard</Text>
+  </View>
+);
+const AdminDashboardScreen = () => (
+  <View style={styles.container}>
+    <Text>Admin Dashboard</Text>
+  </View>
+);
 
-export default function App() {
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+const AuthStack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
-  const fetchCount = async () => {
-    try {
-      const res = await axios.get(`${API}/counter`);
-      setCount(res.data.count);
-    } catch (err) {
-      Alert.alert("Connection Error", "Cannot reach server");
-    }
-  };
+function AppContent() {
+  const { user, isLoading, isAuthenticated } = useAuth();
 
-  const handleTap = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API}/counter/tap`);
-      setCount(res.data.count);
-    } catch (err) {
-      Alert.alert("Error", "Failed to increment");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCount();
-    const interval = setInterval(fetchCount, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>Loading user session...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>OAMS Mobile</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>Current Number</Text>
-        <Text style={styles.value}>{count}</Text>
-        <TouchableOpacity
-          style={[styles.button, loading && styles.disabled]}
-          onPress={handleTap}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? "Processing..." : "Tap to Increment"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.hint}>
-        This app shares the same backend as the web version.
-      </Text>
-    </View>
+    <NavigationContainer>
+      {isAuthenticated ? (
+        <Tab.Navigator>
+          {user?.role === "student" && (
+            <Tab.Screen name="Student" component={StudentDashboardScreen} />
+          )}
+          {user?.role === "faculty" && (
+            <Tab.Screen name="Faculty" component={FacultyDashboardScreen} />
+          )}
+          {user?.role === "admin" && (
+            <Tab.Screen name="Admin" component={AdminDashboardScreen} />
+          )}
+          {/* Add more common tabs or a default if no role-specific screen is found */}
+        </Tab.Navigator>
+      ) : (
+        <AuthStack.Navigator>
+          <AuthStack.Screen name="Login" component={LoginScreen} />
+        </AuthStack.Navigator>
+      )}
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f6fa",
+    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
   },
+  // You might need to adjust or remove these styles if they conflict with new components
   title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1a252f",
-    marginBottom: 24,
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 20,
+    color: "#333",
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    padding: 32,
-    width: "100%",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 10,
+    padding: 20,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 3,
   },
-  label: {
-    fontSize: 14,
-    color: "#94a3b8",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  value: {
-    fontSize: 64,
-    fontWeight: "700",
-    color: "#2563eb",
-    marginBottom: 24,
-  },
-  button: {
-    backgroundColor: "#2563eb",
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-  },
-  disabled: {
-    backgroundColor: "#93c5fd",
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontSize: 16,
+  subtitle: {
+    fontSize: 20,
     fontWeight: "600",
+    marginBottom: 10,
+    color: "#555",
   },
-  hint: {
-    marginTop: 16,
-    fontSize: 12,
-    color: "#94a3b8",
+  description: {
+    fontSize: 16,
     textAlign: "center",
+    color: "#777",
   },
 });
