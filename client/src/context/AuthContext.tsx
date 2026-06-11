@@ -46,15 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useMemo(() => !!user && !!token, [user, token]);
 
   const saveAuthData = useCallback((user: UserData, token: string) => {
-    localStorage.setItem("oams_user", JSON.stringify(user));
-    localStorage.setItem("oams_token", token);
+    sessionStorage.setItem("oams_user", JSON.stringify(user));
+    sessionStorage.setItem("oams_token", token);
     setUser(user);
     setToken(token);
   }, []);
 
   const clearAuthData = useCallback(() => {
-    localStorage.removeItem("oams_user");
-    localStorage.removeItem("oams_token");
+    sessionStorage.removeItem("oams_user");
+    sessionStorage.removeItem("oams_token");
     setUser(null);
     setToken(null);
   }, []);
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // On app load, check for existing token and fetch user data
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedToken = localStorage.getItem("oams_token");
+      const storedToken = sessionStorage.getItem("oams_token");
       if (storedToken) {
         setToken(storedToken);
         // Try to fetch user data with the stored token
