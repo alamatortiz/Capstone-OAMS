@@ -344,8 +344,10 @@ INSERT INTO services (service_id, service_name, description, department_id) VALU
 --   Slot 4: queue_number 11 (completed, not active) → current_count  0
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, status) VALUES
-(1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 'open'),
-(2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 'open'),
+-- (1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 'open'),
+-- (2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 'open'),
+(1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 0, 'open'),
+(2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  0, 'open'),
 (3, 3, 103, CURDATE(), '13:00:00', '17:00:00', 15,  0, 'open'),
 (4, 4, 103, CURDATE(), '08:00:00', '12:00:00', 20,  0, 'open');
 
@@ -361,28 +363,28 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 -- ─────────────────────────────────────────────────────────────
 
 -- Student 101: 1 active + 2 historical completed
-INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at, called_at, completed_at) VALUES
-(1, 101, 1, 1,  8,  'waiting',   NOW() - INTERVAL 20 MINUTE, NULL, NULL),
-(2, 101, 3, 3,  3,  'completed', NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY + INTERVAL 30 MINUTE, NOW() - INTERVAL 3 DAY + INTERVAL 45 MINUTE),
-(3, 101, 4, 4, 11,  'completed', NOW() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY + INTERVAL 20 MINUTE, NOW() - INTERVAL 7 DAY + INTERVAL 40 MINUTE);
+-- INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at, called_at, completed_at) VALUES
+-- (1, 101, 1, 1,  8,  'waiting',   NOW() - INTERVAL 20 MINUTE, NULL, NULL),
+-- (2, 101, 3, 3,  3,  'completed', NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY + INTERVAL 30 MINUTE, NOW() - INTERVAL 3 DAY + INTERVAL 45 MINUTE),
+-- (3, 101, 4, 4, 11,  'completed', NOW() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY + INTERVAL 20 MINUTE, NOW() - INTERVAL 7 DAY + INTERVAL 40 MINUTE);
 
 -- Student 104: 2 active
-INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
-(4, 104, 1, 1, 11, 'waiting', NOW() - INTERVAL  5 MINUTE),
-(5, 104, 2, 2,  5, 'waiting', NOW() - INTERVAL 10 MINUTE);
+-- INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
+-- (4, 104, 1, 1, 11, 'waiting', NOW() - INTERVAL  5 MINUTE),
+-- (5, 104, 2, 2,  5, 'waiting', NOW() - INTERVAL 10 MINUTE);
 
 -- Filler entries for slot 1 positions 1–7 and 9–10 (queue position math correctness)
-INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
-(10, 105, 1, 1,  1, 'waiting', NOW() - INTERVAL 60 MINUTE),
-(11, 108, 1, 1,  2, 'waiting', NOW() - INTERVAL 55 MINUTE),
-(12, 109, 1, 1,  3, 'waiting', NOW() - INTERVAL 50 MINUTE),
-(13, 105, 1, 1,  4, 'waiting', NOW() - INTERVAL 45 MINUTE),
-(14, 108, 1, 1,  5, 'waiting', NOW() - INTERVAL 40 MINUTE),
-(15, 109, 1, 1,  6, 'waiting', NOW() - INTERVAL 35 MINUTE),
-(16, 105, 1, 1,  7, 'waiting', NOW() - INTERVAL 30 MINUTE),
+-- INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
+-- (10, 105, 1, 1,  1, 'waiting', NOW() - INTERVAL 60 MINUTE),
+-- (11, 108, 1, 1,  2, 'waiting', NOW() - INTERVAL 55 MINUTE),
+-- (12, 109, 1, 1,  3, 'waiting', NOW() - INTERVAL 50 MINUTE),
+-- (13, 105, 1, 1,  4, 'waiting', NOW() - INTERVAL 45 MINUTE),
+-- (14, 108, 1, 1,  5, 'waiting', NOW() - INTERVAL 40 MINUTE),
+-- (15, 109, 1, 1,  6, 'waiting', NOW() - INTERVAL 35 MINUTE),
+-- (16, 105, 1, 1,  7, 'waiting', NOW() - INTERVAL 30 MINUTE),
 -- position 8 = student 101 (queue_id 1 above)
-(17, 108, 1, 1,  9, 'waiting', NOW() - INTERVAL 15 MINUTE),
-(18, 109, 1, 1, 10, 'waiting', NOW() - INTERVAL 12 MINUTE);
+-- (17, 108, 1, 1,  9, 'waiting', NOW() - INTERVAL 15 MINUTE),
+-- (18, 109, 1, 1, 10, 'waiting', NOW() - INTERVAL 12 MINUTE);
 -- position 11 = student 104 (queue_id 4 above)
 
 

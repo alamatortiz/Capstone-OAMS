@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
-// ===== Chat Widget Icons (copied pattern from StudentDashboard) =====
+// ===== Chat Widget Icons =====
 const ChatIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
@@ -21,11 +21,12 @@ const CloseIconChat = () => (
   </svg>
 );
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
+import { useQueue } from '../../contexts/QueueContext';
 import { COLLEGES } from '../../data/colleges';
 import { getCollegeLogo } from '../../data/collegeLogo';
 
@@ -33,7 +34,7 @@ import ucLogo from '../../assets/Pnc-Logo.png';
 import oamsLogo from '../../assets/oams_logo.png';
 import './queue.css';
 
-// ===== SIDEBAR ICONS (same as StudentDashboard) =====
+// ===== SIDEBAR ICONS =====
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -105,13 +106,7 @@ const UserIcon = () => (
 );
 
 const SunIcon = () => (
-  <svg
-    className="sun-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
+  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="5"></circle>
     <line x1="12" y1="1" x2="12" y2="3"></line>
     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -125,39 +120,34 @@ const SunIcon = () => (
 );
 
 const MoonIcon = () => (
-  <svg
-    className="moon-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
+  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 
-// Helper function to generate random queue data
-const generateQueueData = (college, service) => {
-  const collegeCode = college.match(/\(([A-Z]+)\)/)?.[1] || 'XXX';
-  const serviceCode = service.split(' ')[0].substring(0, 3).toUpperCase();
-  
-  return {
-    position: Math.floor(Math.random() * 10) + 1,
-    totalWaiting: Math.floor(Math.random() * 20) + 5,
-    estimatedWait: `${Math.floor(Math.random() * 20) + 10}-${Math.floor(Math.random() * 10) + 20} mins`,
-    queueNumber: `${collegeCode}-${serviceCode}-${Math.floor(Math.random() * 900) + 100}`,
-    joinedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-  };
-};
-
 export default function QueuePage() {
   const { user: authUser, logout } = useAuth();
+  const {
+    queues,
+    availableSlots,
+    isLoading,
+    error,
+    joinQueue,
+    leaveQueue,
+    isAlreadyInQueue,
+  } = useQueue();
+
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved ? saved === 'dark' : true;
   });
+
+  // Track which slot/queue buttons are in-flight to prevent double-clicks
+  const [joiningSlotId, setJoiningSlotId] = useState(null);
+  const [leavingQueueId, setLeavingQueueId] = useState(null);
+
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -173,138 +163,73 @@ export default function QueuePage() {
   const user = authUser
     ? {
         ...authUser,
-        college: authUser.departmentName ?? "N/A College",
-        departmentAbbrev: authUser.departmentAbbrev ?? "N/A Abbreviation",
+        college: authUser.departmentName ?? 'N/A College',
+        departmentAbbrev: authUser.departmentAbbrev ?? 'N/A',
       }
-    : {
-        name: "Student",
-        role: "student",
-        college: "",
-        departmentAbbrev: "",
-      };
+    : { name: 'Student', role: 'student', college: '', departmentAbbrev: '' };
 
+  // ── Filters ───────────────────────────────────────────────────────────────
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
-  const [myQueues, setMyQueues] = useState([
-    {
-      id: '1',
-      college: 'College of Computing Studies (CCS)',
-      service: 'Registrar - Document Request',
-      position: 3,
-      totalWaiting: 12,
-      estimatedWait: '15-20 mins',
-      status: 'waiting',
-      queueNumber: 'CCS-REG-047',
-      joinedAt: '10:30 AM',
-    },
-  ]);
 
-  const services = useMemo(
-    () => [
-      'Registrar - Document Request',
-      'Registrar - Enrollment Concerns',
-      'Cashier - Payment',
-      'Student Affairs - Clearance',
-      'Guidance Office - Consultation',
-      'Library - Book Concerns',
-    ],
-    []
-  );
+  // Derive unique service names from live slots
+  const serviceOptions = useMemo(() => {
+    const names = [...new Set(availableSlots.map((s) => s.serviceName))].sort();
+    return names;
+  }, [availableSlots]);
 
-  const availableQueues = useMemo(
-    () => [
-      {
-        college: 'College of Computing Studies (CCS)',
-        service: 'Registrar - Document Request',
-        currentServing: 'CCS-REG-044',
-        totalWaiting: 12,
-        avgWaitTime: '5-7 mins per person',
-        status: 'open',
-      },
-      {
-        college: 'College of Business, Accountancy and Administration (CBAA)',
-        service: 'Cashier - Payment',
-        currentServing: 'CBAA-CSH-028',
-        totalWaiting: 8,
-        avgWaitTime: '3-5 mins per person',
-        status: 'open',
-      },
-      {
-        college: 'College of Engineering (COE)',
-        service: 'Student Affairs - Clearance',
-        currentServing: 'COE-SAF-015',
-        totalWaiting: 5,
-        avgWaitTime: '8-10 mins per person',
-        status: 'open',
-      },
-      {
-        college: 'College of Education (COED)',
-        service: 'Document Processing',
-        currentServing: 'COED-DOC-032',
-        totalWaiting: 7,
-        avgWaitTime: '6-8 mins per person',
-        status: 'open',
-      },
-      {
-        college: 'College of Arts and Sciences (CAS)',
-        service: 'Registration',
-        currentServing: 'CAS-REG-019',
-        totalWaiting: 4,
-        avgWaitTime: '4-6 mins per person',
-        status: 'open',
-      },
-      {
-        college: 'College of Health and Allied Sciences (CHAS)',
-        service: 'Certification',
-        currentServing: 'CHAS-CERT-011',
-        totalWaiting: 6,
-        avgWaitTime: '7-9 mins per person',
-        status: 'open',
-      },
-    ],
-    []
-  );
-
-  const filteredQueues = useMemo(
+  // Filter available slots client-side
+  const filteredSlots = useMemo(
     () =>
-      availableQueues.filter(
-        (q) =>
-          (selectedCollege === 'all' || q.college === selectedCollege) &&
-          (selectedService === 'all' || q.service === selectedService)
-      ),
-    [availableQueues, selectedCollege, selectedService]
+      availableSlots.filter((slot) => {
+        const collegeMatch =
+          selectedCollege === 'all' ||
+          slot.departmentName === selectedCollege ||
+          // also match by abbreviation if someone passes that
+          slot.departmentAbbrev === selectedCollege;
+        const serviceMatch =
+          selectedService === 'all' || slot.serviceName === selectedService;
+        return collegeMatch && serviceMatch;
+      }),
+    [availableSlots, selectedCollege, selectedService],
   );
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // ── Chat ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleJoinQueue = useCallback((college, service) => {
-    const queueData = generateQueueData(college, service);
-    const newQueue = {
-      id: Date.now().toString(),
-      college,
-      service,
-      status: 'waiting',
-      ...queueData,
-    };
-    setMyQueues((prevQueues) => [...prevQueues, newQueue]);
-    toast.success('Successfully joined the queue!');
-  }, []);
+  // ── Actions ───────────────────────────────────────────────────────────────
+  const handleJoinQueue = useCallback(
+    async (slotId) => {
+      if (joiningSlotId) return;
+      setJoiningSlotId(slotId);
+      try {
+        await joinQueue(slotId);
+        toast.success('Successfully joined the queue!');
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        setJoiningSlotId(null);
+      }
+    },
+    [joinQueue, joiningSlotId],
+  );
 
-  const handleLeaveQueue = useCallback((id) => {
-    setMyQueues((prevQueues) => prevQueues.filter((q) => q.id !== id));
-    toast.info('You have left the queue');
-  }, []);
-
-  const isAlreadyInQueue = useCallback(
-    (college, service) =>
-      myQueues.some((q) => q.college === college && q.service === service),
-    [myQueues]
+  const handleLeaveQueue = useCallback(
+    async (queueId) => {
+      if (leavingQueueId) return;
+      setLeavingQueueId(queueId);
+      try {
+        await leaveQueue(queueId);
+        toast.info('You have left the queue');
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        setLeavingQueueId(null);
+      }
+    },
+    [leaveQueue, leavingQueueId],
   );
 
   const handleLogout = () => {
@@ -344,39 +269,36 @@ export default function QueuePage() {
   };
 
   const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-
-    if (lowerInput.includes('queue') || lowerInput.includes('position')) {
-      return myQueues.length > 0
-        ? `You have ${myQueues.length} active queue${myQueues.length > 1 ? 's' : ''}. Your first queue position is ${myQueues[0].position}. Est. wait time: ${myQueues[0].estimatedWait}`
+    const lower = userInput.toLowerCase();
+    if (lower.includes('queue') || lower.includes('position')) {
+      return queues.length > 0
+        ? `You have ${queues.length} active queue${queues.length > 1 ? 's' : ''}. Your first queue position is ${queues[0].position}. Est. wait: ${queues[0].estimatedWait}`
         : "You don't have any active queues. Would you like to join one?";
-    } else if (lowerInput.includes('service') || lowerInput.includes('available')) {
-      return "We have 6 services available including Registrar, Cashier, Student Affairs, Guidance Office, and Library services. Would you like to browse them?";
-    } else if (lowerInput.includes('wait') || lowerInput.includes('time')) {
-      return myQueues.length > 0
-        ? `Your estimated wait time is ${myQueues[0].estimatedWait}. Currently ${myQueues[0].totalWaiting} people are waiting in this queue.`
-        : "Join a queue to see your estimated wait time!";
-    } else if (lowerInput.includes('join') || lowerInput.includes('queue')) {
-      return "Browse the available queues below and click 'Join Queue' to get started. You can filter by college and service type.";
-    } else {
-      return "I can help you with queue information, wait times, and more. What would you like to know?";
     }
+    if (lower.includes('wait') || lower.includes('time')) {
+      return queues.length > 0
+        ? `Your estimated wait time is ${queues[0].estimatedWait}. Currently ${queues[0].totalWaiting} people are waiting.`
+        : 'Join a queue to see your estimated wait time!';
+    }
+    if (lower.includes('service') || lower.includes('available')) {
+      return `There are ${availableSlots.length} open queue${availableSlots.length !== 1 ? 's' : ''} available today. Use the filters to find what you need.`;
+    }
+    return "I can help you with queue information, wait times, and available services. What would you like to know?";
   };
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
-    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
-    { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
-    { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
-    { icon: HistoryIconNav, label: "Transactions", path: "/student/transactions" },
+    { icon: HomeIcon, label: 'Dashboard', path: '/student/dashboard' },
+    { icon: QueueIconNav, label: 'Queue', path: '/student/queue' },
+    { icon: CalendarIconNav, label: 'Appointments', path: '/student/appointments' },
+    { icon: DocumentIconNav, label: 'Documents', path: '/student/documents' },
+    { icon: HistoryIconNav, label: 'Transactions', path: '/student/transactions' },
   ];
 
   return (
     <div className="dashboard-with-sidebar">
       {/* Sidebar */}
-      <aside className={`dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
+      <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-inner">
-          {/* Logo Section */}
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
@@ -386,20 +308,19 @@ export default function QueuePage() {
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
           </div>
 
-          {/* User Info */}
           <div className="sidebar-user-section">
             <div className="user-top-row">
               <div className="user-avatar-large">
                 <UserIcon />
               </div>
               <div className="user-info-content">
-                <p className="user-name-large">{user?.name ?? "Student"}</p>
+                <p className="user-name-large">{user?.name ?? 'Student'}</p>
                 <span className="user-role-badge">Student</span>
               </div>
             </div>
@@ -410,7 +331,6 @@ export default function QueuePage() {
             </div>
           </div>
 
-          {/* Navigation */}
           <nav className="sidebar-nav">
             <div className="nav-items">
               {navItems.map((item) => (
@@ -428,7 +348,6 @@ export default function QueuePage() {
             </div>
           </nav>
 
-          {/* Logout Button */}
           <div className="sidebar-logout">
             <button className="logout-btn" onClick={handleLogout}>
               <LogOutIcon />
@@ -450,7 +369,7 @@ export default function QueuePage() {
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -468,7 +387,8 @@ export default function QueuePage() {
       {/* Main Content */}
       <main className="dashboard-main">
         <div className="queue-page">
-          {/* Queue Header */}
+
+          {/* Header */}
           <div className="queue-header">
             <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
@@ -487,31 +407,47 @@ export default function QueuePage() {
             </div>
           </div>
 
+          {/* Global loading / error states */}
+          {isLoading && (
+            <div className="no-queues-card">
+              <Loader2 className="no-queues-icon" style={{ animation: 'spin 1s linear infinite' }} />
+              <p className="no-queues-description">Loading queues…</p>
+            </div>
+          )}
+
+          {!isLoading && error && (
+            <div className="no-queues-card">
+              <AlertCircle className="no-queues-icon" />
+              <h3 className="no-queues-title">Something went wrong</h3>
+              <p className="no-queues-description">{error}</p>
+            </div>
+          )}
+
           {/* My Active Queues */}
-          {myQueues.length > 0 && (
+          {!isLoading && queues.length > 0 && (
             <section className="my-queues-section">
               <div className="section-title-wrapper">
                 <Clock className="section-icon" />
                 <h2 className="section-title">My Active Queues</h2>
-                <span className="queue-badge">{myQueues.length}</span>
+                <span className="queue-badge">{queues.length}</span>
               </div>
               <div className="queues-list">
-                {myQueues.map((queue) => (
-                  <div key={queue.id} className="queue-card active-queue-card">
+                {queues.map((queue) => (
+                  <div key={queue.queueId} className="queue-card active-queue-card">
                     <div className="queue-card-content">
                       <div className="queue-left">
                         <img
-                          src={getCollegeLogo(queue.college)}
-                          alt={queue.college}
+                          src={getCollegeLogo(queue.departmentName)}
+                          alt={queue.departmentName}
                           className="queue-college-logo"
                         />
                         <div className="queue-info">
                           <div className="queue-header-row">
                             <div>
-                              <h3 className="queue-service-name">{queue.service}</h3>
-                              <p className="queue-college-name">{queue.college}</p>
+                              <h3 className="queue-service-name">{queue.serviceName}</h3>
+                              <p className="queue-college-name">{queue.departmentName}</p>
                             </div>
-                            <span className="queue-number-badge">{queue.queueNumber}</span>
+                            <span className="queue-number-badge">{queue.queueNumberBadge}</span>
                           </div>
                           <div className="queue-stats-grid">
                             <div className="queue-stat">
@@ -535,13 +471,22 @@ export default function QueuePage() {
                             <div className="progress-label-row">
                               <span className="progress-label-text">Queue Progress</span>
                               <span className="progress-percentage">
-                                {Math.round(((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100)}%
+                                {queue.totalWaiting > 0
+                                  ? Math.round(
+                                      ((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100,
+                                    )
+                                  : 0}%
                               </span>
                             </div>
                             <div className="progress-bar">
                               <div
                                 className="progress-fill"
-                                style={{ width: `${((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100}%` }}
+                                style={{
+                                  width:
+                                    queue.totalWaiting > 0
+                                      ? `${((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100}%`
+                                      : '0%',
+                                }}
                               />
                             </div>
                           </div>
@@ -549,13 +494,20 @@ export default function QueuePage() {
                       </div>
                       <button
                         className="queue-leave-btn"
-                        onClick={() => handleLeaveQueue(queue.id)}
+                        onClick={() => handleLeaveQueue(queue.queueId)}
+                        disabled={leavingQueueId === queue.queueId}
                         title="Leave this queue"
                         type="button"
-                        aria-label={`Leave queue for ${queue.service}`}
+                        aria-label={`Leave queue for ${queue.serviceName}`}
                       >
-                        <XCircle className="icon" />
-                        <span className="leave-text">Leave Queue</span>
+                        {leavingQueueId === queue.queueId ? (
+                          <Loader2 className="icon" style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <XCircle className="icon" />
+                        )}
+                        <span className="leave-text">
+                          {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -564,138 +516,172 @@ export default function QueuePage() {
             </section>
           )}
 
-          {/* Filters */}
-          <div className="filters-card">
-            <div className="filters-header">
-              <h3 className="filters-title">Available Queues</h3>
-              <p className="filters-description">Select a college and service to join a queue</p>
-            </div>
-            <div className="filters-grid">
-              <div className="filter-group">
-                <label className="filter-label" htmlFor="college-select">
-                  College
-                </label>
-                <select
-                  id="college-select"
-                  className="filter-select"
-                  value={selectedCollege}
-                  onChange={(e) => setSelectedCollege(e.target.value)}
-                  aria-label="Filter by college"
-                >
-                  <option value="all">All Colleges</option>
-                  {COLLEGES.map((college) => (
-                    <option key={college.name} value={college.name}>
-                      {college.name}
-                    </option>
-                  ))}
-                </select>
+          {/* Filters + Available Queues */}
+          {!isLoading && (
+            <>
+              <div className="filters-card">
+                <div className="filters-header">
+                  <h3 className="filters-title">Available Queues</h3>
+                  <p className="filters-description">
+                    Select a college and service to join a queue
+                  </p>
+                </div>
+                <div className="filters-grid">
+                  <div className="filter-group">
+                    <label className="filter-label" htmlFor="college-select">
+                      College
+                    </label>
+                    <select
+                      id="college-select"
+                      className="filter-select"
+                      value={selectedCollege}
+                      onChange={(e) => setSelectedCollege(e.target.value)}
+                      aria-label="Filter by college"
+                    >
+                      <option value="all">All Colleges</option>
+                      {COLLEGES.map((college) => (
+                        <option key={college.name} value={college.name}>
+                          {college.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="filter-group">
+                    <label className="filter-label" htmlFor="service-select">
+                      Service
+                    </label>
+                    <select
+                      id="service-select"
+                      className="filter-select"
+                      value={selectedService}
+                      onChange={(e) => setSelectedService(e.target.value)}
+                      aria-label="Filter by service"
+                    >
+                      <option value="all">All Services</option>
+                      {serviceOptions.map((service) => (
+                        <option key={service} value={service}>
+                          {service}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div className="filter-group">
-                <label className="filter-label" htmlFor="service-select">
-                  Service
-                </label>
-                <select
-                  id="service-select"
-                  className="filter-select"
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  aria-label="Filter by service"
-                >
-                  <option value="all">All Services</option>
-                  {services.map((service) => (
-                    <option key={service} value={service}>
-                      {service}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
 
-          {/* Available Queues List */}
-          {filteredQueues.length > 0 ? (
-            <div className="available-queues-list">
-              {filteredQueues.map((queue) => {
-                const alreadyInQueue = isAlreadyInQueue(queue.college, queue.service);
-                return (
-                  <div
-                    key={`${queue.college}-${queue.service}`}
-                    className="queue-card available-queue-card"
-                  >
-                    <div className="queue-card-content">
-                      <div className="queue-left">
-                        <div className="queue-logo-wrapper">
-                          <img
-                            src={getCollegeLogo(queue.college)}
-                            alt={queue.college}
-                            className="queue-college-logo-sm"
-                          />
-                        </div>
-                        <div className="queue-info">
-                          <div className="queue-header-row">
-                            <div>
-                              <h3 className="queue-service-name">{queue.service}</h3>
-                              <p className="queue-college-name">{queue.college}</p>
+              {filteredSlots.length > 0 ? (
+                <div className="available-queues-list">
+                  {filteredSlots.map((slot) => {
+                    const alreadyIn = isAlreadyInQueue(slot.slotId);
+                    const isJoining = joiningSlotId === slot.slotId;
+                    const atCapacity = !slot.hasCapacity;
+                    const disabled = alreadyIn || isJoining || atCapacity;
+
+                    return (
+                      <div
+                        key={slot.slotId}
+                        className="queue-card available-queue-card"
+                      >
+                        <div className="queue-card-content">
+                          <div className="queue-left">
+                            <div className="queue-logo-wrapper">
+                              <img
+                                src={getCollegeLogo(slot.departmentName)}
+                                alt={slot.departmentName}
+                                className="queue-college-logo-sm"
+                              />
                             </div>
-                            <span className="queue-status-badge">Open</span>
+                            <div className="queue-info">
+                              <div className="queue-header-row">
+                                <div>
+                                  <h3 className="queue-service-name">{slot.serviceName}</h3>
+                                  <p className="queue-college-name">{slot.departmentName}</p>
+                                </div>
+                                <span className="queue-status-badge">
+                                  {atCapacity ? 'Full' : 'Open'}
+                                </span>
+                              </div>
+                              <div className="queue-details-grid">
+                                <div className="queue-detail-item">
+                                  <div className="detail-icon waiting">
+                                    <Users className="icon" />
+                                  </div>
+                                  <div>
+                                    <p className="detail-label">Waiting</p>
+                                    <p className="detail-value">{slot.waitingCount}</p>
+                                  </div>
+                                </div>
+                                <div className="queue-detail-item">
+                                  <div className="detail-icon time">
+                                    <Clock className="icon" />
+                                  </div>
+                                  <div>
+                                    <p className="detail-label">Avg Wait</p>
+                                    <p className="detail-value">{slot.avgWaitTime}</p>
+                                  </div>
+                                </div>
+                                <div className="queue-detail-item">
+                                  <div className="detail-icon serving">
+                                    <CheckCircle2 className="icon" />
+                                  </div>
+                                  <div>
+                                    <p className="detail-label">Now Serving</p>
+                                    <p className="detail-value">{slot.currentlyServing}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="queue-details-grid">
-                            <div className="queue-detail-item">
-                              <div className="detail-icon waiting">
-                                <Users className="icon" />
-                              </div>
-                              <div>
-                                <p className="detail-label">Waiting</p>
-                                <p className="detail-value">{queue.totalWaiting}</p>
-                              </div>
-                            </div>
-                            <div className="queue-detail-item">
-                              <div className="detail-icon time">
-                                <Clock className="icon" />
-                              </div>
-                              <div>
-                                <p className="detail-label">Avg Wait</p>
-                                <p className="detail-value">{queue.avgWaitTime}</p>
-                              </div>
-                            </div>
-                            <div className="queue-detail-item">
-                              <div className="detail-icon serving">
-                                <CheckCircle2 className="icon" />
-                              </div>
-                              <div>
-                                <p className="detail-label">Now Serving</p>
-                                <p className="detail-value">{queue.currentServing}</p>
-                              </div>
-                            </div>
-                          </div>
+                          <button
+                            className={`queue-join-btn ${disabled ? 'disabled' : ''}`}
+                            onClick={() => handleJoinQueue(slot.slotId)}
+                            disabled={disabled}
+                            type="button"
+                            aria-label={
+                              alreadyIn
+                                ? `Already in queue for ${slot.serviceName}`
+                                : atCapacity
+                                ? `Queue for ${slot.serviceName} is full`
+                                : `Join queue for ${slot.serviceName}`
+                            }
+                          >
+                            {isJoining ? (
+                              <>
+                                <Loader2
+                                  style={{
+                                    width: '1rem',
+                                    height: '1rem',
+                                    marginRight: '0.375rem',
+                                    animation: 'spin 1s linear infinite',
+                                    display: 'inline',
+                                  }}
+                                />
+                                Joining…
+                              </>
+                            ) : alreadyIn ? (
+                              'Already in Queue'
+                            ) : atCapacity ? (
+                              'Queue Full'
+                            ) : (
+                              'Join Queue'
+                            )}
+                          </button>
                         </div>
                       </div>
-                      <button
-                        className={`queue-join-btn ${alreadyInQueue ? 'disabled' : ''}`}
-                        onClick={() => handleJoinQueue(queue.college, queue.service)}
-                        disabled={alreadyInQueue}
-                        type="button"
-                        aria-label={
-                          alreadyInQueue
-                            ? `Already in queue for ${queue.service}`
-                            : `Join queue for ${queue.service}`
-                        }
-                      >
-                        {alreadyInQueue ? 'Already in Queue' : 'Join Queue'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="no-queues-card">
-              <AlertCircle className="no-queues-icon" />
-              <h3 className="no-queues-title">No queues found</h3>
-              <p className="no-queues-description">
-                Try adjusting your filters or check back later
-              </p>
-            </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="no-queues-card">
+                  <AlertCircle className="no-queues-icon" />
+                  <h3 className="no-queues-title">No queues found</h3>
+                  <p className="no-queues-description">
+                    {availableSlots.length === 0
+                      ? 'No queues are open today. Check back later.'
+                      : 'Try adjusting your filters.'}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
@@ -706,7 +692,7 @@ export default function QueuePage() {
       )}
 
       {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
+      <div className={`chat-widget ${chatOpen ? 'open' : ''}`}>
         {chatOpen && (
           <div className="chat-container">
             <div className="chat-header">
@@ -721,10 +707,7 @@ export default function QueuePage() {
             </div>
             <div className="chat-messages">
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`message message-${message.type}`}
-                >
+                <div key={message.id} className={`message message-${message.type}`}>
                   <div className="message-content">{message.text}</div>
                 </div>
               ))}
@@ -738,18 +721,14 @@ export default function QueuePage() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
               />
-              <button
-                type="submit"
-                className="chat-send-btn"
-                aria-label="Send message"
-              >
+              <button type="submit" className="chat-send-btn" aria-label="Send message">
                 <SendIcon />
               </button>
             </form>
           </div>
         )}
         <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
+          className={`chat-fab ${chatOpen ? 'hidden' : ''}`}
           onClick={() => setChatOpen(true)}
           aria-label="Open chat"
         >
