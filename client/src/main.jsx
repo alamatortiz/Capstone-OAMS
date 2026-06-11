@@ -60,10 +60,8 @@ createRoot(document.getElementById("root")).render(
             <Route path="/student-documents" element={<DocumentsPage />} />
             <Route path="/student-transactions" element={<TransactionsPage />} />
 
-            <Route
-              path="/professor-dashboard"
-              element={<ProfessorDashboard />}
-            />
+            <Route path="/professor-dashboard" element={<ProfessorDashboard />} />
+            
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
         </BrowserRouter>

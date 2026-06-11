@@ -21,7 +21,7 @@ const CloseIconChat = () => (
   </svg>
 );
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -265,15 +265,15 @@ export default function QueuePage() {
     []
   );
 
-  const filteredQueues = useMemo(
-    () =>
-      availableQueues.filter(
-        (q) =>
-          (selectedCollege === 'all' || q.college === selectedCollege) &&
-          (selectedService === 'all' || q.service === selectedService)
-      ),
-    [availableQueues, selectedCollege, selectedService]
-  );
+const filteredQueues = useMemo(
+  () =>
+    availableQueues.filter(
+      (q) =>
+        (selectedCollege === 'all' || q.college === selectedCollege) &&
+        (selectedService === 'all' || q.service === selectedService)
+    ),
+  [availableQueues, selectedCollege, selectedService]
+);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -575,39 +575,45 @@ export default function QueuePage() {
                 <label className="filter-label" htmlFor="college-select">
                   College
                 </label>
-                <select
-                  id="college-select"
-                  className="filter-select"
-                  value={selectedCollege}
-                  onChange={(e) => setSelectedCollege(e.target.value)}
-                  aria-label="Filter by college"
-                >
-                  <option value="all">All Colleges</option>
-                  {COLLEGES.map((college) => (
-                    <option key={college.name} value={college.name}>
-                      {college.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="filter-select-wrapper">
+                  <select
+                    id="college-select"
+                    className="filter-select"
+                    value={selectedCollege}
+                    onChange={(e) => setSelectedCollege(e.target.value)}
+                    aria-label="Filter by college"
+                  >
+                    <option value="all">All Colleges</option>
+                    {COLLEGES.map((college) => (
+                      <option key={college.name} value={college.name}>
+                        {college.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="filter-chevron" />
+                </div>
               </div>
               <div className="filter-group">
                 <label className="filter-label" htmlFor="service-select">
                   Service
                 </label>
-                <select
-                  id="service-select"
-                  className="filter-select"
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  aria-label="Filter by service"
-                >
-                  <option value="all">All Services</option>
-                  {services.map((service) => (
-                    <option key={service} value={service}>
-                      {service}
-                    </option>
-                  ))}
-                </select>
+                <div className="filter-select-wrapper">
+                  <select
+                    id="service-select"
+                    className="filter-select"
+                    value={selectedService}
+                    onChange={(e) => setSelectedService(e.target.value)}
+                    aria-label="Filter by service"
+                  >
+                    <option value="all">All Services</option>
+                    {services.map((service) => (
+                      <option key={service} value={service}>
+                        {service}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="filter-chevron" />
+                </div>
               </div>
             </div>
           </div>
