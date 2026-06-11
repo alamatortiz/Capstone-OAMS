@@ -1,3 +1,4 @@
+import React, { Suspense } from 'react';
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -7,6 +8,7 @@ import Login from "./pages/Login.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/student_dashboard.jsx";
 import QueuePage from "./pages/student/queue.jsx";
+const QueueStatusPage = React.lazy(() => import("./pages/student/queue-status.jsx"));
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
@@ -40,6 +42,7 @@ createRoot(document.getElementById("root")).render(
             <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
               <Route path="/student/dashboard" element={<StudentDashboard />} />
               <Route path="/student/queue" element={<QueuePage />} />
+              <Route path="/student/queue-status" element={<QueueStatusPage />} /> {/* ← ADD THIS */}
               <Route path="/student/appointments" element={<AppointmentsPage />} />
               <Route path="/student/documents" element={<DocumentsPage />} />
               <Route path="/student/transactions" element={<TransactionsPage />} />
@@ -56,14 +59,13 @@ createRoot(document.getElementById("root")).render(
             {/* Backward-compatible TEMP UI-testing routes, to be removed later */}
             <Route path="/student-dashboard" element={<StudentDashboard />} />
             <Route path="/student-queue" element={<QueuePage />} />
+            <Route path="/student/queue-status" element={<Suspense fallback={<div>Loading...</div>}><QueueStatusPage /></Suspense>} />
             <Route path="/student-appointments" element={<AppointmentsPage />} />
             <Route path="/student-documents" element={<DocumentsPage />} />
             <Route path="/student-transactions" element={<TransactionsPage />} />
 
-            <Route
-              path="/professor-dashboard"
-              element={<ProfessorDashboard />}
-            />
+            <Route path="/professor-dashboard" element={<ProfessorDashboard />} />
+            
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
         </BrowserRouter>
