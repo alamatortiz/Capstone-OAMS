@@ -197,7 +197,6 @@ router.get(
            qs.max_capacity,
            qs.current_count,
            qs.status,
-           (qs.current_count < qs.max_capacity) AS has_capacity,
            s.service_name,
            d.department_id,
            d.department_name,
@@ -248,7 +247,7 @@ router.get(
           endTime: slot.end_time,
           maxCapacity: slot.max_capacity,
           currentCount: slot.current_count,
-          hasCapacity: !!slot.has_capacity,
+          hasCapacity: waitingCount < slot.max_capacity,
           status: slot.status,
           waitingCount,
           currentlyServing,
@@ -397,7 +396,15 @@ router.post(
           .status(409)
           .json({ error: "This queue is not currently open" });
       }
-      if (slot.current_count >= slot.max_capacity) {
+
+      // 1b. Live capacity check — avoids relying on drifted current_count
+      const [[countRow]] = await conn.query(
+        `SELECT COUNT(*) AS actual_waiting
+         FROM queues
+         WHERE slot_id = ? AND status = 'waiting'`,
+        [slotId],
+      );
+      if (countRow.actual_waiting >= slot.max_capacity) {
         await conn.rollback();
         return res.status(409).json({ error: "This queue is at full capacity" });
       }

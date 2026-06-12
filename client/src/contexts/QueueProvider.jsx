@@ -13,6 +13,7 @@ export function QueueProvider({ children }) {
 
   // ── Fetch active queues for the logged-in student ─────────────────────────
   const fetchActiveQueues = useCallback(async () => {
+    setError(null);
     try {
       const { data } = await api.get('/student/queues/active');
       setQueues(data.queues ?? []);
@@ -24,6 +25,7 @@ export function QueueProvider({ children }) {
 
   // ── Fetch all open slots for today ────────────────────────────────────────
   const fetchAvailableSlots = useCallback(async () => {
+    setError(null);
     try {
       const { data } = await api.get('/student/queues/available');
       setAvailableSlots(data.slots ?? []);
@@ -58,21 +60,35 @@ export function QueueProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.userId]); // Re-run only when the actual user identity changes
 
+  // ── Re-fetch when user returns to the tab ────────────────────────────────
+  useEffect(() => {
+    if (!user?.userId) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        fetchActiveQueues();
+        fetchAvailableSlots();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [user?.userId, fetchActiveQueues, fetchAvailableSlots]);
+
   // ── Join a queue ──────────────────────────────────────────────────────────
   const joinQueue = useCallback(async (slotId) => {
     try {
       const { data } = await api.post('/student/queues/join', { slotId });
       // Add to active queues
       setQueues((prev) => [...prev, data.queue]);
-      // Refresh available slots so counts update
+      // Refresh slot counts and re-fetch active queues to get accurate position
       await fetchAvailableSlots();
+      await fetchActiveQueues();
       return data.queue;
     } catch (err) {
       const msg =
         err?.response?.data?.error ?? 'Failed to join the queue. Please try again.';
       throw new Error(msg);
     }
-  }, [fetchAvailableSlots]);
+  }, [fetchAvailableSlots, fetchActiveQueues]);
 
   // ── Leave a queue ─────────────────────────────────────────────────────────
   const leaveQueue = useCallback(async (queueId) => {
