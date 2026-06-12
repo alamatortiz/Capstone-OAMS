@@ -189,9 +189,10 @@ export default function QueuePage() {
           slot.departmentAbbrev === selectedCollege;
         const serviceMatch =
           selectedService === 'all' || slot.serviceName === selectedService;
-        return collegeMatch && serviceMatch;
+        const notAlreadyJoined = !isAlreadyInQueue(slot.slotId); // Issue 7 fix
+        return collegeMatch && serviceMatch && notAlreadyJoined;
       }),
-    [availableSlots, selectedCollege, selectedService],
+    [availableSlots, selectedCollege, selectedService, isAlreadyInQueue],
   );
 
   // ── Chat ──────────────────────────────────────────────────────────────────
