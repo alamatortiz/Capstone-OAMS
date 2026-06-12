@@ -192,6 +192,8 @@ CREATE TABLE appointments (
     appointment_id   INT          AUTO_INCREMENT PRIMARY KEY,
     student_id       INT          NOT NULL,
     faculty_id       INT          NOT NULL,
+    department_id    INT          NOT NULL,
+    service_id       INT          NULL,
     appointment_date DATE         NOT NULL,
     appointment_time TIME         NOT NULL,
     status           ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
@@ -199,22 +201,29 @@ CREATE TABLE appointments (
     created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id),
-    -- prevents duplicate bookings for the same student/faculty/date/time
-    UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time)
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE SET NULL,    -- prevents duplicate bookings for the same student/faculty/date/time
+    UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
+    INDEX idx_appointments_dept_service (department_id, service_id)
 );
 
 -- ─────────────────────────────────────────────────────────────
 -- 9. DOCUMENT PROCESSING
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE document_requests (
-    request_id      INT          AUTO_INCREMENT PRIMARY KEY,
-    student_id      INT          NOT NULL,
-    service_id      INT          NOT NULL,
-    request_type    VARCHAR(100) NOT NULL,
-    status          ENUM('pending','processing','generated','released') DEFAULT 'pending',
-    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    request_id              INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number         VARCHAR(50)  NOT NULL UNIQUE, -- Dynamically assigned via trigger below    
+    student_id              INT          NOT NULL,  
+    service_id              INT          NOT NULL,
+    request_type            VARCHAR(100) NOT NULL,
+    purpose                 VARCHAR(255) NOT NULL,
+    status                  ENUM('pending','processing','generated','released') DEFAULT 'pending',
+    estimated_completion    DATE         NULL,
+    notes                   TEXT         NULL,
+    created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
-    FOREIGN KEY (service_id) REFERENCES services(service_id)
+    FOREIGN KEY (service_id) REFERENCES services(service_id),
+    INDEX idx_document_requests_tracking (tracking_number)
 );
 
 CREATE TABLE generated_files (

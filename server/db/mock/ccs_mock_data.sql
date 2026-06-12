@@ -48,6 +48,23 @@ TRUNCATE TABLE users;
 TRUNCATE TABLE departments;
 SET FOREIGN_KEY_CHECKS = 1;
 
+-- DYNAMIC GENERATOR TRIGGER FOR TRACKING NUMBER
+DELIMITER //
+
+CREATE TRIGGER ts_auto_tracking_number
+BEFORE INSERT ON document_requests
+FOR EACH ROW
+BEGIN
+    DECLARE next_id INT;
+    
+    -- Dynamically look up the next primary increment token sequence
+    SELECT COALESCE(MAX(request_id), 0) + 1 INTO next_id FROM document_requests;
+    
+    -- Combines text with padded zero increment (e.g., REQ-00001, REQ-00002)
+    SET NEW.tracking_number = CONCAT('REQ-', LPAD(next_id, 5, '0'));
+END//
+
+DELIMITER ;
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 0 · DEPARTMENTS
@@ -391,28 +408,28 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 8 · APPOINTMENTS
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO appointments (appointment_id, student_id, faculty_id, appointment_date, appointment_time, status, notes, created_at) VALUES
+INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, appointment_date, appointment_time, status, notes, created_at) VALUES
 -- Student 101: 1 approved upcoming, 1 pending upcoming, 1 completed
-(1, 101, 102, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
-(2, 101, 106, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
-(3, 101, 107, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
+(1, 101, 102, 1001, 1, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
+(2, 101, 106, 1001, 1, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
+(3, 101, 107, 1001, 1, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
 -- Student 104: 1 pending upcoming, 2 completed
-(4, 104, 102, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
-(5, 104, 106, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
-(6, 104, 107, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
+(4, 104, 102, 1001, 1, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
+(5, 104, 106, 1001, 1, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
+(6, 104, 107, 1001, 1, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 9 · DOCUMENT REQUESTS
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO document_requests (request_id, student_id, service_id, request_type, status, created_at) VALUES
+INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, notes, created_at) VALUES
 -- Student 101: 1 processing, 1 released
-(1, 101, 3, 'Good Moral Certificate',    'processing', NOW() - INTERVAL 3 DAY),
-(2, 101, 4, 'Transcript of Records',     'released',   NOW() - INTERVAL 14 DAY),
+(1,  101, 3, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', '2026-06-14', 'Document Test 1', NOW() - INTERVAL 3 DAY),
+(2,  101, 4, 'Transcript of Records',     'Local Doc Req 2', 'released',   '2026-06-14', 'Document Test 2', NOW() - INTERVAL 14 DAY),
 -- Student 104: 2 pending, 1 released
-(3, 104, 3, 'Good Moral Certificate',    'pending',    NOW() - INTERVAL 1 DAY),
-(4, 104, 4, 'Transcript of Records',     'pending',    NOW() - INTERVAL 2 DAY),
-(5, 104, 5, 'Certificate of Enrollment', 'released',   NOW() - INTERVAL 10 DAY);
+(3,  104, 3, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', 'Document Test 3', NOW() - INTERVAL 1 DAY),
+(4,  104, 4, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', 'Document Test 4', NOW() - INTERVAL 2 DAY),
+(5,  104, 5, 'Certificate of Enrollment', 'Local Doc Req 5', 'released',   '2026-06-14', 'Document Test 5', NOW() - INTERVAL 10 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
