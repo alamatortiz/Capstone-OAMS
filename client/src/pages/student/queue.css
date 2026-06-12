@@ -1172,15 +1172,27 @@ body {
 .filter-chevron {
   position: absolute;
   right: 1rem;
+  /* Match the vertical centering used in transactions page */
   top: 50%;
   transform: translateY(-50%);
-  width: 1.25rem;
-  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
   color: var(--text-tertiary);
   pointer-events: none;
   flex-shrink: 0;
   transition: all 0.2s ease;
 }
+
+.filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+}
+
 
 .filter-select:hover {
   border-color: rgba(34, 197, 94, 0.3);

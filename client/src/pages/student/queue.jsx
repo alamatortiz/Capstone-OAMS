@@ -21,7 +21,7 @@ const CloseIconChat = () => (
   </svg>
 );
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2 } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -546,6 +546,8 @@ export default function QueuePage() {
                         </option>
                       ))}
                     </select>
+
+                    <ChevronDown />
                   </div>
                   <div className="filter-group">
                     <label className="filter-label" htmlFor="service-select">
@@ -565,6 +567,8 @@ export default function QueuePage() {
                         </option>
                       ))}
                     </select>
+
+                    <ChevronDown />
                   </div>
                 </div>
               </div>
