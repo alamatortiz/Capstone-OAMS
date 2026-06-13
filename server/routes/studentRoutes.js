@@ -176,6 +176,187 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
+// DOCUMENT REQUEST ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/documents
+router.get(
+  "/documents",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           dr.request_id,
+           dr.tracking_number,
+           dr.request_type,
+           dr.purpose,
+           dr.status,
+           dr.estimated_completion,
+           dr.notes,
+           dr.created_at,
+           d.department_name AS college
+         FROM document_requests dr
+         JOIN services s ON dr.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE dr.student_id = ?
+         ORDER BY dr.created_at DESC`,
+        [studentId],
+      );
+
+      // Map DB status enum -> frontend status vocabulary
+      const statusMap = {
+        pending: "pending",
+        processing: "processing",
+        generated: "ready",
+        released: "claimed",
+      };
+
+      const documents = rows.map((d) => ({
+        id: String(d.request_id),
+        type: d.request_type,
+        college: d.college,
+        requestDate: d.created_at,
+        purpose: d.purpose,
+        status: statusMap[d.status] ?? d.status,
+        trackingNumber: d.tracking_number,
+        notes: d.notes || undefined,
+        estimatedCompletion: d.estimated_completion || undefined,
+      }));
+
+      res.json({ documents });
+    } catch (error) {
+      console.error("Get documents error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/student/documents
+// Body: { type, college, purpose, copies }
+router.post(
+  "/documents",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { type, college, purpose, copies } = req.body;
+
+    if (!type || !college || !purpose) {
+      return res
+        .status(400)
+        .json({ error: "type, college, and purpose are required" });
+    }
+
+    // Strip an "(ABBR)" suffix, e.g. "College of Computing Studies (CCS)"
+    const collegeName = college.replace(/\s*\([^)]*\)\s*$/, "").trim();
+
+    try {
+      // 1. Try to find a service matching both the document type and college
+      let serviceId = null;
+
+      const [exactMatch] = await pool.query(
+        `SELECT s.service_id
+         FROM services s
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.service_name = ? AND d.department_name = ?
+         LIMIT 1`,
+        [type, collegeName],
+      );
+      if (exactMatch.length) serviceId = exactMatch[0].service_id;
+
+      // 2. Fall back to any service under that college
+      if (!serviceId) {
+        const [deptMatch] = await pool.query(
+          `SELECT s.service_id
+           FROM services s
+           JOIN departments d ON s.department_id = d.department_id
+           WHERE d.department_name = ?
+           LIMIT 1`,
+          [collegeName],
+        );
+        if (deptMatch.length) serviceId = deptMatch[0].service_id;
+      }
+
+      // 3. Fall back to any service under the student's own department
+      if (!serviceId) {
+        const [[stu]] = await pool.query(
+          `SELECT department_id FROM students WHERE student_id = ?`,
+          [studentId],
+        );
+        if (stu) {
+          const [deptDefault] = await pool.query(
+            `SELECT service_id FROM services WHERE department_id = ? LIMIT 1`,
+            [stu.department_id],
+          );
+          if (deptDefault.length) serviceId = deptDefault[0].service_id;
+        }
+      }
+
+      if (!serviceId) {
+        return res
+          .status(404)
+          .json({
+            error:
+              "No matching service configuration found for the selected college",
+          });
+      }
+
+      const estimatedCompletion = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+
+      const copyCount = parseInt(copies, 10) || 1;
+      const notes = copyCount > 1 ? `Copies requested: ${copyCount}` : null;
+
+      const [result] = await pool.query(
+        `INSERT INTO document_requests
+           (student_id, service_id, request_type, purpose, status, estimated_completion, notes, created_at)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?, NOW())`,
+        [studentId, serviceId, type, purpose, estimatedCompletion, notes],
+      );
+
+      const [[newDoc]] = await pool.query(
+        `SELECT
+           dr.request_id, dr.tracking_number, dr.request_type, dr.purpose,
+           dr.status, dr.estimated_completion, dr.notes, dr.created_at,
+           d.department_name AS college
+         FROM document_requests dr
+         JOIN services s ON dr.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE dr.request_id = ?`,
+        [result.insertId],
+      );
+
+      res.status(201).json({
+        message: "Document request submitted successfully",
+        document: {
+          id: String(newDoc.request_id),
+          type: newDoc.request_type,
+          college: newDoc.college,
+          requestDate: newDoc.created_at,
+          purpose: newDoc.purpose,
+          status: newDoc.status,
+          trackingNumber: newDoc.tracking_number,
+          notes: newDoc.notes || undefined,
+          estimatedCompletion: newDoc.estimated_completion || undefined,
+        },
+      });
+    } catch (error) {
+      console.error("Create document request error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // QUEUE ENDPOINTS
 // ─────────────────────────────────────────────────────────────
 

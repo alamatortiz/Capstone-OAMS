@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import ucLogo from '../../assets/Pnc-Logo.png';
-import oamsLogo from '../../assets/oams_logo.png';
-import { toast } from 'sonner';
-import './documents.css';
+import { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
+import { toast } from "sonner";
+import "./documents.css";
 import "../../App.css";
+import api from "../../utils/api";
 
-import { applyTheme, getSavedTheme } from '../../utils/theme';
-import { COLLEGES } from '../../data/colleges';
+import { applyTheme, getSavedTheme } from "../../utils/theme";
+import { COLLEGES } from "../../data/colleges";
 
 // ─── Document Object Structure (JSDoc) ────────────────────────────────────
 /**
@@ -96,7 +97,13 @@ const UserIcon = () => (
 );
 
 const SunIcon = () => (
-  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="sun-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="5"></circle>
     <line x1="12" y1="1" x2="12" y2="3"></line>
     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -110,7 +117,13 @@ const SunIcon = () => (
 );
 
 const MoonIcon = () => (
-  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="moon-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
@@ -196,139 +209,144 @@ export default function DocumentsPage() {
   const user = authUser
     ? {
         ...authUser,
-        college: authUser.departmentName ?? 'N/A College',
-        studentNumber: authUser.studentNumber ?? 'N/A Student Number',
-        departmentAbbrev: authUser.departmentAbbrev ?? 'N/A Abbreviation',
-        course: authUser.course ?? 'N/A Course',
+        college: authUser.departmentName ?? "N/A College",
+        studentNumber: authUser.studentNumber ?? "N/A Student Number",
+        departmentAbbrev: authUser.departmentAbbrev ?? "N/A Abbreviation",
+        course: authUser.course ?? "N/A Course",
       }
     : {
-        name: 'Student',
-        role: 'student',
-        college: '',
-        studentId: '',
-        studentNumber: 'N/A Student Number',
-        departmentAbbrev: '',
-        course: '',
+        name: "Student",
+        role: "student",
+        college: "",
+        studentId: "",
+        studentNumber: "N/A Student Number",
+        departmentAbbrev: "",
+        course: "",
       };
 
   // ── State ───────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
-  const [documents, setDocuments] = useState([
-    {
-      id: '1',
-      type: 'Good Moral Certificate',
-      college: 'College of Computing Studies',
-      requestDate: '2026-03-25',
-      purpose: 'Job application requirement',
-      status: 'processing',
-      trackingNumber: 'DOC-2026-001234',
-      estimatedCompletion: '2026-03-30',
-    },
-    {
-      id: '2',
-      type: 'Transcript of Records',
-      college: 'College of Computing Studies',
-      requestDate: '2026-03-20',
-      purpose: 'Graduate school application',
-      status: 'ready',
-      trackingNumber: 'DOC-2026-001189',
-      notes: 'Ready for pickup at Registrar Office',
-    },
-  ]);
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
+  const [documents, setDocuments] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(true);
+  const [docsError, setDocsError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({ type: '', college: '', purpose: '', copies: '1' });
+  const [formData, setFormData] = useState({
+    type: "",
+    college: "",
+    purpose: "",
+    copies: "1",
+  });
 
   // ── AI Chatbot State ────────────────────────────────────────────────────
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
       id: 1,
-      type: 'bot',
+      type: "bot",
       text: "Hello! 👋 I'm your OAMS Assistant. How can I help you with your documents?",
       timestamp: new Date(),
     },
   ]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
   const documentTypes = [
-    'Good Moral Certificate',
-    'Transcript of Records',
-    'Certificate of Enrollment',
-    'Certificate of Grades',
-    'Diploma',
-    'Honorable Dismissal',
-    'Certificate of Registration',
-    'Certificate of Completion',
+    "Good Moral Certificate",
+    "Transcript of Records",
+    "Certificate of Enrollment",
+    "Certificate of Grades",
+    "Diploma",
+    "Honorable Dismissal",
+    "Certificate of Registration",
+    "Certificate of Completion",
   ];
 
   // ── Effects ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    applyTheme(isDark ? 'dark' : 'light');
+    applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        setDocsLoading(true);
+        const res = await api.get("/student/documents");
+        setDocuments(res.data.documents ?? []);
+        setDocsError(null);
+      } catch (err) {
+        console.error("Failed to fetch documents:", err);
+        setDocsError("Could not load your documents.");
+      } finally {
+        setDocsLoading(false);
+      }
+    };
+
+    fetchDocuments();
+  }, []);
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
-      applyTheme(next ? 'dark' : 'light');
+      applyTheme(next ? "dark" : "light");
       return next;
     });
   };
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
     if (!formData.type || !formData.college || !formData.purpose) {
-      toast.error('Please fill in all required fields');
+      toast.error("Please fill in all required fields");
       return;
     }
-    const newDoc = {
-      id: Date.now().toString(),
-      type: formData.type,
-      college: formData.college,
-      requestDate: new Date().toISOString().split('T')[0],
-      purpose: formData.purpose,
-      status: 'pending',
-      trackingNumber: `DOC-2026-${Math.floor(Math.random() * 900000) + 100000}`,
-      estimatedCompletion: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0],
-    };
-    setDocuments([newDoc, ...documents]);
-    setDialogOpen(false);
-    setFormData({ type: '', college: '', purpose: '', copies: '1' });
-    toast.success('Document request submitted successfully!');
+
+    setSubmitting(true);
+    try {
+      const res = await api.post("/student/documents", formData);
+      setDocuments((prev) => [res.data.document, ...prev]);
+      setDialogOpen(false);
+      setFormData({ type: "", college: "", purpose: "", copies: "1" });
+      toast.success("Document request submitted successfully!");
+    } catch (err) {
+      console.error("Failed to submit document request:", err);
+      toast.error(
+        err?.response?.data?.error ?? "Failed to submit document request",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (inputValue.trim() === '') return;
+    if (inputValue.trim() === "") return;
 
     const userMessage = {
       id: messages.length + 1,
-      type: 'user',
+      type: "user",
       text: inputValue,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMessage]);
 
     const nextInput = inputValue;
-    setInputValue('');
+    setInputValue("");
 
     setTimeout(() => {
       const botResponse = {
         id: messages.length + 2,
-        type: 'bot',
+        type: "bot",
         text: generateBotResponse(nextInput),
         timestamp: new Date(),
       };
@@ -339,12 +357,12 @@ export default function DocumentsPage() {
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
     const activeCount = documents.filter(
-      (d) => d.status !== 'claimed' && d.status !== 'rejected'
+      (d) => d.status !== "claimed" && d.status !== "rejected",
     ).length;
-    const readyCount = documents.filter((d) => d.status === 'ready').length;
-    const pendingCount = documents.filter((d) => d.status === 'pending').length;
+    const readyCount = documents.filter((d) => d.status === "ready").length;
+    const pendingCount = documents.filter((d) => d.status === "pending").length;
 
-    if (lowerInput.includes('document') || lowerInput.includes('tracking')) {
+    if (lowerInput.includes("document") || lowerInput.includes("tracking")) {
       return pendingCount > 0
         ? `You have ${pendingCount} pending document request(s). You currently have ${activeCount} active request(s). If you need help, tell me the document type or tracking number.`
         : readyCount > 0
@@ -352,13 +370,21 @@ export default function DocumentsPage() {
           : `Right now you have no pending requests. You have ${activeCount} active request(s). Want to request a new document?`;
     }
 
-    if (lowerInput.includes('status') || lowerInput.includes('where') || lowerInput.includes('progress')) {
+    if (
+      lowerInput.includes("status") ||
+      lowerInput.includes("where") ||
+      lowerInput.includes("progress")
+    ) {
       return activeCount > 0
         ? `You have ${activeCount} active request(s). Use the list to check each document's current status and estimated completion.`
         : 'You have no active requests right now. You can request a document using the "Request Document" button.';
     }
 
-    if (lowerInput.includes('request') || lowerInput.includes('apply') || lowerInput.includes('new')) {
+    if (
+      lowerInput.includes("request") ||
+      lowerInput.includes("apply") ||
+      lowerInput.includes("new")
+    ) {
       return 'To request a document, click "Request Document", choose the document type and college, then enter the purpose. Want help choosing what to request?';
     }
 
@@ -367,32 +393,32 @@ export default function DocumentsPage() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending':
-        return 'doc-badge-pending';
-      case 'processing':
-        return 'doc-badge-processing';
-      case 'ready':
-        return 'doc-badge-ready';
-      case 'claimed':
-        return 'doc-badge-claimed';
-      case 'rejected':
-        return 'doc-badge-rejected';
+      case "pending":
+        return "doc-badge-pending";
+      case "processing":
+        return "doc-badge-processing";
+      case "ready":
+        return "doc-badge-ready";
+      case "claimed":
+        return "doc-badge-claimed";
+      case "rejected":
+        return "doc-badge-rejected";
       default:
-        return 'doc-badge-pending';
+        return "doc-badge-pending";
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending':
+      case "pending":
         return <ClockIcon />;
-      case 'processing':
+      case "processing":
         return <AlertCircleIcon />;
-      case 'ready':
+      case "ready":
         return <CheckCircleIcon />;
-      case 'claimed':
+      case "claimed":
         return <CheckCircleIcon />;
-      case 'rejected':
+      case "rejected":
         return <XCircleIcon />;
       default:
         return <FileTextIcon />;
@@ -400,36 +426,48 @@ export default function DocumentsPage() {
   };
 
   const activeDocuments = documents.filter(
-    (doc) => doc.status !== 'claimed' && doc.status !== 'rejected'
+    (doc) => doc.status !== "claimed" && doc.status !== "rejected",
   );
   const completedDocuments = documents.filter(
-    (doc) => doc.status === 'claimed' || doc.status === 'rejected'
+    (doc) => doc.status === "claimed" || doc.status === "rejected",
   );
 
   const navItems = [
-    { icon: HomeIcon, label: 'Dashboard', path: '/student/dashboard' },
-    { icon: QueueIconNav, label: 'Queue', path: '/student/queue' },
-    { icon: CalendarIconNav, label: 'Appointments', path: '/student/appointments' },
-    { icon: DocumentIconNav, label: 'Documents', path: '/student/documents' },
-    { icon: HistoryIconNav, label: 'Transactions', path: '/student/transactions' },
+    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/student/appointments",
+    },
+    { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/student/transactions",
+    },
   ];
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="documents-container">
       {/* Sidebar */}
-      <aside className={`doc-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`doc-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="doc-sidebar-inner">
           <div className="doc-sidebar-logo">
             <div className="doc-logo-container">
               <img src={ucLogo} alt="UC Logo" className="doc-logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="doc-logo-img doc-oams-logo" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="doc-logo-img doc-oams-logo"
+              />
             </div>
             <button
               className="doc-theme-toggle"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -441,7 +479,7 @@ export default function DocumentsPage() {
                 <UserIcon />
               </div>
               <div className="doc-user-info">
-                <p className="doc-user-name">{user?.name ?? 'Student'}</p>
+                <p className="doc-user-name">{user?.name ?? "Student"}</p>
                 <span className="doc-user-role">Student</span>
               </div>
             </div>
@@ -483,7 +521,11 @@ export default function DocumentsPage() {
         <div className="doc-mobile-header-content">
           <div className="doc-mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="doc-logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="doc-logo-img doc-oams-logo" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="doc-logo-img doc-oams-logo"
+            />
           </div>
           <div className="doc-mobile-header-actions">
             <button
@@ -505,12 +547,18 @@ export default function DocumentsPage() {
       </header>
 
       {/* Sidebar Overlay */}
-      {sidebarOpen && <div className="doc-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && (
+        <div
+          className="doc-sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Main Content */}
       <main className="doc-main">
         <div className="doc-content">
           {/* Header */}
+          {docsError && <div className="doc-error-banner">{docsError}</div>}
           <div className="doc-header-section">
             <div className="doc-header-top">
               <Link to="/student/dashboard" className="doc-back-link">
@@ -526,14 +574,20 @@ export default function DocumentsPage() {
                 <p>Request and track your documents</p>
               </div>
             </div>
-            <button className="doc-request-btn" onClick={() => setDialogOpen(true)}>
+            <button
+              className="doc-request-btn"
+              onClick={() => setDialogOpen(true)}
+            >
               <PlusIcon /> Request Document
             </button>
           </div>
 
           {/* Request Dialog */}
           {dialogOpen && (
-            <div className="doc-dialog-overlay" onClick={() => setDialogOpen(false)}>
+            <div
+              className="doc-dialog-overlay"
+              onClick={() => setDialogOpen(false)}
+            >
               <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
                 <div className="doc-dialog-header">
                   <h2>New Document Request</h2>
@@ -551,7 +605,9 @@ export default function DocumentsPage() {
                     <select
                       id="type"
                       value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, type: e.target.value })
+                      }
                       className="doc-form-select"
                     >
                       <option value="">Select document type</option>
@@ -568,7 +624,9 @@ export default function DocumentsPage() {
                     <select
                       id="college"
                       value={formData.college}
-                      onChange={(e) => setFormData({ ...formData, college: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, college: e.target.value })
+                      }
                       className="doc-form-select"
                     >
                       <option value="">Select college</option>
@@ -588,7 +646,9 @@ export default function DocumentsPage() {
                       min="1"
                       max="10"
                       value={formData.copies}
-                      onChange={(e) => setFormData({ ...formData, copies: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, copies: e.target.value })
+                      }
                       className="doc-form-input"
                     />
                   </div>
@@ -599,14 +659,20 @@ export default function DocumentsPage() {
                       id="purpose"
                       placeholder="Specify the purpose of your request"
                       value={formData.purpose}
-                      onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, purpose: e.target.value })
+                      }
                       className="doc-form-textarea"
                       rows={3}
                     />
                   </div>
 
-                  <button onClick={handleSubmitRequest} className="doc-form-submit">
-                    Submit Request
+                  <button
+                    onClick={handleSubmitRequest}
+                    className="doc-form-submit"
+                    disabled={submitting}
+                  >
+                    {submitting ? "Submitting..." : "Submit Request"}
                   </button>
                 </div>
               </div>
@@ -617,12 +683,17 @@ export default function DocumentsPage() {
           <section className="doc-section">
             <div className="doc-section-header">
               <h2>
-                <AlertCircleIcon /> Active Requests{' '}
+                <AlertCircleIcon /> Active Requests{" "}
                 <span className="doc-badge">{activeDocuments.length}</span>
               </h2>
             </div>
 
-            {activeDocuments.length > 0 ? (
+            {docsLoading ? (
+              <div className="doc-empty-state">
+                <FileTextIcon />
+                <h3>Loading documents...</h3>
+              </div>
+            ) : activeDocuments.length > 0 ? (
               <div className="doc-cards-grid">
                 {activeDocuments.map((doc) => (
                   <div key={doc.id} className="doc-card">
@@ -634,7 +705,9 @@ export default function DocumentsPage() {
                           Tracking: <span>{doc.trackingNumber}</span>
                         </p>
                       </div>
-                      <span className={`doc-badge ${getStatusColor(doc.status)}`}>
+                      <span
+                        className={`doc-badge ${getStatusColor(doc.status)}`}
+                      >
                         {getStatusIcon(doc.status)}
                         {doc.status}
                       </span>
@@ -644,21 +717,26 @@ export default function DocumentsPage() {
                       <div className="doc-card-field">
                         <label>Request Date</label>
                         <p>
-                          {new Date(doc.requestDate).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
+                          {new Date(doc.requestDate).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}
                         </p>
                       </div>
                       {doc.estimatedCompletion && (
                         <div className="doc-card-field">
                           <label>Est. Completion</label>
                           <p>
-                            {new Date(doc.estimatedCompletion).toLocaleDateString('en-US', {
-                              month: 'long',
-                              day: 'numeric',
-                              year: 'numeric',
+                            {new Date(
+                              doc.estimatedCompletion,
+                            ).toLocaleDateString("en-US", {
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
                             })}
                           </p>
                         </div>
@@ -676,7 +754,7 @@ export default function DocumentsPage() {
                       </div>
                     )}
 
-                    {doc.status === 'ready' && (
+                    {doc.status === "ready" && (
                       <button className="doc-card-claim-btn">
                         <DownloadIcon /> Claim Document
                       </button>
@@ -689,7 +767,10 @@ export default function DocumentsPage() {
                 <FileTextIcon />
                 <h3>No active requests</h3>
                 <p>Start by requesting a document</p>
-                <button className="doc-empty-btn" onClick={() => setDialogOpen(true)}>
+                <button
+                  className="doc-empty-btn"
+                  onClick={() => setDialogOpen(true)}
+                >
                   <PlusIcon /> Request Document
                 </button>
               </div>
@@ -708,15 +789,20 @@ export default function DocumentsPage() {
                         <h3>{doc.type}</h3>
                         <p className="doc-card-college">{doc.college}</p>
                         <p className="doc-card-tracking">
-                          {new Date(doc.requestDate).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}{' '}
+                          {new Date(doc.requestDate).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}{" "}
                           • {doc.trackingNumber}
                         </p>
                       </div>
-                      <span className={`doc-badge ${getStatusColor(doc.status)}`}>
+                      <span
+                        className={`doc-badge ${getStatusColor(doc.status)}`}
+                      >
                         {doc.status}
                       </span>
                     </div>
