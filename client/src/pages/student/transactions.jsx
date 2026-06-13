@@ -132,7 +132,7 @@ const SearchIcon = () => (
   </svg>
 );
 
-const ChevronDownIcon = ({ className = '' }) => (
+const ChevronDownIcon = ({ className = "" }) => (
   <svg
     className={className}
     viewBox="0 0 24 24"
@@ -243,100 +243,21 @@ export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [transactions, setTransactions] = useState([
-    {
-      id: "1",
-      type: "queue",
-      title: "Queue at Registrar Office",
-      college: "College of Computing Studies",
-      date: "2026-03-27",
-      time: "10:30 AM",
-      status: "ongoing",
-      details: "Document request for Certificate of Enrollment",
-    },
-    {
-      id: "2",
-      type: "appointment",
-      title: "Meeting with Prof. Santos",
-      college: "College of Computing Studies",
-      date: "2026-03-26",
-      time: "2:00 PM",
-      status: "completed",
-      details: "Academic consultation regarding thesis proposal",
-    },
-    {
-      id: "3",
-      type: "document",
-      title: "Good Moral Certificate Request",
-      college: "College of Computing Studies",
-      date: "2026-03-25",
-      time: "9:15 AM",
-      status: "ongoing",
-      details: "Request submitted for job application",
-    },
-    {
-      id: "4",
-      type: "queue",
-      title: "Queue at Cashier",
-      college: "College of Computing Studies",
-      date: "2026-03-24",
-      time: "11:00 AM",
-      status: "completed",
-      details: "Payment for tuition fees",
-    },
-    {
-      id: "5",
-      type: "appointment",
-      title: "Guidance Counseling Session",
-      college: "College of Computing Studies",
-      date: "2026-03-23",
-      time: "3:00 PM",
-      status: "completed",
-      details: "Career guidance and academic planning",
-    },
-    {
-      id: "6",
-      type: "document",
-      title: "Transcript of Records Request",
-      college: "College of Computing Studies",
-      date: "2026-03-20",
-      time: "10:00 AM",
-      status: "completed",
-      details: "TOR for graduate school application",
-    },
-    {
-      id: "7",
-      type: "queue",
-      title: "Queue at Library",
-      college: "College of Computing Studies",
-      date: "2026-03-19",
-      time: "2:30 PM",
-      status: "cancelled",
-      details: "Book borrowing request",
-    },
-    {
-      id: "8",
-      type: "appointment",
-      title: "Department Chair Meeting",
-      college: "College of Computing Studies",
-      date: "2026-03-18",
-      time: "1:00 PM",
-      status: "completed",
-      details: "Discussion about curriculum requirements",
-    },
-  ]);
+  const [transactions, setTransactions] = useState([]);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const filteredTransactions = transactions.filter((transaction) => {
     const matchesSearch =
       transaction.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       transaction.details.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType =
-      filterType === "all" || transaction.type === filterType;
+    const matchesType = filterType === "all" || transaction.type === filterType;
     const matchesStatus =
       filterStatus === "all" || transaction.status === filterStatus;
     return matchesSearch && matchesType && matchesStatus;
   });
+  const now = new Date();
 
   const stats = [
     {
@@ -362,8 +283,13 @@ export default function TransactionsPage() {
     },
     {
       label: "This Month",
-      value: transactions.filter((t) => new Date(t.date).getMonth() === 2)
-        .length,
+      value: transactions.filter((t) => {
+        const d = new Date(t.date);
+        return (
+          d.getMonth() === now.getMonth() &&
+          d.getFullYear() === now.getFullYear()
+        );
+      }).length,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
       icon: "calendar",
@@ -382,6 +308,23 @@ export default function TransactionsPage() {
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        setTxLoading(true);
+        const res = await api.get("/student/transactions");
+        setTransactions(res.data.transactions ?? []);
+        setTxError(null);
+      } catch (err) {
+        console.error("Failed to fetch transactions:", err);
+        setTxError("Could not load your transaction history.");
+      } finally {
+        setTxLoading(false);
+      }
+    };
+    fetchTransactions();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -424,12 +367,12 @@ export default function TransactionsPage() {
     const lowerInput = userInput.toLowerCase();
     if (lowerInput.includes("completed") || lowerInput.includes("status")) {
       const completedCount = transactions.filter(
-        (t) => t.status === "completed"
+        (t) => t.status === "completed",
       ).length;
       return `You have ${completedCount} completed transactions. Would you like to see more details?`;
     } else if (lowerInput.includes("ongoing")) {
       const ongoingCount = transactions.filter(
-        (t) => t.status === "ongoing"
+        (t) => t.status === "ongoing",
       ).length;
       return `You currently have ${ongoingCount} ongoing transactions. Check back soon for updates!`;
     } else if (lowerInput.includes("queue")) {
@@ -440,7 +383,7 @@ export default function TransactionsPage() {
       lowerInput.includes("meeting")
     ) {
       const appointmentCount = transactions.filter(
-        (t) => t.type === "appointment"
+        (t) => t.type === "appointment",
       ).length;
       return `You have ${appointmentCount} appointment transactions recorded.`;
     } else if (
@@ -448,7 +391,7 @@ export default function TransactionsPage() {
       lowerInput.includes("certificate")
     ) {
       const documentCount = transactions.filter(
-        (t) => t.type === "document"
+        (t) => t.type === "document",
       ).length;
       return `You have ${documentCount} document-related transactions.`;
     } else {
@@ -704,7 +647,18 @@ export default function TransactionsPage() {
 
           {/* Transaction List */}
           <div className="transactions-list">
-            {filteredTransactions.length === 0 ? (
+            {txLoading ? (
+              <div className="empty-state">
+                <SearchIcon />
+                <h3>Loading transactions…</h3>
+              </div>
+            ) : txError ? (
+              <div className="empty-state">
+                <AlertCircleIcon />
+                <h3>Could not load transactions</h3>
+                <p>{txError}</p>
+              </div>
+            ) : filteredTransactions.length === 0 ? (
               <div className="empty-state">
                 <SearchIcon />
                 <h3>No transactions found</h3>
@@ -714,16 +668,16 @@ export default function TransactionsPage() {
               filteredTransactions.map((transaction) => (
                 <div key={transaction.id} className="transaction-item">
                   <div className="transaction-icon">
-                    <span className={`icon-wrapper ${getTypeColor(transaction.type)}`}>
+                    <span
+                      className={`icon-wrapper ${getTypeColor(transaction.type)}`}
+                    >
                       {getTypeIcon(transaction.type)}
                     </span>
                   </div>
 
                   <div className="transaction-content">
                     <div className="transaction-header">
-                      <h3 className="transaction-title">
-                        {transaction.title}
-                      </h3>
+                      <h3 className="transaction-title">{transaction.title}</h3>
                       <div className="transaction-badges">
                         <span
                           className={`badge ${getTypeColor(transaction.type)}`}
@@ -732,19 +686,15 @@ export default function TransactionsPage() {
                         </span>
                         <span
                           className={`badge ${getStatusColor(
-                            transaction.status
+                            transaction.status,
                           )}`}
                         >
                           {transaction.status}
                         </span>
                       </div>
                     </div>
-                    <p className="transaction-college">
-                      {transaction.college}
-                    </p>
-                    <p className="transaction-details">
-                      {transaction.details}
-                    </p>
+                    <p className="transaction-college">{transaction.college}</p>
+                    <p className="transaction-details">{transaction.details}</p>
                   </div>
 
                   <div className="transaction-meta">

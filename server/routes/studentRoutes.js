@@ -299,12 +299,10 @@ router.post(
       }
 
       if (!serviceId) {
-        return res
-          .status(404)
-          .json({
-            error:
-              "No matching service configuration found for the selected college",
-          });
+        return res.status(404).json({
+          error:
+            "No matching service configuration found for the selected college",
+        });
       }
 
       const estimatedCompletion = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
@@ -1108,6 +1106,107 @@ router.delete(
       });
     } catch (error) {
       console.error("Cancel appointment error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/student/transactions
+// Returns a unified history of queues, appointments, and document requests
+router.get(
+  "/transactions",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `(
+           SELECT
+             'queue' AS type,
+             q.queue_id AS id,
+             CONCAT('Queue for ', s.service_name) AS title,
+             d.department_name AS college,
+             q.status AS raw_status,
+             q.notes AS details,
+             q.created_at AS event_time
+           FROM queues q
+           JOIN services s ON q.service_id = s.service_id
+           JOIN departments d ON s.department_id = d.department_id
+           WHERE q.student_id = ?
+         )
+         UNION ALL
+         (
+           SELECT
+             'appointment' AS type,
+             a.appointment_id AS id,
+             CONCAT('Appointment with ', CONCAT(f.first_name, ' ', f.last_name)) AS title,
+             d.department_name AS college,
+             a.status AS raw_status,
+             a.notes AS details,
+             a.created_at AS event_time
+           FROM appointments a
+           JOIN faculty f ON a.faculty_id = f.faculty_id
+           JOIN departments d ON f.department_id = d.department_id
+           WHERE a.student_id = ?
+         )
+         UNION ALL
+         (
+           SELECT
+             'document' AS type,
+             dr.request_id AS id,
+             CONCAT(dr.request_type, ' Request') AS title,
+             d.department_name AS college,
+             dr.status AS raw_status,
+             dr.purpose AS details,
+             dr.created_at AS event_time
+           FROM document_requests dr
+           JOIN services s ON dr.service_id = s.service_id
+           JOIN departments d ON s.department_id = d.department_id
+           WHERE dr.student_id = ?
+         )
+         ORDER BY event_time DESC`,
+        [studentId, studentId, studentId],
+      );
+
+      // Map raw DB statuses -> the 3 badge states the UI understands
+      const statusMap = {
+        waiting: "ongoing",
+        serving: "ongoing",
+        completed: "completed",
+        cancelled: "cancelled",
+        pending: "ongoing",
+        approved: "ongoing",
+        rejected: "cancelled",
+        processing: "ongoing",
+        generated: "completed",
+        released: "completed",
+      };
+
+      const transactions = rows.map((row) => {
+        const eventDate = new Date(row.event_time);
+        return {
+          id: `${row.type}-${row.id}`,
+          type: row.type,
+          title: row.title,
+          college: row.college,
+          date: eventDate.toISOString().split("T")[0],
+          time: eventDate.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          }),
+          status: statusMap[row.raw_status] ?? "ongoing",
+          details: row.details || "No additional details provided.",
+        };
+      });
+
+      res.json({ transactions });
+    } catch (error) {
+      console.error("Fetch transactions error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
