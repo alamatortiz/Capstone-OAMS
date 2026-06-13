@@ -532,43 +532,47 @@ export default function QueuePage() {
                     <label className="filter-label" htmlFor="college-select">
                       College
                     </label>
-                    <select
-                      id="college-select"
-                      className="filter-select"
-                      value={selectedCollege}
-                      onChange={(e) => setSelectedCollege(e.target.value)}
-                      aria-label="Filter by college"
-                    >
-                      <option value="all">All Colleges</option>
-                      {COLLEGES.map((college) => (
-                        <option key={college.name} value={college.name}>
-                          {college.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="filter-select-wrapper">
+                      <select
+                        id="college-select"
+                        className="filter-select"
+                        value={selectedCollege}
+                        onChange={(e) => setSelectedCollege(e.target.value)}
+                        aria-label="Filter by college"
+                      >
+                        <option value="all">All Colleges</option>
+                        {COLLEGES.map((college) => (
+                          <option key={college.name} value={college.name}>
+                            {college.name}
+                          </option>
+                        ))}
+                      </select>
 
-                    <ChevronDown />
+                      <ChevronDown className="filter-chevron" />
+                    </div>
                   </div>
                   <div className="filter-group">
                     <label className="filter-label" htmlFor="service-select">
                       Service
                     </label>
-                    <select
-                      id="service-select"
-                      className="filter-select"
-                      value={selectedService}
-                      onChange={(e) => setSelectedService(e.target.value)}
-                      aria-label="Filter by service"
-                    >
-                      <option value="all">All Services</option>
-                      {serviceOptions.map((service) => (
-                        <option key={service} value={service}>
-                          {service}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="filter-select-wrapper">
+                      <select
+                        id="service-select"
+                        className="filter-select"
+                        value={selectedService}
+                        onChange={(e) => setSelectedService(e.target.value)}
+                        aria-label="Filter by service"
+                      >
+                        <option value="all">All Services</option>
+                        {serviceOptions.map((service) => (
+                          <option key={service} value={service}>
+                            {service}
+                          </option>
+                        ))}
+                      </select>
 
-                    <ChevronDown />
+                      <ChevronDown className="filter-chevron" />
+                    </div>
                   </div>
                 </div>
               </div>

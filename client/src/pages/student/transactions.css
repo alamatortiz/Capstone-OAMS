@@ -801,7 +801,12 @@ body {
   padding-right: 2.25rem;
 }
 
-.filter-select svg {
+.filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.filter-chevron {
   position: absolute;
   right: 0.9rem;
   width: 1rem;
@@ -812,6 +817,30 @@ body {
   pointer-events: none;
   stroke: currentColor;
   z-index: 2;
+}
+
+/* ===== Filters Select (queue-style chevron inside wrapper) ===== */
+/* Revert to the intended behavior: chevron is positioned absolutely inside the wrapper */
+.filter-select-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
 .select-input {
@@ -829,6 +858,7 @@ body {
   position: relative;
   z-index: 1;
 }
+
 
 .select-input option {
   background: var(--card-bg);
