@@ -406,7 +406,9 @@ router.post(
       );
       if (countRow.actual_waiting >= slot.max_capacity) {
         await conn.rollback();
-        return res.status(409).json({ error: "This queue is at full capacity" });
+        return res
+          .status(409)
+          .json({ error: "This queue is at full capacity" });
       }
 
       // 2. Check if student is already in this slot
@@ -419,9 +421,7 @@ router.post(
 
       if (existing) {
         await conn.rollback();
-        return res
-          .status(409)
-          .json({ error: "You are already in this queue" });
+        return res.status(409).json({ error: "You are already in this queue" });
       }
 
       // 3. Generate next queue_number for this slot
@@ -596,8 +596,359 @@ router.post(
 );
 
 // ─────────────────────────────────────────────────────────────
+// APPOINTMENT ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/appointments
+// Returns all appointments for the logged-in student (upcoming + past).
+router.get(
+  "/appointments",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           a.appointment_id,
+           a.appointment_date,
+           a.appointment_time,
+           a.status,
+           a.notes,
+           a.created_at,
+           f.faculty_id,
+           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+           f.specialization                        AS faculty_role,
+           d.department_name                       AS college,
+           d.department_abbreviation               AS college_abbrev,
+           d.office_location                       AS location,
+           s.service_name
+         FROM appointments a
+         JOIN faculty      f ON a.faculty_id    = f.faculty_id
+         JOIN departments  d ON f.department_id = d.department_id
+         LEFT JOIN services s ON a.service_id   = s.service_id
+         WHERE a.student_id = ?
+         ORDER BY a.appointment_date DESC, a.appointment_time DESC`,
+        [studentId],
+      );
+
+      const formatted = rows.map((row) => ({
+        id: row.appointment_id,
+        title: row.service_name ?? row.faculty_role ?? "Faculty Consultation",
+        college: row.college,
+        person: row.faculty_name,
+        personRole: row.faculty_role ?? "Faculty",
+        date:
+          row.appointment_date instanceof Date
+            ? row.appointment_date.toISOString().split("T")[0]
+            : String(row.appointment_date).split("T")[0],
+        time: formatTime12h(row.appointment_time),
+        location: row.location ?? "TBA",
+        purpose: row.notes ?? "",
+        status: row.status,
+      }));
+
+      res.json({ appointments: formatted });
+    } catch (error) {
+      console.error("Fetch appointments error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/student/appointments/departments
+// Returns all departments (colleges) for the College dropdown.
+router.get(
+  "/appointments/departments",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [rows] = await pool.query(
+        `SELECT department_id, department_name, department_abbreviation
+         FROM departments
+         ORDER BY department_name ASC`,
+      );
+      res.json({ departments: rows });
+    } catch (error) {
+      console.error("Fetch departments error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/student/appointments/services?departmentId=1001
+// Returns all services belonging to the given department.
+// Used to populate the Service dropdown after College is chosen.
+router.get(
+  "/appointments/services",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const departmentId = parseInt(req.query.departmentId, 10);
+
+    if (!departmentId || isNaN(departmentId)) {
+      return res
+        .status(400)
+        .json({ error: "departmentId query parameter is required" });
+    }
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT service_id, service_name, description
+         FROM services
+         WHERE department_id = ?
+         ORDER BY service_name ASC`,
+        [departmentId],
+      );
+
+      res.json({ services: rows });
+    } catch (error) {
+      console.error("Fetch services error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/student/appointments/faculty?serviceId=1
+// Returns faculty members whose department owns the given service.
+// Faculty dropdown is always scoped to the selected College → Service.
+router.get(
+  "/appointments/faculty",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const serviceId = parseInt(req.query.serviceId, 10);
+
+    if (!serviceId || isNaN(serviceId)) {
+      return res
+        .status(400)
+        .json({ error: "serviceId query parameter is required" });
+    }
+
+    try {
+      // Resolve the department that owns this service
+      const [[serviceRow]] = await pool.query(
+        `SELECT department_id FROM services WHERE service_id = ?`,
+        [serviceId],
+      );
+
+      if (!serviceRow) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+           f.faculty_id,
+           CONCAT(f.first_name, ' ', f.last_name) AS name,
+           f.specialization,
+           d.department_name AS college
+         FROM faculty f
+         JOIN departments d ON f.department_id = d.department_id
+         WHERE f.department_id = ?
+         ORDER BY f.last_name ASC`,
+        [serviceRow.department_id],
+      );
+
+      res.json({ faculty: rows });
+    } catch (error) {
+      console.error("Fetch faculty error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/student/appointments
+// Body: { facultyId, serviceId, appointmentDate, appointmentTime, notes }
+router.post(
+  "/appointments",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { facultyId, serviceId, appointmentDate, appointmentTime, notes } =
+      req.body;
+
+    // ── Validation ────────────────────────────────────────────
+    if (!facultyId || !serviceId || !appointmentDate || !appointmentTime) {
+      return res.status(400).json({
+        error:
+          "facultyId, serviceId, appointmentDate, and appointmentTime are required",
+      });
+    }
+
+    // Reject past dates
+    const today = new Date().toISOString().split("T")[0];
+    if (appointmentDate < today) {
+      return res
+        .status(400)
+        .json({ error: "Appointment date cannot be in the past" });
+    }
+
+    try {
+      // Resolve department_id from the selected service
+      const [[serviceRow]] = await pool.query(
+        `SELECT department_id FROM services WHERE service_id = ?`,
+        [serviceId],
+      );
+
+      if (!serviceRow) {
+        return res.status(404).json({ error: "Selected service not found" });
+      }
+
+      // Prevent duplicate booking for the same student + faculty + date + time
+      const [[existing]] = await pool.query(
+        `SELECT appointment_id FROM appointments
+         WHERE student_id = ? AND faculty_id = ?
+           AND appointment_date = ? AND appointment_time = ?
+         LIMIT 1`,
+        [studentId, facultyId, appointmentDate, appointmentTime],
+      );
+
+      if (existing) {
+        return res.status(409).json({
+          error:
+            "You already have an appointment with this faculty member at that date and time",
+        });
+      }
+
+      const [result] = await pool.query(
+        `INSERT INTO appointments
+           (student_id, faculty_id, department_id, service_id, appointment_date, appointment_time, status, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
+        [
+          studentId,
+          facultyId,
+          serviceRow.department_id,
+          serviceId,
+          appointmentDate,
+          appointmentTime,
+          notes ?? null,
+        ],
+      );
+
+      // Return the newly created appointment with joined details
+      const [[newRow]] = await pool.query(
+        `SELECT
+           a.appointment_id,
+           a.appointment_date,
+           a.appointment_time,
+           a.status,
+           a.notes,
+           s.service_name,
+           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+           f.specialization                        AS faculty_role,
+           d.department_name                       AS college,
+           d.office_location                       AS location
+         FROM appointments a
+         JOIN services    s ON a.service_id    = s.service_id
+         JOIN faculty     f ON a.faculty_id    = f.faculty_id
+         JOIN departments d ON f.department_id = d.department_id
+         WHERE a.appointment_id = ?`,
+        [result.insertId],
+      );
+
+      res.status(201).json({
+        message: "Appointment request submitted successfully",
+        appointment: {
+          id: newRow.appointment_id,
+          title: newRow.service_name ?? "Faculty Consultation",
+          college: newRow.college,
+          person: newRow.faculty_name,
+          personRole: newRow.faculty_role ?? "Faculty",
+          date: String(newRow.appointment_date).split("T")[0],
+          time: formatTime12h(newRow.appointment_time),
+          location: newRow.location ?? "TBA",
+          purpose: newRow.notes ?? "",
+          status: newRow.status,
+        },
+      });
+    } catch (error) {
+      console.error("Create appointment error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// DELETE /api/student/appointments/:appointmentId
+// Cancels a pending appointment. Only the owning student may cancel.
+router.delete(
+  "/appointments/:appointmentId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+
+    if (!appointmentId || isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+
+    try {
+      const [[appt]] = await pool.query(
+        `SELECT appointment_id, student_id, status
+         FROM appointments WHERE appointment_id = ?`,
+        [appointmentId],
+      );
+
+      if (!appt) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.student_id !== studentId) {
+        return res
+          .status(403)
+          .json({ error: "You can only cancel your own appointments" });
+      }
+      if (!["pending", "approved"].includes(appt.status)) {
+        return res.status(409).json({
+          error: `Cannot cancel an appointment that is already ${appt.status}`,
+        });
+      }
+
+      await pool.query(
+        `UPDATE appointments SET status = 'cancelled' WHERE appointment_id = ?`,
+        [appointmentId],
+      );
+
+      res.json({
+        message: "Appointment cancelled successfully",
+        appointmentId,
+      });
+    } catch (error) {
+      console.error("Cancel appointment error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
+
+/**
+ * Converts a MySQL TIME string (HH:MM:SS) to 12-hour format (e.g. "2:00 PM").
+ */
+function formatTime12h(timeStr) {
+  if (!timeStr) return "";
+  const parts = String(timeStr).split(":");
+  const h = parseInt(parts[0], 10);
+  const m = parts[1] ?? "00";
+  const suffix = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${m} ${suffix}`;
+}
 function formatRelativeTime(date) {
   const now = new Date();
   const diffMs = now - date;

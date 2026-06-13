@@ -121,7 +121,13 @@ const CalendarIcon = () => (
 );
 
 const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
     <polyline points="15 18 9 12 15 6" />
   </svg>
 );
@@ -181,6 +187,27 @@ const SendIcon = () => (
   </svg>
 );
 
+import api from "../../utils/api";
+import { toast } from "sonner";
+
+// ─── Time-slot options shown in the booking dialog ─────────────────────────────
+const TIME_SLOTS = [
+  "08:00:00",
+  "09:00:00",
+  "10:00:00",
+  "11:00:00",
+  "13:00:00",
+  "14:00:00",
+  "15:00:00",
+  "16:00:00",
+];
+
+/** Converts "HH:MM:SS" to "8:00 AM" for display in the dropdown labels. */
+function label12h(timeStr) {
+  const [h, m] = timeStr.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
 export default function AppointmentsPage() {
   const { user: authUser, logout } = useAuth();
   useQueue();
@@ -200,11 +227,14 @@ export default function AppointmentsPage() {
       };
 
   const navigate = useNavigate();
+
+  // ── UI state ────────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [showBookDialog, setShowBookDialog] = useState(false);
 
+  // ── Chat state ──────────────────────────────────────────────────────────────
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -216,55 +246,131 @@ export default function AppointmentsPage() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  const [appointments, setAppointments] = useState([
-    {
-      id: "1",
-      title: "Academic Consultation",
-      college: "College of Computing Studies",
-      person: "Prof. Maria Santos",
-      personRole: "Department Chair",
-      date: "2026-03-28",
-      time: "2:00 PM",
-      location: "CCS Faculty Room 201",
-      purpose: "Discuss thesis proposal",
-      status: "confirmed",
-      notes: "Please bring your thesis outline",
-    },
-    {
-      id: "2",
-      title: "Clearance Processing",
-      college: "College of Computing Studies",
-      person: "Ms. Ana Cruz",
-      personRole: "Student Affairs Officer",
-      date: "2026-03-29",
-      time: "10:00 AM",
-      location: "Student Affairs Office",
-      purpose: "Complete clearance requirements",
-      status: "pending",
-    },
-  ]);
+  // ── Data state ──────────────────────────────────────────────────────────────
+  const [appointments, setAppointments] = useState([]);
+  const [apptLoading, setApptLoading] = useState(true);
+  const [apptError, setApptError] = useState(null);
 
+  // Cascading dropdown data for the booking dialog
+  const [departmentList, setDepartmentList] = useState([]);
+  const [deptLoading, setDeptLoading] = useState(false);
+  const [serviceList, setServiceList] = useState([]);
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [facultyList, setFacultyList] = useState([]);
+  const [facultyLoading, setFacultyLoading] = useState(false);
+
+  // Booking form — now includes departmentId and serviceId
   const [formData, setFormData] = useState({
-    college: "",
-    service: "",
-    person: "",
+    departmentId: "",
+    serviceId: "",
+    facultyId: "",
     date: "",
     time: "",
     purpose: "",
   });
+  const [submitting, setSubmitting] = useState(false);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Cancel in-flight guard
+  const [cancellingId, setCancellingId] = useState(null);
 
+  // ── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
 
+  // Fetch the student's appointments on mount
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  // 1. Fetch all departments (colleges) when the dialog opens
+  useEffect(() => {
+    if (!showBookDialog) return;
+    const load = async () => {
+      setDeptLoading(true);
+      try {
+        // Departments are static master data — fetch directly from the DB via a
+        // dedicated lightweight query on the student routes.
+        const { data } = await api.get("/student/appointments/departments");
+        setDepartmentList(data.departments ?? []);
+      } catch {
+        toast.error("Could not load college list. Please try again.");
+      } finally {
+        setDeptLoading(false);
+      }
+    };
+    load();
+  }, [showBookDialog]);
+
+  // 2. Fetch services whenever the selected department changes
+  useEffect(() => {
+    if (!formData.departmentId) {
+      setServiceList([]);
+      setFacultyList([]);
+      return;
+    }
+    const load = async () => {
+      setServiceLoading(true);
+      setServiceList([]);
+      setFacultyList([]);
+      try {
+        const { data } = await api.get(
+          `/student/appointments/services?departmentId=${formData.departmentId}`,
+        );
+        setServiceList(data.services ?? []);
+      } catch {
+        toast.error("Could not load services. Please try again.");
+      } finally {
+        setServiceLoading(false);
+      }
+    };
+    load();
+  }, [formData.departmentId]);
+
+  // 3. Fetch faculty whenever the selected service changes
+  useEffect(() => {
+    if (!formData.serviceId) {
+      setFacultyList([]);
+      return;
+    }
+    const load = async () => {
+      setFacultyLoading(true);
+      setFacultyList([]);
+      try {
+        const { data } = await api.get(
+          `/student/appointments/faculty?serviceId=${formData.serviceId}`,
+        );
+        setFacultyList(data.faculty ?? []);
+      } catch {
+        toast.error("Could not load faculty list. Please try again.");
+      } finally {
+        setFacultyLoading(false);
+      }
+    };
+    load();
+  }, [formData.serviceId]);
+
+  // ── API helpers ──────────────────────────────────────────────────────────────
+  const fetchAppointments = async () => {
+    setApptLoading(true);
+    setApptError(null);
+    try {
+      const { data } = await api.get("/student/appointments");
+      setAppointments(data.appointments ?? []);
+    } catch {
+      setApptError(
+        "Could not load your appointments. Please refresh the page.",
+      );
+    } finally {
+      setApptLoading(false);
+    }
+  };
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleLogout = () => {
     logout();
     navigate("/login");
@@ -281,7 +387,6 @@ export default function AppointmentsPage() {
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (inputValue.trim() === "") return;
-
     const userMessage = {
       id: messages.length + 1,
       type: "user",
@@ -290,7 +395,6 @@ export default function AppointmentsPage() {
     };
     setMessages([...messages, userMessage]);
     setInputValue("");
-
     setTimeout(() => {
       const botResponse = {
         id: messages.length + 2,
@@ -303,84 +407,95 @@ export default function AppointmentsPage() {
   };
 
   const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-
-    if (
-      lowerInput.includes("appointment") ||
-      lowerInput.includes("book")
-    ) {
-      return `You have ${appointments.length} appointment${appointments.length !== 1 ? "s" : ""}. ${appointments.filter((a) => a.status === "pending").length} are pending confirmation. Would you like to book a new appointment?`;
-    } else if (
-      lowerInput.includes("confirm") ||
-      lowerInput.includes("confirmed")
-    ) {
-      const confirmed = appointments.filter(
-        (a) => a.status === "confirmed"
-      );
-      return confirmed.length > 0
-        ? `You have ${confirmed.length} confirmed appointment${confirmed.length !== 1 ? "s" : ""}. ${confirmed[0].title} with ${confirmed[0].person} on ${new Date(confirmed[0].date).toLocaleDateString()}.`
-        : "You don't have any confirmed appointments yet.";
-    } else if (lowerInput.includes("pending")) {
-      const pending = appointments.filter((a) => a.status === "pending");
-      return pending.length > 0
-        ? `You have ${pending.length} pending appointment${pending.length !== 1 ? "s" : ""} waiting for confirmation.`
-        : "You don't have any pending appointments.";
-    } else if (
-      lowerInput.includes("cancel") ||
-      lowerInput.includes("reschedule")
-    ) {
-      return "To cancel or reschedule an appointment, please click the cancel button on the appointment card and book a new one.";
-    } else {
-      return "I can help you with appointment information, booking, cancellations, and more. What would you like to know?";
+    const i = userInput.toLowerCase();
+    if (i.includes("appointment") || i.includes("book")) {
+      const pending = appointments.filter((a) => a.status === "pending").length;
+      return `You have ${appointments.length} appointment(s). ${pending} are pending confirmation. Would you like to book a new one?`;
     }
+    if (i.includes("confirm")) {
+      const c = appointments.filter((a) => a.status === "approved");
+      return c.length > 0
+        ? `You have ${c.length} approved appointment(s). The next one is with ${c[0].person} on ${new Date(c[0].date).toLocaleDateString()}.`
+        : "You don't have any approved appointments yet.";
+    }
+    if (i.includes("pending")) {
+      const p = appointments.filter((a) => a.status === "pending");
+      return p.length > 0
+        ? `You have ${p.length} pending appointment(s) waiting for confirmation.`
+        : "You don't have any pending appointments.";
+    }
+    if (i.includes("cancel") || i.includes("reschedule"))
+      return "To cancel an appointment, click the Cancel button on the appointment card. To reschedule, cancel first and then book a new one.";
+    return "I can help you with appointment information, booking, and cancellations. What would you like to know?";
   };
 
-  const handleCreateAppointment = () => {
-    if (
-      !formData.college ||
-      !formData.service ||
-      !formData.person ||
-      !formData.date ||
-      !formData.time ||
-      !formData.purpose
-    ) {
-      alert("Please fill in all required fields");
-      return;
-    }
-
-    const newAppointment = {
-      id: Date.now().toString(),
-      title: formData.service,
-      college: formData.college,
-      person: formData.person,
-      personRole: "Faculty/Staff",
-      date: formData.date,
-      time: formData.time,
-      location: "TBA",
-      purpose: formData.purpose,
-      status: "pending",
-    };
-
-    setAppointments([...appointments, newAppointment]);
-    setShowBookDialog(false);
+  const handleOpenBookDialog = () => {
     setFormData({
-      college: "",
-      service: "",
-      person: "",
+      departmentId: "",
+      serviceId: "",
+      facultyId: "",
       date: "",
       time: "",
       purpose: "",
     });
+    setServiceList([]);
+    setFacultyList([]);
+    setShowBookDialog(true);
   };
 
-  const handleCancelAppointment = (id) => {
-    setAppointments(
-      appointments.map((apt) =>
-        apt.id === id ? { ...apt, status: "cancelled" } : apt
-      )
-    );
+  const handleCreateAppointment = async () => {
+    const { departmentId, serviceId, facultyId, date, time, purpose } =
+      formData;
+    if (
+      !departmentId ||
+      !serviceId ||
+      !facultyId ||
+      !date ||
+      !time ||
+      !purpose.trim()
+    ) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post("/student/appointments", {
+        facultyId: Number(facultyId),
+        serviceId: Number(serviceId),
+        appointmentDate: date,
+        appointmentTime: time,
+        notes: purpose.trim(),
+      });
+      toast.success("Appointment request submitted successfully!");
+      setShowBookDialog(false);
+      await fetchAppointments();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ??
+        "Failed to submit the appointment. Please try again.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
+  const handleCancelAppointment = async (id) => {
+    if (cancellingId) return;
+    setCancellingId(id);
+    try {
+      await api.delete(`/student/appointments/${id}`);
+      toast.info("Appointment cancelled.");
+      await fetchAppointments();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ?? "Failed to cancel the appointment.";
+      toast.error(msg);
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  // ── Derived lists ────────────────────────────────────────────────────────────
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
@@ -398,44 +513,14 @@ export default function AppointmentsPage() {
   ];
 
   const upcomingAppointments = appointments.filter(
-    (apt) => apt.status !== "cancelled"
+    (apt) => apt.status !== "cancelled",
   );
   const pastAppointments = appointments.filter(
-    (apt) => apt.status === "cancelled"
+    (apt) => apt.status === "cancelled",
   );
 
-  const services = [
-    "Academic Consultation",
-    "Grade Inquiry",
-    "Clearance Processing",
-    "Document Signing",
-    "Thesis/Capstone Consultation",
-  ];
-
-  const professors = [
-    { name: "Prof. Maria Santos", role: "Department Chair" },
-    { name: "Prof. Juan Reyes", role: "Faculty Member" },
-    { name: "Ms. Ana Cruz", role: "Student Affairs Officer" },
-    { name: "Dr. Pedro Garcia", role: "Dean" },
-  ];
-
-  const timeSlots = [
-    "8:00 AM",
-    "9:00 AM",
-    "10:00 AM",
-    "11:00 AM",
-    "1:00 PM",
-    "2:00 PM",
-    "3:00 PM",
-    "4:00 PM",
-  ];
-
-  const colleges = [
-    "College of Computing Studies",
-    "College of Education",
-    "College of Science",
-    "College of Engineering",
-  ];
+  // Today's date string for the date picker minimum
+  const todayISO = new Date().toISOString().split("T")[0];
 
   return (
     <div className="dashboard-with-sidebar">
@@ -455,9 +540,7 @@ export default function AppointmentsPage() {
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={
-                isDark ? "Switch to Light Mode" : "Switch to Dark Mode"
-              }
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -560,10 +643,7 @@ export default function AppointmentsPage() {
               </div>
             </div>
 
-            <button
-              className="book-btn"
-              onClick={() => setShowBookDialog(true)}
-            >
+            <button className="book-btn" onClick={handleOpenBookDialog}>
               <PlusIcon />
               Book Appointment
             </button>
@@ -571,7 +651,10 @@ export default function AppointmentsPage() {
 
           {/* Book Dialog */}
           {showBookDialog && (
-            <div className="dialog-overlay" onClick={() => setShowBookDialog(false)}>
+            <div
+              className="dialog-overlay"
+              onClick={() => setShowBookDialog(false)}
+            >
               <div
                 className="dialog-content"
                 onClick={(e) => e.stopPropagation()}
@@ -587,57 +670,92 @@ export default function AppointmentsPage() {
                 </div>
 
                 <div className="dialog-body">
+                  {/* Step 1 — College */}
                   <div className="form-group">
                     <label>College *</label>
                     <select
-                      value={formData.college}
+                      value={formData.departmentId}
                       onChange={(e) =>
-                        setFormData({ ...formData, college: e.target.value })
+                        setFormData({
+                          ...formData,
+                          departmentId: e.target.value,
+                          serviceId: "",
+                          facultyId: "",
+                        })
                       }
+                      disabled={deptLoading}
                     >
-                      <option value="">Select college</option>
-                      {colleges.map((col) => (
-                        <option key={col} value={col}>
-                          {col}
+                      <option value="">
+                        {deptLoading ? "Loading colleges…" : "Select college"}
+                      </option>
+                      {departmentList.map((d) => (
+                        <option key={d.department_id} value={d.department_id}>
+                          {d.department_name}
                         </option>
                       ))}
                     </select>
                   </div>
 
+                  {/* Step 2 — Service (enabled only after a college is picked) */}
                   <div className="form-group">
                     <label>Service *</label>
                     <select
-                      value={formData.service}
+                      value={formData.serviceId}
                       onChange={(e) =>
-                        setFormData({ ...formData, service: e.target.value })
+                        setFormData({
+                          ...formData,
+                          serviceId: e.target.value,
+                          facultyId: "",
+                        })
                       }
+                      disabled={!formData.departmentId || serviceLoading}
                     >
-                      <option value="">Select service</option>
-                      {services.map((svc) => (
-                        <option key={svc} value={svc}>
-                          {svc}
+                      <option value="">
+                        {!formData.departmentId
+                          ? "Select a college first"
+                          : serviceLoading
+                            ? "Loading services…"
+                            : serviceList.length === 0
+                              ? "No services available"
+                              : "Select service"}
+                      </option>
+                      {serviceList.map((s) => (
+                        <option key={s.service_id} value={s.service_id}>
+                          {s.service_name}
                         </option>
                       ))}
                     </select>
                   </div>
 
+                  {/* Step 3 — Faculty/Staff (enabled only after a service is picked) */}
                   <div className="form-group">
-                    <label>Faculty/Staff *</label>
+                    <label>Faculty / Staff *</label>
                     <select
-                      value={formData.person}
+                      value={formData.facultyId}
                       onChange={(e) =>
-                        setFormData({ ...formData, person: e.target.value })
+                        setFormData({ ...formData, facultyId: e.target.value })
                       }
+                      disabled={!formData.serviceId || facultyLoading}
                     >
-                      <option value="">Select person</option>
-                      {professors.map((prof) => (
-                        <option key={prof.name} value={prof.name}>
-                          {prof.name} - {prof.role}
+                      <option value="">
+                        {!formData.serviceId
+                          ? "Select a service first"
+                          : facultyLoading
+                            ? "Loading faculty…"
+                            : facultyList.length === 0
+                              ? "No faculty available"
+                              : "Select faculty / staff"}
+                      </option>
+                      {facultyList.map((f) => (
+                        <option key={f.faculty_id} value={f.faculty_id}>
+                          {f.name}
+                          {f.specialization ? ` — ${f.specialization}` : ""}
                         </option>
                       ))}
                     </select>
                   </div>
 
+                  {/* Date */}
                   <div className="form-group">
                     <label>Date *</label>
                     <input
@@ -646,10 +764,11 @@ export default function AppointmentsPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, date: e.target.value })
                       }
-                      min={new Date().toISOString().split("T")[0]}
+                      min={todayISO}
                     />
                   </div>
 
+                  {/* Time */}
                   <div className="form-group">
                     <label>Time *</label>
                     <select
@@ -658,15 +777,16 @@ export default function AppointmentsPage() {
                         setFormData({ ...formData, time: e.target.value })
                       }
                     >
-                      <option value="">Select time</option>
-                      {timeSlots.map((slot) => (
+                      <option value="">Select time slot</option>
+                      {TIME_SLOTS.map((slot) => (
                         <option key={slot} value={slot}>
-                          {slot}
+                          {label12h(slot)}
                         </option>
                       ))}
                     </select>
                   </div>
 
+                  {/* Purpose / Notes */}
                   <div className="form-group">
                     <label>Purpose *</label>
                     <textarea
@@ -682,8 +802,9 @@ export default function AppointmentsPage() {
                   <button
                     className="submit-btn"
                     onClick={handleCreateAppointment}
+                    disabled={submitting}
                   >
-                    Submit Request
+                    {submitting ? "Submitting…" : "Submit Request"}
                   </button>
                 </div>
               </div>
@@ -696,12 +817,35 @@ export default function AppointmentsPage() {
               <h2>
                 <ClockIcon />
                 Upcoming Appointments
-              
                 <span className="badge">{upcomingAppointments.length}</span>
               </h2>
             </div>
 
-            {upcomingAppointments.length > 0 ? (
+            {/* Loading state */}
+            {apptLoading && (
+              <div className="empty-state">
+                <CalendarIcon />
+                <h3>Loading your appointments…</h3>
+              </div>
+            )}
+
+            {/* Error state */}
+            {!apptLoading && apptError && (
+              <div className="empty-state">
+                <CalendarIcon />
+                <h3>Could not load appointments</h3>
+                <p>{apptError}</p>
+                <button
+                  className="book-btn book-btn-small"
+                  onClick={fetchAppointments}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Data */}
+            {!apptLoading && !apptError && upcomingAppointments.length > 0 && (
               <div className="appointments-list">
                 {upcomingAppointments.map((apt) => (
                   <div key={apt.id} className="appointment-card">
@@ -733,16 +877,15 @@ export default function AppointmentsPage() {
                         <div className="detail-item">
                           <CalendarIcon />
                           <div>
-                            <p className="detail-label">Date & Time</p>
+                            <p className="detail-label">Date &amp; Time</p>
                             <p className="detail-value">
-                              {new Date(apt.date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "long",
-                                  day: "numeric",
-                                  year: "numeric",
-                                }
-                              )}
+                              {new Date(
+                                apt.date + "T00:00:00",
+                              ).toLocaleDateString("en-US", {
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
                             </p>
                             <p className="detail-time">
                               <ClockIcon />
@@ -769,43 +912,43 @@ export default function AppointmentsPage() {
                           </div>
                         </div>
                       </div>
-
-                      {apt.notes && (
-                        <div className="notes-section">
-                          <p className="notes-title">
-                            📝 Note from {apt.person}
-                          </p>
-                          <p className="notes-text">{apt.notes}</p>
-                        </div>
-                      )}
                     </div>
 
-                    {apt.status === "pending" && (
+                    {(apt.status === "pending" ||
+                      apt.status === "approved") && (
                       <button
                         className="cancel-btn"
                         onClick={() => handleCancelAppointment(apt.id)}
+                        disabled={cancellingId === apt.id}
                       >
                         <XIcon />
-                        Cancel Appointment
+                        {cancellingId === apt.id
+                          ? "Cancelling…"
+                          : "Cancel Appointment"}
                       </button>
                     )}
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="empty-state">
-                <CalendarIcon />
-                <h3>No upcoming appointments</h3>
-                <p>Schedule your first appointment to get started</p>
-                <button
-                  className="book-btn book-btn-small"
-                  onClick={() => setShowBookDialog(true)}
-                >
-                  <PlusIcon />
-                  Book Appointment
-                </button>
-              </div>
             )}
+
+            {/* Empty state */}
+            {!apptLoading &&
+              !apptError &&
+              upcomingAppointments.length === 0 && (
+                <div className="empty-state">
+                  <CalendarIcon />
+                  <h3>No upcoming appointments</h3>
+                  <p>Schedule your first appointment to get started</p>
+                  <button
+                    className="book-btn book-btn-small"
+                    onClick={handleOpenBookDialog}
+                  >
+                    <PlusIcon />
+                    Book Appointment
+                  </button>
+                </div>
+              )}
           </section>
 
           {/* Past Appointments */}
