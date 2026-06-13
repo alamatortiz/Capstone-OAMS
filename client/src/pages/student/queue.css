@@ -1198,10 +1198,11 @@ body {
   border-color: rgba(34, 197, 94, 0.3);
 }
 
-.filter-select:hover ~ .filter-chevron,
-.filter-select:focus ~ .filter-chevron {
+.filter-select:hover + .filter-chevron,
+.filter-select:focus + .filter-chevron {
   color: var(--primary-color);
 }
+
 
 .filter-select:focus {
   outline: none;

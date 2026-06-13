@@ -132,8 +132,14 @@ const SearchIcon = () => (
   </svg>
 );
 
-const ChevronDownIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const ChevronDownIcon = ({ className = '' }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
@@ -661,31 +667,37 @@ export default function TransactionsPage() {
               </div>
 
               <div className="filter-select">
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="select-input"
-                >
-                  <option value="all">All Type</option>
-                  <option value="queue">Queue</option>
-                  <option value="appointment">Appointment</option>
-                  <option value="document">Document</option>
-                </select>
-                <ChevronDownIcon />
+                <div className="filter-select-wrapper">
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="select-input"
+                  >
+                    <option value="all">All Type</option>
+                    <option value="queue">Queue</option>
+                    <option value="appointment">Appointment</option>
+                    <option value="document">Document</option>
+                  </select>
+
+                  <ChevronDownIcon className="filter-chevron" />
+                </div>
               </div>
 
               <div className="filter-select">
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="select-input"
-                >
-                  <option value="all">All Status</option>
-                  <option value="completed">Completed</option>
-                  <option value="ongoing">Ongoing</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-                <ChevronDownIcon />
+                <div className="filter-select-wrapper">
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="select-input"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+
+                  <ChevronDownIcon className="filter-chevron" />
+                </div>
               </div>
             </div>
           </div>
