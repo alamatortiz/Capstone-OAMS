@@ -21,6 +21,7 @@ import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
+import { Toaster } from "sonner";
 
 // ─── Loading fallback component ────────────────────────────────────────────
 const LoadingFallback = () => <div>Loading...</div>;
@@ -28,6 +29,7 @@ const LoadingFallback = () => <div>Loading...</div>;
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AuthProvider>
+      <Toaster richColors position="top-right" />
       <QueueProvider>
         <BrowserRouter>
           <Routes>
