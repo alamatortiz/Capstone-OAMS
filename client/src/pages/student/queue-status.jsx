@@ -1,14 +1,23 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Clock, Users, ChevronLeft, MessageSquare, Calendar, MapPin, Info, TrendingUp, CheckCircle2, Timer, XCircle } from 'lucide-react';
-import { getCollegeLogo } from '../../data/collegeLogo';
-import { useQueue } from '../../contexts/QueueContext';
-import { useAuth } from '../../context/AuthContext';
-import { toast } from 'sonner';
-import { applyTheme, getSavedTheme } from '../../utils/theme';
-import ucLogo from '../../assets/Pnc-Logo.png';
-import oamsLogo from '../../assets/oams_logo.png';
-import './queue-status.css';
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  Clock,
+  Users,
+  ChevronLeft,
+  MessageSquare,
+  Calendar,
+  TrendingUp,
+  XCircle,
+  Loader2,
+} from "lucide-react";
+import { getCollegeLogo } from "../../data/collegeLogo";
+import { useQueue } from "../../contexts/QueueContext";
+import { useAuth } from "../../context/AuthContext";
+import { toast } from "sonner";
+import { applyTheme, getSavedTheme } from "../../utils/theme";
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
+import "./queue-status.css";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -129,8 +138,8 @@ const SendIcon = () => (
 export default function QueueStatusPage() {
   const navigate = useNavigate();
   const { user: authUser, logout } = useAuth();
-  const { queues, updateQueue, removeQueue } = useQueue();
-  
+  const { queues, isLoading, error, leaveQueue, updateQueueNotes } = useQueue();
+
   // ── User data ────────────────────────────────────────────────────────────
   const user = authUser
     ? {
@@ -151,10 +160,12 @@ export default function QueueStatusPage() {
       };
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [selectedQueue, setSelectedQueue] = useState(null);
+  const [selectedQueueId, setSelectedQueueId] = useState(null);
   const [showConcernDialog, setShowConcernDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [concernText, setConcernText] = useState('');
+  const [concernText, setConcernText] = useState("");
+  const [savingConcern, setSavingConcern] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
@@ -168,6 +179,19 @@ export default function QueueStatusPage() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
+
+  // The currently-selected queue, always derived fresh from `queues` so it
+  // stays in sync after a refetch (e.g. position changes, notes update).
+  const selectedQueue = selectedQueueId
+    ? (queues.find((q) => q.queueId === selectedQueueId) ?? null)
+    : null;
+
+  // If the selected queue disappears (e.g. cancelled), drop back to the list.
+  useEffect(() => {
+    if (selectedQueueId && !selectedQueue) {
+      setSelectedQueueId(null);
+    }
+  }, [selectedQueueId, selectedQueue]);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -196,21 +220,37 @@ export default function QueueStatusPage() {
     });
   };
 
-  const handleUpdateConcern = () => {
-    if (selectedQueue && concernText.trim()) {
-      updateQueue(selectedQueue.id, { concern: concernText });
-      setSelectedQueue({ ...selectedQueue, concern: concernText });
+  const handleOpenConcernDialog = () => {
+    setConcernText(selectedQueue?.notes ?? "");
+    setShowConcernDialog(true);
+  };
+
+  const handleUpdateConcern = async () => {
+    if (!selectedQueue) return;
+    setSavingConcern(true);
+    try {
+      await updateQueueNotes(selectedQueue.queueId, concernText.trim());
+      toast.success("Concern updated successfully");
       setShowConcernDialog(false);
-      toast.success('Concern updated successfully');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingConcern(false);
     }
   };
 
-  const handleCancelQueue = () => {
-    if (selectedQueue) {
-      removeQueue(selectedQueue.id);
-      setSelectedQueue(null);
-      toast.success('Queue cancelled successfully');
+  const handleCancelQueue = async () => {
+    if (!selectedQueue) return;
+    setCancelling(true);
+    try {
+      await leaveQueue(selectedQueue.queueId);
+      toast.success("Queue cancelled successfully");
       setShowCancelDialog(false);
+      setSelectedQueueId(null);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -240,16 +280,16 @@ export default function QueueStatusPage() {
     const lowerInput = userInput.toLowerCase();
     if (lowerInput.includes("position")) {
       return queue
-        ? `You're currently at position ${queue.position} in the ${queue.service} queue. There are ${queue.totalInQueue - queue.position} people ahead of you.`
+        ? `You're currently at position ${queue.position} in the ${queue.serviceName} queue. There are ${Math.max(queue.totalWaiting - queue.position, 0)} people ahead of you.`
         : "You don't have any active queues right now.";
     } else if (lowerInput.includes("wait") || lowerInput.includes("time")) {
       return queue
-        ? `Your estimated wait time is ${queue.estimatedWaitTime}. You joined at ${queue.joinedAt}.`
+        ? `Your estimated wait time is ${queue.estimatedWait}. You joined at ${queue.joinedAt}.`
         : "Join a queue to see your wait time.";
     } else if (lowerInput.includes("service") || lowerInput.includes("help")) {
-      return "I can help you with your queue position, estimated wait time, service information, and more. What would you like to know?";
+      return "I can help you with your queue position, estimated wait time, and more. What would you like to know?";
     } else if (lowerInput.includes("cancel") || lowerInput.includes("leave")) {
-      return "You can cancel your queue from the Queue Status page. Would you like help with anything else?";
+      return "You can cancel your queue from the Queue Status page using the Cancel Queue button. Would you like help with anything else?";
     } else {
       return "That's a great question! For more detailed assistance, please check the queue details or contact your college office.";
     }
@@ -257,53 +297,86 @@ export default function QueueStatusPage() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'waiting':
-        return 'queue-status-waiting';
-      case 'active':
-        return 'queue-status-active';
-      case 'completed':
-        return 'queue-status-completed';
+      case "waiting":
+        return "queue-status-waiting";
+      case "serving":
+        return "queue-status-active";
+      case "completed":
+        return "queue-status-completed";
       default:
-        return 'queue-status-waiting';
+        return "queue-status-waiting";
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "waiting":
+        return "Waiting";
+      case "serving":
+        return "Now Serving — It's Your Turn!";
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
 
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
-{ icon: QueueIconNav, label: "Queue", path: "/student/queue" },
-    { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
+    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/student/appointments",
+    },
     { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
-    { icon: HistoryIconNav, label: "Transactions", path: "/student/transactions" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/student/transactions",
+    },
   ];
 
   // ── Detail View ──────────────────────────────────────────────────────────────
   const queueDetailView = (queue) => {
-    const queueProgress = ((queue.totalInQueue - queue.position) / queue.totalInQueue) * 100;
+    const queueProgress =
+      queue.totalWaiting > 0
+        ? ((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100
+        : 0;
+    const peopleAhead = Math.max(queue.position - 1, 0);
+
     return (
       <div className="queue-status-container">
         <div className="queue-status-header">
-            <div className="queue-breadcrumb">
-              <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                Dashboard
-              </Link>
-            </div>
+          <div className="queue-breadcrumb">
+            <button
+              type="button"
+              className="breadcrumb-link"
+              onClick={() => setSelectedQueueId(null)}
+            >
+              <ChevronLeft className="breadcrumb-icon" />
+              All Queues
+            </button>
+          </div>
         </div>
 
         {/* Hero Card */}
         <div className="queue-hero-card">
           <div className="queue-hero-content">
             <div className="queue-hero-logo">
-              <img src={getCollegeLogo(queue.college)} alt={queue.college} />
+              <img
+                src={getCollegeLogo(queue.departmentName)}
+                alt={queue.departmentName}
+              />
             </div>
             <div className="queue-hero-text">
               <div className="queue-hero-header">
                 <div className="queue-hero-title">
                   <h2>Queue Status</h2>
-                  <p>{queue.service}</p>
-                  <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>{queue.college}</p>
+                  <p>{queue.serviceName}</p>
+                  <p style={{ fontSize: "0.875rem", opacity: 0.9 }}>
+                    {queue.departmentName}
+                  </p>
                 </div>
-                <div className="queue-hero-badge">{queue.queueNumber}</div>
+                <div className="queue-hero-badge">{queue.queueNumberBadge}</div>
               </div>
             </div>
           </div>
@@ -325,13 +398,22 @@ export default function QueueStatusPage() {
                   <div className="queue-position-display">
                     <div className="queue-position-label">Your Position</div>
                     <div>
-                      <div className="queue-position-number">{queue.position}</div>
-                      <div className="queue-position-total">/ {queue.totalInQueue}</div>
+                      <div className="queue-position-number">
+                        {queue.position}
+                      </div>
+                      <div className="queue-position-total">
+                        / {queue.totalWaiting}
+                      </div>
                     </div>
-                    <div className="queue-position-message" style={{ marginTop: '1rem' }}>
-                      {queue.position === 1
-                        ? "You're next!"
-                        : `${queue.position - 1} ${queue.position - 1 === 1 ? 'person' : 'people'} ahead of you`}
+                    <div
+                      className="queue-position-message"
+                      style={{ marginTop: "1rem" }}
+                    >
+                      {queue.status === "serving"
+                        ? "You're being served now!"
+                        : queue.position === 1
+                          ? "You're next!"
+                          : `${peopleAhead} ${peopleAhead === 1 ? "person" : "people"} ahead of you`}
                     </div>
                   </div>
 
@@ -341,18 +423,10 @@ export default function QueueStatusPage() {
                       <span>{Math.round(queueProgress)}%</span>
                     </div>
                     <div className="queue-progress-bar">
-                      <div className="queue-progress-fill" style={{ width: `${queueProgress}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div className="queue-stats-grid">
-                    <div className="queue-stat-box">
-                      <div className="queue-stat-label">Currently Serving</div>
-                      <div className="queue-stat-value">{queue.currentlyServing}</div>
-                    </div>
-                    <div className="queue-stat-box">
-                      <div className="queue-stat-label">Avg. Service Time</div>
-                      <div className="queue-stat-value">{queue.averageServiceTime}</div>
+                      <div
+                        className="queue-progress-fill"
+                        style={{ width: `${queueProgress}%` }}
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -370,7 +444,9 @@ export default function QueueStatusPage() {
               <div className="queue-card-content">
                 <div className="queue-wait-time-display">
                   <div className="queue-wait-time-left">
-                    <div className="queue-wait-time-value">{queue.estimatedWaitTime}</div>
+                    <div className="queue-wait-time-value">
+                      {queue.estimatedWait}
+                    </div>
                     <div className="queue-wait-time-joined">
                       Joined at {queue.joinedAt}
                     </div>
@@ -391,40 +467,19 @@ export default function QueueStatusPage() {
                 </h3>
                 <button
                   className="queue-card-action"
-                  onClick={() => {
-                    setConcernText(queue.concern);
-                    setShowConcernDialog(true);
-                  }}
+                  onClick={handleOpenConcernDialog}
                 >
                   Edit
                 </button>
               </div>
               <div className="queue-card-content">
-                <p className="queue-concern-text">{queue.concern}</p>
+                <p className="queue-concern-text">
+                  {queue.notes && queue.notes.trim()
+                    ? queue.notes
+                    : "No concern noted yet. Tap Edit to add one."}
+                </p>
               </div>
             </div>
-
-            {/* Reminders */}
-            {queue.announcementsjson && queue.announcementsjson.length > 0 && (
-              <div className="queue-card queue-reminders-card">
-                <div className="queue-card-header">
-                  <h3 className="queue-card-title queue-reminders-title">
-                    <Info className="w-5 h-5" />
-                    Important Reminders
-                  </h3>
-                </div>
-                <div className="queue-card-content">
-                  <ul className="queue-reminders-list">
-                    {queue.announcementsjson.map((item, index) => (
-                      <li key={index} className="queue-reminder-item">
-                        <CheckCircle2 className="queue-reminder-icon" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Sidebar */}
@@ -439,32 +494,17 @@ export default function QueueStatusPage() {
               </div>
               <div className="queue-card-content">
                 <div className="queue-service-hours-row">
-                  <span className="queue-hours-label">Opens</span>
-                  <span className="queue-hours-time">{queue.serviceHours.start}</span>
+                  <span className="queue-hours-label">Weekdays</span>
+                  <span className="queue-hours-time">8:00 AM – 5:00 PM</span>
                 </div>
                 <div className="queue-service-hours-row">
-                  <span className="queue-hours-label">Closes</span>
-                  <span className="queue-hours-time">{queue.serviceHours.end}</span>
+                  <span className="queue-hours-label">Saturday</span>
+                  <span className="queue-hours-time">8:00 AM – 12:00 PM</span>
                 </div>
-                {queue.serviceHours.breakTime && (
-                  <div className="queue-service-hours-row">
-                    <span className="queue-hours-label">Break</span>
-                    <span className="queue-hours-time">{queue.serviceHours.breakTime}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Location */}
-            <div className="queue-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title">
-                  <MapPin className="w-5 h-5" />
-                  Location
-                </h3>
-              </div>
-              <div className="queue-card-content">
-                <p className="queue-location-text">{queue.location}</p>
+                <div className="queue-service-hours-row">
+                  <span className="queue-hours-label">Break</span>
+                  <span className="queue-hours-time">12:00 PM – 1:00 PM</span>
+                </div>
               </div>
             </div>
 
@@ -477,29 +517,33 @@ export default function QueueStatusPage() {
                 </h3>
               </div>
               <div className="queue-card-content">
-                <div className={`queue-status-badge ${getStatusColor(queue.status)}`}>
-                  {queue.status.charAt(0).toUpperCase() + queue.status.slice(1)}
+                <div
+                  className={`queue-status-badge ${getStatusColor(queue.status)}`}
+                >
+                  {getStatusLabel(queue.status)}
                 </div>
               </div>
             </div>
 
-            {/* Cancel Queue */}
-            <div className="queue-card queue-cancel-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title queue-cancel-title">
-                  <XCircle className="w-5 h-5" />
-                  Cancel Queue
-                </h3>
+            {/* Cancel Queue — only available while still waiting */}
+            {queue.status === "waiting" && (
+              <div className="queue-card queue-cancel-card">
+                <div className="queue-card-header">
+                  <h3 className="queue-card-title queue-cancel-title">
+                    <XCircle className="w-5 h-5" />
+                    Cancel Queue
+                  </h3>
+                </div>
+                <div className="queue-card-content">
+                  <button
+                    className="queue-cancel-btn"
+                    onClick={() => setShowCancelDialog(true)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-              <div className="queue-card-content">
-                <button
-                  className="queue-cancel-btn"
-                  onClick={() => setShowCancelDialog(true)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -509,11 +553,15 @@ export default function QueueStatusPage() {
             <div className="bg-gray-900 dark:bg-gray-900 rounded-lg p-6 max-w-md w-full border border-green-900/20">
               <div className="queue-dialog-header">
                 <h2 className="queue-dialog-title">Edit Your Concern</h2>
-                <p className="queue-dialog-description">Update the details of your service request</p>
+                <p className="queue-dialog-description">
+                  Update the details of your service request
+                </p>
               </div>
               <div className="queue-dialog-form">
                 <div className="queue-dialog-form-group">
-                  <label className="queue-dialog-label">Describe your concern</label>
+                  <label className="queue-dialog-label">
+                    Describe your concern
+                  </label>
                   <textarea
                     className="queue-dialog-textarea"
                     value={concernText}
@@ -525,14 +573,16 @@ export default function QueueStatusPage() {
                   <button
                     className="queue-dialog-btn queue-dialog-btn-secondary"
                     onClick={() => setShowConcernDialog(false)}
+                    disabled={savingConcern}
                   >
                     Cancel
                   </button>
                   <button
                     className="queue-dialog-btn queue-dialog-btn-primary"
                     onClick={handleUpdateConcern}
+                    disabled={savingConcern}
                   >
-                    Save Changes
+                    {savingConcern ? "Saving…" : "Save Changes"}
                   </button>
                 </div>
               </div>
@@ -546,20 +596,24 @@ export default function QueueStatusPage() {
             <div className="bg-gray-900 dark:bg-gray-900 rounded-lg p-6 max-w-md w-full border border-red-900/20">
               <div className="queue-dialog-header">
                 <h2 className="queue-dialog-title">Cancel Queue</h2>
-                <p className="queue-dialog-description">Are you sure you want to cancel this queue?</p>
+                <p className="queue-dialog-description">
+                  Are you sure you want to cancel this queue?
+                </p>
               </div>
               <div className="queue-dialog-actions">
                 <button
                   className="queue-dialog-btn queue-dialog-btn-secondary"
                   onClick={() => setShowCancelDialog(false)}
+                  disabled={cancelling}
                 >
                   Cancel
                 </button>
                 <button
                   className="queue-dialog-btn queue-dialog-btn-danger"
                   onClick={handleCancelQueue}
+                  disabled={cancelling}
                 >
-                  Confirm Cancel
+                  {cancelling ? "Cancelling…" : "Confirm Cancel"}
                 </button>
               </div>
             </div>
@@ -578,7 +632,11 @@ export default function QueueStatusPage() {
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="logo-img oams-logo-img"
+              />
             </div>
             <button
               className="theme-toggle-btn"
@@ -638,7 +696,11 @@ export default function QueueStatusPage() {
         <div className="mobile-header-content">
           <div className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="logo-img oams-logo-img"
+            />
           </div>
           <div className="mobile-header-actions">
             <button
@@ -662,7 +724,9 @@ export default function QueueStatusPage() {
 
       {/* Main Content */}
       <main className="dashboard-main">
-        {selectedQueue ? queueDetailView(selectedQueue) : (
+        {selectedQueue ? (
+          queueDetailView(selectedQueue)
+        ) : (
           <div className="queue-status-container">
             {/* Header */}
             <div className="queue-status-header">
@@ -674,7 +738,7 @@ export default function QueueStatusPage() {
               </div>
               <div className="queue-title-section">
                 <div className="queue-title-icon">
-                  <Timer className="w-5 h-5" />
+                  <Clock className="w-5 h-5" />
                 </div>
                 <div className="queue-title-content">
                   <h1>My Queue Status</h1>
@@ -683,100 +747,154 @@ export default function QueueStatusPage() {
               </div>
             </div>
 
+            {/* Error banner */}
+            {error && (
+              <div className="queue-empty-state">
+                <p className="queue-empty-text">{error}</p>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {isLoading && (
+              <div className="queue-empty-state">
+                <Loader2
+                  className="queue-empty-icon"
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                <p className="queue-empty-text">Loading your queues…</p>
+              </div>
+            )}
+
             {/* Queue Cards */}
-            <div className="queue-list-container">
-              {queues && queues.length > 0 ? (
-                queues.map((queue) => {
-                  const queueProgress = ((queue.totalInQueue - queue.position) / queue.totalInQueue) * 100;
-                  return (
-                    <div
-                      key={queue.id}
-                      className="queue-list-item"
-                      onClick={() => setSelectedQueue(queue)}
-                    >
-                      <div className="queue-list-content">
-                        <div className="queue-list-logo">
-                          <img src={getCollegeLogo(queue.college)} alt={queue.college} />
-                        </div>
-                        <div className="queue-list-info">
-                          <div className="queue-list-header">
-                            <div>
-                              <h3 className="queue-list-title">{queue.service}</h3>
-                              <p className="queue-list-college">{queue.college}</p>
-                            </div>
-                            <div className="queue-list-badge">{queue.queueNumber}</div>
+            {!isLoading && (
+              <div className="queue-list-container">
+                {queues && queues.length > 0 ? (
+                  queues.map((queue) => {
+                    const queueProgress =
+                      queue.totalWaiting > 0
+                        ? ((queue.totalWaiting - queue.position) /
+                            queue.totalWaiting) *
+                          100
+                        : 0;
+                    return (
+                      <div
+                        key={queue.queueId}
+                        className="queue-list-item"
+                        onClick={() => setSelectedQueueId(queue.queueId)}
+                      >
+                        <div className="queue-list-content">
+                          <div className="queue-list-logo">
+                            <img
+                              src={getCollegeLogo(queue.departmentName)}
+                              alt={queue.departmentName}
+                            />
                           </div>
-
-                          <div className="queue-list-stats">
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Position</div>
-                              <div className="queue-list-stat-value">
-                                {queue.position}/{queue.totalInQueue}
+                          <div className="queue-list-info">
+                            <div className="queue-list-header">
+                              <div>
+                                <h3 className="queue-list-title">
+                                  {queue.serviceName}
+                                </h3>
+                                <p className="queue-list-college">
+                                  {queue.departmentName}
+                                </p>
+                              </div>
+                              <div className="queue-list-badge">
+                                {queue.queueNumberBadge}
                               </div>
                             </div>
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Est. Wait</div>
-                              <div className="queue-list-stat-value">{queue.estimatedWaitTime}</div>
-                            </div>
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Joined At</div>
-                              <div className="queue-list-stat-value">{queue.joinedAt}</div>
-                            </div>
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Status</div>
-                              <div className={`queue-status-badge ${getStatusColor(queue.status)}`}>
-                                {queue.status}
+
+                            <div className="queue-list-stats">
+                              <div className="queue-list-stat">
+                                <div className="queue-list-stat-label">
+                                  Position
+                                </div>
+                                <div className="queue-list-stat-value">
+                                  {queue.position}/{queue.totalWaiting}
+                                </div>
+                              </div>
+                              <div className="queue-list-stat">
+                                <div className="queue-list-stat-label">
+                                  Est. Wait
+                                </div>
+                                <div className="queue-list-stat-value">
+                                  {queue.estimatedWait}
+                                </div>
+                              </div>
+                              <div className="queue-list-stat">
+                                <div className="queue-list-stat-label">
+                                  Joined At
+                                </div>
+                                <div className="queue-list-stat-value">
+                                  {queue.joinedAt}
+                                </div>
+                              </div>
+                              <div className="queue-list-stat">
+                                <div className="queue-list-stat-label">
+                                  Status
+                                </div>
+                                <div
+                                  className={`queue-status-badge ${getStatusColor(queue.status)}`}
+                                >
+                                  {queue.status === "serving"
+                                    ? "Your Turn"
+                                    : "Waiting"}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="queue-list-progress">
-                            <div className="queue-list-progress-label">
-                              <span>Progress</span>
-                              <span>{Math.round(queueProgress)}%</span>
-                            </div>
-                            <div className="queue-list-progress-bar">
-                              <div
-                                className="queue-progress-fill"
-                                style={{ width: `${queueProgress}%` }}
-                              ></div>
+                            <div className="queue-list-progress">
+                              <div className="queue-list-progress-label">
+                                <span>Progress</span>
+                                <span>{Math.round(queueProgress)}%</span>
+                              </div>
+                              <div className="queue-list-progress-bar">
+                                <div
+                                  className="queue-progress-fill"
+                                  style={{ width: `${queueProgress}%` }}
+                                ></div>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="queue-empty-state">
-                  <Users className="queue-empty-icon" />
-                  <h3 className="queue-empty-title">No Active Queues</h3>
-                  <p className="queue-empty-text">You haven't joined any queues yet</p>
-                  <button
-                    onClick={() => navigate('/student/avail-service')}
-                    style={{
-                      background: 'var(--primary-color)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '0.75rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--primary-dark)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--primary-color)';
-                    }}
-                  >
-                    Browse Services
-                  </button>
-                </div>
-              )}
-            </div>
+                    );
+                  })
+                ) : (
+                  <div className="queue-empty-state">
+                    <Users className="queue-empty-icon" />
+                    <h3 className="queue-empty-title">No Active Queues</h3>
+                    <p className="queue-empty-text">
+                      You haven't joined any queues yet
+                    </p>
+                    <button
+                      onClick={() => navigate("/student/avail-service")}
+                      style={{
+                        background: "var(--primary-color)",
+                        color: "white",
+                        border: "none",
+                        padding: "0.75rem 1.5rem",
+                        borderRadius: "0.75rem",
+                        cursor: "pointer",
+                        fontSize: "0.875rem",
+                        fontWeight: "600",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background =
+                          "var(--primary-dark)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background =
+                          "var(--primary-color)";
+                      }}
+                    >
+                      Browse Services
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>

@@ -1,13 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import api from '../utils/api';
-import { useAuth } from '../context/AuthContext';
-import QueueContext from './QueueContextBase';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import api from "../utils/api";
+import { useAuth } from "../context/AuthContext";
+import QueueContext from "./QueueContextBase";
+
+const DEFAULT_METRICS = {
+  totalQueuesJoined: 0,
+  totalQueuesCompleted: 0,
+  totalQueuesCancelled: 0,
+  averageWaitTime: "—",
+  totalTimeInQueues: "0 min",
+  mostUsedService: "—",
+};
 
 export function QueueProvider({ children }) {
   const { user } = useAuth();
 
-  const [queues, setQueues] = useState([]);           // active (waiting/serving)
+  const [queues, setQueues] = useState([]); // active (waiting/serving)
   const [availableSlots, setAvailableSlots] = useState([]); // open slots today
+  const [queueHistory, setQueueHistory] = useState([]); // completed/cancelled entries
+  const [metrics, setMetrics] = useState(DEFAULT_METRICS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -15,11 +26,11 @@ export function QueueProvider({ children }) {
   const fetchActiveQueues = useCallback(async () => {
     setError(null);
     try {
-      const { data } = await api.get('/student/queues/active');
+      const { data } = await api.get("/student/queues/active");
       setQueues(data.queues ?? []);
     } catch (err) {
-      console.error('fetchActiveQueues error:', err);
-      setError('Failed to load your active queues.');
+      console.error("fetchActiveQueues error:", err);
+      setError("Failed to load your active queues.");
     }
   }, []);
 
@@ -27,11 +38,33 @@ export function QueueProvider({ children }) {
   const fetchAvailableSlots = useCallback(async () => {
     setError(null);
     try {
-      const { data } = await api.get('/student/queues/available');
+      const { data } = await api.get("/student/queues/available");
       setAvailableSlots(data.slots ?? []);
     } catch (err) {
-      console.error('fetchAvailableSlots error:', err);
-      setError('Failed to load available queues.');
+      console.error("fetchAvailableSlots error:", err);
+      setError("Failed to load available queues.");
+    }
+  }, []);
+
+  // ── Fetch completed/cancelled queue history ───────────────────────────────
+  const fetchQueueHistory = useCallback(async () => {
+    try {
+      const { data } = await api.get("/student/queues/history");
+      setQueueHistory(data.history ?? []);
+    } catch (err) {
+      console.error("fetchQueueHistory error:", err);
+      // Non-fatal — history tab will just show empty state
+    }
+  }, []);
+
+  // ── Fetch aggregate analytics ─────────────────────────────────────────────
+  const fetchQueueMetrics = useCallback(async () => {
+    try {
+      const { data } = await api.get("/student/queues/metrics");
+      setMetrics({ ...DEFAULT_METRICS, ...data });
+    } catch (err) {
+      console.error("fetchQueueMetrics error:", err);
+      // Non-fatal — analytics tab will show defaults
     }
   }, []);
 
@@ -43,6 +76,8 @@ export function QueueProvider({ children }) {
       // Clear previous user's data immediately before fetching
       setQueues([]);
       setAvailableSlots([]);
+      setQueueHistory([]);
+      setMetrics(DEFAULT_METRICS);
       setError(null);
 
       if (!user?.userId) {
@@ -52,58 +87,102 @@ export function QueueProvider({ children }) {
       }
 
       setIsLoading(true);
-      await Promise.all([fetchActiveQueues(), fetchAvailableSlots()]);
+      await Promise.all([
+        fetchActiveQueues(),
+        fetchAvailableSlots(),
+        fetchQueueHistory(),
+        fetchQueueMetrics(),
+      ]);
       if (!cancelled) setIsLoading(false);
     };
     init();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.userId]); // Re-run only when the actual user identity changes
 
   // ── Re-fetch when user returns to the tab ────────────────────────────────
   useEffect(() => {
     if (!user?.userId) return;
     const onVisible = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         fetchActiveQueues();
         fetchAvailableSlots();
+        fetchQueueHistory();
+        fetchQueueMetrics();
       }
     };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [user?.userId, fetchActiveQueues, fetchAvailableSlots]);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [
+    user?.userId,
+    fetchActiveQueues,
+    fetchAvailableSlots,
+    fetchQueueHistory,
+    fetchQueueMetrics,
+  ]);
 
   // ── Join a queue ──────────────────────────────────────────────────────────
-  const joinQueue = useCallback(async (slotId) => {
-    try {
-      const { data } = await api.post('/student/queues/join', { slotId });
-      // Add to active queues
-      setQueues((prev) => [...prev, data.queue]);
-      // Refresh slot counts and re-fetch active queues to get accurate position
-      await fetchAvailableSlots();
-      await fetchActiveQueues();
-      return data.queue;
-    } catch (err) {
-      const msg =
-        err?.response?.data?.error ?? 'Failed to join the queue. Please try again.';
-      throw new Error(msg);
-    }
-  }, [fetchAvailableSlots, fetchActiveQueues]);
+  const joinQueue = useCallback(
+    async (slotId) => {
+      try {
+        const { data } = await api.post("/student/queues/join", { slotId });
+        // Add to active queues
+        setQueues((prev) => [...prev, data.queue]);
+        // Refresh slot counts and re-fetch active queues to get accurate position
+        await fetchAvailableSlots();
+        await fetchActiveQueues();
+        return data.queue;
+      } catch (err) {
+        const msg =
+          err?.response?.data?.error ??
+          "Failed to join the queue. Please try again.";
+        throw new Error(msg);
+      }
+    },
+    [fetchAvailableSlots, fetchActiveQueues],
+  );
 
   // ── Leave a queue ─────────────────────────────────────────────────────────
-  const leaveQueue = useCallback(async (queueId) => {
+  const leaveQueue = useCallback(
+    async (queueId) => {
+      try {
+        await api.post(`/student/queues/${queueId}/leave`);
+        // Remove from active queues optimistically
+        setQueues((prev) => prev.filter((q) => q.queueId !== queueId));
+        // Refresh available slots so counts update, and pull in the new history entry
+        await fetchAvailableSlots();
+        await fetchQueueHistory();
+        await fetchQueueMetrics();
+      } catch (err) {
+        const msg =
+          err?.response?.data?.error ??
+          "Failed to leave the queue. Please try again.";
+        throw new Error(msg);
+      }
+    },
+    [fetchAvailableSlots, fetchQueueHistory, fetchQueueMetrics],
+  );
+
+  // Alias — some pages refer to "cancelling" a queue rather than "leaving" it.
+  // Behaviour is identical: only valid while the entry is still 'waiting'.
+  const cancelQueue = leaveQueue;
+
+  // ── Update the "concern" / notes text on an active queue entry ───────────
+  const updateQueueNotes = useCallback(async (queueId, notes) => {
     try {
-      await api.post(`/student/queues/${queueId}/leave`);
-      // Remove from active queues optimistically
-      setQueues((prev) => prev.filter((q) => q.queueId !== queueId));
-      // Refresh available slots so counts update
-      await fetchAvailableSlots();
+      await api.patch(`/student/queues/${queueId}/notes`, { notes });
+      setQueues((prev) =>
+        prev.map((q) => (q.queueId === queueId ? { ...q, notes } : q)),
+      );
     } catch (err) {
       const msg =
-        err?.response?.data?.error ?? 'Failed to leave the queue. Please try again.';
+        err?.response?.data?.error ??
+        "Failed to update your concern. Please try again.";
       throw new Error(msg);
     }
-  }, [fetchAvailableSlots]);
+  }, []);
 
   // ── Derived helper ────────────────────────────────────────────────────────
   // Returns true if the student already has a waiting/serving entry for a slot
@@ -115,32 +194,51 @@ export function QueueProvider({ children }) {
   // Backwards-compatible alias — StudentDashboard calls getActiveQueues()
   const getActiveQueues = useCallback(() => queues, [queues]);
 
+  // Backwards-compatible alias — queue-tracking.jsx calls getQueueMetrics()
+  const getQueueMetrics = useCallback(() => metrics, [metrics]);
+
   const value = useMemo(
     () => ({
       queues,
       availableSlots,
+      queueHistory,
+      metrics,
       isLoading,
       error,
       fetchActiveQueues,
       fetchAvailableSlots,
+      fetchQueueHistory,
+      fetchQueueMetrics,
       joinQueue,
       leaveQueue,
+      cancelQueue,
+      updateQueueNotes,
       isAlreadyInQueue,
       getActiveQueues,
+      getQueueMetrics,
     }),
     [
       queues,
       availableSlots,
+      queueHistory,
+      metrics,
       isLoading,
       error,
       fetchActiveQueues,
       fetchAvailableSlots,
+      fetchQueueHistory,
+      fetchQueueMetrics,
       joinQueue,
       leaveQueue,
+      cancelQueue,
+      updateQueueNotes,
       isAlreadyInQueue,
       getActiveQueues,
+      getQueueMetrics,
     ],
   );
 
-  return <QueueContext.Provider value={value}>{children}</QueueContext.Provider>;
+  return (
+    <QueueContext.Provider value={value}>{children}</QueueContext.Provider>
+  );
 }

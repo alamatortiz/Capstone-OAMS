@@ -536,6 +536,82 @@ router.get(
   },
 );
 
+router.get(
+  "/queues/history",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           q.queue_id,
+           q.queue_number,
+           q.status,
+           q.created_at,
+           q.completed_at,
+           q.cancelled_at,
+           s.service_name,
+           d.department_name,
+           d.department_abbreviation
+         FROM queues q
+         JOIN services s ON q.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE q.student_id = ?
+           AND q.status IN ('completed', 'cancelled')
+         ORDER BY q.created_at DESC
+         LIMIT 50`,
+        [studentId],
+      );
+
+      const formatted = rows.map((row) => {
+        const deptAbbrev = row.department_abbreviation;
+        const serviceCode = row.service_name
+          .split(" ")[0]
+          .substring(0, 3)
+          .toUpperCase();
+        const endTime = row.completed_at || row.cancelled_at;
+
+        let actualWaitTime = "—";
+        if (row.completed_at) {
+          const diffMs = new Date(row.completed_at) - new Date(row.created_at);
+          const diffMin = Math.max(0, Math.round(diffMs / 60000));
+          actualWaitTime = `${diffMin} min`;
+        }
+
+        return {
+          id: row.queue_id,
+          service: row.service_name,
+          college: row.department_name,
+          queueNumber: `${deptAbbrev}-${serviceCode}-${String(row.queue_number).padStart(3, "0")}`,
+          status: row.status,
+          joinedAt: new Date(row.created_at).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Asia/Manila",
+          }),
+          completedAt: endTime
+            ? new Date(endTime).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Manila",
+              })
+            : "—",
+          actualWaitTime,
+        };
+      });
+
+      res.json({ history: formatted });
+    } catch (error) {
+      console.error("Queue history error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 // POST /api/student/queues/join
 // Body: { slotId }
 router.post(
@@ -770,6 +846,111 @@ router.post(
         .json({ message: "Internal server error", dev_error: error.message });
     } finally {
       conn.release();
+    }
+  },
+);
+
+// GET /api/student/queues/metrics
+// Returns aggregate queue stats for the student's "Analytics" tab.
+router.get(
+  "/queues/metrics",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+
+    try {
+      const [[counts]] = await pool.query(
+        `SELECT
+           COUNT(*) AS total_joined,
+           SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS total_completed,
+           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS total_cancelled,
+           SUM(
+             CASE WHEN status = 'completed'
+               THEN TIMESTAMPDIFF(MINUTE, created_at, completed_at)
+               ELSE 0
+             END
+           ) AS total_minutes
+         FROM queues
+         WHERE student_id = ?`,
+        [studentId],
+      );
+
+      const [[mostUsed]] = await pool.query(
+        `SELECT s.service_name, COUNT(*) AS cnt
+         FROM queues q
+         JOIN services s ON q.service_id = s.service_id
+         WHERE q.student_id = ?
+         GROUP BY s.service_name
+         ORDER BY cnt DESC
+         LIMIT 1`,
+        [studentId],
+      );
+
+      const totalCompleted = counts.total_completed || 0;
+      const totalMinutes = counts.total_minutes || 0;
+      const avgMinutes =
+        totalCompleted > 0 ? Math.round(totalMinutes / totalCompleted) : 0;
+
+      res.json({
+        totalQueuesJoined: counts.total_joined || 0,
+        totalQueuesCompleted: totalCompleted,
+        totalQueuesCancelled: counts.total_cancelled || 0,
+        averageWaitTime: totalCompleted > 0 ? `${avgMinutes} min` : "—",
+        totalTimeInQueues: `${totalMinutes} min`,
+        mostUsedService: mostUsed?.service_name ?? "—",
+      });
+    } catch (error) {
+      console.error("Queue metrics error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/student/queues/:queueId/notes
+// Body: { notes }
+// Lets the student edit the "concern" text on their own active queue entry.
+router.patch(
+  "/queues/:queueId/notes",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const queueId = parseInt(req.params.queueId, 10);
+    const { notes } = req.body;
+
+    if (!queueId || isNaN(queueId)) {
+      return res.status(400).json({ error: "Invalid queueId" });
+    }
+
+    try {
+      const [[entry]] = await pool.query(
+        `SELECT queue_id, student_id, status FROM queues WHERE queue_id = ?`,
+        [queueId],
+      );
+
+      if (!entry) {
+        return res.status(404).json({ error: "Queue entry not found" });
+      }
+      if (entry.student_id !== studentId) {
+        return res
+          .status(403)
+          .json({ error: "You can only edit your own queue entry" });
+      }
+
+      await pool.query(`UPDATE queues SET notes = ? WHERE queue_id = ?`, [
+        notes ?? null,
+        queueId,
+      ]);
+
+      res.json({ message: "Updated", queueId, notes: notes ?? null });
+    } catch (error) {
+      console.error("Update queue notes error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
     }
   },
 );
