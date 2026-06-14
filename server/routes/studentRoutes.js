@@ -299,10 +299,12 @@ router.post(
       }
 
       if (!serviceId) {
-        return res.status(404).json({
-          error:
-            "No matching service configuration found for the selected college",
-        });
+        return res
+          .status(404)
+          .json({
+            error:
+              "No matching service configuration found for the selected college",
+          });
       }
 
       const estimatedCompletion = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
@@ -467,6 +469,7 @@ router.get(
            q.created_at AS joined_at,
            qs.start_time,
            qs.end_time,
+           qs.max_capacity,
            s.service_name,
            d.department_name,
            d.department_abbreviation,
@@ -484,7 +487,21 @@ router.get(
              FROM queues q3
              WHERE q3.slot_id = q.slot_id
                AND q3.status = 'waiting'
-           ) AS total_waiting
+           ) AS total_waiting,
+           -- Total people who have joined this slot (all statuses except cancelled)
+           (
+             SELECT COUNT(*)
+             FROM queues q4
+             WHERE q4.slot_id = q.slot_id
+               AND q4.status != 'cancelled'
+           ) AS total_joined,
+           -- How many have been completed/served in this slot
+           (
+             SELECT COUNT(*)
+             FROM queues q5
+             WHERE q5.slot_id = q.slot_id
+               AND q5.status = 'completed'
+           ) AS completed_count
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -516,6 +533,9 @@ router.get(
           status: row.status,
           position,
           totalWaiting: row.total_waiting || 0,
+          totalJoined: row.total_joined || 0,
+          completedCount: row.completed_count || 0,
+          maxCapacity: row.max_capacity || 0,
           estimatedWait:
             position > 1 ? `~${(position - 1) * 5} min` : "You're next!",
           joinedAt: new Date(row.joined_at).toLocaleTimeString("en-US", {
@@ -529,82 +549,6 @@ router.get(
       res.json({ queues: formatted });
     } catch (error) {
       console.error("Active queues error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
-    }
-  },
-);
-
-router.get(
-  "/queues/history",
-  authenticateToken,
-  authorizeRoles("student"),
-  async (req, res) => {
-    const studentId = req.user.userId;
-
-    try {
-      const [rows] = await pool.query(
-        `SELECT
-           q.queue_id,
-           q.queue_number,
-           q.status,
-           q.created_at,
-           q.completed_at,
-           q.cancelled_at,
-           s.service_name,
-           d.department_name,
-           d.department_abbreviation
-         FROM queues q
-         JOIN services s ON q.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
-         WHERE q.student_id = ?
-           AND q.status IN ('completed', 'cancelled')
-         ORDER BY q.created_at DESC
-         LIMIT 50`,
-        [studentId],
-      );
-
-      const formatted = rows.map((row) => {
-        const deptAbbrev = row.department_abbreviation;
-        const serviceCode = row.service_name
-          .split(" ")[0]
-          .substring(0, 3)
-          .toUpperCase();
-        const endTime = row.completed_at || row.cancelled_at;
-
-        let actualWaitTime = "—";
-        if (row.completed_at) {
-          const diffMs = new Date(row.completed_at) - new Date(row.created_at);
-          const diffMin = Math.max(0, Math.round(diffMs / 60000));
-          actualWaitTime = `${diffMin} min`;
-        }
-
-        return {
-          id: row.queue_id,
-          service: row.service_name,
-          college: row.department_name,
-          queueNumber: `${deptAbbrev}-${serviceCode}-${String(row.queue_number).padStart(3, "0")}`,
-          status: row.status,
-          joinedAt: new Date(row.created_at).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "Asia/Manila",
-          }),
-          completedAt: endTime
-            ? new Date(endTime).toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Asia/Manila",
-              })
-            : "—",
-          actualWaitTime,
-        };
-      });
-
-      res.json({ history: formatted });
-    } catch (error) {
-      console.error("Queue history error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
@@ -846,111 +790,6 @@ router.post(
         .json({ message: "Internal server error", dev_error: error.message });
     } finally {
       conn.release();
-    }
-  },
-);
-
-// GET /api/student/queues/metrics
-// Returns aggregate queue stats for the student's "Analytics" tab.
-router.get(
-  "/queues/metrics",
-  authenticateToken,
-  authorizeRoles("student"),
-  async (req, res) => {
-    const studentId = req.user.userId;
-
-    try {
-      const [[counts]] = await pool.query(
-        `SELECT
-           COUNT(*) AS total_joined,
-           SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS total_completed,
-           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS total_cancelled,
-           SUM(
-             CASE WHEN status = 'completed'
-               THEN TIMESTAMPDIFF(MINUTE, created_at, completed_at)
-               ELSE 0
-             END
-           ) AS total_minutes
-         FROM queues
-         WHERE student_id = ?`,
-        [studentId],
-      );
-
-      const [[mostUsed]] = await pool.query(
-        `SELECT s.service_name, COUNT(*) AS cnt
-         FROM queues q
-         JOIN services s ON q.service_id = s.service_id
-         WHERE q.student_id = ?
-         GROUP BY s.service_name
-         ORDER BY cnt DESC
-         LIMIT 1`,
-        [studentId],
-      );
-
-      const totalCompleted = counts.total_completed || 0;
-      const totalMinutes = counts.total_minutes || 0;
-      const avgMinutes =
-        totalCompleted > 0 ? Math.round(totalMinutes / totalCompleted) : 0;
-
-      res.json({
-        totalQueuesJoined: counts.total_joined || 0,
-        totalQueuesCompleted: totalCompleted,
-        totalQueuesCancelled: counts.total_cancelled || 0,
-        averageWaitTime: totalCompleted > 0 ? `${avgMinutes} min` : "—",
-        totalTimeInQueues: `${totalMinutes} min`,
-        mostUsedService: mostUsed?.service_name ?? "—",
-      });
-    } catch (error) {
-      console.error("Queue metrics error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
-    }
-  },
-);
-
-// PATCH /api/student/queues/:queueId/notes
-// Body: { notes }
-// Lets the student edit the "concern" text on their own active queue entry.
-router.patch(
-  "/queues/:queueId/notes",
-  authenticateToken,
-  authorizeRoles("student"),
-  async (req, res) => {
-    const studentId = req.user.userId;
-    const queueId = parseInt(req.params.queueId, 10);
-    const { notes } = req.body;
-
-    if (!queueId || isNaN(queueId)) {
-      return res.status(400).json({ error: "Invalid queueId" });
-    }
-
-    try {
-      const [[entry]] = await pool.query(
-        `SELECT queue_id, student_id, status FROM queues WHERE queue_id = ?`,
-        [queueId],
-      );
-
-      if (!entry) {
-        return res.status(404).json({ error: "Queue entry not found" });
-      }
-      if (entry.student_id !== studentId) {
-        return res
-          .status(403)
-          .json({ error: "You can only edit your own queue entry" });
-      }
-
-      await pool.query(`UPDATE queues SET notes = ? WHERE queue_id = ?`, [
-        notes ?? null,
-        queueId,
-      ]);
-
-      res.json({ message: "Updated", queueId, notes: notes ?? null });
-    } catch (error) {
-      console.error("Update queue notes error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
     }
   },
 );
@@ -1294,107 +1133,6 @@ router.delete(
   },
 );
 
-// GET /api/student/transactions
-// Returns a unified history of queues, appointments, and document requests
-router.get(
-  "/transactions",
-  authenticateToken,
-  authorizeRoles("student"),
-  async (req, res) => {
-    const studentId = req.user.userId;
-
-    try {
-      const [rows] = await pool.query(
-        `(
-           SELECT
-             'queue' AS type,
-             q.queue_id AS id,
-             CONCAT('Queue for ', s.service_name) AS title,
-             d.department_name AS college,
-             q.status AS raw_status,
-             q.notes AS details,
-             q.created_at AS event_time
-           FROM queues q
-           JOIN services s ON q.service_id = s.service_id
-           JOIN departments d ON s.department_id = d.department_id
-           WHERE q.student_id = ?
-         )
-         UNION ALL
-         (
-           SELECT
-             'appointment' AS type,
-             a.appointment_id AS id,
-             CONCAT('Appointment with ', CONCAT(f.first_name, ' ', f.last_name)) AS title,
-             d.department_name AS college,
-             a.status AS raw_status,
-             a.notes AS details,
-             a.created_at AS event_time
-           FROM appointments a
-           JOIN faculty f ON a.faculty_id = f.faculty_id
-           JOIN departments d ON f.department_id = d.department_id
-           WHERE a.student_id = ?
-         )
-         UNION ALL
-         (
-           SELECT
-             'document' AS type,
-             dr.request_id AS id,
-             CONCAT(dr.request_type, ' Request') AS title,
-             d.department_name AS college,
-             dr.status AS raw_status,
-             dr.purpose AS details,
-             dr.created_at AS event_time
-           FROM document_requests dr
-           JOIN services s ON dr.service_id = s.service_id
-           JOIN departments d ON s.department_id = d.department_id
-           WHERE dr.student_id = ?
-         )
-         ORDER BY event_time DESC`,
-        [studentId, studentId, studentId],
-      );
-
-      // Map raw DB statuses -> the 3 badge states the UI understands
-      const statusMap = {
-        waiting: "ongoing",
-        serving: "ongoing",
-        completed: "completed",
-        cancelled: "cancelled",
-        pending: "ongoing",
-        approved: "ongoing",
-        rejected: "cancelled",
-        processing: "ongoing",
-        generated: "completed",
-        released: "completed",
-      };
-
-      const transactions = rows.map((row) => {
-        const eventDate = new Date(row.event_time);
-        return {
-          id: `${row.type}-${row.id}`,
-          type: row.type,
-          title: row.title,
-          college: row.college,
-          date: eventDate.toISOString().split("T")[0],
-          time: eventDate.toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          }),
-          status: statusMap[row.raw_status] ?? "ongoing",
-          details: row.details || "No additional details provided.",
-        };
-      });
-
-      res.json({ transactions });
-    } catch (error) {
-      console.error("Fetch transactions error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
-    }
-  },
-);
-
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
@@ -1421,168 +1159,5 @@ function formatRelativeTime(date) {
   const diffDay = Math.floor(diffHr / 24);
   return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
 }
-
-// ─────────────────────────────────────────────────────────────
-// AVAIL-SERVICES ENDPOINTS
-// ─────────────────────────────────────────────────────────────
-
-/**
- * GET /api/student/services/by-department
- *
- * Returns every department together with its services.
- * For each service we also attach:
- *   - requirements  → rows from service_requirements (or the service description as fallback)
- *   - todaySlot     → the open queue_slot for today, if one exists (null otherwise)
- *
- * This single endpoint powers the entire Avail-Services page so the
- * frontend never needs to waterfall multiple requests.
- */
-router.get(
-  "/services/by-department",
-  authenticateToken,
-  authorizeRoles("student"),
-  async (req, res) => {
-    try {
-      // 1. All departments
-      const [departments] = await pool.query(
-        `SELECT department_id, department_name, department_abbreviation, office_location
-         FROM departments
-         ORDER BY department_name ASC`,
-      );
-
-      // 2. All services with their requirements (LEFT JOIN so services without
-      //    rows in service_requirements are still returned).
-      const [services] = await pool.query(
-        `SELECT
-           s.service_id,
-           s.service_name,
-           s.description,
-           s.department_id,
-           sr.requirement_id,
-           sr.requirement_name,
-           sr.description  AS req_description,
-           sr.is_mandatory
-         FROM services s
-         LEFT JOIN service_requirements sr ON sr.service_id = s.service_id
-         ORDER BY s.department_id, s.service_name, sr.requirement_id`,
-      );
-
-      // 3. Open queue slots for today (one per service; we pick the first open one)
-      const [slots] = await pool.query(
-        `SELECT
-           qs.slot_id,
-           qs.service_id,
-           qs.start_time,
-           qs.end_time,
-           qs.max_capacity,
-           qs.current_count,
-           qs.status,
-           (
-             SELECT COUNT(*)
-             FROM queues q
-             WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
-           ) AS waiting_count,
-           (
-             SELECT q2.queue_number
-             FROM queues q2
-             WHERE q2.slot_id = qs.slot_id AND q2.status = 'serving'
-             ORDER BY q2.called_at DESC
-             LIMIT 1
-           ) AS currently_serving_number
-         FROM queue_slots qs
-         WHERE qs.slot_date = CURDATE()
-           AND qs.status = 'open'
-         ORDER BY qs.start_time ASC`,
-      );
-
-      // ── Assemble: group requirements per service ──────────────────────────
-      // serviceMap: service_id → { ...service fields, requirements: [] }
-      const serviceMap = new Map();
-      for (const row of services) {
-        if (!serviceMap.has(row.service_id)) {
-          serviceMap.set(row.service_id, {
-            serviceId: row.service_id,
-            serviceName: row.service_name,
-            description: row.description ?? "",
-            departmentId: row.department_id,
-            requirements: [],
-          });
-        }
-        // Attach requirement row if it exists
-        if (row.requirement_id) {
-          serviceMap.get(row.service_id).requirements.push({
-            id: row.requirement_id,
-            name: row.requirement_name,
-            description: row.req_description ?? "",
-            isMandatory: !!row.is_mandatory,
-          });
-        }
-      }
-
-      // ── Assemble: index slots by service_id (first open slot wins) ────────
-      const slotByService = new Map();
-      for (const slot of slots) {
-        if (!slotByService.has(slot.service_id)) {
-          const waitingCount = Number(slot.waiting_count) || 0;
-          const avgWaitMin = waitingCount * 5;
-          slotByService.set(slot.service_id, {
-            slotId: slot.slot_id,
-            startTime: formatTime12h(slot.start_time),
-            endTime: formatTime12h(slot.end_time),
-            maxCapacity: slot.max_capacity,
-            currentCount: slot.current_count,
-            waitingCount,
-            hasCapacity: waitingCount < slot.max_capacity,
-            status: slot.status,
-            avgWaitTime:
-              waitingCount === 0
-                ? "No wait"
-                : `${avgWaitMin}–${avgWaitMin + 5} mins`,
-            currentlyServingNumber: slot.currently_serving_number ?? null,
-          });
-        }
-      }
-
-      // ── Assemble: group services per department ───────────────────────────
-      const deptMap = new Map();
-      for (const dept of departments) {
-        deptMap.set(dept.department_id, {
-          departmentId: dept.department_id,
-          departmentName: dept.department_name,
-          departmentAbbrev: dept.department_abbreviation,
-          officeLocation: dept.office_location ?? "",
-          services: [],
-        });
-      }
-
-      for (const svc of serviceMap.values()) {
-        const dept = deptMap.get(svc.departmentId);
-        if (!dept) continue;
-
-        const todaySlot = slotByService.get(svc.serviceId) ?? null;
-
-        dept.services.push({
-          serviceId: svc.serviceId,
-          serviceName: svc.serviceName,
-          description: svc.description,
-          requirements: svc.requirements,
-          todaySlot,
-          // Convenience flags the UI uses directly
-          hasQueueToday: todaySlot !== null,
-          isQueueOpen: todaySlot?.hasCapacity ?? false,
-        });
-      }
-
-      const result = [...deptMap.values()].filter((d) => d.services.length > 0);
-
-      res.json({ departments: result });
-    } catch (error) {
-      console.error("Services by-department error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
-    }
-  },
-);
 
 module.exports = router;
