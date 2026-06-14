@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useQueue } from '../../contexts/QueueContext';
-import { applyTheme, getSavedTheme } from '../../utils/theme';
-import ucLogo from '../../assets/Pnc-Logo.png';
-import oamsLogo from '../../assets/oams_logo.png';
-import './queue-tracking.css';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { useQueue } from "../../contexts/QueueContext";
+import { applyTheme, getSavedTheme } from "../../utils/theme";
+import { getCollegeLogo } from "../../data/collegeLogo";
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
+import "./queue-tracking.css";
 
 import {
-  MapPin,
   Clock,
   Users,
   TrendingUp,
@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Timer,
   Target,
-} from 'lucide-react';
+  Loader2,
+} from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -29,14 +30,12 @@ const HomeIcon = () => (
     <polyline points="9 22 9 12 15 12 15 22"></polyline>
   </svg>
 );
-
 const QueueIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
-
 const CalendarIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -45,7 +44,6 @@ const CalendarIconNav = () => (
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
-
 const DocumentIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -54,7 +52,6 @@ const DocumentIconNav = () => (
     <line x1="9" y1="15" x2="15" y2="15"></line>
   </svg>
 );
-
 const HistoryIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
@@ -62,7 +59,6 @@ const HistoryIconNav = () => (
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36"></path>
   </svg>
 );
-
 const LogOutIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -70,7 +66,6 @@ const LogOutIcon = () => (
     <line x1="21" y1="12" x2="9" y2="12"></line>
   </svg>
 );
-
 const MenuIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -78,21 +73,18 @@ const MenuIcon = () => (
     <line x1="3" y1="18" x2="21" y2="18"></line>
   </svg>
 );
-
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
-
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
     <circle cx="12" cy="7" r="4"></circle>
   </svg>
 );
-
 const SunIcon = () => (
   <svg
     className="sun-icon"
@@ -112,7 +104,6 @@ const SunIcon = () => (
     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
   </svg>
 );
-
 const MoonIcon = () => (
   <svg
     className="moon-icon"
@@ -124,7 +115,6 @@ const MoonIcon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
-
 const ChatIcon = () => (
   <svg
     className="icon"
@@ -136,7 +126,6 @@ const ChatIcon = () => (
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </svg>
 );
-
 const SendIcon = () => (
   <svg
     className="icon"
@@ -150,31 +139,62 @@ const SendIcon = () => (
   </svg>
 );
 
-// ─── Main Component ────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const getProgress = (position, totalWaiting) => {
+  if (!totalWaiting || totalWaiting === 0) return 100;
+  return Math.round(((totalWaiting - position) / totalWaiting) * 100);
+};
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case "serving":
+      return "status-active";
+    case "waiting":
+      return "status-waiting";
+    case "completed":
+      return "status-completed";
+    case "cancelled":
+      return "status-cancelled";
+    default:
+      return "status-default";
+  }
+};
+
+const getStatusLabel = (status) => {
+  switch (status) {
+    case "serving":
+      return "Your Turn!";
+    case "waiting":
+      return "Waiting";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status;
+  }
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function QueueTrackingPage() {
   const { user: authUser, logout } = useAuth();
   const {
     queues = [],
     queueHistory = [],
-    getQueueMetrics = () => ({}),
-    completeQueue = () => {},
-    cancelQueue = () => {},
+    metrics,
+    isLoading,
+    leaveQueue,
+    fetchQueueHistory,
+    fetchMetrics,
   } = useQueue();
 
   const user = authUser
     ? {
         ...authUser,
-        college: authUser.departmentName ?? 'N/A College',
-        studentNumber: authUser.studentNumber ?? 'N/A Student Number',
-        departmentAbbrev: authUser.departmentAbbrev ?? 'N/A Abbreviation',
+        college: authUser.departmentName ?? "N/A College",
+        departmentAbbrev: authUser.departmentAbbrev ?? "N/A",
       }
-    : {
-        name: 'Student',
-        role: 'student',
-        college: '',
-        studentNumber: 'N/A Student Number',
-        departmentAbbrev: '',
-      };
+    : { name: "Student", role: "student", college: "", departmentAbbrev: "" };
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -182,144 +202,125 @@ export default function QueueTrackingPage() {
   // ── State ─────────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [messages, setMessages] = useState([
     {
       id: 1,
-      type: 'bot',
+      type: "bot",
       text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
       timestamp: new Date(),
     },
   ]);
-  const [inputValue, setInputValue] = useState('');
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [activeTab, setActiveTab] = useState('active');
+  const [inputValue, setInputValue] = useState("");
+  const [activeTab, setActiveTab] = useState("active");
+  const [leavingId, setLeavingId] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // ── Effects ───────────────────────────────────────────────────────────────
+  // Load history + metrics when the tracking page mounts
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    fetchQueueHistory();
+    fetchMetrics();
+  }, [fetchQueueHistory, fetchMetrics]);
 
   useEffect(() => {
-    applyTheme(isDark ? 'dark' : 'light');
+    applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ── Derived Values ────────────────────────────────────────────────────────
-  const activeQueues = (Array.isArray(queues) ? queues : []).filter(
-    (q) => q?.status === 'waiting' || q?.status === 'active'
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const activeQueues = queues.filter(
+    (q) => q.status === "waiting" || q.status === "serving",
   );
-  const metrics = getQueueMetrics() || {};
+
+  // Compute analytics from real metrics (API) + local data
+  const totalJoined = metrics?.totalQueuesJoined ?? 0;
+  const totalCompleted = metrics?.totalQueuesCompleted ?? 0;
+  const totalCancelled = metrics?.totalQueuesCancelled ?? 0;
+  const avgWait = metrics?.averageWaitTime ?? "—";
+  const totalTime = metrics?.totalTimeInQueues ?? "—";
+  const mostUsed = metrics?.mostUsedService ?? "—";
+  const successRate =
+    totalJoined > 0 ? Math.round((totalCompleted / totalJoined) * 100) : 0;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
-
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
-      applyTheme(next ? 'dark' : 'light');
+      applyTheme(next ? "dark" : "light");
       return next;
     });
   };
 
+  const handleLeaveQueue = async (queueId) => {
+    if (leavingId) return;
+    setLeavingId(queueId);
+    try {
+      await leaveQueue(queueId);
+      await fetchQueueHistory();
+      await fetchMetrics();
+    } catch (err) {
+      // toast handled by caller context; just log
+      console.error("Leave queue error:", err);
+    } finally {
+      setLeavingId(null);
+    }
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (inputValue.trim() === '') return;
-    const userMessage = {
+    if (!inputValue.trim()) return;
+    const userMsg = {
       id: messages.length + 1,
-      type: 'user',
+      type: "user",
       text: inputValue,
       timestamp: new Date(),
     };
-    setMessages([...messages, userMessage]);
-    setInputValue('');
+    setMessages((prev) => [...prev, userMsg]);
+    const captured = inputValue;
+    setInputValue("");
     setTimeout(() => {
-      const botResponse = {
+      const bot = {
         id: messages.length + 2,
-        type: 'bot',
-        text: generateBotResponse(inputValue),
+        type: "bot",
+        text: generateBotResponse(captured),
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, botResponse]);
+      setMessages((prev) => [...prev, bot]);
     }, 600);
   };
 
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-    if (lowerInput.includes('queue') || lowerInput.includes('position')) {
+  const generateBotResponse = (input) => {
+    const i = input.toLowerCase();
+    if (i.includes("queue") || i.includes("position"))
       return activeQueues.length > 0
         ? `You have ${activeQueues.length} active queue(s). Check the Active tab for details.`
-        : "You don't have any active queues. Would you like to join one?";
-    } else if (lowerInput.includes('history')) {
-      return `You have ${queueHistory.length} queue history record(s).`;
-    } else if (lowerInput.includes('analytics')) {
-      return `Your average wait time is ${metrics.averageWaitTime}. Visit the Analytics tab for more details.`;
-    } else {
-      return 'That is a great question! For more assistance, check the respective tab or contact your college office.';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'status-active';
-      case 'waiting':
-        return 'status-waiting';
-      case 'completed':
-        return 'status-completed';
-      case 'cancelled':
-        return 'status-cancelled';
-      default:
-        return 'status-default';
-    }
-  };
-
-  const getProgressPercentage = (position, total) => {
-    return ((total - position) / total) * 100;
-  };
-
-  const formatTimeAgo = (joinedAt) => {
-    const joined = new Date(`2000-01-01 ${joinedAt}`);
-    const now = new Date(
-      `2000-01-01 ${currentTime.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
-    );
-    const diffMinutes = Math.round((now.getTime() - joined.getTime()) / 60000);
-
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes === 1) return '1 minute ago';
-    return `${diffMinutes} minutes ago`;
+        : "You don't have any active queues right now. Join one from the Queue page.";
+    if (i.includes("history"))
+      return `You have ${queueHistory.length} past queue record(s) in your history.`;
+    if (i.includes("analytics") || i.includes("stats"))
+      return `You've joined ${totalJoined} queue(s) total, completed ${totalCompleted}, with a ${successRate}% success rate. Average wait: ${avgWait}.`;
+    return "I can help with your active queues, history, and analytics. What would you like to know?";
   };
 
   const navItems = [
-    { icon: HomeIcon, label: 'Dashboard', path: '/student/dashboard' },
-    { icon: QueueIconNav, label: 'Queue', path: '/student/queue' },
+    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
-      label: 'Appointments',
-      path: '/student/appointments',
+      label: "Appointments",
+      path: "/student/appointments",
     },
-    { icon: DocumentIconNav, label: 'Documents', path: '/student/documents' },
+    { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
     {
       icon: HistoryIconNav,
-      label: 'Transactions',
-      path: '/student/transactions',
+      label: "Transactions",
+      path: "/student/transactions",
     },
   ];
 
@@ -327,7 +328,7 @@ export default function QueueTrackingPage() {
   return (
     <div className="dashboard-with-sidebar">
       {/* Sidebar */}
-      <aside className={`dashboard-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-inner">
           <div className="sidebar-logo">
             <div className="logo-container">
@@ -342,19 +343,17 @@ export default function QueueTrackingPage() {
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
           </div>
-
           <div className="sidebar-user-section">
             <div className="user-top-row">
               <div className="user-avatar-large">
                 <UserIcon />
               </div>
               <div className="user-info-content">
-                <p className="user-name-large">{user?.name ?? 'Student'}</p>
+                <p className="user-name-large">{user?.name ?? "Student"}</p>
                 <span className="user-role-badge">Student</span>
               </div>
             </div>
@@ -364,7 +363,6 @@ export default function QueueTrackingPage() {
               </p>
             </div>
           </div>
-
           <nav className="sidebar-nav">
             <div className="nav-items">
               {navItems.map((item) => (
@@ -372,9 +370,7 @@ export default function QueueTrackingPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className={`nav-item ${
-                    location.pathname === item.path ? 'active' : ''
-                  }`}
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -383,7 +379,6 @@ export default function QueueTrackingPage() {
               ))}
             </div>
           </nav>
-
           <div className="sidebar-logout">
             <button className="logout-btn" onClick={handleLogout}>
               <LogOutIcon />
@@ -409,7 +404,6 @@ export default function QueueTrackingPage() {
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -424,21 +418,21 @@ export default function QueueTrackingPage() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main */}
       <main className="dashboard-main">
         <div className="queue-tracking-page">
-          {/* Header */}
+          {/* Page Header */}
           <div className="qt-header">
             <h1 className="qt-title">
               <Activity className="qt-icon" />
-              Queue Tracking System
+              Queue Tracking
             </h1>
             <p className="qt-subtitle">
-              Real-time queue monitoring, history, and analytics
+              Monitor your active queues, review history, and view your stats
             </p>
           </div>
 
-          {/* Metrics Overview */}
+          {/* Metrics Strip */}
           <div className="qt-metrics-grid">
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-joined">
@@ -446,57 +440,50 @@ export default function QueueTrackingPage() {
               </div>
               <p className="qt-metric-label">Total Joined</p>
               <p className="qt-metric-value qt-metric-value-joined">
-                {metrics.totalQueuesJoined}
+                {totalJoined}
               </p>
             </div>
-
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-completed">
                 <CheckCircle2 className="qt-icon-sm" />
               </div>
               <p className="qt-metric-label">Completed</p>
               <p className="qt-metric-value qt-metric-value-completed">
-                {metrics.totalQueuesCompleted}
+                {totalCompleted}
               </p>
             </div>
-
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-cancelled">
                 <XCircle className="qt-icon-sm" />
               </div>
               <p className="qt-metric-label">Cancelled</p>
               <p className="qt-metric-value qt-metric-value-cancelled">
-                {metrics.totalQueuesCancelled}
+                {totalCancelled}
               </p>
             </div>
-
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-wait">
                 <Clock className="qt-icon-sm" />
               </div>
               <p className="qt-metric-label">Avg Wait</p>
-              <p className="qt-metric-value qt-metric-value-wait">
-                {metrics.averageWaitTime}
-              </p>
+              <p className="qt-metric-value qt-metric-value-wait">{avgWait}</p>
             </div>
-
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-used">
                 <TrendingUp className="qt-icon-sm" />
               </div>
               <p className="qt-metric-label">Most Used</p>
               <p className="qt-metric-value-sm qt-metric-value-used">
-                {metrics.mostUsedService}
+                {mostUsed}
               </p>
             </div>
-
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-time">
                 <Timer className="qt-icon-sm" />
               </div>
               <p className="qt-metric-label">Total Time</p>
               <p className="qt-metric-value-sm qt-metric-value-time">
-                {metrics.totalTimeInQueues}
+                {totalTime}
               </p>
             </div>
           </div>
@@ -505,238 +492,263 @@ export default function QueueTrackingPage() {
           <div className="qt-tabs-container">
             <div className="qt-tabs-list">
               <button
-                className={`qt-tab ${activeTab === 'active' ? 'active' : ''}`}
-                onClick={() => setActiveTab('active')}
+                className={`qt-tab ${activeTab === "active" ? "active" : ""}`}
+                onClick={() => setActiveTab("active")}
               >
                 <Activity className="qt-icon-xs" />
                 Active ({activeQueues.length})
               </button>
               <button
-                className={`qt-tab ${activeTab === 'history' ? 'active' : ''}`}
-                onClick={() => setActiveTab('history')}
+                className={`qt-tab ${activeTab === "history" ? "active" : ""}`}
+                onClick={() => setActiveTab("history")}
               >
                 <History className="qt-icon-xs" />
                 History ({queueHistory.length})
               </button>
               <button
-                className={`qt-tab ${activeTab === 'analytics' ? 'active' : ''}`}
-                onClick={() => setActiveTab('analytics')}
+                className={`qt-tab ${activeTab === "analytics" ? "active" : ""}`}
+                onClick={() => setActiveTab("analytics")}
               >
                 <BarChart3 className="qt-icon-xs" />
                 Analytics
               </button>
             </div>
 
-            {/* Active Queues Tab */}
-            {activeTab === 'active' && (
+            {/* ── ACTIVE TAB ── */}
+            {activeTab === "active" && (
               <div className="qt-tab-content">
-                {activeQueues.length === 0 ? (
+                {isLoading ? (
+                  <div className="qt-empty-state">
+                    <Loader2
+                      className="qt-empty-icon"
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                    <p className="qt-empty-description">
+                      Loading active queues…
+                    </p>
+                  </div>
+                ) : activeQueues.length === 0 ? (
                   <div className="qt-empty-state">
                     <AlertCircle className="qt-empty-icon" />
                     <h3 className="qt-empty-title">No Active Queues</h3>
                     <p className="qt-empty-description">
-                      You are not currently in any queues. Join a queue to start
-                      tracking.
+                      You're not currently in any queues. Browse available
+                      services to join one.
                     </p>
-                    <Link to="/student/avail-service" className="qt-primary-btn">
-                      Join Queue
+                    <Link
+                      to="/student/avail-service"
+                      className="qt-primary-btn"
+                    >
+                      Browse Services
                     </Link>
                   </div>
                 ) : (
                   <div className="qt-queues-list">
-                    {activeQueues.map((queue) => (
-                      <div key={queue.id} className="qt-queue-card">
-                        <div className="qt-queue-header">
-                          <div className="qt-queue-info">
-                            <h3 className="qt-queue-service">{queue.service}</h3>
-                            <span
-                              className={`qt-status-badge ${getStatusColor(
-                                queue.status
-                              )}`}
-                            >
-                              {queue.status === 'active'
-                                ? 'Your Turn!'
-                                : 'Waiting'}
-                            </span>
-                          </div>
-                        </div>
+                    {activeQueues.map((queue) => {
+                      const progress = getProgress(
+                        queue.position,
+                        queue.totalWaiting,
+                      );
+                      const peopleAhead = Math.max(queue.position - 1, 0);
+                      const isLeaving = leavingId === queue.queueId;
 
-                        <div className="qt-queue-details">
-                          <div className="qt-queue-detail-row">
-                            <span className="qt-detail-label">
-                              <MapPin className="qt-icon-xs" />
-                              {queue.location}
-                            </span>
-                            <span className="qt-queue-number">
-                              {queue.queueNumber}
-                            </span>
-                            <span className="qt-detail-label">
-                              <Clock className="qt-icon-xs" />
-                              Joined {formatTimeAgo(queue.joinedAt)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="qt-queue-position">
-                          <div className="qt-position-header">
-                            <div className="qt-position-label">
-                              <Users className="qt-icon-xs" />
-                              Your Position
+                      return (
+                        <div key={queue.queueId} className="qt-queue-card">
+                          {/* Card Header */}
+                          <div className="qt-queue-header">
+                            <div className="qt-queue-info">
+                              <img
+                                src={getCollegeLogo(queue.departmentName)}
+                                alt={queue.departmentName}
+                                style={{
+                                  width: "2.5rem",
+                                  height: "2.5rem",
+                                  objectFit: "contain",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <div>
+                                <h3 className="qt-queue-service">
+                                  {queue.serviceName}
+                                </h3>
+                                <p
+                                  style={{
+                                    fontSize: "0.8rem",
+                                    color: "var(--text-tertiary)",
+                                    margin: 0,
+                                  }}
+                                >
+                                  {queue.departmentName}
+                                </p>
+                              </div>
                             </div>
-                            <div className="qt-position-display">
-                              <p className="qt-position-number">
-                                {queue.position}
-                              </p>
-                              <p className="qt-position-total">
-                                of {queue.totalInQueue}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="qt-progress-bar">
                             <div
-                              className="qt-progress-fill"
                               style={{
-                                width: `${getProgressPercentage(
-                                  queue.position,
-                                  queue.totalInQueue
-                                )}%`,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-end",
+                                gap: "0.375rem",
                               }}
-                            ></div>
-                          </div>
-                          <p className="qt-progress-text">
-                            {Math.round(
-                              getProgressPercentage(
-                                queue.position,
-                                queue.totalInQueue
-                              )
-                            )}
-                            % through queue
-                          </p>
-                        </div>
-
-                        <div className="qt-queue-stats-grid">
-                          <div className="qt-stat-box">
-                            <p className="qt-stat-label">Currently Serving</p>
-                            <p className="qt-stat-value">
-                              {queue.currentlyServing}
-                            </p>
-                          </div>
-                          <div className="qt-stat-box">
-                            <p className="qt-stat-label">Estimated Wait</p>
-                            <p className="qt-stat-value">
-                              {queue.estimatedWaitTime}
-                            </p>
-                          </div>
-                          <div className="qt-stat-box">
-                            <p className="qt-stat-label">Avg Service Time</p>
-                            <p className="qt-stat-value">
-                              {queue.averageServiceTime}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="qt-service-hours">
-                          <p className="qt-hours-label">Service Hours</p>
-                          <p className="qt-hours-time">
-                            {queue.serviceHours.start} - {queue.serviceHours.end}
-                            {queue.serviceHours.breakTime && (
-                              <span className="qt-break-time">
-                                (Break: {queue.serviceHours.breakTime})
-                              </span>
-                            )}
-                          </p>
-                        </div>
-
-                        {queue.announcementsjson &&
-                          queue.announcementsjson.length > 0 && (
-                            <div className="qt-announcements">
-                              <p className="qt-announcements-title">
-                                <AlertCircle className="qt-icon-xs" />
-                                Important Announcements
-                              </p>
-                              <ul className="qt-announcements-list">
-                                {queue.announcementsjson.map((ann, i) => (
-                                  <li key={i}>• {ann}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                        <div className="qt-queue-actions">
-                          {queue.status === 'active' && (
-                            <button
-                              onClick={() =>
-                                completeQueue(queue.id, 'Staff Member')
-                              }
-                              className="qt-btn-complete"
                             >
-                              <CheckCircle2 className="qt-icon-xs" />
-                              Mark as Completed
-                            </button>
-                          )}
-                          <button
-                            onClick={() => cancelQueue(queue.id)}
-                            className="qt-btn-cancel"
-                          >
-                            <XCircle className="qt-icon-xs" />
-                            Cancel Queue
-                          </button>
+                              <span
+                                className={`qt-status-badge ${getStatusColor(queue.status)}`}
+                              >
+                                {getStatusLabel(queue.status)}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: 700,
+                                  fontFamily: "monospace",
+                                  color: "var(--primary-color)",
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                {queue.queueNumberBadge}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Position */}
+                          <div className="qt-queue-position">
+                            <div className="qt-position-header">
+                              <div className="qt-position-label">
+                                <Users className="qt-icon-xs" /> Your Position
+                              </div>
+                              <div className="qt-position-display">
+                                <p className="qt-position-number">
+                                  {queue.position}
+                                </p>
+                                <p className="qt-position-total">
+                                  of {queue.totalWaiting}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="qt-progress-bar">
+                              <div
+                                className="qt-progress-fill"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <p className="qt-progress-text">
+                              {progress}% through queue
+                              {peopleAhead > 0
+                                ? ` — ${peopleAhead} ${peopleAhead === 1 ? "person" : "people"} ahead`
+                                : " — You're next!"}
+                            </p>
+                          </div>
+
+                          {/* Stats */}
+                          <div className="qt-queue-stats-grid">
+                            <div className="qt-stat-box">
+                              <p className="qt-stat-label">Estimated Wait</p>
+                              <p className="qt-stat-value">
+                                {queue.estimatedWait}
+                              </p>
+                            </div>
+                            <div className="qt-stat-box">
+                              <p className="qt-stat-label">Total Waiting</p>
+                              <p className="qt-stat-value">
+                                {queue.totalWaiting}
+                              </p>
+                            </div>
+                            <div className="qt-stat-box">
+                              <p className="qt-stat-label">Joined At</p>
+                              <p className="qt-stat-value">{queue.joinedAt}</p>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="qt-queue-actions">
+                            <Link
+                              to="/student/queue-status"
+                              className="qt-primary-btn"
+                              style={{ textAlign: "center" }}
+                            >
+                              View Full Detail
+                            </Link>
+                            {queue.status === "waiting" && (
+                              <button
+                                onClick={() => handleLeaveQueue(queue.queueId)}
+                                className="qt-btn-cancel"
+                                disabled={isLeaving}
+                              >
+                                {isLeaving ? (
+                                  <>
+                                    <Loader2
+                                      className="qt-icon-xs"
+                                      style={{
+                                        animation: "spin 1s linear infinite",
+                                      }}
+                                    />{" "}
+                                    Leaving…
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="qt-icon-xs" /> Leave
+                                    Queue
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
 
-            {/* History Tab */}
-            {activeTab === 'history' && (
+            {/* ── HISTORY TAB ── */}
+            {activeTab === "history" && (
               <div className="qt-tab-content">
                 {queueHistory.length === 0 ? (
                   <div className="qt-empty-state">
                     <History className="qt-empty-icon" />
-                    <h3 className="qt-empty-title">No Queue History</h3>
+                    <h3 className="qt-empty-title">No Queue History Yet</h3>
                     <p className="qt-empty-description">
-                      Your completed and cancelled queues will appear here.
+                      Your completed and cancelled queues will appear here once
+                      you start using the service.
                     </p>
                   </div>
                 ) : (
                   <div className="qt-history-list">
-                    {queueHistory.map((history) => (
-                      <div key={history.id} className="qt-history-item">
+                    {queueHistory.map((item) => (
+                      <div key={item.id} className="qt-history-item">
                         <div className="qt-history-content">
                           <div className="qt-history-header">
                             <h4 className="qt-history-service">
-                              {history.service}
+                              {item.service}
                             </h4>
                             <span
-                              className={`qt-status-badge ${getStatusColor(
-                                history.status
-                              )}`}
+                              className={`qt-status-badge ${getStatusColor(item.status)}`}
                             >
-                              {history.status}
+                              {getStatusLabel(item.status)}
                             </span>
                           </div>
                           <p className="qt-history-college">
-                            {history.college} • {history.queueNumber}
+                            {item.college} • {item.queueNumber}
                           </p>
                           <div className="qt-history-meta">
-                            <span>Joined: {history.joinedAt}</span>
+                            <span>Joined: {item.joinedAt}</span>
                             <span>•</span>
-                            <span>Completed: {history.completedAt}</span>
-                            <span>•</span>
-                            <span className="qt-wait-time">
-                              Wait time: {history.actualWaitTime}
+                            <span>
+                              {item.status === "completed"
+                                ? `Completed: ${item.completedAt}`
+                                : `Ended: ${item.completedAt}`}
                             </span>
-                            {history.servedBy && (
+                            {item.actualWaitTime !== "—" && (
                               <>
                                 <span>•</span>
-                                <span>Served by: {history.servedBy}</span>
+                                <span className="qt-wait-time">
+                                  Wait: {item.actualWaitTime}
+                                </span>
                               </>
                             )}
                           </div>
                         </div>
-                        {history.status === 'completed' ? (
+                        {item.status === "completed" ? (
                           <CheckCircle2 className="qt-history-icon completed" />
                         ) : (
                           <XCircle className="qt-history-icon cancelled" />
@@ -748,76 +760,66 @@ export default function QueueTrackingPage() {
               </div>
             )}
 
-            {/* Analytics Tab */}
-            {activeTab === 'analytics' && (
+            {/* ── ANALYTICS TAB ── */}
+            {activeTab === "analytics" && (
               <div className="qt-tab-content">
                 <div className="qt-analytics-grid">
+                  {/* Queue Statistics */}
                   <div className="qt-analytics-card">
                     <h3 className="qt-analytics-title">
-                      <BarChart3 className="qt-icon-xs" />
-                      Queue Statistics
+                      <BarChart3 className="qt-icon-xs" /> Queue Statistics
                     </h3>
                     <p className="qt-analytics-subtitle">
-                      Overview of your queue activity
+                      Overview of your total queue activity
                     </p>
 
                     <div className="qt-analytics-stat">
                       <div className="qt-stat-header">
                         <span>Success Rate</span>
                         <span className="qt-stat-percentage">
-                          {metrics.totalQueuesJoined > 0
-                            ? Math.round(
-                                (metrics.totalQueuesCompleted /
-                                  metrics.totalQueuesJoined) *
-                                  100
-                              )
-                            : 0}
-                          %
+                          {successRate}%
                         </span>
                       </div>
                       <div className="qt-progress-bar">
                         <div
                           className="qt-progress-fill"
-                          style={{
-                            width: `${
-                              metrics.totalQueuesJoined > 0
-                                ? (metrics.totalQueuesCompleted /
-                                    metrics.totalQueuesJoined) *
-                                  100
-                                : 0
-                            }%`,
-                          }}
-                        ></div>
+                          style={{ width: `${successRate}%` }}
+                        />
                       </div>
                     </div>
 
                     <div className="qt-analytics-grid-2">
                       <div className="qt-stat-box">
-                        <p className="qt-stat-label">Total Sessions</p>
-                        <p className="qt-stat-value">
-                          {metrics.totalQueuesJoined}
-                        </p>
+                        <p className="qt-stat-label">Total Joined</p>
+                        <p className="qt-stat-value">{totalJoined}</p>
                       </div>
                       <div className="qt-stat-box">
                         <p className="qt-stat-label">Completed</p>
-                        <p className="qt-stat-value">
-                          {metrics.totalQueuesCompleted}
-                        </p>
+                        <p className="qt-stat-value">{totalCompleted}</p>
+                      </div>
+                      <div className="qt-stat-box">
+                        <p className="qt-stat-label">Cancelled</p>
+                        <p className="qt-stat-value">{totalCancelled}</p>
+                      </div>
+                      <div className="qt-stat-box">
+                        <p className="qt-stat-label">Active Now</p>
+                        <p className="qt-stat-value">{activeQueues.length}</p>
                       </div>
                     </div>
 
-                    <div className="qt-stat-box">
+                    <div
+                      className="qt-stat-box"
+                      style={{ marginTop: "0.75rem" }}
+                    >
                       <p className="qt-stat-label">Most Used Service</p>
-                      <p className="qt-stat-value-sm">
-                        {metrics.mostUsedService}
-                      </p>
+                      <p className="qt-stat-value-sm">{mostUsed}</p>
                     </div>
                   </div>
 
+                  {/* Time Analytics */}
                   <div className="qt-analytics-card">
                     <h3 className="qt-analytics-title">
-                      <Clock className="qt-icon-xs" />
-                      Time Analytics
+                      <Clock className="qt-icon-xs" /> Time Analytics
                     </h3>
                     <p className="qt-analytics-subtitle">
                       Wait time and efficiency metrics
@@ -825,23 +827,46 @@ export default function QueueTrackingPage() {
 
                     <div className="qt-stat-box">
                       <p className="qt-stat-label">Average Wait Time</p>
-                      <p className="qt-stat-value">
-                        {metrics.averageWaitTime}
-                      </p>
+                      <p className="qt-stat-value">{avgWait}</p>
+                      <p className="qt-stat-subtext">Across completed queues</p>
                     </div>
 
                     <div className="qt-stat-box">
                       <p className="qt-stat-label">Total Time in Queues</p>
-                      <p className="qt-stat-value">
-                        {metrics.totalTimeInQueues}
+                      <p className="qt-stat-value">{totalTime}</p>
+                      <p className="qt-stat-subtext">
+                        All completed sessions combined
                       </p>
                     </div>
 
-                    <div className="qt-stat-box">
-                      <p className="qt-stat-label">Active Queues</p>
-                      <p className="qt-stat-value">{activeQueues.length}</p>
-                      <p className="qt-stat-subtext">Currently in progress</p>
-                    </div>
+                    {totalJoined === 0 ? (
+                      <div
+                        className="qt-stat-box"
+                        style={{ textAlign: "center", padding: "1.5rem" }}
+                      >
+                        <AlertCircle
+                          style={{
+                            width: "2rem",
+                            height: "2rem",
+                            margin: "0 auto 0.5rem",
+                            opacity: 0.4,
+                          }}
+                        />
+                        <p className="qt-stat-label">
+                          No data yet — join a queue to start building your
+                          stats.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="qt-stat-box">
+                        <p className="qt-stat-label">Efficiency</p>
+                        <p className="qt-stat-value">{successRate}%</p>
+                        <p className="qt-stat-subtext">
+                          {totalCompleted} of {totalJoined} queues completed
+                          successfully
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -850,7 +875,7 @@ export default function QueueTrackingPage() {
         </div>
       </main>
 
-      {/* Sidebar Overlay (Mobile) */}
+      {/* Sidebar Overlay */}
       {sidebarOpen && (
         <div
           className="sidebar-overlay"
@@ -858,8 +883,8 @@ export default function QueueTrackingPage() {
         />
       )}
 
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? 'open' : ''}`}>
+      {/* AI Chat */}
+      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
           <div className="chat-container">
             <div className="chat-header">
@@ -873,12 +898,9 @@ export default function QueueTrackingPage() {
               </button>
             </div>
             <div className="chat-messages">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`message message-${message.type}`}
-                >
-                  <div className="message-content">{message.text}</div>
+              {messages.map((m) => (
+                <div key={m.id} className={`message message-${m.type}`}>
+                  <div className="message-content">{m.text}</div>
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -887,22 +909,18 @@ export default function QueueTrackingPage() {
               <input
                 type="text"
                 className="chat-input"
-                placeholder="Ask me anything..."
+                placeholder="Ask me anything…"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
               />
-              <button
-                type="submit"
-                className="chat-send-btn"
-                aria-label="Send message"
-              >
+              <button type="submit" className="chat-send-btn" aria-label="Send">
                 <SendIcon />
               </button>
             </form>
           </div>
         )}
         <button
-          className={`chat-fab ${chatOpen ? 'hidden' : ''}`}
+          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
           onClick={() => setChatOpen(true)}
           aria-label="Open chat"
         >

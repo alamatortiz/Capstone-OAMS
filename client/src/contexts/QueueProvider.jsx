@@ -3,26 +3,17 @@ import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import QueueContext from "./QueueContextBase";
 
-const DEFAULT_METRICS = {
-  totalQueuesJoined: 0,
-  totalQueuesCompleted: 0,
-  totalQueuesCancelled: 0,
-  averageWaitTime: "—",
-  totalTimeInQueues: "0 min",
-  mostUsedService: "—",
-};
-
 export function QueueProvider({ children }) {
   const { user } = useAuth();
 
-  const [queues, setQueues] = useState([]); // active (waiting/serving)
-  const [availableSlots, setAvailableSlots] = useState([]); // open slots today
-  const [queueHistory, setQueueHistory] = useState([]); // completed/cancelled entries
-  const [metrics, setMetrics] = useState(DEFAULT_METRICS);
+  const [queues, setQueues] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [queueHistory, setQueueHistory] = useState([]);
+  const [metrics, setMetrics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ── Fetch active queues for the logged-in student ─────────────────────────
+  // ── Fetch active queues ───────────────────────────────────────────────────
   const fetchActiveQueues = useCallback(async () => {
     setError(null);
     try {
@@ -34,7 +25,7 @@ export function QueueProvider({ children }) {
     }
   }, []);
 
-  // ── Fetch all open slots for today ────────────────────────────────────────
+  // ── Fetch available slots ─────────────────────────────────────────────────
   const fetchAvailableSlots = useCallback(async () => {
     setError(null);
     try {
@@ -46,42 +37,37 @@ export function QueueProvider({ children }) {
     }
   }, []);
 
-  // ── Fetch completed/cancelled queue history ───────────────────────────────
+  // ── Fetch queue history ───────────────────────────────────────────────────
   const fetchQueueHistory = useCallback(async () => {
     try {
       const { data } = await api.get("/student/queues/history");
       setQueueHistory(data.history ?? []);
     } catch (err) {
       console.error("fetchQueueHistory error:", err);
-      // Non-fatal — history tab will just show empty state
     }
   }, []);
 
-  // ── Fetch aggregate analytics ─────────────────────────────────────────────
-  const fetchQueueMetrics = useCallback(async () => {
+  // ── Fetch metrics ─────────────────────────────────────────────────────────
+  const fetchMetrics = useCallback(async () => {
     try {
       const { data } = await api.get("/student/queues/metrics");
-      setMetrics({ ...DEFAULT_METRICS, ...data });
+      setMetrics(data);
     } catch (err) {
-      console.error("fetchQueueMetrics error:", err);
-      // Non-fatal — analytics tab will show defaults
+      console.error("fetchMetrics error:", err);
     }
   }, []);
 
-  // ── Reset and re-fetch whenever the logged-in user changes ───────────────
-  // This prevents User 1's stale queues from leaking into User 2's session.
+  // ── Reset on user change ──────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
-      // Clear previous user's data immediately before fetching
       setQueues([]);
       setAvailableSlots([]);
       setQueueHistory([]);
-      setMetrics(DEFAULT_METRICS);
+      setMetrics(null);
       setError(null);
 
       if (!user?.userId) {
-        // No logged-in user — just stop loading, leave state empty
         setIsLoading(false);
         return;
       }
@@ -91,7 +77,7 @@ export function QueueProvider({ children }) {
         fetchActiveQueues(),
         fetchAvailableSlots(),
         fetchQueueHistory(),
-        fetchQueueMetrics(),
+        fetchMetrics(),
       ]);
       if (!cancelled) setIsLoading(false);
     };
@@ -100,37 +86,27 @@ export function QueueProvider({ children }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.userId]); // Re-run only when the actual user identity changes
+  }, [user?.userId]);
 
-  // ── Re-fetch when user returns to the tab ────────────────────────────────
+  // ── Re-fetch on tab focus ─────────────────────────────────────────────────
   useEffect(() => {
     if (!user?.userId) return;
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         fetchActiveQueues();
         fetchAvailableSlots();
-        fetchQueueHistory();
-        fetchQueueMetrics();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [
-    user?.userId,
-    fetchActiveQueues,
-    fetchAvailableSlots,
-    fetchQueueHistory,
-    fetchQueueMetrics,
-  ]);
+  }, [user?.userId, fetchActiveQueues, fetchAvailableSlots]);
 
   // ── Join a queue ──────────────────────────────────────────────────────────
   const joinQueue = useCallback(
     async (slotId) => {
       try {
         const { data } = await api.post("/student/queues/join", { slotId });
-        // Add to active queues
         setQueues((prev) => [...prev, data.queue]);
-        // Refresh slot counts and re-fetch active queues to get accurate position
         await fetchAvailableSlots();
         await fetchActiveQueues();
         return data.queue;
@@ -149,12 +125,9 @@ export function QueueProvider({ children }) {
     async (queueId) => {
       try {
         await api.post(`/student/queues/${queueId}/leave`);
-        // Remove from active queues optimistically
         setQueues((prev) => prev.filter((q) => q.queueId !== queueId));
-        // Refresh available slots so counts update, and pull in the new history entry
         await fetchAvailableSlots();
         await fetchQueueHistory();
-        await fetchQueueMetrics();
       } catch (err) {
         const msg =
           err?.response?.data?.error ??
@@ -162,14 +135,10 @@ export function QueueProvider({ children }) {
         throw new Error(msg);
       }
     },
-    [fetchAvailableSlots, fetchQueueHistory, fetchQueueMetrics],
+    [fetchAvailableSlots, fetchQueueHistory],
   );
 
-  // Alias — some pages refer to "cancelling" a queue rather than "leaving" it.
-  // Behaviour is identical: only valid while the entry is still 'waiting'.
-  const cancelQueue = leaveQueue;
-
-  // ── Update the "concern" / notes text on an active queue entry ───────────
+  // ── Update queue notes (concern) ──────────────────────────────────────────
   const updateQueueNotes = useCallback(async (queueId, notes) => {
     try {
       await api.patch(`/student/queues/${queueId}/notes`, { notes });
@@ -177,25 +146,18 @@ export function QueueProvider({ children }) {
         prev.map((q) => (q.queueId === queueId ? { ...q, notes } : q)),
       );
     } catch (err) {
-      const msg =
-        err?.response?.data?.error ??
-        "Failed to update your concern. Please try again.";
+      const msg = err?.response?.data?.error ?? "Failed to update notes.";
       throw new Error(msg);
     }
   }, []);
 
-  // ── Derived helper ────────────────────────────────────────────────────────
-  // Returns true if the student already has a waiting/serving entry for a slot
+  // ── Derived helpers ───────────────────────────────────────────────────────
   const isAlreadyInQueue = useCallback(
     (slotId) => queues.some((q) => q.slotId === slotId),
     [queues],
   );
 
-  // Backwards-compatible alias — StudentDashboard calls getActiveQueues()
   const getActiveQueues = useCallback(() => queues, [queues]);
-
-  // Backwards-compatible alias — queue-tracking.jsx calls getQueueMetrics()
-  const getQueueMetrics = useCallback(() => metrics, [metrics]);
 
   const value = useMemo(
     () => ({
@@ -208,14 +170,12 @@ export function QueueProvider({ children }) {
       fetchActiveQueues,
       fetchAvailableSlots,
       fetchQueueHistory,
-      fetchQueueMetrics,
+      fetchMetrics,
       joinQueue,
       leaveQueue,
-      cancelQueue,
       updateQueueNotes,
       isAlreadyInQueue,
       getActiveQueues,
-      getQueueMetrics,
     }),
     [
       queues,
@@ -227,14 +187,12 @@ export function QueueProvider({ children }) {
       fetchActiveQueues,
       fetchAvailableSlots,
       fetchQueueHistory,
-      fetchQueueMetrics,
+      fetchMetrics,
       joinQueue,
       leaveQueue,
-      cancelQueue,
       updateQueueNotes,
       isAlreadyInQueue,
       getActiveQueues,
-      getQueueMetrics,
     ],
   );
 
