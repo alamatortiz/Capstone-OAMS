@@ -18,6 +18,7 @@ import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
+import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
@@ -84,6 +85,10 @@ createRoot(document.getElementById("root")).render(
                 path="/professor/dashboard"
                 element={<ProfessorDashboard />}
               />
+              <Route
+                path="/professor/queue"
+                element={<ProfessorQueue />}
+              />
             </Route>
 
             {/* ─── Protected Admin Routes ────────────────────────────────────────── */}
@@ -123,6 +128,7 @@ createRoot(document.getElementById("root")).render(
             <Route path="/student-documents" element={<DocumentsPage />} />
             <Route path="/student-transactions" element={<TransactionsPage />} />
             <Route path="/professor-dashboard" element={<ProfessorDashboard />} />
+            <Route path="/professor-queue" element={<ProfessorQueue />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
         </BrowserRouter>
