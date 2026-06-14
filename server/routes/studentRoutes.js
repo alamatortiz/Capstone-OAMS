@@ -1422,4 +1422,167 @@ function formatRelativeTime(date) {
   return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
 }
 
+// ─────────────────────────────────────────────────────────────
+// AVAIL-SERVICES ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/student/services/by-department
+ *
+ * Returns every department together with its services.
+ * For each service we also attach:
+ *   - requirements  → rows from service_requirements (or the service description as fallback)
+ *   - todaySlot     → the open queue_slot for today, if one exists (null otherwise)
+ *
+ * This single endpoint powers the entire Avail-Services page so the
+ * frontend never needs to waterfall multiple requests.
+ */
+router.get(
+  "/services/by-department",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      // 1. All departments
+      const [departments] = await pool.query(
+        `SELECT department_id, department_name, department_abbreviation, office_location
+         FROM departments
+         ORDER BY department_name ASC`,
+      );
+
+      // 2. All services with their requirements (LEFT JOIN so services without
+      //    rows in service_requirements are still returned).
+      const [services] = await pool.query(
+        `SELECT
+           s.service_id,
+           s.service_name,
+           s.description,
+           s.department_id,
+           sr.requirement_id,
+           sr.requirement_name,
+           sr.description  AS req_description,
+           sr.is_mandatory
+         FROM services s
+         LEFT JOIN service_requirements sr ON sr.service_id = s.service_id
+         ORDER BY s.department_id, s.service_name, sr.requirement_id`,
+      );
+
+      // 3. Open queue slots for today (one per service; we pick the first open one)
+      const [slots] = await pool.query(
+        `SELECT
+           qs.slot_id,
+           qs.service_id,
+           qs.start_time,
+           qs.end_time,
+           qs.max_capacity,
+           qs.current_count,
+           qs.status,
+           (
+             SELECT COUNT(*)
+             FROM queues q
+             WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
+           ) AS waiting_count,
+           (
+             SELECT q2.queue_number
+             FROM queues q2
+             WHERE q2.slot_id = qs.slot_id AND q2.status = 'serving'
+             ORDER BY q2.called_at DESC
+             LIMIT 1
+           ) AS currently_serving_number
+         FROM queue_slots qs
+         WHERE qs.slot_date = CURDATE()
+           AND qs.status = 'open'
+         ORDER BY qs.start_time ASC`,
+      );
+
+      // ── Assemble: group requirements per service ──────────────────────────
+      // serviceMap: service_id → { ...service fields, requirements: [] }
+      const serviceMap = new Map();
+      for (const row of services) {
+        if (!serviceMap.has(row.service_id)) {
+          serviceMap.set(row.service_id, {
+            serviceId: row.service_id,
+            serviceName: row.service_name,
+            description: row.description ?? "",
+            departmentId: row.department_id,
+            requirements: [],
+          });
+        }
+        // Attach requirement row if it exists
+        if (row.requirement_id) {
+          serviceMap.get(row.service_id).requirements.push({
+            id: row.requirement_id,
+            name: row.requirement_name,
+            description: row.req_description ?? "",
+            isMandatory: !!row.is_mandatory,
+          });
+        }
+      }
+
+      // ── Assemble: index slots by service_id (first open slot wins) ────────
+      const slotByService = new Map();
+      for (const slot of slots) {
+        if (!slotByService.has(slot.service_id)) {
+          const waitingCount = Number(slot.waiting_count) || 0;
+          const avgWaitMin = waitingCount * 5;
+          slotByService.set(slot.service_id, {
+            slotId: slot.slot_id,
+            startTime: formatTime12h(slot.start_time),
+            endTime: formatTime12h(slot.end_time),
+            maxCapacity: slot.max_capacity,
+            currentCount: slot.current_count,
+            waitingCount,
+            hasCapacity: waitingCount < slot.max_capacity,
+            status: slot.status,
+            avgWaitTime:
+              waitingCount === 0
+                ? "No wait"
+                : `${avgWaitMin}–${avgWaitMin + 5} mins`,
+            currentlyServingNumber: slot.currently_serving_number ?? null,
+          });
+        }
+      }
+
+      // ── Assemble: group services per department ───────────────────────────
+      const deptMap = new Map();
+      for (const dept of departments) {
+        deptMap.set(dept.department_id, {
+          departmentId: dept.department_id,
+          departmentName: dept.department_name,
+          departmentAbbrev: dept.department_abbreviation,
+          officeLocation: dept.office_location ?? "",
+          services: [],
+        });
+      }
+
+      for (const svc of serviceMap.values()) {
+        const dept = deptMap.get(svc.departmentId);
+        if (!dept) continue;
+
+        const todaySlot = slotByService.get(svc.serviceId) ?? null;
+
+        dept.services.push({
+          serviceId: svc.serviceId,
+          serviceName: svc.serviceName,
+          description: svc.description,
+          requirements: svc.requirements,
+          todaySlot,
+          // Convenience flags the UI uses directly
+          hasQueueToday: todaySlot !== null,
+          isQueueOpen: todaySlot?.hasCapacity ?? false,
+        });
+      }
+
+      const result = [...deptMap.values()].filter((d) => d.services.length > 0);
+
+      res.json({ departments: result });
+    } catch (error) {
+      console.error("Services by-department error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 module.exports = router;
