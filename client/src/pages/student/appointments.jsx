@@ -940,13 +940,6 @@ export default function AppointmentsPage() {
                   <CalendarIcon />
                   <h3>No upcoming appointments</h3>
                   <p>Schedule your first appointment to get started</p>
-                  <button
-                    className="book-btn book-btn-small"
-                    onClick={handleOpenBookDialog}
-                  >
-                    <PlusIcon />
-                    Book Appointment
-                  </button>
                 </div>
               )}
           </section>
