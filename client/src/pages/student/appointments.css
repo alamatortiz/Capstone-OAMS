@@ -841,6 +841,7 @@ body {
   font-size: 0.875rem;
   color: var(--text-primary);
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .form-group select,
