@@ -718,9 +718,8 @@ export default function StudentDashboard() {
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
                   </div>
-                  <div className="stat-header">
-                    <ChevronRightIcon className="stat-chevron" />
-                  </div>
+                  <div className="stat-header"></div>
+
                   <p
                     className={`stat-value ${dashLoading ? "stat-loading" : ""}`}
                   >

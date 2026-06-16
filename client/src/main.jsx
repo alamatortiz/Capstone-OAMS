@@ -12,7 +12,8 @@ import QueuePage from "./pages/student/queue.jsx";
 // ─── Lazy-loaded routes for better performance ───────────────────────────
 const QueueStatusPage = React.lazy(() => import("./pages/student/queue-status.jsx"));
 const QueueTrackingPage = React.lazy(() => import("./pages/student/queue-tracking.jsx"));
-const AvailServicesPage = React.lazy(() => import("./pages/student/avail-services.jsx")); // ← NEW
+const AvailServicesPage = React.lazy(() => import("./pages/student/avail-services.jsx")); 
+const AnnouncementsPage = React.lazy(() => import("./pages/student/announcements.jsx"));
 
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
@@ -74,6 +75,16 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
+              {/* Announcements - NEW ROUTE */}
+              <Route
+                path="/student/announcements"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AnnouncementsPage />
+                  </Suspense>
+                }
+              />
+
               {/* Appointments, Documents, Transactions */}
               <Route path="/student/appointments" element={<AppointmentsPage />} />
               <Route path="/student/documents" element={<DocumentsPage />} />
@@ -123,6 +134,14 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AvailServicesPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/student-announcements"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AnnouncementsPage />
                 </Suspense>
               }
             />

@@ -807,18 +807,11 @@ body {
   border: 1px solid rgba(168, 85, 247, 0.15);
 }
 
-.stat-chevron {
-  display: none;
-}
-
 .stat-header {
   gap: 0;
 }
 
-.stat-card:hover .stat-chevron {
-  opacity: 1;
-  transform: translateX(0);
-}
+
 
 .stat-value {
   font-size: 2.25rem;

@@ -767,12 +767,6 @@ export default function DocumentsPage() {
                 <FileTextIcon />
                 <h3>No active requests</h3>
                 <p>Start by requesting a document</p>
-                <button
-                  className="doc-empty-btn"
-                  onClick={() => setDialogOpen(true)}
-                >
-                  <PlusIcon /> Request Document
-                </button>
               </div>
             )}
           </section>
