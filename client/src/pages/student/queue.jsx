@@ -469,44 +469,24 @@ export default function QueuePage() {
                             </div>
                           </div>
                           <div className="queue-progress-wrapper">
-                            {/* ── Slot Fill Progress ── */}
                             <div className="progress-label-row">
-                              <span className="progress-label-text">Slot Capacity</span>
+                              <span className="progress-label-text">Queue Progress</span>
                               <span className="progress-percentage">
-                                {queue.totalJoined} / {queue.maxCapacity} joined
-                                {queue.maxCapacity > 0
-                                  ? ` (${Math.round((queue.totalJoined / queue.maxCapacity) * 100)}%)`
-                                  : ''}
-                              </span>
-                            </div>
-                            <div className="progress-bar" style={{ marginBottom: '0.75rem' }}>
-                              <div
-                                className="progress-fill progress-fill--capacity"
-                                style={{
-                                  width: queue.maxCapacity > 0
-                                    ? `${Math.min((queue.totalJoined / queue.maxCapacity) * 100, 100)}%`
-                                    : '0%',
-                                }}
-                              />
-                            </div>
-
-                            {/* ── Service Progress ── */}
-                            <div className="progress-label-row">
-                              <span className="progress-label-text">Service Progress</span>
-                              <span className="progress-percentage">
-                                {queue.completedCount} / {queue.totalJoined} served
-                                {queue.totalJoined > 0
-                                  ? ` (${Math.round((queue.completedCount / queue.totalJoined) * 100)}%)`
-                                  : ''}
+                                {queue.totalWaiting > 0
+                                  ? Math.round(
+                                      ((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100,
+                                    )
+                                  : 0}%
                               </span>
                             </div>
                             <div className="progress-bar">
                               <div
-                                className="progress-fill progress-fill--served"
+                                className="progress-fill"
                                 style={{
-                                  width: queue.totalJoined > 0
-                                    ? `${Math.round((queue.completedCount / queue.totalJoined) * 100)}%`
-                                    : '0%',
+                                  width:
+                                    queue.totalWaiting > 0
+                                      ? `${((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100}%`
+                                      : '0%',
                                 }}
                               />
                             </div>
