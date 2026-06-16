@@ -685,9 +685,11 @@ body {
 .stat-header {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  width: 100%;
   margin-bottom: 0.75rem;
 }
+
 
 .stat-title,
 .stat-value,
@@ -1356,6 +1358,7 @@ body {
   color: var(--text-tertiary);
   margin: 0;
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .documents-list,

@@ -665,6 +665,10 @@ body {
   gap: 1rem;
 }
 
+/* Chevron right alignment inside stat cards */
+
+
+
 @media (min-width: 1024px) {
   .stats-grid {
     grid-template-columns: repeat(4, 1fr);
@@ -701,6 +705,14 @@ body {
   position: relative;
   z-index: 1;
 }
+
+/* Make sure the chevron stays in the stat-icon column/left area */
+.stat-header .chevron-right-professor {
+  position: static;
+  margin-left: auto;
+  transform: translateX(0);
+}
+
 
 .stat-icon {
   width: 3rem;

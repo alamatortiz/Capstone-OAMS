@@ -512,9 +512,7 @@ export default function ProfessorDashboard() {
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
                   </div>
-                  <div className="stat-header">
-                    <ChevronRightIcon />
-                  </div>
+                  <div className="stat-header"></div>
                   <p className={`stat-value ${loading ? "stat-loading" : ""}`}>
                     {stat.value}
                   </p>

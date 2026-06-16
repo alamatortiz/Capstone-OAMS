@@ -20,6 +20,7 @@ import TransactionsPage from "./pages/student/transactions.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
+import AdminQueue from "./pages/admin/AdminQueue.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { Toaster } from "sonner";
@@ -94,6 +95,7 @@ createRoot(document.getElementById("root")).render(
             {/* ─── Protected Admin Routes ────────────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/queue" element={<AdminQueue />} />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}
