@@ -22,11 +22,16 @@ const AvailServicesPage = React.lazy(
 const AnnouncementsPage = React.lazy(
   () => import("./pages/student/announcements.jsx"),
 );
+const ProfessorSchedulePage = React.lazy(
+  () => import("./pages/student/ProfessorSchedule.jsx"),
+);
 
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
+import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
+
 import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminQueue from "./pages/admin/AdminQueue.jsx";
@@ -73,7 +78,7 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* Services - NEW ROUTE */}
+              {/* Services */}
               <Route
                 path="/student/avail-service"
                 element={
@@ -83,7 +88,7 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* Announcements - NEW ROUTE */}
+              {/* Announcements */}
               <Route
                 path="/student/announcements"
                 element={
@@ -93,10 +98,24 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* Appointments, Documents, Transactions */}
+              {/* Professor Schedules - NEW ROUTE */}
+              <Route
+                path="/student/professor-schedules"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorSchedulePage />
+                  </Suspense>
+                }
+              />
+
+              {/* Appointments, Booking, Documents, Transactions */}
               <Route
                 path="/student/appointments"
                 element={<AppointmentsPage />}
+              />
+              <Route
+                path="/student/appointment-booking"
+                element={<AppointmentBookingPage />}
               />
               <Route path="/student/documents" element={<DocumentsPage />} />
               <Route
@@ -157,8 +176,20 @@ createRoot(document.getElementById("root")).render(
               }
             />
             <Route
+              path="/student-professor-schedules"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <ProfessorSchedulePage />
+                </Suspense>
+              }
+            />
+            <Route
               path="/student-appointments"
               element={<AppointmentsPage />}
+            />
+            <Route
+              path="/student-appointment-booking"
+              element={<AppointmentBookingPage />}
             />
             <Route path="/student-documents" element={<DocumentsPage />} />
             <Route
@@ -169,6 +200,7 @@ createRoot(document.getElementById("root")).render(
               path="/professor-dashboard"
               element={<ProfessorDashboard />}
             />
+
             <Route path="/professor-queue" element={<ProfessorQueue />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
