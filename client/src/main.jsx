@@ -18,7 +18,9 @@ const AnnouncementsPage = React.lazy(() => import("./pages/student/announcements
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
+import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
+
 import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminQueue from "./pages/admin/AdminQueue.jsx";
@@ -85,8 +87,9 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* Appointments, Documents, Transactions */}
+              {/* Appointments, Booking, Documents, Transactions */}
               <Route path="/student/appointments" element={<AppointmentsPage />} />
+              <Route path="/student/appointment-booking" element={<AppointmentBookingPage />} />
               <Route path="/student/documents" element={<DocumentsPage />} />
               <Route path="/student/transactions" element={<TransactionsPage />} />
             </Route>
@@ -146,9 +149,11 @@ createRoot(document.getElementById("root")).render(
               }
             />
             <Route path="/student-appointments" element={<AppointmentsPage />} />
+            <Route path="/student-appointment-booking" element={<AppointmentBookingPage />} />
             <Route path="/student-documents" element={<DocumentsPage />} />
             <Route path="/student-transactions" element={<TransactionsPage />} />
             <Route path="/professor-dashboard" element={<ProfessorDashboard />} />
+
             <Route path="/professor-queue" element={<ProfessorQueue />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
