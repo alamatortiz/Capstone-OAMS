@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense } from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -10,10 +10,18 @@ import StudentDashboard from "./pages/student/student_dashboard.jsx";
 import QueuePage from "./pages/student/queue.jsx";
 
 // ─── Lazy-loaded routes for better performance ───────────────────────────
-const QueueStatusPage = React.lazy(() => import("./pages/student/queue-status.jsx"));
-const QueueTrackingPage = React.lazy(() => import("./pages/student/queue-tracking.jsx"));
-const AvailServicesPage = React.lazy(() => import("./pages/student/avail-services.jsx")); 
-const AnnouncementsPage = React.lazy(() => import("./pages/student/announcements.jsx"));
+const QueueStatusPage = React.lazy(
+  () => import("./pages/student/queue-status.jsx"),
+);
+const QueueTrackingPage = React.lazy(
+  () => import("./pages/student/queue-tracking.jsx"),
+);
+const AvailServicesPage = React.lazy(
+  () => import("./pages/student/avail-services.jsx"),
+);
+const AnnouncementsPage = React.lazy(
+  () => import("./pages/student/announcements.jsx"),
+);
 
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
@@ -86,9 +94,15 @@ createRoot(document.getElementById("root")).render(
               />
 
               {/* Appointments, Documents, Transactions */}
-              <Route path="/student/appointments" element={<AppointmentsPage />} />
+              <Route
+                path="/student/appointments"
+                element={<AppointmentsPage />}
+              />
               <Route path="/student/documents" element={<DocumentsPage />} />
-              <Route path="/student/transactions" element={<TransactionsPage />} />
+              <Route
+                path="/student/transactions"
+                element={<TransactionsPage />}
+              />
             </Route>
 
             {/* ─── Protected Faculty Routes ──────────────────────────────────────── */}
@@ -97,10 +111,7 @@ createRoot(document.getElementById("root")).render(
                 path="/professor/dashboard"
                 element={<ProfessorDashboard />}
               />
-              <Route
-                path="/professor/queue"
-                element={<ProfessorQueue />}
-              />
+              <Route path="/professor/queue" element={<ProfessorQueue />} />
             </Route>
 
             {/* ─── Protected Admin Routes ────────────────────────────────────────── */}
@@ -145,10 +156,19 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-            <Route path="/student-appointments" element={<AppointmentsPage />} />
+            <Route
+              path="/student-appointments"
+              element={<AppointmentsPage />}
+            />
             <Route path="/student-documents" element={<DocumentsPage />} />
-            <Route path="/student-transactions" element={<TransactionsPage />} />
-            <Route path="/professor-dashboard" element={<ProfessorDashboard />} />
+            <Route
+              path="/student-transactions"
+              element={<TransactionsPage />}
+            />
+            <Route
+              path="/professor-dashboard"
+              element={<ProfessorDashboard />}
+            />
             <Route path="/professor-queue" element={<ProfessorQueue />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
