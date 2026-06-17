@@ -246,7 +246,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
                 <Users style={{ width: "1.25rem", height: "1.25rem" }} />
                 Your Position
               </h3>
-              <span className={`queue-status-badge ${statusMeta.cls}`}>
+              <span className={`detailed-queue-status-badge ${statusMeta.cls}`}>
                 {statusMeta.label}
               </span>
             </div>
@@ -901,7 +901,7 @@ export default function QueueStatusPage() {
                                   {queue.queueNumberBadge}
                                 </div>
                                 <span
-                                  className={`queue-status-badge ${statusMeta.cls}`}
+                                  className={`detailed-queue-status-badge ${statusMeta.cls}`}
                                 >
                                   {statusMeta.label}
                                 </span>

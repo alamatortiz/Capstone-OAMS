@@ -1,5 +1,5 @@
 /* ===== IMPORT EXISTING STUDENT DASHBOARD CSS VARIABLES ===== */
-@import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
 
 /* ===== DARK MODE (DEFAULT) ===== */
 :root,
@@ -109,8 +109,10 @@
 body {
   background-color: var(--dark-bg);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: "Inter", sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* ===== Dashboard With Sidebar Layout ===== */
@@ -132,7 +134,9 @@ body {
   background-color: var(--card-bg);
   border-bottom: 1px solid var(--card-border);
   z-index: 50;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .mobile-header-content {
@@ -244,7 +248,9 @@ body {
   display: flex;
   flex-direction: column;
   padding: 1rem 0;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .sidebar-inner {
@@ -281,12 +287,11 @@ body {
 }
 
 [data-theme="dark"] .oams-logo-img {
-  filter:
-    drop-shadow(0 0 0 rgba(255,255,255,0.85))
-    drop-shadow(1px 0 0 rgba(255,255,255,0.85))
-    drop-shadow(-1px 0 0 rgba(255,255,255,0.85))
-    drop-shadow(0 1px 0 rgba(255,255,255,0.85))
-    drop-shadow(0 -1px 0 rgba(255,255,255,0.85));
+  filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(-1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85));
 }
 
 .sidebar-user-section {
@@ -297,7 +302,9 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .user-avatar-large {
@@ -331,7 +338,11 @@ body {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.2) 0%,
+    rgba(34, 197, 94, 0.1) 100%
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -428,8 +439,8 @@ body {
 }
 
 .nav-icon-medium {
-  width: 1.0rem;
-  height: 1.0rem;
+  width: 1rem;
+  height: 1rem;
   flex-shrink: 0;
   stroke: currentColor;
 }
@@ -703,14 +714,22 @@ body {
 }
 
 .active-queue-card {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.15) 0%,
+    rgba(34, 197, 94, 0.05) 100%
+  );
   border: 1px solid rgba(34, 197, 94, 0.15);
 }
 
 .active-queue-card:hover {
   box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
   border-color: rgba(34, 197, 94, 0.3);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.2) 0%,
+    rgba(34, 197, 94, 0.08) 100%
+  );
 }
 
 .available-queue-card {
@@ -819,10 +838,22 @@ body {
   border-radius: 0.5rem;
   font-size: 0.75rem;
   font-weight: 700;
+
+  flex: none;
   flex-shrink: 0;
-  transition: all 0.3s ease;
+  flex-grow: 0;
+
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    opacity 0.3s ease;
+
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  align-self: flex-start; /* ← prevents flex stretch */
+  width: fit-content; /* ← fallback */
+  white-space: nowrap; /* ← keeps text on one line */
 }
 
 .queue-status-badge {
@@ -947,7 +978,11 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   transition: width 0.3s ease;
   border-radius: 9999px;
 }
@@ -1066,7 +1101,11 @@ body {
 
 .queue-join-btn {
   padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   color: white;
   border: none;
   border-radius: 0.75rem;
@@ -1175,7 +1214,7 @@ body {
   border-radius: 0.75rem;
   color: var(--text-primary);
   font-size: 0.875rem;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
   appearance: none;
@@ -1205,7 +1244,6 @@ body {
   stroke-width: 2;
 }
 
-
 .filter-select:hover {
   border-color: rgba(34, 197, 94, 0.3);
 }
@@ -1214,7 +1252,6 @@ body {
 .filter-select:focus + .filter-chevron {
   color: var(--primary-color);
 }
-
 
 .filter-select:focus {
   outline: none;
@@ -1294,7 +1331,11 @@ body {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   border: none;
   color: white;
   cursor: pointer;
@@ -1340,7 +1381,11 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.15) 0%,
+    rgba(34, 197, 94, 0.05) 100%
+  );
 }
 
 .chat-header h3 {
@@ -1431,7 +1476,7 @@ body {
   background: var(--input-background);
   color: var(--text-primary);
   font-size: 0.875rem;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   outline: none;
   transition: all 0.2s ease;
 }
@@ -1608,7 +1653,11 @@ body {
 
 /* Light mode specific improvements */
 [data-theme="light"] .queue-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 1) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(248, 250, 252, 1) 100%
+  );
 }
 
 [data-theme="light"] .filters-card {
