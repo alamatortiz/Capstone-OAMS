@@ -437,28 +437,28 @@ INSERT INTO document_requests (request_id, student_id, service_id, request_type,
 -- Used by the admin dashboard announcements card.
 -- department_id NULL = global/cross-department announcement.
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO faqs (faq_id, question, answer, department_id) VALUES
+INSERT INTO faqs (faq_id, question, answer, is_pinned, department_id) VALUES
 (1, 'How do I request a Good Moral Certificate?',
    'Submit a document request through the OAMS portal under Document Requests. Processing takes 3–5 business days. Claim your document at the CCS office upon notification.',
-   1001),
+   FALSE, 1001),
 (2, 'How do I book a consultation with my professor?',
    'Go to Appointments in your student dashboard, select your professor, choose an available time slot, and submit your request. You will be notified once the professor approves.',
-   1001),
+   FALSE, 1001),
 (3, 'How does the online queue work?',
    'Join a queue from the Queue section of your dashboard. You will receive a queue number and can monitor your position in real time. Proceed to the office when you are called.',
-   1001),
+   FALSE, 1001),
 (4, 'What documents are required for enrollment assistance?',
    'Bring your registration form, previous grades, and any outstanding clearance slips. Visit the CCS office or join the Enrollment Assistance queue online.',
-   1001),
+   FALSE, 1001),
 (5, 'What are the CCS office hours?',
    'The CCS office is open Monday to Friday, 8:00 AM to 5:00 PM. Queue slots are available from 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM.',
-   1001),
+   FALSE, 1001),
 (6, 'Enrollment period for AY 2026–2027 is now open.',
    'All students must complete online enrollment via the OAMS portal by June 30, 2026. Walk-in enrollment will not be accommodated after the deadline.',
-   NULL),
+   TRUE, NULL),
 (7, 'System maintenance scheduled for June 15, 2026.',
    'OAMS will be unavailable from 12:00 AM to 4:00 AM on June 15, 2026 for scheduled maintenance. Please plan your transactions accordingly.',
-   NULL);
+   TRUE, NULL);
 
 
 -- ─────────────────────────────────────────────────────────────

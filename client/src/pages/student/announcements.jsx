@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
+import api from "../../utils/api";
 
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
@@ -130,7 +131,14 @@ const MegaphoneIcon = () => (
 );
 
 const AlertCircleIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="12" y1="8" x2="12" y2="12"></line>
     <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -179,129 +187,31 @@ const ChevronLeftIcon = () => (
   </svg>
 );
 
-// ─── Sample Announcements Data ─────────────────────────────────────────────────
-const ANNOUNCEMENTS_DATA = [
-  {
-    id: "1",
-    title: "Enrollment Period for Second Semester",
-    description: "The enrollment period for the second semester AY 2025-2026 will be from April 1-15, 2026. Please prepare all necessary documents and settle any outstanding balances before enrollment.",
-    college: "College of Computing Studies (CCS)",
-    date: "2026-03-25",
-    category: "important",
-    isPinned: true,
-    icon: "alert",
-  },
-  {
-    id: "2",
-    title: "System Maintenance Notice",
-    description: "The OAMS system will undergo scheduled maintenance on March 29, 2026, from 12:00 to 6:00 AM. Services will be temporarily unavailable during this period.",
-    college: "All Departments",
-    date: "2026-03-26",
-    category: "important",
-    isPinned: true,
-    icon: "alert",
-  },
-  {
-    id: "3",
-    title: "Career Fair 2026",
-    description: "Join us for the University Career Fair on April 10, 2026, at the University Gymnasium. Meet with potential employers and learn about career opportunities.",
-    college: "College of Business Accountancy and Administration (CBAA)",
-    date: "2026-03-24",
-    category: "event",
-    isPinned: false,
-    icon: "calendar",
-  },
-  {
-    id: "4",
-    title: "Thesis Defense Schedule",
-    description: "Final thesis defense schedules for graduating students are now available. Please check with your respective department offices for your assigned date and time.",
-    college: "College of Engineering (COE)",
-    date: "2026-03-23",
-    category: "reminder",
-    isPinned: false,
-    icon: "bell",
-  },
-  {
-    id: "5",
-    title: "Scholarship Application Open",
-    description: "Scholarship applications for Academic Year 2026-2027 are now open. Deadline for submission is April 30, 2026. Visit the Scholarship Office for more details.",
-    college: "All Departments",
-    date: "2026-03-22",
-    category: "general",
-    isPinned: false,
-    icon: "alert",
-  },
-  {
-    id: "6",
-    title: "Library Extended Hours",
-    description: "The University Library will extend its operating hours during the examination period. Open from 7:00 AM to 10:00 PM starting April 1, 2026.",
-    college: "All Departments",
-    date: "2026-03-21",
-    category: "general",
-    isPinned: false,
-    icon: "bell",
-  },
-  {
-    id: "7",
-    title: "Health and Wellness Week",
-    description: "Join us for Health and Wellness Week from April 5-9, 2026. Free health screenings, fitness activities, and mental health awareness programs will be available.",
-    college: "College of Health and Allied Sciences (CHAS)",
-    date: "2026-03-20",
-    category: "event",
-    isPinned: false,
-    icon: "calendar",
-  },
-  {
-    id: "8",
-    title: "Clearance Processing Reminder",
-    description: "Graduating students are reminded to start their clearance processing. Please settle all obligations and return borrowed items to avoid delays.",
-    college: "All Departments",
-    date: "2026-03-19",
-    category: "reminder",
-    isPinned: false,
-    icon: "bell",
-  },
-  {
-    id: "9",
-    title: "Research Symposium",
-    description: "The Annual Research Symposium will be held on April 15, 2026. Students are encouraged to attend and learn from research presentations across all disciplines.",
-    college: "College of Arts and Sciences (CAS)",
-    date: "2026-03-18",
-    category: "event",
-    isPinned: false,
-    icon: "calendar",
-  },
-  {
-    id: "10",
-    title: "Student Council Elections",
-    description: "Filing of candidacy for Student Council Elections is now open until April 5, 2026. Voting will take place on April 20-22, 2026.",
-    college: "All Departments",
-    date: "2026-03-17",
-    category: "general",
-    isPinned: false,
-    icon: "alert",
-  },
-  {
-    id: "11",
-    title: "Practicum Orientation",
-    description: "Mandatory practicum orientation for education students will be held on April 8, 2026, at 2:00 PM in the AVR. Attendance is required.",
-    college: "College of Education (COEd)",
-    date: "2026-03-16",
-    category: "important",
-    isPinned: false,
-    icon: "alert",
-  },
-  {
-    id: "12",
-    title: "No Classes on April 9",
-    description: "In observance of the Day of Valor, there will be no classes on April 9, 2026. Regular schedule resumes on April 10, 2026.",
-    college: "All Departments",
-    date: "2026-03-15",
-    category: "general",
-    isPinned: false,
-    icon: "bell",
-  },
-];
+const ChevronDownIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+const Loader2Icon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="12" y1="2" x2="12" y2="6"></line>
+    <line x1="12" y1="18" x2="12" y2="22"></line>
+    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+    <line x1="2" y1="12" x2="6" y2="12"></line>
+    <line x1="18" y1="12" x2="22" y2="12"></line>
+    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+  </svg>
+);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AnnouncementsPage() {
@@ -330,6 +240,7 @@ export default function AnnouncementsPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [selectedFilter, setSelectedFilter] = useState("all");
+  const [selectedCollege, setSelectedCollege] = useState("all");
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -341,6 +252,29 @@ export default function AnnouncementsPage() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
+  // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
+  const [announcements, setAnnouncements] = useState([]);
+  const [annLoading, setAnnLoading] = useState(true);
+  const [annError, setAnnError] = useState(null);
+
+  const fetchAnnouncements = async () => {
+    setAnnLoading(true);
+    setAnnError(null);
+    try {
+      const { data } = await api.get("/student/announcements");
+      setAnnouncements(data.announcements ?? []);
+    } catch (err) {
+      console.error("Fetch announcements error:", err);
+      setAnnError("Could not load announcements. Please try again.");
+    } finally {
+      setAnnLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, []);
+
   // ── Filter tabs ────────────────────────────────────────────────────────────
   const filterTabs = [
     { id: "all", label: "All" },
@@ -350,12 +284,36 @@ export default function AnnouncementsPage() {
     { id: "general", label: "General" },
   ];
 
-  // ── Filtered announcements ──────────────────────────────────────────────────
-  const pinnedAnnouncements = ANNOUNCEMENTS_DATA.filter(a => a.isPinned);
-  const filteredAnnouncements = ANNOUNCEMENTS_DATA.filter(ann => {
-    if (selectedFilter === "all") return true;
-    return ann.category === selectedFilter;
-  }).filter(a => !a.isPinned);
+  // ── College options derived from live data: each department that actually
+  //    has at least one announcement, keyed by abbreviation (e.g. "CCS").
+  //    Global notices (departmentAbbrev "ALL") are excluded from the option
+  //    list itself but always remain visible regardless of which college is
+  //    selected, since they apply to every department by definition. ───────
+  const collegeOptions = useMemo(() => {
+    const seen = new Map();
+    announcements.forEach((a) => {
+      if (a.departmentAbbrev !== "ALL" && !seen.has(a.departmentAbbrev)) {
+        seen.set(a.departmentAbbrev, a.departmentName);
+      }
+    });
+    return [...seen.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([abbrev, name]) => ({ abbrev, name }));
+  }, [announcements]);
+
+  // ── Filtered announcements (category tab + department dropdown both apply).
+  //    Selecting a college (e.g. "CCS") shows that college's announcements
+  //    PLUS global ("All Departments") ones -- never hides global notices. ──
+  const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
+  const filteredAnnouncements = announcements
+    .filter((a) => selectedFilter === "all" || a.category === selectedFilter)
+    .filter(
+      (a) =>
+        selectedCollege === "all" ||
+        a.departmentAbbrev === selectedCollege ||
+        a.departmentAbbrev === "ALL",
+    )
+    .filter((a) => !a.isPinned);
 
   // ── Chat handlers ──────────────────────────────────────────────────────────
   const scrollToBottom = () => {
@@ -400,16 +358,25 @@ export default function AnnouncementsPage() {
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
     if (lowerInput.includes("announcement")) {
-      const total = ANNOUNCEMENTS_DATA.length;
+      const total = announcements.length;
       const pinned = pinnedAnnouncements.length;
-      return `There are currently ${total} announcements, with ${pinned} pinned as important. You can filter by category using the tabs above!`;
+      return `There are currently ${total} announcements, with ${pinned} pinned as important. You can filter by category or college using the controls above!`;
     } else if (lowerInput.includes("important")) {
-      return "Important announcements are marked with red badges. We have 3 important announcements currently visible. Check them out to stay updated!";
-    } else if (lowerInput.includes("event") || lowerInput.includes("activity")) {
-      const events = ANNOUNCEMENTS_DATA.filter(a => a.category === "event");
+      const importantCount = announcements.filter(
+        (a) => a.category === "important",
+      ).length;
+      return `Important announcements are marked with red badges. We have ${importantCount} important announcement(s) currently visible. Check them out to stay updated!`;
+    } else if (
+      lowerInput.includes("event") ||
+      lowerInput.includes("activity")
+    ) {
+      const events = announcements.filter((a) => a.category === "event");
       return `There are ${events.length} upcoming events. Click on 'Events' tab to see all of them!`;
-    } else if (lowerInput.includes("enrollment")) {
-      return "The enrollment period for the second semester is from April 1-15, 2026. Make sure to prepare your documents and settle any outstanding balances!";
+    } else if (
+      lowerInput.includes("college") ||
+      lowerInput.includes("department")
+    ) {
+      return "Use the College dropdown to filter announcements down to a specific department, or leave it on 'All Colleges' to see everything.";
     } else {
       return "I can help you find announcements, learn about upcoming events, deadlines, and more. What would you like to know?";
     }
@@ -426,9 +393,17 @@ export default function AnnouncementsPage() {
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
-    { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/student/appointments",
+    },
     { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
-    { icon: HistoryIconNav, label: "Transactions", path: "/student/transactions" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/student/transactions",
+    },
   ];
 
   const getCategoryColor = (category) => {
@@ -441,13 +416,13 @@ export default function AnnouncementsPage() {
     return colors[category] || colors.general;
   };
 
-  const getAnnouncementIcon = (icon) => {
-    switch (icon) {
-      case "alert":
+  const getAnnouncementIcon = (category) => {
+    switch (category) {
+      case "important":
         return <AlertCircleIcon />;
-      case "calendar":
+      case "event":
         return <CalendarIcon />;
-      case "bell":
+      case "reminder":
         return <BellIcon />;
       default:
         return <AlertCircleIcon />;
@@ -463,7 +438,11 @@ export default function AnnouncementsPage() {
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="logo-img oams-logo-img"
+              />
             </div>
             <button
               className="theme-toggle-btn"
@@ -523,7 +502,11 @@ export default function AnnouncementsPage() {
         <div className="mobile-header-content">
           <div className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="logo-img oams-logo-img"
+            />
           </div>
           <div className="mobile-header-actions">
             <button
@@ -559,7 +542,9 @@ export default function AnnouncementsPage() {
                 Dashboard
               </button>
 
-              <div className="header-badge">{ANNOUNCEMENTS_DATA.length} Total</div>
+              <div className="header-badge">
+                {annLoading ? "—" : announcements.length} Total
+              </div>
             </div>
 
             <div className="page-header">
@@ -576,95 +561,207 @@ export default function AnnouncementsPage() {
             </div>
           </div>
 
-          {/* Filter Tabs */}
-          <div className="filter-tabs">
-            {filterTabs.map((tab) => (
+          {/* Error banner */}
+          {annError && (
+            <div className="empty-state" style={{ marginBottom: "1rem" }}>
+              <AlertCircleIcon />
+              <p>{annError}</p>
               <button
-                key={tab.id}
-                className={`filter-tab ${selectedFilter === tab.id ? "active" : ""}`}
-                onClick={() => setSelectedFilter(tab.id)}
+                className="filter-tab"
+                style={{ marginTop: "0.5rem" }}
+                onClick={fetchAnnouncements}
               >
-                {tab.label}
+                Retry
               </button>
-            ))}
-          </div>
-
-          {/* Pinned Announcements Section */}
-          {selectedFilter === "all" && pinnedAnnouncements.length > 0 && (
-            <section className="announcements-section">
-              <h2 className="section-title">Pinned Announcements</h2>
-              <div className="announcements-list">
-                {pinnedAnnouncements.map((announcement) => (
-                  <div key={announcement.id} className={`announcement-card ${getCategoryColor(announcement.category)}`}>
-                    <div className="announcement-header">
-                      <div className="announcement-icon">
-                        {getAnnouncementIcon(announcement.icon)}
-                      </div>
-                      <div className="announcement-content">
-                        <h3 className="announcement-title">{announcement.title}</h3>
-                        <p className="announcement-description">{announcement.description}</p>
-                        <div className="announcement-meta">
-                          <span className="announcement-college">{announcement.college}</span>
-                          <span className="announcement-date">
-                            {new Date(announcement.date).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                      <span className={`announcement-badge badge-${announcement.category}`}>
-                        {announcement.category.charAt(0).toUpperCase() + announcement.category.slice(1)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+            </div>
           )}
 
-          {/* All Announcements Section */}
-          <section className="announcements-section">
-            <h2 className="section-title">
-              {selectedFilter === "all" ? "All Announcements" : `${selectedFilter.charAt(0).toUpperCase() + selectedFilter.slice(1)} Announcements`}
-            </h2>
-            {filteredAnnouncements.length === 0 ? (
-              <div className="empty-state">
-                <BellIcon />
-                <p>No announcements in this category</p>
-              </div>
-            ) : (
-              <div className="announcements-list">
-                {filteredAnnouncements.map((announcement) => (
-                  <div key={announcement.id} className={`announcement-card ${getCategoryColor(announcement.category)}`}>
-                    <div className="announcement-header">
-                      <div className="announcement-icon">
-                        {getAnnouncementIcon(announcement.icon)}
-                      </div>
-                      <div className="announcement-content">
-                        <h3 className="announcement-title">{announcement.title}</h3>
-                        <p className="announcement-description">{announcement.description}</p>
-                        <div className="announcement-meta">
-                          <span className="announcement-college">{announcement.college}</span>
-                          <span className="announcement-date">
-                            {new Date(announcement.date).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                      <span className={`announcement-badge badge-${announcement.category}`}>
-                        {announcement.category.charAt(0).toUpperCase() + announcement.category.slice(1)}
-                      </span>
-                    </div>
-                  </div>
+          {/* Filter Tabs + College Filter */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div className="filter-tabs">
+              {filterTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={`filter-tab ${selectedFilter === tab.id ? "active" : ""}`}
+                  onClick={() => setSelectedFilter(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div
+              style={{
+                position: "relative",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              <select
+                value={selectedCollege}
+                onChange={(e) => setSelectedCollege(e.target.value)}
+                aria-label="Filter by college"
+                style={{
+                  appearance: "none",
+                  padding: "0.5rem 2rem 0.5rem 0.85rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid var(--card-border, #ccc)",
+                  background: "var(--card-bg, #fff)",
+                  color: "var(--text-primary, #111)",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <option value="all">All Colleges</option>
+                {collegeOptions.map((opt) => (
+                  <option key={opt.abbrev} value={opt.abbrev}>
+                    {opt.name} ({opt.abbrev})
+                  </option>
                 ))}
-              </div>
+              </select>
+              <ChevronDownIcon
+                style={{
+                  position: "absolute",
+                  right: "0.6rem",
+                  width: "1rem",
+                  height: "1rem",
+                  pointerEvents: "none",
+                  opacity: 0.6,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Loading state */}
+          {annLoading && (
+            <div className="empty-state">
+              <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
+              <p>Loading announcements…</p>
+            </div>
+          )}
+
+          {/* Pinned Announcements Section */}
+          {!annLoading &&
+            selectedFilter === "all" &&
+            selectedCollege === "all" &&
+            pinnedAnnouncements.length > 0 && (
+              <section className="announcements-section">
+                <h2 className="section-title">Pinned Announcements</h2>
+                <div className="announcements-list">
+                  {pinnedAnnouncements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className={`announcement-card ${getCategoryColor(announcement.category)}`}
+                    >
+                      <div className="announcement-header">
+                        <div className="announcement-icon">
+                          {getAnnouncementIcon(announcement.category)}
+                        </div>
+                        <div className="announcement-content">
+                          <h3 className="announcement-title">
+                            {announcement.title}
+                          </h3>
+                          <p className="announcement-description">
+                            {announcement.description}
+                          </p>
+                          <div className="announcement-meta">
+                            <span className="announcement-college">
+                              {announcement.college}
+                            </span>
+                            <span className="announcement-date">
+                              {new Date(announcement.date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`announcement-badge badge-${announcement.category}`}
+                        >
+                          {announcement.category.charAt(0).toUpperCase() +
+                            announcement.category.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
-          </section>
+
+          {/* All Announcements Section */}
+          {!annLoading && (
+            <section className="announcements-section">
+              <h2 className="section-title">
+                {selectedFilter === "all"
+                  ? "All Announcements"
+                  : `${selectedFilter.charAt(0).toUpperCase() + selectedFilter.slice(1)} Announcements`}
+              </h2>
+              {filteredAnnouncements.length === 0 ? (
+                <div className="empty-state">
+                  <BellIcon />
+                  <p>No announcements match these filters</p>
+                </div>
+              ) : (
+                <div className="announcements-list">
+                  {filteredAnnouncements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className={`announcement-card ${getCategoryColor(announcement.category)}`}
+                    >
+                      <div className="announcement-header">
+                        <div className="announcement-icon">
+                          {getAnnouncementIcon(announcement.category)}
+                        </div>
+                        <div className="announcement-content">
+                          <h3 className="announcement-title">
+                            {announcement.title}
+                          </h3>
+                          <p className="announcement-description">
+                            {announcement.description}
+                          </p>
+                          <div className="announcement-meta">
+                            <span className="announcement-college">
+                              {announcement.college}
+                            </span>
+                            <span className="announcement-date">
+                              {new Date(announcement.date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`announcement-badge badge-${announcement.category}`}
+                        >
+                          {announcement.category.charAt(0).toUpperCase() +
+                            announcement.category.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </main>
 

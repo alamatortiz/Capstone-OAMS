@@ -289,9 +289,11 @@ CREATE TABLE faqs (
     faq_id          INT          AUTO_INCREMENT PRIMARY KEY,
     question        TEXT         NOT NULL,
     answer          TEXT         NOT NULL,
+    is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
     department_id   INT          NULL,   -- NULL = global announcement
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+    INDEX idx_faqs_pinned_created (is_pinned, created_at)
 );
 
 -- ─────────────────────────────────────────────────────────────

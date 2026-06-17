@@ -176,6 +176,99 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
+// ANNOUNCEMENTS ENDPOINT
+// ─────────────────────────────────────────────────────────────
+
+// Lightweight keyword classifier so the UI's existing category
+// tabs (important/event/reminder/general) keep working without
+// requiring admins to pick a category when creating a notice.
+// This is intentionally simple -- swap for a stored column later
+// if admins need to override the auto-detected category.
+function classifyAnnouncement(question = "", answer = "") {
+  const text = `${question} ${answer}`.toLowerCase();
+
+  if (
+    text.includes("deadline") ||
+    text.includes("maintenance") ||
+    text.includes("must") ||
+    text.includes("required") ||
+    text.includes("suspension")
+  ) {
+    return "important";
+  }
+  if (
+    text.includes("fair") ||
+    text.includes("symposium") ||
+    text.includes("week") ||
+    text.includes("orientation") ||
+    text.includes("defense")
+  ) {
+    return "event";
+  }
+  if (
+    text.includes("reminder") ||
+    text.includes("don't forget") ||
+    text.includes("clearance") ||
+    text.includes("schedule")
+  ) {
+    return "reminder";
+  }
+  return "general";
+}
+
+// GET /api/student/announcements
+// Returns every announcement, each tagged with the department it
+// belongs to (department_id IS NULL = "All Departments" / global).
+// Students filter by department on the frontend using
+// departmentAbbrev (e.g. "CCS", "CBAA") or the "all" sentinel.
+router.get(
+  "/announcements",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           f.faq_id,
+           f.question,
+           f.answer,
+           f.is_pinned,
+           f.created_at,
+           d.department_id,
+           d.department_name,
+           d.department_abbreviation
+         FROM faqs f
+         LEFT JOIN departments d ON f.department_id = d.department_id
+         ORDER BY f.is_pinned DESC, f.created_at DESC`,
+      );
+
+      const announcements = rows.map((row) => ({
+        id: String(row.faq_id),
+        title: row.question,
+        description: row.answer,
+        category: classifyAnnouncement(row.question, row.answer),
+        isPinned: !!row.is_pinned,
+        date: row.created_at,
+        // department_id NULL -> global notice, visible regardless of filter
+        departmentId: row.department_id,
+        departmentName: row.department_name ?? "All Departments",
+        departmentAbbrev: row.department_abbreviation ?? "ALL",
+        college: row.department_id
+          ? `${row.department_name} (${row.department_abbreviation})`
+          : "All Departments",
+      }));
+
+      res.json({ announcements });
+    } catch (error) {
+      console.error("Fetch announcements error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // DOCUMENT REQUEST ENDPOINTS
 // ─────────────────────────────────────────────────────────────
 
