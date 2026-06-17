@@ -14,6 +14,7 @@ const QueueStatusPage = React.lazy(() => import("./pages/student/queue-status.js
 const QueueTrackingPage = React.lazy(() => import("./pages/student/queue-tracking.jsx"));
 const AvailServicesPage = React.lazy(() => import("./pages/student/avail-services.jsx")); 
 const AnnouncementsPage = React.lazy(() => import("./pages/student/announcements.jsx"));
+const ProfessorSchedulePage = React.lazy(() => import("./pages/student/ProfessorSchedule.jsx"));
 
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
@@ -67,7 +68,7 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* Services - NEW ROUTE */}
+              {/* Services */}
               <Route
                 path="/student/avail-service"
                 element={
@@ -77,12 +78,22 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* Announcements - NEW ROUTE */}
+              {/* Announcements */}
               <Route
                 path="/student/announcements"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <AnnouncementsPage />
+                  </Suspense>
+                }
+              />
+
+              {/* Professor Schedules - NEW ROUTE */}
+              <Route
+                path="/student/professor-schedules"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorSchedulePage />
                   </Suspense>
                 }
               />
@@ -145,6 +156,14 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AnnouncementsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/student-professor-schedules"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <ProfessorSchedulePage />
                 </Suspense>
               }
             />
