@@ -467,6 +467,7 @@ router.get(
            q.created_at AS joined_at,
            qs.start_time,
            qs.end_time,
+           qs.max_capacity,
            s.service_name,
            d.department_name,
            d.department_abbreviation,
@@ -484,7 +485,22 @@ router.get(
              FROM queues q3
              WHERE q3.slot_id = q.slot_id
                AND q3.status = 'waiting'
-           ) AS total_waiting
+           ) AS total_waiting,
+           -- Cumulative headcount for this slot: everyone who joined today and
+           -- hasn't cancelled (waiting + serving + completed)
+           (
+             SELECT COUNT(*)
+             FROM queues q4
+             WHERE q4.slot_id = q.slot_id
+               AND q4.status IN ('waiting', 'serving', 'completed')
+           ) AS total_in_queue,
+           -- How many of those have already been fully serviced
+           (
+             SELECT COUNT(*)
+             FROM queues q5
+             WHERE q5.slot_id = q.slot_id
+               AND q5.status = 'completed'
+           ) AS serviced_count
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -504,6 +520,18 @@ router.get(
           .toUpperCase();
         const queueNumberBadge = `${deptAbbrev}-${serviceCode}-${String(row.queue_number).padStart(3, "0")}`;
 
+        const maxCapacity = row.max_capacity || 0;
+        const totalInQueue = row.total_in_queue || 0;
+        const servicedCount = row.serviced_count || 0;
+        const queueOccupancyPercent =
+          maxCapacity > 0
+            ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
+            : 0;
+        const servicedPercent =
+          totalInQueue > 0
+            ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
+            : 0;
+
         return {
           queueId: row.queue_id,
           queueNumber: row.queue_number,
@@ -516,6 +544,11 @@ router.get(
           status: row.status,
           position,
           totalWaiting: row.total_waiting || 0,
+          maxCapacity,
+          totalInQueue,
+          servicedCount,
+          queueOccupancyPercent,
+          servicedPercent,
           estimatedWait:
             position > 1 ? `~${(position - 1) * 5} min` : "You're next!",
           joinedAt: new Date(row.joined_at).toLocaleTimeString("en-US", {
@@ -714,6 +747,7 @@ router.post(
       const [[newEntry]] = await conn.query(
         `SELECT
            q.queue_id, q.queue_number, q.slot_id, q.service_id, q.status, q.created_at AS joined_at,
+           qs.max_capacity,
            s.service_name,
            d.department_name, d.department_abbreviation,
            (
@@ -723,8 +757,17 @@ router.post(
            (
              SELECT COUNT(*) FROM queues q3
              WHERE q3.slot_id = q.slot_id AND q3.status = 'waiting'
-           ) AS total_waiting
+           ) AS total_waiting,
+           (
+             SELECT COUNT(*) FROM queues q4
+             WHERE q4.slot_id = q.slot_id AND q4.status IN ('waiting', 'serving', 'completed')
+           ) AS total_in_queue,
+           (
+             SELECT COUNT(*) FROM queues q5
+             WHERE q5.slot_id = q.slot_id AND q5.status = 'completed'
+           ) AS serviced_count
          FROM queues q
+         JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE q.queue_id = ?`,
@@ -737,6 +780,17 @@ router.post(
         .substring(0, 3)
         .toUpperCase();
       const position = newEntry.position || 1;
+      const maxCapacity = newEntry.max_capacity || 0;
+      const totalInQueue = newEntry.total_in_queue || 0;
+      const servicedCount = newEntry.serviced_count || 0;
+      const queueOccupancyPercent =
+        maxCapacity > 0
+          ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
+          : 0;
+      const servicedPercent =
+        totalInQueue > 0
+          ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
+          : 0;
 
       res.status(201).json({
         message: "Successfully joined the queue",
@@ -752,6 +806,11 @@ router.post(
           status: newEntry.status,
           position,
           totalWaiting: newEntry.total_waiting || 0,
+          maxCapacity,
+          totalInQueue,
+          servicedCount,
+          queueOccupancyPercent,
+          servicedPercent,
           estimatedWait:
             position > 1 ? `~${(position - 1) * 5} min` : "You're next!",
           joinedAt: new Date(newEntry.joined_at).toLocaleTimeString("en-US", {

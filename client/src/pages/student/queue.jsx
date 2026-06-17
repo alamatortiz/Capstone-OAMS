@@ -468,27 +468,40 @@ export default function QueuePage() {
                               <p className="queue-stat-value-sm">{queue.joinedAt}</p>
                             </div>
                           </div>
-                          <div className="queue-progress-wrapper">
-                            <div className="progress-label-row">
-                              <span className="progress-label-text">Queue Progress</span>
-                              <span className="progress-percentage">
-                                {queue.totalWaiting > 0
-                                  ? Math.round(
-                                      ((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100,
-                                    )
-                                  : 0}%
-                              </span>
+                          <div className="queue-progress-group">
+                            <div className="queue-progress-wrapper">
+                              <div className="progress-label-row">
+                                <p className="queue-stat-label">People in Queue</p>
+                                <p className="queue-stat-value">
+                                  {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
+                                  <span className="progress-value-percent">
+                                    ({queue.queueOccupancyPercent ?? 0}%)
+                                  </span>
+                                </p>
+                              </div>
+                              <div className="progress-bar">
+                                <div
+                                  className="progress-fill"
+                                  style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
+                                />
+                              </div>
                             </div>
-                            <div className="progress-bar">
-                              <div
-                                className="progress-fill"
-                                style={{
-                                  width:
-                                    queue.totalWaiting > 0
-                                      ? `${((queue.totalWaiting - queue.position) / queue.totalWaiting) * 100}%`
-                                      : '0%',
-                                }}
-                              />
+                            <div className="queue-progress-wrapper">
+                              <div className="progress-label-row">
+                                <p className="queue-stat-label">Serviced</p>
+                                <p className="queue-stat-value">
+                                  {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
+                                  <span className="progress-value-percent">
+                                    ({queue.servicedPercent ?? 0}%)
+                                  </span>
+                                </p>
+                              </div>
+                              <div className="progress-bar">
+                                <div
+                                  className="progress-fill progress-fill-serviced"
+                                  style={{ width: `${queue.servicedPercent ?? 0}%` }}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
