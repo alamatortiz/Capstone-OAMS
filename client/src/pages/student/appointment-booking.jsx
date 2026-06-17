@@ -172,12 +172,19 @@ const UsersIcon = () => (
   </svg>
 );
 
-const SearchIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const SearchIcon = ({ className = '' }) => (
+  <svg
+    className={`icon ${className}`.trim()}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="11" cy="11" r="8"></circle>
     <path d="m21 21-4.35-4.35"></path>
   </svg>
 );
+
 
 const ChatIcon = () => (
   <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -627,6 +634,7 @@ export default function AppointmentBookingPage() {
                 <label htmlFor="searchQuery">Search Professor or Location</label>
                 <div className="search-input-wrapper">
                   <SearchIcon />
+
                   <input
                     id="searchQuery"
                     type="text"

@@ -666,7 +666,11 @@ body {
 .stat-body {
   flex: 1;
   min-width: 0;
-  text-align: left;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .stat-label {
@@ -686,7 +690,9 @@ body {
   margin: 0;
   line-height: 1;
   transition: color 0.3s ease;
+  text-align: center;
 }
+
 
 /* ===== Filters Card ===== */
 .filters-card {
@@ -710,6 +716,7 @@ body {
   margin: 0;
   margin-bottom: 0.25rem;
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .filters-header p {
@@ -717,6 +724,7 @@ body {
   color: var(--text-tertiary);
   margin: 0;
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .filters-grid {
@@ -751,6 +759,7 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .search-input-wrapper {
@@ -1094,6 +1103,7 @@ body {
   margin: 0;
   margin-bottom: 0.25rem;
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .bookings-header p {
@@ -1101,6 +1111,7 @@ body {
   color: var(--text-tertiary);
   margin: 0;
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .bookings-list {
