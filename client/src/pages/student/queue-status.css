@@ -1094,35 +1094,6 @@ body {
   transition: width 0.3s ease;
 }
 
-.queue-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(34, 197, 94, 0.1);
-}
-
-.queue-stat-box {
-  text-align: center;
-}
-
-.queue-stat-label {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  margin-bottom: 0.5rem;
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  transition: color 0.3s ease;
-}
-
-.queue-stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  transition: color 0.3s ease;
-}
-
 /* ===== Wait Time Display ===== */
 .queue-wait-time-display {
   display: flex;
