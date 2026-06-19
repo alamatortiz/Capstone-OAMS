@@ -516,3 +516,39 @@ INSERT INTO notifications (user_id, message, is_read, created_at) VALUES
 -- Admin 103
 (103, 'New document request submitted by Alvin Matthew Ortiz (Good Moral Certificate).',                                               TRUE,  NOW() - INTERVAL 3 DAY),
 (103, 'New document request submitted by Luiz Gabriel Rosales (Transcript of Records).',                                               TRUE,  NOW() - INTERVAL 2 DAY);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 13 · FACULTY POSITIONS (update existing rows)
+-- ─────────────────────────────────────────────────────────────
+UPDATE faculty SET position = 'Department Chair'    WHERE faculty_id = 102;
+UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 106;
+UPDATE faculty SET position = 'Program Coordinator'  WHERE faculty_id = 107;
+UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 110;
+UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 111;
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 14 · FACULTY AVAILABILITY (consultation hours)
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location) VALUES
+-- 102 Patrick Ogalesco
+(102, 'Monday',    '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+(102, 'Monday',    '14:00:00', '17:00:00', 'CCS Faculty Room 201'),
+(102, 'Wednesday', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+(102, 'Friday',    '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
+-- 106 Marvin Bicua
+(106, 'Tuesday',   '10:00:00', '12:00:00', 'CCS Faculty Room 203'),
+(106, 'Tuesday',   '14:00:00', '17:00:00', 'CCS Faculty Room 203'),
+(106, 'Thursday',  '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
+(106, 'Thursday',  '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
+-- 107 Janus Raymond Tan
+(107, 'Monday',    '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+(107, 'Wednesday', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+(107, 'Wednesday', '14:00:00', '16:00:00', 'CCS Dean\'s Office'),
+(107, 'Friday',    '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
+-- 110 Lena Villanueva
+(110, 'Monday',    '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
+(110, 'Wednesday', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
+(110, 'Friday',    '14:00:00', '17:00:00', 'CCS Faculty Room 105'),
+-- 111 Marco Dela Cruz
+(111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
+(111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401');

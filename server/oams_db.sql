@@ -63,6 +63,7 @@ CREATE TABLE faculty (
     first_name      VARCHAR(50)  NOT NULL,
     last_name       VARCHAR(50)  NOT NULL,
     specialization  VARCHAR(100),
+    position        VARCHAR(100) NOT NULL DEFAULT 'Faculty Member',
     email           VARCHAR(100) NOT NULL UNIQUE,
     department_id   INT          NOT NULL,
     FOREIGN KEY (faculty_id)    REFERENCES users(user_id)       ON DELETE CASCADE,
@@ -205,6 +206,21 @@ CREATE TABLE appointments (
     FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE SET NULL,    -- prevents duplicate bookings for the same student/faculty/date/time
     UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
     INDEX idx_appointments_dept_service (department_id, service_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- FACULTY AVAILABILITY
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE faculty_availability (
+    availability_id INT AUTO_INCREMENT PRIMARY KEY,
+    faculty_id       INT NOT NULL,
+    day_of_week      ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday') NOT NULL,
+    start_time       TIME NOT NULL,
+    end_time         TIME NOT NULL,
+    location         VARCHAR(150),
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    INDEX idx_faculty_availability_faculty (faculty_id)
 );
 
 -- ─────────────────────────────────────────────────────────────

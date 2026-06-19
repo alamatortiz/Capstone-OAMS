@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
@@ -7,46 +7,6 @@ import "./appointment-booking.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";
-
-// Sample initial slots data
-const INITIAL_SLOTS = [
-  {
-    id: "slot-1",
-    professorId: "prof-1",
-    professorName: "Dr. Maria Santos",
-    college: "CCS",
-    date: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-    startTime: "09:00",
-    endTime: "10:00",
-    location: "Room 101, CCS Building",
-    maxSlots: 3,
-    currentBookings: 1,
-  },
-  {
-    id: "slot-2",
-    professorId: "prof-2",
-    professorName: "Dr. Juan Dela Cruz",
-    college: "CBAA",
-    date: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-    startTime: "10:30",
-    endTime: "11:30",
-    location: "Room 205, CBAA Building",
-    maxSlots: 4,
-    currentBookings: 2,
-  },
-  {
-    id: "slot-3",
-    professorId: "prof-3",
-    professorName: "Dr. Anna Garcia",
-    college: "COED",
-    date: new Date(Date.now() + 172800000).toISOString().split("T")[0],
-    startTime: "14:00",
-    endTime: "15:00",
-    location: "Room 301, COED Building",
-    maxSlots: 3,
-    currentBookings: 0,
-  },
-];
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -285,6 +245,25 @@ const XCircleIcon = () => (
   </svg>
 );
 
+const Loader2Icon = () => (
+  <svg
+    className="appointment-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <line x1="12" y1="2" x2="12" y2="6"></line>
+    <line x1="12" y1="18" x2="12" y2="22"></line>
+    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+    <line x1="2" y1="12" x2="6" y2="12"></line>
+    <line x1="18" y1="12" x2="22" y2="12"></line>
+    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+  </svg>
+);
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentBookingPage() {
   const { user: authUser, logout } = useAuth();
@@ -306,9 +285,19 @@ export default function AppointmentBookingPage() {
 
   const navigate = useNavigate();
 
-  // ── Local State Management ─────────────────────────────────────────────────
-  const [slots, setSlots] = useState(INITIAL_SLOTS);
-  const [bookings, setBookings] = useState([]);
+  // ── Live data state (replaces INITIAL_SLOTS / local bookings array) ───────
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(true);
+  const [slotsError, setSlotsError] = useState(null);
+
+  const [myBookings, setMyBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookingsError, setBookingsError] = useState(null);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+
+  // ── UI state ────────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
@@ -323,7 +312,7 @@ export default function AppointmentBookingPage() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  // ── Appointment State ──────────────────────────────────────────────────────
+  // ── Appointment / filter state ─────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedCollege, setSelectedCollege] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -331,94 +320,68 @@ export default function AppointmentBookingPage() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [purpose, setPurpose] = useState("");
 
-  const studentId = user?.studentId || "student-001";
-
-  // ── Slot Management Functions ──────────────────────────────────────────────
-  const getAvailableSlots = () => {
-    return slots.filter((slot) => slot.currentBookings < slot.maxSlots);
-  };
-
-  const getBookedSlots = (id) => {
-    return bookings
-      .filter((booking) => booking.studentId === id)
-      .map((booking) => {
-        const slot = slots.find((s) => s.id === booking.slotId);
-        return slot ? { ...slot, ...booking, id: booking.slotId } : null;
-      })
-      .filter(Boolean);
-  };
-
-  const bookSlot = (slotId, stId, studentName, bookingPurpose) => {
-    const slot = slots.find((s) => s.id === slotId);
-
-    if (!slot || slot.currentBookings >= slot.maxSlots) {
-      return false;
+  // ── Fetch helpers ───────────────────────────────────────────────────────────
+  const fetchSlots = async () => {
+    setSlotsLoading(true);
+    setSlotsError(null);
+    try {
+      const { data } = await api.get("/student/appointments/available-slots");
+      setSlots(data.slots ?? []);
+    } catch (err) {
+      console.error("Fetch available slots error:", err);
+      setSlotsError("Could not load available slots. Please try again.");
+    } finally {
+      setSlotsLoading(false);
     }
-
-    const alreadyBooked = bookings.some(
-      (b) => b.slotId === slotId && b.studentId === stId,
-    );
-    if (alreadyBooked) return false;
-
-    const newBooking = {
-      id: `booking-${Date.now()}`,
-      slotId,
-      studentId: stId,
-      studentName,
-      purpose: bookingPurpose,
-      bookedAt: new Date().toISOString(),
-    };
-
-    setBookings([...bookings, newBooking]);
-    setSlots((prevSlots) =>
-      prevSlots.map((s) =>
-        s.id === slotId ? { ...s, currentBookings: s.currentBookings + 1 } : s,
-      ),
-    );
-
-    return true;
   };
 
-  const cancelBooking = (slotId) => {
-    const booking = bookings.find((b) => b.slotId === slotId);
-    if (!booking) return false;
-
-    setBookings((prevBookings) =>
-      prevBookings.filter((b) => b.slotId !== slotId),
-    );
-    setSlots((prevSlots) =>
-      prevSlots.map((s) =>
-        s.id === slotId && s.currentBookings > 0
-          ? { ...s, currentBookings: s.currentBookings - 1 }
-          : s,
-      ),
-    );
-
-    return true;
+  const fetchMyBookings = async () => {
+    setBookingsLoading(true);
+    setBookingsError(null);
+    try {
+      // Reuses the same endpoint the Appointments page uses — every row
+      // here is a real `appointments` table record for this student.
+      const { data } = await api.get("/student/appointments");
+      setMyBookings(data.appointments ?? []);
+    } catch (err) {
+      console.error("Fetch my bookings error:", err);
+      setBookingsError("Could not load your bookings. Please try again.");
+    } finally {
+      setBookingsLoading(false);
+    }
   };
 
-  const myBookings = getBookedSlots(studentId);
-  const availableSlots = getAvailableSlots().filter((slot) => {
-    const matchesDate = !selectedDate || slot.date === selectedDate;
-    const matchesCollege =
-      selectedCollege === "all" || slot.college === selectedCollege;
-    const matchesSearch =
-      !searchQuery ||
-      slot.professorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      slot.location.toLowerCase().includes(searchQuery.toLowerCase());
+  useEffect(() => {
+    fetchSlots();
+    fetchMyBookings();
+  }, []);
 
-    const slotDate = new Date(slot.date + "T" + slot.startTime);
-    const now = new Date();
-    const isFuture = slotDate > now;
-
-    return matchesDate && matchesCollege && matchesSearch && isFuture;
-  });
+  // ── Derived / filtered slots (replaces getAvailableSlots()) ───────────────
+  const availableSlots = useMemo(() => {
+    return slots.filter((slot) => {
+      const matchesDate = !selectedDate || slot.date === selectedDate;
+      const matchesCollege =
+        selectedCollege === "all" || slot.college === selectedCollege;
+      const matchesSearch =
+        !searchQuery ||
+        slot.professorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        slot.location.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesDate && matchesCollege && matchesSearch;
+    });
+  }, [slots, selectedDate, selectedCollege, searchQuery]);
 
   // Group slots by date
-  const slotsByDate = availableSlots.reduce((acc, slot) => {
-    (acc[slot.date] ||= []).push(slot);
-    return acc;
-  }, {});
+  const slotsByDate = useMemo(() => {
+    return availableSlots.reduce((acc, slot) => {
+      (acc[slot.date] ||= []).push(slot);
+      return acc;
+    }, {});
+  }, [availableSlots]);
+
+  // Only pending/approved bookings count as "active" for the My Bookings tab
+  const activeBookings = myBookings.filter(
+    (b) => b.status === "pending" || b.status === "approved",
+  );
 
   const colleges = [
     { value: "all", label: "All Colleges" },
@@ -500,40 +463,60 @@ export default function AppointmentBookingPage() {
     }
   };
 
-  const handleBookSlot = () => {
+  const handleBookSlot = async () => {
     if (!selectedSlot || !purpose.trim()) {
       toast.error("Please provide a purpose for consultation");
       return;
     }
 
-    const success = bookSlot(
-      selectedSlot.id,
-      studentId,
-      user?.name || "Student",
-      purpose,
-    );
+    setSubmitting(true);
+    try {
+      await api.post("/student/appointments/book-slot", {
+        facultyId: selectedSlot.professorId,
+        date: selectedSlot.date,
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
+        purpose: purpose.trim(),
+      });
 
-    if (success) {
       toast.success("Appointment booked successfully!");
       setPurpose("");
       setSelectedSlot(null);
       setShowBookDialog(false);
-    } else {
-      toast.error(
-        "Failed to book appointment. Slot may no longer be available.",
-      );
+
+      // Refresh both lists — the booked slot's capacity changes, and the
+      // new booking needs to show up under "My Appointments".
+      await Promise.all([fetchSlots(), fetchMyBookings()]);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ??
+        "Failed to book appointment. The slot may no longer be available.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleCancelBooking = (slotId) => {
-    if (confirm("Are you sure you want to cancel this appointment?")) {
-      cancelBooking(slotId);
+  const handleCancelBooking = async (appointmentId) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    if (cancellingId) return;
+
+    setCancellingId(appointmentId);
+    try {
+      await api.delete(`/student/appointments/${appointmentId}`);
       toast.success("Appointment cancelled successfully");
+      await Promise.all([fetchSlots(), fetchMyBookings()]);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ?? "Failed to cancel the appointment.";
+      toast.error(msg);
+    } finally {
+      setCancellingId(null);
     }
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+    return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
@@ -541,6 +524,8 @@ export default function AppointmentBookingPage() {
     });
   };
 
+  // Slots from the API arrive as "HH:MM:SS"; bookings from /appointments
+  // already arrive pre-formatted (e.g. "9:00 AM") by the backend.
   const formatTime = (time) => {
     const [hours, minutes] = time.split(":");
     const hour = parseInt(hours);
@@ -551,14 +536,14 @@ export default function AppointmentBookingPage() {
 
   const isToday = (dateString) => {
     const today = new Date();
-    const slotDate = new Date(dateString);
+    const slotDate = new Date(`${dateString}T00:00:00`);
     return today.toDateString() === slotDate.toDateString();
   };
 
   const isTomorrow = (dateString) => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const slotDate = new Date(dateString);
+    const slotDate = new Date(`${dateString}T00:00:00`);
     return tomorrow.toDateString() === slotDate.toDateString();
   };
 
@@ -701,7 +686,9 @@ export default function AppointmentBookingPage() {
               </div>
               <div className="stat-body">
                 <p className="stat-label">Available Slots</p>
-                <p className="stat-value">{availableSlots.length}</p>
+                <p className="stat-value">
+                  {slotsLoading ? "—" : availableSlots.length}
+                </p>
               </div>
             </div>
             <div className="appointment-stat-card">
@@ -710,7 +697,9 @@ export default function AppointmentBookingPage() {
               </div>
               <div className="stat-body">
                 <p className="stat-label">My Bookings</p>
-                <p className="stat-value">{myBookings.length}</p>
+                <p className="stat-value">
+                  {bookingsLoading ? "—" : activeBookings.length}
+                </p>
               </div>
             </div>
             <div className="appointment-stat-card">
@@ -720,7 +709,9 @@ export default function AppointmentBookingPage() {
               <div className="stat-body">
                 <p className="stat-label">Professors</p>
                 <p className="stat-value">
-                  {new Set(availableSlots.map((s) => s.professorId)).size}
+                  {slotsLoading
+                    ? "—"
+                    : new Set(availableSlots.map((s) => s.professorId)).size}
                 </p>
               </div>
             </div>
@@ -784,25 +775,43 @@ export default function AppointmentBookingPage() {
             <div className="tabs-header">
               <div className="tab-button active">
                 <ChevronRightIcon />
-                Available Slots ({availableSlots.length})
+                Available Slots ({slotsLoading ? "—" : availableSlots.length})
               </div>
               <div className="tab-button">
                 <CheckCircleIcon />
-                My Bookings ({myBookings.length})
+                My Bookings ({bookingsLoading ? "—" : activeBookings.length})
               </div>
             </div>
           </div>
 
           {/* Available Slots */}
           <div className="slots-container">
-            {Object.keys(slotsByDate).length === 0 ? (
+            {slotsLoading ? (
+              <div className="empty-state">
+                <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
+                <h3>Loading available slots…</h3>
+              </div>
+            ) : slotsError ? (
+              <div className="empty-state">
+                <CalendarIcon />
+                <h3>Could not load slots</h3>
+                <p>{slotsError}</p>
+                <button
+                  className="book-btn"
+                  style={{ marginTop: "0.5rem" }}
+                  onClick={fetchSlots}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : Object.keys(slotsByDate).length === 0 ? (
               <div className="empty-state">
                 <CalendarIcon />
                 <h3>No Available Slots</h3>
                 <p>
                   {selectedDate || selectedCollege !== "all" || searchQuery
                     ? "Try adjusting your filters to see more results"
-                    : "No professors have created time slots yet"}
+                    : "No professors have published consultation hours yet"}
                 </p>
               </div>
             ) : (
@@ -881,7 +890,25 @@ export default function AppointmentBookingPage() {
               <h2>My Appointments</h2>
               <p>Your scheduled consultations</p>
             </div>
-            {myBookings.length === 0 ? (
+            {bookingsLoading ? (
+              <div className="empty-state">
+                <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
+                <h3>Loading your appointments…</h3>
+              </div>
+            ) : bookingsError ? (
+              <div className="empty-state">
+                <CheckCircleIcon />
+                <h3>Could not load your appointments</h3>
+                <p>{bookingsError}</p>
+                <button
+                  className="book-btn"
+                  style={{ marginTop: "0.5rem" }}
+                  onClick={fetchMyBookings}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : activeBookings.length === 0 ? (
               <div className="empty-state">
                 <CheckCircleIcon />
                 <h3>No Appointments Booked</h3>
@@ -891,16 +918,12 @@ export default function AppointmentBookingPage() {
               </div>
             ) : (
               <div className="bookings-list">
-                {myBookings
-                  .sort((a, b) => {
-                    const dateCompare = a.date.localeCompare(b.date);
-                    if (dateCompare !== 0) return dateCompare;
-                    return a.startTime.localeCompare(b.startTime);
-                  })
+                {activeBookings
+                  .sort((a, b) => a.date.localeCompare(b.date))
                   .map((booking) => (
                     <div key={booking.id} className="booking-card">
                       <div className="booking-header">
-                        <h4>{booking.professorName}</h4>
+                        <h4>{booking.person}</h4>
                         <span className="college-badge">{booking.college}</span>
                       </div>
                       <div className="booking-details">
@@ -910,10 +933,9 @@ export default function AppointmentBookingPage() {
                         </div>
                         <div className="booking-detail">
                           <ClockIcon />
-                          <span>
-                            {formatTime(booking.startTime)} -{" "}
-                            {formatTime(booking.endTime)}
-                          </span>
+                          {/* booking.time already arrives pre-formatted
+                              (e.g. "9:00 AM") from the backend */}
+                          <span>{booking.time}</span>
                         </div>
                         <div className="booking-detail">
                           <MapPinIcon />
@@ -928,12 +950,22 @@ export default function AppointmentBookingPage() {
                           </span>
                         </div>
                       )}
+                      <span
+                        className="college-badge"
+                        style={{
+                          marginBottom: "0.5rem",
+                          display: "inline-block",
+                        }}
+                      >
+                        {booking.status}
+                      </span>
                       <button
                         className="cancel-btn"
                         onClick={() => handleCancelBooking(booking.id)}
+                        disabled={cancellingId === booking.id}
                       >
                         <XCircleIcon />
-                        Cancel
+                        {cancellingId === booking.id ? "Cancelling…" : "Cancel"}
                       </button>
                     </div>
                   ))}
@@ -955,7 +987,7 @@ export default function AppointmentBookingPage() {
       {showBookDialog && selectedSlot && (
         <div
           className="dialog-overlay"
-          onClick={() => setShowBookDialog(false)}
+          onClick={() => !submitting && setShowBookDialog(false)}
         >
           <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
             <div className="dialog-header">
@@ -963,6 +995,7 @@ export default function AppointmentBookingPage() {
               <button
                 className="dialog-close"
                 onClick={() => setShowBookDialog(false)}
+                disabled={submitting}
               >
                 <CloseIcon />
               </button>
@@ -1003,11 +1036,16 @@ export default function AppointmentBookingPage() {
                 <button
                   className="btn-secondary"
                   onClick={() => setShowBookDialog(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
-                <button className="btn-primary" onClick={handleBookSlot}>
-                  Confirm Booking
+                <button
+                  className="btn-primary"
+                  onClick={handleBookSlot}
+                  disabled={submitting}
+                >
+                  {submitting ? "Booking…" : "Confirm Booking"}
                 </button>
               </div>
             </div>

@@ -1478,6 +1478,105 @@ router.delete(
   },
 );
 
+// ─────────────────────────────────────────────────────────────
+// PROFESSOR SCHEDULE ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/student/professor-schedules
+ *
+ * Returns every department together with its faculty members and
+ * each faculty member's weekly consultation availability, grouped
+ * by day. Single aggregated query — mirrors the pattern used in
+ * /services/by-department so the frontend never waterfalls requests.
+ */
+router.get(
+  "/professor-schedules",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [departments] = await pool.query(
+        `SELECT department_id, department_name, department_abbreviation
+         FROM departments
+         ORDER BY department_name ASC`,
+      );
+
+      const [rows] = await pool.query(
+        `SELECT
+           f.faculty_id,
+           f.first_name,
+           f.last_name,
+           f.position,
+           f.specialization,
+           f.email,
+           f.department_id,
+           fa.availability_id,
+           fa.day_of_week,
+           fa.start_time,
+           fa.end_time,
+           fa.location
+         FROM faculty f
+         LEFT JOIN faculty_availability fa ON fa.faculty_id = f.faculty_id
+         ORDER BY f.department_id, f.last_name ASC,
+           CASE fa.day_of_week
+             WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3
+             WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 ELSE 6
+           END,
+           fa.start_time ASC`,
+      );
+
+      // Group rows -> faculty (faculty_id -> { ...info, availability: [] })
+      const facultyMap = new Map();
+      for (const row of rows) {
+        if (!facultyMap.has(row.faculty_id)) {
+          facultyMap.set(row.faculty_id, {
+            facultyId: row.faculty_id,
+            name: `${row.first_name} ${row.last_name}`,
+            position: row.position,
+            specialization: row.specialization,
+            email: row.email,
+            departmentId: row.department_id,
+            availability: [],
+          });
+        }
+        if (row.availability_id) {
+          facultyMap.get(row.faculty_id).availability.push({
+            day: row.day_of_week,
+            timeStart: formatTime12h(row.start_time),
+            timeEnd: formatTime12h(row.end_time),
+            location: row.location ?? "TBA",
+          });
+        }
+      }
+
+      // Group faculty -> department
+      const deptMap = new Map();
+      for (const dept of departments) {
+        deptMap.set(dept.department_id, {
+          departmentId: dept.department_id,
+          departmentName: dept.department_name,
+          departmentAbbrev: dept.department_abbreviation,
+          faculty: [],
+        });
+      }
+      for (const fac of facultyMap.values()) {
+        const dept = deptMap.get(fac.departmentId);
+        if (dept) dept.faculty.push(fac);
+      }
+
+      const result = [...deptMap.values()].filter((d) => d.faculty.length > 0);
+
+      res.json({ departments: result });
+    } catch (error) {
+      console.error("Professor schedules error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 // GET /api/student/transactions
 // Returns a unified history of queues, appointments, and document requests
 router.get(
@@ -1579,32 +1678,294 @@ router.get(
   },
 );
 
+/**
+ * ─────────────────────────────────────────────────────────────────────────
+ * ADD THESE ROUTES TO studentRoutes.js
+ * ─────────────────────────────────────────────────────────────────────────
+ * Where to paste:
+ *   Insert this block right after the existing
+ *     DELETE /appointments/:appointmentId   (Cancel appointment)
+ *   route, and BEFORE the
+ *     // GET /api/student/transactions
+ *   comment.
+ *
+ * Why no new tables are needed:
+ *   - "Slots" are derived live from faculty_availability (already seeded
+ *     in ccs_mock_data.sql, Section 14).
+ *   - "Bookings" are just rows in the existing `appointments` table.
+ *   - Your existing GET /appointments and DELETE /appointments/:id routes
+ *     already cover "My Bookings" and "Cancel" — reuse them on the
+ *     frontend instead of duplicating logic here.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
 // ─────────────────────────────────────────────────────────────
-// HELPERS
+// BOOKING SLOTS ENDPOINTS (derived from faculty_availability)
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Converts a MySQL TIME string (HH:MM:SS) to 12-hour format (e.g. "2:00 PM").
- */
-function formatTime12h(timeStr) {
-  if (!timeStr) return "";
-  const parts = String(timeStr).split(":");
-  const h = parseInt(parts[0], 10);
-  const m = parts[1] ?? "00";
-  const suffix = h >= 12 ? "PM" : "AM";
-  return `${h % 12 || 12}:${m} ${suffix}`;
-}
-function formatRelativeTime(date) {
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? "s" : ""} ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? "s" : ""} ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
-}
+// GET /api/student/appointments/available-slots
+// Expands each faculty_availability row into per-day "slots" for the next
+// 14 days, with live capacity computed from the appointments table.
+router.get(
+  "/appointments/available-slots",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const DAYS_AHEAD = 14;
+
+    try {
+      const [availability] = await pool.query(
+        `SELECT
+           fa.availability_id, fa.faculty_id, fa.day_of_week,
+           fa.start_time, fa.end_time, fa.location,
+           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+           f.specialization,
+           d.department_abbreviation AS college,
+           d.department_id
+         FROM faculty_availability fa
+         JOIN faculty f ON fa.faculty_id = f.faculty_id
+         JOIN departments d ON f.department_id = d.department_id
+         ORDER BY fa.faculty_id, fa.day_of_week, fa.start_time`,
+      );
+
+      if (availability.length === 0) {
+        return res.json({ slots: [] });
+      }
+
+      const facultyIds = [...new Set(availability.map((a) => a.faculty_id))];
+
+      // Pull every non-cancelled/rejected appointment for these faculty
+      // within the visible window, so we can compute live capacity.
+      const [existing] = await pool.query(
+        `SELECT faculty_id, appointment_date, appointment_time
+         FROM appointments
+         WHERE faculty_id IN (?)
+           AND appointment_date >= CURDATE()
+           AND appointment_date < CURDATE() + INTERVAL ? DAY
+           AND status NOT IN ('cancelled', 'rejected')`,
+        [facultyIds, DAYS_AHEAD],
+      );
+
+      // Map: "facultyId|YYYY-MM-DD" -> booked count
+      const bookedCountByFacultyDate = new Map();
+      for (const row of existing) {
+        const dateStr =
+          row.appointment_date instanceof Date
+            ? row.appointment_date.toISOString().split("T")[0]
+            : String(row.appointment_date).split("T")[0];
+        const key = `${row.faculty_id}|${dateStr}`;
+        bookedCountByFacultyDate.set(
+          key,
+          (bookedCountByFacultyDate.get(key) || 0) + 1,
+        );
+      }
+
+      const DAY_NAMES = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+      ];
+
+      const now = new Date();
+      const slots = [];
+
+      for (let offset = 0; offset < DAYS_AHEAD; offset++) {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        const dateStr = d.toISOString().split("T")[0];
+        const dayName = DAY_NAMES[d.getDay()];
+
+        for (const a of availability) {
+          if (a.day_of_week !== dayName) continue;
+
+          // Skip windows that have already fully elapsed today
+          const windowEnd = new Date(`${dateStr}T${a.end_time}`);
+          if (windowEnd <= now) continue;
+
+          const startMin = timeStrToMinutes(a.start_time);
+          const endMin = timeStrToMinutes(a.end_time);
+          // Each 30-minute increment within the window is one bookable slot
+          const maxSlots = Math.max(1, Math.floor((endMin - startMin) / 30));
+
+          const key = `${a.faculty_id}|${dateStr}`;
+          const currentBookings = Math.min(
+            maxSlots,
+            bookedCountByFacultyDate.get(key) || 0,
+          );
+
+          // Fully booked windows are simply omitted (matches old UI behavior
+          // of available slots only showing slots with room)
+          if (currentBookings >= maxSlots) continue;
+
+          slots.push({
+            id: `${a.availability_id}_${dateStr}`,
+            availabilityId: a.availability_id,
+            professorId: a.faculty_id,
+            professorName: a.faculty_name,
+            college: a.college,
+            date: dateStr,
+            startTime: a.start_time,
+            endTime: a.end_time,
+            location: a.location ?? "TBA",
+            maxSlots,
+            currentBookings,
+          });
+        }
+      }
+
+      res.json({ slots });
+    } catch (error) {
+      console.error("Available slots error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/student/appointments/book-slot
+// Body: { facultyId, date, startTime, endTime, purpose }
+// Finds the next free 30-min increment inside [startTime, endTime) for the
+// given faculty/date and inserts a real appointment row.
+router.post(
+  "/appointments/book-slot",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { facultyId, date, startTime, endTime, purpose } = req.body;
+
+    if (!facultyId || !date || !startTime || !endTime || !purpose?.trim()) {
+      return res.status(400).json({
+        error: "facultyId, date, startTime, endTime, and purpose are required",
+      });
+    }
+
+    const todayISO = new Date().toISOString().split("T")[0];
+    if (date < todayISO) {
+      return res.status(400).json({ error: "Cannot book a date in the past" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Lock existing bookings for this faculty/date to avoid race conditions
+      // when two students try to grab the same window at once.
+      const [existing] = await conn.query(
+        `SELECT appointment_time FROM appointments
+         WHERE faculty_id = ? AND appointment_date = ?
+           AND status NOT IN ('cancelled', 'rejected')
+         FOR UPDATE`,
+        [facultyId, date],
+      );
+      const takenTimes = new Set(
+        existing.map((r) => String(r.appointment_time).slice(0, 8)),
+      );
+
+      // Walk the window in 30-minute increments to find the next free slot
+      let chosenTime = null;
+      const startMin = timeStrToMinutes(startTime);
+      const endMin = timeStrToMinutes(endTime);
+      for (let m = startMin; m < endMin; m += 30) {
+        const candidate = minutesToTimeStr(m);
+        if (!takenTimes.has(candidate)) {
+          chosenTime = candidate;
+          break;
+        }
+      }
+
+      if (!chosenTime) {
+        await conn.rollback();
+        return res
+          .status(409)
+          .json({ error: "This time slot is fully booked" });
+      }
+
+      const [[facultyRow]] = await conn.query(
+        `SELECT department_id FROM faculty WHERE faculty_id = ?`,
+        [facultyId],
+      );
+      if (!facultyRow) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Faculty member not found" });
+      }
+
+      // Guard against the same student double-booking this exact slot
+      const [[dup]] = await conn.query(
+        `SELECT appointment_id FROM appointments
+         WHERE student_id = ? AND faculty_id = ?
+           AND appointment_date = ? AND appointment_time = ?`,
+        [studentId, facultyId, date, chosenTime],
+      );
+      if (dup) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "You already have an appointment with this faculty member at that time",
+        });
+      }
+
+      const [result] = await conn.query(
+        `INSERT INTO appointments
+           (student_id, faculty_id, department_id, service_id, appointment_date, appointment_time, status, notes, created_at)
+         VALUES (?, ?, ?, NULL, ?, ?, 'pending', ?, NOW())`,
+        [
+          studentId,
+          facultyId,
+          facultyRow.department_id,
+          date,
+          chosenTime,
+          purpose.trim(),
+        ],
+      );
+
+      await conn.commit();
+
+      const [[newRow]] = await pool.query(
+        `SELECT
+           a.appointment_id, a.appointment_date, a.appointment_time, a.status, a.notes,
+           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+           f.specialization AS faculty_role,
+           d.department_name AS college,
+           d.office_location AS location
+         FROM appointments a
+         JOIN faculty f ON a.faculty_id = f.faculty_id
+         JOIN departments d ON f.department_id = d.department_id
+         WHERE a.appointment_id = ?`,
+        [result.insertId],
+      );
+
+      res.status(201).json({
+        message: "Appointment booked successfully",
+        appointment: {
+          id: newRow.appointment_id,
+          title: newRow.faculty_role ?? "Faculty Consultation",
+          professorName: newRow.faculty_name,
+          personRole: newRow.faculty_role ?? "Faculty",
+          college: newRow.college,
+          date: String(newRow.appointment_date).split("T")[0],
+          time: formatTime12hLocal(chosenTime),
+          location: newRow.location ?? "TBA",
+          purpose: newRow.notes ?? "",
+          status: newRow.status,
+        },
+      });
+    } catch (error) {
+      await conn.rollback();
+      console.error("Book slot error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
+    }
+  },
+);
 
 // ─────────────────────────────────────────────────────────────
 // AVAIL-SERVICES ENDPOINTS
@@ -1770,3 +2131,50 @@ router.get(
 );
 
 module.exports = router;
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Converts a MySQL TIME string (HH:MM:SS) to 12-hour format (e.g. "2:00 PM").
+ */
+function formatTime12h(timeStr) {
+  if (!timeStr) return "";
+  const parts = String(timeStr).split(":");
+  const h = parseInt(parts[0], 10);
+  const m = parts[1] ?? "00";
+  const suffix = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${m} ${suffix}`;
+}
+function formatRelativeTime(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "Just now";
+  if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? "s" : ""} ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? "s" : ""} ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
+}
+
+// ── Local helpers for the booking-slots routes ──────────────────────────
+// (If formatTime12h already exists lower in this file, reuse that one
+// instead and delete formatTime12hLocal to avoid a duplicate definition.)
+function timeStrToMinutes(timeStr) {
+  const [h, m] = String(timeStr).split(":").map(Number);
+  return h * 60 + m;
+}
+function minutesToTimeStr(mins) {
+  const h = Math.floor(mins / 60)
+    .toString()
+    .padStart(2, "0");
+  const m = (mins % 60).toString().padStart(2, "0");
+  return `${h}:${m}:00`;
+}
+function formatTime12hLocal(timeStr) {
+  const [h, m] = String(timeStr).split(":").map(Number);
+  const suffix = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
+}
