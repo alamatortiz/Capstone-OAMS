@@ -26,7 +26,12 @@ const ProfessorSchedulePage = React.lazy(
   () => import("./pages/student/ProfessorSchedule.jsx"),
 );
 
+const AdminDocumentsPage = React.lazy(
+  () => import("./pages/admin/AdminDocuments.jsx"),
+);
+
 import AppointmentsPage from "./pages/student/appointments.jsx";
+
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
 import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
@@ -139,9 +144,18 @@ createRoot(document.getElementById("root")).render(
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/queue" element={<AdminQueue />} />
               <Route path="/admin/appointments" element={<AdminAppointment />} />
+              <Route
+                path="/admin/documents"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminDocumentsPage />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}
+
             <Route path="/dashboard" element={<StudentDashboard />} />
             <Route path="/student-dashboard" element={<StudentDashboard />} />
             <Route path="/student-queue" element={<QueuePage />} />

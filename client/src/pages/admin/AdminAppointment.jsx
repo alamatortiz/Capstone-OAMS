@@ -446,38 +446,38 @@ export default function AdminAppointment() {
   return (
     <div className="admin-appointment-with-sidebar">
       {/* AI Chatbot */}
-      <div className={`admin-appointment-chat-widget ${chatOpen ? "open" : ""}`}>
+      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
-          <div className="admin-appointment-chat-container">
-            <div className="admin-appointment-chat-header">
+          <div className="chat-container">
+            <div className="chat-header">
               <h3>OAMS Assistant</h3>
               <button
-                className="admin-appointment-chat-close-btn"
+                className="chat-close-btn"
                 onClick={() => setChatOpen(false)}
                 aria-label="Close chat"
               >
                 <CloseIcon />
               </button>
             </div>
-            <div className="admin-appointment-chat-messages">
+            <div className="chat-messages">
               {messages.map((m) => (
-                <div key={m.id} className={`admin-appointment-message admin-appointment-message-${m.type}`}>
-                  <div className="admin-appointment-message-content">{m.text}</div>
+                <div key={m.id} className={`message message-${m.type}`}>
+                  <div className="message-content">{m.text}</div>
                 </div>
               ))}
               <div ref={messagesEndRef} />
             </div>
-            <form className="admin-appointment-chat-input-form" onSubmit={handleSendMessage}>
+            <form className="chat-input-form" onSubmit={handleSendMessage}>
               <input
                 type="text"
-                className="admin-appointment-chat-input"
+                className="chat-input"
                 placeholder="Ask me anything..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
               />
               <button
                 type="submit"
-                className="admin-appointment-chat-send-btn"
+                className="chat-send-btn"
                 aria-label="Send message"
               >
                 <SendIcon />
@@ -486,7 +486,7 @@ export default function AdminAppointment() {
           </div>
         )}
         <button
-          className={`admin-appointment-chat-fab ${chatOpen ? "hidden" : ""}`}
+          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
           onClick={() => setChatOpen(true)}
           aria-label="Open chat"
         >
