@@ -369,10 +369,14 @@ export default function StudentDashboard() {
   const activeQueueCount =
     dashStats?.stats?.activeQueueCount ?? contextQueues.length;
 
-  const queueProgress = mostRecentQueue
-    ? ((mostRecentQueue.totalInQueue - mostRecentQueue.position) /
-        mostRecentQueue.totalInQueue) *
-      100
+  // Two distinct progress measures, mirroring the Queue Management page:
+  // 1) how full the queue is (people in queue vs. max capacity)
+  // 2) how far along the queue has been serviced (serviced vs. total in queue)
+  const queueOccupancyPercent = mostRecentQueue
+    ? mostRecentQueue.queueOccupancyPercent ?? 0
+    : 0;
+  const servicedPercent = mostRecentQueue
+    ? mostRecentQueue.servicedPercent ?? 0
     : 0;
 
   // ── Stats cards (live values) ─────────────────────────────────────────────
@@ -813,7 +817,7 @@ export default function StudentDashboard() {
                       <p className="stat-label">Position</p>
                     </div>
                     <div className="queue-stat">
-                      <p className="stat-num">{mostRecentQueue.totalInQueue}</p>
+                      <p className="stat-num">{mostRecentQueue.totalWaiting}</p>
                       <p className="stat-label">Waiting</p>
                     </div>
                     <div className="queue-stat">
@@ -823,16 +827,42 @@ export default function StudentDashboard() {
                       <p className="stat-label">Est. Wait</p>
                     </div>
                   </div>
-                  <div className="queue-progress">
-                    <div className="progress-label">
-                      <span>Progress</span>
-                      <span>{Math.round(queueProgress)}%</span>
+                  <div className="queue-progress-group">
+                    <div className="queue-progress">
+                      <div className="progress-label">
+                        <span>People in Queue</span>
+                        <span>
+                          {mostRecentQueue.totalInQueue ?? 0}/
+                          {mostRecentQueue.maxCapacity ?? 0}
+                          <span className="progress-value-percent">
+                            ({queueOccupancyPercent}%)
+                          </span>
+                        </span>
+                      </div>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${queueOccupancyPercent}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{ width: `${queueProgress}%` }}
-                      ></div>
+                    <div className="queue-progress">
+                      <div className="progress-label">
+                        <span>Serviced</span>
+                        <span>
+                          {mostRecentQueue.servicedCount ?? 0}/
+                          {mostRecentQueue.totalInQueue ?? 0}
+                          <span className="progress-value-percent">
+                            ({servicedPercent}%)
+                          </span>
+                        </span>
+                      </div>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill progress-fill-serviced"
+                          style={{ width: `${servicedPercent}%` }}
+                        ></div>
+                      </div>
                     </div>
                   </div>
                   <Link to="/student/queue-status" className="primary-btn">

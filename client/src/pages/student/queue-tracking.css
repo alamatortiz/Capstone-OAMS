@@ -977,7 +977,7 @@ body {
 
 .qt-progress-fill {
   height: 100%;
-  background: var(--primary-color);
+  background: linear-gradient(90deg, var(--primary-color) 0%, var(--success) 100%);
   transition: width 0.3s ease;
 }
 
@@ -987,6 +987,55 @@ body {
   text-align: right;
   margin: 0;
   transition: color 0.3s ease;
+}
+
+/* ===== Dual Queue Progress (occupancy + serviced) ===== */
+.qt-progress-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.qt-progress-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.qt-progress-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.qt-progress-name {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.qt-progress-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.qt-progress-value-percent {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-left: 0.375rem;
+  transition: color 0.3s ease;
+}
+
+.qt-progress-fill-serviced {
+  background: linear-gradient(90deg, var(--blue) 0%, var(--purple) 100%);
 }
 
 /* ===== Queue Stats ===== */

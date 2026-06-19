@@ -19,11 +19,13 @@ router.get(
         `SELECT 
            q.queue_id,
            q.queue_number,
+           q.slot_id,
            q.status,
            q.created_at,
            s.service_name,
            d.department_name,
            d.department_abbreviation,
+           qs.max_capacity,
            (
              SELECT COUNT(*) 
              FROM queues q2 
@@ -36,8 +38,21 @@ router.get(
              FROM queues q3 
              WHERE q3.slot_id = q.slot_id 
                AND q3.status = 'waiting'
-           ) AS total_waiting
+           ) AS total_waiting,
+           (
+             SELECT COUNT(*)
+             FROM queues q4
+             WHERE q4.slot_id = q.slot_id
+               AND q4.status IN ('waiting', 'serving', 'completed')
+           ) AS total_in_queue,
+           (
+             SELECT COUNT(*)
+             FROM queues q5
+             WHERE q5.slot_id = q.slot_id
+               AND q5.status = 'completed'
+           ) AS serviced_count
          FROM queues q
+         JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE q.student_id = ? AND q.status = 'waiting'
@@ -128,6 +143,18 @@ router.get(
 
       const mostRecentQueue = activeQueues[0] || null;
 
+      const maxCapacity = mostRecentQueue?.max_capacity || 0;
+      const totalInQueue = mostRecentQueue?.total_in_queue || 0;
+      const servicedCount = mostRecentQueue?.serviced_count || 0;
+      const queueOccupancyPercent =
+        maxCapacity > 0
+          ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
+          : 0;
+      const servicedPercent =
+        totalInQueue > 0
+          ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
+          : 0;
+
       res.json({
         stats: {
           queuePosition: mostRecentQueue ? mostRecentQueue.position : 0,
@@ -150,7 +177,12 @@ router.get(
               college: mostRecentQueue.department_name,
               collegeAbbrev: mostRecentQueue.department_abbreviation,
               position: mostRecentQueue.position,
-              totalInQueue: mostRecentQueue.total_waiting,
+              totalWaiting: mostRecentQueue.total_waiting,
+              maxCapacity,
+              totalInQueue,
+              servicedCount,
+              queueOccupancyPercent,
+              servicedPercent,
               estimatedWaitTime:
                 mostRecentQueue.position > 1
                   ? `~${(mostRecentQueue.position - 1) * 5} min`

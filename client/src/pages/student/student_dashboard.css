@@ -1356,10 +1356,27 @@ body {
 }
 
 
-.queue-progress {
-
-
+.queue-progress-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
   margin-bottom: 1rem;
+}
+
+.queue-progress {
+  margin-bottom: 0;
+}
+
+.progress-value-percent {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin-left: 0.25rem;
+  transition: color 0.3s ease;
+}
+
+.progress-fill-serviced {
+  background: linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%);
 }
 
 .progress-label {

@@ -140,11 +140,6 @@ const SendIcon = () => (
 );
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const getProgress = (position, totalWaiting) => {
-  if (!totalWaiting || totalWaiting === 0) return 100;
-  return Math.round(((totalWaiting - position) / totalWaiting) * 100);
-};
-
 const getStatusColor = (status) => {
   switch (status) {
     case "serving":
@@ -545,11 +540,6 @@ export default function QueueTrackingPage() {
                 ) : (
                   <div className="qt-queues-list">
                     {activeQueues.map((queue) => {
-                      const progress = getProgress(
-                        queue.position,
-                        queue.totalWaiting,
-                      );
-                      const peopleAhead = Math.max(queue.position - 1, 0);
                       const isLeaving = leavingId === queue.queueId;
 
                       return (
@@ -624,18 +614,50 @@ export default function QueueTrackingPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="qt-progress-bar">
-                              <div
-                                className="qt-progress-fill"
-                                style={{ width: `${progress}%` }}
-                              />
+                            <div className="qt-progress-group">
+                              <div className="qt-progress-wrapper">
+                                <div className="qt-progress-label-row">
+                                  <p className="qt-progress-name">
+                                    People in Queue
+                                  </p>
+                                  <p className="qt-progress-value">
+                                    {queue.totalInQueue ?? 0}/
+                                    {queue.maxCapacity ?? 0}
+                                    <span className="qt-progress-value-percent">
+                                      ({queue.queueOccupancyPercent ?? 0}%)
+                                    </span>
+                                  </p>
+                                </div>
+                                <div className="qt-progress-bar">
+                                  <div
+                                    className="qt-progress-fill"
+                                    style={{
+                                      width: `${queue.queueOccupancyPercent ?? 0}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="qt-progress-wrapper">
+                                <div className="qt-progress-label-row">
+                                  <p className="qt-progress-name">Serviced</p>
+                                  <p className="qt-progress-value">
+                                    {queue.servicedCount ?? 0}/
+                                    {queue.totalInQueue ?? 0}
+                                    <span className="qt-progress-value-percent">
+                                      ({queue.servicedPercent ?? 0}%)
+                                    </span>
+                                  </p>
+                                </div>
+                                <div className="qt-progress-bar">
+                                  <div
+                                    className="qt-progress-fill qt-progress-fill-serviced"
+                                    style={{
+                                      width: `${queue.servicedPercent ?? 0}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
                             </div>
-                            <p className="qt-progress-text">
-                              {progress}% through queue
-                              {peopleAhead > 0
-                                ? ` — ${peopleAhead} ${peopleAhead === 1 ? "person" : "people"} ahead`
-                                : " — You're next!"}
-                            </p>
                           </div>
 
                           {/* Stats */}
