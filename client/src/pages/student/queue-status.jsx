@@ -182,7 +182,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
       {/* Breadcrumb */}
       <div className="queue-status-header">
         <div className="queue-breadcrumb">
-          <button type="button" className="breadcrumb-link" onClick={onBack}>
+          <button type="button" className="qss-breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             All Queues
           </button>
@@ -240,9 +240,9 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
       <div className="queue-detail-grid">
         <div className="queue-detail-main">
           {/* Position card */}
-          <div className="queue-card">
-            <div className="queue-card-header">
-              <h3 className="queue-card-title">
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
                 <Users style={{ width: "1.25rem", height: "1.25rem" }} />
                 Your Position
               </h3>
@@ -250,7 +250,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
                 {statusMeta.label}
               </span>
             </div>
-            <div className="queue-card-content">
+            <div className="qss-card-content">
               <div className="queue-placement-center">
                 <div className="queue-position-display">
                   <div className="queue-position-label">Number in Line</div>
@@ -319,14 +319,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
           </div>
 
           {/* Wait time card */}
-          <div className="queue-card">
-            <div className="queue-card-header">
-              <h3 className="queue-card-title">
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
                 <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
                 Estimated Wait
               </h3>
             </div>
-            <div className="queue-card-content">
+            <div className="qss-card-content">
               <div className="queue-wait-time-display">
                 <div className="queue-wait-time-left">
                   <div className="queue-wait-time-value">
@@ -344,16 +344,16 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
           </div>
 
           {/* Notes / concern card */}
-          <div className="queue-card">
-            <div className="queue-card-header">
-              <h3 className="queue-card-title">
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
                 <MessageSquare
                   style={{ width: "1.25rem", height: "1.25rem" }}
                 />
                 Your Concern
               </h3>
               <button
-                className="queue-card-action"
+                className="qss-card-action"
                 onClick={() => {
                   setNotesText(queue.notes ?? "");
                   setShowNotesDialog(true);
@@ -362,7 +362,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
                 Edit
               </button>
             </div>
-            <div className="queue-card-content">
+            <div className="qss-card-content">
               <p className="queue-concern-text">
                 {queue.notes && queue.notes.trim()
                   ? queue.notes
@@ -375,14 +375,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
         {/* Sidebar */}
         <div className="queue-detail-sidebar">
           {/* Queue number */}
-          <div className="queue-card">
-            <div className="queue-card-header">
-              <h3 className="queue-card-title">
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
                 <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
                 Queue Number
               </h3>
             </div>
-            <div className="queue-card-content" style={{ textAlign: "center" }}>
+            <div className="qss-card-content" style={{ textAlign: "center" }}>
               <div
                 style={{
                   fontSize: "1.5rem",
@@ -407,14 +407,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
           </div>
 
           {/* Office hours */}
-          <div className="queue-card">
-            <div className="queue-card-header">
-              <h3 className="queue-card-title">
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
                 <TrendingUp style={{ width: "1.25rem", height: "1.25rem" }} />
                 Office Hours
               </h3>
             </div>
-            <div className="queue-card-content">
+            <div className="qss-card-content">
               <div className="queue-service-hours-row">
                 <span className="queue-hours-label">Mon – Fri</span>
                 <span className="queue-hours-time">8:00 AM – 5:00 PM</span>
@@ -432,14 +432,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
 
           {/* Cancel (only while waiting) */}
           {queue.status === "waiting" && (
-            <div className="queue-card queue-cancel-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title queue-cancel-title">
+            <div className="qss-card queue-cancel-card">
+              <div className="qss-card-header">
+                <h3 className="qss-card-title queue-cancel-title">
                   <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
                   Leave Queue
                 </h3>
               </div>
-              <div className="queue-card-content">
+              <div className="qss-card-content">
                 <p
                   style={{
                     fontSize: "0.8rem",
@@ -842,13 +842,13 @@ export default function QueueStatusPage() {
             {/* Page Header */}
             <div className="queue-status-header">
               <div className="queue-breadcrumb">
-                <Link to="/student/dashboard" className="breadcrumb-link">
+                <Link to="/student/dashboard" className="qss-breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
                   Dashboard
                 </Link>
               </div>
               <div className="queue-title-section">
-                <div className="queue-title-icon">
+                <div className="qss-title-icon">
                   <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
                 </div>
                 <div className="queue-title-content">
