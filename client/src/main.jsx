@@ -41,6 +41,7 @@ import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminQueue from "./pages/admin/AdminQueue.jsx";
 import AdminAppointment from "./pages/admin/AdminAppointment.jsx";
+import AdminTransaction from "./pages/admin/AdminTransactions.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { Toaster } from "sonner";
@@ -152,6 +153,7 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
+              <Route path="/admin/transactions" element={<AdminTransaction />} />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}

@@ -947,6 +947,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  font-family: 'Inter', sans-serif;
 }
 
 .admin-documents-dropdown {
@@ -960,6 +961,7 @@
   appearance: none;
   padding-right: 2rem;
   transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
 }
 
 .admin-documents-dropdown:hover {
@@ -1050,6 +1052,7 @@
   gap: 0;
   border-bottom: 1px solid var(--card-border);
   overflow-x: auto;
+  font-family: 'Inter', sans-serif;
 }
 
 .admin-documents-tab {
@@ -1064,6 +1067,7 @@
   position: relative;
   transition: all 0.2s ease;
   border-bottom: 2px solid transparent;
+  font-family: 'Inter', sans-serif;
 }
 
 .admin-documents-tab:hover {
