@@ -168,9 +168,10 @@ const UsersIcon = () => (
   </svg>
 );
 
-const SearchIcon = ({ className = "" }) => (
+const SearchIcon = ({ className = "", style = {} }) => (
   <svg
     className={`icon ${className}`.trim()}
+    style={style}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -264,6 +265,70 @@ const Loader2Icon = () => (
   </svg>
 );
 
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+// Color-coded so status is readable at a glance instead of reusing the
+// generic green "college-badge" pill for every state.
+const STATUS_STYLES = {
+  pending: {
+    bg: "rgba(245, 158, 11, 0.15)",
+    border: "rgba(245, 158, 11, 0.4)",
+    color: "#f59e0b",
+  },
+  approved: {
+    bg: "rgba(59, 130, 246, 0.15)",
+    border: "rgba(59, 130, 246, 0.4)",
+    color: "#3b82f6",
+  },
+  completed: {
+    bg: "rgba(34, 197, 94, 0.15)",
+    border: "rgba(34, 197, 94, 0.4)",
+    color: "#22c55e",
+  },
+  rejected: {
+    bg: "rgba(239, 68, 68, 0.15)",
+    border: "rgba(239, 68, 68, 0.4)",
+    color: "#ef4444",
+  },
+  cancelled: {
+    bg: "rgba(148, 163, 184, 0.15)",
+    border: "rgba(148, 163, 184, 0.4)",
+    color: "#94a3b8",
+  },
+};
+
+const StatusBadge = ({ status }) => {
+  const s = STATUS_STYLES[status] ?? STATUS_STYLES.pending;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.35rem",
+        padding: "0.25rem 0.7rem",
+        borderRadius: "999px",
+        fontSize: "0.7rem",
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        background: s.bg,
+        border: `1px solid ${s.border}`,
+        color: s.color,
+      }}
+    >
+      <span
+        style={{
+          width: "0.4rem",
+          height: "0.4rem",
+          borderRadius: "50%",
+          background: s.color,
+          flexShrink: 0,
+        }}
+      />
+      {status}
+    </span>
+  );
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentBookingPage() {
   const { user: authUser, logout } = useAuth();
@@ -319,6 +384,7 @@ export default function AppointmentBookingPage() {
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [purpose, setPurpose] = useState("");
+  const [activeTab, setActiveTab] = useState("slots"); // "slots" | "bookings"
 
   // ── Fetch helpers ───────────────────────────────────────────────────────────
   const fetchSlots = async () => {
@@ -382,6 +448,37 @@ export default function AppointmentBookingPage() {
   const activeBookings = myBookings.filter(
     (b) => b.status === "pending" || b.status === "approved",
   );
+
+  // Group bookings by status (pending shown first) instead of stamping a
+  // badge on every single card — mirrors how slots are grouped by date.
+  const STATUS_ORDER = [
+    "pending",
+    "approved",
+    "completed",
+    "rejected",
+    "cancelled",
+  ];
+  const STATUS_LABELS = {
+    pending: "Pending Approval",
+    approved: "Approved",
+    completed: "Completed",
+    rejected: "Rejected",
+    cancelled: "Cancelled",
+  };
+  const bookingsByStatus = useMemo(() => {
+    const grouped = activeBookings.reduce((acc, b) => {
+      (acc[b.status] ||= []).push(b);
+      return acc;
+    }, {});
+    // Sort each group by date, then return entries in STATUS_ORDER
+    Object.values(grouped).forEach((list) =>
+      list.sort((a, b) => a.date.localeCompare(b.date)),
+    );
+    return STATUS_ORDER.filter((s) => grouped[s]?.length).map((s) => [
+      s,
+      grouped[s],
+    ]);
+  }, [activeBookings]);
 
   const colleges = [
     { value: "all", label: "All Colleges" },
@@ -728,8 +825,24 @@ export default function AppointmentBookingPage() {
                 <label htmlFor="searchQuery">
                   Search Professor or Location
                 </label>
-                <div className="search-input-wrapper">
-                  <SearchIcon />
+                <div
+                  className="search-input-wrapper"
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <SearchIcon
+                    style={{
+                      position: "absolute",
+                      left: "0.85rem",
+                      width: "1rem",
+                      height: "1rem",
+                      opacity: 0.55,
+                      pointerEvents: "none",
+                    }}
+                  />
 
                   <input
                     id="searchQuery"
@@ -738,6 +851,7 @@ export default function AppointmentBookingPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="search-input"
+                    style={{ paddingLeft: "2.5rem", width: "100%" }}
                   />
                 </div>
               </div>
@@ -773,117 +887,128 @@ export default function AppointmentBookingPage() {
           {/* Tabs Navigation */}
           <div className="tabs-navigation">
             <div className="tabs-header">
-              <div className="tab-button active">
+              <button
+                type="button"
+                className={`tab-button ${activeTab === "slots" ? "active" : ""}`}
+                onClick={() => setActiveTab("slots")}
+              >
                 <ChevronRightIcon />
                 Available Slots ({slotsLoading ? "—" : availableSlots.length})
-              </div>
-              <div className="tab-button">
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === "bookings" ? "active" : ""}`}
+                onClick={() => setActiveTab("bookings")}
+              >
                 <CheckCircleIcon />
                 My Bookings ({bookingsLoading ? "—" : activeBookings.length})
-              </div>
+              </button>
             </div>
           </div>
 
           {/* Available Slots */}
-          <div className="slots-container">
-            {slotsLoading ? (
-              <div className="empty-state">
-                <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
-                <h3>Loading available slots…</h3>
-              </div>
-            ) : slotsError ? (
-              <div className="empty-state">
-                <CalendarIcon />
-                <h3>Could not load slots</h3>
-                <p>{slotsError}</p>
-                <button
-                  className="book-btn"
-                  style={{ marginTop: "0.5rem" }}
-                  onClick={fetchSlots}
-                >
-                  Retry
-                </button>
-              </div>
-            ) : Object.keys(slotsByDate).length === 0 ? (
-              <div className="empty-state">
-                <CalendarIcon />
-                <h3>No Available Slots</h3>
-                <p>
-                  {selectedDate || selectedCollege !== "all" || searchQuery
-                    ? "Try adjusting your filters to see more results"
-                    : "No professors have published consultation hours yet"}
-                </p>
-              </div>
-            ) : (
-              <div className="slots-list">
-                {Object.keys(slotsByDate)
-                  .sort()
-                  .map((date) => (
-                    <div key={date} className="slots-date-group">
-                      <div className="date-header">
-                        <CalendarIcon />
-                        <h3>{formatDate(date)}</h3>
-                        {isToday(date) && (
-                          <span className="appointment-booking-badge today">
-                            Today
-                          </span>
-                        )}
-                        {isTomorrow(date) && (
-                          <span className="appointment-booking-badge tomorrow">
-                            Tomorrow
-                          </span>
-                        )}
-                      </div>
-                      <p className="date-count">
-                        {slotsByDate[date].length} slots available
-                      </p>
-                      <div className="slots-grid">
-                        {slotsByDate[date].map((slot) => (
-                          <div key={slot.id} className="slot-card">
-                            <div className="slot-header">
-                              <h4>{slot.professorName}</h4>
-                              <span className="college-badge">
-                                {slot.college}
-                              </span>
-                            </div>
-                            <div className="slot-details">
-                              <div className="slot-detail">
-                                <ClockIcon />
-                                <span>
-                                  {formatTime(slot.startTime)} -{" "}
-                                  {formatTime(slot.endTime)}
+          {activeTab === "slots" && (
+            <div className="slots-container">
+              {slotsLoading ? (
+                <div className="empty-state">
+                  <Loader2Icon
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                  <h3>Loading available slots…</h3>
+                </div>
+              ) : slotsError ? (
+                <div className="empty-state">
+                  <CalendarIcon />
+                  <h3>Could not load slots</h3>
+                  <p>{slotsError}</p>
+                  <button
+                    className="book-btn"
+                    style={{ marginTop: "0.5rem" }}
+                    onClick={fetchSlots}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : Object.keys(slotsByDate).length === 0 ? (
+                <div className="empty-state">
+                  <CalendarIcon />
+                  <h3>No Available Slots</h3>
+                  <p>
+                    {selectedDate || selectedCollege !== "all" || searchQuery
+                      ? "Try adjusting your filters to see more results"
+                      : "No professors have published consultation hours yet"}
+                  </p>
+                </div>
+              ) : (
+                <div className="slots-list">
+                  {Object.keys(slotsByDate)
+                    .sort()
+                    .map((date) => (
+                      <div key={date} className="slots-date-group">
+                        <div className="date-header">
+                          <CalendarIcon />
+                          <h3>{formatDate(date)}</h3>
+                          {isToday(date) && (
+                            <span className="appointment-booking-badge today">
+                              Today
+                            </span>
+                          )}
+                          {isTomorrow(date) && (
+                            <span className="appointment-booking-badge tomorrow">
+                              Tomorrow
+                            </span>
+                          )}
+                        </div>
+                        <p className="date-count">
+                          {slotsByDate[date].length} slots available
+                        </p>
+                        <div className="slots-grid">
+                          {slotsByDate[date].map((slot) => (
+                            <div key={slot.id} className="slot-card">
+                              <div className="slot-header">
+                                <h4>{slot.professorName}</h4>
+                                <span className="college-badge">
+                                  {slot.college}
                                 </span>
                               </div>
-                              <div className="slot-detail">
-                                <MapPinIcon />
-                                <span>{slot.location}</span>
+                              <div className="slot-details">
+                                <div className="slot-detail">
+                                  <ClockIcon />
+                                  <span>
+                                    {formatTime(slot.startTime)} -{" "}
+                                    {formatTime(slot.endTime)}
+                                  </span>
+                                </div>
+                                <div className="slot-detail">
+                                  <MapPinIcon />
+                                  <span>{slot.location}</span>
+                                </div>
+                                <div className="slot-detail">
+                                  <UsersIcon />
+                                  <span>
+                                    {slot.maxSlots - slot.currentBookings} of{" "}
+                                    {slot.maxSlots} available
+                                  </span>
+                                </div>
                               </div>
-                              <div className="slot-detail">
-                                <UsersIcon />
-                                <span>
-                                  {slot.maxSlots - slot.currentBookings} of{" "}
-                                  {slot.maxSlots} available
-                                </span>
-                              </div>
+                              <button
+                                className="book-btn"
+                                onClick={() => {
+                                  setSelectedSlot(slot);
+                                  setShowBookDialog(true);
+                                }}
+                              >
+                                Book This Slot
+                              </button>
                             </div>
-                            <button
-                              className="book-btn"
-                              onClick={() => {
-                                setSelectedSlot(slot);
-                                setShowBookDialog(true);
-                              }}
-                            >
-                              Book This Slot
-                            </button>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
           {/* My Bookings */}
           <div className="bookings-container">
             <div className="bookings-header">
@@ -918,57 +1043,76 @@ export default function AppointmentBookingPage() {
               </div>
             ) : (
               <div className="bookings-list">
-                {activeBookings
-                  .sort((a, b) => a.date.localeCompare(b.date))
-                  .map((booking) => (
-                    <div key={booking.id} className="booking-card">
-                      <div className="booking-header">
-                        <h4>{booking.person}</h4>
-                        <span className="college-badge">{booking.college}</span>
-                      </div>
-                      <div className="booking-details">
-                        <div className="booking-detail">
-                          <CalendarIcon />
-                          <span>{formatDate(booking.date)}</span>
-                        </div>
-                        <div className="booking-detail">
-                          <ClockIcon />
-                          {/* booking.time already arrives pre-formatted
-                              (e.g. "9:00 AM") from the backend */}
-                          <span>{booking.time}</span>
-                        </div>
-                        <div className="booking-detail">
-                          <MapPinIcon />
-                          <span>{booking.location}</span>
-                        </div>
-                      </div>
-                      {booking.purpose && (
-                        <div className="purpose-box">
-                          <span className="purpose-label">Purpose:</span>
-                          <span className="purpose-text">
-                            {booking.purpose}
+                {bookingsByStatus.map(([status, bookings]) => (
+                  <div key={status} className="slots-date-group">
+                    <div
+                      className="date-header"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.6rem",
+                      }}
+                    >
+                      <StatusBadge status={status} />
+                      <h3 style={{ margin: 0 }}>{STATUS_LABELS[status]}</h3>
+                    </div>
+                    <p className="date-count">
+                      {bookings.length}{" "}
+                      {bookings.length === 1 ? "appointment" : "appointments"}
+                    </p>
+
+                    {bookings.map((booking) => (
+                      <div
+                        key={booking.id}
+                        className="booking-card"
+                        style={{ marginBottom: "0.75rem" }}
+                      >
+                        <div className="booking-header">
+                          <h4>{booking.person}</h4>
+                          <span className="college-badge">
+                            {booking.college}
                           </span>
                         </div>
-                      )}
-                      <span
-                        className="college-badge"
-                        style={{
-                          marginBottom: "0.5rem",
-                          display: "inline-block",
-                        }}
-                      >
-                        {booking.status}
-                      </span>
-                      <button
-                        className="cancel-btn"
-                        onClick={() => handleCancelBooking(booking.id)}
-                        disabled={cancellingId === booking.id}
-                      >
-                        <XCircleIcon />
-                        {cancellingId === booking.id ? "Cancelling…" : "Cancel"}
-                      </button>
-                    </div>
-                  ))}
+                        <div className="booking-details">
+                          <div className="booking-detail">
+                            <CalendarIcon />
+                            <span>{formatDate(booking.date)}</span>
+                          </div>
+                          <div className="booking-detail">
+                            <ClockIcon />
+                            {/* booking.time already arrives pre-formatted
+                                (e.g. "9:00 AM") from the backend */}
+                            <span>{booking.time}</span>
+                          </div>
+                          <div className="booking-detail">
+                            <MapPinIcon />
+                            <span>{booking.location}</span>
+                          </div>
+                        </div>
+                        {booking.purpose && (
+                          <div className="purpose-box">
+                            <span className="purpose-label">Purpose:</span>
+                            <span className="purpose-text">
+                              {booking.purpose}
+                            </span>
+                          </div>
+                        )}
+                        {(status === "pending" || status === "approved") && (
+                          <button
+                            className="cancel-btn"
+                            onClick={() => handleCancelBooking(booking.id)}
+                            disabled={cancellingId === booking.id}
+                          >
+                            <XCircleIcon />
+                            {cancellingId === booking.id
+                              ? "Cancelling…"
+                              : "Cancel"}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
             )}
           </div>
