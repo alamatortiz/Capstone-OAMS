@@ -405,6 +405,7 @@ export default function AdminDashboard() {
       icon: ClockIcon,
       bgColor: "bg-blue-50",
       isClickable: true,
+      ctaAriaLabel: "View queue management for active queues",
     },
     {
       title: "Pending Documents",
