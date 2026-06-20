@@ -30,6 +30,10 @@ const AdminDocumentsPage = React.lazy(
   () => import("./pages/admin/AdminDocuments.jsx"),
 );
 
+const AdminQueueManagement = React.lazy(
+  () => import("./pages/admin/AdminQueueManagement.jsx"),
+);
+
 import AppointmentsPage from "./pages/student/appointments.jsx";
 
 import DocumentsPage from "./pages/student/documents.jsx";
@@ -39,10 +43,11 @@ import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 
 import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
-import AdminQueue from "./pages/admin/AdminQueue.jsx";
 import AdminAppointment from "./pages/admin/AdminAppointment.jsx";
 import AdminTransaction from "./pages/admin/AdminTransactions.jsx";
+import AdminQueue from "./pages/admin/AdminQueue.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
+
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { Toaster } from "sonner";
 
@@ -143,8 +148,30 @@ createRoot(document.getElementById("root")).render(
             {/* ─── Protected Admin Routes ────────────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/queue" element={<AdminQueue />} />
+              {/* 
+                ─── Admin Queue Management Route ───────────────────────────────
+                This route is triggered when user clicks "Active Queues" stat card
+                in the admin dashboard. The AdminQueueManagement component handles
+                both list view and detailed queue view.
+              */}
+              <Route
+                path="/admin/queue"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueue />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/queue-management"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueueManagement />
+                  </Suspense>
+                }
+              />
               <Route path="/admin/appointments" element={<AdminAppointment />} />
+
               <Route
                 path="/admin/documents"
                 element={
@@ -221,7 +248,7 @@ createRoot(document.getElementById("root")).render(
 
             <Route path="/professor-queue" element={<ProfessorQueue />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/admin-queue" element={<AdminQueue />} />
+            <Route path="/admin-queue-management" element={<AdminQueueManagement />} />
             <Route
               path="/admin-appointments"
               element={<AdminAppointment />}

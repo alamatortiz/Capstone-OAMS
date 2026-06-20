@@ -404,6 +404,7 @@ export default function AdminDashboard() {
       description: "Across all colleges",
       icon: ClockIcon,
       bgColor: "bg-blue-50",
+      isClickable: true,
     },
     {
       title: "Pending Documents",
@@ -411,6 +412,7 @@ export default function AdminDashboard() {
       description: "Awaiting processing",
       icon: FileTextIcon,
       bgColor: "bg-orange-50",
+      isClickable: false,
     },
     {
       title: "Faculty Available",
@@ -418,6 +420,7 @@ export default function AdminDashboard() {
       description: "Today",
       icon: UsersIcon,
       bgColor: "bg-emerald-50",
+      isClickable: false,
     },
     {
       title: "Announcements",
@@ -425,6 +428,7 @@ export default function AdminDashboard() {
       description: "Published",
       icon: BellIcon,
       bgColor: "bg-purple-50",
+      isClickable: false,
     },
   ];
 
@@ -488,9 +492,17 @@ export default function AdminDashboard() {
     return "I can help with user management, document approvals, queue hosting, and announcements. What are you working on?";
   };
 
+  // ── Handler for clicking Active Queues stat card ──────────────────────────
+  const handleStatCardClick = (statTitle) => {
+    if (statTitle === "Active Queues") {
+      navigate("/admin/queue-management");
+    }
+  };
+
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
+
     {
       icon: CalendarIconNav,
       label: "Appointments",
@@ -680,7 +692,18 @@ export default function AdminDashboard() {
           {/* Stats Grid */}
           <div className="stats-grid">
             {stats.map((stat) => (
-              <div key={stat.title} className="stat-card">
+              <div
+                key={stat.title}
+                className={`stat-card ${stat.isClickable ? "stat-card-clickable" : ""}`}
+                onClick={() => stat.isClickable && handleStatCardClick(stat.title)}
+                role={stat.isClickable ? "button" : undefined}
+                tabIndex={stat.isClickable ? 0 : undefined}
+                onKeyPress={(e) => {
+                  if (stat.isClickable && (e.key === "Enter" || e.key === " ")) {
+                    handleStatCardClick(stat.title);
+                  }
+                }}
+              >
                 <div className="stat-header">
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
@@ -856,7 +879,14 @@ export default function AdminDashboard() {
             <section className="hosted-queues-section">
               <div className="card-header-admin">
                 <h3>Current Hosted Queues</h3>
-                <a href="#" className="view-all-link">
+                <a
+                  href="/admin/queue-management"
+                  className="view-all-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/admin/queue-management");
+                  }}
+                >
                   Manage <ChevronRightIcon />
                 </a>
               </div>
