@@ -1062,17 +1062,6 @@ router.get(
         [studentId],
       );
 
-      const [[mostUsed]] = await pool.query(
-        `SELECT s.service_name, COUNT(*) AS cnt
-         FROM queues q
-         JOIN services s ON q.service_id = s.service_id
-         WHERE q.student_id = ?
-         GROUP BY s.service_name
-         ORDER BY cnt DESC
-         LIMIT 1`,
-        [studentId],
-      );
-
       const totalCompleted = counts.total_completed || 0;
       const totalMinutes = counts.total_minutes || 0;
       const avgMinutes =
@@ -1083,8 +1072,6 @@ router.get(
         totalQueuesCompleted: totalCompleted,
         totalQueuesCancelled: counts.total_cancelled || 0,
         averageWaitTime: totalCompleted > 0 ? `${avgMinutes} min` : "—",
-        totalTimeInQueues: `${totalMinutes} min`,
-        mostUsedService: mostUsed?.service_name ?? "—",
       });
     } catch (error) {
       console.error("Queue metrics error:", error);
