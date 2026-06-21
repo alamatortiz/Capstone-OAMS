@@ -717,6 +717,198 @@ router.get(
   },
 );
 
+// ─────────────────────────────────────────────────────────────
+// TRANSACTIONS — unified history of queues, appointments, and
+// document requests, scoped strictly to the admin's own department.
+// There is no single "transactions" table in the schema, so this
+// endpoint UNIONs the three source tables (mirrors the pattern used
+// in GET /api/student/transactions) and returns one chronological feed.
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/transactions
+// Query params (all optional):
+//   type   = "all" | "queue" | "appointment" | "document"
+//   status = "all" | <status string from the relevant table>
+//   range  = "today" | "week" | "month" | "all"   (default "all")
+//   search = free text matched against student name/id, processor, details
+router.get(
+  "/transactions",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const { type = "all", status = "all", range = "all" } = req.query;
+
+      // Date-range boundary applied identically to all three branches below
+      let dateClause = "";
+      if (range === "today") dateClause = "AND event_time >= CURDATE()";
+      else if (range === "week")
+        dateClause = "AND event_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+      else if (range === "month")
+        dateClause = "AND event_time >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+
+      const unionSql = `
+        SELECT * FROM (
+          (
+            SELECT
+              'queue' AS type,
+              q.queue_id AS id,
+              CASE q.status
+                WHEN 'completed' THEN 'Completed Queue Service'
+                WHEN 'cancelled' THEN 'Cancelled Queue Request'
+                WHEN 'serving'   THEN 'Currently Serving'
+                ELSE 'Queue Joined'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+              st.student_number AS student_id,
+              s.service_name AS processor,
+              s.service_name AS details,
+              q.status AS raw_status,
+              COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time
+            FROM queues q
+            JOIN services s ON q.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
+            JOIN students st ON q.student_id = st.student_id
+            WHERE s.department_id = ?
+          )
+          UNION ALL
+          (
+            SELECT
+              'appointment' AS type,
+              a.appointment_id AS id,
+              CASE a.status
+                WHEN 'approved'  THEN 'Approved Appointment'
+                WHEN 'completed' THEN 'Completed Appointment'
+                WHEN 'rejected'  THEN 'Rejected Appointment'
+                WHEN 'cancelled' THEN 'Cancelled Appointment'
+                ELSE 'Pending Appointment'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+              st.student_number AS student_id,
+              CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
+              COALESCE(a.notes, 'No purpose specified') AS details,
+              a.status AS raw_status,
+              a.created_at AS event_time
+            FROM appointments a
+            JOIN departments d ON a.department_id = d.department_id
+            JOIN students st ON a.student_id = st.student_id
+            JOIN faculty f ON a.faculty_id = f.faculty_id
+            WHERE a.department_id = ?
+          )
+          UNION ALL
+          (
+            SELECT
+              'document' AS type,
+              dr.request_id AS id,
+              CASE dr.status
+                WHEN 'released'   THEN 'Released Document Request'
+                WHEN 'generated'  THEN 'Generated Document'
+                WHEN 'processing' THEN 'Processing Document Request'
+                ELSE 'Pending Document Request'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+              st.student_number AS student_id,
+              dr.request_type AS processor,
+              dr.purpose AS details,
+              dr.status AS raw_status,
+              dr.created_at AS event_time
+            FROM document_requests dr
+            JOIN services s ON dr.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
+            JOIN students st ON dr.student_id = st.student_id
+            WHERE s.department_id = ?
+          )
+        ) AS combined
+        WHERE 1=1 ${dateClause}
+        ORDER BY event_time DESC
+        LIMIT 200
+      `;
+
+      const [rows] = await pool.query(unionSql, [deptId, deptId, deptId]);
+
+      // Map raw per-table statuses -> the badge vocabulary the UI uses
+      const statusMap = {
+        completed: "completed",
+        cancelled: "cancelled",
+        waiting: "completed", // not surfaced as a transaction row by default, kept for safety
+        serving: "completed",
+        approved: "approved",
+        pending: "approved",
+        rejected: "rejected",
+        processing: "approved",
+        generated: "approved",
+        released: "completed",
+      };
+
+      let transactions = rows.map((r) => ({
+        id: `${r.type}-${r.id}`,
+        type: r.type,
+        action: r.action,
+        college: `${r.college} (${r.college_abbrev})`,
+        collegeAbbrev: r.college_abbrev,
+        studentName: r.student_name,
+        studentId: r.student_id,
+        processor: r.processor,
+        details: r.details || "No additional details provided.",
+        status: statusMap[r.raw_status] ?? r.raw_status,
+        timestamp: new Date(r.event_time).toLocaleString("en-US", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }),
+      }));
+
+      // Server-side filtering for type/status (search stays client-side,
+      // matching how the rest of the admin UI already filters in-memory)
+      if (type !== "all") {
+        transactions = transactions.filter((t) => t.type === type);
+      }
+      if (status !== "all") {
+        transactions = transactions.filter((t) => t.status === status);
+      }
+
+      // Aggregate stats over the full (unfiltered-by-type/status) dataset
+      // so the summary cards always reflect the department total.
+      const allForStats = rows.map((r) => ({
+        type: r.type,
+        status: statusMap[r.raw_status] ?? r.raw_status,
+      }));
+
+      res.json({
+        transactions,
+        stats: {
+          total: allForStats.length,
+          queue: allForStats.filter((t) => t.type === "queue").length,
+          appointments: allForStats.filter((t) => t.type === "appointment")
+            .length,
+          documents: allForStats.filter((t) => t.type === "document").length,
+        },
+      });
+    } catch (error) {
+      console.error("Admin transactions fetch error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 function formatTime(timeStr) {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":");

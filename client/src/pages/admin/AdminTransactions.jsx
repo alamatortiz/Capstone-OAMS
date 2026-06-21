@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
@@ -11,6 +11,8 @@ import collegeCASlogo from "../../assets/CAS.png";
 import collegeCHASlogo from "../../assets/CHAS.png";
 import "./admin_transactions.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import { toast } from "sonner";
+import api from "../../utils/api";
 
 // ── Icons (all unchanged from admin_dashboard) ──────────────────────────────
 const ChatIcon = () => (
@@ -238,90 +240,8 @@ const ChevronDownIcon = () => (
   </svg>
 );
 
-// ── Sample Transactions Data ──────────────────────────────────────────────
-const SAMPLE_TRANSACTIONS = [
-  {
-    id: "1",
-    type: "queue",
-    action: "Completed Queue Service",
-    college: "College of Computing Studies",
-    studentName: "Juan Dela Cruz",
-    studentId: "2100123",
-    processor: "Prof. Maria Santos",
-    details: "Academic Consultation - Thesis guidance",
-    timestamp: "2026-03-27 11:30 AM",
-    status: "completed",
-  },
-  {
-    id: "2",
-    type: "appointment",
-    action: "Approved Appointment",
-    college: "College of Business Accountancy and Administration",
-    studentName: "Maria Garcia",
-    studentId: "2100456",
-    processor: "Prof. Pedro Reyes",
-    details: "Career Guidance - Online meeting scheduled",
-    timestamp: "2026-03-27 10:15 AM",
-    status: "approved",
-  },
-  {
-    id: "3",
-    type: "document",
-    action: "Approved Document Request",
-    college: "College of Engineering",
-    studentName: "Carlos Rodriguez",
-    studentId: "2000789",
-    processor: "Prof. Ana Mendoza",
-    details: "Recommendation Letter for job application",
-    timestamp: "2026-03-27 09:45 AM",
-    status: "approved",
-  },
-  {
-    id: "4",
-    type: "queue",
-    action: "Cancelled Queue Request",
-    college: "College of Education",
-    studentName: "Lisa Fernandez",
-    studentId: "2100234",
-    processor: "Prof. Juan Lopez",
-    details: "Grade Inquiry - Student no-show",
-    timestamp: "2026-03-27 09:00 AM",
-    status: "cancelled",
-  },
-  {
-    id: "5",
-    type: "appointment",
-    action: "Completed Appointment",
-    college: "College of Arts and Sciences",
-    studentName: "Marco Velasco",
-    studentId: "2100567",
-    processor: "Prof. Sofia Cruz",
-    details: "Research Consultation - Methodology discussion",
-    timestamp: "2026-03-26 03:00 PM",
-    status: "completed",
-  },
-  {
-    id: "6",
-    type: "document",
-    action: "Rejected Document Request",
-    college: "College of Health and Allied Sciences",
-    studentName: "Anna Reyes",
-    studentId: "2200123",
-    processor: "Prof. Carlos Ramos",
-    details: "Grade Certification - Incomplete requirements",
-    timestamp: "2026-03-26 02:30 PM",
-    status: "rejected",
-  },
-];
-
-const COLLEGES = [
-  { name: "College of Computing Studies", shortName: "CCS" },
-  { name: "College of Business Accountancy and Administration", shortName: "CBAA" },
-  { name: "College of Engineering", shortName: "COE" },
-  { name: "College of Education", shortName: "COED" },
-  { name: "College of Arts and Sciences", shortName: "CAS" },
-  { name: "College of Health and Allied Sciences", shortName: "CHAS" },
-];
+// Transactions now come live from GET /api/admin/transactions, scoped
+// server-side to the logged-in admin's own department. No static data.
 
 export default function AdminTransaction() {
   const { user: authUser, logout } = useAuth();
@@ -358,9 +278,49 @@ export default function AdminTransaction() {
   // ── Transaction Page State ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [filterCollege, setFilterCollege] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [dateRange, setDateRange] = useState("today");
+  const [dateRange, setDateRange] = useState("all");
+
+  // ── Live transaction data (scoped server-side to admin's department) ─────
+  const [transactions, setTransactions] = useState([]);
+  const [txnStats, setTxnStats] = useState({
+    total: 0,
+    queue: 0,
+    appointments: 0,
+    documents: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setError(null);
+      const res = await api.get("/admin/transactions", {
+        params: {
+          type: filterType,
+          status: filterStatus,
+          range: dateRange,
+        },
+      });
+      setTransactions(res.data.transactions ?? []);
+      setTxnStats(
+        res.data.stats ?? { total: 0, queue: 0, appointments: 0, documents: 0 },
+      );
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+      setError("Could not load transaction data.");
+      toast.error("Could not load transaction data");
+    }
+  }, [filterType, filterStatus, dateRange]);
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await fetchTransactions();
+      setLoading(false);
+    };
+    if (authUser) init();
+  }, [authUser, fetchTransactions]);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -410,11 +370,11 @@ export default function AdminTransaction() {
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
     if (i.includes("transaction") || i.includes("log"))
-      return "The transaction log shows all system activities. You can filter by type, college, status, and date range.";
+      return "The transaction log shows all activity in your department. You can filter by type, status, and date range.";
     if (i.includes("queue"))
-      return "Queue transactions show completed, cancelled, and pending queue services. Filter by college to see specific department activity.";
+      return "Queue transactions show completed, cancelled, and pending queue services in your department.";
     if (i.includes("appointment"))
-      return "Appointment transactions track scheduled, approved, and rejected appointments across all departments.";
+      return "Appointment transactions track scheduled, approved, and rejected appointments in your department.";
     if (i.includes("document"))
       return "Document request transactions show approved, rejected, and pending document requests from students.";
     if (i.includes("export") || i.includes("download"))
@@ -438,40 +398,21 @@ export default function AdminTransaction() {
     },
   ];
 
-  // ── Calculate Statistics ──────────────────────────────────────────────────
-  const stats = {
-    total: SAMPLE_TRANSACTIONS.length,
-    queue: SAMPLE_TRANSACTIONS.filter((t) => t.type === "queue").length,
-    appointments: SAMPLE_TRANSACTIONS.filter((t) => t.type === "appointment")
-      .length,
-    documents: SAMPLE_TRANSACTIONS.filter((t) => t.type === "document").length,
-  };
-
-  const collegeStats = COLLEGES.map((college) => {
-    const collegeTransactions = SAMPLE_TRANSACTIONS.filter(
-      (t) => t.college === college.name
-    );
-    return {
-      college: college.shortName,
-      total: collegeTransactions.length,
-      queue: collegeTransactions.filter((t) => t.type === "queue").length,
-      appointments: collegeTransactions.filter((t) => t.type === "appointment")
-        .length,
-      documents: collegeTransactions.filter((t) => t.type === "document").length,
-    };
-  });
+  // ── Statistics (computed server-side over the admin's full department) ───
+  const stats = txnStats;
 
   // ── Filter Transactions ───────────────────────────────────────────────────
-  const filteredTransactions = SAMPLE_TRANSACTIONS.filter((t) => {
-    const matchesSearch =
-      t.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.studentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.processor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.details.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === "all" || t.type === filterType;
-    const matchesCollege = filterCollege === "all" || t.college === filterCollege;
-    const matchesStatus = filterStatus === "all" || t.status === filterStatus;
-    return matchesSearch && matchesType && matchesCollege && matchesStatus;
+  // type/status filters are applied server-side (re-fetched via fetchTransactions
+  // whenever they change); search is applied client-side over the current page.
+  const filteredTransactions = transactions.filter((t) => {
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      t.studentName?.toLowerCase().includes(q) ||
+      t.studentId?.toLowerCase().includes(q) ||
+      t.processor?.toLowerCase().includes(q) ||
+      t.details?.toLowerCase().includes(q)
+    );
   });
 
   // ── Badge Helpers ─────────────────────────────────────────────────────────
@@ -482,7 +423,10 @@ export default function AdminTransaction() {
         color: "admin-transaction-badge-appointment",
         label: "Appointment",
       },
-      document: { color: "admin-transaction-badge-document", label: "Document" },
+      document: {
+        color: "admin-transaction-badge-document",
+        label: "Document",
+      },
     };
     const config = typeConfig[type];
     return (
@@ -499,10 +443,12 @@ export default function AdminTransaction() {
       approved: { color: "admin-transaction-badge-approved" },
       rejected: { color: "admin-transaction-badge-rejected" },
     };
-    const config = statusConfig[status];
+    const config = statusConfig[status] || {
+      color: "admin-transaction-badge-approved",
+    };
     return (
       <span className={`admin-transaction-badge ${config.color}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown"}
       </span>
     );
   };
@@ -559,7 +505,9 @@ export default function AdminTransaction() {
       </div>
 
       {/* Sidebar */}
-      <aside className={`admin-transaction-sidebar ${sidebarOpen ? "open" : ""}`}>
+      <aside
+        className={`admin-transaction-sidebar ${sidebarOpen ? "open" : ""}`}
+      >
         <div className="sidebar-inner">
           <div className="sidebar-logo">
             <div className="logo-container">
@@ -657,20 +605,28 @@ export default function AdminTransaction() {
         <div className="admin-transaction-container">
           {/* Header */}
           <div className="admin-transaction-header">
-            <h1 className="admin-transaction-title">
-              Comprehensive Transaction Logs
-            </h1>
+            <h1 className="admin-transaction-title">Transaction Logs</h1>
             <p className="admin-transaction-subtitle">
-              View system-wide transaction logs across all colleges
+              View transaction logs for {user.college} ({user.departmentAbbrev})
             </p>
           </div>
 
-          {/* System-wide Statistics */}
+          {error && (
+            <div className="dash-error-banner" style={{ marginBottom: "1rem" }}>
+              {error}
+            </div>
+          )}
+
+          {/* Department Statistics */}
           <div className="admin-transaction-stats-grid">
             <div className="admin-transaction-stat-card admin-transaction-stat-total">
               <div className="admin-transaction-stat-content">
-                <p className="admin-transaction-stat-label">Total Transactions</p>
-                <p className="admin-transaction-stat-value">{stats.total}</p>
+                <p className="admin-transaction-stat-label">
+                  Total Transactions
+                </p>
+                <p className="admin-transaction-stat-value">
+                  {loading ? "—" : stats.total}
+                </p>
               </div>
               <ActivityIcon />
             </div>
@@ -678,7 +634,9 @@ export default function AdminTransaction() {
             <div className="admin-transaction-stat-card admin-transaction-stat-queue">
               <div className="admin-transaction-stat-content">
                 <p className="admin-transaction-stat-label">Queue Services</p>
-                <p className="admin-transaction-stat-value">{stats.queue}</p>
+                <p className="admin-transaction-stat-value">
+                  {loading ? "—" : stats.queue}
+                </p>
               </div>
               <UserGroupIcon />
             </div>
@@ -687,7 +645,7 @@ export default function AdminTransaction() {
               <div className="admin-transaction-stat-content">
                 <p className="admin-transaction-stat-label">Appointments</p>
                 <p className="admin-transaction-stat-value">
-                  {stats.appointments}
+                  {loading ? "—" : stats.appointments}
                 </p>
               </div>
               <CalendarIcon />
@@ -696,69 +654,11 @@ export default function AdminTransaction() {
             <div className="admin-transaction-stat-card admin-transaction-stat-document">
               <div className="admin-transaction-stat-content">
                 <p className="admin-transaction-stat-label">Documents</p>
-                <p className="admin-transaction-stat-value">{stats.documents}</p>
+                <p className="admin-transaction-stat-value">
+                  {loading ? "—" : stats.documents}
+                </p>
               </div>
               <FileTextIcon />
-            </div>
-          </div>
-
-          {/* College Statistics */}
-          <div className="admin-transaction-college-section">
-            <div className="admin-transaction-section-header">
-              <h2>Transactions by College</h2>
-              <p className="admin-transaction-section-subtitle">
-                Activity breakdown across all colleges
-              </p>
-            </div>
-            <div className="admin-transaction-college-grid">
-              {collegeStats.map((stat) => (
-                <div
-                  key={stat.college}
-                  className="admin-transaction-college-card"
-                >
-                  <div className="admin-transaction-college-header">
-                    <CollegeLogoIcon collegeShortName={stat.college} />
-                    <p className="admin-transaction-college-name">
-                      {stat.college}
-                    </p>
-                  </div>
-
-                  <div className="admin-transaction-college-stats">
-                    <div className="admin-transaction-college-stat">
-                      <p className="admin-transaction-college-stat-label">
-                        Total
-                      </p>
-                      <p className="admin-transaction-college-stat-value">
-                        {stat.total}
-                      </p>
-                    </div>
-                    <div className="admin-transaction-college-stat">
-                      <p className="admin-transaction-college-stat-label">
-                        Queue
-                      </p>
-                      <p className="admin-transaction-college-stat-value admin-transaction-college-queue">
-                        {stat.queue}
-                      </p>
-                    </div>
-                    <div className="admin-transaction-college-stat">
-                      <p className="admin-transaction-college-stat-label">
-                        Appts
-                      </p>
-                      <p className="admin-transaction-college-stat-value admin-transaction-college-appointment">
-                        {stat.appointments}
-                      </p>
-                    </div>
-                    <div className="admin-transaction-college-stat">
-                      <p className="admin-transaction-college-stat-label">
-                        Docs
-                      </p>
-                      <p className="admin-transaction-college-stat-value admin-transaction-college-document">
-                        {stat.documents}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -767,7 +667,7 @@ export default function AdminTransaction() {
             <div className="admin-transaction-section-header">
               <h2>Transaction Log</h2>
               <p className="admin-transaction-section-subtitle">
-                Complete history of all system activities
+                Complete history of activity in your department
               </p>
             </div>
 
@@ -786,22 +686,6 @@ export default function AdminTransaction() {
                 </div>
 
                 <div className="admin-transaction-filter-selects">
-                  <div className="admin-transaction-select-wrapper">
-                    <select
-                      value={filterCollege}
-                      onChange={(e) => setFilterCollege(e.target.value)}
-                      className="admin-transaction-select"
-                    >
-                      <option value="all">All Colleges</option>
-                      {COLLEGES.map((college) => (
-                        <option key={college.name} value={college.name}>
-                          {college.shortName}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDownIcon />
-                  </div>
-
                   <div className="admin-transaction-select-wrapper">
                     <select
                       value={filterType}
@@ -856,16 +740,18 @@ export default function AdminTransaction() {
 
             {/* Transactions List */}
             <div className="admin-transaction-list">
-              {filteredTransactions.length === 0 ? (
+              {loading ? (
+                <div className="admin-transaction-empty-state">
+                  <ActivityIcon />
+                  <p>Loading transactions...</p>
+                </div>
+              ) : filteredTransactions.length === 0 ? (
                 <div className="admin-transaction-empty-state">
                   <ActivityIcon />
                   <p>No transactions found</p>
                 </div>
               ) : (
                 filteredTransactions.map((transaction) => {
-                  const collegeData = COLLEGES.find(
-                    (c) => c.name === transaction.college
-                  );
                   return (
                     <div
                       key={transaction.id}
@@ -882,11 +768,12 @@ export default function AdminTransaction() {
 
                         <div className="admin-transaction-item-grid">
                           <div className="admin-transaction-item-college">
-                            <CollegeLogoIcon collegeShortName={collegeData?.shortName} />
+                            <CollegeLogoIcon
+                              collegeShortName={transaction.collegeAbbrev}
+                            />
                             <span className="admin-transaction-item-college-name">
-                              {collegeData?.shortName}
+                              {transaction.collegeAbbrev}
                             </span>
-
                           </div>
                           <div className="admin-transaction-item-student">
                             <UserGroupIcon />
