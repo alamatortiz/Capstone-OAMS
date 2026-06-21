@@ -406,26 +406,22 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
             </div>
           </div>
 
-          {/* Office hours */}
+          {/* Service hours */}
           <div className="qss-card">
             <div className="qss-card-header">
               <h3 className="qss-card-title">
                 <TrendingUp style={{ width: "1.25rem", height: "1.25rem" }} />
-                Office Hours
+                Service Hours
               </h3>
             </div>
             <div className="qss-card-content">
               <div className="queue-service-hours-row">
-                <span className="queue-hours-label">Mon – Fri</span>
-                <span className="queue-hours-time">8:00 AM – 5:00 PM</span>
+                <span className="queue-hours-label">Opens</span>
+                <span className="queue-hours-time">{queue.startTime ?? "—"}</span>
               </div>
               <div className="queue-service-hours-row">
-                <span className="queue-hours-label">Saturday</span>
-                <span className="queue-hours-time">8:00 AM – 12:00 PM</span>
-              </div>
-              <div className="queue-service-hours-row">
-                <span className="queue-hours-label">Lunch Break</span>
-                <span className="queue-hours-time">12:00 – 1:00 PM</span>
+                <span className="queue-hours-label">Closes</span>
+                <span className="queue-hours-time">{queue.endTime ?? "—"}</span>
               </div>
             </div>
           </div>
