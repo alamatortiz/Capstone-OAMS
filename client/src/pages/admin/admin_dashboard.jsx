@@ -414,7 +414,8 @@ export default function AdminDashboard() {
       description: "Awaiting processing",
       icon: FileTextIcon,
       bgColor: "bg-orange-50",
-      isClickable: false,
+      isClickable: true,
+      ctaAriaLabel: "View document processing for pending documents",
     },
     {
       title: "Faculty Available",
@@ -498,6 +499,11 @@ export default function AdminDashboard() {
   const handleStatCardClick = (statTitle) => {
     if (statTitle === "Active Queues") {
       navigate("/admin/queue-management");
+      return;
+    }
+
+    if (statTitle === "Pending Documents") {
+      navigate("/admin/document-processing");
     }
   };
 

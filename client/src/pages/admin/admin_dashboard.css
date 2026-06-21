@@ -698,6 +698,12 @@ body {
   width: 100%;
 }
 
+/* Ensure description text aligns left on all stat-card sizes */
+.stat-description {
+  text-align: left;
+}
+
+
 .stat-icon {
   width: 2.5rem;
   height: 2.5rem;

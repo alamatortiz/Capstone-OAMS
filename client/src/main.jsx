@@ -34,8 +34,9 @@ const AdminQueueManagement = React.lazy(
   () => import("./pages/admin/AdminQueueManagement.jsx"),
 );
 
-const AdminQueueHosting = React.lazy(
-  () => import("./pages/admin/AdminQueueHosting.jsx"),
+// ─── NEW: Admin Document Processing page ─────────────────────────────────
+const AdminDocumentProcessing = React.lazy(
+  () => import("./pages/admin/AdminDocumentProcessing.jsx"),
 );
 
 import AppointmentsPage from "./pages/student/appointments.jsx";
@@ -114,7 +115,7 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* Professor Schedules - NEW ROUTE */}
+              {/* Professor Schedules */}
               <Route
                 path="/student/professor-schedules"
                 element={
@@ -152,12 +153,7 @@ createRoot(document.getElementById("root")).render(
             {/* ─── Protected Admin Routes ────────────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              {/* 
-                ─── Admin Queue Management Route ───────────────────────────────
-                This route is triggered when user clicks "Active Queues" stat card
-                in the admin dashboard. The AdminQueueManagement component handles
-                both list view and detailed queue view.
-              */}
+
               <Route
                 path="/admin/queue"
                 element={
@@ -174,24 +170,7 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              {/*
-                ─── Admin Queue Hosting Route ───────────────────────────────
-                This route is triggered when the admin clicks the "Host Queue"
-                card in the Quick Actions section of the admin dashboard. It
-                lets admins open, pause, resume, and close queue lines.
-              */}
-              <Route
-                path="/admin/queue-hosting"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AdminQueueHosting />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/admin/appointments"
-                element={<AdminAppointment />}
-              />
+              <Route path="/admin/appointments" element={<AdminAppointment />} />
 
               <Route
                 path="/admin/documents"
@@ -201,10 +180,18 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
+
+              {/* Admin Document Processing Route */}
               <Route
-                path="/admin/transactions"
-                element={<AdminTransaction />}
+                path="/admin/document-processing"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminDocumentProcessing />
+                  </Suspense>
+                }
               />
+
+              <Route path="/admin/transactions" element={<AdminTransaction />} />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}
@@ -269,7 +256,6 @@ createRoot(document.getElementById("root")).render(
               path="/professor-dashboard"
               element={<ProfessorDashboard />}
             />
-
             <Route path="/professor-queue" element={<ProfessorQueue />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route
@@ -277,14 +263,18 @@ createRoot(document.getElementById("root")).render(
               element={<AdminQueueManagement />}
             />
             <Route
-              path="/admin-queue-hosting"
+              path="/admin-appointments"
+              element={<AdminAppointment />}
+            />
+            {/* Backward-compatible temp route for document processing */}
+            <Route
+              path="/admin-document-processing"
               element={
                 <Suspense fallback={<LoadingFallback />}>
-                  <AdminQueueHosting />
+                  <AdminDocumentProcessing />
                 </Suspense>
               }
             />
-            <Route path="/admin-appointments" element={<AdminAppointment />} />
           </Routes>
         </BrowserRouter>
       </QueueProvider>
