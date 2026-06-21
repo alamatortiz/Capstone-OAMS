@@ -644,8 +644,8 @@ body {
 }
 
 .banner-ccs-logo {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 3.5rem;
+  height: 3.5rem;
   object-fit: contain;
   flex-shrink: 0;
   display: block; 
@@ -653,7 +653,7 @@ body {
 }
 
 .banner-title {
-  font-size: 1.875rem;
+  font-size: 2.25rem;
   font-weight: 700;
   margin: 0;
   line-height: 1.1;
@@ -663,7 +663,7 @@ body {
 
 @media (min-width: 768px) {
   .banner-title {
-    font-size: 2rem;
+    font-size: 2.75rem;
   }
 }
 
@@ -1133,6 +1133,12 @@ body {
 
 .activity-empty {
   margin: 2rem 1.25rem;
+}
+
+.announcement-loading,
+.announcement-empty {
+  margin: 2rem 1.25rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
 }
 
 .queue-preview-card {
@@ -2146,7 +2152,7 @@ body {
   }
 
   .banner-title {
-    font-size: 1.5rem;
+    font-size: 1.875rem;
   }
 
   .quick-actions-grid {
@@ -2182,7 +2188,7 @@ body {
   }
 
   .banner-title {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
   }
 
   .stats-grid {

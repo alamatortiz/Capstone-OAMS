@@ -283,22 +283,6 @@ const SendIcon = () => (
   </svg>
 );
 
-// ─── Static pinned announcements (no announcements table yet) ─────────────────
-const PINNED_ANNOUNCEMENTS = [
-  {
-    id: "1",
-    title: "Enrollment Period for Second Semester",
-    college: "College of Computing Studies (CCS)",
-    date: "2026-03-25",
-  },
-  {
-    id: "2",
-    title: "System Maintenance Notice",
-    college: "All Departments",
-    date: "2026-03-26",
-  },
-];
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
   const { user: authUser, logout } = useAuth();
@@ -343,6 +327,11 @@ export default function StudentDashboard() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
 
+  // ── Pinned announcements state ────────────────────────────────────────────
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
+  const [announcementsError, setAnnouncementsError] = useState(null);
+
   // ── Fetch dashboard stats from backend ───────────────────────────────────
   useEffect(() => {
     const fetchStats = async () => {
@@ -360,6 +349,29 @@ export default function StudentDashboard() {
 
     if (authUser) fetchStats();
   }, [authUser]);
+
+  // ── Fetch announcements from backend ──────────────────────────────────────
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        setAnnouncementsLoading(true);
+        const res = await api.get("/student/announcements");
+        setAnnouncements(res.data?.announcements ?? []);
+      } catch (err) {
+        console.error("Failed to fetch announcements:", err);
+        setAnnouncementsError("Could not load announcements.");
+      } finally {
+        setAnnouncementsLoading(false);
+      }
+    };
+
+    if (authUser) fetchAnnouncements();
+  }, [authUser]);
+
+  // Pinned announcements only, capped to the top 2 for the dashboard preview
+  const pinnedAnnouncements = announcements
+    .filter((a) => a.isPinned)
+    .slice(0, 2);
 
   // ── Derived values from API response ─────────────────────────────────────
   const apiQueue = dashStats?.activeQueue ?? null;
@@ -418,7 +430,7 @@ export default function StudentDashboard() {
         ? "Loading..."
         : dashStats?.stats?.documents?.pending > 0
           ? `${dashStats.stats.documents.pending} pending approval`
-          : "All documents processed",
+          : "No pending documents",
       icon: FileTextIcon,
       color: "text-orange-600",
       bgColor: "bg-orange-50 dark:bg-orange-950",
@@ -438,6 +450,14 @@ export default function StudentDashboard() {
   // ── Quick actions (badge for active queues is now live) ───────────────────
   const quickActions = [
     {
+      title: "Announcements",
+      description: "Stay updated with the latest notices from all colleges.",
+      icon: MegaphoneIcon,
+      link: "/student/announcements",
+      gradient: "from-violet-500 to-purple-600",
+      badge: `${pinnedAnnouncements.length} Pinned`,
+    },
+    {
       title: "Avail Service",
       description:
         "Browse available office services and join a queue instantly.",
@@ -445,15 +465,6 @@ export default function StudentDashboard() {
       link: "/student/avail-service",
       gradient: "from-emerald-500 to-green-600",
       badge: "6 Services",
-    },
-    {
-      title: "Queue Tracking",
-      description:
-        "View detailed analytics and history of all your queue activities.",
-      icon: ActivityIcon,
-      link: "/student/queue-tracking",
-      gradient: "from-cyan-500 to-blue-600",
-      badge: "Analytics",
     },
     {
       title: "Appointment Booking",
@@ -465,12 +476,21 @@ export default function StudentDashboard() {
       badge: "New Slots",
     },
     {
-      title: "Announcements",
-      description: "Stay updated with the latest notices from all colleges.",
-      icon: MegaphoneIcon,
-      link: "/student/announcements",
-      gradient: "from-violet-500 to-purple-600",
-      badge: "2 Pinned",
+      title: "View Queue Status",
+      description: "Track your real-time position across all active queues.",
+      icon: TimerIcon,
+      link: "/student/queue-status",
+      gradient: "from-rose-500 to-pink-600",
+      badge: `${activeQueueCount} Active`,
+    },
+    {
+      title: "Queue Tracking",
+      description:
+        "View detailed analytics and history of all your queue activities.",
+      icon: ActivityIcon,
+      link: "/student/queue-tracking",
+      gradient: "from-cyan-500 to-blue-600",
+      badge: "Analytics",
     },
     {
       title: "Professor Schedules",
@@ -479,14 +499,6 @@ export default function StudentDashboard() {
       link: "/student/professor-schedules",
       gradient: "from-sky-500 to-blue-600",
       badge: "13 Faculty",
-    },
-    {
-      title: "View Queue Status",
-      description: "Track your real-time position across all active queues.",
-      icon: TimerIcon,
-      link: "/student/queue-status",
-      gradient: "from-rose-500 to-pink-600",
-      badge: `${activeQueueCount} Active`,
     },
   ];
 
@@ -690,7 +702,7 @@ export default function StudentDashboard() {
             <div className="banner-backdrop banner-backdrop-1"></div>
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
-              <p className="banner-greeting">Good day! 👋</p>
+              <p className="banner-greeting">Good day!</p>
               <div className="banner-title-row">
                 <img
                   src={
@@ -899,29 +911,46 @@ export default function StudentDashboard() {
                 </Link>
               </div>
               <div className="card-content announcements-content">
-                {PINNED_ANNOUNCEMENTS.map((ann) => (
-                  <Link
-                    key={ann.id}
-                    to="/student/announcements"
-                    className="announcement-item"
-                  >
-                    <div className="announcement-icon">
-                      <AlertCircleIcon />
-                    </div>
-                    <div className="announcement-details">
-                      <p className="announcement-title">{ann.title}</p>
-                      <p className="announcement-college">{ann.college}</p>
-                      <p className="announcement-date">
-                        {new Date(ann.date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
-                    <span className="announcement-badge">Important</span>
-                  </Link>
-                ))}
+                {announcementsLoading ? (
+                  <p className="announcement-loading">
+                    Loading announcements...
+                  </p>
+                ) : announcementsError ? (
+                  <p className="announcement-empty">{announcementsError}</p>
+                ) : pinnedAnnouncements.length === 0 ? (
+                  <p className="announcement-empty">
+                    No pinned announcements.
+                  </p>
+                ) : (
+                  pinnedAnnouncements.map((ann) => (
+                    <Link
+                      key={ann.id}
+                      to="/student/announcements"
+                      className="announcement-item"
+                    >
+                      <div className="announcement-icon">
+                        <AlertCircleIcon />
+                      </div>
+                      <div className="announcement-details">
+                        <p className="announcement-title">{ann.title}</p>
+                        <p className="announcement-college">{ann.college}</p>
+                        <p className="announcement-date">
+                          {new Date(ann.date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                      <span className="announcement-badge">
+                        {ann.category
+                          ? ann.category.charAt(0).toUpperCase() +
+                            ann.category.slice(1)
+                          : "Notice"}
+                      </span>
+                    </Link>
+                  ))
+                )}
                 <Link to="/student/announcements" className="secondary-btn">
                   <BellIcon /> View All Announcements
                 </Link>
