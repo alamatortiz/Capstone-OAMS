@@ -681,6 +681,8 @@ router.get(
             minute: "2-digit",
             timeZone: "Asia/Manila",
           }),
+          startTime: formatTime12h(row.start_time),
+          endTime: formatTime12h(row.end_time),
         };
       });
 
