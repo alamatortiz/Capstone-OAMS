@@ -38,14 +38,16 @@ const AdminQueueHosting = React.lazy(
   () => import("./pages/admin/AdminQueueHosting.jsx"),
 );
 
-// ─── NEW: Admin Document Processing page ─────────────────────────────────
 const AdminDocumentProcessing = React.lazy(
   () => import("./pages/admin/AdminDocumentProcessing.jsx"),
 );
 
-// ─── NEW: Admin Professor (Faculty) Availability page ────────────────────
 const AdminProfessorAvailability = React.lazy(
   () => import("./pages/admin/admin-professor-availability.jsx"),
+);
+
+const AdminAnnouncements = React.lazy(
+  () => import("./pages/admin/admin_announcements.jsx"),
 );
 
 import AppointmentsPage from "./pages/student/appointments.jsx";
@@ -225,6 +227,16 @@ createRoot(document.getElementById("root")).render(
                 path="/admin/transactions"
                 element={<AdminTransaction />}
               />
+
+              {/* ★ CHANGE: NEW — Admin Announcements Route */}
+              <Route
+                path="/admin/announcements"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminAnnouncements />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}
@@ -311,6 +323,15 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AdminProfessorAvailability />
+                </Suspense>
+              }
+            />
+            {/* ★ CHANGE: NEW — Backward-compatible temp route for announcements */}
+            <Route
+              path="/admin-announcements"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminAnnouncements />
                 </Suspense>
               }
             />
