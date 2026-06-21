@@ -10,12 +10,24 @@ import { COLLEGES } from "../../data/colleges";
 
 // ── Icons (All SVG Components) ──────────────────────────────────────────────
 const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </svg>
 );
 const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <line x1="22" y1="2" x2="11" y2="13"></line>
     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
@@ -82,7 +94,13 @@ const UserIcon = () => (
   </svg>
 );
 const SunIcon = () => (
-  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="sun-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="5"></circle>
     <line x1="12" y1="1" x2="12" y2="3"></line>
     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -95,7 +113,13 @@ const SunIcon = () => (
   </svg>
 );
 const MoonIcon = () => (
-  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="moon-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
@@ -119,7 +143,6 @@ const AlertCircleIcon = () => (
     <circle cx="12" cy="16" r="1" />
   </svg>
 );
-
 
 const CheckCircleIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -147,30 +170,27 @@ const PersonIcon = ({ className = "" }) => (
 );
 
 export default function AdminAppointment() {
-
-  // eslint-disable-next-line no-unused-vars
-  const Appointment = null;
   const { user: authUser, logout } = useAuth();
   const user = authUser
     ? {
         ...authUser,
         college: authUser.departmentName ?? "N/A College",
-        employeeId: authUser.employeeId ?? "",
         departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
       }
-    : {
-        name: "Admin",
-        role: "admin",
-        college: "",
-        employeeId: "",
-        departmentAbbrev: "CCS",
-      };
+    : { name: "Admin", role: "admin", college: "", departmentAbbrev: "CCS" };
 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [chatOpen, setChatOpen] = useState(false);
+
   const [selectedCollege, setSelectedCollege] = useState("all");
+  const [appointments, setAppointments] = useState([]);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
@@ -184,86 +204,32 @@ export default function AdminAppointment() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
-
-  const [appointments, setAppointments] = useState([
-    {
-      id: "1",
-      college: "College of Computing Studies",
-      studentName: "Juan Dela Cruz",
-      studentId: "2100123",
-      professor: "Prof. Maria Santos",
-      purpose: "Thesis Defense Preparation",
-      date: "2026-03-28",
-      time: "10:00 AM",
-      duration: "1 hour",
-      type: "in-person",
-      status: "pending",
-      requestedAt: "2026-03-27 09:30 AM",
-    },
-    {
-      id: "2",
-      college: "College of Business Accountancy and Administration",
-      studentName: "Maria Garcia",
-      studentId: "2100456",
-      professor: "Prof. Pedro Reyes",
-      purpose: "Career Guidance",
-      date: "2026-03-28",
-      time: "2:00 PM",
-      duration: "30 mins",
-      type: "online",
-      status: "approved",
-      requestedAt: "2026-03-26 03:15 PM",
-    },
-    {
-      id: "3",
-      college: "College of Engineering",
-      studentName: "Carlos Rodriguez",
-      studentId: "2000789",
-      professor: "Prof. Ana Mendoza",
-      purpose: "Project Consultation",
-      date: "2026-03-29",
-      time: "11:00 AM",
-      duration: "45 mins",
-      type: "in-person",
-      status: "pending",
-      requestedAt: "2026-03-27 08:00 AM",
-    },
-    {
-      id: "4",
-      college: "College of Education",
-      studentName: "Lisa Fernandez",
-      studentId: "2100234",
-      professor: "Prof. Juan Lopez",
-      purpose: "Academic Advising",
-      date: "2026-03-27",
-      time: "3:00 PM",
-      duration: "30 mins",
-      type: "online",
-      status: "completed",
-      requestedAt: "2026-03-25 10:00 AM",
-    },
-    {
-      id: "5",
-      college: "College of Arts and Sciences",
-      studentName: "Marco Velasco",
-      studentId: "2100567",
-      professor: "Prof. Sofia Cruz",
-      purpose: "Research Guidance",
-      date: "2026-03-30",
-      time: "9:00 AM",
-      duration: "1 hour",
-      type: "in-person",
-      status: "approved",
-      requestedAt: "2026-03-26 11:30 AM",
-    },
-  ]);
-
+  const handleViewDetails = (appointment) =>
+    setSelectedAppointment(appointment);
+  const handleCloseDetails = () => setSelectedAppointment(null);
   const stats = {
     total: appointments.length,
     pending: appointments.filter((a) => a.status === "pending").length,
     approved: appointments.filter((a) => a.status === "approved").length,
-    today: appointments.filter((a) => a.date === "2026-03-27" && a.status !== "cancelled").length,
+    today: appointments.filter((a) => a.isToday && a.status !== "cancelled")
+      .length,
   };
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get("/admin/appointments");
+        setAppointments(res.data.appointments ?? []);
+      } catch (err) {
+        console.error("Failed to fetch appointments:", err);
+        setError("Could not load appointments.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (authUser) fetchAppointments();
+  }, [authUser]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -323,24 +289,17 @@ export default function AdminAppointment() {
 
   const filterAppointments = (status) => {
     let filtered = appointments;
-
-    if (status !== "all") {
+    if (status !== "all")
       filtered = filtered.filter((a) => a.status === status);
-    }
-
-    if (selectedCollege !== "all") {
-      filtered = filtered.filter((a) => a.college === selectedCollege);
-    }
-
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (a) =>
-          a.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.studentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.professor.toLowerCase().includes(searchQuery.toLowerCase())
+          a.studentName.toLowerCase().includes(q) ||
+          a.studentId.toLowerCase().includes(q) ||
+          a.professor.toLowerCase().includes(q),
       );
     }
-
     return filtered;
   };
 
@@ -379,9 +338,11 @@ export default function AdminAppointment() {
     );
   };
 
-  const AppointmentCard = ({ appointment }) => {
+  const AppointmentCard = ({ appointment, onViewDetails }) => {
     const collegeData = COLLEGES.find((c) => c.name === appointment.college);
-
+    const handleViewDetails = (appointment) => {
+      console.log("Viewing details for:", appointment);
+    };
     return (
       <div key={appointment.id} className="admin-appointment-card">
         <div className="admin-appointment-card-content">
@@ -392,19 +353,27 @@ export default function AdminAppointment() {
               </div>
               <div className="admin-appointment-student-info">
                 <PersonIcon className="admin-appointment-student-person-icon" />
-                <h4 className="admin-appointment-student-name">{appointment.studentName}</h4>
-                <span className="admin-appointment-student-id">({appointment.studentId})</span>
+                <h4 className="admin-appointment-student-name">
+                  {appointment.studentName}
+                </h4>
+                <span className="admin-appointment-student-id">
+                  ({appointment.studentId})
+                </span>
               </div>
 
               <p className="admin-appointment-purpose">{appointment.purpose}</p>
             </div>
-            <div className="admin-appointment-card-right">{getStatusBadge(appointment.status)}</div>
+            <div className="admin-appointment-card-right">
+              {getStatusBadge(appointment.status)}
+            </div>
           </div>
 
           <div className="admin-appointment-card-details">
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Professor</span>
-              <span className="admin-appointment-detail-value">{appointment.professor}</span>
+              <span className="admin-appointment-detail-value">
+                {appointment.professor}
+              </span>
             </div>
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Date</span>
@@ -414,7 +383,9 @@ export default function AdminAppointment() {
             </div>
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Time</span>
-              <span className="admin-appointment-detail-value">{appointment.time}</span>
+              <span className="admin-appointment-detail-value">
+                {appointment.time}
+              </span>
             </div>
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Type</span>
@@ -428,7 +399,12 @@ export default function AdminAppointment() {
             <span className="admin-appointment-requested-text">
               Requested: {appointment.requestedAt}
             </span>
-            <button className="admin-appointment-view-details-btn">View Details</button>
+            <button
+              className="admin-appointment-view-details-btn"
+              onClick={() => onViewDetails(appointment)}
+            >
+              View Details
+            </button>
           </div>
         </div>
       </div>
@@ -438,9 +414,17 @@ export default function AdminAppointment() {
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
-    { icon: CalendarIconNav, label: "Appointments", path: "/admin/appointments" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/admin/appointments",
+    },
     { icon: DocumentIconNav, label: "Documents", path: "/admin/documents" },
-    { icon: HistoryIconNav, label: "Transactions", path: "/admin/transactions" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/admin/transactions",
+    },
   ];
 
   return (
@@ -495,11 +479,17 @@ export default function AdminAppointment() {
       </div>
 
       {/* Sidebar */}
-      <aside className={`admin-appointment-sidebar ${sidebarOpen ? "open" : ""}`}>
+      <aside
+        className={`admin-appointment-sidebar ${sidebarOpen ? "open" : ""}`}
+      >
         <div className="admin-appointment-sidebar-inner">
           <div className="admin-appointment-sidebar-logo">
             <div className="admin-appointment-logo-container">
-              <img src={ucLogo} alt="UC Logo" className="admin-appointment-logo-img" />
+              <img
+                src={ucLogo}
+                alt="UC Logo"
+                className="admin-appointment-logo-img"
+              />
               <img
                 src={oamsLogo}
                 alt="OAMS Logo"
@@ -521,8 +511,12 @@ export default function AdminAppointment() {
                 <UserIcon />
               </div>
               <div className="admin-appointment-user-info-content">
-                <p className="admin-appointment-user-name-large">{user?.name}</p>
-                <span className="admin-appointment-user-role-badge">Administrator</span>
+                <p className="admin-appointment-user-name-large">
+                  {user?.name}
+                </p>
+                <span className="admin-appointment-user-role-badge">
+                  Administrator
+                </span>
               </div>
             </div>
             <div className="admin-appointment-user-college-wrapper">
@@ -542,13 +536,18 @@ export default function AdminAppointment() {
                   title={item.label}
                 >
                   <item.icon className="admin-appointment-nav-icon-medium" />
-                  <span className="admin-appointment-nav-label">{item.label}</span>
+                  <span className="admin-appointment-nav-label">
+                    {item.label}
+                  </span>
                 </Link>
               ))}
             </div>
           </nav>
           <div className="admin-appointment-sidebar-logout">
-            <button className="admin-appointment-logout-btn" onClick={handleLogout}>
+            <button
+              className="admin-appointment-logout-btn"
+              onClick={handleLogout}
+            >
               <LogOutIcon />
               <span>Logout</span>
             </button>
@@ -560,7 +559,11 @@ export default function AdminAppointment() {
       <header className="admin-appointment-mobile-header">
         <div className="admin-appointment-mobile-header-content">
           <div className="admin-appointment-mobile-logo">
-            <img src={ucLogo} alt="UC Logo" className="admin-appointment-logo-img" />
+            <img
+              src={ucLogo}
+              alt="UC Logo"
+              className="admin-appointment-logo-img"
+            />
             <img
               src={oamsLogo}
               alt="OAMS Logo"
@@ -591,8 +594,12 @@ export default function AdminAppointment() {
         <div className="admin-appointment-container">
           {/* Header */}
           <div className="admin-appointment-page-header">
-            <h1 className="admin-appointment-page-title">Centralized Appointment Management</h1>
-            <p className="admin-appointment-page-subtitle">Oversee appointment system across all colleges</p>
+            <h1 className="admin-appointment-page-title">
+              Centralized Appointment Management
+            </h1>
+            <p className="admin-appointment-page-subtitle">
+              Oversee appointment system across all colleges
+            </p>
           </div>
 
           {/* Stats Grid */}
@@ -640,55 +647,52 @@ export default function AdminAppointment() {
                   className="admin-appointment-search-input"
                 />
               </div>
-              <div className="admin-appointment-college-select-wrapper">
-                <select
-                  value={selectedCollege}
-                  onChange={(e) => setSelectedCollege(e.target.value)}
-                  className="admin-appointment-college-select"
-                >
-                  <option value="all">All Colleges</option>
-                  {COLLEGES.map((college) => (
-                    <option key={college.name} value={college.name}>
-                      {college.shortName}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDownIcon />
-              </div>
             </div>
           </div>
 
           {/* Appointments List with Tabs */}
           <div className="admin-appointment-overview-card">
             <div className="admin-appointment-overview-header">
-              <h2 className="admin-appointment-overview-title">Appointment Overview</h2>
-              <p className="admin-appointment-overview-subtitle">System-wide appointment tracking and management</p>
+              <h2 className="admin-appointment-overview-title">
+                Appointment Overview
+              </h2>
+              <p className="admin-appointment-overview-subtitle">
+                System-wide appointment tracking and management
+              </p>
             </div>
             <div className="admin-appointment-tabs-container">
               <div className="admin-appointment-tabs-list">
-                {["all", "pending", "approved", "completed", "rejected"].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`admin-appointment-tab-trigger ${
-                      activeTab === tab ? "active" : ""
-                    }`}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </button>
-                ))}
+                {["all", "pending", "approved", "completed", "rejected"].map(
+                  (tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`admin-appointment-tab-trigger ${
+                        activeTab === tab ? "active" : ""
+                      }`}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  ),
+                )}
               </div>
 
               <div className="admin-appointment-tabs-content">
                 {filterAppointments(activeTab).length === 0 ? (
                   <div className="admin-appointment-empty-state">
                     <CalendarIconNav />
-                    <p className="admin-appointment-empty-text">No appointments found</p>
+                    <p className="admin-appointment-empty-text">
+                      No appointments found
+                    </p>
                   </div>
                 ) : (
                   <div className="admin-appointment-cards-list">
                     {filterAppointments(activeTab).map((appointment) => (
-                      <AppointmentCard key={appointment.id} appointment={appointment} />
+                      <AppointmentCard
+                        key={appointment.id}
+                        appointment={appointment}
+                        onViewDetails={handleViewDetails}
+                      />
                     ))}
                   </div>
                 )}
@@ -703,6 +707,128 @@ export default function AdminAppointment() {
           className="admin-appointment-sidebar-overlay"
           onClick={() => setSidebarOpen(false)}
         />
+      )}
+
+      {selectedAppointment && (
+        <div
+          className="admin-appointment-modal-overlay"
+          onClick={handleCloseDetails}
+        >
+          <div
+            className="admin-appointment-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="admin-appointment-modal-header">
+              <div>
+                <h2 className="admin-appointment-modal-title">
+                  Appointment Details
+                </h2>
+                <p className="admin-appointment-modal-subtitle">
+                  Read-only — monitoring view
+                </p>
+              </div>
+              <button
+                className="admin-appointment-modal-close-btn"
+                onClick={handleCloseDetails}
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="admin-appointment-modal-body">
+              <div className="admin-appointment-modal-status-row">
+                {getStatusBadge(selectedAppointment.status)}
+                <span className="admin-appointment-modal-tracking">
+                  #{selectedAppointment.id}
+                </span>
+              </div>
+
+              <div className="admin-appointment-modal-grid">
+                <div className="admin-appointment-modal-field">
+                  <span className="admin-appointment-modal-label">Student</span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.studentName} (
+                    {selectedAppointment.studentId})
+                  </span>
+                </div>
+                <div className="admin-appointment-modal-field">
+                  <span className="admin-appointment-modal-label">Course</span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.studentCourse ?? "—"}
+                  </span>
+                </div>
+                <div className="admin-appointment-modal-field">
+                  <span className="admin-appointment-modal-label">Faculty</span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.professor}
+                  </span>
+                </div>
+                <div className="admin-appointment-modal-field">
+                  <span className="admin-appointment-modal-label">College</span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.college}
+                  </span>
+                </div>
+                <div className="admin-appointment-modal-field">
+                  <span className="admin-appointment-modal-label">Date</span>
+                  <span className="admin-appointment-modal-value">
+                    {new Date(selectedAppointment.date).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="admin-appointment-modal-field">
+                  <span className="admin-appointment-modal-label">Time</span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.time}
+                  </span>
+                </div>
+                <div className="admin-appointment-modal-field">
+                  <span className="admin-appointment-modal-label">
+                    Location
+                  </span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.location}
+                  </span>
+                </div>
+                {selectedAppointment.serviceName && (
+                  <div className="admin-appointment-modal-field">
+                    <span className="admin-appointment-modal-label">
+                      Service
+                    </span>
+                    <span className="admin-appointment-modal-value">
+                      {selectedAppointment.serviceName}
+                    </span>
+                  </div>
+                )}
+                <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                  <span className="admin-appointment-modal-label">
+                    Purpose / Notes
+                  </span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.purpose}
+                  </span>
+                </div>
+                <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                  <span className="admin-appointment-modal-label">
+                    Requested At
+                  </span>
+                  <span className="admin-appointment-modal-value">
+                    {selectedAppointment.requestedAt}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="admin-appointment-modal-footer">
+              <button
+                className="admin-appointment-modal-close-action"
+                onClick={handleCloseDetails}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

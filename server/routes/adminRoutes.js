@@ -637,6 +637,86 @@ router.patch(
   },
 );
 
+// GET /api/admin/appointments
+// Scoped strictly to the admin's own department (enforced server-side)
+router.get(
+  "/appointments",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+          a.appointment_id,
+          a.appointment_date,
+          a.appointment_time,
+          a.status,
+          a.notes,
+          a.created_at,
+          CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+          s.student_number,
+          s.course AS student_course,
+          CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+          f.position AS faculty_position,
+          f.email AS faculty_email,
+          d.department_name,
+          d.department_abbreviation,
+          d.office_location,
+          svc.service_name
+        FROM appointments a
+        JOIN students     s   ON a.student_id   = s.student_id
+        JOIN faculty       f   ON a.faculty_id    = f.faculty_id
+        JOIN departments   d   ON a.department_id = d.department_id
+        LEFT JOIN services svc ON a.service_id    = svc.service_id
+        WHERE a.department_id = ?
+        ORDER BY a.created_at DESC`,
+        [deptId],
+      );
+
+      const todayStr = new Date().toISOString().split("T")[0];
+
+      const appointments = rows.map((r) => {
+        const dateStr =
+          r.appointment_date instanceof Date
+            ? r.appointment_date.toISOString().split("T")[0]
+            : String(r.appointment_date).split("T")[0];
+
+        return {
+          id: String(r.appointment_id),
+          college: `${r.department_name} (${r.department_abbreviation})`,
+          location: r.office_location ?? "TBA",
+          studentName: r.student_name,
+          studentId: r.student_number,
+          studentCourse: r.student_course,
+          professor: `${r.faculty_position ?? "Prof."} ${r.faculty_name}`,
+          facultyEmail: r.faculty_email,
+          serviceName: r.service_name ?? null,
+          purpose: r.notes || "No purpose specified",
+          date: dateStr,
+          time: formatTime(r.appointment_time),
+          status: r.status,
+          requestedAt: new Date(r.created_at).toLocaleString("en-US"),
+          isToday: dateStr === todayStr,
+        };
+      });
+
+      res.json({ appointments });
+    } catch (error) {
+      console.error("Admin appointments fetch error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 function formatTime(timeStr) {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":");
