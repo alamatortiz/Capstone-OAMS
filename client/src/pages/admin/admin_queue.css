@@ -1107,6 +1107,18 @@ body {
   gap: 0.625rem;
 }
 
+/* College logo shown on the left of queue detail header */
+.queue-detail-college-logo {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
+  object-fit: contain;
+  display: block;
+  border-radius: 0.25rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+/* Keep the existing icon sizing usable if used elsewhere */
 .queue-detail-icon {
   width: 1.25rem !important;
   height: 1.25rem !important;
@@ -1114,6 +1126,7 @@ body {
   min-height: 1rem;
   flex-shrink: 0;
 }
+
 
 .queue-detail-abbrev {
   font-weight: 600;

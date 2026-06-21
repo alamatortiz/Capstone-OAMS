@@ -432,7 +432,8 @@ export default function AdminDashboard() {
       description: "Published",
       icon: BellIcon,
       bgColor: "bg-purple-50",
-      isClickable: false,
+      isClickable: true,
+      ctaAriaLabel: "View announcement management",
     },
   ];
 
@@ -510,6 +511,11 @@ export default function AdminDashboard() {
 
     if (statTitle === "Faculty Available") {
       navigate("/admin/professor-availability");
+      return;
+    }
+
+    if (statTitle === "Announcements") {
+      navigate("/admin/announcements");
     }
   };
 
@@ -813,7 +819,10 @@ export default function AdminDashboard() {
                 <BellIcon />
                 <h2>Announcement Management</h2>
               </div>
-              <button className="btn-new-announcement">
+              <button
+                className="btn-new-announcement"
+                onClick={() => navigate("/admin/announcements")}
+              >
                 <PlusIcon />
                 New Announcement
               </button>
@@ -843,7 +852,7 @@ export default function AdminDashboard() {
                         type="button"
                         className="btn-announcement-icon btn-announcement-edit"
                         aria-label={`Edit: ${ann.title}`}
-                        onClick={() => console.log("edit", ann)}
+                        onClick={() => navigate("/admin/announcements")}
                       >
                         <img
                           className="btn-announcement-icon-img"
@@ -855,7 +864,7 @@ export default function AdminDashboard() {
                         type="button"
                         className="btn-announcement-icon btn-announcement-delete"
                         aria-label={`Delete: ${ann.title}`}
-                        onClick={() => console.log("delete", ann)}
+                        onClick={() => navigate("/admin/announcements")}
                       >
                         <img
                           className="btn-announcement-icon-img"
@@ -875,7 +884,14 @@ export default function AdminDashboard() {
             <section className="pending-documents-section">
               <div className="card-header-admin">
                 <h3>Pending Requested Documents</h3>
-                <a href="#" className="view-all-link">
+                <a
+                  href="/admin/document-processing"
+                  className="view-all-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/admin/document-processing");
+                  }}
+                >
                   View All <ChevronRightIcon />
                 </a>
               </div>

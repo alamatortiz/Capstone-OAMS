@@ -7,6 +7,8 @@ import "./admin_queue.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
 import api from "../../utils/api";
+import { getCollegeLogo } from "../../data/collegeLogo";
+
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -1151,15 +1153,16 @@ export default function AdminQueue() {
                 activeQueueDetails.map((detail) => (
                   <div key={detail.id} className="queue-detail-row">
                     <div className="queue-detail-info">
-                      <div className="queue-detail-header-row">
-                        <BuildingIcon className="queue-detail-icon" />
-                        <span className="queue-detail-abbrev">
-                          {detail.college}
-                        </span>
-                        <span className="queue-detail-service">
-                          {detail.queueType}
-                        </span>
-                      </div>
+                    <div className="queue-detail-header-row">
+                      <img
+                        src={getCollegeLogo(detail.college)}
+                        alt={`${detail.college} logo`}
+                        className="queue-detail-college-logo"
+                      />
+                      <span className="queue-detail-abbrev">{detail.college}</span>
+                      <span className="queue-detail-service">{detail.queueType}</span>
+                    </div>
+
                       <div className="queue-detail-grid">
                         <div className="queue-detail-item">
                           <span className="queue-detail-item-label">
