@@ -27,7 +27,6 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
 import { useQueue } from '../../contexts/QueueContext';
-import { COLLEGES } from '../../data/colleges';
 import { getCollegeLogo } from '../../data/collegeLogo';
 
 import ucLogo from '../../assets/Pnc-Logo.png';
@@ -172,6 +171,20 @@ export default function QueuePage() {
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
 
+  // Derive unique college names from live slots (guarantees exact name match)
+  const collegeOptions = useMemo(() => {
+    const seen = new Map();
+    for (const s of availableSlots) {
+      if (!seen.has(s.departmentName)) {
+        seen.set(s.departmentName, {
+          name: s.departmentName,
+          abbrev: s.departmentAbbrev,
+        });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [availableSlots]);
+
   // Derive unique service names from live slots
   const serviceOptions = useMemo(() => {
     const names = [...new Set(availableSlots.map((s) => s.serviceName))].sort();
@@ -184,12 +197,10 @@ export default function QueuePage() {
       availableSlots.filter((slot) => {
         const collegeMatch =
           selectedCollege === 'all' ||
-          slot.departmentName === selectedCollege ||
-          // also match by abbreviation if someone passes that
-          slot.departmentAbbrev === selectedCollege;
+          slot.departmentName === selectedCollege;
         const serviceMatch =
           selectedService === 'all' || slot.serviceName === selectedService;
-        const notAlreadyJoined = !isAlreadyInQueue(slot.slotId); // Issue 7 fix
+        const notAlreadyJoined = !isAlreadyInQueue(slot.slotId);
         return collegeMatch && serviceMatch && notAlreadyJoined;
       }),
     [availableSlots, selectedCollege, selectedService, isAlreadyInQueue],
@@ -468,39 +479,41 @@ export default function QueuePage() {
                               <p className="queue-stat-value-sm">{queue.joinedAt}</p>
                             </div>
                           </div>
-                          <div className="queue-progress-group">
-                            <div className="queue-progress-wrapper">
-                              <div className="progress-label-row">
-                                <p className="queue-stat-label">People in Queue</p>
-                                <p className="queue-stat-value">
-                                  {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
-                                  <span className="progress-value-percent">
-                                    ({queue.queueOccupancyPercent ?? 0}%)
-                                  </span>
-                                </p>
+                          <div className="qs-progress-card">
+                            <div className="queue-progress-group">
+                              <div className="queue-progress-wrapper">
+                                <div className="qs-progress-label-row">
+                                  <p className="qs-progress-label">People in Queue</p>
+                                  <p className="qs-progress-value">
+                                    {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
+                                    <span className="qs-progress-percent">
+                                      &nbsp;({queue.queueOccupancyPercent ?? 0}%)
+                                    </span>
+                                  </p>
+                                </div>
+                                <div className="qs-progress-bar">
+                                  <div
+                                    className="qs-progress-fill"
+                                    style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
+                                  />
+                                </div>
                               </div>
-                              <div className="progress-bar">
-                                <div
-                                  className="progress-fill"
-                                  style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
-                                />
-                              </div>
-                            </div>
-                            <div className="queue-progress-wrapper">
-                              <div className="progress-label-row">
-                                <p className="queue-stat-label">Serviced</p>
-                                <p className="queue-stat-value">
-                                  {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
-                                  <span className="progress-value-percent">
-                                    ({queue.servicedPercent ?? 0}%)
-                                  </span>
-                                </p>
-                              </div>
-                              <div className="progress-bar">
-                                <div
-                                  className="progress-fill progress-fill-serviced"
-                                  style={{ width: `${queue.servicedPercent ?? 0}%` }}
-                                />
+                              <div className="queue-progress-wrapper">
+                                <div className="qs-progress-label-row">
+                                  <p className="qs-progress-label">Serviced</p>
+                                  <p className="qs-progress-value">
+                                    {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
+                                    <span className="qs-progress-percent">
+                                      &nbsp;({queue.servicedPercent ?? 0}%)
+                                    </span>
+                                  </p>
+                                </div>
+                                <div className="qs-progress-bar">
+                                  <div
+                                    className="qs-progress-fill qs-progress-fill-serviced"
+                                    style={{ width: `${queue.servicedPercent ?? 0}%` }}
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -554,9 +567,9 @@ export default function QueuePage() {
                         aria-label="Filter by college"
                       >
                         <option value="all">All Colleges</option>
-                        {COLLEGES.map((college) => (
+                        {collegeOptions.map((college) => (
                           <option key={college.name} value={college.name}>
-                            {college.name}
+                            {college.abbrev} — {college.name}
                           </option>
                         ))}
                       </select>

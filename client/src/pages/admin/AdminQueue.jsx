@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_queue.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import { toast } from "sonner";
 import api from "../../utils/api";
-import { getCollegeLogo } from "../../data/collegeLogo";
-
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -190,7 +189,6 @@ const TrendingUpIcon = ({ className }) => (
   </svg>
 );
 
-
 const BuildingIcon = ({ className }) => (
   <svg
     className={className}
@@ -213,18 +211,6 @@ const RefreshIcon = () => (
   </svg>
 );
 
-const ChevronDownIcon = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="6 9 12 15 18 9"></polyline>
-  </svg>
-);
-
 const AlertCircleIcon = ({ className }) => (
   <svg
     className={className}
@@ -240,99 +226,6 @@ const AlertCircleIcon = ({ className }) => (
     <path d="M12 16h.01" />
   </svg>
 );
-
-// ── Mock Data ──────────────────────────────────────────────────────────────
-const mockCollegeQueues = [
-  {
-    college: "College of Computing Studies (CCS)",
-    activeQueues: 5,
-    waitingStudents: 23,
-    averageWaitTime: "8 mins",
-    status: "operational",
-  },
-  {
-    college: "College of Business Accountancy and Administration (CBAA)",
-    activeQueues: 4,
-    waitingStudents: 31,
-    averageWaitTime: "12 mins",
-    status: "busy",
-  },
-  {
-    college: "College of Engineering (COE)",
-    activeQueues: 3,
-    waitingStudents: 15,
-    averageWaitTime: "10 mins",
-    status: "operational",
-  },
-  {
-    college: "College of Education (COED)",
-    activeQueues: 4,
-    waitingStudents: 18,
-    averageWaitTime: "7 mins",
-    status: "operational",
-  },
-  {
-    college: "College of Arts and Sciences (CAS)",
-    activeQueues: 3,
-    waitingStudents: 12,
-    averageWaitTime: "6 mins",
-    status: "operational",
-  },
-  {
-    college: "College of Health and Allied Sciences (CHAS)",
-    activeQueues: 2,
-    waitingStudents: 9,
-    averageWaitTime: "5 mins",
-    status: "operational",
-  },
-];
-
-const mockQueueDetails = [
-  {
-    id: "1",
-    college: "College of Computing Studies (CCS)",
-    service: "Academic Consultation",
-    currentlyServing: "CCS-CON-047",
-    waitingCount: 8,
-    avgServiceTime: "10 mins",
-    professor: "Prof. Juan Santos",
-    location: "CCS Faculty Room 201",
-    serviceHours: { start: "8:00 AM", end: "5:00 PM" },
-  },
-  {
-    id: "2",
-    college: "College of Computing Studies (CCS)",
-    service: "Document Signing",
-    currentlyServing: "CCS-DOC-023",
-    waitingCount: 5,
-    avgServiceTime: "5 mins",
-    professor: "Prof. Maria Garcia",
-    location: "CCS Dean's Office",
-    serviceHours: { start: "9:00 AM", end: "4:00 PM" },
-  },
-  {
-    id: "3",
-    college: "College of Business Accountancy and Administration (CBAA)",
-    service: "Grade Inquiry",
-    currentlyServing: "CBA-GRD-034",
-    waitingCount: 12,
-    avgServiceTime: "8 mins",
-    professor: "Prof. Pedro Reyes",
-    location: "CBAA Registrar Office",
-    serviceHours: { start: "8:00 AM", end: "5:00 PM" },
-  },
-  {
-    id: "4",
-    college: "College of Engineering (COE)",
-    service: "Thesis Consultation",
-    currentlyServing: "COE-THE-019",
-    waitingCount: 6,
-    avgServiceTime: "15 mins",
-    professor: "Prof. Ana Mendoza",
-    location: "COE Research Lab",
-    serviceHours: { start: "10:00 AM", end: "6:00 PM" },
-  },
-];
 
 export default function AdminQueue() {
   const { user: authUser, logout } = useAuth();
@@ -366,11 +259,34 @@ export default function AdminQueue() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  // Queue state
-  const [selectedCollege, setSelectedCollege] = useState("all");
-  const [monitoringQueue, setMonitoringQueue] = useState(null);
-  const [collegeQueues] = useState(mockCollegeQueues);
-  const [queueDetails] = useState(mockQueueDetails);
+  // Queue state (live data, scoped server-side to the admin's own department)
+  const [queueDetails, setQueueDetails] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [monitoringQueueId, setMonitoringQueueId] = useState(null);
+
+  const fetchQueueDetails = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/queue-hosting");
+      setQueueDetails(res.data.queues ?? []);
+    } catch (error) {
+      console.error("Failed to fetch queues:", error);
+      toast.error("Could not load queue data");
+    }
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await fetchQueueDetails();
+      setLoading(false);
+    };
+    if (authUser) init();
+  }, [authUser, fetchQueueDetails]);
+
+  // Re-derive the monitored queue from live data on every refresh, so the
+  // monitor view always reflects the latest call-next/serve/pause actions
+  const monitoringQueue =
+    queueDetails.find((q) => q.id === monitoringQueueId) || null;
 
   // Handlers
   useEffect(() => {
@@ -419,14 +335,19 @@ export default function AdminQueue() {
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
     if (i.includes("queue") || i.includes("waiting"))
-      return `Currently managing ${collegeQueues.reduce((sum, c) => sum + c.activeQueues, 0)} active queues across all colleges with ${collegeQueues.reduce((sum, c) => sum + c.waitingStudents, 0)} students waiting.`;
-    if (i.includes("busy") || i.includes("status"))
-      return "The CBAA college queue is currently busy with 31 students waiting. Consider redirecting traffic to other colleges if possible.";
+      return `Currently managing ${systemStats.totalQueues} active queue line(s) with ${systemStats.totalWaiting} students waiting.`;
+    if (i.includes("busy") || i.includes("status")) {
+      const busiest = Math.max(
+        0,
+        ...queueDetails.map((q) => q.currentCount || 0),
+      );
+      return `Your busiest queue line right now has ${busiest} students waiting.`;
+    }
     if (i.includes("average") || i.includes("wait"))
-      return `The average wait time across all queues is 8.5 minutes. This is within acceptable parameters.`;
+      return `The average service time across your queue lines is ${systemStats.avgWaitTime}.`;
     if (i.includes("monitor"))
       return "Click the Monitor button on any queue detail to track it in real-time and receive live updates.";
-    return "I can help you with queue monitoring, wait time analysis, traffic management, and college statistics. What would you like to know?";
+    return "I can help you with queue monitoring, wait time analysis, and department statistics. What would you like to know?";
   };
 
   const navItems = [
@@ -445,60 +366,127 @@ export default function AdminQueue() {
     },
   ];
 
+  // Only today's currently open/paused queue lines count as "active"
+  const activeQueueDetails = queueDetails.filter(
+    (q) => q.status === "open" || q.status === "paused",
+  );
+
   const systemStats = {
-    totalQueues: collegeQueues.reduce((sum, c) => sum + c.activeQueues, 0),
-    totalWaiting: collegeQueues.reduce((sum, c) => sum + c.waitingStudents, 0),
-    avgWaitTime: "8.5 mins",
-    operational: collegeQueues.filter((c) => c.status === "operational").length,
+    totalQueues: activeQueueDetails.length,
+    totalWaiting: activeQueueDetails.reduce(
+      (sum, q) => sum + (q.currentCount || 0),
+      0,
+    ),
+    avgWaitTime: (() => {
+      const withAvg = activeQueueDetails.filter(
+        (q) => q.avgServiceMinutes != null,
+      );
+      if (withAvg.length === 0) return "N/A";
+      const avg =
+        withAvg.reduce((sum, q) => sum + q.avgServiceMinutes, 0) /
+        withAvg.length;
+      return `${Math.round(avg)} mins`;
+    })(),
+    operational: activeQueueDetails.filter((q) => q.status === "open").length,
   };
 
-  const filteredQueues =
-    selectedCollege === "all"
-      ? collegeQueues
-      : collegeQueues.filter((q) => q.college === selectedCollege);
+  const formatAvgService = (minutes) =>
+    minutes != null ? `${minutes} mins` : "No data yet";
 
-  const filteredDetails =
-    selectedCollege === "all"
-      ? queueDetails
-      : queueDetails.filter((q) => q.college === selectedCollege);
-
-  const getCollegeAbbrev = (collegeName) => {
-    const abbrevMap = {
-      "College of Computing Studies": "CCS",
-      "College of Business Accountancy": "CBAA",
-      "College of Engineering": "COE",
-      "College of Education": "COED",
-      "College of Arts and Sciences": "CAS",
-      "College of Health and Allied Sciences": "CHAS",
-    };
-    for (const [key, value] of Object.entries(abbrevMap)) {
-      if (collegeName.includes(key)) return value;
-    }
-    return "OAMS";
-  };
-
-  const getStatusColor = (status) => {
+  const getQueueStatusLabel = (status) => {
     switch (status) {
-      case "operational":
-        return "#10b981";
-      case "busy":
-        return "#f59e0b";
+      case "open":
+        return "Active";
+      case "paused":
+        return "Paused";
       case "closed":
-        return "#ef4444";
+        return "Closed";
+      case "cancelled":
+        return "Cancelled";
       default:
-        return "#6b7280";
+        return status;
     }
   };
 
-  const getStatusLabel = (status) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+  // ── Queue action handlers (server-authoritative) ─────────────────────────
+  const handleCallNext = async (slotId) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${slotId}/call-next`);
+      toast.success("Next student called");
+      await fetchQueueDetails();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.error ?? "Failed to call next student",
+      );
+    }
+  };
+
+  const handleMarkAsServed = async (slotId) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${slotId}/serve`);
+      toast.success("Student marked as served");
+      await fetchQueueDetails();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.error ?? "Failed to mark student as served",
+      );
+    }
+  };
+
+  const handlePauseQueue = async (slotId) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${slotId}/pause`);
+      toast.message("Queue paused");
+      await fetchQueueDetails();
+    } catch (error) {
+      toast.error(error?.response?.data?.error ?? "Failed to pause queue");
+    }
+  };
+
+  const handleResumeQueue = async (slotId) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${slotId}/resume`);
+      toast.success("Queue resumed");
+      await fetchQueueDetails();
+    } catch (error) {
+      toast.error(error?.response?.data?.error ?? "Failed to resume queue");
+    }
+  };
+
+  const handleStopQueue = async (slotId) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to stop this queue? This action cannot be undone.",
+      )
+    )
+      return;
+    try {
+      await api.patch(`/admin/queue-hosting/${slotId}/close`);
+      toast.success("Queue stopped");
+      setMonitoringQueueId(null);
+      await fetchQueueDetails();
+    } catch (error) {
+      toast.error(error?.response?.data?.error ?? "Failed to stop queue");
+    }
   };
 
   // Render monitoring detail view
   if (monitoringQueue) {
-    const queueProgress = ((20 - monitoringQueue.waitingCount) / 20) * 100;
+    const queueProgress = monitoringQueue.maxCapacity
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            ((monitoringQueue.maxCapacity - monitoringQueue.currentCount) /
+              monitoringQueue.maxCapacity) *
+              100,
+          ),
+        )
+      : 0;
     const estimatedWaitMinutes =
-      parseInt(monitoringQueue.avgServiceTime) * monitoringQueue.waitingCount;
+      monitoringQueue.avgServiceMinutes != null
+        ? monitoringQueue.avgServiceMinutes * monitoringQueue.currentCount
+        : null;
 
     return (
       <div className="admin-queue-with-sidebar">
@@ -649,7 +637,7 @@ export default function AdminQueue() {
             <div className="queue-monitoring-topbar">
               <button
                 className="btn-back-queue"
-                onClick={() => setMonitoringQueue(null)}
+                onClick={() => setMonitoringQueueId(null)}
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -663,7 +651,10 @@ export default function AdminQueue() {
                 Back to Queue List
               </button>
               {/* refresh icon aligned to the right edge of the back button */}
-              <button className="btn-refresh-queue queue-monitoring-refresh">
+              <button
+                className="btn-refresh-queue queue-monitoring-refresh"
+                onClick={fetchQueueDetails}
+              >
                 <RefreshIcon />
               </button>
             </div>
@@ -672,12 +663,11 @@ export default function AdminQueue() {
             <div className="queue-monitoring-header">
               <div className="queue-header-content">
                 <div className="queue-header-text">
-                  <h1 className="queue-monitoring-title">Queue Monitoring</h1>
-                  <p className="queue-monitoring-service">
-                    {monitoringQueue.service}
-                  </p>
+                  <h1 className="queue-monitoring-title">
+                    {monitoringQueue.queueType}
+                  </h1>
                   <p className="queue-monitoring-college">
-                    {getCollegeAbbrev(monitoringQueue.college)}
+                    {monitoringQueue.college}
                   </p>
                 </div>
               </div>
@@ -688,23 +678,26 @@ export default function AdminQueue() {
               <div className="queue-stat-card">
                 <div className="queue-stat-label">Currently Serving</div>
                 <div className="queue-stat-value">
-                  {monitoringQueue.currentlyServing}
+                  {monitoringQueue.currentlyServingStudentNumber || "—"}
                 </div>
                 <ClockIcon className="queue-stat-icon" />
               </div>
               <div className="queue-stat-card">
                 <div className="queue-stat-label">Students Waiting</div>
                 <div className="queue-stat-value" style={{ color: "#3b82f6" }}>
-                  {monitoringQueue.waitingCount}
+                  {monitoringQueue.currentCount}
                 </div>
                 <UsersIcon className="queue-stat-icon" />
               </div>
               <div className="queue-stat-card">
                 <div className="queue-stat-label">Avg Service Time</div>
                 <div className="queue-stat-value" style={{ color: "#ef4444" }}>
-                  {monitoringQueue.avgServiceTime}
+                  {formatAvgService(monitoringQueue.avgServiceMinutes)}
                 </div>
-                <ClockIcon className="queue-stat-icon" style={{ color: "#ef4444" }} />
+                <ClockIcon
+                  className="queue-stat-icon"
+                  style={{ color: "#ef4444" }}
+                />
               </div>
             </div>
 
@@ -735,14 +728,18 @@ export default function AdminQueue() {
                         <span className="progress-stat-label">
                           Total Served Today
                         </span>
-                        <span className="progress-stat-value">32</span>
+                        <span className="progress-stat-value">
+                          {monitoringQueue.servedCount}
+                        </span>
                       </div>
                       <div className="progress-stat">
                         <span className="progress-stat-label">
                           Est. Wait Time
                         </span>
                         <span className="progress-stat-value">
-                          {estimatedWaitMinutes} mins
+                          {estimatedWaitMinutes != null
+                            ? `${estimatedWaitMinutes} mins`
+                            : "N/A"}
                         </span>
                       </div>
                     </div>
@@ -755,21 +752,72 @@ export default function AdminQueue() {
                     <h3>Queue Actions</h3>
                   </div>
                   <div className="queue-actions-grid">
-                    <button className="queue-action-btn">
+                    <button
+                      className="queue-action-btn"
+                      onClick={() => handleCallNext(monitoringQueue.id)}
+                      disabled={
+                        !!monitoringQueue.currentlyServingStudentNumber ||
+                        monitoringQueue.currentCount === 0
+                      }
+                    >
                       <UsersIcon />
                       Call Next
                     </button>
-                    <button className="queue-action-btn">
-                      <AlertCircleIcon />
-                      Pause Queue
-                    </button>
-                    <button className="queue-action-btn">
-                      <ActivityIcon />
-                      Send Announcement
+                    {monitoringQueue.status === "paused" ? (
+                      <button
+                        className="queue-action-btn"
+                        onClick={() => handleResumeQueue(monitoringQueue.id)}
+                      >
+                        <AlertCircleIcon />
+                        Resume Queue
+                      </button>
+                    ) : (
+                      <button
+                        className="queue-action-btn"
+                        onClick={() => handlePauseQueue(monitoringQueue.id)}
+                      >
+                        <AlertCircleIcon />
+                        Pause Queue
+                      </button>
+                    )}
+                    <button
+                      className="queue-action-btn"
+                      onClick={() => handleStopQueue(monitoringQueue.id)}
+                    >
+                      <CloseIcon />
+                      Stop Queue
                     </button>
                     <button className="queue-action-btn">
                       <TrendingUpIcon />
                       Export Data
+                    </button>
+                  </div>
+                </div>
+
+                {/* Currently Serving */}
+                <div className="queue-detail-card">
+                  <div className="queue-detail-header">
+                    <h3>
+                      <ClockIcon />
+                      Currently Serving
+                    </h3>
+                  </div>
+                  <div className="queue-detail-content">
+                    <p className="professor-name">
+                      {monitoringQueue.currentlyServingStudentNumber ||
+                        "No student is currently being served"}
+                    </p>
+                    <p className="professor-label">
+                      {monitoringQueue.queueType}
+                    </p>
+                    <button
+                      className="queue-action-btn"
+                      style={{ width: "100%", marginTop: "0.75rem" }}
+                      onClick={() => handleMarkAsServed(monitoringQueue.id)}
+                      disabled={!monitoringQueue.currentlyServingStudentNumber}
+                    >
+                      <AlertCircleIcon />
+                      Mark as Served
                     </button>
                   </div>
                 </div>
@@ -795,7 +843,7 @@ export default function AdminQueue() {
                   </div>
                   <div className="queue-detail-content">
                     <p className="queue-detail-text">
-                      {monitoringQueue.location}
+                      {monitoringQueue.location || "Not specified"}
                     </p>
                   </div>
                 </div>
@@ -810,36 +858,32 @@ export default function AdminQueue() {
                       </h3>
                     </div>
                     <div className="queue-detail-content">
-                      <div className="service-hours-row">
+                      <div
+                        className="service-hours-row"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
                         <span className="service-hours-label">Opens</span>
                         <span className="service-hours-value">
                           {monitoringQueue.serviceHours.start}
                         </span>
                       </div>
-                      <div className="service-hours-row">
+                      <div
+                        className="service-hours-row"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
                         <span className="service-hours-label">Closes</span>
                         <span className="service-hours-value">
                           {monitoringQueue.serviceHours.end}
                         </span>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Professor */}
-                {monitoringQueue.professor && (
-                  <div className="queue-detail-card">
-                    <div className="queue-detail-header">
-                      <h3>
-                        <UsersIcon />
-                        Assigned Professor
-                      </h3>
-                    </div>
-                    <div className="queue-detail-content">
-                      <p className="professor-name">
-                        {monitoringQueue.professor}
-                      </p>
-                      <p className="professor-label">Managing this queue</p>
                     </div>
                   </div>
                 )}
@@ -853,7 +897,9 @@ export default function AdminQueue() {
                     </h3>
                   </div>
                   <div className="queue-detail-content">
-                    <div className="status-badge">Active</div>
+                    <div className="status-badge">
+                      {getQueueStatusLabel(monitoringQueue.status)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1019,7 +1065,7 @@ export default function AdminQueue() {
           {/* Header */}
           <div className="queue-page-header">
             <h1>Centralized Queue Management</h1>
-            <p>Monitor and control queues across all colleges</p>
+            <p>Monitor and control queues for your department</p>
           </div>
 
           {/* System Stats */}
@@ -1035,26 +1081,38 @@ export default function AdminQueue() {
                 <ActivityIcon className="queue-stat-box-icon" />
               </div>
             </div>
-                <div className="queue-stat-box">
+            <div className="queue-stat-box">
               <div className="queue-stat-box-content">
                 <div className="queue-stat-box-text">
                   <p className="queue-stat-box-label">Total Waiting</p>
-                  <p className="queue-stat-box-value" style={{ color: "#3b82f6" }}>
+                  <p
+                    className="queue-stat-box-value"
+                    style={{ color: "#3b82f6" }}
+                  >
                     {systemStats.totalWaiting}
                   </p>
                 </div>
-                <UsersIcon className="queue-stat-box-icon" style={{ color: "#3b82f6" }} />
+                <UsersIcon
+                  className="queue-stat-box-icon"
+                  style={{ color: "#3b82f6" }}
+                />
               </div>
             </div>
             <div className="queue-stat-box">
               <div className="queue-stat-box-content">
                 <div className="queue-stat-box-text">
                   <p className="queue-stat-box-label">Avg Wait Time</p>
-                  <p className="queue-stat-box-value" style={{ color: "#ef4444" }}>
+                  <p
+                    className="queue-stat-box-value"
+                    style={{ color: "#ef4444" }}
+                  >
                     {systemStats.avgWaitTime}
                   </p>
                 </div>
-                <ClockIcon className="queue-stat-box-icon" style={{ color: "#ef4444" }} />
+                <ClockIcon
+                  className="queue-stat-box-icon"
+                  style={{ color: "#ef4444" }}
+                />
               </div>
             </div>
             <div className="queue-stat-box">
@@ -1062,89 +1120,11 @@ export default function AdminQueue() {
                 <div className="queue-stat-box-text">
                   <p className="queue-stat-box-label">Operational</p>
                   <p className="queue-stat-box-value">
-                    {systemStats.operational}/6
+                    {systemStats.operational}/{systemStats.totalQueues}
                   </p>
                 </div>
                 <TrendingUpIcon className="queue-stat-box-icon" />
               </div>
-            </div>
-          </div>
-
-          {/* College Queue Overview */}
-          <div className="queue-overview-section">
-            <div className="queue-section-header">
-              <div className="queue-section-title">
-                <h2>College Queue Overview</h2>
-                <p>Real-time queue status across all colleges</p>
-              </div>
-              <div className="queue-section-controls">
-                <div className="queue-filter-wrapper">
-                  <select
-                    className="queue-filter-select"
-                    value={selectedCollege}
-                    onChange={(e) => setSelectedCollege(e.target.value)}
-                  >
-                    <option value="all">All Colleges</option>
-                    {collegeQueues.map((q) => (
-                      <option key={q.college} value={q.college}>
-                        {getCollegeAbbrev(q.college)}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDownIcon className="queue-filter-icon" />
-                </div>
-                <button className="btn-refresh-queue">
-                  <RefreshIcon />
-                </button>
-              </div>
-            </div>
-            <div className="college-queues-grid">
-              {filteredQueues.map((queue) => (
-                <div key={queue.college} className="college-queue-card">
-                  <div className="college-queue-header">
-                    <div className="college-queue-title">
-                      <div className="college-queue-name">
-                        <div className="college-queue-abbrev-row">
-                          <img
-                            className="college-queue-logo"
-                            src={getCollegeLogo(queue.college)}
-                            alt={`${getCollegeAbbrev(queue.college)} logo`}
-                          />
-                          <p className="college-queue-abbrev">{getCollegeAbbrev(queue.college)}</p>
-                        </div>
-                      </div>
-
-                    </div>
-                    <div className="college-queue-status">
-                      <span
-                        className={`college-status-badge status-${queue.status}`}
-                      >
-                        {getStatusLabel(queue.status)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="college-queue-stats">
-                    <div className="college-queue-stat">
-                      <span className="college-stat-label">Queues</span>
-                      <span className="college-stat-value">
-                        {queue.activeQueues}
-                      </span>
-                    </div>
-                    <div className="college-queue-stat">
-                      <span className="college-stat-label">Waiting</span>
-                      <span className="college-stat-value">
-                        {queue.waitingStudents}
-                      </span>
-                    </div>
-                    <div className="college-queue-stat">
-                      <span className="college-stat-label">Avg Time</span>
-                      <span className="college-stat-value">
-                        {queue.averageWaitTime}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -1153,26 +1133,31 @@ export default function AdminQueue() {
             <div className="queue-section-header">
               <div className="queue-section-title">
                 <h2>Active Queue Details</h2>
-                <p>Individual queue information and management</p>
+                <p>Queue information for {user?.college}</p>
               </div>
             </div>
             <div className="queue-details-list">
-              {filteredDetails.length === 0 ? (
+              {loading ? (
+                <div className="queue-empty-state">
+                  <ActivityIcon />
+                  <p>Loading queues…</p>
+                </div>
+              ) : activeQueueDetails.length === 0 ? (
                 <div className="queue-empty-state">
                   <ActivityIcon />
                   <p>No active queues found</p>
                 </div>
               ) : (
-                filteredDetails.map((detail) => (
+                activeQueueDetails.map((detail) => (
                   <div key={detail.id} className="queue-detail-row">
                     <div className="queue-detail-info">
                       <div className="queue-detail-header-row">
                         <BuildingIcon className="queue-detail-icon" />
                         <span className="queue-detail-abbrev">
-                          {getCollegeAbbrev(detail.college)}
+                          {detail.college}
                         </span>
                         <span className="queue-detail-service">
-                          {detail.service}
+                          {detail.queueType}
                         </span>
                       </div>
                       <div className="queue-detail-grid">
@@ -1181,7 +1166,7 @@ export default function AdminQueue() {
                             Currently Serving
                           </span>
                           <span className="queue-detail-item-value">
-                            {detail.currentlyServing}
+                            {detail.currentlyServingStudentNumber || "—"}
                           </span>
                         </div>
                         <div className="queue-detail-item">
@@ -1189,7 +1174,7 @@ export default function AdminQueue() {
                             Waiting
                           </span>
                           <span className="queue-detail-item-value">
-                            {detail.waitingCount} students
+                            {detail.currentCount} students
                           </span>
                         </div>
                         <div className="queue-detail-item">
@@ -1197,19 +1182,9 @@ export default function AdminQueue() {
                             Avg Service
                           </span>
                           <span className="queue-detail-item-value">
-                            {detail.avgServiceTime}
+                            {formatAvgService(detail.avgServiceMinutes)}
                           </span>
                         </div>
-                        {detail.professor && (
-                          <div className="queue-detail-item">
-                            <span className="queue-detail-item-label">
-                              Assigned To
-                            </span>
-                            <span className="queue-detail-item-value">
-                              {detail.professor}
-                            </span>
-                          </div>
-                        )}
                         {detail.location && (
                           <div className="queue-detail-item">
                             <span className="queue-detail-item-label">
@@ -1235,7 +1210,7 @@ export default function AdminQueue() {
                     </div>
                     <button
                       className="btn-monitor"
-                      onClick={() => setMonitoringQueue(detail)}
+                      onClick={() => setMonitoringQueueId(detail.id)}
                     >
                       <AlertCircleIcon />
                       Monitor

@@ -34,6 +34,10 @@ const AdminQueueManagement = React.lazy(
   () => import("./pages/admin/AdminQueueManagement.jsx"),
 );
 
+const AdminQueueHosting = React.lazy(
+  () => import("./pages/admin/AdminQueueHosting.jsx"),
+);
+
 // ─── NEW: Admin Document Processing page ─────────────────────────────────
 const AdminDocumentProcessing = React.lazy(
   () => import("./pages/admin/AdminDocumentProcessing.jsx"),
@@ -175,7 +179,18 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              <Route path="/admin/appointments" element={<AdminAppointment />} />
+              <Route
+                path="/admin/queue-hosting"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueueHosting />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/appointments"
+                element={<AdminAppointment />}
+              />
 
               <Route
                 path="/admin/documents"
@@ -206,7 +221,10 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              <Route path="/admin/transactions" element={<AdminTransaction />} />
+              <Route
+                path="/admin/transactions"
+                element={<AdminTransaction />}
+              />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}
@@ -277,10 +295,7 @@ createRoot(document.getElementById("root")).render(
               path="/admin-queue-management"
               element={<AdminQueueManagement />}
             />
-            <Route
-              path="/admin-appointments"
-              element={<AdminAppointment />}
-            />
+            <Route path="/admin-appointments" element={<AdminAppointment />} />
             {/* Backward-compatible temp route for document processing */}
             <Route
               path="/admin-document-processing"

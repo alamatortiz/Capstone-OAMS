@@ -9,16 +9,13 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./queue-tracking.css";
 
 import {
-  Clock,
   Users,
-  TrendingUp,
   CheckCircle2,
   XCircle,
   Activity,
   BarChart3,
   History,
   AlertCircle,
-  Timer,
   Target,
   Loader2,
 } from "lucide-react";
@@ -234,8 +231,6 @@ export default function QueueTrackingPage() {
   const totalCompleted = metrics?.totalQueuesCompleted ?? 0;
   const totalCancelled = metrics?.totalQueuesCancelled ?? 0;
   const avgWait = metrics?.averageWaitTime ?? "—";
-  const totalTime = metrics?.totalTimeInQueues ?? "—";
-  const mostUsed = metrics?.mostUsedService ?? "—";
   const successRate =
     totalJoined > 0 ? Math.round((totalCompleted / totalJoined) * 100) : 0;
 
@@ -456,31 +451,6 @@ export default function QueueTrackingPage() {
                 {totalCancelled}
               </p>
             </div>
-            <div className="qt-metric-card">
-              <div className="qt-metric-icon qt-metric-icon-wait">
-                <Clock className="qt-icon-sm" />
-              </div>
-              <p className="qt-metric-label">Avg Wait</p>
-              <p className="qt-metric-value qt-metric-value-wait">{avgWait}</p>
-            </div>
-            <div className="qt-metric-card">
-              <div className="qt-metric-icon qt-metric-icon-used">
-                <TrendingUp className="qt-icon-sm" />
-              </div>
-              <p className="qt-metric-label">Most Used</p>
-              <p className="qt-metric-value-sm qt-metric-value-used">
-                {mostUsed}
-              </p>
-            </div>
-            <div className="qt-metric-card">
-              <div className="qt-metric-icon qt-metric-icon-time">
-                <Timer className="qt-icon-sm" />
-              </div>
-              <p className="qt-metric-label">Total Time</p>
-              <p className="qt-metric-value-sm qt-metric-value-time">
-                {totalTime}
-              </p>
-            </div>
           </div>
 
           {/* Tabs */}
@@ -614,47 +584,49 @@ export default function QueueTrackingPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="qt-progress-group">
-                              <div className="qt-progress-wrapper">
-                                <div className="qt-progress-label-row">
-                                  <p className="qt-progress-name">
-                                    People in Queue
-                                  </p>
-                                  <p className="qt-progress-value">
-                                    {queue.totalInQueue ?? 0}/
-                                    {queue.maxCapacity ?? 0}
-                                    <span className="qt-progress-value-percent">
-                                      ({queue.queueOccupancyPercent ?? 0}%)
-                                    </span>
-                                  </p>
+                            <div className="qt-progress-card">
+                              <div className="qt-progress-group">
+                                <div className="qt-progress-wrapper">
+                                  <div className="qt-progress-label-row">
+                                    <p className="qt-progress-name">
+                                      People in Queue
+                                    </p>
+                                    <p className="qt-progress-value">
+                                      {queue.totalInQueue ?? 0}/
+                                      {queue.maxCapacity ?? 0}
+                                      <span className="qt-progress-value-percent">
+                                        ({queue.queueOccupancyPercent ?? 0}%)
+                                      </span>
+                                    </p>
+                                  </div>
+                                  <div className="qt-progress-bar">
+                                    <div
+                                      className="qt-progress-fill"
+                                      style={{
+                                        width: `${queue.queueOccupancyPercent ?? 0}%`,
+                                      }}
+                                    />
+                                  </div>
                                 </div>
-                                <div className="qt-progress-bar">
-                                  <div
-                                    className="qt-progress-fill"
-                                    style={{
-                                      width: `${queue.queueOccupancyPercent ?? 0}%`,
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                              <div className="qt-progress-wrapper">
-                                <div className="qt-progress-label-row">
-                                  <p className="qt-progress-name">Serviced</p>
-                                  <p className="qt-progress-value">
-                                    {queue.servicedCount ?? 0}/
-                                    {queue.totalInQueue ?? 0}
-                                    <span className="qt-progress-value-percent">
-                                      ({queue.servicedPercent ?? 0}%)
-                                    </span>
-                                  </p>
-                                </div>
-                                <div className="qt-progress-bar">
-                                  <div
-                                    className="qt-progress-fill qt-progress-fill-serviced"
-                                    style={{
-                                      width: `${queue.servicedPercent ?? 0}%`,
-                                    }}
-                                  />
+                                <div className="qt-progress-wrapper">
+                                  <div className="qt-progress-label-row">
+                                    <p className="qt-progress-name">Serviced</p>
+                                    <p className="qt-progress-value">
+                                      {queue.servicedCount ?? 0}/
+                                      {queue.totalInQueue ?? 0}
+                                      <span className="qt-progress-value-percent">
+                                        ({queue.servicedPercent ?? 0}%)
+                                      </span>
+                                    </p>
+                                  </div>
+                                  <div className="qt-progress-bar">
+                                    <div
+                                      className="qt-progress-fill qt-progress-fill-serviced"
+                                      style={{
+                                        width: `${queue.servicedPercent ?? 0}%`,
+                                      }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -828,67 +800,6 @@ export default function QueueTrackingPage() {
                         <p className="qt-stat-value">{activeQueues.length}</p>
                       </div>
                     </div>
-
-                    <div
-                      className="qt-stat-box"
-                      style={{ marginTop: "0.75rem" }}
-                    >
-                      <p className="qt-stat-label">Most Used Service</p>
-                      <p className="qt-stat-value-sm">{mostUsed}</p>
-                    </div>
-                  </div>
-
-                  {/* Time Analytics */}
-                  <div className="qt-analytics-card">
-                    <h3 className="qt-analytics-title">
-                      <Clock className="qt-icon-xs" /> Time Analytics
-                    </h3>
-                    <p className="qt-analytics-subtitle">
-                      Wait time and efficiency metrics
-                    </p>
-
-                    <div className="qt-stat-box">
-                      <p className="qt-stat-label">Average Wait Time</p>
-                      <p className="qt-stat-value">{avgWait}</p>
-                      <p className="qt-stat-subtext">Across completed queues</p>
-                    </div>
-
-                    <div className="qt-stat-box">
-                      <p className="qt-stat-label">Total Time in Queues</p>
-                      <p className="qt-stat-value">{totalTime}</p>
-                      <p className="qt-stat-subtext">
-                        All completed sessions combined
-                      </p>
-                    </div>
-
-                    {totalJoined === 0 ? (
-                      <div
-                        className="qt-stat-box"
-                        style={{ textAlign: "center", padding: "1.5rem" }}
-                      >
-                        <AlertCircle
-                          style={{
-                            width: "2rem",
-                            height: "2rem",
-                            margin: "0 auto 0.5rem",
-                            opacity: 0.4,
-                          }}
-                        />
-                        <p className="qt-stat-label">
-                          No data yet — join a queue to start building your
-                          stats.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="qt-stat-box">
-                        <p className="qt-stat-label">Efficiency</p>
-                        <p className="qt-stat-value">{successRate}%</p>
-                        <p className="qt-stat-subtext">
-                          {totalCompleted} of {totalJoined} queues completed
-                          successfully
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
