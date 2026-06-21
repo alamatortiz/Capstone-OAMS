@@ -523,7 +523,7 @@ router.get(
          JOIN services s ON qs.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE qs.slot_date = CURDATE()
-           AND qs.status = 'open'
+           AND qs.status IN ('open', 'paused')
          ORDER BY d.department_abbreviation, s.service_name`,
       );
 
@@ -551,7 +551,8 @@ router.get(
           endTime: slot.end_time,
           maxCapacity: slot.max_capacity,
           currentCount: slot.current_count,
-          hasCapacity: waitingCount < slot.max_capacity,
+          hasCapacity:
+            slot.status === "open" && waitingCount < slot.max_capacity,
           status: slot.status,
           waitingCount,
           currentlyServing,
@@ -593,6 +594,7 @@ router.get(
            qs.start_time,
            qs.end_time,
            qs.max_capacity,
+           qs.status AS slot_status,
            s.service_name,
            d.department_name,
            d.department_abbreviation,
@@ -667,6 +669,7 @@ router.get(
           departmentName: row.department_name,
           departmentAbbrev: deptAbbrev,
           status: row.status,
+          slotStatus: row.slot_status,
           position,
           totalWaiting: row.total_waiting || 0,
           maxCapacity,
@@ -875,6 +878,7 @@ router.post(
         `SELECT
            q.queue_id, q.queue_number, q.slot_id, q.service_id, q.status, q.created_at AS joined_at,
            qs.max_capacity,
+           qs.status AS slot_status,
            s.service_name,
            d.department_name, d.department_abbreviation,
            (
@@ -931,6 +935,7 @@ router.post(
           departmentName: newEntry.department_name,
           departmentAbbrev: deptAbbrev,
           status: newEntry.status,
+          slotStatus: newEntry.slot_status,
           position,
           totalWaiting: newEntry.total_waiting || 0,
           maxCapacity,
@@ -2025,7 +2030,7 @@ router.get(
            ) AS currently_serving_number
          FROM queue_slots qs
          WHERE qs.slot_date = CURDATE()
-           AND qs.status = 'open'
+           AND qs.status IN ('open', 'paused')
          ORDER BY qs.start_time ASC`,
       );
 
@@ -2066,7 +2071,8 @@ router.get(
             maxCapacity: slot.max_capacity,
             currentCount: slot.current_count,
             waitingCount,
-            hasCapacity: waitingCount < slot.max_capacity,
+            hasCapacity:
+              slot.status === "open" && waitingCount < slot.max_capacity,
             status: slot.status,
             avgWaitTime:
               waitingCount === 0
