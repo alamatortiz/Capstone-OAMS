@@ -839,41 +839,43 @@ export default function StudentDashboard() {
                       <p className="stat-label">Est. Wait</p>
                     </div>
                   </div>
-                  <div className="queue-progress-group">
-                    <div className="queue-progress">
-                      <div className="progress-label">
-                        <span>People in Queue</span>
-                        <span>
-                          {mostRecentQueue.totalInQueue ?? 0}/
-                          {mostRecentQueue.maxCapacity ?? 0}
-                          <span className="progress-value-percent">
-                            ({queueOccupancyPercent}%)
-                          </span>
-                        </span>
+                  <div className="qs-progress-card">
+                    <div className="queue-progress-group">
+                      <div className="queue-progress-wrapper">
+                        <div className="qs-progress-label-row">
+                          <p className="qs-progress-label">People in Queue</p>
+                          <p className="qs-progress-value">
+                            {mostRecentQueue.totalInQueue ?? 0}/
+                            {mostRecentQueue.maxCapacity ?? 0}
+                            <span className="qs-progress-percent">
+                              &nbsp;({queueOccupancyPercent}%)
+                            </span>
+                          </p>
+                        </div>
+                        <div className="qs-progress-bar">
+                          <div
+                            className="qs-progress-fill"
+                            style={{ width: `${queueOccupancyPercent}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${queueOccupancyPercent}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div className="queue-progress">
-                      <div className="progress-label">
-                        <span>Serviced</span>
-                        <span>
-                          {mostRecentQueue.servicedCount ?? 0}/
-                          {mostRecentQueue.totalInQueue ?? 0}
-                          <span className="progress-value-percent">
-                            ({servicedPercent}%)
-                          </span>
-                        </span>
-                      </div>
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill progress-fill-serviced"
-                          style={{ width: `${servicedPercent}%` }}
-                        ></div>
+                      <div className="queue-progress-wrapper">
+                        <div className="qs-progress-label-row">
+                          <p className="qs-progress-label">Serviced</p>
+                          <p className="qs-progress-value">
+                            {mostRecentQueue.servicedCount ?? 0}/
+                            {mostRecentQueue.totalInQueue ?? 0}
+                            <span className="qs-progress-percent">
+                              &nbsp;({servicedPercent}%)
+                            </span>
+                          </p>
+                        </div>
+                        <div className="qs-progress-bar">
+                          <div
+                            className="qs-progress-fill qs-progress-fill-serviced"
+                            style={{ width: `${servicedPercent}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
