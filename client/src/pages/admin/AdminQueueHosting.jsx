@@ -8,7 +8,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
 import api from "../../utils/api";
 
-// ── Icons (unchanged) ──────────────────────────────────────────────────────
+// ── Icons ──────────────────────────────────────────────────────
 const ChatIcon = () => (
   <svg
     className="icon"
@@ -186,6 +186,16 @@ const formatDateTime = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+
+// ── College logo resolver ────────────────────────────────────────────────
+// Resolves a college's logo image from /src/assets/{CODE}.png, falling
+// back to the CCS logo if the specific college image is missing/404s.
+const ccsLogoFallback = new URL("../../assets/CCS.png", import.meta.url).href;
+const getCollegeLogo = (code) =>
+  new URL(
+    `../../assets/${(code || "CCS").toString().toUpperCase()}.png`,
+    import.meta.url,
+  ).href;
 
 export default function AdminQueueHosting() {
   const { user: authUser, logout } = useAuth();
@@ -635,13 +645,27 @@ export default function AdminQueueHosting() {
                     className="aqh-queue-card aqh-card-active"
                   >
                     <div className="aqh-queue-card-top">
-                      <div className="aqh-queue-card-title-block">
-                        <h3 className="aqh-queue-card-title">
-                          {queue.queueType}
-                        </h3>
-                        <p className="aqh-queue-card-dept">
-                          {queue.department}
-                        </p>
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                          onError={(e) => {
+                            if (e.currentTarget.src !== ccsLogoFallback) {
+                              e.currentTarget.src = ccsLogoFallback;
+                            }
+                          }}
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
                       </div>
                       <div className="aqh-queue-card-top-right">
                         <span className="aqh-status-badge aqh-status-active">
@@ -719,13 +743,27 @@ export default function AdminQueueHosting() {
                     className="aqh-queue-card aqh-card-paused"
                   >
                     <div className="aqh-queue-card-top">
-                      <div className="aqh-queue-card-title-block">
-                        <h3 className="aqh-queue-card-title">
-                          {queue.queueType}
-                        </h3>
-                        <p className="aqh-queue-card-dept">
-                          {queue.department}
-                        </p>
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                          onError={(e) => {
+                            if (e.currentTarget.src !== ccsLogoFallback) {
+                              e.currentTarget.src = ccsLogoFallback;
+                            }
+                          }}
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
                       </div>
                       <div className="aqh-queue-card-top-right">
                         <span className="aqh-status-badge aqh-status-paused">
@@ -787,13 +825,27 @@ export default function AdminQueueHosting() {
                     className="aqh-queue-card aqh-card-closed"
                   >
                     <div className="aqh-queue-card-top">
-                      <div className="aqh-queue-card-title-block">
-                        <h3 className="aqh-queue-card-title">
-                          {queue.queueType}
-                        </h3>
-                        <p className="aqh-queue-card-dept">
-                          {queue.department}
-                        </p>
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                          onError={(e) => {
+                            if (e.currentTarget.src !== ccsLogoFallback) {
+                              e.currentTarget.src = ccsLogoFallback;
+                            }
+                          }}
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
                       </div>
                       <span className="aqh-status-badge aqh-status-closed">
                         closed
