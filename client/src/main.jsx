@@ -39,6 +39,11 @@ const AdminDocumentProcessing = React.lazy(
   () => import("./pages/admin/AdminDocumentProcessing.jsx"),
 );
 
+// ─── NEW: Admin Professor (Faculty) Availability page ────────────────────
+const AdminProfessorAvailability = React.lazy(
+  () => import("./pages/admin/admin-professor-availability.jsx"),
+);
+
 import AppointmentsPage from "./pages/student/appointments.jsx";
 
 import DocumentsPage from "./pages/student/documents.jsx";
@@ -191,6 +196,16 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
+              {/* Admin Professor (Faculty) Availability Route */}
+              <Route
+                path="/admin/professor-availability"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminProfessorAvailability />
+                  </Suspense>
+                }
+              />
+
               <Route path="/admin/transactions" element={<AdminTransaction />} />
             </Route>
 
@@ -272,6 +287,15 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AdminDocumentProcessing />
+                </Suspense>
+              }
+            />
+            {/* Backward-compatible temp route for professor availability */}
+            <Route
+              path="/admin-professor-availability"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminProfessorAvailability />
                 </Suspense>
               }
             />

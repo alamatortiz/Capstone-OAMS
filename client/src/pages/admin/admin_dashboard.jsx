@@ -423,7 +423,8 @@ export default function AdminDashboard() {
       description: "Today",
       icon: UsersIcon,
       bgColor: "bg-emerald-50",
-      isClickable: false,
+      isClickable: true,
+      ctaAriaLabel: "View faculty availability",
     },
     {
       title: "Announcements",
@@ -495,7 +496,7 @@ export default function AdminDashboard() {
     return "I can help with user management, document approvals, queue hosting, and announcements. What are you working on?";
   };
 
-  // ── Handler for clicking Active Queues stat card ──────────────────────────
+  // ── Handler for clicking stat cards ────────────────────────────────────────
   const handleStatCardClick = (statTitle) => {
     if (statTitle === "Active Queues") {
       navigate("/admin/queue-management");
@@ -504,6 +505,11 @@ export default function AdminDashboard() {
 
     if (statTitle === "Pending Documents") {
       navigate("/admin/document-processing");
+      return;
+    }
+
+    if (statTitle === "Faculty Available") {
+      navigate("/admin/professor-availability");
     }
   };
 
@@ -708,6 +714,7 @@ export default function AdminDashboard() {
                 }
                 role={stat.isClickable ? "button" : undefined}
                 tabIndex={stat.isClickable ? 0 : undefined}
+                aria-label={stat.isClickable ? stat.ctaAriaLabel : undefined}
                 onKeyPress={(e) => {
                   if (
                     stat.isClickable &&
@@ -949,7 +956,14 @@ export default function AdminDashboard() {
           <section className="faculty-availability-section">
             <div className="card-header-admin">
               <h3>Faculty Availability Today</h3>
-              <a href="#" className="view-all-link">
+              <a
+                href="/admin/professor-availability"
+                className="view-all-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/admin/professor-availability");
+                }}
+              >
                 View All Faculty <ChevronRightIcon />
               </a>
             </div>

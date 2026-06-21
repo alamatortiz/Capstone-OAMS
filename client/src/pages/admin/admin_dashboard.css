@@ -1160,7 +1160,6 @@ body {
   line-height: 1.5;
 }
 
-/* announcement tag + date aligned as a right-side status/date row */
 .announcement-important-date {
   display: flex;
   flex-direction: row;
