@@ -200,6 +200,324 @@ router.get(
   },
 );
 
+// ─────────────────────────────────────────────────────────────
+// QUEUE HOSTING — scoped strictly to the admin's own department
+// ─────────────────────────────────────────────────────────────
+
+// Small helper: resolve admin -> department_id, or null if not found
+async function getAdminDepartmentId(adminId) {
+  const [[row]] = await pool.query(
+    `SELECT department_id FROM administrators WHERE admin_id = ?`,
+    [adminId],
+  );
+  return row?.department_id ?? null;
+}
+
+// GET /api/admin/queue-hosting/services
+// Services dropdown — only services under the admin's own department.
+router.get(
+  "/queue-hosting/services",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const [services] = await pool.query(
+        `SELECT service_id, service_name, description
+         FROM services
+         WHERE department_id = ?
+         ORDER BY service_name ASC`,
+        [deptId],
+      );
+
+      res.json({ services });
+    } catch (error) {
+      console.error("Queue hosting services error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/queue-hosting
+// All of today's queue_slots for the admin's department, with live
+// waiting counts. Frontend buckets these into active/paused/closed.
+router.get(
+  "/queue-hosting",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const [slots] = await pool.query(
+        `SELECT
+           qs.slot_id,
+           qs.service_id,
+           qs.max_capacity,
+           qs.start_time,
+           qs.end_time,
+           qs.status,
+           qs.created_at,
+           s.service_name,
+           d.department_name,
+           d.department_abbreviation,
+           (
+             SELECT COUNT(*) FROM queues q
+             WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
+           ) AS waiting_count,
+           (
+             SELECT COUNT(*) FROM queues q2
+             WHERE q2.slot_id = qs.slot_id AND q2.status = 'completed'
+           ) AS served_count
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ?
+           AND qs.slot_date = CURDATE()
+         ORDER BY qs.created_at DESC`,
+        [deptId],
+      );
+
+      const formatted = slots.map((q) => ({
+        id: q.slot_id,
+        queueType: q.service_name,
+        department: `${q.department_name} (${q.department_abbreviation})`,
+        maxCapacity: q.max_capacity,
+        currentCount: q.waiting_count || 0,
+        servedCount: q.served_count || 0,
+        status: q.status, // 'open' | 'paused' | 'closed' | 'cancelled'
+        createdAt: q.created_at,
+        serviceHours: {
+          start: String(q.start_time).slice(0, 5),
+          end: String(q.end_time).slice(0, 5),
+        },
+      }));
+
+      res.json({ queues: formatted });
+    } catch (error) {
+      console.error("Queue hosting fetch error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/admin/queue-hosting
+// Body: { serviceId, maxCapacity, startTime, endTime }
+// Opens a new queue_slot for TODAY. serviceId is verified to belong
+// to the admin's own department — this is the actual enforcement
+// point that stops an admin from hosting another college's queue.
+router.post(
+  "/queue-hosting",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const adminId = req.user.userId;
+    const { serviceId, maxCapacity, startTime, endTime } = req.body;
+
+    if (!serviceId || !maxCapacity || !startTime || !endTime) {
+      return res.status(400).json({
+        error: "serviceId, maxCapacity, startTime, and endTime are required",
+      });
+    }
+    const capacityNum = parseInt(maxCapacity, 10);
+    if (!capacityNum || capacityNum <= 0) {
+      return res
+        .status(400)
+        .json({ error: "maxCapacity must be a positive number" });
+    }
+    if (startTime >= endTime) {
+      return res
+        .status(400)
+        .json({ error: "Start time must be before end time" });
+    }
+
+    try {
+      const deptId = await getAdminDepartmentId(adminId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      // Enforcement: the chosen service MUST belong to the admin's department
+      const [[service]] = await pool.query(
+        `SELECT service_id, department_id, service_name
+         FROM services WHERE service_id = ?`,
+        [serviceId],
+      );
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+      if (service.department_id !== deptId) {
+        return res
+          .status(403)
+          .json({ error: "You can only host queues for your own department" });
+      }
+
+      const [result] = await pool.query(
+        `INSERT INTO queue_slots
+           (service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, status)
+         VALUES (?, ?, CURDATE(), ?, ?, ?, 0, 'open')`,
+        [serviceId, adminId, startTime, endTime, capacityNum],
+      );
+
+      res.status(201).json({
+        message: "Queue line opened successfully",
+        queue: {
+          id: result.insertId,
+          queueType: service.service_name,
+          maxCapacity: capacityNum,
+          currentCount: 0,
+          servedCount: 0,
+          status: "open",
+          serviceHours: { start: startTime, end: endTime },
+        },
+      });
+    } catch (error) {
+      if (error.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({
+          error: "A queue for this service and start time already exists today",
+        });
+      }
+      console.error("Open queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// Shared guard used by pause/resume/close below: confirms the slot
+// belongs to the admin's own department before any mutation.
+async function assertOwnedSlot(deptId, slotId) {
+  const [[slot]] = await pool.query(
+    `SELECT qs.slot_id, qs.status, s.department_id
+     FROM queue_slots qs
+     JOIN services s ON qs.service_id = s.service_id
+     WHERE qs.slot_id = ?`,
+    [slotId],
+  );
+  if (!slot) return { error: 404, message: "Queue slot not found" };
+  if (slot.department_id !== deptId) {
+    return {
+      error: 403,
+      message: "You can only manage queues for your own department",
+    };
+  }
+  return { slot };
+}
+
+// PATCH /api/admin/queue-hosting/:slotId/pause
+router.patch(
+  "/queue-hosting/:slotId/pause",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+      if (check.slot.status !== "open") {
+        return res
+          .status(409)
+          .json({ error: "Only an open queue can be paused" });
+      }
+
+      await pool.query(
+        `UPDATE queue_slots SET status = 'paused' WHERE slot_id = ?`,
+        [slotId],
+      );
+      res.json({ message: "Queue paused", slotId, status: "paused" });
+    } catch (error) {
+      console.error("Pause queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/resume
+router.patch(
+  "/queue-hosting/:slotId/resume",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+      if (check.slot.status !== "paused") {
+        return res
+          .status(409)
+          .json({ error: "Only a paused queue can be resumed" });
+      }
+
+      await pool.query(
+        `UPDATE queue_slots SET status = 'open' WHERE slot_id = ?`,
+        [slotId],
+      );
+      res.json({ message: "Queue resumed", slotId, status: "open" });
+    } catch (error) {
+      console.error("Resume queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/close
+router.patch(
+  "/queue-hosting/:slotId/close",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+      if (!["open", "paused"].includes(check.slot.status)) {
+        return res
+          .status(409)
+          .json({ error: `Queue is already ${check.slot.status}` });
+      }
+
+      await pool.query(
+        `UPDATE queue_slots SET status = 'closed' WHERE slot_id = ?`,
+        [slotId],
+      );
+      res.json({ message: "Queue closed", slotId, status: "closed" });
+    } catch (error) {
+      console.error("Close queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 function formatTime(timeStr) {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":");

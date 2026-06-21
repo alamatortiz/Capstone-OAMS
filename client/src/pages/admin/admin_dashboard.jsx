@@ -337,6 +337,7 @@ const quickActions = [
     iconColor: "bg-blue-500",
     title: "Host Queue",
     description: "Manage and host student queues",
+    path: "/admin/queue-hosting",
   },
 ];
 
@@ -696,11 +697,16 @@ export default function AdminDashboard() {
               <div
                 key={stat.title}
                 className={`stat-card ${stat.isClickable ? "stat-card-clickable" : ""}`}
-                onClick={() => stat.isClickable && handleStatCardClick(stat.title)}
+                onClick={() =>
+                  stat.isClickable && handleStatCardClick(stat.title)
+                }
                 role={stat.isClickable ? "button" : undefined}
                 tabIndex={stat.isClickable ? 0 : undefined}
                 onKeyPress={(e) => {
-                  if (stat.isClickable && (e.key === "Enter" || e.key === " ")) {
+                  if (
+                    stat.isClickable &&
+                    (e.key === "Enter" || e.key === " ")
+                  ) {
                     handleStatCardClick(stat.title);
                   }
                 }}
@@ -762,7 +768,19 @@ export default function AdminDashboard() {
             </div>
             <div className="quick-actions-grid">
               {quickActions.map((action) => (
-                <div key={action.title} className="quick-action-card">
+                <div
+                  key={action.title}
+                  className="quick-action-card"
+                  onClick={() => action.path && navigate(action.path)}
+                  role={action.path ? "button" : undefined}
+                  tabIndex={action.path ? 0 : undefined}
+                  style={action.path ? { cursor: "pointer" } : undefined}
+                  onKeyPress={(e) => {
+                    if (action.path && (e.key === "Enter" || e.key === " ")) {
+                      navigate(action.path);
+                    }
+                  }}
+                >
                   <div className={`action-icon ${action.iconColor}`}>
                     <action.icon />
                   </div>

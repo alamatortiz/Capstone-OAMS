@@ -34,6 +34,10 @@ const AdminQueueManagement = React.lazy(
   () => import("./pages/admin/AdminQueueManagement.jsx"),
 );
 
+const AdminQueueHosting = React.lazy(
+  () => import("./pages/admin/AdminQueueHosting.jsx"),
+);
+
 import AppointmentsPage from "./pages/student/appointments.jsx";
 
 import DocumentsPage from "./pages/student/documents.jsx";
@@ -170,7 +174,24 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              <Route path="/admin/appointments" element={<AdminAppointment />} />
+              {/*
+                ─── Admin Queue Hosting Route ───────────────────────────────
+                This route is triggered when the admin clicks the "Host Queue"
+                card in the Quick Actions section of the admin dashboard. It
+                lets admins open, pause, resume, and close queue lines.
+              */}
+              <Route
+                path="/admin/queue-hosting"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueueHosting />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/appointments"
+                element={<AdminAppointment />}
+              />
 
               <Route
                 path="/admin/documents"
@@ -180,7 +201,10 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              <Route path="/admin/transactions" element={<AdminTransaction />} />
+              <Route
+                path="/admin/transactions"
+                element={<AdminTransaction />}
+              />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}
@@ -248,11 +272,19 @@ createRoot(document.getElementById("root")).render(
 
             <Route path="/professor-queue" element={<ProfessorQueue />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/admin-queue-management" element={<AdminQueueManagement />} />
             <Route
-              path="/admin-appointments"
-              element={<AdminAppointment />}
+              path="/admin-queue-management"
+              element={<AdminQueueManagement />}
             />
+            <Route
+              path="/admin-queue-hosting"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminQueueHosting />
+                </Suspense>
+              }
+            />
+            <Route path="/admin-appointments" element={<AdminAppointment />} />
           </Routes>
         </BrowserRouter>
       </QueueProvider>

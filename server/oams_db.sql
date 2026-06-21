@@ -147,6 +147,7 @@ CREATE TABLE queue_slots (
     current_count   INT          NOT NULL DEFAULT 0,
     status          ENUM('open','paused','closed','cancelled') DEFAULT 'open',
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (service_id) REFERENCES services(service_id),
     FOREIGN KEY (admin_id)   REFERENCES administrators(admin_id),
     -- prevents duplicate slots for the same service on the same day/time window
