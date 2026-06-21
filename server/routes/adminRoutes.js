@@ -274,6 +274,7 @@ router.get(
            s.service_name,
            d.department_name,
            d.department_abbreviation,
+           d.office_location,
            (
              SELECT COUNT(*) FROM queues q
              WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
@@ -281,7 +282,23 @@ router.get(
            (
              SELECT COUNT(*) FROM queues q2
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'completed'
-           ) AS served_count
+           ) AS served_count,
+           (
+             SELECT st.student_number
+             FROM queues q3
+             JOIN students st ON q3.student_id = st.student_id
+             WHERE q3.slot_id = qs.slot_id AND q3.status = 'serving'
+             ORDER BY q3.called_at DESC
+             LIMIT 1
+           ) AS currently_serving_student_number,
+           (
+             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q4.called_at, q4.completed_at)))
+             FROM queues q4
+             WHERE q4.slot_id = qs.slot_id
+               AND q4.status = 'completed'
+               AND q4.called_at IS NOT NULL
+               AND q4.completed_at IS NOT NULL
+           ) AS avg_service_minutes
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
@@ -295,11 +312,17 @@ router.get(
         id: q.slot_id,
         queueType: q.service_name,
         department: `${q.department_name} (${q.department_abbreviation})`,
+        college: q.department_abbreviation,
         maxCapacity: q.max_capacity,
         currentCount: q.waiting_count || 0,
         servedCount: q.served_count || 0,
         status: q.status, // 'open' | 'paused' | 'closed' | 'cancelled'
         createdAt: q.created_at,
+        location: q.office_location || null,
+        currentlyServingStudentNumber:
+          q.currently_serving_student_number || null,
+        avgServiceMinutes:
+          q.avg_service_minutes != null ? Number(q.avg_service_minutes) : null,
         serviceHours: {
           start: String(q.start_time).slice(0, 5),
           end: String(q.end_time).slice(0, 5),
@@ -511,6 +534,102 @@ router.patch(
       res.json({ message: "Queue closed", slotId, status: "closed" });
     } catch (error) {
       console.error("Close queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/call-next
+// Calls the next waiting student into 'serving'. Refuses if someone
+// is already being served — that student must be marked served first.
+router.patch(
+  "/queue-hosting/:slotId/call-next",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+
+      const [[alreadyServing]] = await pool.query(
+        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+        [slotId],
+      );
+      if (alreadyServing) {
+        return res.status(409).json({
+          error:
+            "A student is already being served. Mark them as served first.",
+        });
+      }
+
+      const [[next]] = await pool.query(
+        `SELECT queue_id FROM queues
+         WHERE slot_id = ? AND status = 'waiting'
+         ORDER BY queue_number ASC
+         LIMIT 1`,
+        [slotId],
+      );
+      if (!next) {
+        return res
+          .status(404)
+          .json({ error: "No students waiting in this queue" });
+      }
+
+      await pool.query(
+        `UPDATE queues SET status = 'serving', called_at = NOW() WHERE queue_id = ?`,
+        [next.queue_id],
+      );
+
+      res.json({ message: "Next student called", queueId: next.queue_id });
+    } catch (error) {
+      console.error("Call next error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/serve
+// Marks the currently-serving student as completed.
+router.patch(
+  "/queue-hosting/:slotId/serve",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+
+      const [[serving]] = await pool.query(
+        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+        [slotId],
+      );
+      if (!serving) {
+        return res
+          .status(404)
+          .json({ error: "No student is currently being served" });
+      }
+
+      await pool.query(
+        `UPDATE queues SET status = 'completed', completed_at = NOW() WHERE queue_id = ?`,
+        [serving.queue_id],
+      );
+
+      res.json({
+        message: "Student marked as served",
+        queueId: serving.queue_id,
+      });
+    } catch (error) {
+      console.error("Mark as served error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
