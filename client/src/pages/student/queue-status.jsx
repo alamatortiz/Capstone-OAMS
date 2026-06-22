@@ -1013,7 +1013,7 @@ export default function QueueStatusPage() {
                       You haven't joined any queues yet today.
                     </p>
                     <button
-                      onClick={() => navigate("/student/avail-service")}
+                      onClick={() => navigate("/student/queue")}
                       style={{
                         marginTop: "1rem",
                         background: "var(--primary-color)",

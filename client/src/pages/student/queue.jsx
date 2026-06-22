@@ -339,7 +339,6 @@ export default function QueuePage() {
       await joinQueue(selectedSlot.slotId);
       toast.success(`Successfully joined the queue for ${selectedSlot.serviceName}!`);
       setSelectedSlot(null);
-      setTimeout(() => navigate('/student/queue-status'), 800);
     } catch (err) {
       toast.error(err.message ?? 'Failed to join the queue. Please try again.');
     } finally {
@@ -862,6 +861,7 @@ export default function QueuePage() {
                   {filteredSlots.length > 0 ? (
                     <div className="available-queues-list">
                       {filteredSlots.map((slot) => {
+                        const isJoining = joiningSlotId === slot.slotId;
                         const atCapacity = !slot.hasCapacity;
 
                         return (
@@ -921,7 +921,36 @@ export default function QueuePage() {
                                   </div>
                                 </div>
                               </div>
-                              <ChevronRight className="queue-card-chevron" />
+                              <button
+                                className={`queue-join-btn ${(isJoining || atCapacity) ? 'disabled' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); handleJoinQueue(slot.slotId); }}
+                                disabled={isJoining || atCapacity}
+                                type="button"
+                                aria-label={
+                                  atCapacity
+                                    ? `Queue for ${slot.serviceName} is full`
+                                    : `Join queue for ${slot.serviceName}`
+                                }
+                              >
+                                {isJoining ? (
+                                  <>
+                                    <Loader2
+                                      style={{
+                                        width: '1rem',
+                                        height: '1rem',
+                                        marginRight: '0.375rem',
+                                        animation: 'spin 1s linear infinite',
+                                        display: 'inline',
+                                      }}
+                                    />
+                                    Joining…
+                                  </>
+                                ) : atCapacity ? (
+                                  'Queue Full'
+                                ) : (
+                                  'Join Queue'
+                                )}
+                              </button>
                             </div>
                           </div>
                         );
