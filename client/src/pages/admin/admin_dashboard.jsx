@@ -298,13 +298,15 @@ const HostQueueIcon = () => (
   </svg>
 );
 
-// ── Static tool/action arrays (UI only, no data dependency) ──────────────────
+// ── Static tool/action arrays ─────────────────────────────────────────────────
+// ★ CHANGE: User Management now has a path so its card navigates on click
 const adminTools = [
   {
     icon: UserManagementIcon,
     iconColor: "bg-orange-500",
     title: "User Management",
     description: "Manage user accounts",
+    path: "/admin/user-management",
   },
   {
     icon: DataManagementIcon,
@@ -503,17 +505,14 @@ export default function AdminDashboard() {
       navigate("/admin/queue-management");
       return;
     }
-
     if (statTitle === "Pending Documents") {
       navigate("/admin/document-processing");
       return;
     }
-
     if (statTitle === "Faculty Available") {
       navigate("/admin/professor-availability");
       return;
     }
-
     if (statTitle === "Announcements") {
       navigate("/admin/announcements");
     }
@@ -522,7 +521,6 @@ export default function AdminDashboard() {
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
-
     {
       icon: CalendarIconNav,
       label: "Appointments",
@@ -758,8 +756,21 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="admin-tools-grid">
+              {/* ★ CHANGE: tool cards with a path are now clickable */}
               {adminTools.map((tool) => (
-                <div key={tool.title} className="admin-tool-card">
+                <div
+                  key={tool.title}
+                  className="admin-tool-card"
+                  onClick={() => tool.path && navigate(tool.path)}
+                  role={tool.path ? "button" : undefined}
+                  tabIndex={tool.path ? 0 : undefined}
+                  style={tool.path ? { cursor: "pointer" } : undefined}
+                  onKeyPress={(e) => {
+                    if (tool.path && (e.key === "Enter" || e.key === " ")) {
+                      navigate(tool.path);
+                    }
+                  }}
+                >
                   <div className={`admin-tool-icon ${tool.iconColor}`}>
                     <tool.icon />
                   </div>

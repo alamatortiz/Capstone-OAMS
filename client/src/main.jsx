@@ -50,6 +50,11 @@ const AdminAnnouncements = React.lazy(
   () => import("./pages/admin/admin_announcements.jsx"),
 );
 
+// ★ NEW — Admin User Management
+const AdminUserManagement = React.lazy(
+  () => import("./pages/admin/admin_user_management.jsx"),
+);
+
 import AppointmentsPage from "./pages/student/appointments.jsx";
 
 import DocumentsPage from "./pages/student/documents.jsx";
@@ -228,12 +233,22 @@ createRoot(document.getElementById("root")).render(
                 element={<AdminTransaction />}
               />
 
-              {/* ★ CHANGE: NEW — Admin Announcements Route */}
+              {/* Admin Announcements Route */}
               <Route
                 path="/admin/announcements"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <AdminAnnouncements />
+                  </Suspense>
+                }
+              />
+
+              {/* ★ NEW — Admin User Management Route */}
+              <Route
+                path="/admin/user-management"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminUserManagement />
                   </Suspense>
                 }
               />
@@ -326,12 +341,21 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-            {/* ★ CHANGE: NEW — Backward-compatible temp route for announcements */}
+            {/* Backward-compatible temp route for announcements */}
             <Route
               path="/admin-announcements"
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AdminAnnouncements />
+                </Suspense>
+              }
+            />
+            {/* ★ NEW — Backward-compatible temp route for user management */}
+            <Route
+              path="/admin-user-management"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminUserManagement />
                 </Suspense>
               }
             />
