@@ -377,7 +377,11 @@ export default function StudentDashboard() {
   const apiQueue = dashStats?.activeQueue ?? null;
   // Fallback to QueueContext (for locally-joined queues before page refresh)
   const contextQueues = getActiveQueues();
-  const mostRecentQueue = apiQueue ?? contextQueues[0] ?? null;
+  // Sort by position ascending so index [0] is always the closest to being served
+  const closestContextQueue = contextQueues.length > 0
+    ? [...contextQueues].sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity))[0]
+    : null;
+  const mostRecentQueue = apiQueue ?? closestContextQueue ?? null;
   const activeQueueCount =
     dashStats?.stats?.activeQueueCount ?? contextQueues.length;
 
@@ -457,15 +461,6 @@ export default function StudentDashboard() {
       link: "/student/announcements",
       gradient: "from-violet-500 to-purple-600",
       badge: `${pinnedAnnouncements.length} Pinned`,
-    },
-    {
-      title: "Avail Service",
-      description:
-        "Browse available office services and join a queue instantly.",
-      icon: ListIcon,
-      link: "/student/avail-service",
-      gradient: "from-emerald-500 to-green-600",
-      badge: "6 Services",
     },
     {
       title: "Appointment Booking",
