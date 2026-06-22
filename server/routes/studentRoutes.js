@@ -56,7 +56,7 @@ router.get(
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE q.student_id = ? AND q.status = 'waiting'
-         ORDER BY q.created_at DESC`,
+         ORDER BY position ASC`,
         [studentId],
       );
 
@@ -141,11 +141,12 @@ router.get(
         [studentId, studentId, studentId],
       );
 
-      const mostRecentQueue = activeQueues[0] || null;
+      // Pick the queue with the lowest position (closest to being served)
+      const closestQueue = activeQueues.length > 0 ? activeQueues[0] : null;
 
-      const maxCapacity = mostRecentQueue?.max_capacity || 0;
-      const totalInQueue = mostRecentQueue?.total_in_queue || 0;
-      const servicedCount = mostRecentQueue?.serviced_count || 0;
+      const maxCapacity = closestQueue?.max_capacity || 0;
+      const totalInQueue = closestQueue?.total_in_queue || 0;
+      const servicedCount = closestQueue?.serviced_count || 0;
       const queueOccupancyPercent =
         maxCapacity > 0
           ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
@@ -155,9 +156,22 @@ router.get(
           ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
           : 0;
 
+      // Build the queue number badge for the closest queue
+      const closestQueueNumberBadge = closestQueue
+        ? (() => {
+            const deptAbbrev = closestQueue.department_abbreviation;
+            const serviceCode = closestQueue.service_name
+              .split(' ')[0]
+              .substring(0, 3)
+              .toUpperCase();
+            return `${deptAbbrev}-${serviceCode}-${String(closestQueue.queue_number).padStart(3, '0')}`;
+          })()
+        : null;
+
       res.json({
         stats: {
-          queuePosition: mostRecentQueue ? mostRecentQueue.position : 0,
+          queuePosition: closestQueue ? closestQueue.position : 0,
+          queueNumberBadge: closestQueueNumberBadge,
           activeQueueCount: activeQueues.length,
           appointments: {
             upcoming: apptRow.upcoming_count || 0,
@@ -169,23 +183,24 @@ router.get(
           },
           completed: completedRow.total_completed || 0,
         },
-        activeQueue: mostRecentQueue
+        activeQueue: closestQueue
           ? {
-              queueId: mostRecentQueue.queue_id,
-              queueNumber: mostRecentQueue.queue_number,
-              service: mostRecentQueue.service_name,
-              college: mostRecentQueue.department_name,
-              collegeAbbrev: mostRecentQueue.department_abbreviation,
-              position: mostRecentQueue.position,
-              totalWaiting: mostRecentQueue.total_waiting,
+              queueId: closestQueue.queue_id,
+              queueNumber: closestQueue.queue_number,
+              queueNumberBadge: closestQueueNumberBadge,
+              service: closestQueue.service_name,
+              college: closestQueue.department_name,
+              collegeAbbrev: closestQueue.department_abbreviation,
+              position: closestQueue.position,
+              totalWaiting: closestQueue.total_waiting,
               maxCapacity,
               totalInQueue,
               servicedCount,
               queueOccupancyPercent,
               servicedPercent,
               estimatedWaitTime:
-                mostRecentQueue.position > 1
-                  ? `~${(mostRecentQueue.position - 1) * 5} min`
+                closestQueue.position > 1
+                  ? `~${(closestQueue.position - 1) * 5} min`
                   : "You're next!",
             }
           : null,
