@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import {
   Clock,
   Users,
@@ -600,6 +600,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function QueueStatusPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: authUser, logout } = useAuth();
   const { queues, isLoading, error, leaveQueue, updateQueueNotes } = useQueue();
 
@@ -612,7 +613,9 @@ export default function QueueStatusPage() {
     : { name: "Student", role: "student", college: "", departmentAbbrev: "" };
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [selectedQueueId, setSelectedQueueId] = useState(null);
+  const [selectedQueueId, setSelectedQueueId] = useState(
+    () => location.state?.queueId ?? null
+  );
   const [cancelling, setCancelling] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);

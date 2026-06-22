@@ -912,19 +912,23 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  text-align: left;
+  align-items: flex-start;
 }
 
 .queue-hero-title h2 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   margin: 0;
   line-height: 1.1;
+  text-align: left;
 }
 
 .queue-hero-title p {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
+  text-align: left;
 }
 
 .queue-hero-badge {

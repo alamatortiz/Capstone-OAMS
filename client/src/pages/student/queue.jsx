@@ -445,7 +445,12 @@ export default function QueuePage() {
               </div>
               <div className="queues-list">
                 {queues.map((queue) => (
-                  <div key={queue.queueId} className="queue-card active-queue-card">
+                  <div
+                    key={queue.queueId}
+                    className="queue-card active-queue-card"
+                    onClick={() => navigate('/student/queue-status', { state: { queueId: queue.queueId } })}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <div className="queue-card-content">
                       <div className="queue-left">
                         <img
@@ -521,7 +526,7 @@ export default function QueuePage() {
                       </div>
                       <button
                         className="queue-leave-btn"
-                        onClick={() => handleLeaveQueue(queue.queueId)}
+                        onClick={(e) => { e.stopPropagation(); handleLeaveQueue(queue.queueId); }}
                         disabled={leavingQueueId === queue.queueId}
                         title="Leave this queue"
                         type="button"

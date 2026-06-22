@@ -396,6 +396,7 @@ export default function StudentDashboard() {
     {
       title: "Queue Position",
       value: dashLoading ? "—" : String(dashStats?.stats?.queuePosition ?? 0),
+      badge: dashLoading ? null : (dashStats?.stats?.queueNumberBadge ?? null),
       description: dashLoading
         ? "Loading..."
         : activeQueueCount > 0
@@ -733,6 +734,25 @@ export default function StudentDashboard() {
                   >
                     {stat.value}
                   </p>
+                  {stat.badge && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: "rgba(34,197,94,0.15)",
+                        color: "var(--primary-color)",
+                        border: "1px solid rgba(34,197,94,0.3)",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.7rem",
+                        fontWeight: 700,
+                        fontFamily: "monospace",
+                        letterSpacing: "0.05em",
+                        padding: "0.2rem 0.5rem",
+                        marginBottom: "0.25rem",
+                      }}
+                    >
+                      {stat.badge}
+                    </span>
+                  )}
                   <p className="stat-title">{stat.title}</p>
                   <p className="stat-description">{stat.description}</p>
                 </div>
