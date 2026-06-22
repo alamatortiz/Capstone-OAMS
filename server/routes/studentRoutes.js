@@ -132,7 +132,7 @@ router.get(
              dr.status,
              dr.created_at AS event_time
            FROM document_requests dr
-           JOIN services s ON dr.service_id = s.service_id
+           JOIN document_services s ON dr.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id
            WHERE dr.student_id = ?
          )
@@ -340,7 +340,7 @@ router.get(
            dr.created_at,
            d.department_name AS college
          FROM document_requests dr
-         JOIN services s ON dr.service_id = s.service_id
+         JOIN document_services s ON dr.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE dr.student_id = ?
          ORDER BY dr.created_at DESC`,
@@ -402,7 +402,7 @@ router.post(
 
       const [exactMatch] = await pool.query(
         `SELECT s.service_id
-         FROM services s
+         FROM document_services s
          JOIN departments d ON s.department_id = d.department_id
          WHERE s.service_name = ? AND d.department_name = ?
          LIMIT 1`,
@@ -410,11 +410,11 @@ router.post(
       );
       if (exactMatch.length) serviceId = exactMatch[0].service_id;
 
-      // 2. Fall back to any service under that college
+      // 2. Fall back to any document service under that college
       if (!serviceId) {
         const [deptMatch] = await pool.query(
           `SELECT s.service_id
-           FROM services s
+           FROM document_services s
            JOIN departments d ON s.department_id = d.department_id
            WHERE d.department_name = ?
            LIMIT 1`,
@@ -423,7 +423,7 @@ router.post(
         if (deptMatch.length) serviceId = deptMatch[0].service_id;
       }
 
-      // 3. Fall back to any service under the student's own department
+      // 3. Fall back to any document service under the student's own department
       if (!serviceId) {
         const [[stu]] = await pool.query(
           `SELECT department_id FROM students WHERE student_id = ?`,
@@ -431,7 +431,7 @@ router.post(
         );
         if (stu) {
           const [deptDefault] = await pool.query(
-            `SELECT service_id FROM services WHERE department_id = ? LIMIT 1`,
+            `SELECT service_id FROM document_services WHERE department_id = ? LIMIT 1`,
             [stu.department_id],
           );
           if (deptDefault.length) serviceId = deptDefault[0].service_id;
@@ -465,7 +465,7 @@ router.post(
            dr.status, dr.estimated_completion, dr.notes, dr.created_at,
            d.department_name AS college
          FROM document_requests dr
-         JOIN services s ON dr.service_id = s.service_id
+         JOIN document_services s ON dr.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE dr.request_id = ?`,
         [result.insertId],
@@ -1180,7 +1180,7 @@ router.get(
          FROM appointments a
          JOIN faculty      f ON a.faculty_id    = f.faculty_id
          JOIN departments  d ON f.department_id = d.department_id
-         LEFT JOIN services s ON a.service_id   = s.service_id
+         LEFT JOIN appointment_services s ON a.service_id   = s.service_id
          WHERE a.student_id = ?
          ORDER BY a.appointment_date DESC, a.appointment_time DESC`,
         [studentId],
@@ -1235,34 +1235,38 @@ router.get(
   },
 );
 
-// GET /api/student/appointments/services?departmentId=1001
-// Returns all services belonging to the given department.
-// Used to populate the Service dropdown after College is chosen.
+// GET /api/student/appointments/faculty?departmentId=1001
+// Returns faculty members, optionally filtered by department.
+// This is the first step in booking — student picks a faculty member.
 router.get(
-  "/appointments/services",
+  "/appointments/faculty",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
-    const departmentId = parseInt(req.query.departmentId, 10);
-
-    if (!departmentId || isNaN(departmentId)) {
-      return res
-        .status(400)
-        .json({ error: "departmentId query parameter is required" });
-    }
+    const departmentId = req.query.departmentId
+      ? parseInt(req.query.departmentId, 10)
+      : null;
 
     try {
       const [rows] = await pool.query(
-        `SELECT service_id, service_name, description
-         FROM services
-         WHERE department_id = ?
-         ORDER BY service_name ASC`,
-        [departmentId],
+        `SELECT
+           f.faculty_id,
+           CONCAT(f.first_name, ' ', f.last_name) AS name,
+           f.specialization,
+           f.position,
+           d.department_id,
+           d.department_name AS college,
+           d.department_abbreviation AS college_abbrev
+         FROM faculty f
+         JOIN departments d ON f.department_id = d.department_id
+         ${departmentId ? "WHERE f.department_id = ?" : ""}
+         ORDER BY d.department_name ASC, f.last_name ASC`,
+        departmentId ? [departmentId] : [],
       );
 
-      res.json({ services: rows });
+      res.json({ faculty: rows });
     } catch (error) {
-      console.error("Fetch services error:", error);
+      console.error("Fetch faculty error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
@@ -1270,49 +1274,34 @@ router.get(
   },
 );
 
-// GET /api/student/appointments/faculty?serviceId=1
-// Returns faculty members whose department owns the given service.
-// Faculty dropdown is always scoped to the selected College → Service.
+// GET /api/student/appointments/services?facultyId=102
+// Returns appointment services created by the given faculty member.
+// Used to populate the Service dropdown after a faculty member is chosen.
 router.get(
-  "/appointments/faculty",
+  "/appointments/services",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
-    const serviceId = parseInt(req.query.serviceId, 10);
+    const facultyId = parseInt(req.query.facultyId, 10);
 
-    if (!serviceId || isNaN(serviceId)) {
+    if (!facultyId || isNaN(facultyId)) {
       return res
         .status(400)
-        .json({ error: "serviceId query parameter is required" });
+        .json({ error: "facultyId query parameter is required" });
     }
 
     try {
-      // Resolve the department that owns this service
-      const [[serviceRow]] = await pool.query(
-        `SELECT department_id FROM services WHERE service_id = ?`,
-        [serviceId],
-      );
-
-      if (!serviceRow) {
-        return res.status(404).json({ error: "Service not found" });
-      }
-
       const [rows] = await pool.query(
-        `SELECT
-           f.faculty_id,
-           CONCAT(f.first_name, ' ', f.last_name) AS name,
-           f.specialization,
-           d.department_name AS college
-         FROM faculty f
-         JOIN departments d ON f.department_id = d.department_id
-         WHERE f.department_id = ?
-         ORDER BY f.last_name ASC`,
-        [serviceRow.department_id],
+        `SELECT service_id, service_name, description
+         FROM appointment_services
+         WHERE faculty_id = ?
+         ORDER BY service_name ASC`,
+        [facultyId],
       );
 
-      res.json({ faculty: rows });
+      res.json({ services: rows });
     } catch (error) {
-      console.error("Fetch faculty error:", error);
+      console.error("Fetch appointment services error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
@@ -1348,14 +1337,19 @@ router.post(
     }
 
     try {
-      // Resolve department_id from the selected service
+      // Verify the service exists and belongs to the selected faculty
       const [[serviceRow]] = await pool.query(
-        `SELECT department_id FROM services WHERE service_id = ?`,
-        [serviceId],
+        `SELECT aps.service_id, f.department_id
+         FROM appointment_services aps
+         JOIN faculty f ON aps.faculty_id = f.faculty_id
+         WHERE aps.service_id = ? AND aps.faculty_id = ?`,
+        [serviceId, facultyId],
       );
 
       if (!serviceRow) {
-        return res.status(404).json({ error: "Selected service not found" });
+        return res
+          .status(404)
+          .json({ error: "Selected service not found or does not belong to this faculty member" });
       }
 
       // Prevent duplicate booking for the same student + faculty + date + time
@@ -1403,9 +1397,9 @@ router.post(
            d.department_name                       AS college,
            d.office_location                       AS location
          FROM appointments a
-         JOIN services    s ON a.service_id    = s.service_id
-         JOIN faculty     f ON a.faculty_id    = f.faculty_id
-         JOIN departments d ON f.department_id = d.department_id
+         JOIN appointment_services s ON a.service_id    = s.service_id
+         JOIN faculty              f ON a.faculty_id    = f.faculty_id
+         JOIN departments          d ON f.department_id = d.department_id
          WHERE a.appointment_id = ?`,
         [result.insertId],
       );
@@ -1637,7 +1631,7 @@ router.get(
              dr.purpose AS details,
              dr.created_at AS event_time
            FROM document_requests dr
-           JOIN services s ON dr.service_id = s.service_id
+           JOIN document_services s ON dr.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id
            WHERE dr.student_id = ?
          )

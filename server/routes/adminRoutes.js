@@ -38,7 +38,7 @@ router.get(
       const [[docRow]] = await pool.query(
         `SELECT COUNT(*) AS pending_doc_count
          FROM document_requests dr
-         JOIN services s ON dr.service_id = s.service_id
+         JOIN document_services s ON dr.service_id = s.service_id
          WHERE dr.status IN ('pending', 'processing')
            AND (? IS NULL OR s.department_id = ?)`,
         [deptId, deptId],
@@ -71,7 +71,7 @@ router.get(
            d.department_abbreviation AS college
          FROM document_requests dr
          JOIN students st ON dr.student_id = st.student_id
-         JOIN services s ON dr.service_id = s.service_id
+         JOIN document_services s ON dr.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE dr.status IN ('pending', 'processing')
            AND (? IS NULL OR s.department_id = ?)
@@ -674,7 +674,7 @@ router.get(
         JOIN students     s   ON a.student_id   = s.student_id
         JOIN faculty       f   ON a.faculty_id    = f.faculty_id
         JOIN departments   d   ON a.department_id = d.department_id
-        LEFT JOIN services svc ON a.service_id    = svc.service_id
+        LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
         WHERE a.department_id = ?
         ORDER BY a.created_at DESC`,
         [deptId],
@@ -826,7 +826,7 @@ router.get(
               dr.status AS raw_status,
               dr.created_at AS event_time
             FROM document_requests dr
-            JOIN services s ON dr.service_id = s.service_id
+            JOIN document_services s ON dr.service_id = s.service_id
             JOIN departments d ON s.department_id = d.department_id
             JOIN students st ON dr.student_id = st.student_id
             WHERE s.department_id = ?
