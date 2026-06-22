@@ -568,6 +568,199 @@ body {
   background: #475569;
 }
 
+/* ===== AI Chatbot ===== */
+.chat-widget {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.chat-fab {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+  transition: all 0.2s ease;
+}
+
+.chat-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.5);
+}
+
+.chat-fab.hidden {
+  display: none;
+}
+
+.chat-fab .icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke: white;
+}
+
+.chat-container {
+  width: 20rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  color: white;
+}
+
+.chat-header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.chat-close-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  transition: background-color 0.2s ease;
+}
+
+.chat-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.chat-close-btn svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 20rem;
+  min-height: 10rem;
+}
+
+.message {
+  display: flex;
+  max-width: 85%;
+}
+
+.message-bot {
+  align-self: flex-start;
+}
+
+.message-user {
+  align-self: flex-end;
+}
+
+.message-content {
+  padding: 0.625rem 0.875rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.message-bot .message-content {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--text-primary);
+  border-bottom-left-radius: 0.25rem;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.message-user .message-content {
+  background: var(--primary-color);
+  color: white;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.chat-input-form {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--card-border);
+  transition: border-color 0.3s ease;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.chat-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.chat-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.chat-send-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  background: var(--primary-color);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.chat-send-btn:hover {
+  background: var(--primary-dark);
+  transform: scale(1.05);
+}
+
+.chat-send-btn .icon {
+  width: 1rem;
+  height: 1rem;
+  stroke: white;
+}
+
 /* ===== Welcome Banner ===== */
 .welcome-banner.admin-banner {
   position: relative;
@@ -690,7 +883,6 @@ body {
   margin-bottom: 0.75rem;
 }
 
-
 .stat-title,
 .stat-value,
 .stat-description {
@@ -698,11 +890,9 @@ body {
   width: 100%;
 }
 
-/* Ensure description text aligns left on all stat-card sizes */
 .stat-description {
   text-align: left;
 }
-
 
 .stat-icon {
   width: 2.5rem;
@@ -885,7 +1075,6 @@ body {
   gap: 0.75rem;
 }
 
-
 .admin-tool-text {
   width: 100%;
   display: flex;
@@ -913,17 +1102,6 @@ body {
   box-shadow: 0 8px 16px rgba(34, 197, 94, 0.1);
 }
 
-.tool-icon {
-  font-size: 1.75rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-  border-radius: 0.75rem;
-}
-
 .admin-tool-icon {
   width: 3rem;
   height: 3rem;
@@ -936,8 +1114,15 @@ body {
   transition: all 0.3s ease;
 }
 
+/* ── Admin tool icon background colours ── */
 .admin-tool-icon.bg-orange-500 {
   background: #f97316;
+}
+
+/* ★ Violet background for the Data Management database icon */
+.admin-tool-icon.bg-data-green {
+  background: #7c3aed;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
 }
 
 .admin-tool-icon.bg-purple-500 {
@@ -952,6 +1137,7 @@ body {
   background: #06b6d4;
 }
 
+/* Fill-based icons (QueueAnalytics, Sync, QRCode) */
 .admin-tool-icon svg {
   width: 1.5rem;
   height: 1.5rem;
@@ -963,6 +1149,13 @@ body {
   height: 1.5rem;
   color: white;
   fill: currentColor;
+}
+
+/* Stroke-only icons must not be filled — override tool-icon-svg fill */
+.admin-tool-icon.bg-data-green svg {
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
 }
 
 .tool-title {
@@ -1229,42 +1422,6 @@ body {
   transform: translateY(-1px);
 }
 
-.btn-announcement-edit {
-  padding: 0.45rem 0.85rem;
-  border-radius: 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
-  transition: all 0.2s ease;
-}
-
-.btn-announcement-edit:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.55);
-  transform: translateY(-1px);
-}
-
-.btn-announcement-delete {
-  padding: 0.45rem 0.85rem;
-  border-radius: 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
-  transition: all 0.2s ease;
-}
-
-.btn-announcement-delete:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.65);
-  transform: translateY(-1px);
-}
-
 .announcement-tag {
   padding: 0.375rem 0.75rem;
   border-radius: 0.375rem;
@@ -1438,7 +1595,6 @@ body {
   margin-top: 0.1rem;
 }
 
-/* Pending Requested Documents - date aligned to the right side */
 .document-meta-row {
   display: flex;
   align-items: center;
@@ -1457,30 +1613,12 @@ body {
   margin-left: auto;
 }
 
-/* College color hints for Pending Requested Documents */
-.document-college.college-CCS {
-  color: #f97316; /* Orange */
-}
-
-.document-college.college-CBAA {
-  color: #facc15; /* Yellow */
-}
-
-.document-college.college-COED {
-  color: #2563eb; /* Blue */
-}
-
-.document-college.college-COE {
-  color: #ef4444; /* Red */
-}
-
-.document-college.college-CAS {
-  color: #7f1d1d; /* Maroon */
-}
-
-.document-college.college-CHAS {
-  color: #22c55e; /* Green */
-}
+.document-college.college-CCS  { color: #f97316; }
+.document-college.college-CBAA { color: #facc15; }
+.document-college.college-COED { color: #2563eb; }
+.document-college.college-COE  { color: #ef4444; }
+.document-college.college-CAS  { color: #7f1d1d; }
+.document-college.college-CHAS { color: #22c55e; }
 
 .document-badge,
 .queue-badge {
@@ -1544,7 +1682,6 @@ body {
   margin-top: 1.5rem;
   text-align: left;
 }
-
 
 @media (max-width: 1024px) {
   .faculty-grid {
@@ -1617,6 +1754,27 @@ body {
   margin: 0;
   transition: color 0.3s ease;
   font-weight: 500;
+}
+
+/* ===== Error banner ===== */
+.dash-error-banner {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  color: #ef4444;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* ===== Activity placeholders ===== */
+.activity-loading,
+.activity-empty {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  padding: 1rem 0;
+  text-align: left;
+  transition: color 0.3s ease;
 }
 
 /* ===== Responsive ===== */
@@ -1749,13 +1907,11 @@ body {
     padding: 0.5rem;
   }
 
-  /* Admin tool cards: stack icon and text on very small screens */
   .admin-tool-card {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
   }
-
 
   .banner-title {
     font-size: 1.25rem;

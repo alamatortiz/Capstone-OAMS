@@ -251,19 +251,19 @@ const UserManagementIcon = () => (
     <path d="M18 5l1 1"></path>
   </svg>
 );
-const DataManagementIcon = () => (
+const DatabaseIcon = () => (
   <svg
-    className="tool-icon-svg"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    style={{ width: "1.5rem", height: "1.5rem" }}
   >
-    <ellipse cx="12" cy="5" rx="8" ry="3" />
-    <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
-    <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+    <ellipse cx="12" cy="5" rx="9" ry="3" fill="none" />
+    <path d="M21 5v6c0 1.66-4.03 3-9 3S3 12.66 3 11V5" fill="none" />
+    <path d="M21 11v6c0 1.66-4.03 3-9 3S3 18.66 3 17v-6" fill="none" />
   </svg>
 );
 const QueueAnalyticsIcon = () => (
@@ -299,7 +299,6 @@ const HostQueueIcon = () => (
 );
 
 // ── Static tool/action arrays ─────────────────────────────────────────────────
-// ★ CHANGE: User Management now has a path so its card navigates on click
 const adminTools = [
   {
     icon: UserManagementIcon,
@@ -309,10 +308,11 @@ const adminTools = [
     path: "/admin/user-management",
   },
   {
-    icon: DataManagementIcon,
-    iconColor: "bg-purple-500",
+    icon: DatabaseIcon,
+    iconColor: "bg-data-green",
     title: "Data Management",
     description: "Configure settings",
+    path: "/admin/data-management",
   },
   {
     icon: QueueAnalyticsIcon,
@@ -756,7 +756,6 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="admin-tools-grid">
-              {/* ★ CHANGE: tool cards with a path are now clickable */}
               {adminTools.map((tool) => (
                 <div
                   key={tool.title}

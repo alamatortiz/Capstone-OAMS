@@ -50,9 +50,14 @@ const AdminAnnouncements = React.lazy(
   () => import("./pages/admin/admin_announcements.jsx"),
 );
 
-// ★ NEW — Admin User Management
+// ★ Admin User Management
 const AdminUserManagement = React.lazy(
   () => import("./pages/admin/admin_user_management.jsx"),
+);
+
+// ★ Admin Data Management
+const AdminDataManagement = React.lazy(
+  () => import("./pages/admin/admin_data_management.jsx"),
 );
 
 import AppointmentsPage from "./pages/student/appointments.jsx";
@@ -243,12 +248,22 @@ createRoot(document.getElementById("root")).render(
                 }
               />
 
-              {/* ★ NEW — Admin User Management Route */}
+              {/* Admin User Management Route */}
               <Route
                 path="/admin/user-management"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <AdminUserManagement />
+                  </Suspense>
+                }
+              />
+
+              {/* ★ Admin Data Management Route */}
+              <Route
+                path="/admin/data-management"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminDataManagement />
                   </Suspense>
                 }
               />
@@ -350,12 +365,21 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-            {/* ★ NEW — Backward-compatible temp route for user management */}
+            {/* Backward-compatible temp route for user management */}
             <Route
               path="/admin-user-management"
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AdminUserManagement />
+                </Suspense>
+              }
+            />
+            {/* ★ Backward-compatible temp route for data management */}
+            <Route
+              path="/admin-data-management"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminDataManagement />
                 </Suspense>
               }
             />
