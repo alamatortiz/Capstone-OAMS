@@ -53,6 +53,11 @@ const AdminScanDocument = React.lazy(
   () => import("./pages/admin/admin_scan_document.jsx"),
 );
 
+// ★ Admin Queue Analytics
+const AdminQueueAnalytics = React.lazy(
+  () => import("./pages/admin/admin_queue_analytics.jsx"),
+);
+
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
@@ -233,6 +238,15 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
+              {/* ★ Admin Queue Analytics Route */}
+              <Route
+                path="/admin/queue-analytics"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueueAnalytics />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes ──────────────── */}
@@ -341,6 +355,15 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AdminScanDocument />
+                </Suspense>
+              }
+            />
+            {/* Backward-compatible temp route for queue analytics */}
+            <Route
+              path="/admin-queue-analytics"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminQueueAnalytics />
                 </Suspense>
               }
             />

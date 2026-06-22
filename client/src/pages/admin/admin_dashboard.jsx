@@ -319,6 +319,7 @@ const adminTools = [
     iconColor: "bg-blue-600",
     title: "Queue Analytics",
     description: "Performance metrics",
+    path: "/admin/queue-analytics",
   },
   {
     icon: SyncIcon,
