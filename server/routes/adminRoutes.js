@@ -909,6 +909,65 @@ router.get(
   },
 );
 
+// GET /api/admin/queue-hosting/:slotId/entries
+// Returns all queue entries (students) for a specific slot, scoped to admin's department.
+router.get(
+  "/queue-hosting/:slotId/entries",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[slot]] = await pool.query(
+        `SELECT qs.slot_id FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? AND s.department_id = ?`,
+        [slotId, deptId],
+      );
+      if (!slot) {
+        return res.status(404).json({ error: "Queue slot not found or not in your department" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+           q.queue_number,
+           q.status,
+           q.notes,
+           q.created_at,
+           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+           st.student_number,
+           d.department_abbreviation
+         FROM queues q
+         JOIN students st ON q.student_id = st.student_id
+         JOIN services s ON q.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE q.slot_id = ?
+         ORDER BY q.queue_number ASC`,
+        [slotId],
+      );
+
+      const entries = rows.map((r) => ({
+        queueNumber: `${r.department_abbreviation}-${String(r.queue_number).padStart(3, "0")}`,
+        studentName: r.student_name,
+        studentId: r.student_number,
+        concern: r.notes || "No concern specified",
+        joinedAt: formatTime(new Date(r.created_at).toTimeString().slice(0, 8)),
+        status: r.status,
+      }));
+
+      res.json({ entries });
+    } catch (error) {
+      console.error("Queue entries fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 function formatTime(timeStr) {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":");
