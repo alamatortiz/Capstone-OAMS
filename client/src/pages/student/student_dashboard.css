@@ -1032,10 +1032,6 @@ body {
   background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
 }
 
-.action-gradient-6 {
-  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
-}
-
 .action-badge {
   background: rgba(34, 197, 94, 0.15);
   color: var(--primary-light);

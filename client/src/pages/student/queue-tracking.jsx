@@ -767,21 +767,6 @@ export default function QueueTrackingPage() {
                       Overview of your total queue activity
                     </p>
 
-                    <div className="qt-analytics-stat">
-                      <div className="qt-stat-header">
-                        <span>Success Rate</span>
-                        <span className="qt-stat-percentage">
-                          {successRate}%
-                        </span>
-                      </div>
-                      <div className="qt-progress-bar">
-                        <div
-                          className="qt-progress-fill"
-                          style={{ width: `${successRate}%` }}
-                        />
-                      </div>
-                    </div>
-
                     <div className="qt-analytics-grid-2">
                       <div className="qt-stat-box">
                         <p className="qt-stat-label">Total Joined</p>

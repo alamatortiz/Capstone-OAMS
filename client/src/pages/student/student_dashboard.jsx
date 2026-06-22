@@ -476,14 +476,6 @@ export default function StudentDashboard() {
       badge: "New Slots",
     },
     {
-      title: "View Queue Status",
-      description: "Track your real-time position across all active queues.",
-      icon: TimerIcon,
-      link: "/student/queue-status",
-      gradient: "from-rose-500 to-pink-600",
-      badge: `${activeQueueCount} Active`,
-    },
-    {
       title: "Queue Tracking",
       description:
         "View detailed analytics and history of all your queue activities.",
