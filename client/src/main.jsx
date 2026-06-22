@@ -1,7 +1,7 @@
 import React, { Suspense } from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import App from "./App.jsx";
 import Login from "./pages/Login.tsx";
@@ -51,26 +51,12 @@ const AdminDataManagement = React.lazy(
   () => import("./pages/admin/admin_data_management.jsx"),
 );
 
-// ★ Admin Scan Document
-const AdminScanDocument = React.lazy(
-  () => import("./pages/admin/admin_scan_document.jsx"),
-);
-
-// ★ Admin Queue Analytics
-const AdminQueueAnalytics = React.lazy(
-  () => import("./pages/admin/admin_queue_analytics.jsx"),
-);
-
-// ★ Admin PinnaCle Sync
-const AdminPinnacleSync = React.lazy(
-  () => import("./pages/admin/admin_pinnacle_sync.jsx"),
-);
-
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
 import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
+
 import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminAppointment from "./pages/admin/AdminAppointment.jsx";
@@ -159,7 +145,19 @@ createRoot(document.getElementById("root")).render(
                 path="/professor/dashboard"
                 element={<ProfessorDashboard />}
               />
-              <Route path="/professor/queue" element={<ProfessorQueue />} />
+              <Route
+                path="/professor/queue"
+                element={<Navigate to="/professor/appointments" replace />}
+              />
+              {/* ★ Appointments page */}
+              <Route
+                path="/professor/appointments"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorAppointmentsPage />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* ─── Protected Admin Routes ────────────────────────────────────── */}
@@ -335,7 +333,19 @@ createRoot(document.getElementById("root")).render(
               path="/professor-dashboard"
               element={<ProfessorDashboard />}
             />
-            <Route path="/professor-queue" element={<ProfessorQueue />} />
+            <Route
+              path="/professor-queue"
+              element={<Navigate to="/professor/appointments" replace />}
+            />
+            {/* ★ Backward-compatible temp route for professor appointments */}
+            <Route
+              path="/professor-appointments"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <ProfessorAppointmentsPage />
+                </Suspense>
+              }
+            />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route
               path="/admin-queue-management"

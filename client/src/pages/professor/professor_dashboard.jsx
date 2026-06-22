@@ -14,12 +14,7 @@ const HomeIcon = () => (
     <polyline points="9 22 9 12 15 12 15 22"></polyline>
   </svg>
 );
-const QueueIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-);
+
 const CalendarIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -363,7 +358,6 @@ export default function ProfessorDashboard() {
 
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
-    { icon: QueueIconNav, label: "Queue", path: "/professor/queue" },
     {
       icon: CalendarIconNav,
       label: "Appointments",
@@ -376,6 +370,7 @@ export default function ProfessorDashboard() {
       path: "/professor/transactions",
     },
   ];
+
 
   return (
     <div className="dashboard-with-sidebar">
@@ -536,7 +531,7 @@ export default function ProfessorDashboard() {
                 {loading ? (
                   <p className="activity-loading">Loading appointments...</p>
                 ) : todayAppointments.length === 0 ? (
-                  <p className="activity-empty">
+                  <p className="appointment-empty">
                     No appointments scheduled for today.
                   </p>
                 ) : (
