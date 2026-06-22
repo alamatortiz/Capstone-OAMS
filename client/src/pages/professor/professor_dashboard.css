@@ -423,6 +423,13 @@ body {
   background-color: rgba(34, 197, 94, 0.15);
   color: var(--primary-color);
   font-weight: 600;
+  cursor: default;
+  pointer-events: none;
+}
+
+.nav-item.active:hover {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
 }
 
 .nav-icon-medium {
