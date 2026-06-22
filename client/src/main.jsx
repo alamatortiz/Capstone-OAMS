@@ -16,9 +16,6 @@ const QueueStatusPage = React.lazy(
 const QueueTrackingPage = React.lazy(
   () => import("./pages/student/queue-tracking.jsx"),
 );
-const AvailServicesPage = React.lazy(
-  () => import("./pages/student/avail-services.jsx"),
-);
 const AnnouncementsPage = React.lazy(
   () => import("./pages/student/announcements.jsx"),
 );
@@ -101,14 +98,6 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <QueueTrackingPage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/student/avail-service"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AvailServicesPage />
                   </Suspense>
                 }
               />
@@ -263,14 +252,6 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <QueueTrackingPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/student-avail-service"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AvailServicesPage />
                 </Suspense>
               }
             />
