@@ -1,0 +1,752 @@
+/* ===================================================================
+   admin_queue_analytics.css
+   All classes prefixed with "aqa-" to avoid collision with other pages
+   =================================================================== */
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.aqa-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", sans-serif;
+}
+
+.aqa-main {
+  flex: 1;
+  margin-left: var(--sidebar-width, 14rem);
+  padding: 2rem;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .aqa-main {
+    margin-left: 0;
+    padding: 1rem;
+    padding-top: 5rem;
+  }
+}
+
+.aqa-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Banner ─────────────────────────────────────────────────────── */
+.aqa-banner {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  border-radius: 1rem;
+  padding: 1.75rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: #fff;
+}
+
+.aqa-banner-icon {
+  display: flex;
+  align-items: center;
+  opacity: 0.9;
+}
+
+.aqa-banner-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.aqa-banner-subtitle {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  margin: 0.25rem 0 0;
+}
+
+/* ── Filters Card ───────────────────────────────────────────────── */
+.aqa-filters-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.aqa-filters-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.aqa-filters-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.aqa-filters-sub {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+  margin: 0.2rem 0 0;
+}
+
+.aqa-filters-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.aqa-btn-outline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.aqa-btn-outline:hover {
+  background: var(--muted);
+}
+
+.aqa-filters-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .aqa-filters-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aqa-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.aqa-filter-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+/* Read-only department display */
+.aqa-filter-display {
+  padding: 0.55rem 0.85rem;
+  background: var(--input-background, var(--muted));
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--foreground);
+  opacity: 0.75;
+  user-select: none;
+}
+
+/* ── Dropdown ───────────────────────────────────────────────────── */
+.aqa-dropdown-wrapper {
+  position: relative;
+  cursor: pointer;
+}
+
+.aqa-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.85rem;
+  background: var(--input-background, var(--muted));
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--foreground);
+  user-select: none;
+}
+
+.aqa-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  z-index: 100;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.aqa-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.aqa-dropdown-item:hover {
+  background: var(--muted);
+}
+.aqa-dropdown-item.selected {
+  background: var(--accent);
+  color: var(--primary-color);
+}
+
+/* ── Stats Row ──────────────────────────────────────────────────── */
+.aqa-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .aqa-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .aqa-stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aqa-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.aqa-stat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.aqa-stat-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.aqa-stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.4rem;
+}
+
+.aqa-stat-green {
+  color: #22c55e;
+}
+.aqa-stat-blue {
+  color: #3b82f6;
+}
+.aqa-stat-purple {
+  color: #a855f7;
+}
+.aqa-stat-orange {
+  color: #f97316;
+}
+
+.aqa-stat-sub {
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────── */
+.aqa-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 0.3rem;
+  width: fit-content;
+}
+
+.aqa-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 0.4rem;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.aqa-tab:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.aqa-tab-active {
+  background: var(--accent);
+  color: var(--primary-color);
+}
+
+/* ── Insights ───────────────────────────────────────────────────── */
+.aqa-insights-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .aqa-insights-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aqa-insights-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.aqa-insights-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  height: 100%;
+}
+
+.aqa-insights-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.aqa-insights-card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.aqa-insights-card-sub {
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+  margin: 0.15rem 0 0;
+}
+
+.aqa-insights-positive .aqa-insights-card-header svg {
+  color: #22c55e;
+}
+.aqa-insights-warning .aqa-insights-card-header svg {
+  color: #f97316;
+}
+
+.aqa-insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.aqa-insight-item {
+  border-left: 3px solid;
+  padding: 0.75rem 1rem;
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+
+.aqa-insight-green {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.07);
+}
+
+.aqa-insight-orange {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.07);
+}
+
+.aqa-insight-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--foreground);
+  margin: 0 0 0.3rem;
+}
+
+.aqa-insight-desc {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Trends ─────────────────────────────────────────────────────── */
+.aqa-trends-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .aqa-trends-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aqa-trend-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.aqa-trend-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.aqa-trend-sub {
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+  margin: -0.5rem 0 0;
+}
+
+.aqa-trend-item {
+  border-radius: 0.5rem;
+  padding: 0.85rem 1rem;
+}
+
+.aqa-trend-item-blue {
+  background: rgba(59, 130, 246, 0.1);
+}
+.aqa-trend-item-green {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.aqa-trend-item-label {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--foreground);
+  margin: 0 0 0.3rem;
+}
+
+.aqa-trend-item-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.2rem;
+}
+
+.aqa-trend-item-note {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.aqa-weekly-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+  background: var(--muted);
+  border-radius: 0.4rem;
+}
+
+.aqa-weekly-label {
+  font-size: 0.85rem;
+  color: var(--foreground);
+}
+
+.aqa-weekly-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.aqa-weekly-value {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.aqa-weekly-change {
+  font-size: 0.75rem;
+  background: var(--accent);
+  color: var(--primary-color);
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+/* ── Performance ─────────────────────────────────────────────────── */
+.aqa-performance-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.aqa-perf-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--foreground);
+  margin: 0 0 0.25rem;
+}
+
+.aqa-perf-sub {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+  margin: 0 0 1rem;
+}
+
+.aqa-perf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.aqa-perf-card {
+  background: var(--muted);
+  border-radius: 0.6rem;
+  padding: 1rem 1.25rem;
+}
+
+.aqa-perf-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.aqa-perf-service {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--foreground);
+}
+
+.aqa-perf-college {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--accent);
+  color: var(--primary-color);
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.aqa-perf-status {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.aqa-status-excellent {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+.aqa-status-good {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+.aqa-status-needs {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+.aqa-perf-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .aqa-perf-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.aqa-perf-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.aqa-perf-metric-label {
+  font-size: 0.72rem;
+  color: var(--muted-foreground);
+}
+
+.aqa-perf-metric-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+/* ── AI Chatbot ──────────────────────────────────────────────────── */
+.aqa-chat-widget {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.aqa-chat-container {
+  width: 320px;
+  max-height: 440px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.aqa-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  background: var(--primary-color);
+  color: #fff;
+}
+
+.aqa-chat-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.aqa-chat-close-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.aqa-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aqa-message {
+  display: flex;
+}
+.aqa-message-user {
+  justify-content: flex-end;
+}
+.aqa-message-bot {
+  justify-content: flex-start;
+}
+
+.aqa-message-content {
+  max-width: 80%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 1rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.aqa-message-user .aqa-message-content {
+  background: var(--primary-color);
+  color: #fff;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.aqa-message-bot .aqa-message-content {
+  background: var(--muted);
+  color: var(--foreground);
+  border-bottom-left-radius: 0.25rem;
+}
+
+.aqa-chat-input-form {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.aqa-chat-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--foreground);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.aqa-chat-input:focus {
+  border-color: var(--primary-color);
+}
+
+.aqa-chat-send-btn {
+  padding: 0.5rem;
+  background: var(--primary-color);
+  border: none;
+  border-radius: 0.5rem;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aqa-chat-fab {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--primary-color);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.35);
+  transition: transform 0.15s;
+}
+
+.aqa-chat-fab:hover {
+  transform: scale(1.08);
+}
+.aqa-chat-fab.hidden {
+  display: none;
+}
+
+.aqa-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
