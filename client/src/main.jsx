@@ -41,6 +41,15 @@ const AdminDocumentProcessing = React.lazy(
 const AdminProfessorAvailability = React.lazy(
   () => import("./pages/admin/admin-professor-availability.jsx"),
 );
+const AdminScanDocument = React.lazy(
+  () => import("./pages/admin/admin_scan_document.jsx"),
+);
+const AdminQueueAnalytics = React.lazy(
+  () => import("./pages/admin/admin_queue_analytics.jsx"),
+);
+const AdminPinnacleSync = React.lazy(
+  () => import("./pages/admin/admin_pinnacle_sync.jsx"),
+);
 const AdminAnnouncements = React.lazy(
   () => import("./pages/admin/admin_announcements.jsx"),
 );
@@ -57,7 +66,9 @@ import TransactionsPage from "./pages/student/transactions.jsx";
 import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 
-import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
+const ProfessorAppointmentsPage = React.lazy(
+  () => import("./pages/professor/ProfessorAppointmentsPage.jsx"),
+);
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminAppointment from "./pages/admin/AdminAppointment.jsx";
 import AdminTransaction from "./pages/admin/AdminTransactions.jsx";

@@ -5,6 +5,7 @@ import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin-professor-availability.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -139,154 +140,12 @@ const MailIcon = ({ className }) => (
     <polyline points="22 6 12 13 2 6"></polyline>
   </svg>
 );
-const PhoneIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path>
-  </svg>
-);
 const MapPinIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
     <circle cx="12" cy="10" r="3"></circle>
   </svg>
 );
-
-// ── Faculty data ──────────────────────────────────────────────────────────
-const facultyData = [
-  {
-    id: "f1",
-    name: "Prof. Maria Santos",
-    position: "Department Chair",
-    college: "College of Computing Studies (CCS)",
-    status: "available",
-    nextAvailableSlot: "10:00 AM - 11:00 AM",
-    email: "maria.santos@ucab.edu.ph",
-    contactNumber: "0912-345-6789",
-    todaySchedule: [
-      { time: "9:00 AM - 10:00 AM", activity: "Consultation", location: "CCS Faculty Room 201", status: "booked" },
-      { time: "10:00 AM - 11:00 AM", activity: "Available", location: "CCS Faculty Room 201", status: "free" },
-      { time: "11:00 AM - 12:00 PM", activity: "Meeting", location: "Conference Room", status: "booked" },
-      { time: "2:00 PM - 3:00 PM", activity: "Available", location: "CCS Faculty Room 201", status: "free" },
-      { time: "3:00 PM - 4:00 PM", activity: "Consultation", location: "CCS Faculty Room 201", status: "booked" },
-    ],
-  },
-  {
-    id: "f2",
-    name: "Prof. Juan Reyes",
-    position: "Faculty Member",
-    college: "College of Computing Studies (CCS)",
-    status: "busy",
-    currentActivity: "In consultation with student",
-    nextAvailableSlot: "2:00 PM - 3:00 PM",
-    email: "juan.reyes@ucab.edu.ph",
-    contactNumber: "0923-456-7890",
-    todaySchedule: [
-      { time: "10:00 AM - 11:00 AM", activity: "Consultation", location: "CCS Faculty Room 203", status: "booked" },
-      { time: "11:00 AM - 12:00 PM", activity: "Class", location: "Room 305", status: "booked" },
-      { time: "2:00 PM - 3:00 PM", activity: "Available", location: "CCS Faculty Room 203", status: "free" },
-      { time: "3:00 PM - 4:00 PM", activity: "Available", location: "CCS Faculty Room 203", status: "free" },
-    ],
-  },
-  {
-    id: "f3",
-    name: "Dr. Roberto Cruz",
-    position: "Dean",
-    college: "College of Business Accountancy and Administration (CBAA)",
-    status: "available",
-    nextAvailableSlot: "2:00 PM - 3:00 PM",
-    email: "roberto.cruz@ucab.edu.ph",
-    contactNumber: "0934-567-8901",
-    todaySchedule: [
-      { time: "9:00 AM - 10:00 AM", activity: "Administrative Work", location: "Dean's Office", status: "booked" },
-      { time: "10:00 AM - 11:00 AM", activity: "Meeting", location: "Dean's Office", status: "booked" },
-      { time: "2:00 PM - 3:00 PM", activity: "Available", location: "Dean's Office", status: "free" },
-      { time: "3:00 PM - 4:00 PM", activity: "Available", location: "Dean's Office", status: "free" },
-    ],
-  },
-  {
-    id: "f4",
-    name: "Prof. Linda Gomez",
-    position: "Faculty Member",
-    college: "College of Business Accountancy and Administration (CBAA)",
-    status: "available",
-    nextAvailableSlot: "1:00 PM - 2:00 PM",
-    email: "linda.gomez@ucab.edu.ph",
-    contactNumber: "0945-678-9012",
-    todaySchedule: [
-      { time: "1:00 PM - 2:00 PM", activity: "Available", location: "CBAA Faculty Room 105", status: "free" },
-      { time: "2:00 PM - 3:00 PM", activity: "Consultation", location: "CBAA Faculty Room 105", status: "booked" },
-      { time: "3:00 PM - 4:00 PM", activity: "Available", location: "CBAA Faculty Room 105", status: "free" },
-      { time: "4:00 PM - 5:00 PM", activity: "Available", location: "CBAA Faculty Room 105", status: "free" },
-    ],
-  },
-  {
-    id: "f5",
-    name: "Dr. Carmen Ramos",
-    position: "Department Chair",
-    college: "College of Education (COED)",
-    status: "busy",
-    currentActivity: "In class",
-    nextAvailableSlot: "3:00 PM - 4:00 PM",
-    email: "carmen.ramos@ucab.edu.ph",
-    contactNumber: "0956-789-0123",
-    todaySchedule: [
-      { time: "8:00 AM - 9:00 AM", activity: "Class", location: "Room 401", status: "booked" },
-      { time: "9:00 AM - 10:00 AM", activity: "Consultation", location: "COED Faculty Room 301", status: "booked" },
-      { time: "10:00 AM - 11:00 AM", activity: "Meeting", location: "Conference Room", status: "booked" },
-      { time: "3:00 PM - 4:00 PM", activity: "Available", location: "COED Faculty Room 301", status: "free" },
-      { time: "4:00 PM - 5:00 PM", activity: "Available", location: "COED Faculty Room 301", status: "free" },
-    ],
-  },
-  {
-    id: "f6",
-    name: "Engr. Pedro Villanueva",
-    position: "Dean",
-    college: "College of Engineering (COE)",
-    status: "available",
-    nextAvailableSlot: "1:00 PM - 2:00 PM",
-    email: "pedro.villanueva@ucab.edu.ph",
-    contactNumber: "0967-890-1234",
-    todaySchedule: [
-      { time: "10:00 AM - 11:00 AM", activity: "Meeting", location: "Dean's Office", status: "booked" },
-      { time: "11:00 AM - 12:00 PM", activity: "Administrative Work", location: "Dean's Office", status: "booked" },
-      { time: "1:00 PM - 2:00 PM", activity: "Available", location: "Dean's Office", status: "free" },
-      { time: "2:00 PM - 3:00 PM", activity: "Available", location: "Dean's Office", status: "free" },
-      { time: "3:00 PM - 4:00 PM", activity: "Consultation", location: "Dean's Office", status: "booked" },
-    ],
-  },
-  {
-    id: "f7",
-    name: "Dr. Elena Mendoza",
-    position: "Department Chair",
-    college: "College of Arts and Sciences (CAS)",
-    status: "unavailable",
-    currentActivity: "On leave",
-    nextAvailableSlot: "Tomorrow, 9:00 AM",
-    email: "elena.mendoza@ucab.edu.ph",
-    contactNumber: "0978-901-2345",
-    todaySchedule: [
-      { time: "8:00 AM - 5:00 PM", activity: "On Leave", location: "N/A", status: "unavailable" },
-    ],
-  },
-  {
-    id: "f8",
-    name: "Dr. Grace Santos",
-    position: "Dean",
-    college: "College of Health and Allied Sciences (CHAS)",
-    status: "available",
-    nextAvailableSlot: "8:00 AM - 9:00 AM",
-    email: "grace.santos@ucab.edu.ph",
-    contactNumber: "0989-012-3456",
-    todaySchedule: [
-      { time: "8:00 AM - 9:00 AM", activity: "Available", location: "Dean's Office", status: "free" },
-      { time: "9:00 AM - 10:00 AM", activity: "Meeting", location: "Dean's Office", status: "booked" },
-      { time: "10:00 AM - 11:00 AM", activity: "Available", location: "Dean's Office", status: "free" },
-      { time: "1:00 PM - 2:00 PM", activity: "Available", location: "Dean's Office", status: "free" },
-    ],
-  },
-];
-
-const collegeOptions = Array.from(new Set(facultyData.map((f) => f.college)));
 
 export default function AdminProfessorAvailability() {
   const { user: authUser, logout } = useAuth();
@@ -313,14 +172,16 @@ export default function AdminProfessorAvailability() {
     {
       id: 1,
       type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you check faculty availability today?",
+      text: "Hello! I'm your OAMS Assistant. How can I help you check faculty availability today?",
       timestamp: new Date(),
     },
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  const [selectedCollege, setSelectedCollege] = useState("all");
+  const [faculty, setFaculty] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
@@ -330,6 +191,23 @@ export default function AdminProfessorAvailability() {
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
+
+  useEffect(() => {
+    const fetchFaculty = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await api.get("/admin/faculty-availability");
+        setFaculty(res.data.faculty || []);
+      } catch (err) {
+        console.error("Failed to fetch faculty availability:", err);
+        setError("Failed to load faculty data. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFaculty();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -369,14 +247,14 @@ export default function AdminProfessorAvailability() {
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
     if (i.includes("available"))
-      return `There are currently ${facultyData.filter((f) => f.status === "available").length} faculty members available.`;
+      return `There are currently ${faculty.filter((f) => f.status === "available").length} faculty members available.`;
     if (i.includes("busy"))
-      return `${facultyData.filter((f) => f.status === "busy").length} faculty members are busy right now.`;
+      return `${faculty.filter((f) => f.status === "busy").length} faculty members are busy right now.`;
     if (i.includes("leave") || i.includes("unavailable"))
-      return `${facultyData.filter((f) => f.status === "unavailable").length} faculty members are unavailable today.`;
-    if (i.includes("college") || i.includes("department"))
-      return "You can filter faculty by college using the 'All Colleges' dropdown above the list.";
-    return "I can help you check who's available, busy, or on leave, and filter by college. What do you need?";
+      return `${faculty.filter((f) => f.status === "unavailable").length} faculty members are unavailable today.`;
+    if (i.includes("total"))
+      return `There are ${faculty.length} faculty members in your department.`;
+    return "I can help you check who's available, busy, or on leave. What do you need?";
   };
 
   const navItems = [
@@ -387,17 +265,15 @@ export default function AdminProfessorAvailability() {
     { icon: HistoryIconNav, label: "Transactions", path: "/admin/transactions" },
   ];
 
-  const filteredFaculty = facultyData.filter((f) => {
-    const matchesCollege = selectedCollege === "all" || f.college === selectedCollege;
-    const matchesStatus = statusFilter === "all" || f.status === statusFilter;
-    return matchesCollege && matchesStatus;
-  });
+  const filteredFaculty = faculty.filter((f) =>
+    statusFilter === "all" || f.status === statusFilter
+  );
 
   const stats = {
-    total: facultyData.length,
-    available: facultyData.filter((f) => f.status === "available").length,
-    busy: facultyData.filter((f) => f.status === "busy").length,
-    unavailable: facultyData.filter((f) => f.status === "unavailable").length,
+    total: faculty.length,
+    available: faculty.filter((f) => f.status === "available").length,
+    busy: faculty.filter((f) => f.status === "busy").length,
+    unavailable: faculty.filter((f) => f.status === "unavailable").length,
   };
 
   const getStatusBadgeClass = (status) => `apa-status-badge apa-status-${status}`;
@@ -406,8 +282,10 @@ export default function AdminProfessorAvailability() {
   const getInitials = (name) =>
     name
       .split(" ")
+      .filter((n) => /^[A-Za-z]/.test(n))
       .map((n) => n[0])
-      .join("");
+      .join("")
+      .slice(0, 3);
 
   return (
     <div className="apa-dashboard-with-sidebar">
@@ -546,7 +424,9 @@ export default function AdminProfessorAvailability() {
           {/* Page Header */}
           <div className="apa-page-header">
             <h1 className="apa-page-title">Faculty Availability</h1>
-            <p className="apa-page-subtitle">Monitor faculty consultation schedules and availability</p>
+            <p className="apa-page-subtitle">
+              Monitor faculty consultation schedules and availability for your department
+            </p>
           </div>
 
           {/* Summary Stats */}
@@ -554,50 +434,35 @@ export default function AdminProfessorAvailability() {
             <div className="apa-summary-card apa-summary-total">
               <div className="apa-summary-text">
                 <p className="apa-summary-label">Total Faculty</p>
-                <p className="apa-summary-value">{stats.total}</p>
+                <p className="apa-summary-value">{loading ? "—" : stats.total}</p>
               </div>
               <UsersIcon className="apa-summary-icon" />
             </div>
             <div className="apa-summary-card apa-summary-available">
               <div className="apa-summary-text">
                 <p className="apa-summary-label">Available</p>
-                <p className="apa-summary-value">{stats.available}</p>
+                <p className="apa-summary-value">{loading ? "—" : stats.available}</p>
               </div>
               <CheckCircleIcon className="apa-summary-icon" />
             </div>
             <div className="apa-summary-card apa-summary-busy">
               <div className="apa-summary-text">
                 <p className="apa-summary-label">Busy</p>
-                <p className="apa-summary-value">{stats.busy}</p>
+                <p className="apa-summary-value">{loading ? "—" : stats.busy}</p>
               </div>
               <ClockIcon className="apa-summary-icon" />
             </div>
             <div className="apa-summary-card apa-summary-unavailable">
               <div className="apa-summary-text">
                 <p className="apa-summary-label">Unavailable</p>
-                <p className="apa-summary-value">{stats.unavailable}</p>
+                <p className="apa-summary-value">{loading ? "—" : stats.unavailable}</p>
               </div>
               <XCircleIcon className="apa-summary-icon" />
             </div>
           </div>
 
-          {/* Filters */}
+          {/* Status Filter */}
           <div className="apa-filters-card">
-            <div className="apa-filter-group">
-              <select
-                className="apa-filter-select"
-                value={selectedCollege}
-                onChange={(e) => setSelectedCollege(e.target.value)}
-                aria-label="Filter by college"
-              >
-                <option value="all">All Colleges</option>
-                {collegeOptions.map((college) => (
-                  <option key={college} value={college}>
-                    {college}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div className="apa-filter-group apa-filter-group-narrow">
               <select
                 className="apa-filter-select"
@@ -615,7 +480,21 @@ export default function AdminProfessorAvailability() {
 
           {/* Faculty List */}
           <div className="apa-faculty-list">
-            {filteredFaculty.map((f) => (
+            {loading && (
+              <div className="apa-empty-state">
+                <p className="apa-empty-text">Loading faculty data...</p>
+              </div>
+            )}
+
+            {!loading && error && (
+              <div className="apa-empty-state">
+                <XCircleIcon className="apa-empty-icon" />
+                <h3 className="apa-empty-title">Error loading faculty</h3>
+                <p className="apa-empty-text">{error}</p>
+              </div>
+            )}
+
+            {!loading && !error && filteredFaculty.map((f) => (
               <div key={f.id} className="apa-faculty-card">
                 <div className="apa-faculty-top">
                   <div className="apa-faculty-identity">
@@ -649,41 +528,43 @@ export default function AdminProfessorAvailability() {
                       <MailIcon className="apa-meta-icon" />
                       {f.email}
                     </span>
-                    <span className="apa-meta-contact">
-                      <PhoneIcon className="apa-meta-icon" />
-                      {f.contactNumber}
-                    </span>
                   </div>
                 </div>
 
-                <div className="apa-schedule-section">
-                  <p className="apa-schedule-label">Today's Schedule</p>
-                  <div className="apa-schedule-grid">
-                    {f.todaySchedule.map((slot, idx) => (
-                      <div key={idx} className={getSlotClass(slot.status)}>
-                        <div className="apa-slot-time-row">
-                          <ClockIcon className="apa-slot-icon" />
-                          <span className="apa-slot-time">{slot.time}</span>
-                        </div>
-                        <p className="apa-slot-activity">{slot.activity}</p>
-                        {slot.location !== "N/A" && (
-                          <div className="apa-slot-location-row">
-                            <MapPinIcon className="apa-slot-icon" />
-                            <span className="apa-slot-location">{slot.location}</span>
+                {f.todaySchedule.length > 0 && (
+                  <div className="apa-schedule-section">
+                    <p className="apa-schedule-label">Today's Schedule</p>
+                    <div className="apa-schedule-grid">
+                      {f.todaySchedule.map((slot, idx) => (
+                        <div key={idx} className={getSlotClass(slot.status)}>
+                          <div className="apa-slot-time-row">
+                            <ClockIcon className="apa-slot-icon" />
+                            <span className="apa-slot-time">{slot.time}</span>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          <p className="apa-slot-activity">{slot.activity}</p>
+                          {slot.location && slot.location !== "N/A" && (
+                            <div className="apa-slot-location-row">
+                              <MapPinIcon className="apa-slot-icon" />
+                              <span className="apa-slot-location">{slot.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
 
-            {filteredFaculty.length === 0 && (
+            {!loading && !error && filteredFaculty.length === 0 && (
               <div className="apa-empty-state">
                 <UsersIcon className="apa-empty-icon" />
                 <h3 className="apa-empty-title">No faculty found</h3>
-                <p className="apa-empty-text">Try adjusting your filters</p>
+                <p className="apa-empty-text">
+                  {faculty.length === 0
+                    ? "No faculty members are assigned to your department."
+                    : "Try adjusting your filters."}
+                </p>
               </div>
             )}
           </div>
