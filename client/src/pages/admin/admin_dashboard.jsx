@@ -333,6 +333,7 @@ const quickActions = [
     iconColor: "bg-green-500",
     title: "Scan Document",
     description: "Verify QR codes and view document details",
+    path: "/admin/scan-document",
   },
   {
     icon: HostQueueIcon,

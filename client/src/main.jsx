@@ -29,55 +29,47 @@ const ProfessorSchedulePage = React.lazy(
 const AdminDocumentsPage = React.lazy(
   () => import("./pages/admin/AdminDocuments.jsx"),
 );
-
 const AdminQueueManagement = React.lazy(
   () => import("./pages/admin/AdminQueueManagement.jsx"),
 );
-
 const AdminQueueHosting = React.lazy(
   () => import("./pages/admin/AdminQueueHosting.jsx"),
 );
-
 const AdminDocumentProcessing = React.lazy(
   () => import("./pages/admin/AdminDocumentProcessing.jsx"),
 );
-
 const AdminProfessorAvailability = React.lazy(
   () => import("./pages/admin/admin-professor-availability.jsx"),
 );
-
 const AdminAnnouncements = React.lazy(
   () => import("./pages/admin/admin_announcements.jsx"),
 );
-
-// ★ Admin User Management
 const AdminUserManagement = React.lazy(
   () => import("./pages/admin/admin_user_management.jsx"),
 );
-
-// ★ Admin Data Management
 const AdminDataManagement = React.lazy(
   () => import("./pages/admin/admin_data_management.jsx"),
 );
 
-import AppointmentsPage from "./pages/student/appointments.jsx";
+// ★ Admin Scan Document
+const AdminScanDocument = React.lazy(
+  () => import("./pages/admin/admin_scan_document.jsx"),
+);
 
+import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
 import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
-
 import ProfessorQueue from "./pages/professor/ProfessorQueue.jsx";
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminAppointment from "./pages/admin/AdminAppointment.jsx";
 import AdminTransaction from "./pages/admin/AdminTransactions.jsx";
 import AdminQueue from "./pages/admin/AdminQueue.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
-
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { Toaster } from "sonner";
 
-// ─── Loading fallback component ────────────────────────────────────────────
 const LoadingFallback = () => <div>Loading...</div>;
 
 createRoot(document.getElementById("root")).render(
@@ -87,18 +79,15 @@ createRoot(document.getElementById("root")).render(
       <QueueProvider>
         <BrowserRouter>
           <Routes>
-            {/* ─── Public Routes ─────────────────────────────────────────────────── */}
+            {/* ─── Public Routes ─────────────────────────────────────────────── */}
             <Route path="/" element={<App />} />
             <Route path="/login" element={<Login />} />
             <Route path="/unauthorized" element={<div>Unauthorized</div>} />
 
-            {/* ─── Protected Student Routes ──────────────────────────────────────── */}
+            {/* ─── Protected Student Routes ──────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
-              {/* Dashboard & Core Navigation */}
               <Route path="/student/dashboard" element={<StudentDashboard />} />
               <Route path="/student/queue" element={<QueuePage />} />
-
-              {/* Queue Management */}
               <Route
                 path="/student/queue-status"
                 element={
@@ -115,8 +104,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* Services */}
               <Route
                 path="/student/avail-service"
                 element={
@@ -125,8 +112,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* Announcements */}
               <Route
                 path="/student/announcements"
                 element={
@@ -135,8 +120,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* Professor Schedules */}
               <Route
                 path="/student/professor-schedules"
                 element={
@@ -145,8 +128,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* Appointments, Booking, Documents, Transactions */}
               <Route
                 path="/student/appointments"
                 element={<AppointmentsPage />}
@@ -162,7 +143,7 @@ createRoot(document.getElementById("root")).render(
               />
             </Route>
 
-            {/* ─── Protected Faculty Routes ──────────────────────────────────────── */}
+            {/* ─── Protected Faculty Routes ──────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={["faculty"]} />}>
               <Route
                 path="/professor/dashboard"
@@ -171,10 +152,9 @@ createRoot(document.getElementById("root")).render(
               <Route path="/professor/queue" element={<ProfessorQueue />} />
             </Route>
 
-            {/* ─── Protected Admin Routes ────────────────────────────────────────── */}
+            {/* ─── Protected Admin Routes ────────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-
               <Route
                 path="/admin/queue"
                 element={
@@ -203,7 +183,6 @@ createRoot(document.getElementById("root")).render(
                 path="/admin/appointments"
                 element={<AdminAppointment />}
               />
-
               <Route
                 path="/admin/documents"
                 element={
@@ -212,8 +191,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* Admin Document Processing Route */}
               <Route
                 path="/admin/document-processing"
                 element={
@@ -222,8 +199,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* Admin Professor (Faculty) Availability Route */}
               <Route
                 path="/admin/professor-availability"
                 element={
@@ -232,13 +207,10 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
               <Route
                 path="/admin/transactions"
                 element={<AdminTransaction />}
               />
-
-              {/* Admin Announcements Route */}
               <Route
                 path="/admin/announcements"
                 element={
@@ -247,8 +219,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* Admin User Management Route */}
               <Route
                 path="/admin/user-management"
                 element={
@@ -257,8 +227,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-
-              {/* ★ Admin Data Management Route */}
               <Route
                 path="/admin/data-management"
                 element={
@@ -267,10 +235,18 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
+              {/* ★ Admin Scan Document Route */}
+              <Route
+                path="/admin/scan-document"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminScanDocument />
+                  </Suspense>
+                }
+              />
             </Route>
 
-            {/* ─── Backward-compatible TEMP UI-testing routes (to be removed later) ─ */}
-
+            {/* ─── Backward-compatible TEMP UI-testing routes ──────────────── */}
             <Route path="/dashboard" element={<StudentDashboard />} />
             <Route path="/student-dashboard" element={<StudentDashboard />} />
             <Route path="/student-queue" element={<QueuePage />} />
@@ -338,7 +314,6 @@ createRoot(document.getElementById("root")).render(
               element={<AdminQueueManagement />}
             />
             <Route path="/admin-appointments" element={<AdminAppointment />} />
-            {/* Backward-compatible temp route for document processing */}
             <Route
               path="/admin-document-processing"
               element={
@@ -347,7 +322,6 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-            {/* Backward-compatible temp route for professor availability */}
             <Route
               path="/admin-professor-availability"
               element={
@@ -356,7 +330,6 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-            {/* Backward-compatible temp route for announcements */}
             <Route
               path="/admin-announcements"
               element={
@@ -365,7 +338,6 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-            {/* Backward-compatible temp route for user management */}
             <Route
               path="/admin-user-management"
               element={
@@ -374,12 +346,20 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-            {/* ★ Backward-compatible temp route for data management */}
             <Route
               path="/admin-data-management"
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AdminDataManagement />
+                </Suspense>
+              }
+            />
+            {/* Backward-compatible temp route for scan document */}
+            <Route
+              path="/admin-scan-document"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminScanDocument />
                 </Suspense>
               }
             />
