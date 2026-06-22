@@ -912,19 +912,23 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  text-align: left;
+  align-items: flex-start;
 }
 
 .queue-hero-title h2 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   margin: 0;
   line-height: 1.1;
+  text-align: left;
 }
 
 .queue-hero-title p {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
+  text-align: left;
 }
 
 .queue-hero-badge {
@@ -1638,6 +1642,19 @@ body {
 .queue-dialog-btn-danger:hover {
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.5);
+}
+
+.queue-leave-dialog-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0.75rem 0 0 0;
+  line-height: 1.65;
+  text-align: justify;
+  transition: color 0.3s ease;
+}
+
+.queue-dialog-actions-spread {
+  justify-content: space-between;
 }
 
 /* ===== Responsive ===== */

@@ -112,7 +112,7 @@ CREATE TABLE login_logs (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- 5. SERVICES & REQUIREMENTS
+-- 5. SERVICES & REQUIREMENTS (queue only)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE services (
     service_id      INT          AUTO_INCREMENT PRIMARY KEY,
@@ -130,6 +130,28 @@ CREATE TABLE service_requirements (
     is_mandatory     BOOLEAN      DEFAULT TRUE,
     created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5b. APPOINTMENT SERVICES (created by faculty, for appointments only)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE appointment_services (
+    service_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name    VARCHAR(100) NOT NULL,
+    description     TEXT,
+    faculty_id      INT          NOT NULL,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5c. DOCUMENT SERVICES (document requests only)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_services (
+    service_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name    VARCHAR(100) NOT NULL,
+    description     TEXT,
+    department_id   INT          NOT NULL,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id)
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -204,7 +226,7 @@ CREATE TABLE appointments (
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id),
     FOREIGN KEY (department_id) REFERENCES departments(department_id),
-    FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE SET NULL,    -- prevents duplicate bookings for the same student/faculty/date/time
+    FOREIGN KEY (service_id) REFERENCES appointment_services(service_id) ON DELETE SET NULL,    -- prevents duplicate bookings for the same student/faculty/date/time
     UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
     INDEX idx_appointments_dept_service (department_id, service_id)
 );
@@ -239,7 +261,7 @@ CREATE TABLE document_requests (
     notes                   TEXT         NULL,
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
-    FOREIGN KEY (service_id) REFERENCES services(service_id),
+    FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_document_requests_tracking (tracking_number)
 );
 

@@ -39,7 +39,7 @@ router.get(
       const [[docRow]] = await pool.query(
         `SELECT COUNT(*) AS doc_count
          FROM document_requests dr
-         JOIN services s ON dr.service_id = s.service_id
+         JOIN document_services s ON dr.service_id = s.service_id
          JOIN faculty f ON f.department_id = s.department_id
          WHERE f.faculty_id = ? AND dr.status IN ('pending', 'processing')`,
         [facultyId],

@@ -319,12 +319,14 @@ const adminTools = [
     iconColor: "bg-blue-600",
     title: "Queue Analytics",
     description: "Performance metrics",
+    path: "/admin/queue-analytics",
   },
   {
     icon: SyncIcon,
     iconColor: "bg-cyan-500",
     title: "Pinnacle Sync",
     description: "Data synchronization",
+    path: "/admin/pinnacle-sync",
   },
 ];
 const quickActions = [
@@ -333,6 +335,7 @@ const quickActions = [
     iconColor: "bg-green-500",
     title: "Scan Document",
     description: "Verify QR codes and view document details",
+    path: "/admin/scan-document",
   },
   {
     icon: HostQueueIcon,

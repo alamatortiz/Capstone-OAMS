@@ -1,11 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import ucLogo from '../../assets/Pnc-Logo.png';
 import oamsLogo from '../../assets/oams_logo.png';
 import './admin-queue-management.css';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 import { getCollegeLogo } from '../../data/collegeLogo';
+import api from '../../utils/api';
 
 
 // ─── Icons (all from admin dashboard) ───────────────────────────────────────
@@ -178,127 +180,24 @@ const ServedIcon = ({ className }) => (
   </svg>
 );
 
-// ─── Queue data and interfaces ──────────────────────────────────────────────
-
-const QueueEntryData = [
-  {
-    queueNumber: 'CCS-REG-044',
-    studentName: 'Juan Dela Cruz',
-    studentId: '2100001',
-    concern: 'Enroll remaining subjects for current semester',
-    joinedAt: '10:25 AM',
-    status: 'serving'
-  },
-  {
-    queueNumber: 'CCS-REG-045',
-    studentName: 'Maria Santos',
-    studentId: '2100002',
-    concern: 'Add/Drop subjects - need to drop 1 course',
-    joinedAt: '10:28 AM',
-    status: 'waiting'
-  },
-  {
-    queueNumber: 'CCS-REG-046',
-    studentName: 'Pedro Garcia',
-    studentId: '2000015',
-    concern: 'Subject enrollment with special permission',
-    joinedAt: '10:30 AM',
-    status: 'waiting'
-  },
-  {
-    queueNumber: 'CCS-REG-047',
-    studentName: 'Ana Lopez',
-    studentId: '2100045',
-    concern: 'Enrollment for summer classes',
-    joinedAt: '10:32 AM',
-    status: 'waiting'
-  },
-  {
-    queueNumber: 'CCS-REG-048',
-    studentName: 'Luis Ramirez',
-    studentId: '2000032',
-    concern: 'Late enrollment processing',
-    joinedAt: '10:35 AM',
-    status: 'waiting'
-  }
-];
-
-const QueuesData = [
-  {
-    id: '1',
-    queueType: 'Subject Enrollment',
-    department: 'College of Computing Studies (CCS)',
-    allowedDepartments: ['College of Computing Studies (CCS)'],
-    maxCapacity: 100,
-    currentCount: 15,
-    servedCount: 32,
-    status: 'active',
-    createdAt: '2026-03-27 08:00',
-    serviceHours: { start: '08:00', end: '17:00' },
-    location: 'CCS Office - Room 201, 2nd Floor',
-    currentlyServing: 'CCS-REG-044',
-    averageServiceTime: '5-7 minutes',
-    entries: QueueEntryData
-  },
-  {
-    id: '2',
-    queueType: 'Payment Processing',
-    department: 'College of Business Accountancy and Administration (CBAA)',
-    allowedDepartments: ['All Departments'],
-    maxCapacity: 150,
-    currentCount: 28,
-    servedCount: 45,
-    status: 'active',
-    createdAt: '2026-03-27 08:00',
-    serviceHours: { start: '08:00', end: '16:00' },
-    location: 'Cashier Office - Ground Floor',
-    currentlyServing: 'CBAA-CSH-025',
-    averageServiceTime: '3-5 minutes',
-    entries: [
-      {
-        queueNumber: 'CBAA-CSH-025',
-        studentName: 'Sofia Martinez',
-        studentId: '2100078',
-        concern: 'Tuition fee payment for current semester',
-        joinedAt: '10:20 AM',
-        status: 'serving'
-      },
-      {
-        queueNumber: 'CBAA-CSH-026',
-        studentName: 'Carlos Fernandez',
-        studentId: '2100089',
-        concern: 'Miscellaneous fee payment',
-        joinedAt: '10:22 AM',
-        status: 'waiting'
-      }
-    ]
-  },
-  {
-    id: '3',
-    queueType: 'Document Request',
-    department: 'College of Engineering (COE)',
-    allowedDepartments: ['College of Engineering (COE)', 'College of Computing Studies (CCS)'],
-    maxCapacity: 50,
-    currentCount: 8,
-    servedCount: 12,
-    status: 'paused',
-    createdAt: '2026-03-27 09:00',
-    serviceHours: { start: '09:00', end: '17:00' },
-    location: 'COE Office - Room 401, 4th Floor',
-    currentlyServing: 'COE-DOC-017',
-    averageServiceTime: '8-10 minutes',
-    entries: [
-      {
-        queueNumber: 'COE-DOC-017',
-        studentName: 'Miguel Santos',
-        studentId: '2000067',
-        concern: 'Request Certificate of Grades',
-        joinedAt: '09:15 AM',
-        status: 'serving'
-      }
-    ]
-  }
-];
+function mapQueueFromApi(q) {
+  return {
+    id: q.id,
+    queueType: q.queueType,
+    department: q.department,
+    maxCapacity: q.maxCapacity,
+    currentCount: q.currentCount,
+    servedCount: q.servedCount,
+    status: q.status === 'open' ? 'active' : q.status,
+    createdAt: q.createdAt
+      ? new Date(q.createdAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true })
+      : '—',
+    serviceHours: q.serviceHours,
+    location: q.location || 'N/A',
+    currentlyServing: q.currentlyServingStudentNumber || '—',
+    averageServiceTime: q.avgServiceMinutes != null ? `~${q.avgServiceMinutes} min` : 'N/A',
+  };
+}
 
 export default function AdminQueueManagement() {
   const { user: authUser, logout } = useAuth();
@@ -331,7 +230,14 @@ export default function AdminQueueManagement() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
-  const [selectedQueue, setSelectedQueue] = useState(null);
+  const [selectedQueueId, setSelectedQueueId] = useState(null);
+  const [queues, setQueues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [queueEntries, setQueueEntries] = useState([]);
+  const [loadingEntries, setLoadingEntries] = useState(false);
+
+  const selectedQueue = queues.find(q => q.id === selectedQueueId) || null;
 
   // ─── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -341,6 +247,44 @@ export default function AdminQueueManagement() {
   useEffect(() => {
     applyTheme(isDark ? 'dark' : 'light');
   }, [isDark]);
+
+  const fetchQueues = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/queue-hosting');
+      setQueues((res.data.queues || []).map(mapQueueFromApi));
+    } catch {
+      setError('Failed to load queues. Please try again.');
+    }
+  }, []);
+
+  const fetchEntries = useCallback(async () => {
+    if (!selectedQueueId) {
+      setQueueEntries([]);
+      return;
+    }
+    setLoadingEntries(true);
+    try {
+      const res = await api.get(`/admin/queue-hosting/${selectedQueueId}/entries`);
+      setQueueEntries(res.data.entries || []);
+    } catch {
+      setQueueEntries([]);
+    } finally {
+      setLoadingEntries(false);
+    }
+  }, [selectedQueueId]);
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await fetchQueues();
+      setLoading(false);
+    };
+    init();
+  }, [fetchQueues]);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
@@ -384,20 +328,73 @@ export default function AdminQueueManagement() {
     if (i.includes('pause') || i.includes('stop'))
       return 'You can pause/resume queues from the queue details view. Click on a queue to manage its status.';
     if (i.includes('waiting') || i.includes('student'))
-      return `There are currently ${QueuesData.reduce((acc, q) => acc + q.currentCount, 0)} students waiting across all queues.`;
+      return `There are currently ${queues.reduce((acc, q) => acc + q.currentCount, 0)} students waiting across all queues.`;
     if (i.includes('served') || i.includes('complete'))
-      return `Today, ${QueuesData.reduce((acc, q) => acc + q.servedCount, 0)} students have been served.`;
+      return `Today, ${queues.reduce((acc, q) => acc + q.servedCount, 0)} students have been served.`;
     if (i.includes('capacity'))
       return 'Monitor capacity using the progress bars in the queue details. Pause when reaching max capacity.';
     return 'I can help you manage queues, track students, and monitor queue status. What do you need?';
   };
 
   const handleViewDetails = (queue) => {
-    setSelectedQueue(queue);
+    setSelectedQueueId(queue.id);
   };
 
   const handleBack = () => {
-    setSelectedQueue(null);
+    setSelectedQueueId(null);
+  };
+
+  // ─── Queue Action Handlers ─────────────────────────────────────────────────
+  const handleCallNext = async () => {
+    try {
+      await api.patch(`/admin/queue-hosting/${selectedQueueId}/call-next`);
+      toast.success('Next student called');
+      await Promise.all([fetchQueues(), fetchEntries()]);
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? 'Failed to call next student');
+    }
+  };
+
+  const handleMarkServed = async () => {
+    try {
+      await api.patch(`/admin/queue-hosting/${selectedQueueId}/serve`);
+      toast.success('Student marked as served');
+      await Promise.all([fetchQueues(), fetchEntries()]);
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? 'Failed to mark as served');
+    }
+  };
+
+  const handlePause = async () => {
+    try {
+      await api.patch(`/admin/queue-hosting/${selectedQueueId}/pause`);
+      toast.message('Queue paused');
+      await fetchQueues();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? 'Failed to pause queue');
+    }
+  };
+
+  const handleResume = async () => {
+    try {
+      await api.patch(`/admin/queue-hosting/${selectedQueueId}/resume`);
+      toast.success('Queue resumed');
+      await fetchQueues();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? 'Failed to resume queue');
+    }
+  };
+
+  const handleStop = async () => {
+    if (!window.confirm('Are you sure you want to stop this queue? This cannot be undone.')) return;
+    try {
+      await api.patch(`/admin/queue-hosting/${selectedQueueId}/close`);
+      toast.success('Queue stopped');
+      setSelectedQueueId(null);
+      await fetchQueues();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? 'Failed to stop queue');
+    }
   };
 
   const navItems = [
@@ -607,7 +604,7 @@ export default function AdminQueueManagement() {
                       <PlayIcon className="aqm-stat-icon" />
                     </div>
                     <p className="aqm-stat-label">Active queues</p>
-                    <p className="aqm-stat-value">{QueuesData.filter((q) => q.status === 'active').length}</p>
+                    <p className="aqm-stat-value">{queues.filter((q) => q.status === 'active').length}</p>
                   </div>
 
                   <div className="aqm-stat-card aqm-stat-total">
@@ -616,7 +613,7 @@ export default function AdminQueueManagement() {
                     </div>
                     <p className="aqm-stat-label">Total waiting</p>
                     <p className="aqm-stat-value">
-                      {QueuesData.reduce((acc, q) => acc + q.currentCount, 0)}
+                      {queues.reduce((acc, q) => acc + q.currentCount, 0)}
                     </p>
                   </div>
 
@@ -626,7 +623,7 @@ export default function AdminQueueManagement() {
                     </div>
                     <p className="aqm-stat-label">Served today</p>
                     <p className="aqm-stat-value">
-                      {QueuesData.reduce((acc, q) => acc + q.servedCount, 0)}
+                      {queues.reduce((acc, q) => acc + q.servedCount, 0)}
                     </p>
                   </div>
 
@@ -636,6 +633,53 @@ export default function AdminQueueManagement() {
                   </div>
                 </div>
 
+
+                {/* Queue Actions */}
+                <div className="aqm-progress-card aqm-actions-card">
+                  <div className="aqm-progress-header">
+                    <h3>Queue Actions</h3>
+                  </div>
+                  <div className="aqm-actions-grid">
+                    <button
+                      className="aqm-action-btn"
+                      onClick={handleCallNext}
+                      disabled={
+                        !!queueEntries.find(e => e.status === 'serving') ||
+                        selectedQueue.currentCount === 0 ||
+                        selectedQueue.status !== 'active'
+                      }
+                    >
+                      Call Next
+                    </button>
+                    <button
+                      className="aqm-action-btn"
+                      onClick={handleMarkServed}
+                      disabled={!queueEntries.find(e => e.status === 'serving')}
+                    >
+                      Mark as Served
+                    </button>
+                    {selectedQueue.status === 'paused' ? (
+                      <button className="aqm-action-btn" onClick={handleResume}>
+                        Resume Queue
+                      </button>
+                    ) : (
+                      <button
+                        className="aqm-action-btn"
+                        onClick={handlePause}
+                        disabled={selectedQueue.status !== 'active'}
+                      >
+                        Pause Queue
+                      </button>
+                    )}
+                    <button
+                      className="aqm-action-btn aqm-action-btn-danger"
+                      onClick={handleStop}
+                      disabled={selectedQueue.status === 'closed' || selectedQueue.status === 'cancelled'}
+                    >
+                      Stop Queue
+                    </button>
+                  </div>
+                </div>
 
                 {/* Progress Metrics */}
                 <div className="aqm-progress-card">
@@ -671,39 +715,45 @@ export default function AdminQueueManagement() {
                 <div className="aqm-entries-card">
                   <div className="aqm-entries-header">
                     <Users className="aqm-icon-header" />
-                    <h3>Queue Entries ({selectedQueue.entries.length})</h3>
+                    <h3>Queue Entries ({queueEntries.length})</h3>
                   </div>
                   <p className="aqm-entries-subtitle">Students currently in queue</p>
                   <div className="aqm-entries-list">
-                    {selectedQueue.entries.map((entry, index) => (
-                      <div
-                        key={entry.queueNumber}
-                        className={`aqm-entry-item ${entry.status === 'serving' ? 'aqm-entry-serving' : ''}`}
-                      >
-                        <div className="aqm-entry-top">
-                          <div className="aqm-entry-number">{index + 1}</div>
-                          <div className="aqm-entry-info">
-                            <h4 className="aqm-entry-name">{entry.studentName}</h4>
-                            <p className="aqm-entry-id">ID: {entry.studentId}</p>
+                    {loadingEntries ? (
+                      <p style={{ padding: '1rem', textAlign: 'center', opacity: 0.6 }}>Loading entries...</p>
+                    ) : queueEntries.length === 0 ? (
+                      <p style={{ padding: '1rem', textAlign: 'center', opacity: 0.6 }}>No students in queue.</p>
+                    ) : (
+                      queueEntries.map((entry, index) => (
+                        <div
+                          key={entry.queueNumber}
+                          className={`aqm-entry-item ${entry.status === 'serving' ? 'aqm-entry-serving' : ''}`}
+                        >
+                          <div className="aqm-entry-top">
+                            <div className="aqm-entry-number">{index + 1}</div>
+                            <div className="aqm-entry-info">
+                              <h4 className="aqm-entry-name">{entry.studentName}</h4>
+                              <p className="aqm-entry-id">ID: {entry.studentId}</p>
+                            </div>
+                            <div className="aqm-entry-badges">
+                              <span className={`aqm-entry-status ${getEntryStatusColor(entry.status)}`}>
+                                {entry.status}
+                              </span>
+                              <span className="aqm-entry-queue-number">{entry.queueNumber}</span>
+                            </div>
                           </div>
-                          <div className="aqm-entry-badges">
-                            <span className={`aqm-entry-status ${getEntryStatusColor(entry.status)}`}>
-                              {entry.status}
-                            </span>
-                            <span className="aqm-entry-queue-number">{entry.queueNumber}</span>
+                          <div className="aqm-entry-details">
+                            <p className="aqm-entry-concern">
+                              <strong>Concern:</strong> {entry.concern}
+                            </p>
+                            <p className="aqm-entry-time">
+                              <Clock className="aqm-icon-small" />
+                              Joined at {entry.joinedAt}
+                            </p>
                           </div>
                         </div>
-                        <div className="aqm-entry-details">
-                          <p className="aqm-entry-concern">
-                            <strong>Concern:</strong> {entry.concern}
-                          </p>
-                          <p className="aqm-entry-time">
-                            <Clock className="aqm-icon-small" />
-                            Joined at {entry.joinedAt}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -739,9 +789,11 @@ export default function AdminQueueManagement() {
                     <h4>Now Serving</h4>
                   </div>
                   <div className="aqm-sidebar-card-body">
-                    <p className="aqm-now-serving-number">{selectedQueue.currentlyServing}</p>
+                    <p className="aqm-now-serving-number">
+                      {queueEntries.find((e) => e.status === 'serving')?.queueNumber || selectedQueue.currentlyServing}
+                    </p>
                     <p className="aqm-now-serving-name">
-                      {selectedQueue.entries.find((e) => e.status === 'serving')?.studentName}
+                      {queueEntries.find((e) => e.status === 'serving')?.studentName || 'None'}
                     </p>
                   </div>
                 </div>
@@ -754,22 +806,6 @@ export default function AdminQueueManagement() {
                   </div>
                   <div className="aqm-sidebar-card-body">
                     <p className="aqm-location-text">{selectedQueue.location}</p>
-                  </div>
-                </div>
-
-                {/* Allowed Departments */}
-                <div className="aqm-sidebar-card">
-                  <div className="aqm-sidebar-card-header">
-                    <h4>Allowed Departments</h4>
-                  </div>
-                  <div className="aqm-sidebar-card-body">
-                    <div className="aqm-departments-list">
-                      {selectedQueue.allowedDepartments.map((dept, idx) => (
-                        <span key={idx} className="aqm-dept-badge">
-                          {dept === 'All Departments' ? 'All' : dept.match(/\(([^)]+)\)/)?.[1] || dept}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
@@ -936,7 +972,7 @@ export default function AdminQueueManagement() {
               <div className="aqm-summary-content">
                 <p className="aqm-summary-label">Active Queues</p>
                 <p className="aqm-summary-value">
-                  {QueuesData.filter((q) => q.status === 'active').length}
+                  {queues.filter((q) => q.status === 'active').length}
                 </p>
               </div>
               <div className="aqm-summary-icon aqm-summary-icon-active" aria-hidden="true">
@@ -948,7 +984,7 @@ export default function AdminQueueManagement() {
               <div className="aqm-summary-content">
                 <p className="aqm-summary-label">Total Waiting</p>
                 <p className="aqm-summary-value">
-                  {QueuesData.reduce((acc, q) => acc + q.currentCount, 0)}
+                  {queues.reduce((acc, q) => acc + q.currentCount, 0)}
                 </p>
               </div>
               <div className="aqm-summary-icon aqm-summary-icon-waiting" aria-hidden="true">
@@ -960,7 +996,7 @@ export default function AdminQueueManagement() {
               <div className="aqm-summary-content">
                 <p className="aqm-summary-label">Served Today</p>
                 <p className="aqm-summary-value">
-                  {QueuesData.reduce((acc, q) => acc + q.servedCount, 0)}
+                  {queues.reduce((acc, q) => acc + q.servedCount, 0)}
                 </p>
               </div>
               <div className="aqm-summary-icon aqm-summary-icon-served" aria-hidden="true">
@@ -971,62 +1007,70 @@ export default function AdminQueueManagement() {
 
           {/* Queue List */}
           <div className="aqm-queue-list">
-            {QueuesData.map((queue) => (
-              <div
-                key={queue.id}
-                className="aqm-queue-card"
-                onClick={() => handleViewDetails(queue)}
-              >
-                <div className="aqm-queue-card-content">
-                  <div className="aqm-queue-card-main">
-                    <div className="aqm-queue-card-header">
-                      <div className="aqm-queue-card-left">
-                        <img
-                          className="aqm-queue-college-logo"
-                          src={getCollegeLogo(queue.department)}
-                          alt={`${queue.department} logo`}
-                        />
-                        <div className="aqm-queue-card-left-text">
-                          <h3 className="aqm-queue-card-title">{queue.queueType}</h3>
-                          <p className="aqm-queue-card-department">{queue.department}</p>
+            {loading ? (
+              <p style={{ padding: '2rem', textAlign: 'center', opacity: 0.6 }}>Loading queues...</p>
+            ) : error ? (
+              <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-error, #e53e3e)' }}>{error}</p>
+            ) : queues.length === 0 ? (
+              <p style={{ padding: '2rem', textAlign: 'center', opacity: 0.6 }}>No queues opened today for your department.</p>
+            ) : (
+              queues.map((queue) => (
+                <div
+                  key={queue.id}
+                  className="aqm-queue-card"
+                  onClick={() => handleViewDetails(queue)}
+                >
+                  <div className="aqm-queue-card-content">
+                    <div className="aqm-queue-card-main">
+                      <div className="aqm-queue-card-header">
+                        <div className="aqm-queue-card-left">
+                          <img
+                            className="aqm-queue-college-logo"
+                            src={getCollegeLogo(queue.department)}
+                            alt={`${queue.department} logo`}
+                          />
+                          <div className="aqm-queue-card-left-text">
+                            <h3 className="aqm-queue-card-title">{queue.queueType}</h3>
+                            <p className="aqm-queue-card-department">{queue.department}</p>
+                          </div>
+                        </div>
+
+                        <span className={`aqm-queue-status-badge ${getStatusColor(queue.status)}`}>
+                          {queue.status}
+                        </span>
+                      </div>
+
+                      <div className="aqm-queue-card-stats">
+                        <div className="aqm-queue-stat">
+                          <p className="aqm-queue-stat-label">Waiting</p>
+                          <p className="aqm-queue-stat-value">{queue.currentCount}</p>
+                        </div>
+                        <div className="aqm-queue-stat">
+                          <p className="aqm-queue-stat-label">Served</p>
+                          <p className="aqm-queue-stat-value">{queue.servedCount}</p>
+                        </div>
+                        <div className="aqm-queue-stat">
+                          <p className="aqm-queue-stat-label">Now Serving</p>
+                          <p className="aqm-queue-stat-value-small">{queue.currentlyServing}</p>
+                        </div>
+                        <div className="aqm-queue-stat">
+                          <p className="aqm-queue-stat-label">Avg. Time</p>
+                          <p className="aqm-queue-stat-value-small">{queue.averageServiceTime}</p>
                         </div>
                       </div>
 
-                      <span className={`aqm-queue-status-badge ${getStatusColor(queue.status)}`}>
-                        {queue.status}
-                      </span>
-                    </div>
-
-                    <div className="aqm-queue-card-stats">
-                      <div className="aqm-queue-stat">
-                        <p className="aqm-queue-stat-label">Waiting</p>
-                        <p className="aqm-queue-stat-value">{queue.currentCount}</p>
+                      <div className="aqm-queue-card-footer">
+                        <Clock className="aqm-icon-small" />
+                        <span>{queue.serviceHours.start} - {queue.serviceHours.end}</span>
+                        <span>•</span>
+                        <MapPin className="aqm-icon-small" />
+                        <span>{queue.location}</span>
                       </div>
-                      <div className="aqm-queue-stat">
-                        <p className="aqm-queue-stat-label">Served</p>
-                        <p className="aqm-queue-stat-value">{queue.servedCount}</p>
-                      </div>
-                      <div className="aqm-queue-stat">
-                        <p className="aqm-queue-stat-label">Now Serving</p>
-                        <p className="aqm-queue-stat-value-small">{queue.currentlyServing}</p>
-                      </div>
-                      <div className="aqm-queue-stat">
-                        <p className="aqm-queue-stat-label">Avg. Time</p>
-                        <p className="aqm-queue-stat-value-small">{queue.averageServiceTime}</p>
-                      </div>
-                    </div>
-
-                    <div className="aqm-queue-card-footer">
-                      <Clock className="aqm-icon-small" />
-                      <span>{queue.serviceHours.start} - {queue.serviceHours.end}</span>
-                      <span>•</span>
-                      <MapPin className="aqm-icon-small" />
-                      <span>{queue.location}</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </main>

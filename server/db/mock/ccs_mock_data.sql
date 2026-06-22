@@ -34,6 +34,8 @@ TRUNCATE TABLE queue_status_logs;
 TRUNCATE TABLE queues;
 TRUNCATE TABLE queue_slots;
 TRUNCATE TABLE service_requirements;
+TRUNCATE TABLE appointment_services;
+TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
 TRUNCATE TABLE chat_messages;
 TRUNCATE TABLE chat_sessions;
@@ -337,10 +339,7 @@ INSERT INTO students (student_id, student_number, first_name, last_name, course,
 
 
 -- ─────────────────────────────────────────────────────────────
--- SECTION 5 · SERVICES
--- Services 1–4 are CCS-scoped. Services 5–6 are for other
--- colleges (CBAA, COED) and are included for FK completeness
--- in cross-department document_requests testing only.
+-- SECTION 5 · SERVICES (queue only)
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO services (service_id, service_name, description, department_id) VALUES
 (1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001),
@@ -349,6 +348,27 @@ INSERT INTO services (service_id, service_name, description, department_id) VALU
 (4, 'Transcript of Records',     'Request for official Transcript of Records',      1001),
 (5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001),
 (6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 5b · APPOINTMENT SERVICES (created by faculty)
+-- Each row is a service type a faculty member offers for appointments.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO appointment_services (service_id, service_name, description, faculty_id) VALUES
+(1, 'Web Development Consultation',  'Frontend/backend web development guidance',    102),
+(2, 'Mobile App Consultation',       'Mobile application development advice',        102),
+(3, 'Database Design Review',        'Database schema and query optimization',       106),
+(4, 'Backend Architecture Review',   'Server-side architecture guidance',            107),
+(5, 'Software Engineering Consult',  'SDLC and software design principles',          110),
+(6, 'Network Security Consultation', 'Cybersecurity and network security guidance',  111);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 5c · DOCUMENT SERVICES
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO document_services (service_id, service_name, description, department_id) VALUES
+(1, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001),
+(2, 'Transcript of Records',     'Request for official Transcript of Records',      1001),
+(3, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001),
+(4, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -411,12 +431,12 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, appointment_date, appointment_time, status, notes, created_at) VALUES
 -- Student 101: 1 approved upcoming, 1 pending upcoming, 1 completed
 (1, 101, 102, 1001, 1, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
-(2, 101, 106, 1001, 1, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
-(3, 101, 107, 1001, 1, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
+(2, 101, 106, 1001, 3, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
+(3, 101, 107, 1001, 4, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
 -- Student 104: 1 pending upcoming, 2 completed
-(4, 104, 102, 1001, 1, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
-(5, 104, 106, 1001, 1, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
-(6, 104, 107, 1001, 1, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
+(4, 104, 102, 1001, 2, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
+(5, 104, 106, 1001, 3, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
+(6, 104, 107, 1001, 4, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -424,12 +444,12 @@ INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id,
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, notes, created_at) VALUES
 -- Student 101: 1 processing, 1 released
-(1,  101, 3, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', '2026-06-14', 'Document Test 1', NOW() - INTERVAL 3 DAY),
-(2,  101, 4, 'Transcript of Records',     'Local Doc Req 2', 'released',   '2026-06-14', 'Document Test 2', NOW() - INTERVAL 14 DAY),
+(1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', '2026-06-14', 'Document Test 1', NOW() - INTERVAL 3 DAY),
+(2,  101, 2, 'Transcript of Records',     'Local Doc Req 2', 'released',   '2026-06-14', 'Document Test 2', NOW() - INTERVAL 14 DAY),
 -- Student 104: 2 pending, 1 released
-(3,  104, 3, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', 'Document Test 3', NOW() - INTERVAL 1 DAY),
-(4,  104, 4, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', 'Document Test 4', NOW() - INTERVAL 2 DAY),
-(5,  104, 5, 'Certificate of Enrollment', 'Local Doc Req 5', 'released',   '2026-06-14', 'Document Test 5', NOW() - INTERVAL 10 DAY);
+(3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', 'Document Test 3', NOW() - INTERVAL 1 DAY),
+(4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', 'Document Test 4', NOW() - INTERVAL 2 DAY),
+(5,  104, 3, 'Certificate of Enrollment', 'Local Doc Req 5', 'released',   '2026-06-14', 'Document Test 5', NOW() - INTERVAL 10 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────

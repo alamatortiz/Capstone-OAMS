@@ -1140,6 +1140,58 @@
   transition: color 0.3s ease;
 }
 
+/* Queue Actions Card */
+.aqm-actions-card {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+.aqm-actions-card:hover {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1) !important;
+}
+
+.aqm-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.aqm-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.aqm-action-btn:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.7);
+}
+
+.aqm-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.aqm-action-btn-danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.aqm-action-btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.7);
+}
+
 /* Progress Card */
 .aqm-progress-card {
   background: var(--card-bg);

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import {
   Clock,
   Users,
@@ -542,8 +542,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
             style={{
               background: "var(--card-bg)",
               borderRadius: "1rem",
-              padding: "1.5rem",
-              maxWidth: "28rem",
+              padding: "1.75rem",
+              maxWidth: "30rem",
               width: "100%",
               border: "1px solid rgba(239,68,68,0.3)",
               boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
@@ -553,13 +553,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
               <h2 className="queue-dialog-title" style={{ color: "#ef4444" }}>
                 Leave Queue?
               </h2>
-              <p className="queue-dialog-description">
+              <p className="queue-leave-dialog-description">
                 You are currently at position <strong>{queue.position}</strong>{" "}
                 in the <strong>{queue.serviceName}</strong> queue. Leaving will
-                remove your spot permanently.
+                permanently remove your spot — you will need to rejoin and wait
+                from the back of the line if you change your mind.
               </p>
             </div>
-            <div className="queue-dialog-actions">
+            <div className="queue-dialog-actions queue-dialog-actions-spread">
               <button
                 className="queue-dialog-btn queue-dialog-btn-secondary"
                 onClick={() => setShowCancelDialog(false)}
@@ -600,6 +601,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function QueueStatusPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: authUser, logout } = useAuth();
   const { queues, isLoading, error, leaveQueue, updateQueueNotes } = useQueue();
 
@@ -612,7 +614,9 @@ export default function QueueStatusPage() {
     : { name: "Student", role: "student", college: "", departmentAbbrev: "" };
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [selectedQueueId, setSelectedQueueId] = useState(null);
+  const [selectedQueueId, setSelectedQueueId] = useState(
+    () => location.state?.queueId ?? null
+  );
   const [cancelling, setCancelling] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -1010,7 +1014,7 @@ export default function QueueStatusPage() {
                       You haven't joined any queues yet today.
                     </p>
                     <button
-                      onClick={() => navigate("/student/avail-service")}
+                      onClick={() => navigate("/student/queue")}
                       style={{
                         marginTop: "1rem",
                         background: "var(--primary-color)",
