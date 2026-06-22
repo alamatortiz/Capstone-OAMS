@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_document_processing.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
+import { toast } from "sonner";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -150,83 +152,6 @@ const ChevronDownIcon = () => (
   </svg>
 );
 
-// ── Static data ───────────────────────────────────────────────────────────────
-const INITIAL_DOCUMENTS = [
-  {
-    id: "1",
-    trackingNumber: "DOC-2026-0327-001",
-    studentName: "Juan Dela Cruz",
-    studentId: "2100001",
-    college: "CCS",
-    documentType: "Certificate of Grades",
-    purpose: "Scholarship application",
-    requestDate: "2026-03-27",
-    status: "pending",
-  },
-  {
-    id: "2",
-    trackingNumber: "DOC-2026-0327-002",
-    studentName: "Maria Santos",
-    studentId: "2100002",
-    college: "CBAA",
-    documentType: "Good Moral Certificate",
-    purpose: "Job application",
-    requestDate: "2026-03-27",
-    status: "pending",
-  },
-  {
-    id: "3",
-    trackingNumber: "DOC-2026-0326-015",
-    studentName: "Pedro Garcia",
-    studentId: "2000015",
-    college: "COE",
-    documentType: "Certificate of Enrollment",
-    purpose: "Student discount",
-    requestDate: "2026-03-26",
-    status: "processing",
-    processedBy: "Admin User",
-  },
-  {
-    id: "4",
-    trackingNumber: "DOC-2026-0326-012",
-    studentName: "Ana Lopez",
-    studentId: "2100045",
-    college: "COED",
-    documentType: "Certificate of Grades",
-    purpose: "Transfer credentials",
-    requestDate: "2026-03-26",
-    status: "ready",
-    processedBy: "Admin User",
-    notes: "Ready for pickup",
-  },
-  {
-    id: "5",
-    trackingNumber: "DOC-2026-0325-008",
-    studentName: "Luis Ramirez",
-    studentId: "2000032",
-    college: "CAS",
-    documentType: "Transcript of Records",
-    purpose: "Graduate school application",
-    requestDate: "2026-03-25",
-    status: "completed",
-    processedBy: "Admin User",
-    completedDate: "2026-03-26",
-    notes: "Claimed by student",
-  },
-  {
-    id: "6",
-    trackingNumber: "DOC-2026-0325-003",
-    studentName: "Sofia Martinez",
-    studentId: "2100078",
-    college: "CHAS",
-    documentType: "Good Moral Certificate",
-    purpose: "Internship requirement",
-    requestDate: "2026-03-25",
-    status: "rejected",
-    processedBy: "Admin User",
-    notes: "Incomplete clearance",
-  },
-];
 
 export default function AdminDocumentProcessing() {
   const { user: authUser, logout } = useAuth();
@@ -252,7 +177,8 @@ export default function AdminDocumentProcessing() {
   const messagesEndRef = useRef(null);
 
   // ── Document processing state ─────────────────────────────────────────────
-  const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedDocument, setSelectedDocument] = useState(null);
@@ -262,6 +188,22 @@ export default function AdminDocumentProcessing() {
   const filterRef = useRef(null);
 
   // ── Effects ───────────────────────────────────────────────────────────────
+  const fetchDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/admin/document-processing");
+      setDocuments(res.data.documents ?? []);
+    } catch (err) {
+      toast.error("Failed to load document requests");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -331,19 +273,21 @@ export default function AdminDocumentProcessing() {
     setShowDetailsModal(true);
   };
 
-  const handleUpdateStatus = (newStatus) => {
+  const handleUpdateStatus = async (newStatus) => {
     if (!selectedDocument) return;
-    const updatedDoc = {
-      ...selectedDocument,
-      status: newStatus,
-      processedBy: user.name || "Admin User",
-      notes: processingNotes,
-      ...(newStatus === "completed" && { completedDate: new Date().toISOString().split("T")[0] }),
-    };
-    setDocuments((prev) => prev.map((d) => (d.id === selectedDocument.id ? updatedDoc : d)));
-    setShowDetailsModal(false);
-    setSelectedDocument(null);
-    setProcessingNotes("");
+    try {
+      await api.patch(`/admin/document-processing/${selectedDocument.id}/status`, {
+        status: newStatus,
+        notes: processingNotes,
+      });
+      toast.success(`Document marked as ${newStatus}`);
+      setShowDetailsModal(false);
+      setSelectedDocument(null);
+      setProcessingNotes("");
+      await fetchDocuments();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to update document status");
+    }
   };
 
   const handleCloseModal = () => {
@@ -586,7 +530,11 @@ export default function AdminDocumentProcessing() {
 
           {/* Documents List */}
           <div className="adp-documents-list">
-            {filteredDocuments.length === 0 ? (
+            {loading ? (
+              <div className="adp-empty-state">
+                <p className="adp-empty-desc">Loading document requests...</p>
+              </div>
+            ) : filteredDocuments.length === 0 ? (
               <div className="adp-empty-state">
                 <div className="adp-empty-icon"><FileTextIcon /></div>
                 <h3 className="adp-empty-title">No documents found</h3>

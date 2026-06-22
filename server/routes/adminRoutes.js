@@ -968,6 +968,129 @@ router.get(
   },
 );
 
+// GET /api/admin/document-processing
+// Returns all document requests scoped to the admin's own department.
+router.get(
+  "/document-processing",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+           dr.request_id,
+           dr.tracking_number,
+           dr.request_type,
+           dr.purpose,
+           dr.status,
+           dr.notes,
+           dr.created_at,
+           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+           st.student_number AS student_id,
+           d.department_abbreviation AS college
+         FROM document_requests dr
+         JOIN students st ON dr.student_id = st.student_id
+         JOIN document_services s ON dr.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ?
+         ORDER BY dr.created_at DESC`,
+        [deptId],
+      );
+
+      const statusMap = {
+        pending: "pending",
+        processing: "processing",
+        generated: "ready",
+        released: "completed",
+        rejected: "rejected",
+      };
+
+      const documents = rows.map((r) => ({
+        id: String(r.request_id),
+        trackingNumber: r.tracking_number,
+        studentName: r.student_name,
+        studentId: r.student_id,
+        college: r.college,
+        documentType: r.request_type,
+        purpose: r.purpose,
+        requestDate: r.created_at instanceof Date
+          ? r.created_at.toISOString().split("T")[0]
+          : String(r.created_at).split("T")[0],
+        status: statusMap[r.status] ?? r.status,
+        notes: r.notes || "",
+      }));
+
+      res.json({ documents });
+    } catch (error) {
+      console.error("Document processing fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/document-processing/:requestId/status
+// Body: { status, notes }
+// Validates the request belongs to the admin's department before updating.
+router.patch(
+  "/document-processing/:requestId/status",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const requestId = parseInt(req.params.requestId, 10);
+    const { status, notes } = req.body;
+
+    // Map frontend status vocabulary -> DB ENUM values
+    const dbStatusMap = {
+      pending: "pending",
+      processing: "processing",
+      ready: "generated",
+      completed: "released",
+      rejected: "rejected",
+    };
+
+    if (!dbStatusMap[status]) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[request]] = await pool.query(
+        `SELECT dr.request_id, s.department_id
+         FROM document_requests dr
+         JOIN document_services s ON dr.service_id = s.service_id
+         WHERE dr.request_id = ?`,
+        [requestId],
+      );
+
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.department_id !== deptId) {
+        return res.status(403).json({ error: "You can only update documents for your own department" });
+      }
+
+      await pool.query(
+        `UPDATE document_requests SET status = ?, notes = ? WHERE request_id = ?`,
+        [dbStatusMap[status], notes !== undefined ? notes : null, requestId],
+      );
+
+      res.json({ message: "Document status updated", requestId, status });
+    } catch (error) {
+      console.error("Document status update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 function formatTime(timeStr) {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":");

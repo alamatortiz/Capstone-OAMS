@@ -256,7 +256,7 @@ CREATE TABLE document_requests (
     service_id              INT          NOT NULL,
     request_type            VARCHAR(100) NOT NULL,
     purpose                 VARCHAR(255) NOT NULL,
-    status                  ENUM('pending','processing','generated','released') DEFAULT 'pending',
+    status                  ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
     estimated_completion    DATE         NULL,
     notes                   TEXT         NULL,
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
