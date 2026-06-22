@@ -61,6 +61,11 @@ const AdminQueueAnalytics = React.lazy(
   () => import("./pages/admin/admin_queue_analytics.jsx"),
 );
 
+// ★ Admin PinnaCle Sync
+const AdminPinnacleSync = React.lazy(
+  () => import("./pages/admin/admin_pinnacle_sync.jsx"),
+);
+
 import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
@@ -258,6 +263,15 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
+              {/* ★ Admin PinnaCle Sync Route */}
+              <Route
+                path="/admin/pinnacle-sync"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminPinnacleSync />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* ─── Backward-compatible TEMP UI-testing routes ──────────────── */}
@@ -383,6 +397,15 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AdminQueueAnalytics />
+                </Suspense>
+              }
+            />
+            {/* Backward-compatible temp route for pinnacle sync */}
+            <Route
+              path="/admin-pinnacle-sync"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminPinnacleSync />
                 </Suspense>
               }
             />

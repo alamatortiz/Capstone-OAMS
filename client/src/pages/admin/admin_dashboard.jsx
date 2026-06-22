@@ -326,6 +326,7 @@ const adminTools = [
     iconColor: "bg-cyan-500",
     title: "Pinnacle Sync",
     description: "Data synchronization",
+    path: "/admin/pinnacle-sync",
   },
 ];
 const quickActions = [
