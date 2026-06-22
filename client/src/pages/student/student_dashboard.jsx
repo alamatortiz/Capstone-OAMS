@@ -439,7 +439,7 @@ export default function StudentDashboard() {
       icon: FileTextIcon,
       color: "text-orange-600",
       bgColor: "bg-orange-50 dark:bg-orange-950",
-      link: "/student/documents",
+      link: "/student/document-status",
     },
     {
       title: "Completed",

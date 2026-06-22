@@ -1,0 +1,366 @@
+/* ===== Document Status Page — Overrides & Extensions ===== */
+/* Base layout / sidebar / card / dialog styles come from queue-status.css  */
+
+/* ─── Title Icon (orange, matching Documents color) ─────────────────────── */
+.dss-title-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+}
+
+.dss-title-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+}
+
+/* ─── Hero Card ──────────────────────────────────────────────────────────── */
+.dss-hero-card {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 10px 30px rgba(249, 115, 22, 0.2);
+  transition: all 0.3s ease;
+}
+
+.dss-hero-content {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+.dss-hero-icon {
+  width: 4rem;
+  height: 4rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.dss-hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.dss-hero-text h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.dss-hero-text p {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0.125rem 0 0;
+  text-align: left;
+}
+
+.dss-hero-status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 640px) {
+  .dss-hero-content {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .dss-hero-status-badge {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ─── Status Badges ──────────────────────────────────────────────────────── */
+.dss-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.dss-badge-pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.dss-badge-processing {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.dss-badge-ready {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.dss-badge-claimed {
+  background: rgba(156, 163, 175, 0.15);
+  color: #e5e7eb;
+  border: 1px solid rgba(156, 163, 175, 0.35);
+}
+
+.dss-badge-rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="light"] .dss-badge-pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+[data-theme="light"] .dss-badge-processing {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+[data-theme="light"] .dss-badge-ready {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .dss-badge-claimed {
+  background: rgba(75, 85, 99, 0.1);
+  color: #1f2937;
+  border-color: rgba(75, 85, 99, 0.25);
+}
+[data-theme="light"] .dss-badge-rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* ─── Detail Rows (inside qss-card-content) ──────────────────────────────── */
+.dss-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(34, 197, 94, 0.08);
+  transition: border-color 0.3s ease;
+}
+
+.dss-detail-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+}
+
+.dss-detail-value {
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  transition: color 0.3s ease;
+}
+
+/* ─── Section Label (between Active / Completed groups) ─────────────────── */
+.dss-section-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid rgba(249, 115, 22, 0.45);
+  transition: color 0.3s ease;
+}
+
+/* ─── Document List ──────────────────────────────────────────────────────── */
+.dss-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.dss-list-item {
+  background: var(--queue-card-bg);
+  border: 1px solid var(--queue-card-border);
+  border-radius: 1.125rem;
+  padding: 1.25rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dss-list-item:hover {
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.12);
+  transform: translateY(-2px);
+  border-color: rgba(249, 115, 22, 0.35);
+}
+
+.dss-list-item-completed {
+  opacity: 0.72;
+}
+
+.dss-list-item-completed:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+.dss-list-body {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.dss-list-icon-wrap {
+  width: 3rem;
+  height: 3rem;
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+
+.dss-list-item-completed .dss-list-icon-wrap {
+  background: rgba(107, 114, 128, 0.1);
+}
+
+[data-theme="light"] .dss-list-icon-wrap {
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.dss-list-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dss-list-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.dss-list-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem;
+  transition: color 0.3s ease;
+}
+
+.dss-list-college {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.dss-list-tracking {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0;
+  transition: color 0.3s ease;
+}
+
+.dss-list-tracking span {
+  font-family: "Courier New", monospace;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Stats row inside list item */
+.dss-list-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.dss-list-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.dss-list-stat-wide {
+  flex: 1;
+  min-width: 8rem;
+}
+
+.dss-list-stat-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+}
+
+.dss-list-stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  transition: color 0.3s ease;
+}
+
+.dss-list-purpose {
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 20rem;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .dss-hero-text h2 {
+    font-size: 1.25rem;
+  }
+
+  .dss-list-item {
+    padding: 1rem;
+  }
+
+  .dss-list-stats {
+    gap: 0.75rem;
+  }
+
+  .dss-list-purpose {
+    max-width: 12rem;
+  }
+}

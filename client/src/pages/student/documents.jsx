@@ -9,7 +9,6 @@ import "../../App.css";
 import api from "../../utils/api";
 
 import { applyTheme, getSavedTheme } from "../../utils/theme";
-import { COLLEGES } from "../../data/colleges";
 
 // ─── Document Object Structure (JSDoc) ────────────────────────────────────
 /**
@@ -231,6 +230,11 @@ export default function DocumentsPage() {
   const [docsLoading, setDocsLoading] = useState(true);
   const [docsError, setDocsError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [servicesByDepartmentId, setServicesByDepartmentId] = useState({});
+  const [collegesFromDB, setCollegesFromDB] = useState([]);
+  const [formOptionsLoading, setFormOptionsLoading] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -253,21 +257,26 @@ export default function DocumentsPage() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  const documentTypes = [
-    "Good Moral Certificate",
-    "Transcript of Records",
-    "Certificate of Enrollment",
-    "Certificate of Grades",
-    "Diploma",
-    "Honorable Dismissal",
-    "Certificate of Registration",
-    "Certificate of Completion",
-  ];
-
   // ── Effects ─────────────────────────────────────────────────────────────
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
+
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      setFormOptionsLoading(true);
+      try {
+        const res = await api.get("/student/documents/service-types");
+        setCollegesFromDB(res.data.departments ?? []);
+        setServicesByDepartmentId(res.data.servicesByDepartmentId ?? {});
+      } catch (err) {
+        console.error("Failed to fetch document service types:", err);
+      } finally {
+        setFormOptionsLoading(false);
+      }
+    };
+    fetchServiceTypes();
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -325,6 +334,23 @@ export default function DocumentsPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCancelRequest = async (docId) => {
+    setCancellingId(docId);
+    try {
+      await api.delete(`/student/documents/${docId}`);
+      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+      setCancelTarget(null);
+      toast.success("Document request cancelled.");
+    } catch (err) {
+      console.error("Failed to cancel document request:", err);
+      toast.error(
+        err?.response?.data?.error ?? "Failed to cancel document request",
+      );
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -582,103 +608,6 @@ export default function DocumentsPage() {
             </button>
           </div>
 
-          {/* Request Dialog */}
-          {dialogOpen && (
-            <div
-              className="doc-dialog-overlay"
-              onClick={() => setDialogOpen(false)}
-            >
-              <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
-                <div className="doc-dialog-header">
-                  <h2>New Document Request</h2>
-                  <p>Submit a request for official documents</p>
-                  <button
-                    className="doc-dialog-close"
-                    onClick={() => setDialogOpen(false)}
-                  >
-                    <CloseIcon />
-                  </button>
-                </div>
-                <div className="doc-dialog-content">
-                  <div className="doc-form-group">
-                    <label htmlFor="type">Document Type</label>
-                    <select
-                      id="type"
-                      value={formData.type}
-                      onChange={(e) =>
-                        setFormData({ ...formData, type: e.target.value })
-                      }
-                      className="doc-form-select"
-                    >
-                      <option value="">Select document type</option>
-                      {documentTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="doc-form-group">
-                    <label htmlFor="college">College</label>
-                    <select
-                      id="college"
-                      value={formData.college}
-                      onChange={(e) =>
-                        setFormData({ ...formData, college: e.target.value })
-                      }
-                      className="doc-form-select"
-                    >
-                      <option value="">Select college</option>
-                      {COLLEGES.map((college) => (
-                        <option key={college.name} value={college.name}>
-                          {college.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="doc-form-group">
-                    <label htmlFor="copies">Number of Copies</label>
-                    <input
-                      id="copies"
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={formData.copies}
-                      onChange={(e) =>
-                        setFormData({ ...formData, copies: e.target.value })
-                      }
-                      className="doc-form-input"
-                    />
-                  </div>
-
-                  <div className="doc-form-group">
-                    <label htmlFor="purpose">Purpose</label>
-                    <textarea
-                      id="purpose"
-                      placeholder="Specify the purpose of your request"
-                      value={formData.purpose}
-                      onChange={(e) =>
-                        setFormData({ ...formData, purpose: e.target.value })
-                      }
-                      className="doc-form-textarea"
-                      rows={3}
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleSubmitRequest}
-                    className="doc-form-submit"
-                    disabled={submitting}
-                  >
-                    {submitting ? "Submitting..." : "Submit Request"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Active Requests */}
           <section className="doc-section">
             <div className="doc-section-header">
@@ -759,6 +688,16 @@ export default function DocumentsPage() {
                         <DownloadIcon /> Claim Document
                       </button>
                     )}
+
+                    {(doc.status === "pending" ||
+                      doc.status === "processing") && (
+                      <button
+                        className="doc-cancel-request-btn"
+                        onClick={() => setCancelTarget(doc)}
+                      >
+                        <XCircleIcon /> Cancel Request
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -774,7 +713,14 @@ export default function DocumentsPage() {
           {/* Completed Requests */}
           {completedDocuments.length > 0 && (
             <section className="doc-section">
-              <h2>Completed Requests</h2>
+              <div className="doc-section-header">
+                <h2>
+                  <CheckCircleIcon /> Completed Requests{" "}
+                  <span className="doc-badge doc-badge-completed-count">
+                    {completedDocuments.length}
+                  </span>
+                </h2>
+              </div>
               <div className="doc-cards-grid">
                 {completedDocuments.map((doc) => (
                   <div key={doc.id} className="doc-card doc-card-completed">
@@ -835,6 +781,180 @@ export default function DocumentsPage() {
           </section>
         </div>
       </main>
+
+      {/* Request Document Dialog */}
+      {dialogOpen && (
+        <div
+          className="doc-dialog-overlay"
+          onClick={() => setDialogOpen(false)}
+        >
+          <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="doc-dialog-header">
+              <h2>New Document Request</h2>
+              <p>Submit a request for official documents</p>
+              <button
+                className="doc-dialog-close"
+                onClick={() => setDialogOpen(false)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="doc-dialog-content">
+              <div className="doc-form-group">
+                <label htmlFor="college">College</label>
+                <select
+                  id="college"
+                  value={formData.college}
+                  onChange={(e) =>
+                    setFormData({ ...formData, college: e.target.value, type: "" })
+                  }
+                  className="doc-form-select"
+                  disabled={formOptionsLoading}
+                >
+                  <option value="">
+                    {formOptionsLoading ? "Loading colleges…" : "Select college"}
+                  </option>
+                  {collegesFromDB.map((college) => (
+                    <option key={college.id} value={college.name}>
+                      {college.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="doc-form-group">
+                <label htmlFor="type">Document Type</label>
+                <select
+                  id="type"
+                  value={formData.type}
+                  onChange={(e) =>
+                    setFormData({ ...formData, type: e.target.value })
+                  }
+                  className="doc-form-select"
+                  disabled={formOptionsLoading || !formData.college}
+                >
+                  <option value="">
+                    {!formData.college
+                      ? "Select a college first"
+                      : "Select document type"}
+                  </option>
+                  {(servicesByDepartmentId[
+                    collegesFromDB.find((c) => c.name === formData.college)?.id ?? -1
+                  ] ?? []).map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="doc-form-group">
+                <label htmlFor="copies">Number of Copies</label>
+                <input
+                  id="copies"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={formData.copies}
+                  onChange={(e) =>
+                    setFormData({ ...formData, copies: e.target.value })
+                  }
+                  className="doc-form-input"
+                />
+              </div>
+
+              <div className="doc-form-group">
+                <label htmlFor="purpose">Purpose</label>
+                <textarea
+                  id="purpose"
+                  placeholder="Specify the purpose of your request"
+                  value={formData.purpose}
+                  onChange={(e) =>
+                    setFormData({ ...formData, purpose: e.target.value })
+                  }
+                  className="doc-form-textarea"
+                  rows={3}
+                />
+              </div>
+
+              <button
+                onClick={handleSubmitRequest}
+                className="doc-form-submit"
+                disabled={submitting}
+              >
+                {submitting ? "Submitting..." : "Submit Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Confirm Dialog */}
+      {cancelTarget && (
+        <div
+          className="doc-dialog-overlay"
+          onClick={() => setCancelTarget(null)}
+        >
+          <div
+            className="doc-dialog"
+            onClick={(e) => e.stopPropagation()}
+            style={{ borderColor: "rgba(239,68,68,0.3)" }}
+          >
+            <div className="doc-dialog-header">
+              <h2 style={{ color: "#ef4444" }}>Cancel Request?</h2>
+              <p>
+                You are about to cancel your request for{" "}
+                <strong>{cancelTarget.type}</strong>. This will permanently
+                remove your request — you will need to resubmit if you change
+                your mind.
+              </p>
+              <button
+                className="doc-dialog-close"
+                onClick={() => setCancelTarget(null)}
+                disabled={!!cancellingId}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div
+              className="doc-dialog-content"
+              style={{
+                display: "flex",
+                gap: "0.75rem",
+                justifyContent: "space-between",
+              }}
+            >
+              <button
+                className="doc-form-submit"
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                  flex: 1,
+                }}
+                onClick={() => setCancelTarget(null)}
+                disabled={!!cancellingId}
+              >
+                Keep Request
+              </button>
+              <button
+                className="doc-form-submit"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                  flex: 1,
+                }}
+                onClick={() => handleCancelRequest(cancelTarget.id)}
+                disabled={!!cancellingId}
+              >
+                {cancellingId === cancelTarget.id
+                  ? "Cancelling…"
+                  : "Cancel Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI Chatbot Widget */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>

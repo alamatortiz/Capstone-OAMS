@@ -494,6 +494,102 @@ router.post(
   },
 );
 
+// GET /api/student/documents/service-types
+// Returns service names and departments from document_services for the request form.
+router.get(
+  "/documents/service-types",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [rows] = await pool.query(
+        `SELECT ds.service_id, ds.service_name,
+                d.department_id, d.department_name, d.department_abbreviation
+         FROM document_services ds
+         JOIN departments d ON ds.department_id = d.department_id
+         ORDER BY ds.service_name ASC`,
+      );
+
+      const departmentMap = new Map();
+      const servicesByDepartmentId = {};
+      for (const row of rows) {
+        if (!departmentMap.has(row.department_id)) {
+          departmentMap.set(row.department_id, {
+            id: row.department_id,
+            name: row.department_name,
+            abbrev: row.department_abbreviation,
+          });
+          servicesByDepartmentId[row.department_id] = [];
+        }
+        servicesByDepartmentId[row.department_id].push(row.service_name);
+      }
+
+      res.json({
+        departments: [...departmentMap.values()],
+        servicesByDepartmentId,
+      });
+    } catch (error) {
+      console.error("Document service types error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// DELETE /api/student/documents/:requestId
+// Cancels (removes) a pending or processing document request owned by the student.
+router.delete(
+  "/documents/:requestId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const requestId = parseInt(req.params.requestId, 10);
+
+    if (!requestId || isNaN(requestId)) {
+      return res.status(400).json({ error: "Invalid requestId" });
+    }
+
+    try {
+      const [[request]] = await pool.query(
+        `SELECT request_id, student_id, status
+         FROM document_requests WHERE request_id = ?`,
+        [requestId],
+      );
+
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.student_id !== studentId) {
+        return res
+          .status(403)
+          .json({ error: "You can only cancel your own document requests" });
+      }
+      if (!["pending", "processing"].includes(request.status)) {
+        return res.status(409).json({
+          error: `Cannot cancel a request that is already ${request.status}`,
+        });
+      }
+
+      await pool.query(
+        `DELETE FROM document_requests WHERE request_id = ?`,
+        [requestId],
+      );
+
+      res.json({
+        message: "Document request cancelled successfully",
+        requestId,
+      });
+    } catch (error) {
+      console.error("Cancel document request error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 // ─────────────────────────────────────────────────────────────
 // QUEUE ENDPOINTS
 // ─────────────────────────────────────────────────────────────

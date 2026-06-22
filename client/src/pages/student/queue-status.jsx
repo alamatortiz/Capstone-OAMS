@@ -542,8 +542,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
             style={{
               background: "var(--card-bg)",
               borderRadius: "1rem",
-              padding: "1.5rem",
-              maxWidth: "28rem",
+              padding: "1.75rem",
+              maxWidth: "30rem",
               width: "100%",
               border: "1px solid rgba(239,68,68,0.3)",
               boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
@@ -553,13 +553,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
               <h2 className="queue-dialog-title" style={{ color: "#ef4444" }}>
                 Leave Queue?
               </h2>
-              <p className="queue-dialog-description">
+              <p className="queue-leave-dialog-description">
                 You are currently at position <strong>{queue.position}</strong>{" "}
                 in the <strong>{queue.serviceName}</strong> queue. Leaving will
-                remove your spot permanently.
+                permanently remove your spot — you will need to rejoin and wait
+                from the back of the line if you change your mind.
               </p>
             </div>
-            <div className="queue-dialog-actions">
+            <div className="queue-dialog-actions queue-dialog-actions-spread">
               <button
                 className="queue-dialog-btn queue-dialog-btn-secondary"
                 onClick={() => setShowCancelDialog(false)}

@@ -1644,6 +1644,19 @@ body {
   border-color: rgba(239, 68, 68, 0.5);
 }
 
+.queue-leave-dialog-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0.75rem 0 0 0;
+  line-height: 1.65;
+  text-align: justify;
+  transition: color 0.3s ease;
+}
+
+.queue-dialog-actions-spread {
+  justify-content: space-between;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
   :root,
