@@ -458,7 +458,10 @@ export default function AdminDashboard() {
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const handleLogout = () => setShowLogoutConfirm(true);
-  const confirmLogout = () => { logout(); navigate("/login"); };
+  const confirmLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
@@ -540,7 +543,11 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-dashboard-with-sidebar">
-      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
+      <LogoutConfirmModal
+        show={showLogoutConfirm}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
       {/* AI Chatbot */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
@@ -851,13 +858,20 @@ export default function AdminDashboard() {
                 announcements.map((ann) => (
                   <div key={ann.id} className="announcement-item">
                     <div className="announcement-content">
-                      <h4 className="announcement-title">{ann.title}</h4>
+                      <h4 className="announcement-title">
+                        {ann.isPinned && (
+                          <span style={{ marginRight: "0.3rem" }}>📌</span>
+                        )}
+                        {ann.title}
+                      </h4>
                       <p className="announcement-description">
                         {ann.description}
                       </p>
                       <div className="announcement-important-date">
-                        <span className={`announcement-tag tag-${ann.tag}`}>
-                          {ann.tag}
+                        <span
+                          className={`announcement-tag tag-${ann.tag || "general"}`}
+                        >
+                          {ann.tag || "general"}
                         </span>
                         <span className="announcement-date">{ann.date}</span>
                       </div>
@@ -953,9 +967,6 @@ export default function AdminDashboard() {
                   Manage <ChevronRightIcon />
                 </a>
               </div>
-              <p className="section-desc">
-                Active queues across all departments
-              </p>
               <div className="admin-queues-list">
                 {loading ? (
                   <p className="activity-loading">Loading...</p>
@@ -966,7 +977,6 @@ export default function AdminDashboard() {
                     <div key={queue.id} className="queue-item">
                       <div className="queue-info">
                         <p className="queue-name">{queue.name}</p>
-                        <p className="queue-code">{queue.college}</p>
                       </div>
                       <div className="queue-status-info">
                         <span

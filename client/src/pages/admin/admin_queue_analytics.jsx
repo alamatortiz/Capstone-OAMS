@@ -6,6 +6,7 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_queue_analytics.css";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -78,6 +79,11 @@ const MenuIcon = () => (
     <line x1="3" y1="6" x2="21" y2="6"></line>
     <line x1="3" y1="12" x2="21" y2="12"></line>
     <line x1="3" y1="18" x2="21" y2="18"></line>
+  </svg>
+);
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const CloseIcon = () => (
@@ -255,100 +261,6 @@ const CalendarIcon2 = () => (
 
 // ── Static Data ───────────────────────────────────────────────────────────────
 const timePeriods = ["Today", "This Week", "This Month", "This Semester"];
-const serviceTypes = [
-  "All Services",
-  "Subject Enrollment",
-  "Document Request",
-  "Payment Processing",
-  "Consultation",
-];
-
-const performanceData = [
-  {
-    service: "Subject Enrollment",
-    college: "CCS",
-    status: "excellent",
-    studentsServed: 156,
-    avgWait: "18 min",
-    peakHours: "9:00 AM - 11:00 AM",
-    satisfaction: 92,
-  },
-  {
-    service: "Document Request",
-    college: "CCS",
-    status: "good",
-    studentsServed: 89,
-    avgWait: "12 min",
-    peakHours: "10:00 AM - 12:00 PM",
-    satisfaction: 88,
-  },
-  {
-    service: "Payment Processing",
-    college: "CBAA",
-    status: "good",
-    studentsServed: 203,
-    avgWait: "15 min",
-    peakHours: "8:00 AM - 10:00 AM",
-    satisfaction: 85,
-  },
-  {
-    service: "Subject Enrollment",
-    college: "CBAA",
-    status: "needs improvement",
-    studentsServed: 124,
-    avgWait: "22 min",
-    peakHours: "9:00 AM - 11:00 AM",
-    satisfaction: 75,
-  },
-  {
-    service: "Document Request",
-    college: "COE",
-    status: "excellent",
-    studentsServed: 67,
-    avgWait: "10 min",
-    peakHours: "1:00 PM - 3:00 PM",
-    satisfaction: 94,
-  },
-  {
-    service: "Consultation",
-    college: "COED",
-    status: "good",
-    studentsServed: 45,
-    avgWait: "20 min",
-    peakHours: "10:00 AM - 12:00 PM",
-    satisfaction: 80,
-  },
-];
-
-const positiveInsights = [
-  {
-    title: "Improved Wait Times",
-    desc: "COE Document Request service has reduced wait time by 35% this week through optimized processing.",
-  },
-  {
-    title: "High Satisfaction",
-    desc: "CCS Subject Enrollment maintains 92% satisfaction rate with consistent service quality.",
-  },
-  {
-    title: "Efficient Operations",
-    desc: "CBAA Payment Processing served 203 students today with only 15min average wait time.",
-  },
-];
-
-const improvementAreas = [
-  {
-    title: "Long Wait Times",
-    desc: "CBAA Subject Enrollment averages 22min wait time. Consider adding more service windows during peak hours.",
-  },
-  {
-    title: "Peak Hour Bottleneck",
-    desc: "9-11 AM sees highest queue volumes across all services. Recommend staggered scheduling or additional staff.",
-  },
-  {
-    title: "Service Optimization",
-    desc: "COED Consultation service has lower throughput. Review process for potential streamlining opportunities.",
-  },
-];
 
 export default function AdminQueueAnalytics() {
   const { user: authUser, logout } = useAuth();
@@ -388,6 +300,34 @@ export default function AdminQueueAnalytics() {
   const [timePeriodOpen, setTimePeriodOpen] = useState(false);
   const [serviceTypeOpen, setServiceTypeOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("insights");
+
+  // Analytics data from API
+  const [serviceTypes, setServiceTypes] = useState(["All Services"]);
+  const [analyticsData, setAnalyticsData] = useState({ performance: [], positiveInsights: [], improvementAreas: [] });
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authUser) return;
+    const fetchAnalytics = async () => {
+      setAnalyticsLoading(true);
+      try {
+        const res = await api.get("/admin/queue-analytics", {
+          params: { period: timePeriod, service: serviceType },
+        });
+        setAnalyticsData({
+          performance: res.data.performance ?? [],
+          positiveInsights: res.data.positiveInsights ?? [],
+          improvementAreas: res.data.improvementAreas ?? [],
+        });
+        if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
+      } catch (err) {
+        console.error("Queue analytics fetch error:", err);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+    fetchAnalytics();
+  }, [authUser, timePeriod, serviceType]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -470,9 +410,18 @@ export default function AdminQueueAnalytics() {
     },
   ];
 
-  const filteredPerformance = performanceData.filter(
-    (d) => serviceType === "All Services" || d.service === serviceType,
-  );
+  const performance = analyticsData.performance;
+  const positiveInsights = analyticsData.positiveInsights;
+  const improvementAreas = analyticsData.improvementAreas;
+
+  // Summary stats derived from live performance data
+  const totalServed = performance.reduce((sum, p) => sum + (p.studentsServed || 0), 0);
+  const avgWaitAll = performance.length > 0
+    ? Math.round(performance.reduce((sum, p) => sum + (parseInt(p.avgWait) || 0), 0) / performance.length)
+    : 0;
+  const avgSatisfaction = performance.length > 0
+    ? Math.round(performance.reduce((sum, p) => sum + (p.satisfaction || 0), 0) / performance.length)
+    : 0;
 
   const getStatusColor = (status) => {
     if (status === "excellent") return "aqa-status-excellent";
@@ -633,14 +582,14 @@ export default function AdminQueueAnalytics() {
       {/* Main Content */}
       <main className="aqa-main">
         <div className="aqa-content">
-          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
+          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
           {/* Banner */}
           <div className="aqa-banner">
             <div className="aqa-banner-icon">
               <BarChartIcon />
             </div>
-            <div>
-              <h1 className="aqa-banner-title">Queue Analytics Dashboard</h1>
+            <div className="aqa-banner-text">
+              <h1 className="aqa-banner-title">Queue Analytics</h1>
               <p className="aqa-banner-subtitle">
                 Real-time queue performance metrics and insights
               </p>
@@ -793,32 +742,40 @@ export default function AdminQueueAnalytics() {
                 <UsersIcon2 />
                 <span className="aqa-stat-label">Total Served</span>
               </div>
-              <div className="aqa-stat-value aqa-stat-green">684</div>
-              <div className="aqa-stat-sub">+12% from yesterday</div>
+              <div className="aqa-stat-value aqa-stat-green">
+                {analyticsLoading ? "—" : totalServed}
+              </div>
+              <div className="aqa-stat-sub">{timePeriod}</div>
             </div>
             <div className="aqa-stat-card">
               <div className="aqa-stat-header">
                 <ClockIcon2 />
                 <span className="aqa-stat-label">Avg Wait Time</span>
               </div>
-              <div className="aqa-stat-value aqa-stat-blue">16 min</div>
-              <div className="aqa-stat-sub">-3 min from average</div>
+              <div className="aqa-stat-value aqa-stat-blue">
+                {analyticsLoading ? "—" : avgWaitAll > 0 ? `${avgWaitAll} min` : "N/A"}
+              </div>
+              <div className="aqa-stat-sub">Across services</div>
             </div>
             <div className="aqa-stat-card">
               <div className="aqa-stat-header">
                 <SmileIcon />
                 <span className="aqa-stat-label">Satisfaction</span>
               </div>
-              <div className="aqa-stat-value aqa-stat-green">86%</div>
-              <div className="aqa-stat-sub">+5% improvement</div>
+              <div className="aqa-stat-value aqa-stat-green">
+                {analyticsLoading ? "—" : avgSatisfaction > 0 ? `${avgSatisfaction}%` : "N/A"}
+              </div>
+              <div className="aqa-stat-sub">Average score</div>
             </div>
             <div className="aqa-stat-card">
               <div className="aqa-stat-header">
                 <ActivityIcon />
-                <span className="aqa-stat-label">Active Queues</span>
+                <span className="aqa-stat-label">Services Tracked</span>
               </div>
-              <div className="aqa-stat-value aqa-stat-purple">12</div>
-              <div className="aqa-stat-sub">Across all colleges</div>
+              <div className="aqa-stat-value aqa-stat-purple">
+                {analyticsLoading ? "—" : performance.length}
+              </div>
+              <div className="aqa-stat-sub">{user.departmentAbbrev} department</div>
             </div>
           </div>
 
@@ -861,7 +818,11 @@ export default function AdminQueueAnalytics() {
                     </div>
                   </div>
                   <div className="aqa-insights-list">
-                    {positiveInsights.map((item, idx) => (
+                    {analyticsLoading ? (
+                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>Loading...</p>
+                    ) : positiveInsights.length === 0 ? (
+                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>No data available for this period.</p>
+                    ) : positiveInsights.map((item, idx) => (
                       <div
                         key={idx}
                         className="aqa-insight-item aqa-insight-green"
@@ -887,7 +848,11 @@ export default function AdminQueueAnalytics() {
                     </div>
                   </div>
                   <div className="aqa-insights-list">
-                    {improvementAreas.map((item, idx) => (
+                    {analyticsLoading ? (
+                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>Loading...</p>
+                    ) : improvementAreas.length === 0 ? (
+                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>No improvement areas detected.</p>
+                    ) : improvementAreas.map((item, idx) => (
                       <div
                         key={idx}
                         className="aqa-insight-item aqa-insight-orange"
@@ -981,7 +946,12 @@ export default function AdminQueueAnalytics() {
                 Detailed breakdown by service and college
               </p>
               <div className="aqa-perf-list">
-                {filteredPerformance.map((item, idx) => (
+                {analyticsLoading ? (
+                  <p style={{ color: "var(--text-secondary)", padding: "1rem" }}>Loading...</p>
+                ) : performance.length === 0 ? (
+                  <p style={{ color: "var(--text-secondary)", padding: "1rem" }}>No completed queue data for this period.</p>
+                ) : null}
+                {performance.map((item, idx) => (
                   <div key={idx} className="aqa-perf-card">
                     <div className="aqa-perf-card-header">
                       <span className="aqa-perf-service">{item.service}</span>

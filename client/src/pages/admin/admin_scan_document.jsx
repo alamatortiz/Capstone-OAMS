@@ -6,6 +6,7 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_scan_document.css";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -78,6 +79,11 @@ const MenuIcon = () => (
     <line x1="3" y1="6" x2="21" y2="6"></line>
     <line x1="3" y1="12" x2="21" y2="12"></line>
     <line x1="3" y1="18" x2="21" y2="18"></line>
+  </svg>
+);
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const CloseIcon = () => (
@@ -194,126 +200,6 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-// ── Mock document data ────────────────────────────────────────────────────────
-const MOCK_DOCS = {
-  "DOC-2026-0327-001-QR": {
-    trackingNumber: "DOC-2026-0327-001",
-    documentType: "Certificate of Grades",
-    studentName: "Juan Dela Cruz",
-    studentId: "2100032",
-    college: "College of Computing Studies (CCS)",
-    status: "VALID",
-    issueDate: "3/27/2026",
-    validUntil: "9/27/2026",
-    issuedBy: "Registrar's Office",
-    authorizedSignatory: "Maria S. Santos, University Registrar",
-    content: `UNIVERSITY OF CABUYAO
-Registrar's Office
-
-CERTIFICATE OF GRADES
-
-TO WHOM IT MAY CONCERN:
-
-This is to certify that JUAN DELA CRUZ, with Student ID: 2100032,
-currently enrolled in the College of Computing Studies (CCS), has
-satisfactorily completed all academic requirements for the current semester
-with the following grades on file.
-
-This certificate is being issued upon the request of the student
-for whatever legal purpose it may serve.
-
-Valid for six (6) months from the date of issue.
-
-Issued on March 27, 2026`,
-  },
-  "DOC-2026-0326-012-QR": {
-    trackingNumber: "DOC-2026-0326-012",
-    documentType: "Good Moral Certificate",
-    studentName: "Ana Lopez",
-    studentId: "2100045",
-    college: "College of Education (COED)",
-    status: "VALID",
-    issueDate: "3/26/2026",
-    validUntil: "9/26/2026",
-    issuedBy: "Office of Student Affairs",
-    authorizedSignatory: "Roberto D. Cruz, Director of Student Affairs",
-    content: `UNIVERSITY OF CABUYAO
-Office of Student Affairs
-
-CERTIFICATE OF GOOD MORAL CHARACTER
-
-TO WHOM IT MAY CONCERN:
-
-This is to certify that ANA LOPEZ, with Student ID: 2100045,
-currently enrolled in the College of Education
-(COED), has demonstrated
-good moral character during their stay in the
-university.
-
-Based on our records, the student has:
-- No record of disciplinary action
-- Maintained good standing with the university
-- Exhibited exemplary conduct and behavior
-- Complied with university policies and regulations
-
-This certificate is being issued upon the request of the student
-for whatever legal purpose it may serve.
-
-Valid for six (6) months from the date of issue.
-
-Issued on March 26, 2026`,
-  },
-  "DOC-2026-0320-008-QR": {
-    trackingNumber: "DOC-2026-0320-008",
-    documentType: "Certificate of Enrollment",
-    studentName: "Sofia Martinez",
-    studentId: "2100078",
-    college: "College of Business Administration (CBA)",
-    status: "EXPIRED",
-    issueDate: "3/20/2026",
-    validUntil: "3/20/2026",
-    issuedBy: "Registrar's Office",
-    authorizedSignatory: "Maria S. Santos, University Registrar",
-    content: `UNIVERSITY OF CABUYAO
-Registrar's Office
-
-CERTIFICATE OF ENROLLMENT
-
-TO WHOM IT MAY CONCERN:
-
-This is to certify that SOFIA MARTINEZ, with Student ID: 2100078,
-is officially enrolled in the College of Business Administration (CBA)
-for the current academic year.
-
-This certificate is issued for whatever legal purpose it may serve.
-
-Issued on March 20, 2026`,
-  },
-};
-
-const RECENT_SCANS_INIT = [
-  {
-    name: "Juan Dela Cruz",
-    docType: "Certificate of Grades",
-    tracking: "DOC-2026-0327-001",
-    time: "2 minutes ago",
-    status: "valid",
-  },
-  {
-    name: "Ana Lopez",
-    docType: "Good Moral Certificate",
-    tracking: "DOC-2026-0326-012",
-    time: "15 minutes ago",
-    status: "valid",
-  },
-  {
-    name: "Sofia Martinez",
-    docType: "Certificate of Enrollment",
-    tracking: "DOC-2026-0320-008",
-    time: "1 hour ago",
-    status: "expired",
-  },
-];
 
 export default function AdminScanDocument() {
   const { user: authUser, logout } = useAuth();
@@ -349,7 +235,15 @@ export default function AdminScanDocument() {
   const [modalOpen, setModalOpen] = useState(false);
   const [scanToast, setScanToast] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [recentScans, setRecentScans] = useState(RECENT_SCANS_INIT);
+  const [recentScans, setRecentScans] = useState([]);
+
+  // Load recent scans on mount
+  useEffect(() => {
+    if (!authUser) return;
+    api.get("/admin/scan-document/recent")
+      .then((res) => setRecentScans(res.data.scans ?? []))
+      .catch((err) => console.error("Recent scans fetch error:", err));
+  }, [authUser]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -397,34 +291,39 @@ export default function AdminScanDocument() {
     setScanning(true);
     setTimeout(() => {
       setScanning(false);
-      // Simulate scan of first mock doc
-      processCode("DOC-2026-0327-001-QR");
+      processCode("REQ-00002-QR");
     }, 2500);
   };
 
-  const processCode = (code) => {
-    const doc = MOCK_DOCS[code.trim().toUpperCase()];
-    if (!doc) {
-      setErrorMsg(
-        "No document found for this QR code. Please check and try again.",
-      );
-      return;
-    }
+  const processCode = async (code) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
     setErrorMsg("");
-    setVerifiedDoc(doc);
-    setModalOpen(true);
-    setScanToast(true);
-    setTimeout(() => setScanToast(false), 3000);
-    setRecentScans((prev) => [
-      {
-        name: doc.studentName,
-        docType: doc.documentType,
-        tracking: doc.trackingNumber,
-        time: "Just now",
-        status: doc.status.toLowerCase(),
-      },
-      ...prev.slice(0, 4),
-    ]);
+    try {
+      const res = await api.get(`/admin/scan-document/verify/${encodeURIComponent(trimmed)}`);
+      if (!res.data.found) {
+        setErrorMsg("No document found for this QR code. Please check and try again.");
+        return;
+      }
+      const doc = res.data.doc;
+      setVerifiedDoc(doc);
+      setModalOpen(true);
+      setScanToast(true);
+      setTimeout(() => setScanToast(false), 3000);
+      setRecentScans((prev) => [
+        {
+          name: doc.studentName,
+          docType: doc.documentType,
+          tracking: doc.trackingNumber,
+          time: "Just now",
+          status: doc.status.toLowerCase(),
+        },
+        ...prev.slice(0, 4),
+      ]);
+    } catch (err) {
+      console.error("Scan verify error:", err);
+      setErrorMsg("Scan failed. Please try again.");
+    }
   };
 
   const handleVerify = () => {
@@ -600,7 +499,7 @@ export default function AdminScanDocument() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="asd-page">
-          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
+          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
           {/* Page Title */}
           <div className="asd-page-header">
             <h1 className="asd-page-title">Document Scanner</h1>
@@ -782,9 +681,8 @@ export default function AdminScanDocument() {
                   <p className="asd-quick-label">Quick test codes:</p>
                   <div className="asd-quick-codes">
                     {[
-                      "DOC-2026-0327-001-QR",
-                      "DOC-2026-0326-012-QR",
-                      "DOC-2026-0320-008-QR",
+                      "REQ-00002-QR",
+                      "REQ-00005-QR",
                     ].map((code) => (
                       <button
                         key={code}
@@ -972,20 +870,26 @@ export default function AdminScanDocument() {
               </div>
 
               {/* Document Content */}
-              <div className="asd-doc-content-section">
-                <h3 className="asd-doc-content-title">Document Content</h3>
-                <pre className="asd-doc-content-pre">{verifiedDoc.content}</pre>
-              </div>
+              {verifiedDoc.content && (
+                <div className="asd-doc-content-section">
+                  <h3 className="asd-doc-content-title">Document Content</h3>
+                  <pre className="asd-doc-content-pre">{verifiedDoc.content}</pre>
+                </div>
+              )}
 
               {/* Footer */}
               <div className="asd-modal-footer-info">
-                <p>
-                  <strong>Issued by:</strong> {verifiedDoc.issuedBy}
-                </p>
-                <p>
-                  <strong>Authorized Signatory:</strong>{" "}
-                  {verifiedDoc.authorizedSignatory}
-                </p>
+                {verifiedDoc.issuedBy && (
+                  <p>
+                    <strong>Issued by:</strong> {verifiedDoc.issuedBy}
+                  </p>
+                )}
+                {verifiedDoc.authorizedSignatory && (
+                  <p>
+                    <strong>Authorized Signatory:</strong>{" "}
+                    {verifiedDoc.authorizedSignatory}
+                  </p>
+                )}
               </div>
             </div>
 

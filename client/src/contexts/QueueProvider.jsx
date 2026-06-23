@@ -126,7 +126,7 @@ export function QueueProvider({ children }) {
       prevQueuesRef.current = new Map();
       hasLoadedOnceRef.current = false;
 
-      if (!user?.userId) {
+      if (!user?.userId || user.role !== "student") {
         setIsLoading(false);
         return;
       }
@@ -149,7 +149,7 @@ export function QueueProvider({ children }) {
 
   // ── Re-fetch on tab focus ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!user?.userId) return;
+    if (!user?.userId || user.role !== "student") return;
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         fetchActiveQueues();
@@ -162,7 +162,7 @@ export function QueueProvider({ children }) {
 
   // ── Poll for live updates ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!user?.userId) return;
+    if (!user?.userId || user.role !== "student") return;
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         fetchActiveQueues();

@@ -6,6 +6,7 @@ import oamsLogo from "../../assets/oams_logo.png";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import "./admin_pinnacle_sync.css";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import api from "../../utils/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -42,6 +43,11 @@ const MenuIcon = () => (
     <line x1="3" y1="6" x2="21" y2="6"></line>
     <line x1="3" y1="12" x2="21" y2="12"></line>
     <line x1="3" y1="18" x2="21" y2="18"></line>
+  </svg>
+);
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const HomeIcon = () => (
@@ -287,14 +293,32 @@ export default function AdminPinnacleSync() {
   const [apiKey, setApiKey] = useState("");
   const [syncInterval, setSyncInterval] = useState(60);
   const [syncEnabled, setSyncEnabled] = useState(false);
-  const [syncStats] = useState({
-    total: 0,
-    students: 0,
-    professors: 0,
-    admins: 0,
-  });
+  const [syncStats, setSyncStats] = useState({ total: 0, students: 0, professors: 0, admins: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState(null);
+
+  // Load config and stats on mount
+  useEffect(() => {
+    if (!authUser) return;
+    const load = async () => {
+      try {
+        const [cfgRes, statsRes] = await Promise.all([
+          api.get("/admin/pinnacle-sync/config"),
+          api.get("/admin/pinnacle-sync/stats"),
+        ]);
+        const cfg = cfgRes.data;
+        setApiUrl(cfg.apiUrl);
+        setApiKey(cfg.apiKey);
+        setSyncInterval(cfg.syncInterval);
+        setSyncEnabled(cfg.syncEnabled);
+        const s = statsRes.data;
+        setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
+      } catch (err) {
+        console.error("Pinnacle sync load error:", err);
+      }
+    };
+    load();
+  }, [authUser]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -336,45 +360,46 @@ export default function AdminPinnacleSync() {
     }, 600);
   };
 
-  const handleSaveConfiguration = () => {
-    setSyncMessage({
-      type: "success",
-      text: "Configuration saved successfully.",
-    });
+  const handleSaveConfiguration = async () => {
+    try {
+      await api.post("/admin/pinnacle-sync/config", { apiUrl, apiKey, syncInterval, syncEnabled });
+      setSyncMessage({ type: "success", text: "Configuration saved successfully." });
+    } catch (err) {
+      setSyncMessage({ type: "error", text: "Failed to save configuration." });
+    }
     setTimeout(() => setSyncMessage(null), 3000);
   };
 
   const handleTestConnection = () => {
-    setSyncMessage({
-      type: "info",
-      text: "Testing connection to PinnaCle API...",
-    });
+    setSyncMessage({ type: "info", text: "Testing connection to PinnaCle API..." });
     setTimeout(() => {
       setSyncMessage({
         type: syncEnabled ? "success" : "error",
-        text: syncEnabled
-          ? "Connection successful!"
-          : "Connection failed. Please check your API key.",
+        text: syncEnabled ? "Connection successful!" : "Connection failed. Please check your API key.",
       });
       setTimeout(() => setSyncMessage(null), 4000);
     }, 1500);
   };
 
-  const handleSyncNow = () => {
+  const handleSyncNow = async () => {
     if (!syncEnabled) {
-      setSyncMessage({
-        type: "warning",
-        text: "PinnaCle sync is currently disabled. Enable it in the Configuration tab.",
-      });
+      setSyncMessage({ type: "warning", text: "PinnaCle sync is currently disabled. Enable it in the Configuration tab." });
       return;
     }
     setIsSyncing(true);
     setSyncMessage({ type: "info", text: "Syncing data from PinnaCle..." });
-    setTimeout(() => {
+    try {
+      const res = await api.post("/admin/pinnacle-sync/trigger");
+      const statsRes = await api.get("/admin/pinnacle-sync/stats");
+      const s = statsRes.data;
+      setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
+      setSyncMessage({ type: "success", text: res.data.message || "Sync completed successfully." });
+    } catch (err) {
+      setSyncMessage({ type: "error", text: "Sync failed. Please try again." });
+    } finally {
       setIsSyncing(false);
-      setSyncMessage({ type: "success", text: "Sync completed successfully." });
       setTimeout(() => setSyncMessage(null), 3000);
-    }, 2500);
+    }
   };
 
   const navItems = [
@@ -539,16 +564,18 @@ export default function AdminPinnacleSync() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="aps-page">
-          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
+          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
           {/* Hero Banner */}
           <div className="aps-hero-banner">
             <div className="aps-hero-content">
               <div className="aps-hero-left">
-                <DatabaseIcon />
-                <div>
-                  <h1 className="aps-hero-title">PinnaCle Integration</h1>
+                <div className="aps-banner-icon">
+                  <DatabaseIcon />
+                </div>
+                <div className="aps-banner-text">
+                  <h1 className="aps-hero-title">Pinnacle Integration</h1>
                   <p className="aps-hero-subtitle">
-                    Sync user data from PinnaCle microservice
+                    Sync user data from Pinnacle microservice
                   </p>
                 </div>
               </div>

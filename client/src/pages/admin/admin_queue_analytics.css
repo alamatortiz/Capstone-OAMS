@@ -38,19 +38,36 @@
 
 /* ── Banner ─────────────────────────────────────────────────────── */
 .aqa-banner {
-  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
-  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  border-radius: 1.5rem;
   padding: 1.75rem 2rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
   color: #fff;
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.25);
 }
 
 .aqa-banner-icon {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  opacity: 0.9;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
+}
+
+.aqa-banner-icon svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.aqa-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .aqa-banner-title {
@@ -58,12 +75,14 @@
   font-weight: 700;
   margin: 0;
   line-height: 1.2;
+  text-align: left;
 }
 
 .aqa-banner-subtitle {
   font-size: 0.9rem;
-  opacity: 0.85;
-  margin: 0.25rem 0 0;
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0;
+  text-align: left;
 }
 
 /* ── Filters Card ───────────────────────────────────────────────── */

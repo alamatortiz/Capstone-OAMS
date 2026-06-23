@@ -454,6 +454,31 @@ INSERT INTO document_requests (request_id, student_id, service_id, request_type,
 
 
 -- ─────────────────────────────────────────────────────────────
+-- SECTION 9b · GENERATED FILES & QR TRACKING
+-- generated_files for released documents (request_id 2 and 5)
+-- qr_tracking_logs seeded with 3 historical scans by admin (user_id 103)
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO generated_files (file_id, request_id, file_name, file_path, qr_code, generated_at) VALUES
+(1, 2, 'TOR-2100001.pdf', '/files/TOR-2100001.pdf', 'REQ-00002-QR', NOW() - INTERVAL 12 DAY),
+(2, 5, 'COE-2100065.pdf', '/files/COE-2100065.pdf', 'REQ-00005-QR', NOW() - INTERVAL 8 DAY);
+
+INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time) VALUES
+(1, 103, 'CCS Office', NOW() - INTERVAL 2 MINUTE),
+(2, 103, 'CCS Office', NOW() - INTERVAL 1 HOUR),
+(1, 103, 'CCS Office', NOW() - INTERVAL 1 DAY);
+
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 9c · SYSTEM SETTINGS (Pinnacle Sync config)
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO system_settings (setting_key, setting_value, description) VALUES
+('pinnacle_api_url',       'https://pinnacle-api.pnc.edu.ph/v1', 'PinnaCle API base URL'),
+('pinnacle_api_key',       '',                                    'PinnaCle API authentication key'),
+('pinnacle_sync_interval', '60',                                  'Auto-sync interval in minutes'),
+('pinnacle_sync_enabled',  'false',                               'Whether auto-sync is active');
+
+
+-- ─────────────────────────────────────────────────────────────
 -- SECTION 10 · FAQS / ANNOUNCEMENTS
 -- Used by the admin dashboard announcements card.
 -- department_id NULL = global/cross-department announcement.

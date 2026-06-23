@@ -88,6 +88,11 @@ const MenuIcon = () => (
     <line x1="3" y1="18" x2="21" y2="18"></line>
   </svg>
 );
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -604,7 +609,7 @@ export default function AdminTransaction() {
       {/* Main Content */}
       <main className="admin-transaction-main">
         <div className="admin-transaction-container">
-          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
+          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
           {/* Header */}
           <div className="admin-transaction-header">
             <h1 className="admin-transaction-title">Transaction Logs</h1>
