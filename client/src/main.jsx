@@ -81,6 +81,11 @@ const ProfessorDocumentRequestPage = React.lazy(
 const ProfessorScheduleAvailabilityPage = React.lazy(
   () => import("./pages/professor/professor_schedule_availability.jsx"),
 );
+// ★ Announcement Creation page
+const ProfessorAnnouncementCreationPage = React.lazy(
+  () => import("./pages/professor/professor_announcement_creation.jsx"),
+);
+
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminAppointment from "./pages/admin/AdminAppointment.jsx";
 import AdminTransaction from "./pages/admin/AdminTransactions.jsx";
@@ -214,6 +219,15 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <ProfessorScheduleAvailabilityPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Announcement Creation page */}
+              <Route
+                path="/professor/announcement-creation"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorAnnouncementCreationPage />
                   </Suspense>
                 }
               />
@@ -438,6 +452,15 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <ProfessorScheduleAvailabilityPage />
+                </Suspense>
+              }
+            />
+            {/* ★ Backward-compatible temp route for professor announcement creation */}
+            <Route
+              path="/professor-announcement-creation"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <ProfessorAnnouncementCreationPage />
                 </Suspense>
               }
             />

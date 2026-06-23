@@ -1,0 +1,500 @@
+@import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+html, body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Page Wrapper ──────────────────────────────────────────────────────── */
+.anc-page {
+  padding: 2rem;
+  max-width: 1650px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── Page Header ───────────────────────────────────────────────────────── */
+.anc-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.anc-page-header-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.anc-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.anc-page-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+  text-align: left;
+}
+
+/* ── Create Button ─────────────────────────────────────────────────────── */
+.anc-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.2rem;
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.anc-create-btn:hover {
+  background: #15803d;
+}
+.anc-create-btn .anc-icon {
+  width: 16px;
+  height: 16px;
+  stroke: #fff;
+}
+
+/* ── Section ───────────────────────────────────────────────────────────── */
+.anc-section {
+  margin-bottom: 2rem;
+}
+
+.anc-section-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 1rem 0;
+  text-align: left;
+}
+
+/* ── List & Cards ──────────────────────────────────────────────────────── */
+.anc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.anc-card {
+  border-radius: 10px;
+  border: 1px solid;
+  background: var(--card-bg, #1e2a1e);
+  transition: box-shadow 0.2s;
+}
+
+.anc-card--draft {
+  border-color: #ca8a04;
+  background: rgba(202, 138, 4, 0.06);
+}
+
+.anc-card--published {
+  border-color: #16a34a;
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.anc-card-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.anc-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.anc-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 0.4rem 0;
+  text-align: left;
+}
+
+.anc-card-content {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.anc-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.anc-card-date {
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* ── Badges ────────────────────────────────────────────────────────────── */
+.anc-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.anc-badge--draft {
+  background: rgba(100, 116, 139, 0.25);
+  color: #94a3b8;
+}
+
+.anc-badge--published {
+  background: rgba(22, 163, 74, 0.2);
+  color: #4ade80;
+}
+
+.anc-badge--outline {
+  background: transparent;
+  border: 1px solid var(--border-color, #334155);
+  color: var(--text-secondary, #94a3b8);
+}
+
+/* ── Card Action Buttons ───────────────────────────────────────────────── */
+.anc-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.anc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid;
+  background: transparent;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.anc-btn-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.anc-btn--edit {
+  border-color: var(--border-color, #334155);
+  color: var(--text-primary, #f1f5f9);
+}
+.anc-btn--edit:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.anc-btn--publish {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+}
+.anc-btn--publish:hover {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+.anc-btn--unpublish {
+  border-color: var(--border-color, #334155);
+  color: var(--text-primary, #f1f5f9);
+}
+.anc-btn--unpublish:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.anc-btn--delete {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+.anc-btn--delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Empty State ───────────────────────────────────────────────────────── */
+.anc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 10px;
+  background: var(--card-bg, #1e2a1e);
+  text-align: center;
+}
+
+.anc-empty .anc-icon {
+  width: 48px;
+  height: 48px;
+  stroke: #64748b;
+  margin-bottom: 1rem;
+}
+
+.anc-empty-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 0.4rem 0;
+}
+
+.anc-empty-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0 0 1.25rem 0;
+}
+
+/* ── Icon sizes inside cards/buttons ──────────────────────────────────── */
+.anc-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ── Modal Overlay ─────────────────────────────────────────────────────── */
+.anc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+/* ── Modal ─────────────────────────────────────────────────────────────── */
+.anc-modal {
+  background: var(--sidebar-bg, #112211);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.anc-modal-header {
+  padding: 1.5rem 1.75rem 1rem;
+  border-bottom: 1px solid var(--border-color, #1e3a1e);
+}
+
+.anc-modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.anc-modal-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+  text-align: left;
+}
+
+.anc-modal-body {
+  padding: 1.25rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.anc-modal-footer {
+  padding: 1rem 1.75rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border-color, #1e3a1e);
+}
+
+/* ── Form Elements ─────────────────────────────────────────────────────── */
+.anc-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.anc-form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.anc-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+  text-align: left;
+}
+
+.anc-input,
+.anc-textarea,
+.anc-select {
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 7px;
+  background: var(--input-bg, #0f1f0f);
+  color: var(--text-primary, #f1f5f9);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.anc-input:focus,
+.anc-textarea:focus,
+.anc-select:focus {
+  border-color: #16a34a;
+}
+
+.anc-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.anc-select option {
+  background: var(--sidebar-bg, #112211);
+  color: var(--text-primary, #f1f5f9);
+}
+
+/* ── Modal footer buttons ──────────────────────────────────────────────── */
+.anc-btn--cancel {
+  border-color: var(--border-color, #334155);
+  color: var(--text-secondary, #94a3b8);
+  background: transparent;
+}
+.anc-btn--cancel:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.anc-btn--save {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+  font-weight: 600;
+}
+.anc-btn--save:hover {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .anc-page {
+    padding: 1.25rem 1rem;
+  }
+
+  .anc-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .anc-card-body {
+    flex-direction: column;
+  }
+
+  .anc-card-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .anc-form-row {
+    flex-direction: column;
+  }
+
+  .anc-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .anc-btn--cancel,
+  .anc-btn--save {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Light mode overrides ──────────────────────────────────────────────── */
+[data-theme="light"] .anc-page-title,
+[data-theme="light"] .anc-section-title,
+[data-theme="light"] .anc-card-title,
+[data-theme="light"] .anc-modal-title,
+[data-theme="light"] .anc-label,
+[data-theme="light"] .anc-empty-title {
+  color: #1a2e1a;
+}
+
+[data-theme="light"] .anc-page-subtitle,
+[data-theme="light"] .anc-card-content,
+[data-theme="light"] .anc-modal-subtitle,
+[data-theme="light"] .anc-empty-subtitle {
+  color: #475569;
+}
+
+[data-theme="light"] .anc-card--draft {
+  background: rgba(202, 138, 4, 0.07);
+}
+
+[data-theme="light"] .anc-card--published {
+  background: rgba(22, 163, 74, 0.06);
+}
+
+[data-theme="light"] .anc-modal {
+  background: #fff;
+}
+
+[data-theme="light"] .anc-input,
+[data-theme="light"] .anc-textarea,
+[data-theme="light"] .anc-select {
+  background: #f8fafc;
+  color: #1a2e1a;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .anc-badge--outline {
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .anc-btn--edit,
+[data-theme="light"] .anc-btn--unpublish {
+  color: #1a2e1a;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .anc-btn--cancel {
+  color: #475569;
+  border-color: #cbd5e1;
+}
