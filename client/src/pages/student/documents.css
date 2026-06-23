@@ -515,12 +515,12 @@ body {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, #f59e0b, #ea8c55);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
   flex-shrink: 0;
 }
 
@@ -879,6 +879,34 @@ body {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+.doc-card-icon-wrap {
+  width: 3rem;
+  height: 3rem;
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #f97316;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.doc-card-icon-wrap svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke: currentColor;
+}
+
+.doc-card-completed .doc-card-icon-wrap {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text-tertiary);
+}
+
+[data-theme="light"] .doc-card-icon-wrap {
+  background: rgba(249, 115, 22, 0.08);
 }
 
 .doc-card-title-section {

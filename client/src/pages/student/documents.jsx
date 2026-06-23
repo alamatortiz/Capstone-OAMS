@@ -627,6 +627,9 @@ export default function DocumentsPage() {
                 {activeDocuments.map((doc) => (
                   <div key={doc.id} className="doc-card">
                     <div className="doc-card-header">
+                      <div className="doc-card-icon-wrap">
+                        <FileTextIcon />
+                      </div>
                       <div className="doc-card-title-section">
                         <h3>{doc.type}</h3>
                         <p className="doc-card-college">{doc.college}</p>
@@ -725,6 +728,9 @@ export default function DocumentsPage() {
                 {completedDocuments.map((doc) => (
                   <div key={doc.id} className="doc-card doc-card-completed">
                     <div className="doc-card-header">
+                      <div className="doc-card-icon-wrap">
+                        <FileTextIcon />
+                      </div>
                       <div className="doc-card-title-section">
                         <h3>{doc.type}</h3>
                         <p className="doc-card-college">{doc.college}</p>
