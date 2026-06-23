@@ -14,6 +14,7 @@ import {
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { toast } from "sonner";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import ucLogo from "../../assets/Pnc-Logo.png";
@@ -649,10 +650,9 @@ export default function QueueStatusPage() {
   }, [isDark]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
@@ -1054,6 +1054,7 @@ export default function QueueStatusPage() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }

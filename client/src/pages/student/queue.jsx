@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { useQueue } from '../../contexts/QueueContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import api from '../../utils/api';
@@ -368,10 +369,9 @@ export default function QueuePage() {
     return false;
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate('/login'); };
 
   const toggleDarkMode = () => {
     const newTheme = isDark ? 'light' : 'dark';
@@ -1030,6 +1030,7 @@ export default function QueuePage() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }
