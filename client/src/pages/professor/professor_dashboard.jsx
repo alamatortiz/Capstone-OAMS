@@ -203,6 +203,43 @@ const SendIcon = () => (
     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
 );
+const FileEditIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <line x1="12" y1="18" x2="12" y2="12"></line>
+    <line x1="9" y1="15" x2="15" y2="15"></line>
+  </svg>
+);
+const CalendarClockIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+    <line x1="16" y1="2" x2="16" y2="6"></line>
+    <line x1="8" y1="2" x2="8" y2="6"></line>
+    <line x1="3" y1="10" x2="21" y2="10"></line>
+    <circle cx="17" cy="17" r="3"></circle>
+    <polyline points="17 15.5 17 17 18 18"></polyline>
+  </svg>
+);
+const MegaphoneIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 11l19-9-9 19-2-8-8-2z"></path>
+  </svg>
+);
+const LayoutGridIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="3" width="7" height="7"></rect>
+    <rect x="14" y="3" width="7" height="7"></rect>
+    <rect x="3" y="14" width="7" height="7"></rect>
+    <rect x="14" y="14" width="7" height="7"></rect>
+  </svg>
+);
+const ArrowRightIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+    <polyline points="12 5 19 12 12 19"></polyline>
+  </svg>
+);
 
 export default function ProfessorDashboard() {
   const { user: authUser, logout } = useAuth();
@@ -300,6 +337,37 @@ export default function ProfessorDashboard() {
 
   const todayAppointments = dashStats?.todayAppointments ?? [];
   const recentActivity = dashStats?.recentActivity ?? [];
+
+  const quickActions = [
+    {
+      label: "Document Request",
+      description: "Submit or track document requests",
+      icon: FileEditIcon,
+      path: "/professor/document-request",
+      colorClass: "qa-blue",
+    },
+    {
+      label: "Schedule Availability",
+      description: "Set your consultation hours",
+      icon: CalendarClockIcon,
+      path: "/professor/schedule-availability",
+      colorClass: "qa-green",
+    },
+    {
+      label: "Announcement Creation",
+      description: "Post announcements to students",
+      icon: MegaphoneIcon,
+      path: "/professor/announcement-creation",
+      colorClass: "qa-orange",
+    },
+    {
+      label: "Slot Management",
+      description: "Manage appointment slots",
+      icon: LayoutGridIcon,
+      path: "/professor/slot-management",
+      colorClass: "qa-purple",
+    },
+  ];
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -517,6 +585,32 @@ export default function ProfessorDashboard() {
               </Link>
             ))}
           </div>
+
+
+          {/* Quick Actions */}
+          <section className="quick-actions-section">
+            <div className="section-header">
+              <h2>Quick Actions</h2>
+            </div>
+            <div className="quick-actions-grid">
+              {quickActions.map((action) => (
+                <Link key={action.path} to={action.path} className="quick-action-link">
+                  <div className={`quick-action-card ${action.colorClass}`}>
+                    <div className="quick-action-icon">
+                      <action.icon />
+                    </div>
+                    <div className="quick-action-text">
+                      <p className="quick-action-label">{action.label}</p>
+                      <p className="quick-action-desc">{action.description}</p>
+                    </div>
+                    <div className="quick-action-arrow">
+                      <ArrowRightIcon />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
 
           {/* Today's Appointments */}
           <section className="todays-appointments-section">
