@@ -849,7 +849,7 @@ export default function QueueStatusPage() {
               </div>
               <div className="queue-title-section">
                 <div className="qss-title-icon">
-                  <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <Clock style={{ width: "1.75rem", height: "1.75rem" }} />
                 </div>
                 <div className="queue-title-content">
                   <h1>My Queue Status</h1>
