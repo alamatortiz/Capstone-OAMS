@@ -5,7 +5,6 @@ import {
   Users,
   ChevronLeft,
   MessageSquare,
-  TrendingUp,
   XCircle,
   Loader2,
   CheckCircle2,
@@ -410,18 +409,18 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
           <div className="qss-card">
             <div className="qss-card-header">
               <h3 className="qss-card-title">
-                <TrendingUp style={{ width: "1.25rem", height: "1.25rem" }} />
+                <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
                 Service Hours
               </h3>
             </div>
             <div className="qss-card-content">
               <div className="queue-service-hours-row">
-                <span className="queue-hours-label">Opens</span>
-                <span className="queue-hours-time">{queue.startTime ?? "—"}</span>
+                <span className="queue-hours-label">Queue Opened</span>
+                <span className="queue-hours-time">{queue.startTime || "—"}</span>
               </div>
               <div className="queue-service-hours-row">
-                <span className="queue-hours-label">Closes</span>
-                <span className="queue-hours-time">{queue.endTime ?? "—"}</span>
+                <span className="queue-hours-label">Queue Closes</span>
+                <span className="queue-hours-time">{queue.endTime || "—"}</span>
               </div>
             </div>
           </div>
@@ -888,11 +887,6 @@ export default function QueueStatusPage() {
               <div className="queue-list-container">
                 {queues.length > 0 ? (
                   queues.map((queue) => {
-                    const progress = getProgress(
-                      queue.position,
-                      queue.totalWaiting,
-                    );
-                    const statusMeta = getStatusMeta(queue.status);
                     return (
                       <div
                         key={queue.queueId}
@@ -900,103 +894,74 @@ export default function QueueStatusPage() {
                         onClick={() => setSelectedQueueId(queue.queueId)}
                         style={{ cursor: "pointer" }}
                       >
-                        <div className="queue-list-content">
-                          <div className="queue-list-logo">
+                        <div className="queue-card-content">
+                          <div className="queue-left">
                             <img
                               src={getCollegeLogo(queue.departmentName)}
                               alt={queue.departmentName}
+                              className="queue-college-logo"
                             />
-                          </div>
-                          <div className="queue-list-info">
-                            <div className="queue-list-header">
-                              <div>
-                                <h3 className="queue-list-title">
-                                  {queue.serviceName}
-                                </h3>
-                                <p className="queue-list-college">
-                                  {queue.departmentName}
-                                </p>
-                              </div>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "flex-end",
-                                  gap: "0.375rem",
-                                }}
-                              >
-                                <div className="queue-list-badge">
-                                  {queue.queueNumberBadge}
+                            <div className="queue-info">
+                              <div className="queue-header-row">
+                                <div>
+                                  <h3 className="queue-service-name">{queue.serviceName}</h3>
+                                  <p className="queue-college-name">{queue.departmentName}</p>
                                 </div>
-                                <span
-                                  className={`detailed-queue-status-badge ${statusMeta.cls}`}
-                                >
-                                  {statusMeta.label}
-                                </span>
+                                <span className="queue-number-badge">{queue.queueNumberBadge}</span>
                               </div>
-                            </div>
-
-                            <div className="queue-list-stats">
-                              <div className="queue-list-stat">
-                                <div className="queue-list-stat-label">
-                                  Position
+                              <div className="queue-stats-grid">
+                                <div className="queue-stat">
+                                  <p className="queue-stat-label">Your Position</p>
+                                  <p className="queue-stat-value">{queue.position}</p>
                                 </div>
-                                <div className="queue-list-stat-value">
-                                  {queue.position} / {queue.totalWaiting}
+                                <div className="queue-stat">
+                                  <p className="queue-stat-label">Total Waiting</p>
+                                  <p className="queue-stat-value">{queue.totalWaiting}</p>
+                                </div>
+                                <div className="queue-stat">
+                                  <p className="queue-stat-label">Est. Wait Time</p>
+                                  <p className="queue-stat-value-sm">{queue.estimatedWait}</p>
+                                </div>
+                                <div className="queue-stat">
+                                  <p className="queue-stat-label">Joined At</p>
+                                  <p className="queue-stat-value-sm">{queue.joinedAt}</p>
                                 </div>
                               </div>
-                              <div className="queue-list-stat">
-                                <div className="queue-list-stat-label">
-                                  Est. Wait
-                                </div>
-                                <div className="queue-list-stat-value">
-                                  {queue.estimatedWait}
-                                </div>
-                              </div>
-                              <div className="queue-list-stat">
-                                <div className="queue-list-stat-label">
-                                  Joined
-                                </div>
-                                <div className="queue-list-stat-value">
-                                  {queue.joinedAt}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="qs-progress-card">
-                              <div className="queue-progress-group">
-                                <div className="queue-progress-wrapper">
-                                  <div className="qs-progress-label-row">
-                                    <p className="qs-progress-label">People in Queue</p>
-                                    <p className="qs-progress-value">
-                                      {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
-                                      <span className="qs-progress-percent">
-                                        &nbsp;({queue.queueOccupancyPercent ?? 0}%)
-                                      </span>
-                                    </p>
+                              <div className="qs-progress-card">
+                                <div className="queue-progress-group">
+                                  <div className="queue-progress-wrapper">
+                                    <div className="qs-progress-label-row">
+                                      <p className="qs-progress-label">People in Queue</p>
+                                      <p className="qs-progress-value">
+                                        {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
+                                        <span className="qs-progress-percent">
+                                          &nbsp;({queue.queueOccupancyPercent ?? 0}%)
+                                        </span>
+                                      </p>
+                                    </div>
+                                    <div className="qs-progress-bar">
+                                      <div
+                                        className="qs-progress-fill"
+                                        style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="qs-progress-bar">
-                                    <div
-                                      className="qs-progress-fill"
-                                      style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
-                                    />
-                                  </div>
-                                </div>
-                                <div className="queue-progress-wrapper">
-                                  <div className="qs-progress-label-row">
-                                    <p className="qs-progress-label">Serviced</p>
-                                    <p className="qs-progress-value">
-                                      {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
-                                      <span className="qs-progress-percent">
-                                        &nbsp;({queue.servicedPercent ?? 0}%)
-                                      </span>
-                                    </p>
-                                  </div>
-                                  <div className="qs-progress-bar">
-                                    <div
-                                      className="qs-progress-fill qs-progress-fill-serviced"
-                                      style={{ width: `${queue.servicedPercent ?? 0}%` }}
-                                    />
+                                  <div className="queue-progress-wrapper">
+                                    <div className="qs-progress-label-row">
+                                      <p className="qs-progress-label">Serviced</p>
+                                      <p className="qs-progress-value">
+                                        {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
+                                        <span className="qs-progress-percent">
+                                          &nbsp;({queue.servicedPercent ?? 0}%)
+                                        </span>
+                                      </p>
+                                    </div>
+                                    <div className="qs-progress-bar">
+                                      <div
+                                        className="qs-progress-fill qs-progress-fill-serviced"
+                                        style={{ width: `${queue.servicedPercent ?? 0}%` }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                               </div>
