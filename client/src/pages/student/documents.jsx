@@ -645,7 +645,7 @@ export default function DocumentsPage() {
                     <div className="doc-card-grid">
                       <div className="doc-card-field">
                         <label>Request Date</label>
-                        <p>
+                        <p className="doc-card-date-value">
                           {new Date(doc.requestDate).toLocaleDateString(
                             "en-US",
                             {
@@ -659,7 +659,7 @@ export default function DocumentsPage() {
                       {doc.estimatedCompletion && (
                         <div className="doc-card-field">
                           <label>Est. Completion</label>
-                          <p>
+                          <p className="doc-card-date-value">
                             {new Date(
                               doc.estimatedCompletion,
                             ).toLocaleDateString("en-US", {

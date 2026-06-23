@@ -192,19 +192,6 @@
   transition: color 0.3s ease;
 }
 
-/* ─── Section Label (between Active / Completed groups) ─────────────────── */
-.dss-section-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-secondary);
-  margin: 0 0 0.5rem;
-  padding-left: 0.5rem;
-  border-left: 2px solid rgba(249, 115, 22, 0.45);
-  transition: color 0.3s ease;
-}
-
 /* ─── Document List ──────────────────────────────────────────────────────── */
 .dss-list-container {
   display: flex;
@@ -213,18 +200,18 @@
 }
 
 .dss-list-item {
-  background: var(--queue-card-bg);
-  border: 1px solid var(--queue-card-border);
-  border-radius: 1.125rem;
-  padding: 1.25rem 1.5rem;
+  background: var(--card);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 1rem;
+  padding: 1.5rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
 }
 
 .dss-list-item:hover {
-  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.12);
+  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
   transform: translateY(-2px);
-  border-color: rgba(249, 115, 22, 0.35);
+  border-color: rgba(34, 197, 94, 0.4);
 }
 
 .dss-list-item-completed {
@@ -236,10 +223,78 @@
   border-color: rgba(107, 114, 128, 0.3);
 }
 
-.dss-list-body {
+/* ─── Doc-card layout inside list items ──────────────────────────────────── */
+.dss-list-header {
   display: flex;
-  gap: 1rem;
   align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.dss-list-title-section {
+  flex: 1;
+  text-align: left;
+}
+
+.dss-list-title-section h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f59e0b;
+  margin: 0 0 0.25rem 0;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .dss-list-title-section h3 {
+  color: #d97706;
+}
+
+.dss-list-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.dss-list-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.dss-list-card-field label,
+.dss-list-card-field-full label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.dss-list-card-field p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.dss-list-card-field-full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.dss-list-card-field-full p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
 }
 
 .dss-list-icon-wrap {
@@ -299,8 +354,13 @@
 
 .dss-list-tracking span {
   font-family: "Courier New", monospace;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.03em;
+}
+
+[data-theme="light"] .dss-list-tracking span {
+  color: #d97706;
 }
 
 /* Stats row inside list item */

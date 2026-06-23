@@ -689,7 +689,6 @@ export default function DocumentStatusPage() {
                 {/* Active Requests */}
                 {activeDocuments.length > 0 && (
                   <>
-                    <p className="dss-section-label">Active Requests</p>
                     {activeDocuments.map((doc) => {
                       const statusMeta = getStatusMeta(doc.status);
                       return (
@@ -698,7 +697,7 @@ export default function DocumentStatusPage() {
                           className="dss-list-item"
                           onClick={() => setSelectedDocId(doc.id)}
                         >
-                          <div className="dss-list-body">
+                          <div className="dss-list-header">
                             <div className="dss-list-icon-wrap">
                               <FileText
                                 style={{
@@ -708,42 +707,32 @@ export default function DocumentStatusPage() {
                                 }}
                               />
                             </div>
-                            <div className="dss-list-info">
-                              <div className="dss-list-top-row">
-                                <div>
-                                  <h3 className="dss-list-title">{doc.type}</h3>
-                                  <p className="dss-list-college">{doc.college}</p>
-                                  <p className="dss-list-tracking">
-                                    Tracking:{" "}
-                                    <span>{doc.trackingNumber}</span>
-                                  </p>
-                                </div>
-                                <span className={`dss-badge ${statusMeta.cls}`}>
-                                  {statusMeta.label}
-                                </span>
+                            <div className="dss-list-title-section">
+                              <h3>{doc.type}</h3>
+                              <p className="dss-list-college">{doc.college}</p>
+                              <p className="dss-list-tracking">
+                                Tracking: <span>{doc.trackingNumber}</span>
+                              </p>
+                            </div>
+                            <span className={`dss-badge ${statusMeta.cls}`}>
+                              {statusMeta.label}
+                            </span>
+                          </div>
+
+                          <div className="dss-list-card-grid">
+                            <div className="dss-list-card-field">
+                              <label>Request Date</label>
+                              <p>{formatDateShort(doc.requestDate)}</p>
+                            </div>
+                            {doc.estimatedCompletion && (
+                              <div className="dss-list-card-field">
+                                <label>Est. Completion</label>
+                                <p>{formatDateShort(doc.estimatedCompletion)}</p>
                               </div>
-                              <div className="dss-list-stats">
-                                <div className="dss-list-stat">
-                                  <span className="dss-list-stat-label">Request Date</span>
-                                  <span className="dss-list-stat-value">
-                                    {formatDateShort(doc.requestDate)}
-                                  </span>
-                                </div>
-                                {doc.estimatedCompletion && (
-                                  <div className="dss-list-stat">
-                                    <span className="dss-list-stat-label">Est. Completion</span>
-                                    <span className="dss-list-stat-value">
-                                      {formatDateShort(doc.estimatedCompletion)}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="dss-list-stat dss-list-stat-wide">
-                                  <span className="dss-list-stat-label">Purpose</span>
-                                  <span className="dss-list-stat-value dss-list-purpose">
-                                    {doc.purpose}
-                                  </span>
-                                </div>
-                              </div>
+                            )}
+                            <div className="dss-list-card-field-full">
+                              <label>Purpose</label>
+                              <p>{doc.purpose}</p>
                             </div>
                           </div>
                         </div>
@@ -769,7 +758,7 @@ export default function DocumentStatusPage() {
                           className="dss-list-item dss-list-item-completed"
                           onClick={() => setSelectedDocId(doc.id)}
                         >
-                          <div className="dss-list-body">
+                          <div className="dss-list-header">
                             <div className="dss-list-icon-wrap">
                               <FileText
                                 style={{
@@ -779,33 +768,26 @@ export default function DocumentStatusPage() {
                                 }}
                               />
                             </div>
-                            <div className="dss-list-info">
-                              <div className="dss-list-top-row">
-                                <div>
-                                  <h3 className="dss-list-title">{doc.type}</h3>
-                                  <p className="dss-list-college">{doc.college}</p>
-                                  <p className="dss-list-tracking">
-                                    {doc.trackingNumber}
-                                  </p>
-                                </div>
-                                <span className={`dss-badge ${statusMeta.cls}`}>
-                                  {statusMeta.label}
-                                </span>
-                              </div>
-                              <div className="dss-list-stats">
-                                <div className="dss-list-stat">
-                                  <span className="dss-list-stat-label">Request Date</span>
-                                  <span className="dss-list-stat-value">
-                                    {formatDateShort(doc.requestDate)}
-                                  </span>
-                                </div>
-                                <div className="dss-list-stat dss-list-stat-wide">
-                                  <span className="dss-list-stat-label">Purpose</span>
-                                  <span className="dss-list-stat-value dss-list-purpose">
-                                    {doc.purpose}
-                                  </span>
-                                </div>
-                              </div>
+                            <div className="dss-list-title-section">
+                              <h3>{doc.type}</h3>
+                              <p className="dss-list-college">{doc.college}</p>
+                              <p className="dss-list-tracking">
+                                {doc.trackingNumber}
+                              </p>
+                            </div>
+                            <span className={`dss-badge ${statusMeta.cls}`}>
+                              {statusMeta.label}
+                            </span>
+                          </div>
+
+                          <div className="dss-list-card-grid">
+                            <div className="dss-list-card-field">
+                              <label>Request Date</label>
+                              <p>{formatDateShort(doc.requestDate)}</p>
+                            </div>
+                            <div className="dss-list-card-field-full">
+                              <label>Purpose</label>
+                              <p>{doc.purpose}</p>
                             </div>
                           </div>
                         </div>

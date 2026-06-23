@@ -591,7 +591,7 @@ body {
   background-color: var(--card);
   border: 1px solid var(--border);
   border-radius: 1rem;
-  max-width: 28rem;
+  max-width: 40rem;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
@@ -954,6 +954,10 @@ body {
   margin: 0;
   line-height: 1.5;
   transition: color 0.3s ease;
+}
+
+.doc-card-field .doc-card-date-value {
+  color: var(--primary-color);
 }
 
 .doc-card-field-full {
