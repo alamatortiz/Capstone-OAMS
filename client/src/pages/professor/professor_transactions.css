@@ -1,0 +1,371 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+html, body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Page wrapper ─────────────────────────────────────────── */
+.transactions-page {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  color: var(--foreground);
+  text-align: left;
+}
+
+/* ── Page header ──────────────────────────────────────────── */
+.transactions-page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.transactions-page-header p {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin: 0;
+  text-align: left;
+}
+
+/* ── Stats grid ───────────────────────────────────────────── */
+.transactions-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .transactions-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .transactions-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.txn-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: box-shadow 0.2s;
+}
+
+.txn-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.txn-stat-card.primary   { border-color: var(--primary-color); }
+.txn-stat-card.blue      { border-color: var(--blue); }
+.txn-stat-card.green     { border-color: var(--success); }
+.txn-stat-card.purple    { border-color: var(--purple); }
+
+.txn-stat-info p:first-child {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.txn-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: left;
+}
+
+.txn-stat-value.primary { color: var(--primary-color); }
+.txn-stat-value.blue    { color: var(--blue); }
+.txn-stat-value.green   { color: var(--success); }
+.txn-stat-value.purple  { color: var(--purple); }
+
+.txn-stat-icon {
+  opacity: 0.2;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+}
+
+.txn-stat-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.txn-stat-icon.primary { color: var(--primary-color); }
+.txn-stat-icon.blue    { color: var(--blue); }
+.txn-stat-icon.green   { color: var(--success); }
+.txn-stat-icon.purple  { color: var(--purple); }
+
+/* ── Transaction log card ─────────────────────────────────── */
+.transactions-log-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.transactions-log-card-header {
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.transactions-log-card-header h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 0.125rem 0;
+  text-align: left;
+}
+
+.transactions-log-card-header p {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  margin: 0;
+  text-align: left;
+}
+
+.transactions-log-card-body {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Filters row ──────────────────────────────────────────── */
+.txn-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.txn-search-wrapper {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+
+.txn-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.txn-search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.txn-search-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.txn-search-input:focus {
+  border-color: var(--primary-color);
+}
+
+.txn-select {
+  padding: 0.5rem 0.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 150px;
+}
+
+.txn-select:focus {
+  border-color: var(--primary-color);
+}
+
+.txn-export-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.txn-export-btn:hover {
+  background: var(--secondary);
+  border-color: var(--primary-color);
+}
+
+.txn-export-btn svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* ── Transaction list ─────────────────────────────────────── */
+.txn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.txn-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--muted-foreground);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.txn-empty svg {
+  width: 3.5rem;
+  height: 3.5rem;
+  opacity: 0.2;
+}
+
+/* ── Individual transaction item ──────────────────────────── */
+.txn-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: box-shadow 0.2s;
+}
+
+.txn-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.txn-item-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.txn-item-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.txn-item-action {
+  font-weight: 600;
+  color: var(--foreground);
+  font-size: 0.9375rem;
+}
+
+.txn-item-timestamp {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.txn-item-timestamp svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.txn-item-student {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.txn-item-student svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.txn-item-student-name {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.txn-item-details {
+  font-size: 0.875rem;
+  color: var(--foreground);
+  text-align: left;
+}
+
+/* ── Badges ───────────────────────────────────────────────── */
+.txn-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.txn-badge-queue       { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.txn-badge-appointment { background: rgba(16,185,129,0.15); color: #34d399; }
+.txn-badge-document    { background: rgba(168,85,247,0.15); color: #c084fc; }
+
+.txn-badge-completed   { background: rgba(16,185,129,0.15); color: #34d399; }
+.txn-badge-approved    { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.txn-badge-rejected    { background: rgba(239,68,68,0.15);  color: #f87171; }
+.txn-badge-cancelled   { background: rgba(100,116,139,0.15);color: #94a3b8; }
+
+/* ── Responsive tweaks ────────────────────────────────────── */
+@media (max-width: 640px) {
+  .transactions-page {
+    padding: 1rem;
+  }
+
+  .txn-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .txn-select {
+    width: 100%;
+  }
+
+  .txn-item-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
