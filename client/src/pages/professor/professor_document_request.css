@@ -1,0 +1,845 @@
+@import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+html, body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Page Layout ────────────────────────────────── */
+.pdr-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Page Header ─────────────────────────────────── */
+.pdr-page-header {
+  text-align: left;
+}
+
+.pdr-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.375rem 0;
+  line-height: 1.2;
+}
+
+.pdr-page-desc {
+  font-size: 0.95rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ── Info/Instructions Card ──────────────────────── */
+.pdr-info-card {
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 0.75rem;
+  background: rgba(59, 130, 246, 0.06);
+  padding: 1.25rem 1.5rem;
+}
+
+.pdr-info-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #60a5fa;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.875rem;
+}
+
+.pdr-info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  counter-reset: pdr-counter;
+}
+
+.pdr-info-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #93c5fd;
+  text-align: left;
+  counter-increment: pdr-counter;
+}
+
+.pdr-info-list li::before {
+  content: counter(pdr-counter) ".";
+  font-weight: 600;
+  color: #60a5fa;
+  min-width: 1.25rem;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .pdr-info-card {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="light"] .pdr-info-title {
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .pdr-info-list li {
+  color: #1e40af;
+}
+
+[data-theme="light"] .pdr-info-list li::before {
+  color: #1d4ed8;
+}
+
+/* ── Section ─────────────────────────────────────── */
+.pdr-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pdr-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pdr-section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+}
+
+/* ── Request Document Button ─────────────────────── */
+.pdr-request-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 0.6rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pdr-request-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.pdr-request-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Document Types Grid ─────────────────────────── */
+.pdr-doc-types-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.pdr-doc-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  transition: border-color 0.2s ease;
+}
+
+.pdr-doc-card:hover {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.pdr-doc-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pdr-doc-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.pdr-doc-desc {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+/* Availability badges */
+.pdr-availability-badge {
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pdr-avail-available {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.pdr-avail-limited {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.pdr-avail-unavailable {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+[data-theme="light"] .pdr-avail-available {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+[data-theme="light"] .pdr-avail-limited {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+/* Processing time row */
+.pdr-doc-processing {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.pdr-processing-label {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.pdr-processing-time {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* Requirements */
+.pdr-doc-requirements {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pdr-req-label {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0 0 0.2rem 0;
+  text-align: left;
+}
+
+.pdr-req-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--primary-color);
+}
+
+.pdr-req-item span {
+  color: var(--text-primary);
+}
+
+/* ── My Requests List ────────────────────────────── */
+.pdr-requests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.pdr-empty-state {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+}
+
+.pdr-request-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.pdr-request-card:hover {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.pdr-request-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, var(--primary-color), #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.pdr-request-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pdr-request-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.pdr-request-info {
+  min-width: 0;
+}
+
+.pdr-request-type {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem 0;
+  text-align: left;
+}
+
+.pdr-request-purpose {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+.pdr-tracking-badge {
+  padding: 0.2rem 0.6rem;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  border-radius: 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pdr-request-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pdr-requested-date {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+/* Status badges */
+.pdr-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.pdr-status-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.pdr-status-processing {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.pdr-status-ready {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.pdr-status-completed {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+}
+
+.pdr-status-rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+[data-theme="light"] .pdr-status-pending { color: #b45309; }
+[data-theme="light"] .pdr-status-processing { color: #1d4ed8; }
+[data-theme="light"] .pdr-status-ready { color: #15803d; }
+[data-theme="light"] .pdr-status-completed { color: #475569; }
+[data-theme="light"] .pdr-status-rejected { color: #dc2626; }
+
+/* View Details Button */
+.pdr-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.pdr-view-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+/* ── Modal ──────────────────────────────────────── */
+.pdr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+
+.pdr-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 34rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: pdrModalIn 0.25s ease;
+}
+
+.pdr-modal-lg {
+  max-width: 42rem;
+}
+
+@keyframes pdrModalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pdr-modal-header {
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--card-border);
+  position: relative;
+}
+
+.pdr-modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  text-align: left;
+}
+
+.pdr-modal-desc {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+.pdr-modal-close {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+.pdr-modal-close:hover {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+.pdr-modal-close svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.pdr-modal-body {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pdr-modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* Form elements */
+.pdr-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pdr-form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.pdr-form-select,
+.pdr-form-input,
+.pdr-form-textarea {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.875rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+  font-family: inherit;
+}
+
+.pdr-form-select:focus,
+.pdr-form-input:focus,
+.pdr-form-textarea:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.12);
+}
+
+.pdr-form-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.pdr-form-textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.pdr-modal-info-box {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pdr-modal-info-label {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+.pdr-modal-info-label strong {
+  color: var(--text-primary);
+}
+
+/* Modal buttons */
+.pdr-btn-cancel {
+  padding: 0.55rem 1.25rem;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pdr-btn-cancel:hover {
+  border-color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pdr-btn-submit {
+  padding: 0.55rem 1.25rem;
+  background: var(--primary-color);
+  border: none;
+  border-radius: 0.5rem;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.pdr-btn-submit:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+/* ── Details Modal ──────────────────────────────── */
+.pdr-status-banner {
+  border-radius: 0.625rem;
+  padding: 1rem;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pdr-status-banner-ready {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.pdr-status-banner-processing {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.pdr-status-banner-pending {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.pdr-status-banner-completed,
+.pdr-status-banner-rejected {
+  background: rgba(100, 116, 139, 0.08);
+  border-color: rgba(100, 116, 139, 0.3);
+}
+
+.pdr-status-icon-circle {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.pdr-status-icon-ready { background: #22c55e; }
+.pdr-status-icon-processing { background: #3b82f6; }
+.pdr-status-icon-pending { background: #f59e0b; }
+.pdr-status-icon-completed { background: #64748b; }
+.pdr-status-icon-rejected { background: #ef4444; }
+
+.pdr-status-banner-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem 0;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.pdr-status-banner-sub {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+.pdr-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+.pdr-details-full {
+  grid-column: 1 / -1;
+}
+
+.pdr-details-label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0 0 0.2rem 0;
+  text-align: left;
+}
+
+.pdr-details-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+}
+
+.pdr-details-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pdr-notes-box {
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.pdr-notes-blue {
+  background: rgba(59, 130, 246, 0.07);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+[data-theme="light"] .pdr-notes-blue {
+  color: #1d4ed8;
+}
+
+.pdr-reminders-box {
+  background: rgba(34, 197, 94, 0.07);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 0.625rem;
+  padding: 1rem;
+}
+
+.pdr-reminders-title {
+  font-weight: 700;
+  color: var(--primary-color);
+  font-size: 0.9rem;
+  margin: 0 0 0.6rem 0;
+  text-align: left;
+}
+
+.pdr-reminders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pdr-reminders-list li {
+  font-size: 0.82rem;
+  color: #86efac;
+  text-align: left;
+  padding-left: 0.875rem;
+  position: relative;
+}
+
+.pdr-reminders-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+}
+
+[data-theme="light"] .pdr-reminders-list li {
+  color: #166534;
+}
+
+[data-theme="light"] .pdr-reminders-title {
+  color: #15803d;
+}
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 1024px) {
+  .pdr-page {
+    padding: 1.25rem 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .pdr-doc-types-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pdr-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pdr-request-card {
+    flex-wrap: wrap;
+  }
+
+  .pdr-request-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .pdr-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pdr-details-full {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .pdr-page {
+    padding: 0.875rem 0.75rem;
+  }
+
+  .pdr-page-title {
+    font-size: 1.4rem;
+  }
+
+  .pdr-modal {
+    max-height: 95vh;
+  }
+}
