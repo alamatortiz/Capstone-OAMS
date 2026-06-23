@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -11,6 +11,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { toast } from "sonner";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
@@ -455,10 +456,9 @@ export default function DocumentStatusPage() {
   }, []);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
@@ -880,6 +880,7 @@ export default function DocumentStatusPage() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }

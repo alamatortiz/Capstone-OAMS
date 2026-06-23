@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { Link, useNavigate } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
@@ -384,7 +385,9 @@ export default function ProfessorAppointmentsPage() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
 
-  const handleLogout = () => { logout(); navigate("/login"); };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
   const toggleDarkMode = () => {
     setIsDark((prev) => { const next = !prev; applyTheme(next ? "dark" : "light"); return next; });
   };
@@ -607,6 +610,7 @@ export default function ProfessorAppointmentsPage() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }

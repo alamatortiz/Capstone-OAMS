@@ -1,7 +1,7 @@
 .logout-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.65);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,12 +15,13 @@
 }
 
 .logout-modal {
-  background: var(--bg-card, #fff);
+  background: var(--card-bg, #111612);
+  border: 1px solid var(--card-border, #1e3a23);
   border-radius: 16px;
   padding: 2rem 2rem 1.5rem;
   width: 100%;
   max-width: 380px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   text-align: center;
   animation: logout-slide-up 0.2s ease;
 }
@@ -34,7 +35,7 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: #fef2f2;
+  background: rgba(239, 68, 68, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -45,13 +46,13 @@
 .logout-modal-title {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary, #f0fdf4);
   margin: 0 0 0.5rem;
 }
 
 .logout-modal-message {
   font-size: 0.875rem;
-  color: var(--text-secondary, #6b7280);
+  color: var(--muted-foreground, #94a3b8);
   margin: 0 0 1.5rem;
   line-height: 1.5;
 }
@@ -65,17 +66,18 @@
   flex: 1;
   padding: 0.625rem 1rem;
   border-radius: 8px;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--card-border, #1e3a23);
   background: transparent;
-  color: var(--text-primary, #374151);
+  color: var(--text-primary, #f0fdf4);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .logout-modal-cancel:hover {
-  background: var(--bg-hover, #f3f4f6);
+  background: rgba(34, 197, 94, 0.05);
+  border-color: rgba(34, 197, 94, 0.3);
 }
 
 .logout-modal-confirm {

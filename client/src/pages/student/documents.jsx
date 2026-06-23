@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import { toast } from "sonner";
@@ -309,10 +310,9 @@ export default function DocumentsPage() {
     });
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
   const handleSubmitRequest = async () => {
     if (!formData.type || !formData.college || !formData.purpose) {
@@ -1013,6 +1013,7 @@ export default function DocumentsPage() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }

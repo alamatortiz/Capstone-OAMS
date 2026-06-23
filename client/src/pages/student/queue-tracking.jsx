@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { useQueue } from "../../contexts/QueueContext";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { getCollegeLogo } from "../../data/collegeLogo";
@@ -235,10 +236,9 @@ export default function QueueTrackingPage() {
     totalJoined > 0 ? Math.round((totalCompleted / totalJoined) * 100) : 0;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
@@ -845,6 +845,7 @@ export default function QueueTrackingPage() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }

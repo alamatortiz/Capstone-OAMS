@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { Link, useNavigate } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
 
@@ -326,10 +327,9 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
@@ -777,6 +777,7 @@ export default function TransactionsPage() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }

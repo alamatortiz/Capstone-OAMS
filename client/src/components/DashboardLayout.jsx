@@ -3,6 +3,7 @@ import { Link, Outlet, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from './ChatWidget';
+import LogoutConfirmModal from './LogoutConfirmModal';
 import ucLogo from '../assets/Pnc-Logo.png';
 import oamsLogo from '../assets/oams_logo.png';
 import './DashboardLayout.css';
@@ -103,6 +104,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   if (!user) {
     return null;
@@ -117,6 +119,7 @@ export default function DashboardLayout() {
   ];
 
   const handleLogout = () => {
+    setShowLogoutModal(false);
     logout();
     navigate('/login');
   };
@@ -220,9 +223,9 @@ export default function DashboardLayout() {
 
           {/* Logout Button */}
           <div className="sidebar-logout">
-            <button 
+            <button
               className="logout-btn"
-              onClick={handleLogout}
+              onClick={() => setShowLogoutModal(true)}
             >
               <LogOutIcon />
               <span>Logout</span>
@@ -248,6 +251,12 @@ export default function DashboardLayout() {
 
       {/* AI Chat Widget */}
       <ChatWidget />
+
+      <LogoutConfirmModal
+        show={showLogoutModal}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutModal(false)}
+      />
     </div>
   );
 }

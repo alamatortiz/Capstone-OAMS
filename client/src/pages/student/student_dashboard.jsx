@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { useQueue } from "../../contexts/QueueContext";
 
 import { Link, useNavigate } from "react-router-dom";
@@ -505,10 +506,9 @@ export default function StudentDashboard() {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -1100,6 +1100,7 @@ export default function StudentDashboard() {
           <ChatIcon />
         </button>
       </div>
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }
