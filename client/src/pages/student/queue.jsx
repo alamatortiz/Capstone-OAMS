@@ -242,15 +242,24 @@ export default function QueuePage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [servicesData]);
 
-  // Derive unique service names from all services in the database
+  // Derive service names scoped to the selected college (or all if none selected)
   const serviceOptions = useMemo(() => {
+    const departments =
+      selectedCollege === 'all'
+        ? servicesData
+        : servicesData.filter((dept) => dept.departmentName === selectedCollege);
     const names = [
       ...new Set(
-        servicesData.flatMap((dept) => dept.services?.map((s) => s.serviceName) ?? [])
+        departments.flatMap((dept) => dept.services?.map((s) => s.serviceName) ?? [])
       ),
     ].sort();
     return names;
-  }, [servicesData]);
+  }, [servicesData, selectedCollege]);
+
+  // Reset service filter when college changes
+  useEffect(() => {
+    setSelectedService('all');
+  }, [selectedCollege]);
 
   // Filter available slots client-side
   const filteredSlots = useMemo(
@@ -841,6 +850,7 @@ export default function QueuePage() {
                             value={selectedService}
                             onChange={(e) => setSelectedService(e.target.value)}
                             aria-label="Filter by service"
+                            disabled={selectedCollege === 'all'}
                           >
                             <option value="all">All Services</option>
                             {serviceOptions.map((service) => (
