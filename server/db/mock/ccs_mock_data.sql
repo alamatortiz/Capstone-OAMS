@@ -34,6 +34,8 @@ TRUNCATE TABLE queue_status_logs;
 TRUNCATE TABLE queues;
 TRUNCATE TABLE queue_slots;
 TRUNCATE TABLE service_requirements;
+TRUNCATE TABLE appointment_services;
+TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
 TRUNCATE TABLE chat_messages;
 TRUNCATE TABLE chat_sessions;
@@ -48,6 +50,23 @@ TRUNCATE TABLE users;
 TRUNCATE TABLE departments;
 SET FOREIGN_KEY_CHECKS = 1;
 
+-- DYNAMIC GENERATOR TRIGGER FOR TRACKING NUMBER
+DELIMITER //
+
+CREATE TRIGGER ts_auto_tracking_number
+BEFORE INSERT ON document_requests
+FOR EACH ROW
+BEGIN
+    DECLARE next_id INT;
+    
+    -- Dynamically look up the next primary increment token sequence
+    SELECT COALESCE(MAX(request_id), 0) + 1 INTO next_id FROM document_requests;
+    
+    -- Combines text with padded zero increment (e.g., REQ-00001, REQ-00002)
+    SET NEW.tracking_number = CONCAT('REQ-', LPAD(next_id, 5, '0'));
+END//
+
+DELIMITER ;
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 0 · DEPARTMENTS
@@ -320,10 +339,7 @@ INSERT INTO students (student_id, student_number, first_name, last_name, course,
 
 
 -- ─────────────────────────────────────────────────────────────
--- SECTION 5 · SERVICES
--- Services 1–4 are CCS-scoped. Services 5–6 are for other
--- colleges (CBAA, COED) and are included for FK completeness
--- in cross-department document_requests testing only.
+-- SECTION 5 · SERVICES (queue only)
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO services (service_id, service_name, description, department_id) VALUES
 (1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001),
@@ -332,6 +348,27 @@ INSERT INTO services (service_id, service_name, description, department_id) VALU
 (4, 'Transcript of Records',     'Request for official Transcript of Records',      1001),
 (5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001),
 (6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 5b · APPOINTMENT SERVICES (created by faculty)
+-- Each row is a service type a faculty member offers for appointments.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO appointment_services (service_id, service_name, description, faculty_id) VALUES
+(1, 'Web Development Consultation',  'Frontend/backend web development guidance',    102),
+(2, 'Mobile App Consultation',       'Mobile application development advice',        102),
+(3, 'Database Design Review',        'Database schema and query optimization',       106),
+(4, 'Backend Architecture Review',   'Server-side architecture guidance',            107),
+(5, 'Software Engineering Consult',  'SDLC and software design principles',          110),
+(6, 'Network Security Consultation', 'Cybersecurity and network security guidance',  111);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 5c · DOCUMENT SERVICES
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO document_services (service_id, service_name, description, department_id) VALUES
+(1, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001),
+(2, 'Transcript of Records',     'Request for official Transcript of Records',      1001),
+(3, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001),
+(4, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -391,28 +428,28 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 8 · APPOINTMENTS
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO appointments (appointment_id, student_id, faculty_id, appointment_date, appointment_time, status, notes, created_at) VALUES
+INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, appointment_date, appointment_time, status, notes, created_at) VALUES
 -- Student 101: 1 approved upcoming, 1 pending upcoming, 1 completed
-(1, 101, 102, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
-(2, 101, 106, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
-(3, 101, 107, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
+(1, 101, 102, 1001, 1, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
+(2, 101, 106, 1001, 3, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
+(3, 101, 107, 1001, 4, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
 -- Student 104: 1 pending upcoming, 2 completed
-(4, 104, 102, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
-(5, 104, 106, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
-(6, 104, 107, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
+(4, 104, 102, 1001, 2, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
+(5, 104, 106, 1001, 3, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
+(6, 104, 107, 1001, 4, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 9 · DOCUMENT REQUESTS
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO document_requests (request_id, student_id, service_id, request_type, status, created_at) VALUES
+INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, notes, created_at) VALUES
 -- Student 101: 1 processing, 1 released
-(1, 101, 3, 'Good Moral Certificate',    'processing', NOW() - INTERVAL 3 DAY),
-(2, 101, 4, 'Transcript of Records',     'released',   NOW() - INTERVAL 14 DAY),
+(1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', '2026-06-14', 'Document Test 1', NOW() - INTERVAL 3 DAY),
+(2,  101, 2, 'Transcript of Records',     'Local Doc Req 2', 'released',   '2026-06-14', 'Document Test 2', NOW() - INTERVAL 14 DAY),
 -- Student 104: 2 pending, 1 released
-(3, 104, 3, 'Good Moral Certificate',    'pending',    NOW() - INTERVAL 1 DAY),
-(4, 104, 4, 'Transcript of Records',     'pending',    NOW() - INTERVAL 2 DAY),
-(5, 104, 5, 'Certificate of Enrollment', 'released',   NOW() - INTERVAL 10 DAY);
+(3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', 'Document Test 3', NOW() - INTERVAL 1 DAY),
+(4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', 'Document Test 4', NOW() - INTERVAL 2 DAY),
+(5,  104, 3, 'Certificate of Enrollment', 'Local Doc Req 5', 'released',   '2026-06-14', 'Document Test 5', NOW() - INTERVAL 10 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -420,28 +457,28 @@ INSERT INTO document_requests (request_id, student_id, service_id, request_type,
 -- Used by the admin dashboard announcements card.
 -- department_id NULL = global/cross-department announcement.
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO faqs (faq_id, question, answer, department_id) VALUES
+INSERT INTO faqs (faq_id, question, answer, is_pinned, department_id) VALUES
 (1, 'How do I request a Good Moral Certificate?',
    'Submit a document request through the OAMS portal under Document Requests. Processing takes 3–5 business days. Claim your document at the CCS office upon notification.',
-   1001),
+   FALSE, 1001),
 (2, 'How do I book a consultation with my professor?',
    'Go to Appointments in your student dashboard, select your professor, choose an available time slot, and submit your request. You will be notified once the professor approves.',
-   1001),
+   FALSE, 1001),
 (3, 'How does the online queue work?',
    'Join a queue from the Queue section of your dashboard. You will receive a queue number and can monitor your position in real time. Proceed to the office when you are called.',
-   1001),
+   FALSE, 1001),
 (4, 'What documents are required for enrollment assistance?',
    'Bring your registration form, previous grades, and any outstanding clearance slips. Visit the CCS office or join the Enrollment Assistance queue online.',
-   1001),
+   FALSE, 1001),
 (5, 'What are the CCS office hours?',
    'The CCS office is open Monday to Friday, 8:00 AM to 5:00 PM. Queue slots are available from 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM.',
-   1001),
+   FALSE, 1001),
 (6, 'Enrollment period for AY 2026–2027 is now open.',
    'All students must complete online enrollment via the OAMS portal by June 30, 2026. Walk-in enrollment will not be accommodated after the deadline.',
-   NULL),
+   TRUE, NULL),
 (7, 'System maintenance scheduled for June 15, 2026.',
    'OAMS will be unavailable from 12:00 AM to 4:00 AM on June 15, 2026 for scheduled maintenance. Please plan your transactions accordingly.',
-   NULL);
+   TRUE, NULL);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -499,3 +536,39 @@ INSERT INTO notifications (user_id, message, is_read, created_at) VALUES
 -- Admin 103
 (103, 'New document request submitted by Alvin Matthew Ortiz (Good Moral Certificate).',                                               TRUE,  NOW() - INTERVAL 3 DAY),
 (103, 'New document request submitted by Luiz Gabriel Rosales (Transcript of Records).',                                               TRUE,  NOW() - INTERVAL 2 DAY);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 13 · FACULTY POSITIONS (update existing rows)
+-- ─────────────────────────────────────────────────────────────
+UPDATE faculty SET position = 'Department Chair'    WHERE faculty_id = 102;
+UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 106;
+UPDATE faculty SET position = 'Program Coordinator'  WHERE faculty_id = 107;
+UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 110;
+UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 111;
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 14 · FACULTY AVAILABILITY (consultation hours)
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location) VALUES
+-- 102 Patrick Ogalesco
+(102, 'Monday',    '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+(102, 'Monday',    '14:00:00', '17:00:00', 'CCS Faculty Room 201'),
+(102, 'Wednesday', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+(102, 'Friday',    '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
+-- 106 Marvin Bicua
+(106, 'Tuesday',   '10:00:00', '12:00:00', 'CCS Faculty Room 203'),
+(106, 'Tuesday',   '14:00:00', '17:00:00', 'CCS Faculty Room 203'),
+(106, 'Thursday',  '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
+(106, 'Thursday',  '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
+-- 107 Janus Raymond Tan
+(107, 'Monday',    '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+(107, 'Wednesday', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+(107, 'Wednesday', '14:00:00', '16:00:00', 'CCS Dean\'s Office'),
+(107, 'Friday',    '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
+-- 110 Lena Villanueva
+(110, 'Monday',    '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
+(110, 'Wednesday', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
+(110, 'Friday',    '14:00:00', '17:00:00', 'CCS Faculty Room 105'),
+-- 111 Marco Dela Cruz
+(111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
+(111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401');

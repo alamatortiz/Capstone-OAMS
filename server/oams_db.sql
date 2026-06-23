@@ -63,6 +63,7 @@ CREATE TABLE faculty (
     first_name      VARCHAR(50)  NOT NULL,
     last_name       VARCHAR(50)  NOT NULL,
     specialization  VARCHAR(100),
+    position        VARCHAR(100) NOT NULL DEFAULT 'Faculty Member',
     email           VARCHAR(100) NOT NULL UNIQUE,
     department_id   INT          NOT NULL,
     FOREIGN KEY (faculty_id)    REFERENCES users(user_id)       ON DELETE CASCADE,
@@ -111,7 +112,7 @@ CREATE TABLE login_logs (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- 5. SERVICES & REQUIREMENTS
+-- 5. SERVICES & REQUIREMENTS (queue only)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE services (
     service_id      INT          AUTO_INCREMENT PRIMARY KEY,
@@ -132,6 +133,28 @@ CREATE TABLE service_requirements (
 );
 
 -- ─────────────────────────────────────────────────────────────
+-- 5b. APPOINTMENT SERVICES (created by faculty, for appointments only)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE appointment_services (
+    service_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name    VARCHAR(100) NOT NULL,
+    description     TEXT,
+    faculty_id      INT          NOT NULL,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5c. DOCUMENT SERVICES (document requests only)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_services (
+    service_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name    VARCHAR(100) NOT NULL,
+    description     TEXT,
+    department_id   INT          NOT NULL,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
 -- 6. QUEUE SLOT MANAGEMENT
 -- Controls capacity per service window. Separate from appointments.
 -- ─────────────────────────────────────────────────────────────
@@ -146,6 +169,7 @@ CREATE TABLE queue_slots (
     current_count   INT          NOT NULL DEFAULT 0,
     status          ENUM('open','paused','closed','cancelled') DEFAULT 'open',
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (service_id) REFERENCES services(service_id),
     FOREIGN KEY (admin_id)   REFERENCES administrators(admin_id),
     -- prevents duplicate slots for the same service on the same day/time window
@@ -192,6 +216,8 @@ CREATE TABLE appointments (
     appointment_id   INT          AUTO_INCREMENT PRIMARY KEY,
     student_id       INT          NOT NULL,
     faculty_id       INT          NOT NULL,
+    department_id    INT          NOT NULL,
+    service_id       INT          NULL,
     appointment_date DATE         NOT NULL,
     appointment_time TIME         NOT NULL,
     status           ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
@@ -199,22 +225,44 @@ CREATE TABLE appointments (
     created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id),
-    -- prevents duplicate bookings for the same student/faculty/date/time
-    UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time)
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    FOREIGN KEY (service_id) REFERENCES appointment_services(service_id) ON DELETE SET NULL,    -- prevents duplicate bookings for the same student/faculty/date/time
+    UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
+    INDEX idx_appointments_dept_service (department_id, service_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- FACULTY AVAILABILITY
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE faculty_availability (
+    availability_id INT AUTO_INCREMENT PRIMARY KEY,
+    faculty_id       INT NOT NULL,
+    day_of_week      ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday') NOT NULL,
+    start_time       TIME NOT NULL,
+    end_time         TIME NOT NULL,
+    location         VARCHAR(150),
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    INDEX idx_faculty_availability_faculty (faculty_id)
 );
 
 -- ─────────────────────────────────────────────────────────────
 -- 9. DOCUMENT PROCESSING
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE document_requests (
-    request_id      INT          AUTO_INCREMENT PRIMARY KEY,
-    student_id      INT          NOT NULL,
-    service_id      INT          NOT NULL,
-    request_type    VARCHAR(100) NOT NULL,
-    status          ENUM('pending','processing','generated','released') DEFAULT 'pending',
-    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    request_id              INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number         VARCHAR(50)  NOT NULL UNIQUE, -- Dynamically assigned via trigger below    
+    student_id              INT          NOT NULL,  
+    service_id              INT          NOT NULL,
+    request_type            VARCHAR(100) NOT NULL,
+    purpose                 VARCHAR(255) NOT NULL,
+    status                  ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
+    estimated_completion    DATE         NULL,
+    notes                   TEXT         NULL,
+    created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
-    FOREIGN KEY (service_id) REFERENCES services(service_id)
+    FOREIGN KEY (service_id) REFERENCES document_services(service_id),
+    INDEX idx_document_requests_tracking (tracking_number)
 );
 
 CREATE TABLE generated_files (
@@ -280,9 +328,11 @@ CREATE TABLE faqs (
     faq_id          INT          AUTO_INCREMENT PRIMARY KEY,
     question        TEXT         NOT NULL,
     answer          TEXT         NOT NULL,
+    is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
     department_id   INT          NULL,   -- NULL = global announcement
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+    INDEX idx_faqs_pinned_created (is_pinned, created_at)
 );
 
 -- ─────────────────────────────────────────────────────────────

@@ -283,22 +283,6 @@ const SendIcon = () => (
   </svg>
 );
 
-// ─── Static pinned announcements (no announcements table yet) ─────────────────
-const PINNED_ANNOUNCEMENTS = [
-  {
-    id: "1",
-    title: "Enrollment Period for Second Semester",
-    college: "College of Computing Studies (CCS)",
-    date: "2026-03-25",
-  },
-  {
-    id: "2",
-    title: "System Maintenance Notice",
-    college: "All Departments",
-    date: "2026-03-26",
-  },
-];
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
   const { user: authUser, logout } = useAuth();
@@ -343,6 +327,11 @@ export default function StudentDashboard() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
 
+  // ── Pinned announcements state ────────────────────────────────────────────
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
+  const [announcementsError, setAnnouncementsError] = useState(null);
+
   // ── Fetch dashboard stats from backend ───────────────────────────────────
   useEffect(() => {
     const fetchStats = async () => {
@@ -361,18 +350,49 @@ export default function StudentDashboard() {
     if (authUser) fetchStats();
   }, [authUser]);
 
+  // ── Fetch announcements from backend ──────────────────────────────────────
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        setAnnouncementsLoading(true);
+        const res = await api.get("/student/announcements");
+        setAnnouncements(res.data?.announcements ?? []);
+      } catch (err) {
+        console.error("Failed to fetch announcements:", err);
+        setAnnouncementsError("Could not load announcements.");
+      } finally {
+        setAnnouncementsLoading(false);
+      }
+    };
+
+    if (authUser) fetchAnnouncements();
+  }, [authUser]);
+
+  // Pinned announcements only, capped to the top 2 for the dashboard preview
+  const pinnedAnnouncements = announcements
+    .filter((a) => a.isPinned)
+    .slice(0, 2);
+
   // ── Derived values from API response ─────────────────────────────────────
   const apiQueue = dashStats?.activeQueue ?? null;
   // Fallback to QueueContext (for locally-joined queues before page refresh)
   const contextQueues = getActiveQueues();
-  const mostRecentQueue = apiQueue ?? contextQueues[0] ?? null;
+  // Sort by position ascending so index [0] is always the closest to being served
+  const closestContextQueue = contextQueues.length > 0
+    ? [...contextQueues].sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity))[0]
+    : null;
+  const mostRecentQueue = apiQueue ?? closestContextQueue ?? null;
   const activeQueueCount =
     dashStats?.stats?.activeQueueCount ?? contextQueues.length;
 
-  const queueProgress = mostRecentQueue
-    ? ((mostRecentQueue.totalInQueue - mostRecentQueue.position) /
-        mostRecentQueue.totalInQueue) *
-      100
+  // Two distinct progress measures, mirroring the Queue Management page:
+  // 1) how full the queue is (people in queue vs. max capacity)
+  // 2) how far along the queue has been serviced (serviced vs. total in queue)
+  const queueOccupancyPercent = mostRecentQueue
+    ? mostRecentQueue.queueOccupancyPercent ?? 0
+    : 0;
+  const servicedPercent = mostRecentQueue
+    ? mostRecentQueue.servicedPercent ?? 0
     : 0;
 
   // ── Stats cards (live values) ─────────────────────────────────────────────
@@ -380,6 +400,7 @@ export default function StudentDashboard() {
     {
       title: "Queue Position",
       value: dashLoading ? "—" : String(dashStats?.stats?.queuePosition ?? 0),
+      badge: dashLoading ? null : (dashStats?.stats?.queueNumberBadge ?? null),
       description: dashLoading
         ? "Loading..."
         : activeQueueCount > 0
@@ -414,11 +435,11 @@ export default function StudentDashboard() {
         ? "Loading..."
         : dashStats?.stats?.documents?.pending > 0
           ? `${dashStats.stats.documents.pending} pending approval`
-          : "All documents processed",
+          : "No pending documents",
       icon: FileTextIcon,
       color: "text-orange-600",
       bgColor: "bg-orange-50 dark:bg-orange-950",
-      link: "/student/documents",
+      link: "/student/document-status",
     },
     {
       title: "Completed",
@@ -434,22 +455,12 @@ export default function StudentDashboard() {
   // ── Quick actions (badge for active queues is now live) ───────────────────
   const quickActions = [
     {
-      title: "Avail Service",
-      description:
-        "Browse available office services and join a queue instantly.",
-      icon: ListIcon,
-      link: "/student/avail-service",
-      gradient: "from-emerald-500 to-green-600",
-      badge: "6 Services",
-    },
-    {
-      title: "Queue Tracking",
-      description:
-        "View detailed analytics and history of all your queue activities.",
-      icon: ActivityIcon,
-      link: "/student/queue-tracking",
-      gradient: "from-cyan-500 to-blue-600",
-      badge: "Analytics",
+      title: "Announcements",
+      description: "Stay updated with the latest notices from all colleges.",
+      icon: MegaphoneIcon,
+      link: "/student/announcements",
+      gradient: "from-violet-500 to-purple-600",
+      badge: `${pinnedAnnouncements.length} Pinned`,
     },
     {
       title: "Appointment Booking",
@@ -461,12 +472,13 @@ export default function StudentDashboard() {
       badge: "New Slots",
     },
     {
-      title: "Announcements",
-      description: "Stay updated with the latest notices from all colleges.",
-      icon: MegaphoneIcon,
-      link: "/student/announcements",
-      gradient: "from-violet-500 to-purple-600",
-      badge: "2 Pinned",
+      title: "Queue Tracking",
+      description:
+        "View detailed analytics and history of all your queue activities.",
+      icon: ActivityIcon,
+      link: "/student/queue-tracking",
+      gradient: "from-cyan-500 to-blue-600",
+      badge: "Analytics",
     },
     {
       title: "Professor Schedules",
@@ -475,14 +487,6 @@ export default function StudentDashboard() {
       link: "/student/professor-schedules",
       gradient: "from-sky-500 to-blue-600",
       badge: "13 Faculty",
-    },
-    {
-      title: "View Queue Status",
-      description: "Track your real-time position across all active queues.",
-      icon: TimerIcon,
-      link: "/student/queue-status",
-      gradient: "from-rose-500 to-pink-600",
-      badge: `${activeQueueCount} Active`,
     },
   ];
 
@@ -686,7 +690,7 @@ export default function StudentDashboard() {
             <div className="banner-backdrop banner-backdrop-1"></div>
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
-              <p className="banner-greeting">Good day! 👋</p>
+              <p className="banner-greeting">Good day!</p>
               <div className="banner-title-row">
                 <img
                   src={
@@ -718,14 +722,32 @@ export default function StudentDashboard() {
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
                   </div>
-                  <div className="stat-header">
-                    <ChevronRightIcon className="stat-chevron" />
-                  </div>
+                  <div className="stat-header"></div>
+
                   <p
                     className={`stat-value ${dashLoading ? "stat-loading" : ""}`}
                   >
                     {stat.value}
                   </p>
+                  {stat.badge && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: "rgba(34,197,94,0.15)",
+                        color: "var(--primary-color)",
+                        border: "1px solid rgba(34,197,94,0.3)",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.7rem",
+                        fontWeight: 700,
+                        fontFamily: "monospace",
+                        letterSpacing: "0.05em",
+                        padding: "0.2rem 0.5rem",
+                        marginBottom: "0.25rem",
+                      }}
+                    >
+                      {stat.badge}
+                    </span>
+                  )}
                   <p className="stat-title">{stat.title}</p>
                   <p className="stat-description">{stat.description}</p>
                 </div>
@@ -814,7 +836,7 @@ export default function StudentDashboard() {
                       <p className="stat-label">Position</p>
                     </div>
                     <div className="queue-stat">
-                      <p className="stat-num">{mostRecentQueue.totalInQueue}</p>
+                      <p className="stat-num">{mostRecentQueue.totalWaiting}</p>
                       <p className="stat-label">Waiting</p>
                     </div>
                     <div className="queue-stat">
@@ -824,16 +846,44 @@ export default function StudentDashboard() {
                       <p className="stat-label">Est. Wait</p>
                     </div>
                   </div>
-                  <div className="queue-progress">
-                    <div className="progress-label">
-                      <span>Progress</span>
-                      <span>{Math.round(queueProgress)}%</span>
-                    </div>
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{ width: `${queueProgress}%` }}
-                      ></div>
+                  <div className="qs-progress-card">
+                    <div className="queue-progress-group">
+                      <div className="queue-progress-wrapper">
+                        <div className="qs-progress-label-row">
+                          <p className="qs-progress-label">People in Queue</p>
+                          <p className="qs-progress-value">
+                            {mostRecentQueue.totalInQueue ?? 0}/
+                            {mostRecentQueue.maxCapacity ?? 0}
+                            <span className="qs-progress-percent">
+                              &nbsp;({queueOccupancyPercent}%)
+                            </span>
+                          </p>
+                        </div>
+                        <div className="qs-progress-bar">
+                          <div
+                            className="qs-progress-fill"
+                            style={{ width: `${queueOccupancyPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="queue-progress-wrapper">
+                        <div className="qs-progress-label-row">
+                          <p className="qs-progress-label">Serviced</p>
+                          <p className="qs-progress-value">
+                            {mostRecentQueue.servicedCount ?? 0}/
+                            {mostRecentQueue.totalInQueue ?? 0}
+                            <span className="qs-progress-percent">
+                              &nbsp;({servicedPercent}%)
+                            </span>
+                          </p>
+                        </div>
+                        <div className="qs-progress-bar">
+                          <div
+                            className="qs-progress-fill qs-progress-fill-serviced"
+                            style={{ width: `${servicedPercent}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <Link to="/student/queue-status" className="primary-btn">
@@ -870,29 +920,46 @@ export default function StudentDashboard() {
                 </Link>
               </div>
               <div className="card-content announcements-content">
-                {PINNED_ANNOUNCEMENTS.map((ann) => (
-                  <Link
-                    key={ann.id}
-                    to="/student/announcements"
-                    className="announcement-item"
-                  >
-                    <div className="announcement-icon">
-                      <AlertCircleIcon />
-                    </div>
-                    <div className="announcement-details">
-                      <p className="announcement-title">{ann.title}</p>
-                      <p className="announcement-college">{ann.college}</p>
-                      <p className="announcement-date">
-                        {new Date(ann.date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
-                    <span className="announcement-badge">Important</span>
-                  </Link>
-                ))}
+                {announcementsLoading ? (
+                  <p className="announcement-loading">
+                    Loading announcements...
+                  </p>
+                ) : announcementsError ? (
+                  <p className="announcement-empty">{announcementsError}</p>
+                ) : pinnedAnnouncements.length === 0 ? (
+                  <p className="announcement-empty">
+                    No pinned announcements.
+                  </p>
+                ) : (
+                  pinnedAnnouncements.map((ann) => (
+                    <Link
+                      key={ann.id}
+                      to="/student/announcements"
+                      className="announcement-item"
+                    >
+                      <div className="announcement-icon">
+                        <AlertCircleIcon />
+                      </div>
+                      <div className="announcement-details">
+                        <p className="announcement-title">{ann.title}</p>
+                        <p className="announcement-college">{ann.college}</p>
+                        <p className="announcement-date">
+                          {new Date(ann.date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                      <span className="announcement-badge">
+                        {ann.category
+                          ? ann.category.charAt(0).toUpperCase() +
+                            ann.category.slice(1)
+                          : "Notice"}
+                      </span>
+                    </Link>
+                  ))
+                )}
                 <Link to="/student/announcements" className="secondary-btn">
                   <BellIcon /> View All Announcements
                 </Link>

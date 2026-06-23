@@ -251,19 +251,19 @@ const UserManagementIcon = () => (
     <path d="M18 5l1 1"></path>
   </svg>
 );
-const DataManagementIcon = () => (
+const DatabaseIcon = () => (
   <svg
-    className="tool-icon-svg"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    style={{ width: "1.5rem", height: "1.5rem" }}
   >
-    <ellipse cx="12" cy="5" rx="8" ry="3" />
-    <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
-    <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+    <ellipse cx="12" cy="5" rx="9" ry="3" fill="none" />
+    <path d="M21 5v6c0 1.66-4.03 3-9 3S3 12.66 3 11V5" fill="none" />
+    <path d="M21 11v6c0 1.66-4.03 3-9 3S3 18.66 3 17v-6" fill="none" />
   </svg>
 );
 const QueueAnalyticsIcon = () => (
@@ -298,31 +298,35 @@ const HostQueueIcon = () => (
   </svg>
 );
 
-// ── Static tool/action arrays (UI only, no data dependency) ──────────────────
+// ── Static tool/action arrays ─────────────────────────────────────────────────
 const adminTools = [
   {
     icon: UserManagementIcon,
     iconColor: "bg-orange-500",
     title: "User Management",
     description: "Manage user accounts",
+    path: "/admin/user-management",
   },
   {
-    icon: DataManagementIcon,
-    iconColor: "bg-purple-500",
+    icon: DatabaseIcon,
+    iconColor: "bg-data-green",
     title: "Data Management",
     description: "Configure settings",
+    path: "/admin/data-management",
   },
   {
     icon: QueueAnalyticsIcon,
     iconColor: "bg-blue-600",
     title: "Queue Analytics",
     description: "Performance metrics",
+    path: "/admin/queue-analytics",
   },
   {
     icon: SyncIcon,
     iconColor: "bg-cyan-500",
     title: "Pinnacle Sync",
     description: "Data synchronization",
+    path: "/admin/pinnacle-sync",
   },
 ];
 const quickActions = [
@@ -331,12 +335,14 @@ const quickActions = [
     iconColor: "bg-green-500",
     title: "Scan Document",
     description: "Verify QR codes and view document details",
+    path: "/admin/scan-document",
   },
   {
     icon: HostQueueIcon,
     iconColor: "bg-blue-500",
     title: "Host Queue",
     description: "Manage and host student queues",
+    path: "/admin/queue-hosting",
   },
 ];
 
@@ -404,6 +410,8 @@ export default function AdminDashboard() {
       description: "Across all colleges",
       icon: ClockIcon,
       bgColor: "bg-blue-50",
+      isClickable: true,
+      ctaAriaLabel: "View queue management for active queues",
     },
     {
       title: "Pending Documents",
@@ -411,6 +419,8 @@ export default function AdminDashboard() {
       description: "Awaiting processing",
       icon: FileTextIcon,
       bgColor: "bg-orange-50",
+      isClickable: true,
+      ctaAriaLabel: "View document processing for pending documents",
     },
     {
       title: "Faculty Available",
@@ -418,6 +428,8 @@ export default function AdminDashboard() {
       description: "Today",
       icon: UsersIcon,
       bgColor: "bg-emerald-50",
+      isClickable: true,
+      ctaAriaLabel: "View faculty availability",
     },
     {
       title: "Announcements",
@@ -425,6 +437,8 @@ export default function AdminDashboard() {
       description: "Published",
       icon: BellIcon,
       bgColor: "bg-purple-50",
+      isClickable: true,
+      ctaAriaLabel: "View announcement management",
     },
   ];
 
@@ -486,6 +500,25 @@ export default function AdminDashboard() {
     if (i.includes("announcement"))
       return "Use Announcement Management to create and manage announcements.";
     return "I can help with user management, document approvals, queue hosting, and announcements. What are you working on?";
+  };
+
+  // ── Handler for clicking stat cards ────────────────────────────────────────
+  const handleStatCardClick = (statTitle) => {
+    if (statTitle === "Active Queues") {
+      navigate("/admin/queue-management");
+      return;
+    }
+    if (statTitle === "Pending Documents") {
+      navigate("/admin/document-processing");
+      return;
+    }
+    if (statTitle === "Faculty Available") {
+      navigate("/admin/professor-availability");
+      return;
+    }
+    if (statTitle === "Announcements") {
+      navigate("/admin/announcements");
+    }
   };
 
   const navItems = [
@@ -680,7 +713,24 @@ export default function AdminDashboard() {
           {/* Stats Grid */}
           <div className="stats-grid">
             {stats.map((stat) => (
-              <div key={stat.title} className="stat-card">
+              <div
+                key={stat.title}
+                className={`stat-card ${stat.isClickable ? "stat-card-clickable" : ""}`}
+                onClick={() =>
+                  stat.isClickable && handleStatCardClick(stat.title)
+                }
+                role={stat.isClickable ? "button" : undefined}
+                tabIndex={stat.isClickable ? 0 : undefined}
+                aria-label={stat.isClickable ? stat.ctaAriaLabel : undefined}
+                onKeyPress={(e) => {
+                  if (
+                    stat.isClickable &&
+                    (e.key === "Enter" || e.key === " ")
+                  ) {
+                    handleStatCardClick(stat.title);
+                  }
+                }}
+              >
                 <div className="stat-header">
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
@@ -710,7 +760,19 @@ export default function AdminDashboard() {
             </div>
             <div className="admin-tools-grid">
               {adminTools.map((tool) => (
-                <div key={tool.title} className="admin-tool-card">
+                <div
+                  key={tool.title}
+                  className="admin-tool-card"
+                  onClick={() => tool.path && navigate(tool.path)}
+                  role={tool.path ? "button" : undefined}
+                  tabIndex={tool.path ? 0 : undefined}
+                  style={tool.path ? { cursor: "pointer" } : undefined}
+                  onKeyPress={(e) => {
+                    if (tool.path && (e.key === "Enter" || e.key === " ")) {
+                      navigate(tool.path);
+                    }
+                  }}
+                >
                   <div className={`admin-tool-icon ${tool.iconColor}`}>
                     <tool.icon />
                   </div>
@@ -738,7 +800,19 @@ export default function AdminDashboard() {
             </div>
             <div className="quick-actions-grid">
               {quickActions.map((action) => (
-                <div key={action.title} className="quick-action-card">
+                <div
+                  key={action.title}
+                  className="quick-action-card"
+                  onClick={() => action.path && navigate(action.path)}
+                  role={action.path ? "button" : undefined}
+                  tabIndex={action.path ? 0 : undefined}
+                  style={action.path ? { cursor: "pointer" } : undefined}
+                  onKeyPress={(e) => {
+                    if (action.path && (e.key === "Enter" || e.key === " ")) {
+                      navigate(action.path);
+                    }
+                  }}
+                >
                   <div className={`action-icon ${action.iconColor}`}>
                     <action.icon />
                   </div>
@@ -758,7 +832,10 @@ export default function AdminDashboard() {
                 <BellIcon />
                 <h2>Announcement Management</h2>
               </div>
-              <button className="btn-new-announcement">
+              <button
+                className="btn-new-announcement"
+                onClick={() => navigate("/admin/announcements")}
+              >
                 <PlusIcon />
                 New Announcement
               </button>
@@ -788,7 +865,7 @@ export default function AdminDashboard() {
                         type="button"
                         className="btn-announcement-icon btn-announcement-edit"
                         aria-label={`Edit: ${ann.title}`}
-                        onClick={() => console.log("edit", ann)}
+                        onClick={() => navigate("/admin/announcements")}
                       >
                         <img
                           className="btn-announcement-icon-img"
@@ -800,7 +877,7 @@ export default function AdminDashboard() {
                         type="button"
                         className="btn-announcement-icon btn-announcement-delete"
                         aria-label={`Delete: ${ann.title}`}
-                        onClick={() => console.log("delete", ann)}
+                        onClick={() => navigate("/admin/announcements")}
                       >
                         <img
                           className="btn-announcement-icon-img"
@@ -820,7 +897,14 @@ export default function AdminDashboard() {
             <section className="pending-documents-section">
               <div className="card-header-admin">
                 <h3>Pending Requested Documents</h3>
-                <a href="#" className="view-all-link">
+                <a
+                  href="/admin/document-processing"
+                  className="view-all-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/admin/document-processing");
+                  }}
+                >
                   View All <ChevronRightIcon />
                 </a>
               </div>
@@ -856,7 +940,14 @@ export default function AdminDashboard() {
             <section className="hosted-queues-section">
               <div className="card-header-admin">
                 <h3>Current Hosted Queues</h3>
-                <a href="#" className="view-all-link">
+                <a
+                  href="/admin/queue-management"
+                  className="view-all-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/admin/queue-management");
+                  }}
+                >
                   Manage <ChevronRightIcon />
                 </a>
               </div>
@@ -894,7 +985,14 @@ export default function AdminDashboard() {
           <section className="faculty-availability-section">
             <div className="card-header-admin">
               <h3>Faculty Availability Today</h3>
-              <a href="#" className="view-all-link">
+              <a
+                href="/admin/professor-availability"
+                className="view-all-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/admin/professor-availability");
+                }}
+              >
                 View All Faculty <ChevronRightIcon />
               </a>
             </div>

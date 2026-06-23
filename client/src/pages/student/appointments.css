@@ -841,6 +841,7 @@ body {
   font-size: 0.875rem;
   color: var(--text-primary);
   transition: color 0.3s ease;
+  text-align: left;
 }
 
 .form-group select,
@@ -1200,11 +1201,6 @@ body {
   color: var(--text-tertiary);
   margin: 0 0 1.5rem 0;
   transition: color 0.3s ease;
-}
-
-.book-btn-small {
-  margin: 0 auto;
-  padding: 0.75rem 1.5rem;
 }
 
 /* ===== Chat Widget ===== */

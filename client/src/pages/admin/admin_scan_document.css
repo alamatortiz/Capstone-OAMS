@@ -1,0 +1,678 @@
+/* admin_scan_document.css
+   All page-specific classes are prefixed with "asd-" to prevent
+   collisions with other pages that share admin_dashboard.css sidebar styles. */
+
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.asd-page {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.asd-page-header {
+  margin-bottom: 1.5rem;
+}
+
+.asd-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 0.25rem 0;
+  text-align: start;
+}
+
+.asd-page-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+  text-align: start;
+}
+
+/* ── Two-column grid ─────────────────────────────────────────────────────── */
+.asd-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.asd-left-col,
+.asd-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.asd-card {
+  background: var(--card-bg, #1e293b);
+  border: 1.5px solid rgba(34, 197, 94, 0.3);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.asd-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary, #f1f5f9);
+}
+
+.asd-card-header svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+  color: #22c55e;
+}
+
+.asd-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 0.1rem 0;
+  text-align: start;
+}
+
+.asd-card-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+  text-align: start;
+}
+
+/* ── Scanner viewport ────────────────────────────────────────────────────── */
+.asd-scanner-viewport {
+  background: #0f172a;
+  border-radius: 0.5rem;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.asd-scanner-idle,
+.asd-scanner-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.asd-scanner-frame {
+  width: 180px;
+  height: 180px;
+  border: 2px solid #22c55e;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.asd-scanner-frame--scanning {
+  animation: asd-frame-pulse 1s ease-in-out infinite;
+}
+
+@keyframes asd-frame-pulse {
+  0%,
+  100% {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    border-color: #4ade80;
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+}
+
+.asd-scanner-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #22c55e;
+  animation: asd-scan-line 1.5s linear infinite;
+}
+
+@keyframes asd-scan-line {
+  0% {
+    top: 0;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+.asd-scanner-hint {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 0;
+  text-align: center;
+}
+
+.asd-scanner-hint-small {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0;
+  text-align: center;
+}
+
+/* ── Scan button ─────────────────────────────────────────────────────────── */
+.asd-btn-scan {
+  width: 100%;
+  padding: 0.85rem;
+  background: #22c55e;
+  color: #000;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.asd-btn-scan:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.asd-btn-scan:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ── Manual entry ────────────────────────────────────────────────────────── */
+.asd-manual-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.asd-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.asd-input {
+  flex: 1;
+  padding: 0.65rem 0.85rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 0.4rem;
+  color: var(--text-primary, #f1f5f9);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.asd-input:focus {
+  border-color: #22c55e;
+}
+
+.asd-input::placeholder {
+  color: #64748b;
+}
+
+.asd-btn-verify {
+  padding: 0.65rem 1.1rem;
+  background: #22c55e;
+  color: #000;
+  border: none;
+  border-radius: 0.4rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.asd-btn-verify:hover {
+  background: #16a34a;
+}
+
+.asd-error-msg {
+  font-size: 0.8rem;
+  color: #f87171;
+  margin: 0;
+}
+
+.asd-quick-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.asd-quick-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.asd-quick-code-btn {
+  padding: 0.3rem 0.65rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.3rem;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.asd-quick-code-btn:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+/* ── Recent Scans ────────────────────────────────────────────────────────── */
+.asd-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.asd-recent-item {
+  padding: 0.75rem;
+  background: #0f172a;
+  border-radius: 0.5rem;
+  border: 1px solid #1e293b;
+}
+
+.asd-recent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.asd-recent-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.asd-recent-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+}
+
+.asd-recent-doctype {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.asd-recent-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.15rem;
+}
+
+.asd-recent-tracking {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.asd-recent-time {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* ── Status badges ───────────────────────────────────────────────────────── */
+.asd-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: lowercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.asd-status-valid {
+  color: #22c55e;
+}
+
+.asd-status-expired {
+  color: #f87171;
+}
+
+/* ── Scanning Tips ───────────────────────────────────────────────────────── */
+.asd-tips-card {
+  border-color: #1d4ed8;
+}
+
+.asd-tips-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 0.65rem 0;
+}
+
+.asd-tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.asd-tips-list li {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  padding-left: 0.85rem;
+  position: relative;
+}
+
+.asd-tips-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #94a3b8;
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.asd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.asd-modal {
+  background: #1e293b;
+  border-radius: 0.75rem;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.asd-modal-header {
+  position: relative; /* Crucial: establishes a boundary for the absolute close button */
+  display: flex;
+  flex-direction: column; /* Stacks the text wrapper and button context vertically */
+  align-items: center; /* Centers the inner text div horizontally */
+  text-align: center; /* Centers the text lines themselves */
+  padding: 1.25rem 3rem 0; /* Added extra left/right padding (3rem) so text never collides with the close button */
+}
+
+.asd-modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 0.2rem 0;
+}
+
+.asd-modal-subtitle {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.asd-modal-close {
+  position: absolute; /* Pulls the button out of the flex layout layout stream */
+  top: 1.25rem; /* Adjusts distance from the top edge */
+  right: 1.25rem; /* Adjusts distance from the right edge */
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 0.2rem;
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.asd-modal-close:hover {
+  color: #f1f5f9;
+}
+
+.asd-modal-close svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.asd-modal-body {
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.asd-verified-banner {
+  display: flex;
+  flex-direction: column; /* Stacks the icon above the text details */
+  align-items: center; /* Centers the icon and text block horizontally */
+  text-align: center; /* Centers the title and description lines of text */
+  gap: 0.5rem; /* Adjusts spacing between the icon and text */
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid;
+}
+
+.asd-verified-banner--valid {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.asd-verified-banner--expired {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: #f87171;
+  color: #f87171;
+}
+
+.asd-verified-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0 0 0.1rem 0;
+}
+
+.asd-verified-desc {
+  font-size: 0.78rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.asd-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+
+.asd-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.asd-meta-label {
+  font-size: 0.72rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.asd-meta-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.asd-doc-content-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.asd-doc-content-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 0;
+}
+
+.asd-doc-content-pre {
+  background: #0f172a;
+  border-radius: 0.4rem;
+  padding: 1rem;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  font-family: "Courier New", monospace;
+  line-height: 1.6;
+  border: 1px solid #1e293b;
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.asd-modal-footer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.asd-modal-footer-info p {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.asd-modal-footer-info strong {
+  color: #f1f5f9;
+}
+
+.asd-modal-actions {
+  display: flex;
+  gap: 0.65rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #334155;
+  background: #1e293b;
+}
+
+.asd-btn-print,
+.asd-btn-download,
+.asd-btn-close-modal {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.asd-btn-print {
+  background: #0f172a;
+  color: #f1f5f9;
+  border: 1px solid #334155;
+}
+
+.asd-btn-print:hover {
+  background: #1e293b;
+}
+
+.asd-btn-download {
+  background: #0f172a;
+  color: #f1f5f9;
+  border: 1px solid #334155;
+}
+
+.asd-btn-download:hover {
+  background: #1e293b;
+}
+
+.asd-btn-close-modal {
+  background: #22c55e;
+  color: #000;
+  border: none;
+  margin-left: auto;
+}
+
+.asd-btn-close-modal:hover {
+  background: #16a34a;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+.asd-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #1e293b;
+  border: 1px solid #22c55e;
+  color: #22c55e;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 2000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: asd-toast-in 0.3s ease;
+}
+
+@keyframes asd-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.asd-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.asd-sun-icon,
+.asd-moon-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .asd-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .asd-page {
+    padding: 1rem;
+  }
+  .asd-meta-grid {
+    grid-template-columns: 1fr;
+  }
+  .asd-modal-actions {
+    flex-wrap: wrap;
+  }
+  .asd-btn-close-modal {
+    margin-left: 0;
+  }
+}

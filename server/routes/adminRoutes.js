@@ -38,7 +38,7 @@ router.get(
       const [[docRow]] = await pool.query(
         `SELECT COUNT(*) AS pending_doc_count
          FROM document_requests dr
-         JOIN services s ON dr.service_id = s.service_id
+         JOIN document_services s ON dr.service_id = s.service_id
          WHERE dr.status IN ('pending', 'processing')
            AND (? IS NULL OR s.department_id = ?)`,
         [deptId, deptId],
@@ -71,7 +71,7 @@ router.get(
            d.department_abbreviation AS college
          FROM document_requests dr
          JOIN students st ON dr.student_id = st.student_id
-         JOIN services s ON dr.service_id = s.service_id
+         JOIN document_services s ON dr.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE dr.status IN ('pending', 'processing')
            AND (? IS NULL OR s.department_id = ?)
@@ -196,6 +196,1049 @@ router.get(
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// QUEUE HOSTING — scoped strictly to the admin's own department
+// ─────────────────────────────────────────────────────────────
+
+// Small helper: resolve admin -> department_id, or null if not found
+async function getAdminDepartmentId(adminId) {
+  const [[row]] = await pool.query(
+    `SELECT department_id FROM administrators WHERE admin_id = ?`,
+    [adminId],
+  );
+  return row?.department_id ?? null;
+}
+
+// GET /api/admin/queue-hosting/services
+// Services dropdown — only services under the admin's own department.
+router.get(
+  "/queue-hosting/services",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const [services] = await pool.query(
+        `SELECT service_id, service_name, description
+         FROM services
+         WHERE department_id = ?
+         ORDER BY service_name ASC`,
+        [deptId],
+      );
+
+      res.json({ services });
+    } catch (error) {
+      console.error("Queue hosting services error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/queue-hosting
+// All of today's queue_slots for the admin's department, with live
+// waiting counts. Frontend buckets these into active/paused/closed.
+router.get(
+  "/queue-hosting",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const [slots] = await pool.query(
+        `SELECT
+           qs.slot_id,
+           qs.service_id,
+           qs.max_capacity,
+           qs.start_time,
+           qs.end_time,
+           qs.status,
+           qs.created_at,
+           s.service_name,
+           d.department_name,
+           d.department_abbreviation,
+           d.office_location,
+           (
+             SELECT COUNT(*) FROM queues q
+             WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
+           ) AS waiting_count,
+           (
+             SELECT COUNT(*) FROM queues q2
+             WHERE q2.slot_id = qs.slot_id AND q2.status = 'completed'
+           ) AS served_count,
+           (
+             SELECT st.student_number
+             FROM queues q3
+             JOIN students st ON q3.student_id = st.student_id
+             WHERE q3.slot_id = qs.slot_id AND q3.status = 'serving'
+             ORDER BY q3.called_at DESC
+             LIMIT 1
+           ) AS currently_serving_student_number,
+           (
+             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q4.called_at, q4.completed_at)))
+             FROM queues q4
+             WHERE q4.slot_id = qs.slot_id
+               AND q4.status = 'completed'
+               AND q4.called_at IS NOT NULL
+               AND q4.completed_at IS NOT NULL
+           ) AS avg_service_minutes
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ?
+           AND qs.slot_date = CURDATE()
+         ORDER BY qs.created_at DESC`,
+        [deptId],
+      );
+
+      const formatted = slots.map((q) => ({
+        id: q.slot_id,
+        queueType: q.service_name,
+        department: `${q.department_name} (${q.department_abbreviation})`,
+        college: q.department_abbreviation,
+        maxCapacity: q.max_capacity,
+        currentCount: q.waiting_count || 0,
+        servedCount: q.served_count || 0,
+        status: q.status, // 'open' | 'paused' | 'closed' | 'cancelled'
+        createdAt: q.created_at,
+        location: q.office_location || null,
+        currentlyServingStudentNumber:
+          q.currently_serving_student_number || null,
+        avgServiceMinutes:
+          q.avg_service_minutes != null ? Number(q.avg_service_minutes) : null,
+        serviceHours: {
+          start: String(q.start_time).slice(0, 5),
+          end: String(q.end_time).slice(0, 5),
+        },
+      }));
+
+      res.json({ queues: formatted });
+    } catch (error) {
+      console.error("Queue hosting fetch error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/admin/queue-hosting
+// Body: { serviceId, maxCapacity, startTime, endTime }
+// Opens a new queue_slot for TODAY. serviceId is verified to belong
+// to the admin's own department — this is the actual enforcement
+// point that stops an admin from hosting another college's queue.
+router.post(
+  "/queue-hosting",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const adminId = req.user.userId;
+    const { serviceId, maxCapacity, startTime, endTime } = req.body;
+
+    if (!serviceId || !maxCapacity || !startTime || !endTime) {
+      return res.status(400).json({
+        error: "serviceId, maxCapacity, startTime, and endTime are required",
+      });
+    }
+    const capacityNum = parseInt(maxCapacity, 10);
+    if (!capacityNum || capacityNum <= 0) {
+      return res
+        .status(400)
+        .json({ error: "maxCapacity must be a positive number" });
+    }
+    if (startTime >= endTime) {
+      return res
+        .status(400)
+        .json({ error: "Start time must be before end time" });
+    }
+
+    try {
+      const deptId = await getAdminDepartmentId(adminId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      // Enforcement: the chosen service MUST belong to the admin's department
+      const [[service]] = await pool.query(
+        `SELECT service_id, department_id, service_name
+         FROM services WHERE service_id = ?`,
+        [serviceId],
+      );
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+      if (service.department_id !== deptId) {
+        return res
+          .status(403)
+          .json({ error: "You can only host queues for your own department" });
+      }
+
+      const [result] = await pool.query(
+        `INSERT INTO queue_slots
+           (service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, status)
+         VALUES (?, ?, CURDATE(), ?, ?, ?, 0, 'open')`,
+        [serviceId, adminId, startTime, endTime, capacityNum],
+      );
+
+      res.status(201).json({
+        message: "Queue line opened successfully",
+        queue: {
+          id: result.insertId,
+          queueType: service.service_name,
+          maxCapacity: capacityNum,
+          currentCount: 0,
+          servedCount: 0,
+          status: "open",
+          serviceHours: { start: startTime, end: endTime },
+        },
+      });
+    } catch (error) {
+      if (error.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({
+          error: "A queue for this service and start time already exists today",
+        });
+      }
+      console.error("Open queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// Shared guard used by pause/resume/close below: confirms the slot
+// belongs to the admin's own department before any mutation.
+async function assertOwnedSlot(deptId, slotId) {
+  const [[slot]] = await pool.query(
+    `SELECT qs.slot_id, qs.status, s.department_id
+     FROM queue_slots qs
+     JOIN services s ON qs.service_id = s.service_id
+     WHERE qs.slot_id = ?`,
+    [slotId],
+  );
+  if (!slot) return { error: 404, message: "Queue slot not found" };
+  if (slot.department_id !== deptId) {
+    return {
+      error: 403,
+      message: "You can only manage queues for your own department",
+    };
+  }
+  return { slot };
+}
+
+// PATCH /api/admin/queue-hosting/:slotId/pause
+router.patch(
+  "/queue-hosting/:slotId/pause",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+      if (check.slot.status !== "open") {
+        return res
+          .status(409)
+          .json({ error: "Only an open queue can be paused" });
+      }
+
+      await pool.query(
+        `UPDATE queue_slots SET status = 'paused' WHERE slot_id = ?`,
+        [slotId],
+      );
+      res.json({ message: "Queue paused", slotId, status: "paused" });
+    } catch (error) {
+      console.error("Pause queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/resume
+router.patch(
+  "/queue-hosting/:slotId/resume",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+      if (check.slot.status !== "paused") {
+        return res
+          .status(409)
+          .json({ error: "Only a paused queue can be resumed" });
+      }
+
+      await pool.query(
+        `UPDATE queue_slots SET status = 'open' WHERE slot_id = ?`,
+        [slotId],
+      );
+      res.json({ message: "Queue resumed", slotId, status: "open" });
+    } catch (error) {
+      console.error("Resume queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/close
+router.patch(
+  "/queue-hosting/:slotId/close",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+      if (!["open", "paused"].includes(check.slot.status)) {
+        return res
+          .status(409)
+          .json({ error: `Queue is already ${check.slot.status}` });
+      }
+
+      await pool.query(
+        `UPDATE queue_slots SET status = 'closed' WHERE slot_id = ?`,
+        [slotId],
+      );
+      res.json({ message: "Queue closed", slotId, status: "closed" });
+    } catch (error) {
+      console.error("Close queue error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/call-next
+// Calls the next waiting student into 'serving'. Refuses if someone
+// is already being served — that student must be marked served first.
+router.patch(
+  "/queue-hosting/:slotId/call-next",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+
+      const [[alreadyServing]] = await pool.query(
+        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+        [slotId],
+      );
+      if (alreadyServing) {
+        return res.status(409).json({
+          error:
+            "A student is already being served. Mark them as served first.",
+        });
+      }
+
+      const [[next]] = await pool.query(
+        `SELECT queue_id FROM queues
+         WHERE slot_id = ? AND status = 'waiting'
+         ORDER BY queue_number ASC
+         LIMIT 1`,
+        [slotId],
+      );
+      if (!next) {
+        return res
+          .status(404)
+          .json({ error: "No students waiting in this queue" });
+      }
+
+      await pool.query(
+        `UPDATE queues SET status = 'serving', called_at = NOW() WHERE queue_id = ?`,
+        [next.queue_id],
+      );
+
+      res.json({ message: "Next student called", queueId: next.queue_id });
+    } catch (error) {
+      console.error("Call next error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/serve
+// Marks the currently-serving student as completed.
+router.patch(
+  "/queue-hosting/:slotId/serve",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+
+      const [[serving]] = await pool.query(
+        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+        [slotId],
+      );
+      if (!serving) {
+        return res
+          .status(404)
+          .json({ error: "No student is currently being served" });
+      }
+
+      await pool.query(
+        `UPDATE queues SET status = 'completed', completed_at = NOW() WHERE queue_id = ?`,
+        [serving.queue_id],
+      );
+
+      res.json({
+        message: "Student marked as served",
+        queueId: serving.queue_id,
+      });
+    } catch (error) {
+      console.error("Mark as served error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/appointments
+// Scoped strictly to the admin's own department (enforced server-side)
+router.get(
+  "/appointments",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+          a.appointment_id,
+          a.appointment_date,
+          a.appointment_time,
+          a.status,
+          a.notes,
+          a.created_at,
+          CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+          s.student_number,
+          s.course AS student_course,
+          CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+          f.position AS faculty_position,
+          f.email AS faculty_email,
+          d.department_name,
+          d.department_abbreviation,
+          d.office_location,
+          svc.service_name
+        FROM appointments a
+        JOIN students     s   ON a.student_id   = s.student_id
+        JOIN faculty       f   ON a.faculty_id    = f.faculty_id
+        JOIN departments   d   ON a.department_id = d.department_id
+        LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
+        WHERE a.department_id = ?
+        ORDER BY a.created_at DESC`,
+        [deptId],
+      );
+
+      const todayStr = new Date().toISOString().split("T")[0];
+
+      const appointments = rows.map((r) => {
+        const dateStr =
+          r.appointment_date instanceof Date
+            ? r.appointment_date.toISOString().split("T")[0]
+            : String(r.appointment_date).split("T")[0];
+
+        return {
+          id: String(r.appointment_id),
+          college: `${r.department_name} (${r.department_abbreviation})`,
+          location: r.office_location ?? "TBA",
+          studentName: r.student_name,
+          studentId: r.student_number,
+          studentCourse: r.student_course,
+          professor: `${r.faculty_position ?? "Prof."} ${r.faculty_name}`,
+          facultyEmail: r.faculty_email,
+          serviceName: r.service_name ?? null,
+          purpose: r.notes || "No purpose specified",
+          date: dateStr,
+          time: formatTime(r.appointment_time),
+          status: r.status,
+          requestedAt: new Date(r.created_at).toLocaleString("en-US"),
+          isToday: dateStr === todayStr,
+        };
+      });
+
+      res.json({ appointments });
+    } catch (error) {
+      console.error("Admin appointments fetch error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// TRANSACTIONS — unified history of queues, appointments, and
+// document requests, scoped strictly to the admin's own department.
+// There is no single "transactions" table in the schema, so this
+// endpoint UNIONs the three source tables (mirrors the pattern used
+// in GET /api/student/transactions) and returns one chronological feed.
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/transactions
+// Query params (all optional):
+//   type   = "all" | "queue" | "appointment" | "document"
+//   status = "all" | <status string from the relevant table>
+//   range  = "today" | "week" | "month" | "all"   (default "all")
+//   search = free text matched against student name/id, processor, details
+router.get(
+  "/transactions",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
+
+      const { type = "all", status = "all", range = "all" } = req.query;
+
+      // Date-range boundary applied identically to all three branches below
+      let dateClause = "";
+      if (range === "today") dateClause = "AND event_time >= CURDATE()";
+      else if (range === "week")
+        dateClause = "AND event_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+      else if (range === "month")
+        dateClause = "AND event_time >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+
+      const unionSql = `
+        SELECT * FROM (
+          (
+            SELECT
+              'queue' AS type,
+              q.queue_id AS id,
+              CASE q.status
+                WHEN 'completed' THEN 'Completed Queue Service'
+                WHEN 'cancelled' THEN 'Cancelled Queue Request'
+                WHEN 'serving'   THEN 'Currently Serving'
+                ELSE 'Queue Joined'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+              st.student_number AS student_id,
+              s.service_name AS processor,
+              s.service_name AS details,
+              q.status AS raw_status,
+              COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time
+            FROM queues q
+            JOIN services s ON q.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
+            JOIN students st ON q.student_id = st.student_id
+            WHERE s.department_id = ?
+          )
+          UNION ALL
+          (
+            SELECT
+              'appointment' AS type,
+              a.appointment_id AS id,
+              CASE a.status
+                WHEN 'approved'  THEN 'Approved Appointment'
+                WHEN 'completed' THEN 'Completed Appointment'
+                WHEN 'rejected'  THEN 'Rejected Appointment'
+                WHEN 'cancelled' THEN 'Cancelled Appointment'
+                ELSE 'Pending Appointment'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+              st.student_number AS student_id,
+              CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
+              COALESCE(a.notes, 'No purpose specified') AS details,
+              a.status AS raw_status,
+              a.created_at AS event_time
+            FROM appointments a
+            JOIN departments d ON a.department_id = d.department_id
+            JOIN students st ON a.student_id = st.student_id
+            JOIN faculty f ON a.faculty_id = f.faculty_id
+            WHERE a.department_id = ?
+          )
+          UNION ALL
+          (
+            SELECT
+              'document' AS type,
+              dr.request_id AS id,
+              CASE dr.status
+                WHEN 'released'   THEN 'Released Document Request'
+                WHEN 'generated'  THEN 'Generated Document'
+                WHEN 'processing' THEN 'Processing Document Request'
+                ELSE 'Pending Document Request'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+              st.student_number AS student_id,
+              dr.request_type AS processor,
+              dr.purpose AS details,
+              dr.status AS raw_status,
+              dr.created_at AS event_time
+            FROM document_requests dr
+            JOIN document_services s ON dr.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
+            JOIN students st ON dr.student_id = st.student_id
+            WHERE s.department_id = ?
+          )
+        ) AS combined
+        WHERE 1=1 ${dateClause}
+        ORDER BY event_time DESC
+        LIMIT 200
+      `;
+
+      const [rows] = await pool.query(unionSql, [deptId, deptId, deptId]);
+
+      // Map raw per-table statuses -> the badge vocabulary the UI uses
+      const statusMap = {
+        completed: "completed",
+        cancelled: "cancelled",
+        waiting: "completed", // not surfaced as a transaction row by default, kept for safety
+        serving: "completed",
+        approved: "approved",
+        pending: "approved",
+        rejected: "rejected",
+        processing: "approved",
+        generated: "approved",
+        released: "completed",
+      };
+
+      let transactions = rows.map((r) => ({
+        id: `${r.type}-${r.id}`,
+        type: r.type,
+        action: r.action,
+        college: `${r.college} (${r.college_abbrev})`,
+        collegeAbbrev: r.college_abbrev,
+        studentName: r.student_name,
+        studentId: r.student_id,
+        processor: r.processor,
+        details: r.details || "No additional details provided.",
+        status: statusMap[r.raw_status] ?? r.raw_status,
+        timestamp: new Date(r.event_time).toLocaleString("en-US", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }),
+      }));
+
+      // Server-side filtering for type/status (search stays client-side,
+      // matching how the rest of the admin UI already filters in-memory)
+      if (type !== "all") {
+        transactions = transactions.filter((t) => t.type === type);
+      }
+      if (status !== "all") {
+        transactions = transactions.filter((t) => t.status === status);
+      }
+
+      // Aggregate stats over the full (unfiltered-by-type/status) dataset
+      // so the summary cards always reflect the department total.
+      const allForStats = rows.map((r) => ({
+        type: r.type,
+        status: statusMap[r.raw_status] ?? r.raw_status,
+      }));
+
+      res.json({
+        transactions,
+        stats: {
+          total: allForStats.length,
+          queue: allForStats.filter((t) => t.type === "queue").length,
+          appointments: allForStats.filter((t) => t.type === "appointment")
+            .length,
+          documents: allForStats.filter((t) => t.type === "document").length,
+        },
+      });
+    } catch (error) {
+      console.error("Admin transactions fetch error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/queue-hosting/:slotId/entries
+// Returns all queue entries (students) for a specific slot, scoped to admin's department.
+router.get(
+  "/queue-hosting/:slotId/entries",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[slot]] = await pool.query(
+        `SELECT qs.slot_id FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? AND s.department_id = ?`,
+        [slotId, deptId],
+      );
+      if (!slot) {
+        return res.status(404).json({ error: "Queue slot not found or not in your department" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+           q.queue_number,
+           q.status,
+           q.notes,
+           q.created_at,
+           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+           st.student_number,
+           d.department_abbreviation
+         FROM queues q
+         JOIN students st ON q.student_id = st.student_id
+         JOIN services s ON q.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE q.slot_id = ?
+         ORDER BY q.queue_number ASC`,
+        [slotId],
+      );
+
+      const entries = rows.map((r) => ({
+        queueNumber: `${r.department_abbreviation}-${String(r.queue_number).padStart(3, "0")}`,
+        studentName: r.student_name,
+        studentId: r.student_number,
+        concern: r.notes || "No concern specified",
+        joinedAt: formatTime(new Date(r.created_at).toTimeString().slice(0, 8)),
+        status: r.status,
+      }));
+
+      res.json({ entries });
+    } catch (error) {
+      console.error("Queue entries fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/document-processing
+// Returns all document requests scoped to the admin's own department.
+router.get(
+  "/document-processing",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+           dr.request_id,
+           dr.tracking_number,
+           dr.request_type,
+           dr.purpose,
+           dr.status,
+           dr.notes,
+           dr.created_at,
+           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+           st.student_number AS student_id,
+           d.department_abbreviation AS college
+         FROM document_requests dr
+         JOIN students st ON dr.student_id = st.student_id
+         JOIN document_services s ON dr.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ?
+         ORDER BY dr.created_at DESC`,
+        [deptId],
+      );
+
+      const statusMap = {
+        pending: "pending",
+        processing: "processing",
+        generated: "ready",
+        released: "completed",
+        rejected: "rejected",
+      };
+
+      const documents = rows.map((r) => ({
+        id: String(r.request_id),
+        trackingNumber: r.tracking_number,
+        studentName: r.student_name,
+        studentId: r.student_id,
+        college: r.college,
+        documentType: r.request_type,
+        purpose: r.purpose,
+        requestDate: r.created_at instanceof Date
+          ? r.created_at.toISOString().split("T")[0]
+          : String(r.created_at).split("T")[0],
+        status: statusMap[r.status] ?? r.status,
+        notes: r.notes || "",
+      }));
+
+      res.json({ documents });
+    } catch (error) {
+      console.error("Document processing fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/document-processing/:requestId/status
+// Body: { status, notes }
+// Validates the request belongs to the admin's department before updating.
+router.patch(
+  "/document-processing/:requestId/status",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const requestId = parseInt(req.params.requestId, 10);
+    const { status, notes } = req.body;
+
+    // Map frontend status vocabulary -> DB ENUM values
+    const dbStatusMap = {
+      pending: "pending",
+      processing: "processing",
+      ready: "generated",
+      completed: "released",
+      rejected: "rejected",
+    };
+
+    if (!dbStatusMap[status]) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[request]] = await pool.query(
+        `SELECT dr.request_id, s.department_id
+         FROM document_requests dr
+         JOIN document_services s ON dr.service_id = s.service_id
+         WHERE dr.request_id = ?`,
+        [requestId],
+      );
+
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.department_id !== deptId) {
+        return res.status(403).json({ error: "You can only update documents for your own department" });
+      }
+
+      await pool.query(
+        `UPDATE document_requests SET status = ?, notes = ? WHERE request_id = ?`,
+        [dbStatusMap[status], notes !== undefined ? notes : null, requestId],
+      );
+
+      res.json({ message: "Document status updated", requestId, status });
+    } catch (error) {
+      console.error("Document status update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/faculty-availability
+// Returns all faculty in the admin's department with today's schedule and live status.
+router.get(
+  "/faculty-availability",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [facultyList] = await pool.query(
+        `SELECT
+           f.faculty_id,
+           CONCAT(f.first_name, ' ', f.last_name) AS name,
+           f.position,
+           f.email,
+           d.department_name,
+           d.department_abbreviation
+         FROM faculty f
+         JOIN departments d ON f.department_id = d.department_id
+         WHERE f.department_id = ?
+         ORDER BY f.last_name, f.first_name`,
+        [deptId],
+      );
+
+      if (facultyList.length === 0) {
+        return res.json({ faculty: [] });
+      }
+
+      const facultyIds = facultyList.map((f) => f.faculty_id);
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dayName = days[new Date().getDay()];
+
+      const [availabilityRows] = await pool.query(
+        `SELECT faculty_id, start_time, end_time, location
+         FROM faculty_availability
+         WHERE faculty_id IN (?) AND day_of_week = ?
+         ORDER BY faculty_id, start_time`,
+        [facultyIds, dayName],
+      );
+
+      const [appointmentRows] = await pool.query(
+        `SELECT
+           a.faculty_id,
+           a.appointment_time,
+           a.status
+         FROM appointments a
+         WHERE a.faculty_id IN (?)
+           AND a.appointment_date = CURDATE()
+           AND a.status IN ('pending', 'approved')
+         ORDER BY a.faculty_id, a.appointment_time`,
+        [facultyIds],
+      );
+
+      const availMap = {};
+      availabilityRows.forEach((row) => {
+        if (!availMap[row.faculty_id]) availMap[row.faculty_id] = [];
+        availMap[row.faculty_id].push(row);
+      });
+
+      const apptMap = {};
+      appointmentRows.forEach((row) => {
+        if (!apptMap[row.faculty_id]) apptMap[row.faculty_id] = [];
+        apptMap[row.faculty_id].push(row);
+      });
+
+      const nowDate = new Date();
+      const currentTimeStr = nowDate.toTimeString().slice(0, 8);
+
+      const toTimeStr = (val) => {
+        if (!val) return "00:00:00";
+        const s = String(val);
+        return s.length === 8 ? s : s.slice(0, 8).padEnd(8, "0");
+      };
+
+      const addOneHour = (timeStr) => {
+        const [h, m, s] = timeStr.split(":").map(Number);
+        return `${String(Math.min(h + 1, 23)).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      };
+
+      const faculty = facultyList.map((f) => {
+        const avails = availMap[f.faculty_id] || [];
+        const appts = apptMap[f.faculty_id] || [];
+
+        const isBusy = appts.some((a) => {
+          if (a.status !== "approved") return false;
+          const start = toTimeStr(a.appointment_time);
+          const end = addOneHour(start);
+          return currentTimeStr >= start && currentTimeStr < end;
+        });
+
+        const schedule = avails.map((slot) => {
+          const slotStart = toTimeStr(slot.start_time);
+          const slotEnd = toTimeStr(slot.end_time);
+          const hasAppt = appts.some((a) => {
+            const apptTime = toTimeStr(a.appointment_time);
+            return apptTime >= slotStart && apptTime < slotEnd;
+          });
+          return {
+            time: `${formatTime(slotStart)} - ${formatTime(slotEnd)}`,
+            activity: hasAppt ? "Consultation" : "Available",
+            location: slot.location || f.department_name,
+            status: hasAppt ? "booked" : "free",
+          };
+        });
+
+        let nextAvailableSlot = null;
+        for (const slot of avails) {
+          const slotStart = toTimeStr(slot.start_time);
+          const slotEnd = toTimeStr(slot.end_time);
+          const hasAppt = appts.some((a) => {
+            const apptTime = toTimeStr(a.appointment_time);
+            return apptTime >= slotStart && apptTime < slotEnd;
+          });
+          if (!hasAppt && slotStart > currentTimeStr) {
+            nextAvailableSlot = `${formatTime(slotStart)} - ${formatTime(slotEnd)}`;
+            break;
+          }
+        }
+
+        const status = isBusy
+          ? "busy"
+          : avails.length === 0
+          ? "unavailable"
+          : "available";
+
+        return {
+          id: f.faculty_id,
+          name: f.name,
+          position: f.position,
+          college: `${f.department_name} (${f.department_abbreviation})`,
+          status,
+          currentActivity: isBusy ? "In consultation with student" : null,
+          nextAvailableSlot:
+            nextAvailableSlot ||
+            (avails.length === 0 ? "No schedule today" : "No more slots today"),
+          email: f.email,
+          todaySchedule: schedule,
+        };
+      });
+
+      res.json({ faculty });
+    } catch (error) {
+      console.error("Faculty availability fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
     }
   },
 );

@@ -1,8 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+
+html,
+body {
+  overflow-x: hidden;
+}
 
 /* ===== CSS VARIABLES - DARK MODE (DEFAULT) ===== */
 :root,
 [data-theme="dark"] {
+  --sidebar-width: 14rem;
+
   --primary-color: #22c55e;
   --primary-dark: #16a34a;
   --primary-light: #86efac;
@@ -85,8 +92,10 @@
 body {
   background-color: var(--background);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: "Inter", sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* ===== DOCUMENTS CONTAINER ===== */
@@ -97,22 +106,30 @@ body {
   transition: background-color 0.3s ease;
 }
 
+.doc-sidebar,
+.doc-main {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
 /* ===== SIDEBAR ===== */
 .doc-sidebar {
   position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
-  width: 14rem;
-  background-color: var(--card);
-  border-right: 1px solid var(--border);
+  width: var(--sidebar-width);
+  background-color: var(--card-bg);
+  border-right: 1px solid var(--card-border);
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 40;
   display: flex;
   flex-direction: column;
   padding: 1rem 0;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .doc-sidebar-inner {
@@ -123,7 +140,7 @@ body {
 
 .doc-sidebar-logo {
   padding: 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--card-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -185,7 +202,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .doc-user-top {
@@ -302,8 +321,8 @@ body {
 }
 
 .doc-nav-icon {
-  width: 1.0rem;
-  height: 1.0rem;
+  width: 1rem;
+  height: 1rem;
   flex-shrink: 0;
   stroke: currentColor;
 }
@@ -366,7 +385,9 @@ body {
   background-color: var(--card);
   border-bottom: 1px solid var(--border);
   z-index: 50;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .doc-mobile-header-content {
@@ -416,7 +437,8 @@ body {
 /* ===== MAIN CONTENT ===== */
 .doc-main {
   flex: 1;
-  margin-left: 14rem;
+  margin-left: var(--sidebar-width);
+  padding-left: 0;
   overflow-y: auto;
   transition: margin-left 0.3s ease;
 }
@@ -485,25 +507,26 @@ body {
 
 .doc-header-title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
 }
 
 .doc-title-icon {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, #f59e0b, #ea8c55);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+  flex-shrink: 0;
 }
 
 .doc-title-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .doc-title-text {
@@ -532,7 +555,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, var(--primary-color), var(--success));
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
   border: none;
   border-radius: 0.75rem;
@@ -540,12 +563,12 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
 }
 
 .doc-request-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
 }
 
 .doc-request-btn svg {
@@ -569,7 +592,7 @@ body {
   background-color: var(--card);
   border: 1px solid var(--border);
   border-radius: 1rem;
-  max-width: 28rem;
+  max-width: 40rem;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
@@ -680,6 +703,12 @@ body {
   padding-right: 2.5rem;
 }
 
+.doc-form-select:disabled,
+.doc-form-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .doc-form-submit {
   width: 100%;
   padding: 0.875rem 1.25rem;
@@ -776,6 +805,49 @@ body {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+/* ─── Status badge light-mode overrides ─────────────────────────────────── */
+[data-theme="light"] .doc-badge-pending {
+  background-color: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="light"] .doc-badge-processing {
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .doc-badge-ready {
+  background-color: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="light"] .doc-badge-claimed {
+  background-color: rgba(75, 85, 99, 0.1);
+  color: #1f2937;
+  border-color: rgba(75, 85, 99, 0.25);
+}
+
+[data-theme="light"] .doc-badge-rejected {
+  background-color: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.doc-badge-completed-count {
+  background-color: rgba(107, 114, 128, 0.15);
+  color: #d1d5db;
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+[data-theme="light"] .doc-badge-completed-count {
+  background-color: rgba(107, 114, 128, 0.1);
+  color: #374151;
+  border-color: rgba(107, 114, 128, 0.25);
+}
+
 /* ===== DOCUMENT CARDS ===== */
 .doc-cards-grid {
   display: grid;
@@ -798,7 +870,7 @@ body {
 }
 
 .doc-card-completed {
-  opacity: 0.75;
+  opacity: 0.85;
 }
 
 .doc-card-header {
@@ -809,21 +881,53 @@ body {
   margin-bottom: 1.25rem;
 }
 
+.doc-card-icon-wrap {
+  width: 3rem;
+  height: 3rem;
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #f97316;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.doc-card-icon-wrap svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke: currentColor;
+}
+
+.doc-card-completed .doc-card-icon-wrap {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text-tertiary);
+}
+
+[data-theme="light"] .doc-card-icon-wrap {
+  background: rgba(249, 115, 22, 0.08);
+}
+
 .doc-card-title-section {
   flex: 1;
   text-align: left;
 }
 
 .doc-card-title-section h3 {
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #f59e0b;
   margin: 0 0 0.25rem 0;
   transition: color 0.3s ease;
 }
 
+[data-theme="light"] .doc-card-title-section h3 {
+  color: #d97706;
+}
+
 .doc-card-college {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--text-tertiary);
   margin: 0;
   transition: color 0.3s ease;
@@ -837,9 +941,14 @@ body {
 }
 
 .doc-card-tracking span {
-  font-family: 'Courier New', monospace;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.03em;
+}
+
+[data-theme="light"] .doc-card-tracking span {
+  color: #d97706;
 }
 
 .doc-card-grid {
@@ -868,11 +977,16 @@ body {
 
 .doc-card-field p,
 .doc-card-field-full p {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  line-height: 1.5;
   transition: color 0.3s ease;
+}
+
+.doc-card-field .doc-card-date-value {
+  color: var(--primary-color);
 }
 
 .doc-card-field-full {
@@ -910,6 +1024,43 @@ body {
   text-align: left;
 }
 
+.doc-cancel-request-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-top: 0.75rem;
+}
+
+.doc-cancel-request-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.65);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.2);
+}
+
+.doc-cancel-request-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.doc-cancel-request-btn svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
 .doc-card-claim-btn {
   display: inline-flex;
   align-items: center;
@@ -941,11 +1092,28 @@ body {
   border: 1px solid rgba(34, 197, 94, 0.25);
   border-radius: 1rem;
   padding: 3rem 1.5rem;
-  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 
 .doc-empty-btn {
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
 }
 
 .doc-empty-state svg {
@@ -971,29 +1139,15 @@ body {
   transition: color 0.3s ease;
 }
 
-.doc-empty-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, var(--primary-color), var(--success));
-  color: white;
-  border: none;
+.doc-error-banner {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--danger);
   border-radius: 0.75rem;
+  padding: 0.875rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.doc-empty-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
-}
-
-.doc-empty-btn svg {
-  width: 1rem;
-  height: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 /* ===== PROCESSING TIMES ===== */
@@ -1114,7 +1268,11 @@ body {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   color: white;
   border: none;
   cursor: pointer;

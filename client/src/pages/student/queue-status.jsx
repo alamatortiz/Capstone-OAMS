@@ -1,14 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Clock, Users, ChevronLeft, MessageSquare, Calendar, MapPin, Info, TrendingUp, CheckCircle2, Timer, XCircle } from 'lucide-react';
-import { getCollegeLogo } from '../../data/collegeLogo';
-import { useQueue } from '../../contexts/QueueContext';
-import { useAuth } from '../../context/AuthContext';
-import { toast } from 'sonner';
-import { applyTheme, getSavedTheme } from '../../utils/theme';
-import ucLogo from '../../assets/Pnc-Logo.png';
-import oamsLogo from '../../assets/oams_logo.png';
-import './queue-status.css';
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import {
+  Clock,
+  Users,
+  ChevronLeft,
+  MessageSquare,
+  TrendingUp,
+  XCircle,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Hash,
+} from "lucide-react";
+import { getCollegeLogo } from "../../data/collegeLogo";
+import { useQueue } from "../../contexts/QueueContext";
+import { useAuth } from "../../context/AuthContext";
+import { toast } from "sonner";
+import { applyTheme, getSavedTheme } from "../../utils/theme";
+import ucLogo from "../../assets/Pnc-Logo.png";
+import oamsLogo from "../../assets/oams_logo.png";
+import "./queue-status.css";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -126,35 +137,487 @@ const SendIcon = () => (
   </svg>
 );
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const getProgress = (position, totalWaiting) => {
+  if (!totalWaiting || totalWaiting === 0) return 100;
+  return Math.round(((totalWaiting - position) / totalWaiting) * 100);
+};
+
+const getStatusMeta = (status) => {
+  if (status === "serving")
+    return {
+      label: "It's Your Turn!",
+      cls: "queue-status-serving",
+      color: "#22c55e",
+    };
+  return { label: "Waiting", cls: "queue-status-waiting", color: "#f59e0b" };
+};
+
+// ─── Detail View ──────────────────────────────────────────────────────────────
+function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [notesText, setNotesText] = useState(queue.notes ?? "");
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  const progress = getProgress(queue.position, queue.totalWaiting);
+  const statusMeta = getStatusMeta(queue.status);
+  const peopleAhead = Math.max(queue.position - 1, 0);
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true);
+    try {
+      await onSaveNotes(queue.queueId, notesText.trim());
+      toast.success("Notes updated");
+      setShowNotesDialog(false);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  return (
+    <div className="queue-status-container">
+      {/* Breadcrumb */}
+      <div className="queue-status-header">
+        <div className="queue-breadcrumb">
+          <button type="button" className="qss-breadcrumb-link" onClick={onBack}>
+            <ChevronLeft className="breadcrumb-icon" />
+            All Queues
+          </button>
+        </div>
+      </div>
+
+      {/* Hero */}
+      <div className="queue-hero-card">
+        <div className="queue-hero-content">
+          <div className="queue-hero-logo">
+            <img
+              src={getCollegeLogo(queue.departmentName)}
+              alt={queue.departmentName}
+            />
+          </div>
+          <div className="queue-hero-text">
+            <div className="queue-hero-header">
+              <div className="queue-hero-title">
+                <h2>Queue Status</h2>
+                <p>{queue.serviceName}</p>
+                <p style={{ fontSize: "0.875rem", opacity: 0.85 }}>
+                  {queue.departmentName}
+                </p>
+              </div>
+              <div className="queue-hero-badge">{queue.queueNumberBadge}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* "It's your turn" alert */}
+      {queue.status === "serving" && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+            borderRadius: "1rem",
+            padding: "1rem 1.5rem",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            fontWeight: 700,
+            fontSize: "1rem",
+            boxShadow: "0 8px 24px rgba(34,197,94,0.3)",
+          }}
+        >
+          <CheckCircle2
+            style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }}
+          />
+          Please proceed to the service window — it's your turn!
+        </div>
+      )}
+
+      {/* Detail Grid */}
+      <div className="queue-detail-grid">
+        <div className="queue-detail-main">
+          {/* Position card */}
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <Users style={{ width: "1.25rem", height: "1.25rem" }} />
+                Your Position
+              </h3>
+              <span className={`detailed-queue-status-badge ${statusMeta.cls}`}>
+                {statusMeta.label}
+              </span>
+            </div>
+            <div className="qss-card-content">
+              <div className="queue-placement-center">
+                <div className="queue-position-display">
+                  <div className="queue-position-label">Number in Line</div>
+                  <div>
+                    <div className="queue-position-number">
+                      {queue.position}
+                    </div>
+                    <div className="queue-position-total">
+                      of {queue.totalWaiting} waiting
+                    </div>
+                  </div>
+                  <div
+                    className="queue-position-message"
+                    style={{ marginTop: "0.75rem" }}
+                  >
+                    {queue.status === "serving"
+                      ? "You're being served now!"
+                      : queue.position === 1
+                        ? "You're next!"
+                        : `${peopleAhead} ${peopleAhead === 1 ? "person" : "people"} ahead of you`}
+                  </div>
+                </div>
+
+                <div className="queue-progress-section">
+                  <div className="qs-progress-card">
+                    <div className="queue-progress-group">
+                      <div className="queue-progress-wrapper">
+                        <div className="qs-progress-label-row">
+                          <p className="qs-progress-label">People in Queue</p>
+                          <p className="qs-progress-value">
+                            {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
+                            <span className="qs-progress-percent">
+                              &nbsp;({queue.queueOccupancyPercent ?? 0}%)
+                            </span>
+                          </p>
+                        </div>
+                        <div className="qs-progress-bar">
+                          <div
+                            className="qs-progress-fill"
+                            style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="queue-progress-wrapper">
+                        <div className="qs-progress-label-row">
+                          <p className="qs-progress-label">Serviced</p>
+                          <p className="qs-progress-value">
+                            {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
+                            <span className="qs-progress-percent">
+                              &nbsp;({queue.servicedPercent ?? 0}%)
+                            </span>
+                          </p>
+                        </div>
+                        <div className="qs-progress-bar">
+                          <div
+                            className="qs-progress-fill qs-progress-fill-serviced"
+                            style={{ width: `${queue.servicedPercent ?? 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Wait time card */}
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
+                Estimated Wait
+              </h3>
+            </div>
+            <div className="qss-card-content">
+              <div className="queue-wait-time-display">
+                <div className="queue-wait-time-left">
+                  <div className="queue-wait-time-value">
+                    {queue.estimatedWait}
+                  </div>
+                  <div className="queue-wait-time-joined">
+                    Joined at {queue.joinedAt}
+                  </div>
+                </div>
+                <div className="queue-wait-time-icon">
+                  <Clock />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes / concern card */}
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <MessageSquare
+                  style={{ width: "1.25rem", height: "1.25rem" }}
+                />
+                Your Concern
+              </h3>
+              <button
+                className="qss-card-action"
+                onClick={() => {
+                  setNotesText(queue.notes ?? "");
+                  setShowNotesDialog(true);
+                }}
+              >
+                Edit
+              </button>
+            </div>
+            <div className="qss-card-content">
+              <p className="queue-concern-text">
+                {queue.notes && queue.notes.trim()
+                  ? queue.notes
+                  : "No concern noted yet. Tap Edit to describe your request."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="queue-detail-sidebar">
+          {/* Queue number */}
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
+                Queue Number
+              </h3>
+            </div>
+            <div className="qss-card-content" style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 800,
+                  color: "var(--primary-color)",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {queue.queueNumberBadge}
+              </div>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--text-tertiary)",
+                  marginTop: "0.25rem",
+                }}
+              >
+                {queue.departmentAbbrev} • {queue.serviceName}
+              </div>
+            </div>
+          </div>
+
+          {/* Service hours */}
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <TrendingUp style={{ width: "1.25rem", height: "1.25rem" }} />
+                Service Hours
+              </h3>
+            </div>
+            <div className="qss-card-content">
+              <div className="queue-service-hours-row">
+                <span className="queue-hours-label">Opens</span>
+                <span className="queue-hours-time">{queue.startTime ?? "—"}</span>
+              </div>
+              <div className="queue-service-hours-row">
+                <span className="queue-hours-label">Closes</span>
+                <span className="queue-hours-time">{queue.endTime ?? "—"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cancel (only while waiting) */}
+          {queue.status === "waiting" && (
+            <div className="qss-card queue-cancel-card">
+              <div className="qss-card-header">
+                <h3 className="qss-card-title queue-cancel-title">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Leave Queue
+                </h3>
+              </div>
+              <div className="qss-card-content">
+                <p
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "var(--text-tertiary)",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  Leaving will remove you from the queue. You'll need to rejoin
+                  if you change your mind.
+                </p>
+                <button
+                  className="queue-cancel-btn"
+                  onClick={() => setShowCancelDialog(true)}
+                >
+                  Leave Queue
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Edit Notes Dialog ── */}
+      {showNotesDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            style={{
+              background: "var(--card-bg)",
+              borderRadius: "1rem",
+              padding: "1.5rem",
+              maxWidth: "28rem",
+              width: "100%",
+              border: "1px solid var(--card-border)",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+            }}
+          >
+            <div className="queue-dialog-header">
+              <h2 className="queue-dialog-title">Edit Your Concern</h2>
+              <p className="queue-dialog-description">
+                Briefly describe what you need help with so the staff can
+                prepare.
+              </p>
+            </div>
+            <div className="queue-dialog-form">
+              <div className="queue-dialog-form-group">
+                <label className="queue-dialog-label">
+                  Your concern or request
+                </label>
+                <textarea
+                  className="queue-dialog-textarea"
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  placeholder="e.g. Request for good moral certificate for job application"
+                  rows={4}
+                />
+              </div>
+              <div className="queue-dialog-actions">
+                <button
+                  className="queue-dialog-btn queue-dialog-btn-secondary"
+                  onClick={() => setShowNotesDialog(false)}
+                  disabled={savingNotes}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="queue-dialog-btn queue-dialog-btn-primary"
+                  onClick={handleSaveNotes}
+                  disabled={savingNotes}
+                >
+                  {savingNotes ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel Confirm Dialog ── */}
+      {showCancelDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            style={{
+              background: "var(--card-bg)",
+              borderRadius: "1rem",
+              padding: "1.75rem",
+              maxWidth: "30rem",
+              width: "100%",
+              border: "1px solid rgba(239,68,68,0.3)",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+            }}
+          >
+            <div className="queue-dialog-header">
+              <h2 className="queue-dialog-title" style={{ color: "#ef4444" }}>
+                Leave Queue?
+              </h2>
+              <p className="queue-leave-dialog-description">
+                You are currently at position <strong>{queue.position}</strong>{" "}
+                in the <strong>{queue.serviceName}</strong> queue. Leaving will
+                permanently remove your spot — you will need to rejoin and wait
+                from the back of the line if you change your mind.
+              </p>
+            </div>
+            <div className="queue-dialog-actions queue-dialog-actions-spread">
+              <button
+                className="queue-dialog-btn queue-dialog-btn-secondary"
+                onClick={() => setShowCancelDialog(false)}
+                disabled={cancelling}
+              >
+                Stay in Queue
+              </button>
+              <button
+                className="queue-dialog-btn queue-dialog-btn-danger"
+                onClick={() => onCancel(queue.queueId)}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <>
+                    <Loader2
+                      style={{
+                        width: "1rem",
+                        height: "1rem",
+                        display: "inline",
+                        marginRight: "0.375rem",
+                        animation: "spin 1s linear infinite",
+                      }}
+                    />
+                    Leaving…
+                  </>
+                ) : (
+                  "Leave Queue"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function QueueStatusPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: authUser, logout } = useAuth();
-  const { queues, updateQueue, removeQueue } = useQueue();
-  
-  // ── User data ────────────────────────────────────────────────────────────
+  const { queues, isLoading, error, leaveQueue, updateQueueNotes } = useQueue();
+
   const user = authUser
     ? {
         ...authUser,
         college: authUser.departmentName ?? "N/A College",
-        studentNumber: authUser.studentNumber ?? "N/A Student Number",
-        departmentAbbrev: authUser.departmentAbbrev ?? "N/A Abbreviation",
-        course: authUser.course ?? "N/A Course",
+        departmentAbbrev: authUser.departmentAbbrev ?? "N/A",
       }
-    : {
-        name: "Student",
-        role: "student",
-        college: "",
-        studentId: "",
-        studentNumber: "N/A Student Number",
-        departmentAbbrev: "",
-        course: "",
-      };
+    : { name: "Student", role: "student", college: "", departmentAbbrev: "" };
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [selectedQueue, setSelectedQueue] = useState(null);
-  const [showConcernDialog, setShowConcernDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [concernText, setConcernText] = useState('');
+  const [selectedQueueId, setSelectedQueueId] = useState(
+    () => location.state?.queueId ?? null
+  );
+  const [cancelling, setCancelling] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
@@ -169,9 +632,17 @@ export default function QueueStatusPage() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  // ── Effects ───────────────────────────────────────────────────────────────
+  // Auto-deselect if the queue disappears (cancelled/served)
+  const selectedQueue = selectedQueueId
+    ? (queues.find((q) => q.queueId === selectedQueueId) ?? null)
+    : null;
+
   useEffect(() => {
-    scrollToBottom();
+    if (selectedQueueId && !selectedQueue) setSelectedQueueId(null);
+  }, [selectedQueueId, selectedQueue]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -179,15 +650,10 @@ export default function QueueStatusPage() {
   }, [isDark]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
-
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
@@ -196,378 +662,76 @@ export default function QueueStatusPage() {
     });
   };
 
-  const handleUpdateConcern = () => {
-    if (selectedQueue && concernText.trim()) {
-      updateQueue(selectedQueue.id, { concern: concernText });
-      setSelectedQueue({ ...selectedQueue, concern: concernText });
-      setShowConcernDialog(false);
-      toast.success('Concern updated successfully');
-    }
-  };
-
-  const handleCancelQueue = () => {
-    if (selectedQueue) {
-      removeQueue(selectedQueue.id);
-      setSelectedQueue(null);
-      toast.success('Queue cancelled successfully');
-      setShowCancelDialog(false);
+  const handleCancel = async (queueId) => {
+    setCancelling(true);
+    try {
+      await leaveQueue(queueId);
+      toast.success("You have left the queue.");
+      setSelectedQueueId(null);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCancelling(false);
     }
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (inputValue.trim() === "") return;
-    const userMessage = {
+    if (!inputValue.trim()) return;
+    const userMsg = {
       id: messages.length + 1,
       type: "user",
       text: inputValue,
       timestamp: new Date(),
     };
-    setMessages([...messages, userMessage]);
+    setMessages((prev) => [...prev, userMsg]);
+    const captured = inputValue;
     setInputValue("");
     setTimeout(() => {
-      const botResponse = {
+      const bot = {
         id: messages.length + 2,
         type: "bot",
-        text: generateBotResponse(inputValue, selectedQueue),
+        text: generateBotResponse(captured),
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, botResponse]);
+      setMessages((prev) => [...prev, bot]);
     }, 600);
   };
 
-  const generateBotResponse = (userInput, queue) => {
-    const lowerInput = userInput.toLowerCase();
-    if (lowerInput.includes("position")) {
-      return queue
-        ? `You're currently at position ${queue.position} in the ${queue.service} queue. There are ${queue.totalInQueue - queue.position} people ahead of you.`
-        : "You don't have any active queues right now.";
-    } else if (lowerInput.includes("wait") || lowerInput.includes("time")) {
-      return queue
-        ? `Your estimated wait time is ${queue.estimatedWaitTime}. You joined at ${queue.joinedAt}.`
+  const generateBotResponse = (input) => {
+    const i = input.toLowerCase();
+    const q = selectedQueue ?? queues[0];
+    if (i.includes("position") || i.includes("queue")) {
+      return q
+        ? `You're at position ${q.position} of ${q.totalWaiting} in the ${q.serviceName} queue. Estimated wait: ${q.estimatedWait}.`
+        : "You have no active queues right now.";
+    }
+    if (i.includes("wait") || i.includes("time")) {
+      return q
+        ? `Estimated wait: ${q.estimatedWait}. You joined at ${q.joinedAt}.`
         : "Join a queue to see your wait time.";
-    } else if (lowerInput.includes("service") || lowerInput.includes("help")) {
-      return "I can help you with your queue position, estimated wait time, service information, and more. What would you like to know?";
-    } else if (lowerInput.includes("cancel") || lowerInput.includes("leave")) {
-      return "You can cancel your queue from the Queue Status page. Would you like help with anything else?";
-    } else {
-      return "That's a great question! For more detailed assistance, please check the queue details or contact your college office.";
     }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'waiting':
-        return 'queue-status-waiting';
-      case 'active':
-        return 'queue-status-active';
-      case 'completed':
-        return 'queue-status-completed';
-      default:
-        return 'queue-status-waiting';
+    if (i.includes("cancel") || i.includes("leave")) {
+      return "Use the 'Leave Queue' button on the queue detail view to exit a queue.";
     }
+    return "I can help with your queue position, wait time, or concern notes. What would you like to know?";
   };
 
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
-{ icon: QueueIconNav, label: "Queue", path: "/student/queue" },
-    { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
+    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
+    {
+      icon: CalendarIconNav,
+      label: "Appointments",
+      path: "/student/appointments",
+    },
     { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
-    { icon: HistoryIconNav, label: "Transactions", path: "/student/transactions" },
+    {
+      icon: HistoryIconNav,
+      label: "Transactions",
+      path: "/student/transactions",
+    },
   ];
-
-  // ── Detail View ──────────────────────────────────────────────────────────────
-  const queueDetailView = (queue) => {
-    const queueProgress = ((queue.totalInQueue - queue.position) / queue.totalInQueue) * 100;
-    return (
-      <div className="queue-status-container">
-        <div className="queue-status-header">
-            <div className="queue-breadcrumb">
-              <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                Dashboard
-              </Link>
-            </div>
-        </div>
-
-        {/* Hero Card */}
-        <div className="queue-hero-card">
-          <div className="queue-hero-content">
-            <div className="queue-hero-logo">
-              <img src={getCollegeLogo(queue.college)} alt={queue.college} />
-            </div>
-            <div className="queue-hero-text">
-              <div className="queue-hero-header">
-                <div className="queue-hero-title">
-                  <h2>Queue Status</h2>
-                  <p>{queue.service}</p>
-                  <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>{queue.college}</p>
-                </div>
-                <div className="queue-hero-badge">{queue.queueNumber}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Detail Grid */}
-        <div className="queue-detail-grid">
-          <div className="queue-detail-main">
-            {/* Queue Placement */}
-            <div className="queue-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title">
-                  <Users className="w-5 h-5" />
-                  Queue Placement
-                </h3>
-              </div>
-              <div className="queue-card-content">
-                <div className="queue-placement-center">
-                  <div className="queue-position-display">
-                    <div className="queue-position-label">Your Position</div>
-                    <div>
-                      <div className="queue-position-number">{queue.position}</div>
-                      <div className="queue-position-total">/ {queue.totalInQueue}</div>
-                    </div>
-                    <div className="queue-position-message" style={{ marginTop: '1rem' }}>
-                      {queue.position === 1
-                        ? "You're next!"
-                        : `${queue.position - 1} ${queue.position - 1 === 1 ? 'person' : 'people'} ahead of you`}
-                    </div>
-                  </div>
-
-                  <div className="queue-progress-section">
-                    <div className="queue-progress-label">
-                      <span>Queue Progress</span>
-                      <span>{Math.round(queueProgress)}%</span>
-                    </div>
-                    <div className="queue-progress-bar">
-                      <div className="queue-progress-fill" style={{ width: `${queueProgress}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div className="queue-stats-grid">
-                    <div className="queue-stat-box">
-                      <div className="queue-stat-label">Currently Serving</div>
-                      <div className="queue-stat-value">{queue.currentlyServing}</div>
-                    </div>
-                    <div className="queue-stat-box">
-                      <div className="queue-stat-label">Avg. Service Time</div>
-                      <div className="queue-stat-value">{queue.averageServiceTime}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Estimated Wait */}
-            <div className="queue-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title">
-                  <Clock className="w-5 h-5" />
-                  Estimated Wait Time
-                </h3>
-              </div>
-              <div className="queue-card-content">
-                <div className="queue-wait-time-display">
-                  <div className="queue-wait-time-left">
-                    <div className="queue-wait-time-value">{queue.estimatedWaitTime}</div>
-                    <div className="queue-wait-time-joined">
-                      Joined at {queue.joinedAt}
-                    </div>
-                  </div>
-                  <div className="queue-wait-time-icon">
-                    <Clock />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Your Concern */}
-            <div className="queue-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title">
-                  <MessageSquare className="w-5 h-5" />
-                  Your Concern
-                </h3>
-                <button
-                  className="queue-card-action"
-                  onClick={() => {
-                    setConcernText(queue.concern);
-                    setShowConcernDialog(true);
-                  }}
-                >
-                  Edit
-                </button>
-              </div>
-              <div className="queue-card-content">
-                <p className="queue-concern-text">{queue.concern}</p>
-              </div>
-            </div>
-
-            {/* Reminders */}
-            {queue.announcementsjson && queue.announcementsjson.length > 0 && (
-              <div className="queue-card queue-reminders-card">
-                <div className="queue-card-header">
-                  <h3 className="queue-card-title queue-reminders-title">
-                    <Info className="w-5 h-5" />
-                    Important Reminders
-                  </h3>
-                </div>
-                <div className="queue-card-content">
-                  <ul className="queue-reminders-list">
-                    {queue.announcementsjson.map((item, index) => (
-                      <li key={index} className="queue-reminder-item">
-                        <CheckCircle2 className="queue-reminder-icon" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="queue-detail-sidebar">
-            {/* Service Hours */}
-            <div className="queue-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title">
-                  <Calendar className="w-5 h-5" />
-                  Service Hours
-                </h3>
-              </div>
-              <div className="queue-card-content">
-                <div className="queue-service-hours-row">
-                  <span className="queue-hours-label">Opens</span>
-                  <span className="queue-hours-time">{queue.serviceHours.start}</span>
-                </div>
-                <div className="queue-service-hours-row">
-                  <span className="queue-hours-label">Closes</span>
-                  <span className="queue-hours-time">{queue.serviceHours.end}</span>
-                </div>
-                {queue.serviceHours.breakTime && (
-                  <div className="queue-service-hours-row">
-                    <span className="queue-hours-label">Break</span>
-                    <span className="queue-hours-time">{queue.serviceHours.breakTime}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Location */}
-            <div className="queue-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title">
-                  <MapPin className="w-5 h-5" />
-                  Location
-                </h3>
-              </div>
-              <div className="queue-card-content">
-                <p className="queue-location-text">{queue.location}</p>
-              </div>
-            </div>
-
-            {/* Status */}
-            <div className="queue-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title">
-                  <TrendingUp className="w-5 h-5" />
-                  Status
-                </h3>
-              </div>
-              <div className="queue-card-content">
-                <div className={`queue-status-badge ${getStatusColor(queue.status)}`}>
-                  {queue.status.charAt(0).toUpperCase() + queue.status.slice(1)}
-                </div>
-              </div>
-            </div>
-
-            {/* Cancel Queue */}
-            <div className="queue-card queue-cancel-card">
-              <div className="queue-card-header">
-                <h3 className="queue-card-title queue-cancel-title">
-                  <XCircle className="w-5 h-5" />
-                  Cancel Queue
-                </h3>
-              </div>
-              <div className="queue-card-content">
-                <button
-                  className="queue-cancel-btn"
-                  onClick={() => setShowCancelDialog(true)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Edit Concern Dialog */}
-        {showConcernDialog && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-gray-900 dark:bg-gray-900 rounded-lg p-6 max-w-md w-full border border-green-900/20">
-              <div className="queue-dialog-header">
-                <h2 className="queue-dialog-title">Edit Your Concern</h2>
-                <p className="queue-dialog-description">Update the details of your service request</p>
-              </div>
-              <div className="queue-dialog-form">
-                <div className="queue-dialog-form-group">
-                  <label className="queue-dialog-label">Describe your concern</label>
-                  <textarea
-                    className="queue-dialog-textarea"
-                    value={concernText}
-                    onChange={(e) => setConcernText(e.target.value)}
-                    placeholder="Enter your concern here..."
-                  />
-                </div>
-                <div className="queue-dialog-actions">
-                  <button
-                    className="queue-dialog-btn queue-dialog-btn-secondary"
-                    onClick={() => setShowConcernDialog(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="queue-dialog-btn queue-dialog-btn-primary"
-                    onClick={handleUpdateConcern}
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Cancel Queue Dialog */}
-        {showCancelDialog && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-gray-900 dark:bg-gray-900 rounded-lg p-6 max-w-md w-full border border-red-900/20">
-              <div className="queue-dialog-header">
-                <h2 className="queue-dialog-title">Cancel Queue</h2>
-                <p className="queue-dialog-description">Are you sure you want to cancel this queue?</p>
-              </div>
-              <div className="queue-dialog-actions">
-                <button
-                  className="queue-dialog-btn queue-dialog-btn-secondary"
-                  onClick={() => setShowCancelDialog(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="queue-dialog-btn queue-dialog-btn-danger"
-                  onClick={handleCancelQueue}
-                >
-                  Confirm Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -578,18 +742,20 @@ export default function QueueStatusPage() {
           <div className="sidebar-logo">
             <div className="logo-container">
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+              <img
+                src={oamsLogo}
+                alt="OAMS Logo"
+                className="logo-img oams-logo-img"
+              />
             </div>
             <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
           </div>
-
           <div className="sidebar-user-section">
             <div className="user-top-row">
               <div className="user-avatar-large">
@@ -606,7 +772,6 @@ export default function QueueStatusPage() {
               </p>
             </div>
           </div>
-
           <nav className="sidebar-nav">
             <div className="nav-items">
               {navItems.map((item) => (
@@ -623,7 +788,6 @@ export default function QueueStatusPage() {
               ))}
             </div>
           </nav>
-
           <div className="sidebar-logout">
             <button className="logout-btn" onClick={handleLogout}>
               <LogOutIcon />
@@ -638,14 +802,17 @@ export default function QueueStatusPage() {
         <div className="mobile-header-content">
           <div className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
+            <img
+              src={oamsLogo}
+              alt="OAMS Logo"
+              className="logo-img oams-logo-img"
+            />
           </div>
           <div className="mobile-header-actions">
             <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
               aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -662,126 +829,215 @@ export default function QueueStatusPage() {
 
       {/* Main Content */}
       <main className="dashboard-main">
-        {selectedQueue ? queueDetailView(selectedQueue) : (
+        {selectedQueue ? (
+          <QueueDetail
+            queue={selectedQueue}
+            onBack={() => setSelectedQueueId(null)}
+            onCancel={handleCancel}
+            onSaveNotes={updateQueueNotes}
+            cancelling={cancelling}
+          />
+        ) : (
           <div className="queue-status-container">
-            {/* Header */}
+            {/* Page Header */}
             <div className="queue-status-header">
               <div className="queue-breadcrumb">
-                <Link to="/student/dashboard" className="breadcrumb-link">
+                <Link to="/student/dashboard" className="qss-breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
                   Dashboard
                 </Link>
               </div>
               <div className="queue-title-section">
-                <div className="queue-title-icon">
-                  <Timer className="w-5 h-5" />
+                <div className="qss-title-icon">
+                  <Clock style={{ width: "1.75rem", height: "1.75rem" }} />
                 </div>
                 <div className="queue-title-content">
                   <h1>My Queue Status</h1>
-                  <p>View detailed status of your queued services</p>
+                  <p>View and manage your active queues</p>
                 </div>
               </div>
             </div>
 
-            {/* Queue Cards */}
-            <div className="queue-list-container">
-              {queues && queues.length > 0 ? (
-                queues.map((queue) => {
-                  const queueProgress = ((queue.totalInQueue - queue.position) / queue.totalInQueue) * 100;
-                  return (
-                    <div
-                      key={queue.id}
-                      className="queue-list-item"
-                      onClick={() => setSelectedQueue(queue)}
-                    >
-                      <div className="queue-list-content">
-                        <div className="queue-list-logo">
-                          <img src={getCollegeLogo(queue.college)} alt={queue.college} />
-                        </div>
-                        <div className="queue-list-info">
-                          <div className="queue-list-header">
-                            <div>
-                              <h3 className="queue-list-title">{queue.service}</h3>
-                              <p className="queue-list-college">{queue.college}</p>
-                            </div>
-                            <div className="queue-list-badge">{queue.queueNumber}</div>
-                          </div>
+            {/* Error */}
+            {error && (
+              <div
+                className="queue-empty-state"
+                style={{ borderColor: "rgba(239,68,68,0.3)" }}
+              >
+                <AlertCircle
+                  className="queue-empty-icon"
+                  style={{ color: "#ef4444" }}
+                />
+                <p className="queue-empty-text">{error}</p>
+              </div>
+            )}
 
-                          <div className="queue-list-stats">
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Position</div>
-                              <div className="queue-list-stat-value">
-                                {queue.position}/{queue.totalInQueue}
-                              </div>
-                            </div>
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Est. Wait</div>
-                              <div className="queue-list-stat-value">{queue.estimatedWaitTime}</div>
-                            </div>
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Joined At</div>
-                              <div className="queue-list-stat-value">{queue.joinedAt}</div>
-                            </div>
-                            <div className="queue-list-stat">
-                              <div className="queue-list-stat-label">Status</div>
-                              <div className={`queue-status-badge ${getStatusColor(queue.status)}`}>
-                                {queue.status}
-                              </div>
-                            </div>
-                          </div>
+            {/* Loading */}
+            {isLoading && (
+              <div className="queue-empty-state">
+                <Loader2
+                  className="queue-empty-icon"
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                <p className="queue-empty-text">Loading your queues…</p>
+              </div>
+            )}
 
-                          <div className="queue-list-progress">
-                            <div className="queue-list-progress-label">
-                              <span>Progress</span>
-                              <span>{Math.round(queueProgress)}%</span>
-                            </div>
-                            <div className="queue-list-progress-bar">
+            {/* Queue List */}
+            {!isLoading && !error && (
+              <div className="queue-list-container">
+                {queues.length > 0 ? (
+                  queues.map((queue) => {
+                    const progress = getProgress(
+                      queue.position,
+                      queue.totalWaiting,
+                    );
+                    const statusMeta = getStatusMeta(queue.status);
+                    return (
+                      <div
+                        key={queue.queueId}
+                        className="queue-list-item"
+                        onClick={() => setSelectedQueueId(queue.queueId)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div className="queue-list-content">
+                          <div className="queue-list-logo">
+                            <img
+                              src={getCollegeLogo(queue.departmentName)}
+                              alt={queue.departmentName}
+                            />
+                          </div>
+                          <div className="queue-list-info">
+                            <div className="queue-list-header">
+                              <div>
+                                <h3 className="queue-list-title">
+                                  {queue.serviceName}
+                                </h3>
+                                <p className="queue-list-college">
+                                  {queue.departmentName}
+                                </p>
+                              </div>
                               <div
-                                className="queue-progress-fill"
-                                style={{ width: `${queueProgress}%` }}
-                              ></div>
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "flex-end",
+                                  gap: "0.375rem",
+                                }}
+                              >
+                                <div className="queue-list-badge">
+                                  {queue.queueNumberBadge}
+                                </div>
+                                <span
+                                  className={`detailed-queue-status-badge ${statusMeta.cls}`}
+                                >
+                                  {statusMeta.label}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="queue-list-stats">
+                              <div className="queue-list-stat">
+                                <div className="queue-list-stat-label">
+                                  Position
+                                </div>
+                                <div className="queue-list-stat-value">
+                                  {queue.position} / {queue.totalWaiting}
+                                </div>
+                              </div>
+                              <div className="queue-list-stat">
+                                <div className="queue-list-stat-label">
+                                  Est. Wait
+                                </div>
+                                <div className="queue-list-stat-value">
+                                  {queue.estimatedWait}
+                                </div>
+                              </div>
+                              <div className="queue-list-stat">
+                                <div className="queue-list-stat-label">
+                                  Joined
+                                </div>
+                                <div className="queue-list-stat-value">
+                                  {queue.joinedAt}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="qs-progress-card">
+                              <div className="queue-progress-group">
+                                <div className="queue-progress-wrapper">
+                                  <div className="qs-progress-label-row">
+                                    <p className="qs-progress-label">People in Queue</p>
+                                    <p className="qs-progress-value">
+                                      {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
+                                      <span className="qs-progress-percent">
+                                        &nbsp;({queue.queueOccupancyPercent ?? 0}%)
+                                      </span>
+                                    </p>
+                                  </div>
+                                  <div className="qs-progress-bar">
+                                    <div
+                                      className="qs-progress-fill"
+                                      style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="queue-progress-wrapper">
+                                  <div className="qs-progress-label-row">
+                                    <p className="qs-progress-label">Serviced</p>
+                                    <p className="qs-progress-value">
+                                      {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
+                                      <span className="qs-progress-percent">
+                                        &nbsp;({queue.servicedPercent ?? 0}%)
+                                      </span>
+                                    </p>
+                                  </div>
+                                  <div className="qs-progress-bar">
+                                    <div
+                                      className="qs-progress-fill qs-progress-fill-serviced"
+                                      style={{ width: `${queue.servicedPercent ?? 0}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="queue-empty-state">
-                  <Users className="queue-empty-icon" />
-                  <h3 className="queue-empty-title">No Active Queues</h3>
-                  <p className="queue-empty-text">You haven't joined any queues yet</p>
-                  <button
-                    onClick={() => navigate('/student/avail-service')}
-                    style={{
-                      background: 'var(--primary-color)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '0.75rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--primary-dark)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--primary-color)';
-                    }}
-                  >
-                    Browse Services
-                  </button>
-                </div>
-              )}
-            </div>
+                    );
+                  })
+                ) : (
+                  <div className="queue-empty-state">
+                    <Users className="queue-empty-icon" />
+                    <h3 className="queue-empty-title">No Active Queues</h3>
+                    <p className="queue-empty-text">
+                      You haven't joined any queues yet today.
+                    </p>
+                    <button
+                      onClick={() => navigate("/student/queue")}
+                      style={{
+                        marginTop: "1rem",
+                        background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                        color: "white",
+                        border: "none",
+                        padding: "0.75rem 1.5rem",
+                        borderRadius: "0.75rem",
+                        cursor: "pointer",
+                        fontSize: "0.875rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Browse Services
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
 
-      {/* Sidebar Overlay (Mobile) */}
+      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
           className="sidebar-overlay"
@@ -789,7 +1045,7 @@ export default function QueueStatusPage() {
         />
       )}
 
-      {/* AI Chatbot */}
+      {/* AI Chat */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
           <div className="chat-container">
@@ -804,12 +1060,9 @@ export default function QueueStatusPage() {
               </button>
             </div>
             <div className="chat-messages">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`message message-${message.type}`}
-                >
-                  <div className="message-content">{message.text}</div>
+              {messages.map((m) => (
+                <div key={m.id} className={`message message-${m.type}`}>
+                  <div className="message-content">{m.text}</div>
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -822,11 +1075,7 @@ export default function QueueStatusPage() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
               />
-              <button
-                type="submit"
-                className="chat-send-btn"
-                aria-label="Send message"
-              >
+              <button type="submit" className="chat-send-btn" aria-label="Send">
                 <SendIcon />
               </button>
             </form>

@@ -1,0 +1,594 @@
+/* ============================================================
+   admin_pinnacle_sync.css
+   All classes are prefixed with "aps-" to avoid collisions.
+   Layout/sidebar classes reuse admin_dashboard.css variables.
+   ============================================================ */
+
+/* ── Page wrapper ─────────────────────────────────────────── */
+.aps-page {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Hero Banner ──────────────────────────────────────────── */
+.aps-hero-banner {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 60%, #14532d 100%);
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+}
+
+.aps-hero-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.aps-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: #ffffff;
+}
+
+.aps-hero-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.aps-hero-subtitle {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0.2rem 0 0;
+}
+
+/* Sync status badge */
+.aps-sync-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.aps-sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.aps-sync-badge--enabled .aps-sync-dot {
+  background: #4ade80;
+  box-shadow: 0 0 6px #4ade80;
+}
+
+.aps-sync-badge--disabled .aps-sync-dot {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+/* ── Stats Grid ───────────────────────────────────────────── */
+.aps-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .aps-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .aps-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aps-stat-card {
+  background: var(--card-bg, #111612);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aps-stat-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aps-stat-blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+.aps-stat-green {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+.aps-stat-purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+.aps-stat-orange {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+.aps-stat-label {
+  font-size: 0.78rem;
+  color: var(--text-tertiary, #94a3b8);
+  margin: 0;
+}
+
+.aps-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+.aps-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--card-bg, #111612);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.75rem;
+  padding: 0.35rem;
+}
+
+.aps-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--text-tertiary, #94a3b8);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+  white-space: nowrap;
+}
+
+.aps-tab-btn:hover {
+  background: var(--secondary, #1a3a1f);
+  color: var(--text-primary, #f0fdf4);
+}
+
+.aps-tab-btn--active {
+  background: var(--primary-color, #22c55e);
+  color: #ffffff;
+}
+
+.aps-tab-btn--active:hover {
+  background: var(--primary-dark, #16a34a);
+}
+
+@media (max-width: 600px) {
+  .aps-tabs {
+    flex-direction: column;
+  }
+}
+
+/* ── Alert / Toast ────────────────────────────────────────── */
+.aps-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.6rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.aps-alert--success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.aps-alert--error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.aps-alert--warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.aps-alert--info {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* ── Panel (shared content card) ─────────────────────────── */
+.aps-panel {
+  background: var(--card-bg, #111612);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.75rem;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.aps-panel-header {
+  border-bottom: 1px solid var(--card-border, #1e3a23);
+  padding-bottom: 1rem;
+}
+
+.aps-panel-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0 0 0.25rem;
+}
+
+.aps-panel-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-tertiary, #94a3b8);
+  margin: 0;
+}
+
+/* ── Form ─────────────────────────────────────────────────── */
+.aps-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.aps-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0fdf4);
+}
+
+.aps-required {
+  color: #ef4444;
+  margin-left: 0.1rem;
+}
+
+.aps-input {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  background: var(--input-background, #0f1e12);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.5rem;
+  color: var(--text-primary, #f0fdf4);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.aps-input:focus {
+  border-color: var(--primary-color, #22c55e);
+}
+
+.aps-input::placeholder {
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.aps-hint {
+  font-size: 0.78rem;
+  color: var(--text-tertiary, #94a3b8);
+  margin: 0;
+}
+
+/* ── Toggle ───────────────────────────────────────────────── */
+.aps-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--secondary, #1a3a1f);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.65rem;
+  padding: 1rem 1.25rem;
+}
+
+.aps-toggle-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0 0 0.2rem;
+}
+
+.aps-toggle-desc {
+  font-size: 0.8rem;
+  color: var(--text-tertiary, #94a3b8);
+  margin: 0;
+}
+
+.aps-toggle-btn {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border: none;
+  border-radius: 999px;
+  background: var(--card-border, #1e3a23);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.25s;
+  padding: 0;
+}
+
+.aps-toggle-btn--on {
+  background: var(--primary-color, #22c55e);
+}
+
+.aps-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.25s;
+  display: block;
+}
+
+.aps-toggle-btn--on .aps-toggle-thumb {
+  transform: translateX(20px);
+}
+
+/* ── Panel Actions ────────────────────────────────────────── */
+.aps-panel-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+.aps-btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1.4rem;
+  background: var(--primary-color, #22c55e);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.aps-btn-primary:hover {
+  background: var(--primary-dark, #16a34a);
+}
+
+.aps-btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1.4rem;
+  background: transparent;
+  color: var(--text-primary, #f0fdf4);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.aps-btn-secondary:hover {
+  background: var(--secondary, #1a3a1f);
+  border-color: var(--primary-color, #22c55e);
+}
+
+/* ── Sync Now button ──────────────────────────────────────── */
+.aps-sync-now-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.85rem;
+  background: var(--primary-color, #22c55e);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    opacity 0.2s;
+}
+
+.aps-sync-now-btn:hover:not(:disabled) {
+  background: var(--primary-dark, #16a34a);
+}
+
+.aps-sync-now-btn--loading,
+.aps-sync-now-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ── How It Works ─────────────────────────────────────────── */
+.aps-how-it-works {
+  background: var(--secondary, #1a3a1f);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.65rem;
+  padding: 1.25rem;
+}
+
+.aps-how-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0 0 0.75rem;
+}
+
+.aps-how-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.aps-how-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.aps-how-list li svg {
+  color: var(--primary-color, #22c55e);
+  flex-shrink: 0;
+}
+
+/* ── Empty State ──────────────────────────────────────────── */
+.aps-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1rem;
+  color: var(--text-tertiary, #94a3b8);
+  text-align: center;
+}
+
+.aps-empty-state svg {
+  opacity: 0.3;
+  width: 3rem;
+  height: 3rem;
+}
+
+.aps-empty-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0.5rem 0 0;
+}
+
+.aps-empty-desc {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* ── Light mode overrides ─────────────────────────────────── */
+[data-theme="light"] .aps-stat-card,
+[data-theme="light"] .aps-panel,
+[data-theme="light"] .aps-tabs {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .aps-input {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+[data-theme="light"] .aps-toggle-card,
+[data-theme="light"] .aps-how-it-works {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .aps-stat-value,
+[data-theme="light"] .aps-panel-title,
+[data-theme="light"] .aps-label,
+[data-theme="light"] .aps-toggle-title,
+[data-theme="light"] .aps-how-title,
+[data-theme="light"] .aps-empty-title {
+  color: #1e293b;
+}
+
+[data-theme="light"] .aps-panel-subtitle,
+[data-theme="light"] .aps-hint,
+[data-theme="light"] .aps-stat-label,
+[data-theme="light"] .aps-toggle-desc,
+[data-theme="light"] .aps-how-list li,
+[data-theme="light"] .aps-empty-state {
+  color: #64748b;
+}
+
+[data-theme="light"] .aps-tab-btn {
+  color: #64748b;
+}
+
+[data-theme="light"] .aps-tab-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+[data-theme="light"] .aps-btn-secondary {
+  color: #1e293b;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .aps-btn-secondary:hover {
+  background: #e2e8f0;
+  border-color: #15803d;
+}
+
+[data-theme="light"] .aps-toggle-btn {
+  background: #cbd5e1;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .aps-page {
+    padding: 1rem;
+  }
+  .aps-hero-banner {
+    padding: 1.25rem;
+  }
+  .aps-hero-title {
+    font-size: 1.35rem;
+  }
+  .aps-panel-actions {
+    flex-direction: column;
+  }
+  .aps-btn-primary,
+  .aps-btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+}

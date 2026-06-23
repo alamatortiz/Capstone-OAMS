@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Mail, Lock, Sparkles } from "lucide-react";
+import { Mail, Lock, Sparkles, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { applyTheme, getSavedTheme } from "../utils/theme";
@@ -14,13 +14,14 @@ import pncLogo from "../assets/Pnc-Logo.png";
 // @ts-ignore
 import oamsLogo from "../assets/oams_logo.png";
 // @ts-ignore
-import darkModeIcon from "../assets/darkmode_icon.png"; // Crescent moon icon
+import darkModeIcon from "../assets/darkmode_icon.png";
 // @ts-ignore
-import sunIcon from "../assets/sun_icon.png"; // Sun icon (optional, use if available)
+import sunIcon from "../assets/sun_icon.png";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getSavedTheme() === "dark");
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -40,21 +41,24 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !password) {
-      toast.error("Please fill in all fields");
+    if (!email && !password) {
+      toast.error("Please fill in your Email or School ID and password.");
       return;
     }
-
-    // No client-side email format restriction, as backend supports school ID or email
-    // if (!email.endsWith("@pnc.edu.ph")) {
-    //   toast.error("Please use your @pnc.edu.ph email address");
-    //   return;
-    // }
+    if (!email) {
+      toast.error("Please enter your Email or School ID.");
+      return;
+    }
+    if (!password) {
+      toast.error("Please enter your password.");
+      return;
+    }
 
     try {
       await login(email, password);
 
-      const storedUser = localStorage.getItem("oams_user");
+      // Fixed: was reading from localStorage, AuthContext saves to sessionStorage
+      const storedUser = sessionStorage.getItem("oams_user");
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         toast.success(`Welcome back, ${userData.name}!`);
@@ -67,9 +71,28 @@ export default function Login() {
           navigate(roleRoutes[userData.role] ?? "/dashboard");
         }, 500);
       }
-    } catch {
-      toast.error("Login failed. Please check your credentials.");
-    } finally {
+    } catch (err: unknown) {
+      // Extract HTTP status and backend error message directly from the error shape.
+      // Avoids relying on axios.isAxiosError which can fail in Vite ESM builds
+      // when axios is imported separately from the shared api.js instance.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+
+      if (status === 401) {
+        // Backend returns "Invalid credentials" for both user-not-found and wrong password
+        toast.error(message ?? "Invalid credentials. Please check your ID or email and password.");
+      } else if (status === 403) {
+        // Account inactive or suspended — backend message is already descriptive
+        toast.error(message ?? "Your account is not active. Please contact the administrator.");
+      } else if (status === 400) {
+        toast.error(message ?? "Please fill in all fields.");
+      } else if (status) {
+        // Any other HTTP error (e.g. 500)
+        toast.error("Something went wrong. Please try again later.");
+      } else {
+        // No response at all — network offline or server unreachable
+        toast.error("Unable to reach the server. Please check your connection.");
+      }
     }
   };
 
@@ -122,7 +145,7 @@ export default function Login() {
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-field">
               <label htmlFor="email" className="login-label">
-                Email
+                Email or School ID
               </label>
               <div className="login-input-wrap">
                 <Mail className="login-input-icon" size={16} />
@@ -133,6 +156,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="login-input"
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -145,12 +169,23 @@ export default function Login() {
                 <Lock className="login-input-icon" size={16} />
                 <input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="login-input"
+                  className="login-input login-input--password"
+                  autoComplete="current-password"
                 />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  disabled={isLoading}
+                  tabIndex={0}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
