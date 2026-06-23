@@ -956,7 +956,7 @@ export default function AdminDashboard() {
               <p className="section-desc">
                 Active queues across all departments
               </p>
-              <div className="queues-list">
+              <div className="admin-queues-list">
                 {loading ? (
                   <p className="activity-loading">Loading...</p>
                 ) : hostedQueues.length === 0 ? (

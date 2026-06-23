@@ -1524,7 +1524,7 @@ body {
 }
 
 .documents-list,
-.queues-list {
+.admin-queues-list {
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
