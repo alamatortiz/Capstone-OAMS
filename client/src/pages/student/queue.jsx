@@ -235,25 +235,22 @@ export default function QueuePage() {
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
 
-  // Derive unique college names from live slots (guarantees exact name match)
+  // Derive unique college names from all departments in the database
   const collegeOptions = useMemo(() => {
-    const seen = new Map();
-    for (const s of availableSlots) {
-      if (!seen.has(s.departmentName)) {
-        seen.set(s.departmentName, {
-          name: s.departmentName,
-          abbrev: s.departmentAbbrev,
-        });
-      }
-    }
-    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [availableSlots]);
+    return servicesData
+      .map((dept) => ({ name: dept.departmentName, abbrev: dept.departmentAbbrev }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [servicesData]);
 
-  // Derive unique service names from live slots
+  // Derive unique service names from all services in the database
   const serviceOptions = useMemo(() => {
-    const names = [...new Set(availableSlots.map((s) => s.serviceName))].sort();
+    const names = [
+      ...new Set(
+        servicesData.flatMap((dept) => dept.services?.map((s) => s.serviceName) ?? [])
+      ),
+    ].sort();
     return names;
-  }, [availableSlots]);
+  }, [servicesData]);
 
   // Filter available slots client-side
   const filteredSlots = useMemo(

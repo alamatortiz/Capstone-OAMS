@@ -1,0 +1,100 @@
+.logout-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: logout-fade-in 0.15s ease;
+}
+
+@keyframes logout-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.logout-modal {
+  background: var(--bg-card, #fff);
+  border-radius: 16px;
+  padding: 2rem 2rem 1.5rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  animation: logout-slide-up 0.2s ease;
+}
+
+@keyframes logout-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.logout-modal-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #fef2f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  color: #ef4444;
+}
+
+.logout-modal-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 0.5rem;
+}
+
+.logout-modal-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+.logout-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.logout-modal-cancel {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: transparent;
+  color: var(--text-primary, #374151);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.logout-modal-cancel:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.logout-modal-confirm {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: background 0.15s;
+}
+
+.logout-modal-confirm:hover {
+  background: #dc2626;
+}

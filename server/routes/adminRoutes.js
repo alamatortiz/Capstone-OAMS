@@ -1250,4 +1250,635 @@ function formatTime(timeStr) {
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
 }
 
+// ─────────────────────────────────────────────────────────────
+// AUDIT LOG HELPER
+// ─────────────────────────────────────────────────────────────
+async function logAudit(adminId, action, targetTable, targetRecordId, oldValues, newValues) {
+  try {
+    await pool.query(
+      `INSERT INTO audit_logs (admin_id, action, target_table, target_record_id, old_values, new_values)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        adminId,
+        action,
+        targetTable,
+        targetRecordId ?? null,
+        oldValues ? JSON.stringify(oldValues) : null,
+        newValues ? JSON.stringify(newValues) : null,
+      ],
+    );
+  } catch (e) {
+    console.error("Audit log write error:", e.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// DATA MANAGEMENT — Document Types
+// All routes scoped strictly to the admin's own department.
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/data-management/document-types?status=active|inactive
+router.get(
+  "/data-management/document-types",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const { status } = req.query;
+      let sql = `
+        SELECT ds.service_id AS id, ds.service_name AS name, ds.description,
+               ds.status, ds.fee, ds.processing_time,
+               d.department_abbreviation AS dept_abbrev,
+               (SELECT COUNT(*) FROM document_requirements dr WHERE dr.service_id = ds.service_id) AS req_count
+        FROM document_services ds
+        JOIN departments d ON ds.department_id = d.department_id
+        WHERE ds.department_id = ?`;
+      const params = [deptId];
+
+      if (status && status !== "all") {
+        sql += " AND ds.status = ?";
+        params.push(status);
+      }
+      sql += " ORDER BY ds.service_name ASC";
+
+      const [rows] = await pool.query(sql, params);
+      res.json({ documentTypes: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        status: r.status,
+        fee: parseFloat(r.fee) || 0,
+        processingTime: r.processing_time || "",
+        deptAbbrev: r.dept_abbrev,
+        requirementCount: r.req_count,
+      })) });
+    } catch (error) {
+      console.error("Document types fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/data-management/document-types/:id/requirements
+router.get(
+  "/data-management/document-types/:id/requirements",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[svc]] = await pool.query(
+        `SELECT service_id FROM document_services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!svc) return res.status(404).json({ error: "Document type not found in your department" });
+
+      const [rows] = await pool.query(
+        `SELECT requirement_id AS id, requirement_name AS name, description, is_mandatory AS isMandatory
+         FROM document_requirements WHERE service_id = ? ORDER BY requirement_id ASC`,
+        [serviceId],
+      );
+      res.json({ requirements: rows });
+    } catch (error) {
+      console.error("Requirements fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/admin/data-management/document-types
+// Body: { name, description, processingTime, fee, status, requirements[] }
+router.post(
+  "/data-management/document-types",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { name, description, processingTime, fee, status, requirements = [] } = req.body;
+    if (!name || !description || !processingTime || fee === undefined) {
+      return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [result] = await pool.query(
+        `INSERT INTO document_services (service_name, description, department_id, status, fee, processing_time)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [name, description, deptId, status || "active", parseFloat(fee), processingTime],
+      );
+      const newId = result.insertId;
+
+      if (requirements.length > 0) {
+        const reqValues = requirements.map((r) => [newId, r.name, r.description || null, r.isMandatory !== false]);
+        await pool.query(
+          `INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
+          [reqValues],
+        );
+      }
+
+      await logAudit(req.user.userId, "CREATE", "document_services", newId, null, { name, status: status || "active", fee, processingTime });
+      res.status(201).json({ message: "Document type created", id: newId });
+    } catch (error) {
+      console.error("Document type create error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PUT /api/admin/data-management/document-types/:id
+// Body: { name, description, processingTime, fee, status, requirements[] }
+router.put(
+  "/data-management/document-types/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    const { name, description, processingTime, fee, status, requirements = [] } = req.body;
+    if (!name || !description || !processingTime || fee === undefined) {
+      return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[old]] = await pool.query(
+        `SELECT service_name, status, fee, processing_time FROM document_services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!old) return res.status(404).json({ error: "Document type not found in your department" });
+
+      await pool.query(
+        `UPDATE document_services SET service_name = ?, description = ?, status = ?, fee = ?, processing_time = ?
+         WHERE service_id = ?`,
+        [name, description, status || "active", parseFloat(fee), processingTime, serviceId],
+      );
+
+      // Replace requirements: delete all then re-insert
+      await pool.query(`DELETE FROM document_requirements WHERE service_id = ?`, [serviceId]);
+      if (requirements.length > 0) {
+        const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
+        await pool.query(
+          `INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
+          [reqValues],
+        );
+      }
+
+      await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
+        { name: old.service_name, status: old.status, fee: old.fee, processingTime: old.processing_time },
+        { name, status, fee, processingTime },
+      );
+      res.json({ message: "Document type updated" });
+    } catch (error) {
+      console.error("Document type update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// DELETE /api/admin/data-management/document-types/:id
+router.delete(
+  "/data-management/document-types/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[svc]] = await pool.query(
+        `SELECT service_name FROM document_services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!svc) return res.status(404).json({ error: "Document type not found in your department" });
+
+      await pool.query(`DELETE FROM document_services WHERE service_id = ?`, [serviceId]);
+      await logAudit(req.user.userId, "DELETE", "document_services", serviceId, { name: svc.service_name }, null);
+      res.json({ message: "Document type deleted" });
+    } catch (error) {
+      console.error("Document type delete error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// DATA MANAGEMENT — Service Types (queue services)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/data-management/service-types?status=active|inactive
+router.get(
+  "/data-management/service-types",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const { status } = req.query;
+      let sql = `
+        SELECT s.service_id AS id, s.service_name AS name, s.description,
+               s.status, s.average_service_time AS avgServiceTime, s.auto_close AS autoClose,
+               d.department_abbreviation AS deptAbbrev
+        FROM services s
+        JOIN departments d ON s.department_id = d.department_id
+        WHERE s.department_id = ?`;
+      const params = [deptId];
+
+      if (status && status !== "all") {
+        sql += " AND s.status = ?";
+        params.push(status);
+      }
+      sql += " ORDER BY s.service_name ASC";
+
+      const [rows] = await pool.query(sql, params);
+      res.json({ serviceTypes: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        status: r.status,
+        avgServiceTime: r.avgServiceTime,
+        autoClose: !!r.autoClose,
+        deptAbbrev: r.deptAbbrev,
+      })) });
+    } catch (error) {
+      console.error("Service types fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/admin/data-management/service-types
+// Body: { name, description, avgServiceTime, autoClose, status }
+router.post(
+  "/data-management/service-types",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { name, description, avgServiceTime, autoClose, status } = req.body;
+    if (!name || !avgServiceTime) {
+      return res.status(400).json({ error: "name and avgServiceTime are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [result] = await pool.query(
+        `INSERT INTO services (service_name, description, department_id, status, average_service_time, auto_close)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [name, description || null, deptId, status || "active", parseInt(avgServiceTime, 10), autoClose !== false],
+      );
+      const newId = result.insertId;
+      await logAudit(req.user.userId, "CREATE", "services", newId, null, { name, status: status || "active", avgServiceTime });
+      res.status(201).json({ message: "Service type created", id: newId });
+    } catch (error) {
+      console.error("Service type create error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PUT /api/admin/data-management/service-types/:id
+router.put(
+  "/data-management/service-types/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    const { name, description, avgServiceTime, autoClose, status } = req.body;
+    if (!name || !avgServiceTime) {
+      return res.status(400).json({ error: "name and avgServiceTime are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[old]] = await pool.query(
+        `SELECT service_name, status FROM services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!old) return res.status(404).json({ error: "Service type not found in your department" });
+
+      await pool.query(
+        `UPDATE services SET service_name = ?, description = ?, status = ?, average_service_time = ?, auto_close = ?
+         WHERE service_id = ?`,
+        [name, description || null, status || "active", parseInt(avgServiceTime, 10), autoClose !== false, serviceId],
+      );
+
+      await logAudit(req.user.userId, "UPDATE", "services", serviceId,
+        { name: old.service_name, status: old.status },
+        { name, status },
+      );
+      res.json({ message: "Service type updated" });
+    } catch (error) {
+      console.error("Service type update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// DELETE /api/admin/data-management/service-types/:id
+router.delete(
+  "/data-management/service-types/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[svc]] = await pool.query(
+        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
+
+      await pool.query(`DELETE FROM services WHERE service_id = ?`, [serviceId]);
+      await logAudit(req.user.userId, "DELETE", "services", serviceId, { name: svc.service_name }, null);
+      res.json({ message: "Service type deleted" });
+    } catch (error) {
+      console.error("Service type delete error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// DATA MANAGEMENT — Audit Logs
+// Scoped to the admin's own department via the administrators table.
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/data-management/audit-logs?action=CREATE|UPDATE|DELETE|...
+router.get(
+  "/data-management/audit-logs",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const { action } = req.query;
+      const validActions = ["CREATE", "READ", "UPDATE", "DELETE", "LOGIN", "LOGOUT", "EXPORT"];
+
+      let sql = `
+        SELECT al.log_id AS id, al.action, al.target_table, al.target_record_id,
+               al.old_values, al.new_values, al.created_at,
+               CONCAT(a.first_name, ' ', a.last_name) AS admin_name, a.email AS admin_email
+        FROM audit_logs al
+        JOIN administrators a ON al.admin_id = a.admin_id
+        WHERE a.department_id = ?`;
+      const params = [deptId];
+
+      if (action && action !== "all" && validActions.includes(action.toUpperCase())) {
+        sql += " AND al.action = ?";
+        params.push(action.toUpperCase());
+      }
+      sql += " ORDER BY al.created_at DESC LIMIT 200";
+
+      const [rows] = await pool.query(sql, params);
+      res.json({ auditLogs: rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        targetTable: r.target_table || "",
+        targetRecordId: r.target_record_id,
+        oldValues: r.old_values,
+        newValues: r.new_values,
+        adminName: r.admin_name,
+        adminEmail: r.admin_email,
+        timestamp: new Date(r.created_at).toLocaleString("en-US"),
+      })) });
+    } catch (error) {
+      console.error("Audit logs fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// ANNOUNCEMENTS — full CRUD, scoped to the admin's own department
+// Maps to the `faqs` table (question=title, answer=content).
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/announcements
+router.get(
+  "/announcements",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [rows] = await pool.query(
+        `SELECT faq_id, question AS title, answer AS content,
+                is_pinned AS isPinned, type, status, created_by AS createdBy,
+                department_id, created_at
+         FROM faqs
+         WHERE department_id = ? OR department_id IS NULL
+         ORDER BY is_pinned DESC, created_at DESC`,
+        [deptId],
+      );
+
+      res.json({
+        announcements: rows.map((r) => ({
+          id: String(r.faq_id),
+          title: r.title,
+          content: r.content,
+          isPinned: !!r.isPinned,
+          type: r.type || "general",
+          status: r.status || "active",
+          createdBy: r.createdBy || "Admin Office",
+          date: r.created_at,
+          college: r.department_id === deptId ? "Own Department" : "All Departments",
+        })),
+      });
+    } catch (error) {
+      console.error("Announcements fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/admin/announcements
+router.post(
+  "/announcements",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { title, content, type = "general", isPinned = false, isGlobal = false } = req.body;
+    if (!title?.trim() || !content?.trim()) {
+      return res.status(400).json({ error: "title and content are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[adminRow]] = await pool.query(
+        `SELECT CONCAT(first_name, ' ', last_name) AS full_name
+         FROM administrators
+         WHERE admin_id = ?`,
+        [req.user.userId],
+      );
+      const createdBy = adminRow?.full_name || "Admin Office";
+
+      const [result] = await pool.query(
+        `INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id)
+         VALUES (?, ?, ?, 'active', ?, ?, ?)`,
+        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, isGlobal ? null : deptId],
+      );
+
+      res.status(201).json({
+        announcement: {
+          id: String(result.insertId),
+          title: title.trim(),
+          content: content.trim(),
+          type,
+          status: "active",
+          isPinned: !!isPinned,
+          createdBy,
+          date: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error("Announcement create error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PUT /api/admin/announcements/:id
+router.put(
+  "/announcements/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const faqId = parseInt(req.params.id, 10);
+    const { title, content, type } = req.body;
+    if (!title?.trim() || !content?.trim()) {
+      return res.status(400).json({ error: "title and content are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[row]] = await pool.query(
+        `SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId],
+      );
+      if (!row) return res.status(404).json({ error: "Announcement not found" });
+      if (row.department_id !== null && row.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot edit announcements from another department" });
+      }
+
+      await pool.query(
+        `UPDATE faqs SET question = ?, answer = ?, type = ? WHERE faq_id = ?`,
+        [title.trim(), content.trim(), type || "general", faqId],
+      );
+      res.json({ message: "Announcement updated" });
+    } catch (error) {
+      console.error("Announcement update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/announcements/:id/pin
+router.patch(
+  "/announcements/:id/pin",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const faqId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[row]] = await pool.query(`SELECT is_pinned, department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      if (!row) return res.status(404).json({ error: "Announcement not found" });
+      if (row.department_id !== null && row.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot modify announcements from another department" });
+      }
+      const newPinned = row.is_pinned ? 0 : 1;
+      await pool.query(`UPDATE faqs SET is_pinned = ? WHERE faq_id = ?`, [newPinned, faqId]);
+      res.json({ isPinned: !!newPinned });
+    } catch (error) {
+      console.error("Announcement pin toggle error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/announcements/:id/archive
+router.patch(
+  "/announcements/:id/archive",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const faqId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      if (!row) return res.status(404).json({ error: "Announcement not found" });
+      if (row.department_id !== null && row.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot modify announcements from another department" });
+      }
+      await pool.query(`UPDATE faqs SET status = 'archived' WHERE faq_id = ?`, [faqId]);
+      res.json({ message: "Announcement archived" });
+    } catch (error) {
+      console.error("Announcement archive error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/announcements/:id/restore
+router.patch(
+  "/announcements/:id/restore",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const faqId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      if (!row) return res.status(404).json({ error: "Announcement not found" });
+      if (row.department_id !== null && row.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot modify announcements from another department" });
+      }
+      await pool.query(`UPDATE faqs SET status = 'active' WHERE faq_id = ?`, [faqId]);
+      res.json({ message: "Announcement restored" });
+    } catch (error) {
+      console.error("Announcement restore error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// DELETE /api/admin/announcements/:id
+router.delete(
+  "/announcements/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const faqId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      if (!row) return res.status(404).json({ error: "Announcement not found" });
+      if (row.department_id !== null && row.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot delete announcements from another department" });
+      }
+      await pool.query(`DELETE FROM faqs WHERE faq_id = ?`, [faqId]);
+      res.json({ message: "Announcement deleted" });
+    } catch (error) {
+      console.error("Announcement delete error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 module.exports = router;

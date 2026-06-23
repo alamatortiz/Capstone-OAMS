@@ -12,10 +12,11 @@ services:
       - ./server/oams_db.sql:/docker-entrypoint-initdb.d/01_oams_db.sql
       - ./server/db/mock/ccs_mock_data.sql:/docker-entrypoint-initdb.d/02_ccs_mock_data.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysql", "-u", "root", "-pAkosimatt123", "-e", "SELECT 1 FROM oams_db.users LIMIT 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
 
   server:
     build: ./server

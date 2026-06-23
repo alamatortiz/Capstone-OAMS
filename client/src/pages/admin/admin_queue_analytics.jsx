@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_queue_analytics.css";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -405,10 +406,9 @@ export default function AdminQueueAnalytics() {
     return () => document.removeEventListener("click", handler);
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
@@ -488,6 +488,7 @@ export default function AdminQueueAnalytics() {
 
   return (
     <div className="aqa-layout">
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
       {/* AI Chatbot */}
       <div className={`aqa-chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
@@ -632,6 +633,7 @@ export default function AdminQueueAnalytics() {
       {/* Main Content */}
       <main className="aqa-main">
         <div className="aqa-content">
+          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
           {/* Banner */}
           <div className="aqa-banner">
             <div className="aqa-banner-icon">

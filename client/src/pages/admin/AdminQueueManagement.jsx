@@ -8,6 +8,7 @@ import './admin-queue-management.css';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import api from '../../utils/api';
+import LogoutConfirmModal from '../../components/LogoutConfirmModal';
 
 
 // ─── Icons (all from admin dashboard) ───────────────────────────────────────
@@ -287,10 +288,9 @@ export default function AdminQueueManagement() {
   }, [fetchEntries]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate('/login'); };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
@@ -440,6 +440,7 @@ export default function AdminQueueManagement() {
 
     return (
       <div className="aqm-dashboard-with-sidebar">
+        <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
         {/* AI Chatbot */}
         <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
           {chatOpen && (
@@ -829,6 +830,7 @@ export default function AdminQueueManagement() {
   // ─── List View ─────────────────────────────────────────────────────────────
   return (
     <div className="aqm-dashboard-with-sidebar">
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
       {/* AI Chatbot */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
@@ -961,6 +963,7 @@ export default function AdminQueueManagement() {
       {/* Main Content - List View */}
       <main className="aqm-dashboard-main">
         <div className="aqm-list-container">
+          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
           <div className="aqm-page-header">
             <h1 className="aqm-page-title">Queue Management</h1>
             <p className="aqm-page-subtitle">Monitor and manage all active queues</p>

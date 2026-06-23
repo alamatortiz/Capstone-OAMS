@@ -7,6 +7,7 @@ import "./admin-queue-hosting.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
 import api from "../../utils/api";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 
 // ── Icons ──────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -270,10 +271,9 @@ export default function AdminQueueHosting() {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
@@ -428,6 +428,7 @@ export default function AdminQueueHosting() {
 
   return (
     <div className="aqh-dashboard-with-sidebar">
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
       {/* AI Chatbot */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
@@ -572,6 +573,7 @@ export default function AdminQueueHosting() {
       {/* Main Content */}
       <main className="aqh-dashboard-main">
         <div className="aqh-page-container">
+          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
           {/* Page Header */}
           <div className="aqh-page-header">
             <div className="aqh-page-header-text">

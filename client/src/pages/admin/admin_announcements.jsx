@@ -9,9 +9,10 @@ import "./admin_dashboard.css";
 import "./admin_announcements.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { Link } from "react-router-dom";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import api from "../../utils/api";
 
-// ── Icons (kept local to this file so this page never depends on the
-//    dashboard's icon set) ───────────────────────────────────────────────
+// ── Icons ─────────────────────────────────────────────────────────────────────
 const ChatIcon = () => (
   <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
@@ -103,7 +104,7 @@ const MoonIcon = () => (
   </svg>
 );
 
-// ── Page-only icons ───────────────────────────────────────────────────────
+// ── Page-only icons ───────────────────────────────────────────────────────────
 const PlusIconSmall = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -174,8 +175,13 @@ const CheckCircleIcon = (props) => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18">
+    <polyline points="15 18 9 12 15 6"></polyline>
+  </svg>
+);
 
-// ── Static reference data ─────────────────────────────────────────────────
+// ── Static reference data ─────────────────────────────────────────────────────
 const COLLEGES = [
   { name: "College of Computing Studies", shortName: "CCS", color: "#f97316" },
   { name: "College of Business Accountancy and Administration", shortName: "CBAA", color: "#facc15" },
@@ -185,39 +191,14 @@ const COLLEGES = [
   { name: "College of Health and Allied Sciences", shortName: "CHAS", color: "#22c55e" },
 ];
 
-const collegeShort = (fullName) => {
-  if (fullName === "All Departments") return "All Departments";
-  const match = COLLEGES.find((c) => c.name === fullName);
-  return match ? match.shortName : fullName;
-};
-const collegeColor = (fullName) => {
-  const match = COLLEGES.find((c) => c.name === fullName);
-  return match ? match.color : "inherit";
-};
-
 const TYPE_META = {
   important: { label: "Important", icon: AlertCircleIcon, iconClass: "ann-icon-important", badgeClass: "ann-badge-important" },
-  event: { label: "Event", icon: CalendarIcon, iconClass: "ann-icon-event", badgeClass: "ann-badge-event" },
-  reminder: { label: "Reminder", icon: BellIcon, iconClass: "ann-icon-reminder", badgeClass: "ann-badge-reminder" },
-  general: { label: "General", icon: InfoIcon, iconClass: "ann-icon-general", badgeClass: "ann-badge-general" },
+  event:     { label: "Event",     icon: CalendarIcon,    iconClass: "ann-icon-event",     badgeClass: "ann-badge-event"     },
+  reminder:  { label: "Reminder",  icon: BellIcon,        iconClass: "ann-icon-reminder",  badgeClass: "ann-badge-reminder"  },
+  general:   { label: "General",   icon: InfoIcon,        iconClass: "ann-icon-general",   badgeClass: "ann-badge-general"   },
 };
 
-const SEED_ANNOUNCEMENTS = [
-  { id: "1", title: "Enrollment Period for Second Semester", content: "The enrollment period for the Second Semester AY 2025-2026 will be from April 1-15, 2026. Please prepare all necessary documents and settle any outstanding balances before enrollment.", college: "College of Computing Studies", type: "important", date: "2026-03-25", isPinned: true, createdBy: "Prof. Ana Santos", status: "active" },
-  { id: "2", title: "System Maintenance Notice", content: "The OAMS system will undergo scheduled maintenance on March 29, 2026, from 12:00 AM to 6:00 AM. Services will be temporarily unavailable during this period.", college: "All Departments", type: "important", date: "2026-03-26", isPinned: true, createdBy: "Admin Office", status: "active" },
-  { id: "3", title: "Career Fair 2026", content: "Join us for the University Career Fair on April 10, 2026, at the University Gymnasium. Meet with potential employers and learn about career opportunities.", college: "College of Business Accountancy and Administration", type: "event", date: "2026-03-24", isPinned: false, createdBy: "Prof. Maria Cruz", status: "active" },
-  { id: "4", title: "Thesis Defense Schedule", content: "Final thesis defense schedules for graduating students are now available. Please check with your respective department offices for your assigned date and time.", college: "College of Engineering", type: "reminder", date: "2026-03-23", isPinned: false, createdBy: "Prof. Pedro Reyes", status: "active" },
-  { id: "5", title: "Scholarship Application Open", content: "Scholarship applications for Academic Year 2026-2027 are now open. Deadline for submission is April 30, 2026. Visit the Scholarship Office for more details.", college: "All Departments", type: "general", date: "2026-03-22", isPinned: false, createdBy: "Scholarship Office", status: "active" },
-  { id: "6", title: "Library Extended Hours", content: "The University Library will extend its operating hours during the examination period. Open from 7:00 AM to 10:00 PM starting April 1, 2026.", college: "All Departments", type: "general", date: "2026-03-21", isPinned: false, createdBy: "Library Staff", status: "active" },
-  { id: "7", title: "Health and Wellness Week", content: "Join us for Health and Wellness Week from April 5-9, 2026. Free health screenings, fitness activities, and mental health awareness programs will be available.", college: "College of Health and Allied Sciences", type: "event", date: "2026-03-20", isPinned: false, createdBy: "Prof. Lisa Santos", status: "active" },
-  { id: "8", title: "Clearance Processing Reminder", content: "Graduating students are reminded to start their clearance processing. Please settle all obligations and return borrowed items to avoid delays.", college: "All Departments", type: "reminder", date: "2026-03-19", isPinned: false, createdBy: "Registrar Office", status: "active" },
-  { id: "9", title: "Research Symposium", content: "The Annual Research Symposium will be held on April 15, 2026. Students are encouraged to attend and learn from research presentations across all disciplines.", college: "College of Arts and Sciences", type: "event", date: "2026-03-18", isPinned: false, createdBy: "Prof. Sofia Cruz", status: "active" },
-  { id: "10", title: "Student Council Elections", content: "Filing of candidacy for Student Council Elections is now open until April 5, 2026. Voting will take place on April 20-22, 2026.", college: "All Departments", type: "general", date: "2026-03-17", isPinned: false, createdBy: "Student Affairs", status: "active" },
-  { id: "11", title: "Practicum Orientation", content: "Mandatory practicum orientation for Education students will be held on April 8, 2026, at 2:00 PM in the AVR. Attendance is required.", college: "College of Education", type: "important", date: "2026-03-16", isPinned: false, createdBy: "Prof. Maria Lopez", status: "active" },
-  { id: "12", title: "No Classes on April 9", content: "In observance of the Day of Valor, there will be no classes on April 9, 2026. Regular schedule resumes on April 10, 2026.", college: "All Departments", type: "general", date: "2026-03-15", isPinned: false, createdBy: "Admin Office", status: "active" },
-];
-
-const EMPTY_FORM = { title: "", content: "", type: "general", college: "All Departments", isPinned: false };
+const EMPTY_FORM = { title: "", content: "", type: "general", isPinned: false };
 
 const formatDate = (iso) => {
   try {
@@ -230,47 +211,31 @@ const formatDate = (iso) => {
 export default function AdminAnnouncements() {
   const { user: authUser, logout } = useAuth();
   const user = authUser
-    ? {
-        ...authUser,
-        college: authUser.departmentName ?? "N/A College",
-        departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
-      }
+    ? { ...authUser, college: authUser.departmentName ?? "N/A College", departmentAbbrev: authUser.departmentAbbrev ?? "CCS" }
     : { name: "Admin", college: "", departmentAbbrev: "CCS" };
 
   const navigate = useNavigate();
 
-  // ── Sidebar / theme / chat — identical pattern to admin_dashboard ───────
+  // ── Sidebar / theme / chat ─────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. Ask me about announcements, pinning, or filters.",
-      timestamp: new Date(),
-    },
+    { id: 1, type: "bot", text: "Hello! 👋 I'm your OAMS Assistant. Ask me about announcements, pinning, or filters.", timestamp: new Date() },
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-  useEffect(() => {
-    applyTheme(isDark ? "dark" : "light");
-  }, [isDark]);
+  // ── Logout confirmation ────────────────────────────────────────────────────
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
+
   const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
+    setIsDark((prev) => { const next = !prev; applyTheme(next ? "dark" : "light"); return next; });
   };
 
   const generateBotResponse = (input) => {
@@ -279,9 +244,8 @@ export default function AdminAnnouncements() {
     if (i.includes("archive")) return "Archiving moves an announcement out of the active list. You can restore it anytime from the Archived tab.";
     if (i.includes("delete")) return "Deleting an archived announcement removes it permanently — this can't be undone.";
     if (i.includes("filter") || i.includes("college") || i.includes("type"))
-      return "Use the search bar and the College / Type dropdowns above the list to narrow down announcements.";
-    if (i.includes("create") || i.includes("new"))
-      return "Click 'New Announcement' at the top right to publish a new one.";
+      return "Use the search bar and the Type dropdown above the list to narrow down announcements.";
+    if (i.includes("create") || i.includes("new")) return "Click 'New Announcement' at the top right to publish a new one.";
     return "I can help with creating, pinning, filtering, archiving, or deleting announcements. What do you need?";
   };
 
@@ -298,17 +262,17 @@ export default function AdminAnnouncements() {
   };
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
-    { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
+    { icon: HomeIcon,        label: "Dashboard",    path: "/admin/dashboard"    },
+    { icon: QueueIconNav,    label: "Queue",        path: "/admin/queue"        },
     { icon: CalendarIconNav, label: "Appointments", path: "/admin/appointments" },
-    { icon: DocumentIconNav, label: "Documents", path: "/admin/documents" },
-    { icon: HistoryIconNav, label: "Transactions", path: "/admin/transactions" },
+    { icon: DocumentIconNav, label: "Documents",    path: "/admin/documents"    },
+    { icon: HistoryIconNav,  label: "Transactions", path: "/admin/transactions" },
   ];
 
-  // ── Announcements state ──────────────────────────────────────────────────
-  const [announcements, setAnnouncements] = useState(SEED_ANNOUNCEMENTS);
+  // ── Announcements state ────────────────────────────────────────────────────
+  const [announcements, setAnnouncements] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCollege, setSelectedCollege] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
   const [activeTab, setActiveTab] = useState("active");
 
@@ -325,107 +289,151 @@ export default function AdminAnnouncements() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
   };
 
+  // ── Fetch from API ─────────────────────────────────────────────────────────
+  const fetchAnnouncements = async () => {
+    setIsLoading(true);
+    try {
+      const { data } = await api.get("/admin/announcements");
+      setAnnouncements(data.announcements || []);
+    } catch (err) {
+      console.error("Failed to load announcements:", err);
+      showToast("Failed to load announcements", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchAnnouncements(); }, []);
+
+  // ── Derived stats ──────────────────────────────────────────────────────────
   const stats = {
-    total: announcements.filter((a) => a.status === "active").length,
-    pinned: announcements.filter((a) => a.isPinned && a.status === "active").length,
+    total:     announcements.filter((a) => a.status === "active").length,
+    pinned:    announcements.filter((a) => a.isPinned && a.status === "active").length,
     important: announcements.filter((a) => a.type === "important" && a.status === "active").length,
-    archived: announcements.filter((a) => a.status === "archived").length,
+    archived:  announcements.filter((a) => a.status === "archived").length,
   };
 
   const getFiltered = (status) => {
     let list = announcements.filter((a) => a.status === status);
     if (selectedType !== "all") list = list.filter((a) => a.type === selectedType);
-    if (selectedCollege !== "all") list = list.filter((a) => a.college === selectedCollege);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (a) =>
           a.title.toLowerCase().includes(q) ||
           a.content.toLowerCase().includes(q) ||
-          a.createdBy.toLowerCase().includes(q)
+          (a.createdBy || "").toLowerCase().includes(q),
       );
     }
-    // pinned items float to the top within the active list
     return [...list].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
   };
 
-  const handleTogglePin = (id) => {
-    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, isPinned: !a.isPinned } : a)));
-    showToast("Pin status updated");
+  // ── CRUD handlers ──────────────────────────────────────────────────────────
+  const handleTogglePin = async (id) => {
+    try {
+      const { data } = await api.patch(`/admin/announcements/${id}/pin`);
+      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, isPinned: data.isPinned } : a)));
+      showToast("Pin status updated");
+    } catch {
+      showToast("Failed to update pin status", "error");
+    }
   };
-  const handleArchive = (id) => {
-    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: "archived" } : a)));
-    showToast("Announcement archived");
+
+  const handleArchive = async (id) => {
+    try {
+      await api.patch(`/admin/announcements/${id}/archive`);
+      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: "archived" } : a)));
+      showToast("Announcement archived");
+    } catch {
+      showToast("Failed to archive announcement", "error");
+    }
   };
-  const handleRestore = (id) => {
-    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: "active" } : a)));
-    showToast("Announcement restored");
+
+  const handleRestore = async (id) => {
+    try {
+      await api.patch(`/admin/announcements/${id}/restore`);
+      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: "active" } : a)));
+      showToast("Announcement restored");
+    } catch {
+      showToast("Failed to restore announcement", "error");
+    }
   };
-  const handleDelete = (id) => {
+
+  const handleDelete = async (id) => {
     if (!window.confirm("Delete this announcement permanently? This can't be undone.")) return;
-    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
-    showToast("Announcement deleted permanently");
+    try {
+      await api.delete(`/admin/announcements/${id}`);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      showToast("Announcement deleted permanently");
+    } catch {
+      showToast("Failed to delete announcement", "error");
+    }
   };
 
   const openEdit = (announcement) => {
     setEditingAnnouncement(announcement);
-    setEditForm({
-      title: announcement.title,
-      content: announcement.content,
-      type: announcement.type,
-      college: announcement.college,
-      isPinned: announcement.isPinned,
-    });
+    setEditForm({ title: announcement.title, content: announcement.content, type: announcement.type, isPinned: announcement.isPinned });
   };
-  const closeEdit = () => {
-    setEditingAnnouncement(null);
-    setEditForm(EMPTY_FORM);
-  };
-  const saveEdit = () => {
+  const closeEdit = () => { setEditingAnnouncement(null); setEditForm(EMPTY_FORM); };
+
+  const saveEdit = async () => {
     if (!editForm.title.trim() || !editForm.content.trim()) {
       showToast("Please fill in all required fields", "error");
       return;
     }
-    setAnnouncements((prev) =>
-      prev.map((a) =>
-        a.id === editingAnnouncement.id
-          ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, college: editForm.college }
-          : a
-      )
-    );
-    showToast("Announcement updated successfully");
-    closeEdit();
+    try {
+      await api.put(`/admin/announcements/${editingAnnouncement.id}`, {
+        title: editForm.title,
+        content: editForm.content,
+        type: editForm.type,
+      });
+      setAnnouncements((prev) =>
+        prev.map((a) =>
+          a.id === editingAnnouncement.id
+            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type }
+            : a,
+        ),
+      );
+      showToast("Announcement updated successfully");
+      closeEdit();
+    } catch {
+      showToast("Failed to update announcement", "error");
+    }
   };
 
-  const closeCreate = () => {
-    setIsCreating(false);
-    setCreateForm(EMPTY_FORM);
-  };
-  const saveCreate = () => {
+  const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_FORM); };
+
+  const saveCreate = async () => {
     if (!createForm.title.trim() || !createForm.content.trim()) {
       showToast("Please fill in all required fields", "error");
       return;
     }
-    const newAnnouncement = {
-      id: String(Date.now()),
-      title: createForm.title,
-      content: createForm.content,
-      type: createForm.type,
-      college: createForm.college,
-      date: new Date().toISOString(),
-      isPinned: createForm.isPinned,
-      createdBy: user?.name || "Admin Office",
-      status: "active",
-    };
-    setAnnouncements((prev) => [newAnnouncement, ...prev]);
-    showToast("Announcement created successfully");
-    closeCreate();
+    try {
+      const { data } = await api.post("/admin/announcements", {
+        title:    createForm.title,
+        content:  createForm.content,
+        type:     createForm.type,
+        isPinned: createForm.isPinned,
+      });
+      setAnnouncements((prev) => [data.announcement, ...prev]);
+      showToast("Announcement created successfully");
+      closeCreate();
+    } catch {
+      showToast("Failed to create announcement", "error");
+    }
   };
 
   const list = getFiltered(activeTab);
 
   return (
     <div className="admin-dashboard-with-sidebar">
+      {/* Logout Confirmation */}
+      <LogoutConfirmModal
+        show={showLogoutConfirm}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+
       {/* Toasts */}
       <div className="ann-toast-stack">
         {toasts.map((t) => (
@@ -480,20 +488,13 @@ export default function AdminAnnouncements() {
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
               <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
             </div>
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
+            <button className="theme-toggle-btn" onClick={toggleDarkMode} aria-label="Toggle dark mode" title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}>
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
           </div>
           <div className="sidebar-user-section">
             <div className="user-top-row">
-              <div className="user-avatar-large">
-                <UserIcon />
-              </div>
+              <div className="user-avatar-large"><UserIcon /></div>
               <div className="user-info-content">
                 <p className="user-name-large">{user?.name}</p>
                 <span className="user-role-badge">Administrator</span>
@@ -543,11 +544,19 @@ export default function AdminAnnouncements() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="ann-page">
+          {/* Back button */}
+          <button className="ann-back-btn" onClick={() => navigate("/admin/dashboard")}>
+            <ChevronLeftIcon />
+            Back to Dashboard
+          </button>
+
           {/* Header */}
           <div className="ann-header-row">
             <div>
               <h1 className="ann-page-title">Announcements Management</h1>
-              <p className="ann-page-subtitle">Manage system-wide announcements across all colleges</p>
+              <p className="ann-page-subtitle">
+                Manage announcements for {user?.college || "your department"}
+              </p>
             </div>
             <button className="ann-btn-new" onClick={() => setIsCreating(true)}>
               <PlusIconSmall />
@@ -558,31 +567,19 @@ export default function AdminAnnouncements() {
           {/* Stats */}
           <div className="ann-stats-grid">
             <div className="ann-stat-card ann-stat-total">
-              <div>
-                <p className="ann-stat-label">Total Active</p>
-                <p className="ann-stat-value">{stats.total}</p>
-              </div>
+              <div><p className="ann-stat-label">Total Active</p><p className="ann-stat-value">{stats.total}</p></div>
               <MegaphoneIcon className="ann-stat-icon" />
             </div>
             <div className="ann-stat-card ann-stat-pinned">
-              <div>
-                <p className="ann-stat-label">Pinned</p>
-                <p className="ann-stat-value">{stats.pinned}</p>
-              </div>
+              <div><p className="ann-stat-label">Pinned</p><p className="ann-stat-value">{stats.pinned}</p></div>
               <PinIcon className="ann-stat-icon" />
             </div>
             <div className="ann-stat-card ann-stat-important">
-              <div>
-                <p className="ann-stat-label">Important</p>
-                <p className="ann-stat-value">{stats.important}</p>
-              </div>
+              <div><p className="ann-stat-label">Important</p><p className="ann-stat-value">{stats.important}</p></div>
               <AlertCircleIcon className="ann-stat-icon" />
             </div>
             <div className="ann-stat-card ann-stat-archived">
-              <div>
-                <p className="ann-stat-label">Archived</p>
-                <p className="ann-stat-value">{stats.archived}</p>
-              </div>
+              <div><p className="ann-stat-label">Archived</p><p className="ann-stat-value">{stats.archived}</p></div>
               <XIcon className="ann-stat-icon" />
             </div>
           </div>
@@ -598,15 +595,6 @@ export default function AdminAnnouncements() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <select className="ann-select" value={selectedCollege} onChange={(e) => setSelectedCollege(e.target.value)}>
-              <option value="all">All Colleges</option>
-              <option value="All Departments">All Departments</option>
-              {COLLEGES.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.shortName}
-                </option>
-              ))}
-            </select>
             <select className="ann-select" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
               <option value="all">All Types</option>
               <option value="important">Important</option>
@@ -619,8 +607,8 @@ export default function AdminAnnouncements() {
           {/* List */}
           <div className="ann-list-card">
             <div className="ann-list-header">
-              <h2>All Announcements</h2>
-              <p>View and manage all system announcements</p>
+              <h2>Announcements — {user?.college || "Your Department"}</h2>
+              <p>View and manage your department's announcements</p>
             </div>
 
             <div className="ann-tabs">
@@ -632,76 +620,78 @@ export default function AdminAnnouncements() {
               </button>
             </div>
 
-            <div className="ann-items">
-              {list.length === 0 ? (
-                <div className="ann-empty">
-                  <MegaphoneIcon />
-                  <p>No {activeTab} announcements found.</p>
-                </div>
-              ) : (
-                list.map((a) => {
-                  const meta = TYPE_META[a.type] || TYPE_META.general;
-                  const TypeIcon = meta.icon;
-                  return (
-                    <div key={a.id} className={`ann-item ${a.isPinned ? "ann-item-pinned" : ""}`}>
-                      <div className={`ann-item-icon ${meta.iconClass}`}>
-                        <TypeIcon />
-                      </div>
-                      <div className="ann-item-body">
-                        <div className="ann-item-top">
-                          <div className="ann-item-title-row">
-                            <h3 className="ann-item-title">{a.title}</h3>
-                            {a.isPinned && <PinIcon className="ann-pin-flag" />}
+            {isLoading ? (
+              <div className="ann-loading">
+                <div className="ann-loading-spinner" />
+                <p>Loading announcements…</p>
+              </div>
+            ) : (
+              <div className="ann-items">
+                {list.length === 0 ? (
+                  <div className="ann-empty">
+                    <MegaphoneIcon />
+                    <p>No {activeTab} announcements found.</p>
+                  </div>
+                ) : (
+                  list.map((a) => {
+                    const meta = TYPE_META[a.type] || TYPE_META.general;
+                    const TypeIcon = meta.icon;
+                    return (
+                      <div key={a.id} className={`ann-item ${a.isPinned ? "ann-item-pinned" : ""}`}>
+                        <div className={`ann-item-icon ${meta.iconClass}`}>
+                          <TypeIcon />
+                        </div>
+                        <div className="ann-item-body">
+                          <div className="ann-item-top">
+                            <div className="ann-item-title-row">
+                              <h3 className="ann-item-title">{a.title}</h3>
+                              {a.isPinned && <PinIcon className="ann-pin-flag" />}
+                            </div>
+                            <span className={`ann-badge ${meta.badgeClass}`}>{meta.label}</span>
                           </div>
-                          <span className={`ann-badge ${meta.badgeClass}`}>{meta.label}</span>
-                        </div>
-                        <p className="ann-item-desc">{a.content}</p>
-                        <div className="ann-item-meta">
-                          <span>
-                            <CalendarIcon />
-                            {formatDate(a.date)}
-                          </span>
-                          <span>•</span>
-                          <span style={{ color: collegeColor(a.college) }}>{collegeShort(a.college)}</span>
-                          <span>•</span>
-                          <span>By: {a.createdBy}</span>
-                        </div>
-                        <div className="ann-item-actions">
-                          <button className="ann-action-btn" onClick={() => setViewingAnnouncement(a)}>
-                            <EyeIcon /> View
-                          </button>
-                          <button className="ann-action-btn" onClick={() => openEdit(a)}>
-                            <img src={editIcon} alt="" /> Edit
-                          </button>
-                          {a.status === "active" ? (
-                            <>
-                              <button
-                                className={`ann-action-btn ${a.isPinned ? "ann-action-pin-on" : ""}`}
-                                onClick={() => handleTogglePin(a.id)}
-                              >
-                                <PinIcon /> {a.isPinned ? "Unpin" : "Pin"}
-                              </button>
-                              <button className="ann-action-btn ann-action-archive" onClick={() => handleArchive(a.id)}>
-                                <img src={deleteIcon} alt="" /> Archive
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button className="ann-action-btn ann-action-restore" onClick={() => handleRestore(a.id)}>
-                                Restore
-                              </button>
-                              <button className="ann-action-btn ann-action-delete" onClick={() => handleDelete(a.id)}>
-                                <img src={deleteIcon} alt="" /> Delete
-                              </button>
-                            </>
-                          )}
+                          <p className="ann-item-desc">{a.content}</p>
+                          <div className="ann-item-meta">
+                            <span><CalendarIcon />{formatDate(a.date)}</span>
+                            <span>•</span>
+                            <span>By: {a.createdBy || "Admin Office"}</span>
+                          </div>
+                          <div className="ann-item-actions">
+                            <button className="ann-action-btn" onClick={() => setViewingAnnouncement(a)}>
+                              <EyeIcon /> View
+                            </button>
+                            <button className="ann-action-btn" onClick={() => openEdit(a)}>
+                              <img src={editIcon} alt="" /> Edit
+                            </button>
+                            {a.status === "active" ? (
+                              <>
+                                <button
+                                  className={`ann-action-btn ${a.isPinned ? "ann-action-pin-on" : ""}`}
+                                  onClick={() => handleTogglePin(a.id)}
+                                >
+                                  <PinIcon /> {a.isPinned ? "Unpin" : "Pin"}
+                                </button>
+                                <button className="ann-action-btn ann-action-archive" onClick={() => handleArchive(a.id)}>
+                                  <img src={deleteIcon} alt="" /> Archive
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button className="ann-action-btn ann-action-restore" onClick={() => handleRestore(a.id)}>
+                                  Restore
+                                </button>
+                                <button className="ann-action-btn ann-action-delete" onClick={() => handleDelete(a.id)}>
+                                  <img src={deleteIcon} alt="" /> Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -714,9 +704,7 @@ export default function AdminAnnouncements() {
           <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ann-modal-header">
               <div>
-                <h3 className="ann-modal-title">
-                  <EyeIcon /> Announcement Details
-                </h3>
+                <h3 className="ann-modal-title"><EyeIcon /> Announcement Details</h3>
                 <p className="ann-modal-desc">View complete information about this announcement</p>
               </div>
               <button className="ann-modal-close" onClick={() => setViewingAnnouncement(null)} aria-label="Close">
@@ -727,38 +715,25 @@ export default function AdminAnnouncements() {
             <div className="ann-view-banner">
               <div>
                 <h2>{viewingAnnouncement.title}</h2>
-                <div className="ann-view-banner-date">
-                  <CalendarIcon />
-                  {formatDate(viewingAnnouncement.date)}
-                </div>
+                <div className="ann-view-banner-date"><CalendarIcon />{formatDate(viewingAnnouncement.date)}</div>
               </div>
               <div className="ann-view-banner-badges">
                 <span className={`ann-badge ${TYPE_META[viewingAnnouncement.type].badgeClass}`}>
                   {TYPE_META[viewingAnnouncement.type].label}
                 </span>
                 {viewingAnnouncement.isPinned && (
-                  <span className="ann-pinned-pill">
-                    <PinIcon /> Pinned
-                  </span>
+                  <span className="ann-pinned-pill"><PinIcon /> Pinned</span>
                 )}
               </div>
             </div>
 
             <p className="ann-view-label">Content</p>
-            <div className="ann-view-block">
-              <p>{viewingAnnouncement.content}</p>
-            </div>
+            <div className="ann-view-block"><p>{viewingAnnouncement.content}</p></div>
 
             <div className="ann-view-grid">
               <div>
-                <p className="ann-view-label">College / Department</p>
-                <p className="ann-view-value" style={{ color: collegeColor(viewingAnnouncement.college) }}>
-                  {collegeShort(viewingAnnouncement.college)}
-                </p>
-              </div>
-              <div>
                 <p className="ann-view-label">Created By</p>
-                <p className="ann-view-value">{viewingAnnouncement.createdBy}</p>
+                <p className="ann-view-value">{viewingAnnouncement.createdBy || "Admin Office"}</p>
               </div>
               <div>
                 <p className="ann-view-label">Status</p>
@@ -775,19 +750,10 @@ export default function AdminAnnouncements() {
             </div>
 
             <div className="ann-modal-footer">
-              <button
-                className="ann-btn-secondary"
-                onClick={() => {
-                  const a = viewingAnnouncement;
-                  setViewingAnnouncement(null);
-                  openEdit(a);
-                }}
-              >
+              <button className="ann-btn-secondary" onClick={() => { const a = viewingAnnouncement; setViewingAnnouncement(null); openEdit(a); }}>
                 Edit Announcement
               </button>
-              <button className="ann-btn-primary" onClick={() => setViewingAnnouncement(null)}>
-                Close
-              </button>
+              <button className="ann-btn-primary" onClick={() => setViewingAnnouncement(null)}>Close</button>
             </div>
           </div>
         </div>
@@ -802,28 +768,16 @@ export default function AdminAnnouncements() {
                 <h3 className="ann-modal-title">Edit Announcement</h3>
                 <p className="ann-modal-desc">Make changes and save when you're done.</p>
               </div>
-              <button className="ann-modal-close" onClick={closeEdit} aria-label="Close">
-                <XIcon />
-              </button>
+              <button className="ann-modal-close" onClick={closeEdit} aria-label="Close"><XIcon /></button>
             </div>
 
             <div className="ann-field">
               <label htmlFor="edit-title">Title *</label>
-              <input
-                id="edit-title"
-                className="ann-input"
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-              />
+              <input id="edit-title" className="ann-input" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
             </div>
             <div className="ann-field">
               <label htmlFor="edit-content">Content *</label>
-              <textarea
-                id="edit-content"
-                className="ann-textarea"
-                value={editForm.content}
-                onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
-              />
+              <textarea id="edit-content" className="ann-textarea" value={editForm.content} onChange={(e) => setEditForm({ ...editForm, content: e.target.value })} />
             </div>
             <div className="ann-field-row">
               <div className="ann-field">
@@ -835,31 +789,11 @@ export default function AdminAnnouncements() {
                   <option value="reminder">Reminder</option>
                 </select>
               </div>
-              <div className="ann-field">
-                <label htmlFor="edit-college">College/Department *</label>
-                <select
-                  id="edit-college"
-                  className="ann-select"
-                  value={editForm.college}
-                  onChange={(e) => setEditForm({ ...editForm, college: e.target.value })}
-                >
-                  <option value="All Departments">All Departments</option>
-                  {COLLEGES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.shortName}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             <div className="ann-modal-footer">
-              <button className="ann-btn-secondary" onClick={closeEdit}>
-                Cancel
-              </button>
-              <button className="ann-btn-primary" onClick={saveEdit}>
-                <CheckCircleIcon /> Save Changes
-              </button>
+              <button className="ann-btn-secondary" onClick={closeEdit}>Cancel</button>
+              <button className="ann-btn-primary" onClick={saveEdit}><CheckCircleIcon /> Save Changes</button>
             </div>
           </div>
         </div>
@@ -871,45 +805,24 @@ export default function AdminAnnouncements() {
           <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ann-modal-header">
               <div>
-                <h3 className="ann-modal-title">
-                  <PlusIconSmall /> New Announcement
-                </h3>
-                <p className="ann-modal-desc">Create a new announcement and save when you're done.</p>
+                <h3 className="ann-modal-title"><PlusIconSmall /> New Announcement</h3>
+                <p className="ann-modal-desc">Create a new announcement for your department.</p>
               </div>
-              <button className="ann-modal-close" onClick={closeCreate} aria-label="Close">
-                <XIcon />
-              </button>
+              <button className="ann-modal-close" onClick={closeCreate} aria-label="Close"><XIcon /></button>
             </div>
 
             <div className="ann-field">
               <label htmlFor="create-title">Title *</label>
-              <input
-                id="create-title"
-                className="ann-input"
-                placeholder="Enter announcement title"
-                value={createForm.title}
-                onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
-              />
+              <input id="create-title" className="ann-input" placeholder="Enter announcement title" value={createForm.title} onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })} />
             </div>
             <div className="ann-field">
               <label htmlFor="create-content">Content *</label>
-              <textarea
-                id="create-content"
-                className="ann-textarea"
-                placeholder="Enter announcement content"
-                value={createForm.content}
-                onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })}
-              />
+              <textarea id="create-content" className="ann-textarea" placeholder="Enter announcement content" value={createForm.content} onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })} />
             </div>
             <div className="ann-field-row">
               <div className="ann-field">
                 <label htmlFor="create-type">Type *</label>
-                <select
-                  id="create-type"
-                  className="ann-select"
-                  value={createForm.type}
-                  onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}
-                >
+                <select id="create-type" className="ann-select" value={createForm.type} onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}>
                   <option value="general">General</option>
                   <option value="important">Important</option>
                   <option value="event">Event</option>
@@ -917,42 +830,17 @@ export default function AdminAnnouncements() {
                 </select>
               </div>
               <div className="ann-field">
-                <label htmlFor="create-college">College/Department *</label>
-                <select
-                  id="create-college"
-                  className="ann-select"
-                  value={createForm.college}
-                  onChange={(e) => setCreateForm({ ...createForm, college: e.target.value })}
-                >
-                  <option value="All Departments">All Departments</option>
-                  {COLLEGES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.shortName}
-                    </option>
-                  ))}
+                <label htmlFor="create-pinned">Pin Announcement</label>
+                <select id="create-pinned" className="ann-select" value={createForm.isPinned ? "true" : "false"} onChange={(e) => setCreateForm({ ...createForm, isPinned: e.target.value === "true" })}>
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
                 </select>
               </div>
             </div>
-            <div className="ann-field">
-              <label htmlFor="create-pinned">Pin Announcement</label>
-              <select
-                id="create-pinned"
-                className="ann-select"
-                value={createForm.isPinned ? "true" : "false"}
-                onChange={(e) => setCreateForm({ ...createForm, isPinned: e.target.value === "true" })}
-              >
-                <option value="false">No</option>
-                <option value="true">Yes</option>
-              </select>
-            </div>
 
             <div className="ann-modal-footer">
-              <button className="ann-btn-secondary" onClick={closeCreate}>
-                Cancel
-              </button>
-              <button className="ann-btn-primary" onClick={saveCreate}>
-                <CheckCircleIcon /> Save Announcement
-              </button>
+              <button className="ann-btn-secondary" onClick={closeCreate}>Cancel</button>
+              <button className="ann-btn-primary" onClick={saveCreate}><CheckCircleIcon /> Save Announcement</button>
             </div>
           </div>
         </div>

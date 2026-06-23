@@ -115,10 +115,13 @@ CREATE TABLE login_logs (
 -- 5. SERVICES & REQUIREMENTS (queue only)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE services (
-    service_id      INT          AUTO_INCREMENT PRIMARY KEY,
-    service_name    VARCHAR(100) NOT NULL,
-    description     TEXT,
-    department_id   INT          NOT NULL,
+    service_id            INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name          VARCHAR(100) NOT NULL,
+    description           TEXT,
+    department_id         INT          NOT NULL,
+    status                ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    average_service_time  INT          NOT NULL DEFAULT 15,
+    auto_close            BOOLEAN      NOT NULL DEFAULT TRUE,
     FOREIGN KEY (department_id) REFERENCES departments(department_id)
 );
 
@@ -147,11 +150,24 @@ CREATE TABLE appointment_services (
 -- 5c. DOCUMENT SERVICES (document requests only)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE document_services (
-    service_id      INT          AUTO_INCREMENT PRIMARY KEY,
-    service_name    VARCHAR(100) NOT NULL,
-    description     TEXT,
-    department_id   INT          NOT NULL,
+    service_id       INT          AUTO_INCREMENT PRIMARY KEY,
+    service_name     VARCHAR(100) NOT NULL,
+    description      TEXT,
+    department_id    INT          NOT NULL,
+    status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    fee              DECIMAL(10,2) NOT NULL DEFAULT 0,
+    processing_time  VARCHAR(100) NULL,
     FOREIGN KEY (department_id) REFERENCES departments(department_id)
+);
+
+CREATE TABLE document_requirements (
+    requirement_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    service_id       INT          NOT NULL,
+    requirement_name VARCHAR(255) NOT NULL,
+    description      TEXT,
+    is_mandatory     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES document_services(service_id) ON DELETE CASCADE
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -328,6 +344,9 @@ CREATE TABLE faqs (
     faq_id          INT          AUTO_INCREMENT PRIMARY KEY,
     question        TEXT         NOT NULL,
     answer          TEXT         NOT NULL,
+    type            ENUM('important','event','reminder','general') NOT NULL DEFAULT 'general',
+    status          ENUM('active','archived')                      NOT NULL DEFAULT 'active',
+    created_by      VARCHAR(255) NULL,
     is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
     department_id   INT          NULL,   -- NULL = global announcement
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,

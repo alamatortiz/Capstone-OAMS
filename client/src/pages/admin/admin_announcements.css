@@ -798,3 +798,46 @@
   font-size: 0.85rem;
   text-align: left;
 }
+
+/* ===== Back button ===== */
+.ann-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  align-self: flex-start;
+}
+.ann-back-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+/* ===== Loading state ===== */
+.ann-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+}
+.ann-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border, #e5e7eb);
+  border-top-color: var(--accent, #f97316);
+  border-radius: 50%;
+  animation: ann-spin 0.7s linear infinite;
+}
+@keyframes ann-spin {
+  to { transform: rotate(360deg); }
+}

@@ -6,6 +6,7 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_user_management.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 
 // ─── Shared Layout Icons ──────────────────────────────────────────────────────
 const ChatIcon = () => (
@@ -219,7 +220,9 @@ export default function AdminUserManagement() {
   useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
 
   // ── Handlers: layout ────────────────────────────────────────────────────────
-  const handleLogout = () => { logout(); navigate("/login"); };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
   const toggleDarkMode = () => setIsDark((p) => { const n = !p; applyTheme(n ? "dark" : "light"); return n; });
 
   // ── Handlers: chat ───────────────────────────────────────────────────────────
@@ -314,6 +317,7 @@ export default function AdminUserManagement() {
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="admin-dashboard-with-sidebar">
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
 
       {/* ── AI Chatbot ─────────────────────────────────────────────────────────── */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
@@ -397,6 +401,7 @@ export default function AdminUserManagement() {
       {/* ── Main Content ───────────────────────────────────────────────────────── */}
       <main className="admin-dashboard-main">
         <div className="aum-content">
+          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
 
           {/* Header Banner */}
           <div className="aum-header">

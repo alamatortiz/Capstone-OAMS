@@ -34,6 +34,7 @@ TRUNCATE TABLE queue_status_logs;
 TRUNCATE TABLE queues;
 TRUNCATE TABLE queue_slots;
 TRUNCATE TABLE service_requirements;
+TRUNCATE TABLE document_requirements;
 TRUNCATE TABLE appointment_services;
 TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
@@ -341,13 +342,13 @@ INSERT INTO students (student_id, student_number, first_name, last_name, course,
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5 · SERVICES (queue only)
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO services (service_id, service_name, description, department_id) VALUES
-(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001),
-(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001),
-(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001),
-(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001),
-(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001),
-(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001);
+INSERT INTO services (service_id, service_name, description, department_id, status, average_service_time, auto_close) VALUES
+(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001, 'active', 20, TRUE),
+(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001, 'active', 15, TRUE),
+(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, 'active', 10, TRUE),
+(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, 'active', 15, FALSE),
+(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, 'active', 10, TRUE),
+(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 'active', 30, FALSE);
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5b · APPOINTMENT SERVICES (created by faculty)
@@ -364,11 +365,11 @@ INSERT INTO appointment_services (service_id, service_name, description, faculty
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5c · DOCUMENT SERVICES
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO document_services (service_id, service_name, description, department_id) VALUES
-(1, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001),
-(2, 'Transcript of Records',     'Request for official Transcript of Records',      1001),
-(3, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001),
-(4, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001);
+INSERT INTO document_services (service_id, service_name, description, department_id, status, fee, processing_time) VALUES
+(1, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, 'active',  75.00, '2-3 business days'),
+(2, 'Transcript of Records',     'Request for official Transcript of Records',      1001, 'active', 150.00, '5-7 business days'),
+(3, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, 'active',  50.00, '1-2 business days'),
+(4, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 'active',   0.00, '3-5 business days');
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -457,28 +458,28 @@ INSERT INTO document_requests (request_id, student_id, service_id, request_type,
 -- Used by the admin dashboard announcements card.
 -- department_id NULL = global/cross-department announcement.
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO faqs (faq_id, question, answer, is_pinned, department_id) VALUES
+INSERT INTO faqs (faq_id, question, answer, type, status, created_by, is_pinned, department_id) VALUES
 (1, 'How do I request a Good Moral Certificate?',
    'Submit a document request through the OAMS portal under Document Requests. Processing takes 3–5 business days. Claim your document at the CCS office upon notification.',
-   FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001),
 (2, 'How do I book a consultation with my professor?',
    'Go to Appointments in your student dashboard, select your professor, choose an available time slot, and submit your request. You will be notified once the professor approves.',
-   FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001),
 (3, 'How does the online queue work?',
    'Join a queue from the Queue section of your dashboard. You will receive a queue number and can monitor your position in real time. Proceed to the office when you are called.',
-   FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001),
 (4, 'What documents are required for enrollment assistance?',
    'Bring your registration form, previous grades, and any outstanding clearance slips. Visit the CCS office or join the Enrollment Assistance queue online.',
-   FALSE, 1001),
+   'reminder', 'active', 'CCS Admin Office', FALSE, 1001),
 (5, 'What are the CCS office hours?',
    'The CCS office is open Monday to Friday, 8:00 AM to 5:00 PM. Queue slots are available from 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM.',
-   FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001),
 (6, 'Enrollment period for AY 2026–2027 is now open.',
    'All students must complete online enrollment via the OAMS portal by June 30, 2026. Walk-in enrollment will not be accommodated after the deadline.',
-   TRUE, NULL),
+   'important', 'active', 'Admin Office', TRUE, NULL),
 (7, 'System maintenance scheduled for June 15, 2026.',
    'OAMS will be unavailable from 12:00 AM to 4:00 AM on June 15, 2026 for scheduled maintenance. Please plan your transactions accordingly.',
-   TRUE, NULL);
+   'important', 'active', 'Admin Office', TRUE, NULL);
 
 
 -- ─────────────────────────────────────────────────────────────

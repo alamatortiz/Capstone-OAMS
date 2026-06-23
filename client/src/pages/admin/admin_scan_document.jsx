@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_scan_document.css";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -366,10 +367,9 @@ export default function AdminScanDocument() {
     });
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -455,6 +455,7 @@ export default function AdminScanDocument() {
 
   return (
     <div className="admin-dashboard-with-sidebar">
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
       {/* AI Chatbot */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
@@ -599,6 +600,7 @@ export default function AdminScanDocument() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="asd-page">
+          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
           {/* Page Title */}
           <div className="asd-page-header">
             <h1 className="asd-page-title">Document Scanner</h1>

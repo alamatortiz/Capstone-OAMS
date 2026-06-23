@@ -8,6 +8,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import editIcon from "../../assets/edit_icon.png";
 import deleteIcon from "../../assets/delete_icon.png";
 import api from "../../utils/api";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 
 // ── Icons (all unchanged from original) ──────────────────────────────────────
 const ChatIcon = () => (
@@ -455,10 +456,10 @@ export default function AdminDashboard() {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
+
   const toggleDarkMode = () => {
     setIsDark((prev) => {
       const next = !prev;
@@ -539,6 +540,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-dashboard-with-sidebar">
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
       {/* AI Chatbot */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (

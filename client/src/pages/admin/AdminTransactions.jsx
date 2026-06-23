@@ -13,6 +13,7 @@ import "./admin_transactions.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
 import api from "../../utils/api";
+import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 
 // ── Icons (all unchanged from admin_dashboard) ──────────────────────────────
 const ChatIcon = () => (
@@ -332,10 +333,9 @@ export default function AdminTransaction() {
   }, [isDark]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const handleLogout = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
   const toggleDarkMode = () => {
     setIsDark((prev) => {
@@ -455,6 +455,7 @@ export default function AdminTransaction() {
 
   return (
     <div className="admin-transaction-with-sidebar">
+      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
       {/* AI Chatbot */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
@@ -603,6 +604,7 @@ export default function AdminTransaction() {
       {/* Main Content */}
       <main className="admin-transaction-main">
         <div className="admin-transaction-container">
+          <button onClick={() => navigate("/admin/dashboard")} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",padding:"0.45rem 0.9rem",borderRadius:"8px",border:"1px solid var(--border,#e5e7eb)",background:"transparent",color:"var(--text-secondary,#6b7280)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",marginBottom:"1rem"}}>← Back to Dashboard</button>
           {/* Header */}
           <div className="admin-transaction-header">
             <h1 className="admin-transaction-title">Transaction Logs</h1>
