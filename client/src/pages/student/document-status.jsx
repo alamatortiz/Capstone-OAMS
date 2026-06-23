@@ -649,7 +649,7 @@ export default function DocumentStatusPage() {
               </div>
               <div className="queue-title-section">
                 <div className="dss-title-icon">
-                  <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <FileText style={{ width: "1.75rem", height: "1.75rem" }} />
                 </div>
                 <div className="queue-title-content">
                   <h1>My Document Requests</h1>

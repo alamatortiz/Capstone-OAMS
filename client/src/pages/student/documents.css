@@ -507,13 +507,13 @@ body {
 
 .doc-header-title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
 }
 
 .doc-title-icon {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
   border-radius: 0.75rem;
   background: linear-gradient(135deg, #f59e0b, #ea8c55);
   display: flex;
@@ -521,11 +521,12 @@ body {
   justify-content: center;
   color: white;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  flex-shrink: 0;
 }
 
 .doc-title-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .doc-title-text {

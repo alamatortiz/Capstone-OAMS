@@ -3,8 +3,8 @@
 
 /* ─── Title Icon (orange, matching Documents color) ─────────────────────── */
 .dss-title-icon {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
   border-radius: 0.75rem;
   background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   display: flex;
@@ -16,8 +16,8 @@
 }
 
 .dss-title-icon svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.75rem;
+  height: 1.75rem;
   stroke: currentColor;
 }
 

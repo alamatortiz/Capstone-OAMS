@@ -907,8 +907,8 @@ body {
   transition: color 0.3s ease;
 }
 
-.queue-stat-value {
-  font-size: 0.4rem;
+.queue-stat .queue-stat-value {
+  font-size: 1.575rem;
   font-weight: 700;
   color: var(--primary-color);
   line-height: 1.2;
@@ -918,7 +918,7 @@ body {
 }
 
 .queue-stat-value-sm {
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
