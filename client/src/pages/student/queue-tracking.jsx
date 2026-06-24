@@ -418,9 +418,9 @@ export default function QueueTrackingPage() {
           {/* Page Header */}
           <div className="queue-header">
             <div className="queue-breadcrumb">
-              <Link to="/student/queue" className="breadcrumb-link">
+              <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeft className="breadcrumb-icon" />
-                Queue
+                Dashboard
               </Link>
             </div>
             <div className="queue-title-section">
