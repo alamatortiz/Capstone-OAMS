@@ -629,6 +629,7 @@ export default function QueueStatusPage() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
+  const messageIdRef = useRef(1);
 
   // Auto-deselect if the queue disappears (cancelled/served)
   const selectedQueue = selectedQueueId
@@ -644,19 +645,17 @@ export default function QueueStatusPage() {
   }, [messages]);
 
   useEffect(() => {
-    applyTheme(isDark ? "dark" : "light");
-  }, [isDark]);
+    applyTheme(getSavedTheme());
+  }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => { logout(); navigate("/login"); };
   const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
+    const newTheme = isDark ? 'light' : 'dark';
+    setIsDark(!isDark);
+    applyTheme(newTheme);
   };
 
   const handleCancel = async (queueId) => {
@@ -676,7 +675,7 @@ export default function QueueStatusPage() {
     e.preventDefault();
     if (!inputValue.trim()) return;
     const userMsg = {
-      id: messages.length + 1,
+      id: ++messageIdRef.current,
       type: "user",
       text: inputValue,
       timestamp: new Date(),
@@ -686,7 +685,7 @@ export default function QueueStatusPage() {
     setInputValue("");
     setTimeout(() => {
       const bot = {
-        id: messages.length + 2,
+        id: ++messageIdRef.current,
         type: "bot",
         text: generateBotResponse(captured),
         timestamp: new Date(),

@@ -592,7 +592,11 @@ body {
   align-items: center;
 }
 
-.breadcrumb-link {
+.breadcrumb-link,
+.breadcrumb-link:visited,
+.breadcrumb-link:active,
+.breadcrumb-link:focus {
+  outline: none;
   background: transparent;
   border: none;
   color: var(--text-tertiary);
