@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { useQueue } from "../../contexts/QueueContext";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -273,6 +274,7 @@ export default function AppointmentsPage() {
 
   // Cancel in-flight guard
   const [cancellingId, setCancellingId] = useState(null);
+  const [cancelConfirmId, setCancelConfirmId] = useState(null);
 
   // ── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -479,8 +481,14 @@ export default function AppointmentsPage() {
     }
   };
 
-  const handleCancelAppointment = async (id) => {
-    if (cancellingId) return;
+  const handleCancelAppointment = (id) => {
+    setCancelConfirmId(id);
+  };
+
+  const doCancel = async () => {
+    const id = cancelConfirmId;
+    setCancelConfirmId(null);
+    if (!id || cancellingId) return;
     setCancellingId(id);
     try {
       await api.delete(`/student/appointments/${id}`);
@@ -1046,6 +1054,25 @@ export default function AppointmentsPage() {
           <ChatIcon />
         </button>
       </div>
+      <ActionConfirmModal
+        show={cancelConfirmId !== null}
+        onCancel={() => setCancelConfirmId(null)}
+        onConfirm={doCancel}
+        title="Cancel Appointment?"
+        message="Are you sure you want to cancel this appointment? This action cannot be undone."
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+            <line x1="10" y1="14" x2="14" y2="18"></line>
+            <line x1="14" y1="14" x2="10" y2="18"></line>
+          </svg>
+        }
+        cancelText="Keep Appointment"
+        confirmText="Cancel Appointment"
+      />
       <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );

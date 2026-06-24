@@ -15,6 +15,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { toast } from "sonner";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import ucLogo from "../../assets/Pnc-Logo.png";
@@ -523,75 +524,24 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
       )}
 
       {/* ── Cancel Confirm Dialog ── */}
-      {showCancelDialog && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
-        >
-          <div
-            style={{
-              background: "var(--card-bg)",
-              borderRadius: "1rem",
-              padding: "1.75rem",
-              maxWidth: "30rem",
-              width: "100%",
-              border: "1px solid rgba(239,68,68,0.3)",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
-            }}
-          >
-            <div className="queue-dialog-header">
-              <h2 className="queue-dialog-title" style={{ color: "#ef4444" }}>
-                Leave Queue?
-              </h2>
-              <p className="queue-leave-dialog-description">
-                You are currently at position <strong>{queue.position}</strong>{" "}
-                in the <strong>{queue.serviceName}</strong> queue. Leaving will
-                permanently remove your spot — you will need to rejoin and wait
-                from the back of the line if you change your mind.
-              </p>
-            </div>
-            <div className="queue-dialog-actions queue-dialog-actions-spread">
-              <button
-                className="queue-dialog-btn queue-dialog-btn-secondary"
-                onClick={() => setShowCancelDialog(false)}
-                disabled={cancelling}
-              >
-                Stay in Queue
-              </button>
-              <button
-                className="queue-dialog-btn queue-dialog-btn-danger"
-                onClick={() => onCancel(queue.queueId)}
-                disabled={cancelling}
-              >
-                {cancelling ? (
-                  <>
-                    <Loader2
-                      style={{
-                        width: "1rem",
-                        height: "1rem",
-                        display: "inline",
-                        marginRight: "0.375rem",
-                        animation: "spin 1s linear infinite",
-                      }}
-                    />
-                    Leaving…
-                  </>
-                ) : (
-                  "Leave Queue"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ActionConfirmModal
+        show={showCancelDialog}
+        onCancel={() => setShowCancelDialog(false)}
+        onConfirm={() => onCancel(queue.queueId)}
+        title="Leave Queue?"
+        message={
+          <>
+            You are currently at position <strong>{queue.position}</strong> in
+            the <strong>{queue.serviceName}</strong> queue. Leaving will
+            permanently remove your spot — you will need to rejoin and wait
+            from the back of the line if you change your mind.
+          </>
+        }
+        icon={<XCircle width={22} height={22} />}
+        cancelText="Stay in Queue"
+        confirmText={cancelling ? "Leaving…" : "Leave Queue"}
+        confirmDisabled={cancelling}
+      />
     </div>
   );
 }

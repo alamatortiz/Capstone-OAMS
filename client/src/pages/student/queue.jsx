@@ -27,6 +27,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { useQueue } from '../../contexts/QueueContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import api from '../../utils/api';
@@ -340,6 +341,8 @@ export default function QueuePage() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => { logout(); navigate('/login'); };
+
+  const [leaveConfirmQueue, setLeaveConfirmQueue] = useState(null);
 
   const toggleDarkMode = () => {
     const newTheme = isDark ? 'light' : 'dark';
@@ -759,7 +762,7 @@ export default function QueuePage() {
                               </div>
                               <button
                                 className="queue-leave-btn"
-                                onClick={(e) => { e.stopPropagation(); handleLeaveQueue(queue.queueId); }}
+                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName }); }}
                                 disabled={leavingQueueId === queue.queueId}
                                 title="Leave this queue"
                                 type="button"
@@ -1007,6 +1010,23 @@ export default function QueuePage() {
           <ChatIcon />
         </button>
       </div>
+      <ActionConfirmModal
+        show={leaveConfirmQueue !== null}
+        onCancel={() => setLeaveConfirmQueue(null)}
+        onConfirm={() => { handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
+        title="Leave Queue?"
+        message={
+          <>
+            You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
+            Leaving will permanently remove your spot — you will need to rejoin
+            and wait from the back of the line if you change your mind.
+          </>
+        }
+        icon={<XCircle width={22} height={22} />}
+        cancelText="Stay in Queue"
+        confirmText={leavingQueueId === leaveConfirmQueue?.queueId ? "Leaving…" : "Leave Queue"}
+        confirmDisabled={leavingQueueId === leaveConfirmQueue?.queueId}
+      />
       <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );

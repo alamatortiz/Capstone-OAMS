@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { toast } from "sonner";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
@@ -316,75 +317,30 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
       </div>
 
       {/* Cancel Confirm Dialog */}
-      {showCancelDialog && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
-        >
-          <div
-            style={{
-              background: "var(--card-bg)",
-              borderRadius: "1rem",
-              padding: "1.75rem",
-              maxWidth: "30rem",
-              width: "100%",
-              border: "1px solid rgba(239,68,68,0.3)",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
-            }}
-          >
-            <div className="queue-dialog-header">
-              <h2 className="queue-dialog-title" style={{ color: "#ef4444" }}>
-                Cancel Request?
-              </h2>
-              <p className="queue-leave-dialog-description">
-                You are about to cancel your request for{" "}
-                <strong>{doc.type}</strong>. This will permanently remove your
-                request — you will need to submit a new one if you change your
-                mind.
-              </p>
-            </div>
-            <div className="queue-dialog-actions queue-dialog-actions-spread">
-              <button
-                className="queue-dialog-btn queue-dialog-btn-secondary"
-                onClick={() => setShowCancelDialog(false)}
-                disabled={cancelling}
-              >
-                Keep Request
-              </button>
-              <button
-                className="queue-dialog-btn queue-dialog-btn-danger"
-                onClick={() => onCancel(doc.id)}
-                disabled={cancelling}
-              >
-                {cancelling ? (
-                  <>
-                    <Loader2
-                      style={{
-                        width: "1rem",
-                        height: "1rem",
-                        display: "inline",
-                        marginRight: "0.375rem",
-                        animation: "spin 1s linear infinite",
-                      }}
-                    />
-                    Cancelling…
-                  </>
-                ) : (
-                  "Cancel Request"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ActionConfirmModal
+        show={showCancelDialog}
+        onCancel={() => setShowCancelDialog(false)}
+        onConfirm={() => onCancel(doc.id)}
+        title="Cancel Request?"
+        message={
+          <>
+            You are about to cancel your request for{" "}
+            <strong>{doc.type}</strong>. This will permanently remove your
+            request — you will need to submit a new one if you change your mind.
+          </>
+        }
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="10" y1="13" x2="14" y2="17"></line>
+            <line x1="14" y1="13" x2="10" y2="17"></line>
+          </svg>
+        }
+        cancelText="Keep Request"
+        confirmText={cancelling ? "Cancelling…" : "Cancel Request"}
+        confirmDisabled={cancelling}
+      />
     </div>
   );
 }

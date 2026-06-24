@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import { toast } from "sonner";
@@ -896,71 +897,30 @@ export default function DocumentsPage() {
       )}
 
       {/* Cancel Confirm Dialog */}
-      {cancelTarget && (
-        <div
-          className="doc-dialog-overlay"
-          onClick={() => setCancelTarget(null)}
-        >
-          <div
-            className="doc-dialog"
-            onClick={(e) => e.stopPropagation()}
-            style={{ borderColor: "rgba(239,68,68,0.3)" }}
-          >
-            <div className="doc-dialog-header">
-              <h2 style={{ color: "#ef4444" }}>Cancel Request?</h2>
-              <p>
-                You are about to cancel your request for{" "}
-                <strong>{cancelTarget.type}</strong>. This will permanently
-                remove your request — you will need to resubmit if you change
-                your mind.
-              </p>
-              <button
-                className="doc-dialog-close"
-                onClick={() => setCancelTarget(null)}
-                disabled={!!cancellingId}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div
-              className="doc-dialog-content"
-              style={{
-                display: "flex",
-                gap: "0.75rem",
-                justifyContent: "space-between",
-              }}
-            >
-              <button
-                className="doc-form-submit"
-                style={{
-                  background: "transparent",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-secondary)",
-                  flex: 1,
-                }}
-                onClick={() => setCancelTarget(null)}
-                disabled={!!cancellingId}
-              >
-                Keep Request
-              </button>
-              <button
-                className="doc-form-submit"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                  flex: 1,
-                }}
-                onClick={() => handleCancelRequest(cancelTarget.id)}
-                disabled={!!cancellingId}
-              >
-                {cancellingId === cancelTarget.id
-                  ? "Cancelling…"
-                  : "Cancel Request"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ActionConfirmModal
+        show={cancelTarget !== null}
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={() => handleCancelRequest(cancelTarget.id)}
+        title="Cancel Request?"
+        message={
+          <>
+            You are about to cancel your request for{" "}
+            <strong>{cancelTarget?.type}</strong>. This will permanently remove
+            your request — you will need to resubmit if you change your mind.
+          </>
+        }
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="10" y1="13" x2="14" y2="17"></line>
+            <line x1="14" y1="13" x2="10" y2="17"></line>
+          </svg>
+        }
+        cancelText="Keep Request"
+        confirmText={cancellingId === cancelTarget?.id ? "Cancelling…" : "Cancel Request"}
+        confirmDisabled={!!cancellingId}
+      />
 
       {/* AI Chatbot Widget */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
