@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Target,
   Loader2,
+  ChevronLeft,
 } from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
@@ -415,14 +416,24 @@ export default function QueueTrackingPage() {
       <main className="dashboard-main">
         <div className="queue-tracking-page">
           {/* Page Header */}
-          <div className="qt-header">
-            <h1 className="qt-title">
-              <Activity className="qt-icon" />
-              Queue Tracking
-            </h1>
-            <p className="qt-subtitle">
-              Monitor your active queues, review history, and view your stats
-            </p>
+          <div className="queue-header">
+            <div className="queue-breadcrumb">
+              <Link to="/student/queue" className="breadcrumb-link">
+                <ChevronLeft className="breadcrumb-icon" />
+                Queue
+              </Link>
+            </div>
+            <div className="queue-title-section">
+              <div className="queue-title-icon">
+                <Activity className="icon" />
+              </div>
+              <div>
+                <h1 className="queue-title">Queue Tracking</h1>
+                <p className="queue-subtitle">
+                  Monitor your active queues, review history, and view your stats
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Metrics Strip */}
