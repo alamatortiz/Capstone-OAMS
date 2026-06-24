@@ -686,7 +686,7 @@ export default function QueuePage() {
                       <div
                         key={queue.queueId}
                         className="queue-card active-queue-card"
-                        onClick={() => navigate('/student/queue-status', { state: { queueId: queue.queueId } })}
+                        onClick={() => navigate('/student/queue-status', { state: { queueId: queue.queueId, fromQueue: true } })}
                         style={{ cursor: 'pointer' }}
                       >
                         <div className="queue-card-content">

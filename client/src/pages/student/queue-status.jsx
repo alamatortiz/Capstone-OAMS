@@ -155,7 +155,7 @@ const getStatusMeta = (status) => {
 };
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
+function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLabel = 'All Queues' }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [notesText, setNotesText] = useState(queue.notes ?? "");
@@ -185,7 +185,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
         <div className="queue-breadcrumb">
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
-            All Queues
+            {backLabel}
           </button>
         </div>
       </div>
@@ -562,6 +562,7 @@ export default function QueueStatusPage() {
     : { name: "Student", role: "student", college: "", departmentAbbrev: "" };
 
   // ── UI state ──────────────────────────────────────────────────────────────
+  const fromQueue = location.state?.fromQueue ?? false;
   const [selectedQueueId, setSelectedQueueId] = useState(
     () => location.state?.queueId ?? null
   );
@@ -778,7 +779,8 @@ export default function QueueStatusPage() {
         {selectedQueue ? (
           <QueueDetail
             queue={selectedQueue}
-            onBack={() => setSelectedQueueId(null)}
+            backLabel={fromQueue ? 'Queue Management' : 'All Queues'}
+            onBack={() => fromQueue ? navigate('/student/queue') : setSelectedQueueId(null)}
             onCancel={handleCancel}
             onSaveNotes={updateQueueNotes}
             cancelling={cancelling}
