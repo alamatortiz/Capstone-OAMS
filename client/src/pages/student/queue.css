@@ -603,9 +603,12 @@ body {
   gap: 0.5rem;
   font-size: 1.05rem;
   font-weight: 600;
+  font-family: inherit;
   text-decoration: none;
   border-radius: 0.5rem;
   transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .breadcrumb-link:hover {

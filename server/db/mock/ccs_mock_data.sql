@@ -351,6 +351,79 @@ INSERT INTO services (service_id, service_name, description, department_id, stat
 (6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 'active', 30, FALSE);
 
 -- ─────────────────────────────────────────────────────────────
+-- SECTION 5a-REQ · SERVICE REQUIREMENTS
+-- Documents/items students must bring for each queue service.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO service_requirements (service_id, requirement_name, description, is_mandatory) VALUES
+-- Enrollment Assistance (service_id 1)
+(1, 'Advising Form',                    'Signed by your program adviser',                            TRUE),
+(1, 'Previous COR',                     'Certificate of Registration from the prior semester',       TRUE),
+(1, 'Valid Student ID',                 'Current school year student ID',                            TRUE),
+(1, 'Enrollment Portal Access',         'Active login credentials for the online enrollment system', FALSE),
+-- Grade Inquiry (service_id 2)
+(2, 'Valid Student ID',                 'Current school year student ID',                            TRUE),
+(2, 'Grade Slip or Report Card',        'If already available; not required but helpful',            FALSE),
+-- Good Moral Certificate (service_id 3)
+(3, 'Student Affairs Clearance',        'Clearance slip from the Student Affairs Office',            TRUE),
+(3, 'Completed Request Form',           'Good Moral Certificate request form filled out in full',    TRUE),
+(3, 'Official Receipt',                 'Payment receipt from the cashier',                          TRUE),
+(3, 'Valid Student ID',                 'Current school year student ID',                            TRUE),
+-- Transcript of Records (service_id 4)
+(4, 'Completed TOR Request Form',       'Request form filled out in full',                           TRUE),
+(4, 'Official Receipt',                 'Payment receipt from the cashier',                          TRUE),
+(4, 'Valid Student ID',                 'Current school year student ID',                            TRUE),
+-- Certificate of Enrollment (service_id 5)
+(5, 'Completed COE Request Form',       'Certificate of Enrollment request form filled out in full', TRUE),
+(5, 'Official Receipt',                 'Payment receipt from the cashier',                          TRUE),
+(5, 'Valid Student ID',                 'Current school year student ID',                            TRUE),
+-- Clearance Processing (service_id 6)
+(6, 'Clearance Form',                   'Obtained from your department office',                      TRUE),
+(6, 'Valid Student ID',                 'Current school year student ID',                            TRUE),
+(6, 'No Outstanding Obligations',       'All library, laboratory, and financial obligations settled', TRUE);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 5a-STEPS · SERVICE PROCEDURE STEPS
+-- Step-by-step process for each queue service.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO service_procedure_steps (service_id, step_number, step_title, description) VALUES
+-- Enrollment Assistance (service_id 1)
+(1, 1, 'Get advising form signed',          'Have your advising form signed by your program adviser before visiting the office'),
+(1, 2, 'Settle outstanding balances',       'Pay any outstanding fees or balances at the cashier window'),
+(1, 3, 'Present documents at counter',      'Bring your signed advising form, previous COR, and student ID to the enrollment counter'),
+(1, 4, 'Wait for validation',               'Staff will validate your enrollment details and process your subjects'),
+(1, 5, 'Receive Certificate of Registration','Claim your COR once enrollment is confirmed and processing is complete'),
+-- Grade Inquiry (service_id 2)
+(2, 1, 'Join the queue',                    'Submit a Grade Inquiry request via the portal or take a number at the office'),
+(2, 2, 'Present your ID at the window',     'Show your valid student ID and COR when your number is called'),
+(2, 3, 'State your concern',                'Clearly explain your grade concern to the assigned faculty or registrar staff'),
+(2, 4, 'Wait for verification',             'Staff will verify the grade against official records and source documents'),
+(2, 5, 'Receive the result',                'You will receive the official response, endorsement slip, or correction notice'),
+-- Good Moral Certificate (service_id 3)
+(3, 1, 'Secure Student Affairs clearance',  'Visit the Student Affairs Office and obtain a signed clearance slip first'),
+(3, 2, 'Fill out the request form',         'Complete the Good Moral Certificate request form accurately'),
+(3, 3, 'Pay the processing fee',            'Proceed to the cashier and pay the required fee; keep the official receipt'),
+(3, 4, 'Submit all requirements',           'Hand over your clearance, completed form, receipt, and student ID to staff'),
+(3, 5, 'Claim your certificate',            'Return after 2–3 business days with your valid ID to claim the certificate'),
+-- Transcript of Records (service_id 4)
+(4, 1, 'Fill out the TOR request form',     'Obtain and completely fill out the Transcript of Records request form'),
+(4, 2, 'Pay the required fee',              'Proceed to the cashier to pay the TOR fee and secure your official receipt'),
+(4, 3, 'Submit to the registrar',           'Submit the completed form and official receipt to the registrar office'),
+(4, 4, 'Wait for processing',               'Processing takes 5–7 business days; you will be notified when ready'),
+(4, 5, 'Claim your TOR',                    'Return with a valid ID to claim your official Transcript of Records'),
+-- Certificate of Enrollment (service_id 5)
+(5, 1, 'Fill out the COE request form',     'Obtain and completely fill out the Certificate of Enrollment request form'),
+(5, 2, 'Pay the processing fee',            'Proceed to the cashier to pay the COE fee and keep the official receipt'),
+(5, 3, 'Submit to the registrar office',    'Submit the form and receipt to the registrar or designated office window'),
+(5, 4, 'Wait for processing',               'Processing takes 1–2 business days'),
+(5, 5, 'Claim with your student ID',        'Return with your valid student ID to claim the Certificate of Enrollment'),
+-- Clearance Processing (service_id 6)
+(6, 1, 'Obtain the clearance form',         'Get the clearance form from your department or college office'),
+(6, 2, 'Visit all listed offices',          'Go to every office listed on the form (library, laboratory, finance, etc.)'),
+(6, 3, 'Settle all obligations',            'Clear any outstanding fees, unreturned items, or other obligations at each office'),
+(6, 4, 'Collect all required signatures',   'Have each office sign and stamp the clearance form once obligations are cleared'),
+(6, 5, 'Submit completed clearance',        'Submit the fully signed clearance form to the registrar to finalize the process');
+
+-- ─────────────────────────────────────────────────────────────
 -- SECTION 5b · APPOINTMENT SERVICES (created by faculty)
 -- Each row is a service type a faculty member offers for appointments.
 -- ─────────────────────────────────────────────────────────────

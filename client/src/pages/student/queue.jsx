@@ -126,64 +126,6 @@ const MoonIcon = () => (
   </svg>
 );
 
-// ─── Procedure Map ────────────────────────────────────────────────────────────
-const PROCEDURE_MAP = {
-  'enrollment assistance': [
-    'Get your advising form signed by your program adviser.',
-    'Settle any outstanding balances at the cashier.',
-    'Present your documents at the enrollment counter.',
-    'Wait for validation and processing.',
-    'Receive your Certificate of Registration.',
-  ],
-  'grade inquiry': [
-    'Submit a Grade Inquiry request via the portal or join the queue.',
-    'Present your student ID and COR at the window.',
-    'State your concern to the faculty or registrar staff.',
-    'Wait for verification and official response.',
-    'Receive the result or endorsement slip.',
-  ],
-  'good moral certificate': [
-    'Secure clearance from the Student Affairs Office.',
-    'Fill out the Good Moral Certificate request form.',
-    'Pay the required processing fee at the cashier.',
-    'Submit all requirements to the department office.',
-    'Claim your certificate after 2–3 business days with valid ID.',
-  ],
-  'transcript of records': [
-    'Fill out the Transcript of Records request form.',
-    'Pay the required fee at the cashier.',
-    'Submit the form and official receipt to the registrar.',
-    'Wait for processing (5–7 business days).',
-    'Claim your TOR with a valid ID.',
-  ],
-  'certificate of enrollment': [
-    'Fill out the Certificate of Enrollment request form.',
-    'Pay the processing fee.',
-    'Submit to the registrar office.',
-    'Wait 1–2 business days for processing.',
-    'Claim with your valid student ID.',
-  ],
-  'clearance processing': [
-    'Obtain the clearance form from your department.',
-    'Visit all offices listed on the form.',
-    'Settle any outstanding obligations.',
-    'Collect signatures from all required offices.',
-    'Submit the completed clearance form to the registrar.',
-  ],
-};
-
-const GENERIC_PROCEDURE = [
-  'Present your valid Student ID at the service counter.',
-  'State your concern or request to the assigned staff.',
-  'Submit any required documents or forms.',
-  'Wait for processing (timeframe depends on service type).',
-  'Claim your output or receive confirmation when ready.',
-];
-
-function getProcedure(serviceName = '') {
-  const key = serviceName.toLowerCase().trim();
-  return PROCEDURE_MAP[key] ?? GENERIC_PROCEDURE;
-}
 
 export default function QueuePage() {
   const { user: authUser, logout } = useAuth();
@@ -335,6 +277,16 @@ export default function QueuePage() {
         (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
       );
       if (svc?.requirements?.length) return svc.requirements;
+    }
+    return [];
+  };
+
+  const getProcedureSteps = (serviceName) => {
+    for (const dept of servicesData) {
+      const svc = dept.services?.find(
+        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
+      );
+      if (svc?.procedureSteps?.length) return svc.procedureSteps;
     }
     return [];
   };
@@ -579,6 +531,29 @@ export default function QueuePage() {
                 </div>
               </div>
 
+              {/* CTA */}
+              <div className="avail-services-cta-card">
+                <div className="avail-services-cta-content">
+                  <h3>Ready to join this queue?</h3>
+                  <p>Make sure you have all the requirements before joining the queue</p>
+                </div>
+                <button
+                  className="avail-services-queue-btn"
+                  onClick={handleJoinFromDetail}
+                  disabled={detailJoinBtnDisabled()}
+                >
+                  {joiningSlotId === selectedSlot.slotId ? (
+                    <Loader2
+                      className="avail-services-queue-btn-icon"
+                      style={{ animation: 'spin 1s linear infinite' }}
+                    />
+                  ) : (
+                    <Clock className="avail-services-queue-btn-icon" />
+                  )}
+                  {detailJoinBtnLabel()}
+                </button>
+              </div>
+
               {/* Requirements + Procedure */}
               <div className="avail-services-details-grid">
                 {/* Requirements */}
@@ -637,39 +612,25 @@ export default function QueuePage() {
                     </p>
                   </div>
                   <div className="avail-services-details-card-content">
-                    <ol className="avail-services-procedure-list">
-                      {getProcedure(selectedSlot.serviceName).map((step, index) => (
-                        <li key={index} className="avail-services-procedure-item">
-                          <span className="avail-services-procedure-number">{index + 1}</span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
+                    {(() => {
+                      const steps = getProcedureSteps(selectedSlot.serviceName);
+                      return steps.length > 0 ? (
+                        <ol className="avail-services-procedure-list">
+                          {steps.map((step) => (
+                            <li key={step.id} className="avail-services-procedure-item">
+                              <span className="avail-services-procedure-number">{step.stepNumber}</span>
+                              <span>{step.title}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                          No procedure steps have been defined for this service yet. Contact the office for details.
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
-              </div>
-
-              {/* CTA */}
-              <div className="avail-services-cta-card">
-                <div className="avail-services-cta-content">
-                  <h3>Ready to join this queue?</h3>
-                  <p>Make sure you have all the requirements before joining the queue</p>
-                </div>
-                <button
-                  className="avail-services-queue-btn"
-                  onClick={handleJoinFromDetail}
-                  disabled={detailJoinBtnDisabled()}
-                >
-                  {joiningSlotId === selectedSlot.slotId ? (
-                    <Loader2
-                      className="avail-services-queue-btn-icon"
-                      style={{ animation: 'spin 1s linear infinite' }}
-                    />
-                  ) : (
-                    <Clock className="avail-services-queue-btn-icon" />
-                  )}
-                  {detailJoinBtnLabel()}
-                </button>
               </div>
             </div>
           )}

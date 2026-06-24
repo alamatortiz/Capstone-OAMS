@@ -1613,6 +1613,155 @@ router.delete(
 );
 
 // ─────────────────────────────────────────────────────────────
+// DATA MANAGEMENT — Service Type Requirements
+// Mirrors the document-types/:id/requirements pattern.
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/data-management/service-types/:id/requirements
+router.get(
+  "/data-management/service-types/:id/requirements",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[svc]] = await pool.query(
+        `SELECT service_id FROM services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
+
+      const [rows] = await pool.query(
+        `SELECT requirement_id AS id, requirement_name AS name, description, is_mandatory AS isMandatory
+         FROM service_requirements WHERE service_id = ? ORDER BY requirement_id ASC`,
+        [serviceId],
+      );
+      res.json({ requirements: rows });
+    } catch (error) {
+      console.error("Service requirements fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PUT /api/admin/data-management/service-types/:id/requirements
+// Body: { requirements: [{ name, description, isMandatory }] }
+// Replaces all requirements for the service (delete + re-insert).
+router.put(
+  "/data-management/service-types/:id/requirements",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    const { requirements = [] } = req.body;
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[svc]] = await pool.query(
+        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
+
+      await pool.query(`DELETE FROM service_requirements WHERE service_id = ?`, [serviceId]);
+      if (requirements.length > 0) {
+        const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
+        await pool.query(
+          `INSERT INTO service_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
+          [reqValues],
+        );
+      }
+
+      await logAudit(req.user.userId, "UPDATE", "service_requirements", serviceId,
+        null, { requirementCount: requirements.length },
+      );
+      res.json({ message: "Service requirements updated" });
+    } catch (error) {
+      console.error("Service requirements update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// DATA MANAGEMENT — Service Procedure Steps
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/data-management/service-types/:id/steps
+router.get(
+  "/data-management/service-types/:id/steps",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[svc]] = await pool.query(
+        `SELECT service_id FROM services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
+
+      const [rows] = await pool.query(
+        `SELECT step_id AS id, step_number AS stepNumber, step_title AS title, description
+         FROM service_procedure_steps WHERE service_id = ? ORDER BY step_number ASC`,
+        [serviceId],
+      );
+      res.json({ steps: rows });
+    } catch (error) {
+      console.error("Service steps fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PUT /api/admin/data-management/service-types/:id/steps
+// Body: { steps: [{ stepNumber, title, description }] }
+// Replaces all procedure steps for the service (delete + re-insert in order).
+router.put(
+  "/data-management/service-types/:id/steps",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const serviceId = parseInt(req.params.id, 10);
+    const { steps = [] } = req.body;
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [[svc]] = await pool.query(
+        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
+        [serviceId, deptId],
+      );
+      if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
+
+      await pool.query(`DELETE FROM service_procedure_steps WHERE service_id = ?`, [serviceId]);
+      if (steps.length > 0) {
+        const stepValues = steps.map((s, i) => [serviceId, s.stepNumber ?? i + 1, s.title, s.description || null]);
+        await pool.query(
+          `INSERT INTO service_procedure_steps (service_id, step_number, step_title, description) VALUES ?`,
+          [stepValues],
+        );
+      }
+
+      await logAudit(req.user.userId, "UPDATE", "service_procedure_steps", serviceId,
+        null, { stepCount: steps.length },
+      );
+      res.json({ message: "Service procedure steps updated" });
+    } catch (error) {
+      console.error("Service steps update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // DATA MANAGEMENT — Audit Logs
 // Scoped to the admin's own department via the administrators table.
 // ─────────────────────────────────────────────────────────────
