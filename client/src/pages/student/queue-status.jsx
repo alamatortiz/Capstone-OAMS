@@ -182,7 +182,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
       {/* Breadcrumb */}
       <div className="queue-status-header">
         <div className="queue-breadcrumb">
-          <button type="button" className="qss-breadcrumb-link" onClick={onBack}>
+          <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             All Queues
           </button>
@@ -202,10 +202,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling }) {
             <div className="queue-hero-header">
               <div className="queue-hero-title">
                 <h2>Queue Status</h2>
-                <p>{queue.serviceName}</p>
-                <p style={{ fontSize: "0.875rem", opacity: 0.85 }}>
-                  {queue.departmentName}
-                </p>
+                <p className="queue-hero-service-name">{queue.serviceName}</p>
+                <p>{queue.departmentName}</p>
               </div>
               <div className="queue-hero-badge">{queue.queueNumberBadge}</div>
             </div>
@@ -841,18 +839,18 @@ export default function QueueStatusPage() {
             {/* Page Header */}
             <div className="queue-status-header">
               <div className="queue-breadcrumb">
-                <Link to="/student/dashboard" className="qss-breadcrumb-link">
+                <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
                   Dashboard
                 </Link>
               </div>
               <div className="queue-title-section">
-                <div className="qss-title-icon">
-                  <Clock style={{ width: "1.75rem", height: "1.75rem" }} />
+                <div className="queue-title-icon">
+                  <Clock className="icon" />
                 </div>
-                <div className="queue-title-content">
-                  <h1>My Queue Status</h1>
-                  <p>View and manage your active queues</p>
+                <div>
+                  <h1 className="queue-title">My Queue Status</h1>
+                  <p className="queue-subtitle">View and manage your active queues</p>
                 </div>
               </div>
             </div>
