@@ -2111,6 +2111,13 @@ router.get(
          ORDER BY s.department_id, s.service_name, sr.requirement_id`,
       );
 
+      // 2b. All procedure steps for every service, ordered by step_number.
+      const [procedureSteps] = await pool.query(
+        `SELECT step_id, service_id, step_number, step_title, description
+         FROM service_procedure_steps
+         ORDER BY service_id, step_number ASC`,
+      );
+
       // 3. Open queue slots for today (one per service; we pick the first open one)
       const [slots] = await pool.query(
         `SELECT
@@ -2140,7 +2147,7 @@ router.get(
       );
 
       // ── Assemble: group requirements per service ──────────────────────────
-      // serviceMap: service_id → { ...service fields, requirements: [] }
+      // serviceMap: service_id → { ...service fields, requirements: [], procedureSteps: [] }
       const serviceMap = new Map();
       for (const row of services) {
         if (!serviceMap.has(row.service_id)) {
@@ -2150,6 +2157,7 @@ router.get(
             description: row.description ?? "",
             departmentId: row.department_id,
             requirements: [],
+            procedureSteps: [],
           });
         }
         // Attach requirement row if it exists
@@ -2159,6 +2167,19 @@ router.get(
             name: row.requirement_name,
             description: row.req_description ?? "",
             isMandatory: !!row.is_mandatory,
+          });
+        }
+      }
+
+      // ── Assemble: attach procedure steps per service ──────────────────────
+      for (const step of procedureSteps) {
+        const svc = serviceMap.get(step.service_id);
+        if (svc) {
+          svc.procedureSteps.push({
+            id: step.step_id,
+            stepNumber: step.step_number,
+            title: step.step_title,
+            description: step.description ?? "",
           });
         }
       }
@@ -2211,6 +2232,7 @@ router.get(
           serviceName: svc.serviceName,
           description: svc.description,
           requirements: svc.requirements,
+          procedureSteps: svc.procedureSteps,
           todaySlot,
           // Convenience flags the UI uses directly
           hasQueueToday: todaySlot !== null,

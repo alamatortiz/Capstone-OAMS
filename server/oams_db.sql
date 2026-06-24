@@ -135,6 +135,17 @@ CREATE TABLE service_requirements (
     FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE
 );
 
+CREATE TABLE service_procedure_steps (
+    step_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    service_id   INT          NOT NULL,
+    step_number  INT          NOT NULL,
+    step_title   VARCHAR(255) NOT NULL,
+    description  TEXT,
+    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_service_step (service_id, step_number)
+);
+
 -- ─────────────────────────────────────────────────────────────
 -- 5b. APPOINTMENT SERVICES (created by faculty, for appointments only)
 -- ─────────────────────────────────────────────────────────────
