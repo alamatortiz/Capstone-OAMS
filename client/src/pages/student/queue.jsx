@@ -780,25 +780,25 @@ export default function QueuePage() {
                                   </div>
                                 </div>
                               </div>
+                              <button
+                                className="queue-leave-btn"
+                                onClick={(e) => { e.stopPropagation(); handleLeaveQueue(queue.queueId); }}
+                                disabled={leavingQueueId === queue.queueId}
+                                title="Leave this queue"
+                                type="button"
+                                aria-label={`Leave queue for ${queue.serviceName}`}
+                              >
+                                {leavingQueueId === queue.queueId ? (
+                                  <Loader2 className="icon" style={{ animation: 'spin 1s linear infinite' }} />
+                                ) : (
+                                  <XCircle className="icon" />
+                                )}
+                                <span className="leave-text">
+                                  {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
+                                </span>
+                              </button>
                             </div>
                           </div>
-                          <button
-                            className="queue-leave-btn"
-                            onClick={(e) => { e.stopPropagation(); handleLeaveQueue(queue.queueId); }}
-                            disabled={leavingQueueId === queue.queueId}
-                            title="Leave this queue"
-                            type="button"
-                            aria-label={`Leave queue for ${queue.serviceName}`}
-                          >
-                            {leavingQueueId === queue.queueId ? (
-                              <Loader2 className="icon" style={{ animation: 'spin 1s linear infinite' }} />
-                            ) : (
-                              <XCircle className="icon" />
-                            )}
-                            <span className="leave-text">
-                              {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
-                            </span>
-                          </button>
                         </div>
                       </div>
                     ))}
