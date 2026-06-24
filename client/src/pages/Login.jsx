@@ -6,16 +6,11 @@ import { toast } from "sonner";
 
 import { applyTheme, getSavedTheme } from "../utils/theme";
 
-// @ts-ignore
 import "./Login.css";
 
-// @ts-ignore
 import pncLogo from "../assets/Pnc-Logo.png";
-// @ts-ignore
 import oamsLogo from "../assets/oams_logo.png";
-// @ts-ignore
 import darkModeIcon from "../assets/darkmode_icon.png";
-// @ts-ignore
 import sunIcon from "../assets/sun_icon.png";
 
 export default function Login() {
@@ -26,7 +21,6 @@ export default function Login() {
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Apply saved theme on mount
   useEffect(() => {
     applyTheme(getSavedTheme());
     setIsDarkMode(getSavedTheme() === "dark");
@@ -38,7 +32,7 @@ export default function Login() {
     applyTheme(newDarkMode ? "dark" : "light");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!email && !password) {
@@ -57,13 +51,12 @@ export default function Login() {
     try {
       await login(email, password);
 
-      // Fixed: was reading from localStorage, AuthContext saves to sessionStorage
       const storedUser = sessionStorage.getItem("oams_user");
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         toast.success(`Welcome back, ${userData.name}!`);
         setTimeout(() => {
-          const roleRoutes: Record<string, string> = {
+          const roleRoutes = {
             student: "/student/dashboard",
             faculty: "/professor/dashboard",
             admin: "/admin/dashboard",
@@ -71,26 +64,19 @@ export default function Login() {
           navigate(roleRoutes[userData.role] ?? "/dashboard");
         }, 500);
       }
-    } catch (err: unknown) {
-      // Extract HTTP status and backend error message directly from the error shape.
-      // Avoids relying on axios.isAxiosError which can fail in Vite ESM builds
-      // when axios is imported separately from the shared api.js instance.
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+    } catch (err) {
+      const status = err?.response?.status;
+      const message = err?.response?.data?.error;
 
       if (status === 401) {
-        // Backend returns "Invalid credentials" for both user-not-found and wrong password
         toast.error(message ?? "Invalid credentials. Please check your ID or email and password.");
       } else if (status === 403) {
-        // Account inactive or suspended — backend message is already descriptive
         toast.error(message ?? "Your account is not active. Please contact the administrator.");
       } else if (status === 400) {
         toast.error(message ?? "Please fill in all fields.");
       } else if (status) {
-        // Any other HTTP error (e.g. 500)
         toast.error("Something went wrong. Please try again later.");
       } else {
-        // No response at all — network offline or server unreachable
         toast.error("Unable to reach the server. Please check your connection.");
       }
     }
@@ -112,20 +98,26 @@ export default function Login() {
       </button>
 
       <div className="login-wrapper">
-        {/* ── Logos ── */}
-        <div className="login-logos">
-          <img
-            src={pncLogo}
-            alt="University of Cabuyao"
-            className="login-pnc-logo"
-          />
-          <img src={oamsLogo} alt="OAMS" className="login-oams-logo" />
+        {/* ── Left: Branding ── */}
+        <div className="login-branding">
+          <div className="login-logos">
+            <img
+              src={pncLogo}
+              alt="University of Cabuyao"
+              className="login-pnc-logo"
+            />
+            <img src={oamsLogo} alt="OAMS" className="login-oams-logo" />
+          </div>
+          <p className="login-university-name">
+            University of Cabuyao<br />
+            (Pamantasan ng Cabuyao)
+          </p>
         </div>
-        <p className="login-university-name">
-          University of Cabuyao (Pamantasan ng Cabuyao)
-        </p>
 
-        {/* ── Card ── */}
+        {/* ── Vertical divider ── */}
+        <div className="login-divider" aria-hidden="true" />
+
+        {/* ── Right: Card ── */}
         <div className="login-card">
           {/* Card header */}
           <div className="login-card-header">
@@ -204,32 +196,14 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          {/* Demo accounts info */}
-          <div className="login-demo-box">
-            <p className="login-demo-title">Demo Accounts:</p>
-            <ul className="login-demo-list">
-              <li>
-                <strong>Student:</strong> student@pnc.edu.ph
-              </li>
-              <li>
-                <strong>Professor:</strong> professor@pnc.edu.ph
-              </li>
-              <li>
-                <strong>Admin:</strong> admin@pnc.edu.ph
-              </li>
-            </ul>
-            <p className="login-demo-password">Password: any</p>
-          </div>
         </div>
         {/* /login-card */}
-
-        <p className="login-footer-copy">
-          © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights
-          reserved.
-        </p>
       </div>
       {/* /login-wrapper */}
+
+      <p className="login-footer-copy">
+        © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights reserved.
+      </p>
     </div>
   );
 }

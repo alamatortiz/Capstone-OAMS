@@ -7,9 +7,10 @@
 .login-root {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px;
+  padding: 32px 24px;
   background: #ffffff;
   transition: background 0.3s;
   position: relative;
@@ -74,33 +75,44 @@ body.dark-mode .login-theme-btn:hover .login-theme-icon {
   filter: brightness(1.1) sepia(1) saturate(7) hue-rotate(0deg);
 }
 
-/* ── Centred column ── */
+/* ── Two-column wrapper ── */
 .login-wrapper {
   width: 100%;
-  max-width: 1200px;
+  max-width: 900px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+}
+
+/* ── Left: Branding panel ── */
+.login-branding {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
+  text-align: right;
+  padding-right: 52px;
 }
 
 /* ── Logos row ── */
 .login-logos {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 14px;
+  justify-content: flex-end;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
 .login-pnc-logo {
-  height: 75px;
+  height: 110px;
   width: auto;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(34,197,94,0.2));
+  filter: drop-shadow(0 0 10px rgba(34,197,94,0.2));
 }
 
 .login-oams-logo {
-  height: 75px;
+  height: 110px;
   width: auto;
   object-fit: contain;
   filter:
@@ -123,26 +135,41 @@ body.dark-mode .login-oams-logo {
 
 /* ── University name ── */
 .login-university-name {
-  font-size: 0.85rem;
-  color: #6b7280;
-  margin-bottom: 32px;
-  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.55;
+  color: #374151;
+  text-align: right;
   transition: color 0.3s;
 }
 
 body.dark-mode .login-university-name {
-  color: #64748b;
+  color: #9ca3af;
 }
 
-/* ── Card ── */
+/* ── Vertical divider ── */
+.login-divider {
+  width: 1px;
+  height: 260px;
+  background: rgba(34, 197, 94, 0.25);
+  flex-shrink: 0;
+}
+
+body.dark-mode .login-divider {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+/* ── Right: Card ── */
 .login-card {
-  width: 50%;
+  flex: 1;
   background: #f9fafb;
   border: 1px solid rgba(34, 197, 94, 0.15);
   border-radius: 18px;
-  padding: 36px 36px 32px;
+  padding: 36px;
+  margin-left: 52px;
   box-shadow: 0 4px 32px rgba(0,0,0,0.08);
   transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+  box-sizing: border-box;
 }
 
 body.dark-mode .login-card {
@@ -155,7 +182,7 @@ body.dark-mode .login-card {
 
 /* ── Card header ── */
 .login-card-header {
-  margin-bottom: 15px;
+  margin-bottom: 24px;
   text-align: center;
 }
 
@@ -207,7 +234,6 @@ body.dark-mode .login-card-hint {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  margin-bottom: 24px;
 }
 
 .login-field {
@@ -259,6 +285,7 @@ body.dark-mode .login-input-icon {
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.3s, color 0.3s;
   font-family: inherit;
+  box-sizing: border-box;
 }
 
 body.dark-mode .login-input {
@@ -294,13 +321,16 @@ body.dark-mode .login-input::placeholder {
   letter-spacing: 0.01em;
   box-shadow: 0 3px 18px rgba(34,197,94,0.32);
   transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-  margin-top: 4px;
+  margin-top: 8px;
+  box-sizing: border-box;
 }
+
 .login-btn-submit:hover:not(:disabled) {
   opacity: 0.9;
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(34,197,94,0.42);
 }
+
 .login-btn-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -323,77 +353,8 @@ body.dark-mode .login-input::placeholder {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Demo accounts box ── */
-.login-demo-box {
-  background: rgba(30,58,138,0.08);
-  border: 1px solid rgba(59,130,246,0.15);
-  border-radius: 10px;
-  padding: 14px 16px;
-  transition: background 0.3s, border-color 0.3s;
-}
-
-body.dark-mode .login-demo-box {
-  background: rgba(30,58,138,0.18);
-  border-color: rgba(59,130,246,0.22);
-}
-
-.login-demo-title {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #3b82f6;
-  margin-bottom: 8px;
-  text-align: left;
-  transition: color 0.3s;
-}
-
-body.dark-mode .login-demo-title {
-  color: #93c5fd;
-}
-
-.login-demo-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-  text-align: left;
-}
-
-.login-demo-list li {
-  font-size: 0.78rem;
-  color: #2563eb;
-  transition: color 0.3s;
-}
-
-body.dark-mode .login-demo-list li {
-  color: #60a5fa;
-}
-
-.login-demo-list li::before {
-  content: '• ';
-}
-
-.login-demo-list strong {
-  color: #1d4ed8;
-  transition: color 0.3s;
-}
-
-body.dark-mode .login-demo-list strong {
-  color: #93c5fd;
-}
-
-.login-demo-password {
-  font-size: 0.75rem;
-  color: #2563eb;
-  text-align: left;
-  transition: color 0.3s;
-}
-
-body.dark-mode .login-demo-password {
-  color: #3b82f6;
-}
 
 /* ── Footer copyright ── */
 .login-footer-copy {
@@ -444,7 +405,42 @@ body.dark-mode .login-password-toggle:hover:not(:disabled) {
   background: rgba(34, 197, 94, 0.12);
 }
 
-/* Password input needs right padding to avoid text sitting under the toggle */
 .login-input--password {
   padding-right: 40px;
+}
+
+/* ── Responsive: stack on mobile/tablet ── */
+@media (max-width: 680px) {
+  .login-wrapper {
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  /* Hide the vertical divider, show nothing between branding and card */
+  .login-divider {
+    display: none;
+  }
+
+  /* Branding: center everything, remove right-side padding */
+  .login-branding {
+    align-items: center;
+    text-align: center;
+    padding-right: 0;
+  }
+
+  .login-logos {
+    justify-content: center;
+  }
+
+  .login-university-name {
+    text-align: center;
+  }
+
+  /* Card: full width, no left margin */
+  .login-card {
+    width: 100%;
+    margin-left: 0;
+    padding: 28px 20px;
+  }
 }

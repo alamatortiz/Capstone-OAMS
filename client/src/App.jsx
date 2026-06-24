@@ -64,9 +64,8 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(
     () => getSavedTheme() === "dark",
   );
-  const { isAuthenticated } = useAuth(); // Use auth context
+  const { isAuthenticated } = useAuth();
 
-  // Apply the saved theme on first render, and keep DOM in sync
   useEffect(() => {
     applyTheme(isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
@@ -78,7 +77,7 @@ function App() {
   };
 
   const goToLogin = () => navigate("/login");
-  const goToDashboard = () => navigate("/dashboard"); // Redirect to generic dashboard
+  const goToDashboard = () => navigate("/dashboard");
 
   return (
     <div className="oams-root">
@@ -100,7 +99,6 @@ function App() {
               className="icon-btn-img"
             />
           </button>
-          {/* Sign In / Go to Dashboard Button */}
           <button
             className="btn-signin"
             onClick={isAuthenticated ? goToDashboard : goToLogin}
@@ -135,7 +133,6 @@ function App() {
           A centralized platform for students, professors, and administrators to
           streamline university services and enhance productivity.
         </p>
-        {/* Sign In #2 — Hero CTA */}
         <button
           className="btn-hero"
           onClick={isAuthenticated ? goToDashboard : goToLogin}
@@ -169,9 +166,7 @@ function App() {
         <p className="colleges-description">
           Our system serves all six colleges of the University of Cabuyao (Pamantasan ng Cabuyao), providing seamless automation and management solutions.
         </p>
-
         <div className="colleges-grid">
-
           {colleges.map((c) => (
             <div className="college-card" key={c.name}>
               <img src={c.logo} alt={c.name} className="college-logo" />
@@ -191,7 +186,6 @@ function App() {
           Join thousands of students, professors, and staff using OAMS to
           streamline their university experience.
         </p>
-        {/* Sign In #3 — CTA Banner */}
         <button
           className="btn-cta"
           onClick={isAuthenticated ? goToDashboard : goToLogin}
@@ -214,10 +208,15 @@ function App() {
             <img src={oamsLogo} alt="OAMS" className="footer-logo-img" />
           </div>
         </div>
-        <span className="footer-copy">
-          © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights
-          reserved.
-        </span>
+
+        <div className="footer-right">
+          <p className="footer-tagline">
+            <strong>Dangal ng Bayan,</strong> bringing pride and honor to the nation!
+          </p>
+          <span className="footer-copy">
+            © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights reserved.
+          </span>
+        </div>
       </footer>
     </div>
   );

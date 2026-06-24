@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import App from "./App.jsx";
-import Login from "./pages/Login.tsx";
+import Login from "./pages/Login.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/student_dashboard.jsx";
 import QueuePage from "./pages/student/queue.jsx";
@@ -250,10 +250,19 @@ createRoot(document.getElementById("root")).render(
             <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route
-                path="/admin/queue"
+                path="/admin/appointments"
+                element={<AdminAppointment />}
+              />
+              <Route
+                path="/admin/transactions"
+                element={<AdminTransaction />}
+              />
+              <Route path="/admin/queue" element={<AdminQueue />} />
+              <Route
+                path="/admin/documents"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
-                    <AdminQueue />
+                    <AdminDocumentsPage />
                   </Suspense>
                 }
               />
@@ -274,18 +283,6 @@ createRoot(document.getElementById("root")).render(
                 }
               />
               <Route
-                path="/admin/appointments"
-                element={<AdminAppointment />}
-              />
-              <Route
-                path="/admin/documents"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AdminDocumentsPage />
-                  </Suspense>
-                }
-              />
-              <Route
                 path="/admin/document-processing"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
@@ -302,8 +299,20 @@ createRoot(document.getElementById("root")).render(
                 }
               />
               <Route
-                path="/admin/transactions"
-                element={<AdminTransaction />}
+                path="/admin/scan-document"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminScanDocument />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/queue-analytics"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminQueueAnalytics />
+                  </Suspense>
+                }
               />
               <Route
                 path="/admin/announcements"
@@ -329,25 +338,6 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              {/* ★ Admin Scan Document Route */}
-              <Route
-                path="/admin/scan-document"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AdminScanDocument />
-                  </Suspense>
-                }
-              />
-              {/* ★ Admin Queue Analytics Route */}
-              <Route
-                path="/admin/queue-analytics"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AdminQueueAnalytics />
-                  </Suspense>
-                }
-              />
-              {/* ★ Admin PinnaCle Sync Route */}
               <Route
                 path="/admin/pinnacle-sync"
                 element={
