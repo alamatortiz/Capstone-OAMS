@@ -7,6 +7,7 @@ import "./professor_dashboard.css";
 import "./professor_document_request.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
+import api from "../../utils/api";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -141,49 +142,6 @@ const FileTextIcon = () => (
   </svg>
 );
 
-// ── Document Types Data ───────────────────────────────────────────────────────
-const documentTypes = [
-  {
-    name: "Certificate of Employment",
-    description: "Official certification of employment status",
-    processingTime: "3-5 business days",
-    availability: "Available",
-    availabilityType: "available",
-    requirements: ["Valid ID", "Request form"],
-  },
-  {
-    name: "Service Record",
-    description: "Complete record of service history",
-    processingTime: "5-7 business days",
-    availability: "Available",
-    availabilityType: "available",
-    requirements: ["Valid ID", "Request form", "Clearance"],
-  },
-  {
-    name: "Certificate of No Pending Case",
-    description: "Certification of no administrative cases",
-    processingTime: "3-5 business days",
-    availability: "Available",
-    availabilityType: "available",
-    requirements: ["Valid ID", "Request form"],
-  },
-  {
-    name: "Teaching Load Certificate",
-    description: "Official certification of teaching assignments",
-    processingTime: "2-3 business days",
-    availability: "Available",
-    availabilityType: "available",
-    requirements: ["Valid ID", "Request form"],
-  },
-  {
-    name: "Income Tax Form (BIR 2316)",
-    description: "Annual income tax certificate",
-    processingTime: "7-10 business days",
-    availability: "Available (January-April only)",
-    availabilityType: "limited",
-    requirements: ["Valid ID", "Request form"],
-  },
-];
 
 export default function ProfessorDocumentRequest() {
   const { user: authUser, logout } = useAuth();
@@ -225,33 +183,50 @@ export default function ProfessorDocumentRequest() {
   const [purpose, setPurpose] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
 
-  // ── My Requests state ────────────────────────────────────────────────────────
-  const [myRequests, setMyRequests] = useState([
-    {
-      id: "1",
-      type: "Certificate of Employment",
-      purpose: "Bank loan application",
-      requestedDate: "2026-03-25",
-      status: "processing",
-      trackingNumber: "DOC-2026-0325-001",
-      additionalNotes: "Please process urgently for loan submission deadline.",
-      estimatedCompletion: "2026-03-28",
-      processingNotes:
-        "Currently being prepared by HR department. Expected to be ready by tomorrow.",
-    },
-    {
-      id: "2",
-      type: "Service Record",
-      purpose: "Promotion requirements",
-      requestedDate: "2026-03-20",
-      status: "ready",
-      trackingNumber: "DOC-2026-0320-015",
-      additionalNotes: "Need complete service history from date of hiring.",
-      estimatedCompletion: "2026-03-27",
-      processingNotes:
-        "Document is ready for pickup. Please bring valid ID when claiming.",
-    },
-  ]);
+  // ── Document services + my requests ──────────────────────────────────────────
+  const [documentTypes, setDocumentTypes] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
+
+  const fetchDocumentTypes = async () => {
+    try {
+      const res = await api.get("/faculty/document-services");
+      setDocumentTypes(res.data.map((s) => ({
+        id: s.service_id,
+        name: s.service_name,
+        description: s.description ?? "",
+        processingTime: s.processing_time ?? "TBD",
+        availability: s.status === "active" ? "Available" : "Unavailable",
+        availabilityType: s.status === "active" ? "available" : "unavailable",
+        requirements: ["Valid ID", "Request form"],
+      })));
+    } catch {
+      toast.error("Failed to load document types");
+    }
+  };
+
+  const fetchMyRequests = async () => {
+    try {
+      const res = await api.get("/faculty/my-document-requests");
+      setMyRequests(res.data.map((r) => ({
+        id: String(r.request_id),
+        type: r.service_name,
+        purpose: r.purpose,
+        requestedDate: r.created_at?.slice(0, 10),
+        status: r.status,
+        trackingNumber: r.tracking_number,
+        additionalNotes: r.notes,
+        estimatedCompletion: null,
+        processingNotes: null,
+      })));
+    } catch {
+      // table may not exist yet; silently ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchDocumentTypes();
+    fetchMyRequests();
+  }, []);
 
   // ── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -315,32 +290,28 @@ export default function ProfessorDocumentRequest() {
     return "I can help with document requests, processing times, and tracking. What do you need?";
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
     if (!documentType || !purpose.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const rand = String(Math.floor(Math.random() * 999) + 1).padStart(3, "0");
-    const newRequest = {
-      id: Date.now().toString(),
-      type: documentType,
-      purpose,
-      requestedDate: now.toISOString().split("T")[0],
-      status: "pending",
-      trackingNumber: `DOC-${now.getFullYear()}-${month}${day}-${rand}`,
-      additionalNotes,
-      estimatedCompletion: null,
-      processingNotes: null,
-    };
-    setMyRequests((prev) => [...prev, newRequest]);
-    setShowRequestModal(false);
-    setDocumentType("");
-    setPurpose("");
-    setAdditionalNotes("");
-    toast.success("Document request submitted successfully!");
+    const selectedService = documentTypes.find((d) => d.name === documentType);
+    try {
+      await api.post("/faculty/my-document-requests", {
+        service_id: selectedService?.id,
+        request_type: documentType,
+        purpose,
+        notes: additionalNotes,
+      });
+      await fetchMyRequests();
+      setShowRequestModal(false);
+      setDocumentType("");
+      setPurpose("");
+      setAdditionalNotes("");
+      toast.success("Document request submitted successfully!");
+    } catch {
+      toast.error("Failed to submit request");
+    }
   };
 
   const getStatusBadgeClass = (status) => {

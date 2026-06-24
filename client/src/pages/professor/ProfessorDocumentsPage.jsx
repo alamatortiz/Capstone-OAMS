@@ -8,6 +8,7 @@ import "./professor_dashboard.css";
 import "./professor_documents.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
+import api from "../../utils/api";
 
 // ── Nav Icons ─────────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -297,79 +298,47 @@ export default function ProfessorDocumentsPage() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  const [documents, setDocuments] = useState([
-    {
-      id: "1",
-      studentName: "Juan Dela Cruz",
-      studentId: "2100123",
-      documentType: "Recommendation Letter",
-      purpose: "Job Application",
-      requestDate: "2026-03-27 10:30 AM",
-      status: "pending",
-      urgency: "urgent",
-      notes: "Needed for job application deadline on March 30",
-    },
-    {
-      id: "2",
-      studentName: "Maria Santos",
-      studentId: "2100456",
-      documentType: "Grade Certification",
-      purpose: "Scholarship Application",
-      requestDate: "2026-03-26 02:15 PM",
-      status: "pending",
-      urgency: "normal",
-    },
-    {
-      id: "3",
-      studentName: "Pedro Garcia",
-      studentId: "2000789",
-      documentType: "Thesis Approval Form",
-      purpose: "Thesis Defense",
-      requestDate: "2026-03-25 09:00 AM",
-      status: "approved",
-      urgency: "normal",
-      notes: "Approved for defense on April 5",
-    },
-    {
-      id: "4",
-      studentName: "Ana Rodriguez",
-      studentId: "2100234",
-      documentType: "Completion Certificate",
-      purpose: "OJT Completion",
-      requestDate: "2026-03-24 11:20 AM",
-      status: "ready",
-      urgency: "normal",
-    },
-  ]);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await api.get("/faculty/document-requests");
+      setDocuments(res.data);
+    } catch {
+      toast.error("Failed to load document requests");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchDocuments(); }, []);
 
   const stats = {
     pending:    documents.filter((d) => d.status === "pending").length,
     approved:   documents.filter((d) => d.status === "approved").length,
     processing: documents.filter((d) => d.status === "processing").length,
-    ready:      documents.filter((d) => d.status === "ready").length,
+    ready:      documents.filter((d) => d.status === "generated" || d.status === "released").length,
   };
 
   const filtered =
     activeTab === "all" ? documents : documents.filter((d) => d.status === activeTab);
 
-  const handleApprove = (id) => {
+  const updateDocStatus = async (id, status, successMsg) => {
     const doc = documents.find((d) => d.id === id);
-    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, status: "approved" } : d)));
-    toast.success(`Approved ${doc?.documentType} for ${doc?.studentName}`);
+    try {
+      await api.patch(`/faculty/document-requests/${id}/status`, { status });
+      await fetchDocuments();
+      toast.success(successMsg.replace("{type}", doc?.documentType ?? "").replace("{name}", doc?.studentName ?? ""));
+    } catch {
+      toast.error("Failed to update document status");
+    }
   };
-  const handleReject = (id) => {
-    const doc = documents.find((d) => d.id === id);
-    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, status: "rejected" } : d)));
-    toast.error(`Rejected ${doc?.documentType} for ${doc?.studentName}`);
-  };
-  const handleProcess = (id) => {
-    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, status: "processing" } : d)));
-    toast.info("Document moved to processing");
-  };
-  const handleMarkReady = (id) => {
-    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, status: "ready" } : d)));
-    toast.success("Document marked as ready for pickup");
-  };
+
+  const handleApprove  = (id) => updateDocStatus(id, "processing", "Processing {type} for {name}");
+  const handleReject   = (id) => updateDocStatus(id, "rejected",   "Rejected {type} for {name}");
+  const handleProcess  = (id) => updateDocStatus(id, "processing", "Document moved to processing");
+  const handleMarkReady = (id) => updateDocStatus(id, "generated", "Document marked as ready for pickup");
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
@@ -551,7 +520,9 @@ export default function ProfessorDocumentsPage() {
 
             {/* List */}
             <div className="docs-list">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <div className="docs-empty">Loading document requests...</div>
+              ) : filtered.length === 0 ? (
                 <div className="docs-empty">No document requests found.</div>
               ) : (
                 filtered.map((doc) => (

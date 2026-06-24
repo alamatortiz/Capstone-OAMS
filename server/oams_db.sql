@@ -414,6 +414,24 @@ CREATE TABLE notifications (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
+-- ─────────────────────────────────────────────────────────────
+-- 15. FACULTY DOCUMENT REQUESTS (faculty requesting their own documents)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS faculty_document_requests (
+    request_id          INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number     VARCHAR(50)  NOT NULL UNIQUE,
+    faculty_id          INT          NOT NULL,
+    service_id          INT          NOT NULL,
+    request_type        VARCHAR(100) NOT NULL DEFAULT 'General',
+    purpose             VARCHAR(255) NOT NULL,
+    status              ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
+    notes               TEXT         NULL,
+    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES document_services(service_id),
+    INDEX idx_faculty_doc_requests_faculty (faculty_id)
+);
+
 -- ============================================================
 -- Schema definition ends here.
 -- Seed data (departments, users, mock records) is in:

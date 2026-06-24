@@ -167,4 +167,626 @@ function formatRelativeTime(date) {
   return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
 }
 
+// ─────────────────────────────────────────────────────────────
+// APPOINTMENTS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/appointments
+router.get(
+  "/appointments",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { status } = req.query;
+    try {
+      let sql = `
+        SELECT
+          a.appointment_id, a.appointment_date, a.appointment_time,
+          a.status, a.notes, a.created_at,
+          s.first_name, s.last_name, s.student_number, s.course,
+          svc.service_name AS purpose
+        FROM appointments a
+        JOIN students s ON a.student_id = s.student_id
+        LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
+        WHERE a.faculty_id = ?`;
+      const params = [facultyId];
+      if (status && status !== "all") {
+        sql += " AND a.status = ?";
+        params.push(status);
+      }
+      sql += " ORDER BY a.appointment_date DESC, a.appointment_time ASC";
+      const [rows] = await pool.query(sql, params);
+      res.json(rows.map((r) => ({
+        id: r.appointment_id,
+        studentName: `${r.first_name} ${r.last_name}`,
+        studentId: r.student_number,
+        course: r.course,
+        purpose: r.purpose ?? r.notes ?? "No notes provided",
+        date: r.appointment_date,
+        time: formatTime(r.appointment_time),
+        status: r.status,
+        notes: r.notes,
+        requestedAt: r.created_at,
+      })));
+    } catch (err) {
+      console.error("GET /appointments error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// PATCH /api/faculty/appointments/:id/status
+router.patch(
+  "/appointments/:id/status",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    const { status } = req.body;
+    const allowed = ["approved", "rejected", "completed", "cancelled"];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+    try {
+      const [result] = await pool.query(
+        "UPDATE appointments SET status = ? WHERE appointment_id = ? AND faculty_id = ?",
+        [status, id, facultyId]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Appointment not found" });
+      res.json({ message: "Status updated" });
+    } catch (err) {
+      console.error("PATCH /appointments/:id/status error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// DOCUMENT REQUESTS (student requests in faculty's department)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/document-requests
+router.get(
+  "/document-requests",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { status } = req.query;
+    try {
+      let sql = `
+        SELECT
+          dr.request_id, dr.tracking_number, dr.request_type, dr.purpose,
+          dr.status, dr.notes, dr.created_at, dr.estimated_completion,
+          s.first_name, s.last_name, s.student_number,
+          ds.service_name
+        FROM document_requests dr
+        JOIN document_services ds ON dr.service_id = ds.service_id
+        JOIN students s ON dr.student_id = s.student_id
+        JOIN faculty f ON f.department_id = ds.department_id
+        WHERE f.faculty_id = ?`;
+      const params = [facultyId];
+      if (status && status !== "all") {
+        sql += " AND dr.status = ?";
+        params.push(status);
+      }
+      sql += " ORDER BY dr.created_at DESC";
+      const [rows] = await pool.query(sql, params);
+      res.json(rows.map((r) => ({
+        id: r.request_id,
+        trackingNumber: r.tracking_number,
+        studentName: `${r.first_name} ${r.last_name}`,
+        studentId: r.student_number,
+        documentType: r.service_name,
+        requestType: r.request_type,
+        purpose: r.purpose,
+        status: r.status,
+        notes: r.notes,
+        requestDate: r.created_at,
+        estimatedCompletion: r.estimated_completion,
+      })));
+    } catch (err) {
+      console.error("GET /document-requests error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// PATCH /api/faculty/document-requests/:id/status
+router.patch(
+  "/document-requests/:id/status",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    const { status, notes } = req.body;
+    const allowed = ["processing", "generated", "released", "rejected"];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+    try {
+      const [[doc]] = await pool.query(
+        `SELECT dr.request_id FROM document_requests dr
+         JOIN document_services ds ON dr.service_id = ds.service_id
+         JOIN faculty f ON f.department_id = ds.department_id
+         WHERE dr.request_id = ? AND f.faculty_id = ?`,
+        [id, facultyId]
+      );
+      if (!doc) return res.status(404).json({ message: "Document request not found" });
+      await pool.query(
+        "UPDATE document_requests SET status = ?, notes = COALESCE(?, notes) WHERE request_id = ?",
+        [status, notes ?? null, id]
+      );
+      res.json({ message: "Status updated" });
+    } catch (err) {
+      console.error("PATCH /document-requests/:id/status error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// TRANSACTIONS (combined appointment + document history)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/transactions
+router.get(
+  "/transactions",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { search = "", filterType = "all", filterStatus = "all" } = req.query;
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      if (!fac) return res.status(404).json({ message: "Faculty not found" });
+      const deptId = fac.department_id;
+
+      let rows = [];
+
+      if (filterType === "all" || filterType === "appointment") {
+        let sql = `
+          SELECT
+            a.appointment_id AS id, 'appointment' AS type,
+            CONCAT(s.first_name,' ',s.last_name) AS studentName,
+            s.student_number AS studentId,
+            COALESCE(svc.service_name, a.notes, 'Consultation') AS description,
+            a.status, a.appointment_date AS date, a.created_at
+          FROM appointments a
+          JOIN students s ON a.student_id = s.student_id
+          LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
+          WHERE a.faculty_id = ?`;
+        const params = [facultyId];
+        if (filterStatus !== "all") { sql += " AND a.status = ?"; params.push(filterStatus); }
+        if (search) { sql += " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_number LIKE ?)"; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+        const [appts] = await pool.query(sql, params);
+        rows = rows.concat(appts);
+      }
+
+      if (filterType === "all" || filterType === "document") {
+        let sql = `
+          SELECT
+            dr.request_id AS id, 'document' AS type,
+            CONCAT(s.first_name,' ',s.last_name) AS studentName,
+            s.student_number AS studentId,
+            ds.service_name AS description,
+            dr.status, dr.created_at AS date, dr.created_at
+          FROM document_requests dr
+          JOIN document_services ds ON dr.service_id = ds.service_id
+          JOIN students s ON dr.student_id = s.student_id
+          WHERE ds.department_id = ?`;
+        const params = [deptId];
+        if (filterStatus !== "all") { sql += " AND dr.status = ?"; params.push(filterStatus); }
+        if (search) { sql += " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_number LIKE ?)"; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+        const [docs] = await pool.query(sql, params);
+        rows = rows.concat(docs);
+      }
+
+      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      res.json(rows);
+    } catch (err) {
+      console.error("GET /transactions error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// SCHEDULE / AVAILABILITY
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/availability
+router.get(
+  "/availability",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [rows] = await pool.query(
+        "SELECT * FROM faculty_availability WHERE faculty_id = ? ORDER BY FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'), start_time",
+        [facultyId]
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error("GET /availability error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// POST /api/faculty/availability
+router.post(
+  "/availability",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { day_of_week, start_time, end_time, location } = req.body;
+    if (!day_of_week || !start_time || !end_time) {
+      return res.status(400).json({ message: "day_of_week, start_time, end_time are required" });
+    }
+    try {
+      const [result] = await pool.query(
+        "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location) VALUES (?,?,?,?,?)",
+        [facultyId, day_of_week, start_time, end_time, location ?? null]
+      );
+      res.status(201).json({ availability_id: result.insertId, message: "Availability added" });
+    } catch (err) {
+      console.error("POST /availability error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// PATCH /api/faculty/availability/:id
+router.patch(
+  "/availability/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    const { day_of_week, start_time, end_time, location } = req.body;
+    try {
+      const [result] = await pool.query(
+        `UPDATE faculty_availability
+         SET day_of_week = COALESCE(?, day_of_week),
+             start_time = COALESCE(?, start_time),
+             end_time = COALESCE(?, end_time),
+             location = COALESCE(?, location)
+         WHERE availability_id = ? AND faculty_id = ?`,
+        [day_of_week ?? null, start_time ?? null, end_time ?? null, location ?? null, id, facultyId]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Availability not found" });
+      res.json({ message: "Availability updated" });
+    } catch (err) {
+      console.error("PATCH /availability/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// DELETE /api/faculty/availability/:id
+router.delete(
+  "/availability/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    try {
+      const [result] = await pool.query(
+        "DELETE FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
+        [id, facultyId]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Availability not found" });
+      res.json({ message: "Availability deleted" });
+    } catch (err) {
+      console.error("DELETE /availability/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// ANNOUNCEMENTS (stored in faqs table)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/announcements
+router.get(
+  "/announcements",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT employee_id, department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      if (!fac) return res.status(404).json({ message: "Faculty not found" });
+      const [rows] = await pool.query(
+        "SELECT * FROM faqs WHERE created_by = ? ORDER BY created_at DESC",
+        [fac.employee_id]
+      );
+      res.json(rows.map((r) => ({
+        id: r.faq_id,
+        title: r.question,
+        content: r.answer,
+        type: r.type,
+        status: r.status === "active" ? "published" : "draft",
+        isPinned: r.is_pinned,
+        createdAt: r.created_at,
+      })));
+    } catch (err) {
+      console.error("GET /announcements error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// POST /api/faculty/announcements
+router.post(
+  "/announcements",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { title, content, type = "general", status = "draft", isPinned = false } = req.body;
+    if (!title || !content) return res.status(400).json({ message: "title and content are required" });
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT employee_id, department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      const dbStatus = status === "published" ? "active" : "archived";
+      const [result] = await pool.query(
+        "INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id) VALUES (?,?,?,?,?,?,?)",
+        [title, content, type, dbStatus, fac.employee_id, isPinned ? 1 : 0, fac.department_id]
+      );
+      res.status(201).json({ id: result.insertId, message: "Announcement created" });
+    } catch (err) {
+      console.error("POST /announcements error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// PUT /api/faculty/announcements/:id
+router.put(
+  "/announcements/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    const { title, content, type, status, isPinned } = req.body;
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT employee_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      const dbStatus = status === "published" ? "active" : status === "draft" ? "archived" : null;
+      const [result] = await pool.query(
+        `UPDATE faqs SET
+           question = COALESCE(?, question),
+           answer = COALESCE(?, answer),
+           type = COALESCE(?, type),
+           status = COALESCE(?, status),
+           is_pinned = COALESCE(?, is_pinned)
+         WHERE faq_id = ? AND created_by = ?`,
+        [title ?? null, content ?? null, type ?? null, dbStatus, isPinned != null ? (isPinned ? 1 : 0) : null, id, fac.employee_id]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Announcement not found" });
+      res.json({ message: "Announcement updated" });
+    } catch (err) {
+      console.error("PUT /announcements/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// DELETE /api/faculty/announcements/:id
+router.delete(
+  "/announcements/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT employee_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      const [result] = await pool.query(
+        "DELETE FROM faqs WHERE faq_id = ? AND created_by = ?",
+        [id, fac.employee_id]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Announcement not found" });
+      res.json({ message: "Announcement deleted" });
+    } catch (err) {
+      console.error("DELETE /announcements/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// APPOINTMENT SERVICES (slot management)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/appointment-services
+router.get(
+  "/appointment-services",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [rows] = await pool.query(
+        "SELECT * FROM appointment_services WHERE faculty_id = ? ORDER BY service_id",
+        [facultyId]
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error("GET /appointment-services error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// POST /api/faculty/appointment-services
+router.post(
+  "/appointment-services",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { service_name, description } = req.body;
+    if (!service_name) return res.status(400).json({ message: "service_name is required" });
+    try {
+      const [result] = await pool.query(
+        "INSERT INTO appointment_services (service_name, description, faculty_id) VALUES (?,?,?)",
+        [service_name, description ?? null, facultyId]
+      );
+      res.status(201).json({ service_id: result.insertId, message: "Service created" });
+    } catch (err) {
+      console.error("POST /appointment-services error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// PUT /api/faculty/appointment-services/:id
+router.put(
+  "/appointment-services/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    const { service_name, description } = req.body;
+    try {
+      const [result] = await pool.query(
+        `UPDATE appointment_services
+         SET service_name = COALESCE(?, service_name),
+             description = COALESCE(?, description)
+         WHERE service_id = ? AND faculty_id = ?`,
+        [service_name ?? null, description ?? null, id, facultyId]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Service not found" });
+      res.json({ message: "Service updated" });
+    } catch (err) {
+      console.error("PUT /appointment-services/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// DELETE /api/faculty/appointment-services/:id
+router.delete(
+  "/appointment-services/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    try {
+      const [result] = await pool.query(
+        "DELETE FROM appointment_services WHERE service_id = ? AND faculty_id = ?",
+        [id, facultyId]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Service not found" });
+      res.json({ message: "Service deleted" });
+    } catch (err) {
+      console.error("DELETE /appointment-services/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// FACULTY'S OWN DOCUMENT REQUESTS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/document-services — available services for faculty's department
+router.get(
+  "/document-services",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      const [rows] = await pool.query(
+        "SELECT * FROM document_services WHERE department_id = ? AND status = 'active' ORDER BY service_name",
+        [fac.department_id]
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error("GET /document-services error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// GET /api/faculty/my-document-requests
+router.get(
+  "/my-document-requests",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [rows] = await pool.query(
+        `SELECT fdr.*, ds.service_name, ds.processing_time
+         FROM faculty_document_requests fdr
+         JOIN document_services ds ON fdr.service_id = ds.service_id
+         WHERE fdr.faculty_id = ?
+         ORDER BY fdr.created_at DESC`,
+        [facultyId]
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error("GET /my-document-requests error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// POST /api/faculty/my-document-requests
+router.post(
+  "/my-document-requests",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { service_id, request_type, purpose, notes } = req.body;
+    if (!service_id || !purpose) return res.status(400).json({ message: "service_id and purpose are required" });
+    try {
+      const tracking_number = `FDR-${Date.now()}-${facultyId}`;
+      const [result] = await pool.query(
+        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, notes, tracking_number)
+         VALUES (?,?,?,?,?,?)`,
+        [facultyId, service_id, request_type ?? "General", purpose, notes ?? null, tracking_number]
+      );
+      res.status(201).json({ request_id: result.insertId, tracking_number, message: "Request submitted" });
+    } catch (err) {
+      console.error("POST /my-document-requests error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
 module.exports = router;

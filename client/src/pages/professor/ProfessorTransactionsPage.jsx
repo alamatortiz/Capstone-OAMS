@@ -7,6 +7,7 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "../professor/professor_dashboard.css";
 import "./professor_transactions.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -127,88 +128,6 @@ const FileTextIconSm = () => (
 );
 
 // ── Transactions data ─────────────────────────────────────────────────────────
-const TRANSACTIONS = [
-  {
-    id: "1",
-    type: "queue",
-    action: "Completed Queue Service",
-    studentName: "Juan Dela Cruz",
-    studentId: "2100123",
-    details: "Academic Consultation - Thesis guidance",
-    timestamp: "2026-03-27 11:30 AM",
-    status: "completed",
-  },
-  {
-    id: "2",
-    type: "appointment",
-    action: "Approved Appointment",
-    studentName: "Maria Santos",
-    studentId: "2100456",
-    details: "Career Guidance - Online meeting scheduled",
-    timestamp: "2026-03-27 10:15 AM",
-    status: "approved",
-  },
-  {
-    id: "3",
-    type: "document",
-    action: "Approved Document Request",
-    studentName: "Pedro Garcia",
-    studentId: "2000789",
-    details: "Recommendation Letter for job application",
-    timestamp: "2026-03-27 09:45 AM",
-    status: "approved",
-  },
-  {
-    id: "4",
-    type: "queue",
-    action: "Cancelled Queue Request",
-    studentName: "Ana Rodriguez",
-    studentId: "2100234",
-    details: "Grade Inquiry - Student no-show",
-    timestamp: "2026-03-27 09:00 AM",
-    status: "cancelled",
-  },
-  {
-    id: "5",
-    type: "appointment",
-    action: "Completed Appointment",
-    studentName: "Carlos Reyes",
-    studentId: "2100567",
-    details: "Research Consultation - Methodology discussion",
-    timestamp: "2026-03-26 03:00 PM",
-    status: "completed",
-  },
-  {
-    id: "6",
-    type: "document",
-    action: "Rejected Document Request",
-    studentName: "Lisa Fernandez",
-    studentId: "2200123",
-    details: "Grade Certification - Incomplete requirements",
-    timestamp: "2026-03-26 02:30 PM",
-    status: "rejected",
-  },
-  {
-    id: "7",
-    type: "queue",
-    action: "Completed Queue Service",
-    studentName: "Marco Velasco",
-    studentId: "2000456",
-    details: "Document Signing - Clearance form",
-    timestamp: "2026-03-26 01:15 PM",
-    status: "completed",
-  },
-  {
-    id: "8",
-    type: "appointment",
-    action: "Approved Appointment",
-    studentName: "Sofia Mendoza",
-    studentId: "2100789",
-    details: "Academic Advising - Course selection",
-    timestamp: "2026-03-26 11:00 AM",
-    status: "approved",
-  },
-];
 
 export default function ProfessorTransactionsPage() {
   const { user: authUser, logout } = useAuth();
@@ -247,7 +166,30 @@ export default function ProfessorTransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const transactions = TRANSACTIONS;
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTransactions = async () => {
+    try {
+      const params = {};
+      if (searchQuery) params.search = searchQuery;
+      if (filterType !== "all") params.filterType = filterType;
+      if (filterStatus !== "all") params.filterStatus = filterStatus;
+      const res = await api.get("/faculty/transactions", { params });
+      setTransactions(res.data.map((t) => ({
+        ...t,
+        action: `${capitalize(t.status)} ${typeLabel(t.type)}`,
+        details: t.description ?? "",
+        timestamp: t.date ? new Date(t.date).toLocaleString() : "",
+      })));
+    } catch {
+      // silently fail — table might be empty
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchTransactions(); }, [searchQuery, filterType, filterStatus]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -307,17 +249,8 @@ export default function ProfessorTransactionsPage() {
     documents: transactions.filter((t) => t.type === "document").length,
   };
 
-  // ── Filtered list ─────────────────────────────────────────────────────────
-  const filtered = transactions.filter((t) => {
-    const q = searchQuery.toLowerCase();
-    const matchSearch =
-      t.studentName.toLowerCase().includes(q) ||
-      t.studentId.toLowerCase().includes(q) ||
-      t.details.toLowerCase().includes(q);
-    const matchType = filterType === "all" || t.type === filterType;
-    const matchStatus = filterStatus === "all" || t.status === filterStatus;
-    return matchSearch && matchType && matchStatus;
-  });
+  // Server already handles filtering; just use transactions directly
+  const filtered = transactions;
 
   // ── Badge helpers ─────────────────────────────────────────────────────────
   const typeBadgeClass = (type) =>
@@ -532,7 +465,9 @@ export default function ProfessorTransactionsPage() {
 
               {/* List */}
               <div className="txn-list">
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <div className="txn-empty"><p>Loading transactions...</p></div>
+                ) : filtered.length === 0 ? (
                   <div className="txn-empty">
                     <ActivityIcon />
                     <p>No transactions found</p>

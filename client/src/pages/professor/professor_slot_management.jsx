@@ -7,6 +7,8 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./professor_dashboard.css";
 import "./professor_slot_management.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
+import { toast } from "sonner";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -269,6 +271,29 @@ export default function ProfessorSlotManagement() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
 
+  const DAY_NAME_TO_NUM = { Sunday:0, Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6 };
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await api.get("/faculty/availability");
+      setTemplates(res.data.map((r) => ({
+        id: String(r.availability_id),
+        availability_id: r.availability_id,
+        dayOfWeek: DAY_NAME_TO_NUM[r.day_of_week] ?? 1,
+        day_of_week: r.day_of_week,
+        startTime: r.start_time,
+        endTime: r.end_time,
+        location: r.location ?? "",
+        maxSlots: 1,
+        isActive: true,
+      })));
+    } catch {
+      toast.error("Failed to load templates");
+    }
+  };
+
+  useEffect(() => { fetchTemplates(); }, []);
+
   // ── Handlers ──────────────────────────────────────────────────────────
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => { logout(); navigate("/login"); };
@@ -333,27 +358,41 @@ export default function ProfessorSlotManagement() {
   };
 
   // ── Template CRUD ─────────────────────────────────────────────────────
-  const handleCreateTemplate = () => {
+  const DAY_NAMES_ARR = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  const handleCreateTemplate = async () => {
     if (!templateStartTime || !templateEndTime || !templateLocation) {
-      alert("Please fill in all required fields."); return;
+      toast.error("Please fill in all required fields."); return;
     }
-    const t = {
-      id: `tmpl-${Date.now()}`,
-      professorId: user.employeeId || "prof-001",
-      dayOfWeek: parseInt(templateDay),
-      startTime: templateStartTime, endTime: templateEndTime,
-      location: templateLocation, maxSlots: parseInt(templateMaxSlots), isActive: true,
-    };
-    setTemplates((prev) => [...prev, t]);
+    try {
+      await api.post("/faculty/availability", {
+        day_of_week: DAY_NAMES_ARR[parseInt(templateDay)],
+        start_time: templateStartTime,
+        end_time: templateEndTime,
+        location: templateLocation,
+      });
+      await fetchTemplates();
+      toast.success("Template created");
+    } catch {
+      toast.error("Failed to create template");
+    }
     resetTemplateForm();
   };
 
-  const handleDeleteTemplate = (id) => {
-    if (window.confirm("Delete this template?"))
-      setTemplates((prev) => prev.filter(t => t.id !== id));
+  const handleDeleteTemplate = async (id) => {
+    if (!window.confirm("Delete this template?")) return;
+    const tmpl = templates.find(t => t.id === id);
+    try {
+      await api.delete(`/faculty/availability/${tmpl?.availability_id ?? id}`);
+      await fetchTemplates();
+      toast.success("Template deleted");
+    } catch {
+      toast.error("Failed to delete template");
+    }
   };
 
   const handleToggleTemplate = (id, current) => {
+    // Toggle is UI-only (availability rows have no active/inactive flag)
     setTemplates((prev) => prev.map(t => t.id === id ? { ...t, isActive: !current } : t));
   };
 

@@ -6,6 +6,8 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./professor_dashboard.css";
 import "./professor_schedule_availability.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
+import { toast } from "sonner";
 
 // ── Shared Icons ──────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -165,6 +167,13 @@ const generateCalendar = () => {
   return days;
 };
 
+function formatTime12(timeStr) {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":");
+  const hour = parseInt(h, 10);
+  return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ProfessorScheduleAvailability() {
   const { user: authUser, logout } = useAuth();
@@ -188,11 +197,49 @@ export default function ProfessorScheduleAvailability() {
   const messagesEndRef = useRef(null);
 
   // Schedule state
+  const [availabilityRows, setAvailabilityRows] = useState([]);
   const [calendar, setCalendar] = useState(generateCalendar());
   const [selectedDate, setSelectedDate] = useState(null);
   const [showUnavailableDialog, setShowUnavailableDialog] = useState(false);
   const [unavailableReason, setUnavailableReason] = useState("");
   const [openDropdown, setOpenDropdown] = useState(null); // "date-slotId"
+
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  const buildCalendarFromAvailability = (rows) => {
+    const base = generateCalendar();
+    return base.map((day) => {
+      const jsDay = new Date(day.date + "T00:00:00");
+      const dayOfWeek = DAY_NAMES[jsDay.getDay()];
+      const matching = rows.filter((r) => r.day_of_week === dayOfWeek);
+      if (matching.length === 0) {
+        return { ...day, isAvailable: false, slots: [] };
+      }
+      const slots = matching.map((r) => ({
+        id: String(r.availability_id),
+        availability_id: r.availability_id,
+        time: `${formatTime12(r.start_time)} - ${formatTime12(r.end_time)}`,
+        start_time: r.start_time,
+        end_time: r.end_time,
+        location: r.location,
+        appointmentType: "Consultation",
+        isBooked: false,
+      }));
+      return { ...day, isAvailable: true, slots };
+    });
+  };
+
+  const fetchAvailability = async () => {
+    try {
+      const res = await api.get("/faculty/availability");
+      setAvailabilityRows(res.data);
+      setCalendar(buildCalendarFromAvailability(res.data));
+    } catch {
+      toast.error("Failed to load availability schedule");
+    }
+  };
+
+  useEffect(() => { fetchAvailability(); }, []);
 
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
@@ -249,21 +296,39 @@ export default function ProfessorScheduleAvailability() {
       setSelectedDate(date);
       setShowUnavailableDialog(true);
     } else {
-      setCalendar(calendar.map((d) => d.date === date ? { ...d, isAvailable: true, reason: undefined } : d));
+      // Add a default 9AM-5PM slot for that day
+      const jsDay = new Date(date + "T00:00:00");
+      const dayOfWeek = DAY_NAMES[jsDay.getDay()];
+      api.post("/faculty/availability", {
+        day_of_week: dayOfWeek,
+        start_time: "09:00:00",
+        end_time: "17:00:00",
+        location: "",
+      }).then(() => fetchAvailability())
+        .catch(() => toast.error("Failed to add availability"));
     }
   };
 
-  const handleSetUnavailable = () => {
-    if (!selectedDate || !unavailableReason.trim()) return;
-    setCalendar(calendar.map((d) =>
-      d.date === selectedDate ? { ...d, isAvailable: false, reason: unavailableReason } : d
-    ));
+  const handleSetUnavailable = async () => {
+    if (!selectedDate) return;
+    const day = calendar.find((d) => d.date === selectedDate);
+    try {
+      await Promise.all(
+        (day?.slots ?? []).map((s) =>
+          s.availability_id ? api.delete(`/faculty/availability/${s.availability_id}`) : Promise.resolve()
+        )
+      );
+      await fetchAvailability();
+    } catch {
+      toast.error("Failed to remove availability");
+    }
     setShowUnavailableDialog(false);
     setUnavailableReason("");
     setSelectedDate(null);
   };
 
   const updateSlotType = (date, slotId, newType) => {
+    // slot type is UI-only (not stored in DB); just update local state
     setCalendar(calendar.map((d) =>
       d.date === date
         ? { ...d, slots: d.slots.map((s) => s.id === slotId ? { ...s, appointmentType: newType } : s) }

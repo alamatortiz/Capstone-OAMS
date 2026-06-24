@@ -7,6 +7,8 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./professor_dashboard.css";
 import "./professor_announcement_creation.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import api from "../../utils/api";
+import { toast } from "sonner";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -168,38 +170,18 @@ export default function ProfessorAnnouncementCreation() {
   const [formType, setFormType] = useState("general");
   const [formAudience, setFormAudience] = useState("all");
 
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: "1",
-      title: "Midterm Examination Schedule",
-      content:
-        "Midterm examinations will be conducted from April 5-9, 2026. Please check your class schedules for specific exam dates and times.",
-      type: "important",
-      targetAudience: "My Students",
-      createdDate: "2026-03-25",
-      status: "published",
-    },
-    {
-      id: "2",
-      title: "Consultation Hours Update",
-      content:
-        "My consultation hours for next week will be adjusted. Please check the updated schedule in the faculty portal.",
-      type: "reminder",
-      targetAudience: "My Students",
-      createdDate: "2026-03-24",
-      status: "published",
-    },
-    {
-      id: "3",
-      title: "Thesis Defense Guidelines",
-      content:
-        "Draft announcement for thesis defense procedures and requirements.",
-      type: "important",
-      targetAudience: "Department",
-      createdDate: "2026-03-23",
-      status: "draft",
-    },
-  ]);
+  const [announcements, setAnnouncements] = useState([]);
+
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await api.get("/faculty/announcements");
+      setAnnouncements(res.data);
+    } catch {
+      toast.error("Failed to load announcements");
+    }
+  };
+
+  useEffect(() => { fetchAnnouncements(); }, []);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -247,30 +229,26 @@ export default function ProfessorAnnouncementCreation() {
     setShowCreateModal(false);
   };
 
-  const handleCreateOrUpdate = () => {
+  const handleCreateOrUpdate = async () => {
     if (!formTitle.trim() || !formContent.trim()) {
-      alert("Please fill in all required fields.");
+      toast.error("Please fill in all required fields.");
       return;
     }
-    if (editingAnnouncement) {
-      setAnnouncements((prev) =>
-        prev.map((a) =>
-          a.id === editingAnnouncement.id
-            ? { ...a, title: formTitle, content: formContent, type: formType, targetAudience: formAudience }
-            : a
-        )
-      );
-    } else {
-      const newAnnouncement = {
-        id: Date.now().toString(),
-        title: formTitle,
-        content: formContent,
-        type: formType,
-        targetAudience: formAudience,
-        createdDate: new Date().toISOString().split("T")[0],
-        status: "draft",
-      };
-      setAnnouncements((prev) => [newAnnouncement, ...prev]);
+    try {
+      if (editingAnnouncement) {
+        await api.put(`/faculty/announcements/${editingAnnouncement.id}`, {
+          title: formTitle, content: formContent, type: formType,
+        });
+        toast.success("Announcement updated");
+      } else {
+        await api.post("/faculty/announcements", {
+          title: formTitle, content: formContent, type: formType, status: "draft",
+        });
+        toast.success("Announcement created as draft");
+      }
+      await fetchAnnouncements();
+    } catch {
+      toast.error("Failed to save announcement");
     }
     resetForm();
   };
@@ -280,26 +258,31 @@ export default function ProfessorAnnouncementCreation() {
     setFormTitle(announcement.title);
     setFormContent(announcement.content);
     setFormType(announcement.type);
-    setFormAudience(announcement.targetAudience);
+    setFormAudience("all");
     setShowCreateModal(true);
   };
 
-  const handlePublish = (id) => {
-    setAnnouncements((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "published" } : a))
-    );
+  const handlePublish = async (id) => {
+    try {
+      await api.put(`/faculty/announcements/${id}`, { status: "published" });
+      await fetchAnnouncements();
+    } catch { toast.error("Failed to publish"); }
   };
 
-  const handleUnpublish = (id) => {
-    setAnnouncements((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "draft" } : a))
-    );
+  const handleUnpublish = async (id) => {
+    try {
+      await api.put(`/faculty/announcements/${id}`, { status: "draft" });
+      await fetchAnnouncements();
+    } catch { toast.error("Failed to unpublish"); }
   };
 
-  const handleDelete = (id) => {
-    if (confirm("Are you sure you want to delete this announcement?")) {
-      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
-    }
+  const handleDelete = async (id) => {
+    if (!confirm("Are you sure you want to delete this announcement?")) return;
+    try {
+      await api.delete(`/faculty/announcements/${id}`);
+      await fetchAnnouncements();
+      toast.success("Announcement deleted");
+    } catch { toast.error("Failed to delete"); }
   };
 
   const getTypeBadgeStyle = (type) => {

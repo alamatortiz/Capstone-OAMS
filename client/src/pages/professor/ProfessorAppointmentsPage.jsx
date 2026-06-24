@@ -8,6 +8,7 @@ import "./professor_dashboard.css";
 import "./professor_appointments.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
+import api from "../../utils/api";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -323,38 +324,27 @@ export default function ProfessorAppointmentsPage() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  const [appointments, setAppointments] = useState([
-    {
-      id: "1", studentName: "Juan Dela Cruz", studentId: "2100123",
-      purpose: "Thesis Defense Preparation", date: "2026-03-28", time: "10:00 AM",
-      duration: "1 hour", type: "in-person", location: "Faculty Room 203",
-      status: "pending", requestedAt: "2026-03-27 09:30 AM",
-      notes: "Need guidance on methodology chapter",
-    },
-    {
-      id: "2", studentName: "Maria Santos", studentId: "2100456",
-      purpose: "Career Guidance", date: "2026-03-28", time: "2:00 PM",
-      duration: "30 mins", type: "online", meetingLink: "https://meet.google.com/abc-defg-hij",
-      status: "approved", requestedAt: "2026-03-26 03:15 PM",
-    },
-    {
-      id: "3", studentName: "Pedro Garcia", studentId: "2000789",
-      purpose: "Grade Consultation", date: "2026-03-29", time: "11:00 AM",
-      duration: "30 mins", type: "in-person", location: "Faculty Office",
-      status: "pending", requestedAt: "2026-03-27 08:00 AM",
-    },
-    {
-      id: "4", studentName: "Ana Rodriguez", studentId: "2100234",
-      purpose: "Research Consultation", date: "2026-03-27", time: "3:00 PM",
-      duration: "1 hour", type: "online", meetingLink: "https://meet.google.com/xyz-abcd-efg",
-      status: "completed", requestedAt: "2026-03-25 10:00 AM",
-    },
-  ]);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  const fetchAppointments = async () => {
+    try {
+      const res = await api.get("/faculty/appointments");
+      setAppointments(res.data);
+    } catch (err) {
+      toast.error("Failed to load appointments");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchAppointments(); }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
   const stats = {
     pending:  appointments.filter((a) => a.status === "pending").length,
     approved: appointments.filter((a) => a.status === "approved").length,
-    today:    appointments.filter((a) => a.date === "2026-03-27" && a.status === "approved").length,
+    today:    appointments.filter((a) => a.date?.slice(0, 10) === today && ["pending","approved"].includes(a.status)).length,
     thisWeek: appointments.filter((a) => a.status === "approved").length,
   };
 
@@ -363,24 +353,21 @@ export default function ProfessorAppointmentsPage() {
   const filteredAppointments =
     activeTab === "all" ? appointments : appointments.filter((a) => a.status === activeTab);
 
-  const handleApprove = (id) => {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "approved" } : a)));
+  const updateStatus = async (id, status, successMsg, errorMsg) => {
     const apt = appointments.find((a) => a.id === id);
-    toast.success(`Approved appointment with ${apt?.studentName}`);
+    try {
+      await api.patch(`/faculty/appointments/${id}/status`, { status });
+      await fetchAppointments();
+      if (successMsg) toast.success(successMsg.replace("{name}", apt?.studentName ?? ""));
+    } catch {
+      toast.error(errorMsg ?? "Failed to update appointment");
+    }
   };
-  const handleReject = (id) => {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "rejected" } : a)));
-    const apt = appointments.find((a) => a.id === id);
-    toast.error(`Rejected appointment with ${apt?.studentName}`);
-  };
-  const handleComplete = (id) => {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "completed" } : a)));
-    toast.success("Appointment marked as completed");
-  };
-  const handleCancel = (id) => {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a)));
-    toast.info("Appointment cancelled");
-  };
+
+  const handleApprove  = (id) => updateStatus(id, "approved",   "Approved appointment with {name}");
+  const handleReject   = (id) => updateStatus(id, "rejected",   null, "Rejected appointment");
+  const handleComplete = (id) => updateStatus(id, "completed",  "Appointment marked as completed");
+  const handleCancel   = (id) => updateStatus(id, "cancelled",  "Appointment cancelled");
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
@@ -552,7 +539,9 @@ export default function ProfessorAppointmentsPage() {
 
             {/* List */}
             <div className="appt-list">
-              {filteredAppointments.length === 0 ? (
+              {loading ? (
+                <div className="appt-empty">Loading appointments...</div>
+              ) : filteredAppointments.length === 0 ? (
                 <div className="appt-empty">No appointments found.</div>
               ) : (
                 filteredAppointments.map((apt) => (
