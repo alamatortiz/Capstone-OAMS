@@ -21,7 +21,7 @@ const CloseIconChat = () => (
   </svg>
 );
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, ChevronRight, Loader2, ChevronDown, HelpCircle } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -30,6 +30,7 @@ import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { useQueue } from '../../contexts/QueueContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import api from '../../utils/api';
+import { applyTheme, getSavedTheme } from '../../utils/theme';
 
 import ucLogo from '../../assets/Pnc-Logo.png';
 import oamsLogo from '../../assets/oams_logo.png';
@@ -141,10 +142,11 @@ export default function QueuePage() {
 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    return saved ? saved === 'dark' : true;
-  });
+  const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
+
+  useEffect(() => {
+    applyTheme(getSavedTheme());
+  }, []);
 
   // Track which slot/queue buttons are in-flight to prevent double-clicks
   const [joiningSlotId, setJoiningSlotId] = useState(null);
@@ -165,6 +167,7 @@ export default function QueuePage() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
+  const messageIdRef = useRef(1); // initial bot message uses id:1
 
   const user = authUser
     ? {
@@ -180,8 +183,14 @@ export default function QueuePage() {
 
   // Derive unique college names from all departments in the database
   const collegeOptions = useMemo(() => {
-    return servicesData
-      .map((dept) => ({ name: dept.departmentName, abbrev: dept.departmentAbbrev }))
+    const seen = new Map();
+    for (const dept of servicesData) {
+      if (!seen.has(dept.departmentName)) {
+        seen.set(dept.departmentName, dept.departmentAbbrev);
+      }
+    }
+    return [...seen.entries()]
+      .map(([name, abbrev]) => ({ name, abbrev }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [servicesData]);
 
@@ -203,6 +212,13 @@ export default function QueuePage() {
   useEffect(() => {
     setSelectedService('all');
   }, [selectedCollege]);
+
+  // Sync selectedSlot from live availableSlots on each poll
+  useEffect(() => {
+    if (!selectedSlot) return;
+    const fresh = availableSlots.find((s) => s.slotId === selectedSlot.slotId);
+    if (fresh) setSelectedSlot(fresh);
+  }, [availableSlots]);
 
   // Filter available slots client-side
   const filteredSlots = useMemo(
@@ -240,7 +256,7 @@ export default function QueuePage() {
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleJoinQueue = useCallback(
     async (slotId) => {
-      if (joiningSlotId) return;
+      if (joiningSlotId === slotId) return;
       setJoiningSlotId(slotId);
       try {
         await joinQueue(slotId);
@@ -328,28 +344,28 @@ export default function QueuePage() {
   const toggleDarkMode = () => {
     const newTheme = isDark ? 'light' : 'dark';
     setIsDark(!isDark);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+    applyTheme(newTheme);
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (inputValue.trim() === '') return;
 
+    const capturedInput = inputValue;
     const userMessage = {
-      id: messages.length + 1,
+      id: ++messageIdRef.current,
       type: 'user',
-      text: inputValue,
+      text: capturedInput,
       timestamp: new Date(),
     };
-    setMessages([...messages, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
 
     setTimeout(() => {
       const botResponse = {
-        id: messages.length + 2,
+        id: ++messageIdRef.current,
         type: 'bot',
-        text: generateBotResponse(inputValue),
+        text: generateBotResponse(capturedInput),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botResponse]);
