@@ -1,50 +1,44 @@
-# Dependencies
-node_modules/
+# node modules
+node_modules/ 
+*/node_modules/ 
+server/node_modules/ 
+client/node_modules/ 
+**/node_modules/** 
 
-# Environment Variables / Sensitive Data
-.env
+# env
+.env 
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
 .env.*.local
 
-# Production Builds and Compiled Code
-dist/
-build/
+# builds
+dist/ 
+build/  
 web-build/
-out/
-.next/
 
-# Expo and React Native Mobile Builds
+# expo
 .expo/
 .expo-shared/
-
-# Native Mobile Folders
-android/
-ios/
-
-# Cryptographic Keys, Certificates & Credentials
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
-*.keystore
-*.pem
+*.orig.*
+android/
+ios/
 
-# Operating System Files
+# AI assistant
+.claude/
+AGENTS.md
+CLAUDE.md
+
+# OS file
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# Logs and Debugging
-*.log
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-
-# Diagnostics & Backup files
-.orig.
-.spec/
+.aider*
+.aiderignore

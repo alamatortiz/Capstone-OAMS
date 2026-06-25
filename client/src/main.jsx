@@ -85,10 +85,6 @@ const ProfessorScheduleAvailabilityPage = React.lazy(
 const ProfessorAnnouncementCreationPage = React.lazy(
   () => import("./pages/professor/professor_announcement_creation.jsx"),
 );
-// ★ Slot Management page
-const ProfessorSlotManagementPage = React.lazy(
-  () => import("./pages/professor/professor_slot_management.jsx"),
-);
 
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
 import AdminAppointment from "./pages/admin/AdminAppointment.jsx";
@@ -232,15 +228,6 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <ProfessorAnnouncementCreationPage />
-                  </Suspense>
-                }
-              />
-              {/* ★ Slot Management page */}
-              <Route
-                path="/professor/slot-management"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <ProfessorSlotManagementPage />
                   </Suspense>
                 }
               />
@@ -464,15 +451,6 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <ProfessorAnnouncementCreationPage />
-                </Suspense>
-              }
-            />
-            {/* ★ Backward-compatible temp route for professor slot management */}
-            <Route
-              path="/professor-slot-management"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfessorSlotManagementPage />
                 </Suspense>
               }
             />
