@@ -30,7 +30,6 @@ ios/
 # AI assistant
 .claude/
 AGENTS.md
-CLAUDE.md
 
 # OS file
 .DS_Store
