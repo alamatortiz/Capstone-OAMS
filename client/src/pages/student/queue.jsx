@@ -221,7 +221,7 @@ export default function QueuePage() {
     const fresh = availableSlots.find((s) => s.slotId === selectedSlot.slotId);
     if (fresh) setSelectedSlot(fresh);
     else setSelectedSlot(null);
-  }, [availableSlots]);
+  }, [availableSlots, selectedSlot]);
 
   // Filter available slots client-side
   const filteredSlots = useMemo(
@@ -518,12 +518,10 @@ export default function QueuePage() {
               </div>
               <div>
                 <h1 className="queue-title">
-                  {selectedSlot ? 'Service Details' : 'Queue Management'}
+                  {selectedSlot ? 'Queue Details' : 'Queue Management'}
                 </h1>
                 <p className="queue-subtitle">
-                  {selectedSlot
-                    ? `${selectedSlot.serviceName} — ${selectedSlot.departmentName}`
-                    : 'Join queues and track your position in real-time'}
+                  Join queues and track your position in real-time
                 </p>
               </div>
             </div>
@@ -959,9 +957,9 @@ export default function QueuePage() {
                       <AlertCircle className="no-queues-icon" />
                       <h3 className="no-queues-title">No queues found</h3>
                       <p className="no-queues-description">
-                        {availableSlots.length === 0
-                          ? 'No queues are open today. Check back later.'
-                          : 'Try adjusting your filters.'}
+                        {(selectedCollege !== 'all' || selectedService !== 'all')
+                          ? 'Try adjusting your filters.'
+                          : 'No queues are open today. Check back later.'}
                       </p>
                     </div>
                   )}

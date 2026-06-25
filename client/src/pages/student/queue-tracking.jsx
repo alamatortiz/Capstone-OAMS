@@ -210,6 +210,7 @@ export default function QueueTrackingPage() {
   const [activeTab, setActiveTab] = useState("active");
   const [leavingId, setLeavingId] = useState(null);
   const messagesEndRef = useRef(null);
+  const messageIdRef = useRef(1);
 
   // Load history + metrics when the tracking page mounts
   useEffect(() => {
@@ -265,7 +266,7 @@ export default function QueueTrackingPage() {
     e.preventDefault();
     if (!inputValue.trim()) return;
     const userMsg = {
-      id: messages.length + 1,
+      id: ++messageIdRef.current,
       type: "user",
       text: inputValue,
       timestamp: new Date(),
@@ -275,7 +276,7 @@ export default function QueueTrackingPage() {
     setInputValue("");
     setTimeout(() => {
       const bot = {
-        id: messages.length + 2,
+        id: ++messageIdRef.current,
         type: "bot",
         text: generateBotResponse(captured),
         timestamp: new Date(),

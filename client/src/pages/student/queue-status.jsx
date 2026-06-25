@@ -146,13 +146,16 @@ const getProgress = (position, totalWaiting) => {
 };
 
 const getStatusMeta = (status) => {
-  if (status === "serving")
-    return {
-      label: "It's Your Turn!",
-      cls: "queue-status-serving",
-      color: "#22c55e",
-    };
-  return { label: "Waiting", cls: "queue-status-waiting", color: "#f59e0b" };
+  switch (status) {
+    case "serving":
+      return { label: "It's Your Turn!", cls: "queue-status-serving", color: "#22c55e" };
+    case "completed":
+      return { label: "Completed", cls: "queue-status-completed", color: "#6b7280" };
+    case "cancelled":
+      return { label: "Cancelled", cls: "queue-status-cancelled", color: "#ef4444" };
+    default:
+      return { label: "Waiting", cls: "queue-status-waiting", color: "#f59e0b" };
+  }
 };
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
