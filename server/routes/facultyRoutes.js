@@ -433,6 +433,13 @@ router.post(
       return res.status(400).json({ message: "day_of_week, start_time, end_time are required" });
     }
     try {
+      const [existing] = await pool.query(
+        "SELECT availability_id FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ? AND start_time = ? AND end_time = ?",
+        [facultyId, day_of_week, start_time, end_time]
+      );
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "A slot with the same day and time already exists" });
+      }
       const [result] = await pool.query(
         "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location) VALUES (?,?,?,?,?)",
         [facultyId, day_of_week, start_time, end_time, location ?? null]
@@ -490,6 +497,74 @@ router.delete(
       res.json({ message: "Availability deleted" });
     } catch (err) {
       console.error("DELETE /availability/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// BLOCKED DATES (specific-date availability overrides)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/blocked-dates
+router.get(
+  "/blocked-dates",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [rows] = await pool.query(
+        "SELECT * FROM faculty_blocked_dates WHERE faculty_id = ? ORDER BY blocked_date ASC",
+        [facultyId]
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error("GET /blocked-dates error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// POST /api/faculty/blocked-dates
+router.post(
+  "/blocked-dates",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { date, reason } = req.body;
+    if (!date) return res.status(400).json({ message: "date is required" });
+    try {
+      const [result] = await pool.query(
+        "INSERT INTO faculty_blocked_dates (faculty_id, blocked_date, reason) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE reason = VALUES(reason)",
+        [facultyId, date, reason ?? null]
+      );
+      res.status(201).json({ blocked_id: result.insertId, message: "Date blocked" });
+    } catch (err) {
+      console.error("POST /blocked-dates error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// DELETE /api/faculty/blocked-dates/:id
+router.delete(
+  "/blocked-dates/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    try {
+      const [result] = await pool.query(
+        "DELETE FROM faculty_blocked_dates WHERE blocked_id = ? AND faculty_id = ?",
+        [id, facultyId]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Blocked date not found" });
+      res.json({ message: "Date unblocked" });
+    } catch (err) {
+      console.error("DELETE /blocked-dates/:id error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
     }
   }

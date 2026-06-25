@@ -227,14 +227,7 @@ const MegaphoneIcon = () => (
     <path d="M3 11l19-9-9 19-2-8-8-2z"></path>
   </svg>
 );
-const LayoutGridIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="3" width="7" height="7"></rect>
-    <rect x="14" y="3" width="7" height="7"></rect>
-    <rect x="3" y="14" width="7" height="7"></rect>
-    <rect x="14" y="14" width="7" height="7"></rect>
-  </svg>
-);
+
 const ArrowRightIcon = () => (
   <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -360,13 +353,6 @@ export default function ProfessorDashboard() {
       icon: MegaphoneIcon,
       path: "/professor/announcement-creation",
       colorClass: "qa-orange",
-    },
-    {
-      label: "Slot Management",
-      description: "Manage appointment slots",
-      icon: LayoutGridIcon,
-      path: "/professor/slot-management",
-      colorClass: "qa-purple",
     },
   ];
 
