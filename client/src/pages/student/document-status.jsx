@@ -31,8 +31,10 @@ const HomeIcon = () => (
 );
 const QueueIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+    <circle cx="9" cy="7" r="4"></circle>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
   </svg>
 );
 const CalendarIconNav = () => (
@@ -145,7 +147,7 @@ const formatDateShort = (dateStr) => {
 };
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
+function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Documents" }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const statusMeta = getStatusMeta(doc.status);
   const canCancel = doc.status === "pending" || doc.status === "processing";
@@ -157,7 +159,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
         <div className="queue-breadcrumb">
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
-            All Documents
+            {backLabel}
           </button>
         </div>
       </div>
@@ -361,8 +363,14 @@ export default function DocumentStatusPage() {
       }
     : { name: "Student", role: "student", college: "", departmentAbbrev: "" };
 
+  const fromDocuments = navState.from === "documents";
+
   // ── State ──────────────────────────────────────────────────────────────────
   const [selectedDocId, setSelectedDocId] = useState(navState.docId ?? null);
+  const [detailOpenedFromExternal, setDetailOpenedFromExternal] = useState(
+    fromDocuments && !!navState.docId,
+  );
+  const [activeTab, setActiveTab] = useState("active");
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -592,7 +600,12 @@ export default function DocumentStatusPage() {
         {selectedDoc ? (
           <DocumentDetail
             doc={selectedDoc}
-            onBack={() => setSelectedDocId(null)}
+            backLabel={detailOpenedFromExternal ? "Document Requests" : "All Documents"}
+            onBack={() =>
+              detailOpenedFromExternal
+                ? navigate("/student/documents")
+                : setSelectedDocId(null)
+            }
             onCancel={handleCancel}
             cancelling={cancelling}
           />
@@ -645,143 +658,147 @@ export default function DocumentStatusPage() {
               </div>
             )}
 
-            {/* Document List */}
+            {/* Document Tabs */}
             {!loading && !error && (
-              <div className="dss-list-container">
-                {/* Active Requests */}
-                {activeDocuments.length > 0 && (
-                  <>
-                    {activeDocuments.map((doc) => {
-                      const statusMeta = getStatusMeta(doc.status);
-                      return (
-                        <div
-                          key={doc.id}
-                          className="dss-list-item"
-                          onClick={() => setSelectedDocId(doc.id)}
-                        >
-                          <div className="dss-list-header">
-                            <div className="dss-list-icon-wrap">
-                              <FileText
-                                style={{
-                                  width: "1.5rem",
-                                  height: "1.5rem",
-                                  color: "#f97316",
-                                }}
-                              />
-                            </div>
-                            <div className="dss-list-title-section">
-                              <h3>{doc.type}</h3>
-                              <p className="dss-list-college">{doc.college}</p>
-                              <p className="dss-list-tracking">
-                                Tracking: <span>{doc.trackingNumber}</span>
-                              </p>
-                            </div>
-                            <span className={`dss-badge ${statusMeta.cls}`}>
-                              {statusMeta.label}
-                            </span>
-                          </div>
+              <div className="qt-tabs-container">
+                <div className="qt-tabs-list">
+                  <button
+                    className={`qt-tab ${activeTab === "active" ? "active" : ""}`}
+                    onClick={() => setActiveTab("active")}
+                  >
+                    <AlertCircle />
+                    Active Requests ({activeDocuments.length})
+                  </button>
+                  <button
+                    className={`qt-tab ${activeTab === "completed" ? "active" : ""}`}
+                    onClick={() => setActiveTab("completed")}
+                  >
+                    <CheckCircle2 />
+                    Completed ({completedDocuments.length})
+                  </button>
+                </div>
 
-                          <div className="dss-list-card-grid">
-                            <div className="dss-list-card-field">
-                              <label>Request Date</label>
-                              <p>{formatDateShort(doc.requestDate)}</p>
-                            </div>
-                            {doc.estimatedCompletion && (
-                              <div className="dss-list-card-field">
-                                <label>Est. Completion</label>
-                                <p>{formatDateShort(doc.estimatedCompletion)}</p>
+                {/* Active Tab */}
+                {activeTab === "active" && (
+                  <div className="dss-list-container">
+                    {activeDocuments.length > 0 ? (
+                      activeDocuments.map((doc) => {
+                        const statusMeta = getStatusMeta(doc.status);
+                        return (
+                          <div
+                            key={doc.id}
+                            className="dss-list-item"
+                            onClick={() => { setDetailOpenedFromExternal(false); setSelectedDocId(doc.id); }}
+                          >
+                            <div className="dss-list-header">
+                              <div className="dss-list-icon-wrap">
+                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
                               </div>
-                            )}
-                            <div className="dss-list-card-field-full">
-                              <label>Purpose</label>
-                              <p>{doc.purpose}</p>
+                              <div className="dss-list-title-section">
+                                <h3>{doc.type}</h3>
+                                <p className="dss-list-college">{doc.college}</p>
+                                <p className="dss-list-tracking">
+                                  Tracking: <span>{doc.trackingNumber}</span>
+                                </p>
+                              </div>
+                              <span className={`dss-badge ${statusMeta.cls}`}>
+                                {statusMeta.label}
+                              </span>
+                            </div>
+                            <div className="dss-list-card-grid">
+                              <div className="dss-list-card-field">
+                                <label>Request Date</label>
+                                <p>{formatDateShort(doc.requestDate)}</p>
+                              </div>
+                              {doc.estimatedCompletion && (
+                                <div className="dss-list-card-field">
+                                  <label>Est. Completion</label>
+                                  <p>{formatDateShort(doc.estimatedCompletion)}</p>
+                                </div>
+                              )}
+                              <div className="dss-list-card-field-full">
+                                <label>Purpose</label>
+                                <p>{doc.purpose}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* Completed Requests */}
-                {completedDocuments.length > 0 && (
-                  <>
-                    <p
-                      className="dss-section-label"
-                      style={{ marginTop: activeDocuments.length > 0 ? "1rem" : "0" }}
-                    >
-                      Completed
-                    </p>
-                    {completedDocuments.map((doc) => {
-                      const statusMeta = getStatusMeta(doc.status);
-                      return (
-                        <div
-                          key={doc.id}
-                          className="dss-list-item dss-list-item-completed"
-                          onClick={() => setSelectedDocId(doc.id)}
+                        );
+                      })
+                    ) : (
+                      <div className="queue-empty-state">
+                        <FileText className="queue-empty-icon" />
+                        <h3 className="queue-empty-title">No Active Requests</h3>
+                        <p className="queue-empty-text">
+                          You have no active document requests.
+                        </p>
+                        <button
+                          onClick={() => navigate("/student/documents")}
+                          style={{
+                            marginTop: "1rem",
+                            background: "linear-gradient(135deg, #f97316, #ea580c)",
+                            color: "white",
+                            border: "none",
+                            padding: "0.75rem 1.5rem",
+                            borderRadius: "0.75rem",
+                            cursor: "pointer",
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                          }}
                         >
-                          <div className="dss-list-header">
-                            <div className="dss-list-icon-wrap">
-                              <FileText
-                                style={{
-                                  width: "1.5rem",
-                                  height: "1.5rem",
-                                  color: "var(--text-tertiary)",
-                                }}
-                              />
-                            </div>
-                            <div className="dss-list-title-section">
-                              <h3>{doc.type}</h3>
-                              <p className="dss-list-college">{doc.college}</p>
-                              <p className="dss-list-tracking">
-                                {doc.trackingNumber}
-                              </p>
-                            </div>
-                            <span className={`dss-badge ${statusMeta.cls}`}>
-                              {statusMeta.label}
-                            </span>
-                          </div>
-
-                          <div className="dss-list-card-grid">
-                            <div className="dss-list-card-field">
-                              <label>Request Date</label>
-                              <p>{formatDateShort(doc.requestDate)}</p>
-                            </div>
-                            <div className="dss-list-card-field-full">
-                              <label>Purpose</label>
-                              <p>{doc.purpose}</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
+                          Request a Document
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
-                {/* Empty state */}
-                {documents.length === 0 && (
-                  <div className="queue-empty-state">
-                    <FileText className="queue-empty-icon" />
-                    <h3 className="queue-empty-title">No Document Requests</h3>
-                    <p className="queue-empty-text">
-                      You haven't submitted any document requests yet.
-                    </p>
-                    <button
-                      onClick={() => navigate("/student/documents")}
-                      style={{
-                        marginTop: "1rem",
-                        background: "linear-gradient(135deg, #f97316, #ea580c)",
-                        color: "white",
-                        border: "none",
-                        padding: "0.75rem 1.5rem",
-                        borderRadius: "0.75rem",
-                        cursor: "pointer",
-                        fontSize: "0.875rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Request a Document
-                    </button>
+                {/* Completed Tab */}
+                {activeTab === "completed" && (
+                  <div className="dss-list-container">
+                    {completedDocuments.length > 0 ? (
+                      completedDocuments.map((doc) => {
+                        const statusMeta = getStatusMeta(doc.status);
+                        return (
+                          <div
+                            key={doc.id}
+                            className="dss-list-item dss-list-item-completed"
+                            onClick={() => { setDetailOpenedFromExternal(false); setSelectedDocId(doc.id); }}
+                          >
+                            <div className="dss-list-header">
+                              <div className="dss-list-icon-wrap">
+                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "var(--text-tertiary)" }} />
+                              </div>
+                              <div className="dss-list-title-section">
+                                <h3>{doc.type}</h3>
+                                <p className="dss-list-college">{doc.college}</p>
+                                <p className="dss-list-tracking">{doc.trackingNumber}</p>
+                              </div>
+                              <span className={`dss-badge ${statusMeta.cls}`}>
+                                {statusMeta.label}
+                              </span>
+                            </div>
+                            <div className="dss-list-card-grid">
+                              <div className="dss-list-card-field">
+                                <label>Request Date</label>
+                                <p>{formatDateShort(doc.requestDate)}</p>
+                              </div>
+                              <div className="dss-list-card-field-full">
+                                <label>Purpose</label>
+                                <p>{doc.purpose}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="queue-empty-state">
+                        <CheckCircle2 className="queue-empty-icon" />
+                        <h3 className="queue-empty-title">No Completed Requests</h3>
+                        <p className="queue-empty-text">
+                          Your completed and rejected requests will appear here.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
