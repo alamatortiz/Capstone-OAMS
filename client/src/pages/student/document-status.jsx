@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
   FileText,
@@ -18,6 +18,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
+import { getCollegeLogo } from "../../data/collegeLogo";
 import "./queue-status.css";
 import "./document-status.css";
 
@@ -164,18 +165,17 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
       {/* Hero */}
       <div className="dss-hero-card">
         <div className="dss-hero-content">
-          <div className="dss-hero-icon">
-            <FileText style={{ width: "2rem", height: "2rem" }} />
+          <div className="dss-hero-logo">
+            <img src={getCollegeLogo(doc.college)} alt={doc.college} />
           </div>
           <div className="dss-hero-text">
-            <h2>{doc.type}</h2>
-            <p>{doc.college}</p>
-            <p style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-              Tracking: {doc.trackingNumber}
-            </p>
-          </div>
-          <div className="dss-hero-status-badge">
-            {statusMeta.label}
+            <div className="dss-hero-header">
+              <div className="dss-hero-title">
+                <p className="dss-hero-doc-name">{doc.type}</p>
+                <p>{doc.college}</p>
+              </div>
+              <div className="dss-hero-badge">{doc.trackingNumber}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -234,13 +234,13 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
             </div>
           </div>
 
-          {/* Staff notes card */}
+          {/* Notes card */}
           {doc.notes && (
             <div className="qss-card">
               <div className="qss-card-header">
                 <h3 className="qss-card-title">
                   <MessageSquare style={{ width: "1.25rem", height: "1.25rem" }} />
-                  Staff Notes
+                  Notes
                 </h3>
               </div>
               <div className="qss-card-content">
@@ -263,7 +263,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
             <div className="qss-card-content" style={{ textAlign: "center" }}>
               <div
                 style={{
-                  fontSize: "1.1rem",
+                  fontSize: "1.5rem",
                   fontWeight: 800,
                   color: "var(--primary-color)",
                   fontFamily: "monospace",
@@ -348,7 +348,10 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DocumentStatusPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: authUser, logout } = useAuth();
+
+  const navState = location.state ?? {};
 
   const user = authUser
     ? {
@@ -359,7 +362,7 @@ export default function DocumentStatusPage() {
     : { name: "Student", role: "student", college: "", departmentAbbrev: "" };
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [selectedDocId, setSelectedDocId] = useState(null);
+  const [selectedDocId, setSelectedDocId] = useState(navState.docId ?? null);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -383,8 +386,8 @@ export default function DocumentStatusPage() {
     : null;
 
   useEffect(() => {
-    if (selectedDocId && !selectedDoc) setSelectedDocId(null);
-  }, [selectedDocId, selectedDoc]);
+    if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
+  }, [loading, selectedDocId, selectedDoc]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -598,9 +601,12 @@ export default function DocumentStatusPage() {
             {/* Page Header */}
             <div className="queue-status-header">
               <div className="queue-breadcrumb">
-                <Link to="/student/dashboard" className="breadcrumb-link">
+                <Link
+                  to={navState.from === "documents" ? "/student/documents" : "/student/dashboard"}
+                  className="breadcrumb-link"
+                >
                   <ChevronLeft className="breadcrumb-icon" />
-                  Dashboard
+                  {navState.from === "documents" ? "Documents" : "Dashboard"}
                 </Link>
               </div>
               <div className="queue-title-section">

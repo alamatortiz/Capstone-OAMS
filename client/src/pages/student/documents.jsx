@@ -639,7 +639,16 @@ export default function DocumentsPage() {
                 ) : activeDocuments.length > 0 ? (
                   <div className="doc-cards-grid">
                     {activeDocuments.map((doc) => (
-                      <div key={doc.id} className="doc-card">
+                      <div
+                        key={doc.id}
+                        className="doc-card"
+                        style={{ cursor: "pointer" }}
+                        onClick={() =>
+                          navigate("/student/document-status", {
+                            state: { docId: doc.id, from: "documents" },
+                          })
+                        }
+                      >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
                             <FileTextIcon />
@@ -701,7 +710,10 @@ export default function DocumentsPage() {
                         )}
 
                         {doc.status === "ready" && (
-                          <button className="doc-card-claim-btn">
+                          <button
+                            className="doc-card-claim-btn"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <DownloadIcon /> Claim Document
                           </button>
                         )}
@@ -710,7 +722,10 @@ export default function DocumentsPage() {
                           doc.status === "processing") && (
                           <button
                             className="doc-cancel-request-btn"
-                            onClick={() => setCancelTarget(doc)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCancelTarget(doc);
+                            }}
                           >
                             <XCircleIcon /> Cancel Request
                           </button>
@@ -734,7 +749,16 @@ export default function DocumentsPage() {
                 {completedDocuments.length > 0 ? (
                   <div className="doc-cards-grid">
                     {completedDocuments.map((doc) => (
-                      <div key={doc.id} className="doc-card doc-card-completed">
+                      <div
+                        key={doc.id}
+                        className="doc-card doc-card-completed"
+                        style={{ cursor: "pointer" }}
+                        onClick={() =>
+                          navigate("/student/document-status", {
+                            state: { docId: doc.id, from: "documents" },
+                          })
+                        }
+                      >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
                             <FileTextIcon />

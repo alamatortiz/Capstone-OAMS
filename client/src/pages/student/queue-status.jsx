@@ -206,7 +206,6 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
           <div className="queue-hero-text">
             <div className="queue-hero-header">
               <div className="queue-hero-title">
-                <h2>Queue Status</h2>
                 <p className="queue-hero-service-name">{queue.serviceName}</p>
                 <p>{queue.departmentName}</p>
               </div>
