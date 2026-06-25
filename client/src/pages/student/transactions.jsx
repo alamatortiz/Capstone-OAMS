@@ -122,6 +122,15 @@ const ChevronLeftIcon = () => (
   </svg>
 );
 
+const ClipboardListIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    <line x1="8" y1="11" x2="16" y2="11"></line>
+    <line x1="8" y1="15" x2="12" y2="15"></line>
+  </svg>
+);
+
 const TrendingUpIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
@@ -450,7 +459,7 @@ export default function TransactionsPage() {
     },
     { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
     {
-      icon: HistoryIconNav,
+      icon: ClipboardListIcon,
       label: "Transactions",
       path: "/student/transactions",
     },
@@ -561,20 +570,20 @@ export default function TransactionsPage() {
       <main className="transactions-main">
         <div className="transactions-container">
           {/* Header */}
-          <div className="page-header">
-            <div className="header-breadcrumb">
+          <div className="queue-header">
+            <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeftIcon />
                 Dashboard
               </Link>
             </div>
-            <div className="header-title-row">
-              <div className="header-icon">
-                <TrendingUpIcon />
+            <div className="queue-title-section">
+              <div className="queue-title-icon">
+                <ClipboardListIcon />
               </div>
               <div>
-                <h1 className="page-title">Transaction History</h1>
-                <p className="page-subtitle">
+                <h1 className="queue-title">Transaction History</h1>
+                <p className="queue-subtitle">
                   View all your activities and transactions
                 </p>
               </div>
@@ -586,61 +595,79 @@ export default function TransactionsPage() {
             {stats.map((stat) => (
               <div key={stat.label} className="stat-card">
                 <div className={`stat-icon-box ${stat.bgColor}`}>
-                  {stat.icon === "list" && <TrendingUpIcon />}
+                  {stat.icon === "list" && <ClipboardListIcon />}
                   {stat.icon === "check" && <CheckCircleIcon />}
                   {stat.icon === "clock" && <ClockIcon />}
                   {stat.icon === "calendar" && <CalendarIcon />}
                 </div>
-                <p className={`stat-value ${stat.color}`}>{stat.value}</p>
                 <p className="stat-label">{stat.label}</p>
+                <p className={`stat-value ${stat.color}`}>{stat.value}</p>
               </div>
             ))}
           </div>
 
           {/* Filters */}
           <div className="filters-card">
+            <div className="filters-header">
+              <h3 className="filters-title">Transaction Filter</h3>
+              <p className="filters-description">
+                Search and filter your transactions
+              </p>
+            </div>
             <div className="filters-grid">
-              <div className="filter-search">
-                <SearchIcon />
-                <input
-                  type="text"
-                  placeholder="Search transactions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="search-input"
-                />
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="tx-search">
+                  Search
+                </label>
+                <div className="filter-search-wrapper">
+                  <SearchIcon />
+                  <input
+                    id="tx-search"
+                    type="text"
+                    placeholder="Search transactions..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="filter-search-input"
+                  />
+                </div>
               </div>
 
-              <div className="filter-select">
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="tx-type-select">
+                  Type
+                </label>
                 <div className="filter-select-wrapper">
                   <select
+                    id="tx-type-select"
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
-                    className="select-input"
+                    className="filter-select"
                   >
-                    <option value="all">All Type</option>
+                    <option value="all">All Types</option>
                     <option value="queue">Queue</option>
                     <option value="appointment">Appointment</option>
                     <option value="document">Document</option>
                   </select>
-
                   <ChevronDownIcon className="filter-chevron" />
                 </div>
               </div>
 
-              <div className="filter-select">
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="tx-status-select">
+                  Status
+                </label>
                 <div className="filter-select-wrapper">
                   <select
+                    id="tx-status-select"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="select-input"
+                    className="filter-select"
                   >
-                    <option value="all">All Status</option>
+                    <option value="all">All Statuses</option>
                     <option value="completed">Completed</option>
                     <option value="ongoing">Ongoing</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
-
                   <ChevronDownIcon className="filter-chevron" />
                 </div>
               </div>
@@ -668,7 +695,7 @@ export default function TransactionsPage() {
               </div>
             ) : (
               filteredTransactions.map((transaction) => (
-                <div key={transaction.id} className="transaction-item">
+                <div key={transaction.id} className={`transaction-item transaction-type-${transaction.type}`}>
                   <div className="transaction-icon">
                     <span
                       className={`icon-wrapper ${getTypeColor(transaction.type)}`}

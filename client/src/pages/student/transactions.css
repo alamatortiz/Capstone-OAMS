@@ -515,16 +515,7 @@ body {
 }
 
 /* ===== Page Header ===== */
-.page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.header-breadcrumb {
-  display: flex;
-  align-items: center;
-}
+/* Layout uses .queue-header / .queue-title-section / .queue-title / .queue-subtitle from queue.css */
 
 .breadcrumb-link,
 .breadcrumb-link:visited,
@@ -555,50 +546,21 @@ body {
 }
 
 .breadcrumb-link svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.25rem;
+  height: 1.25rem;
   stroke: currentColor;
 }
 
-.header-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.header-icon {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 0.875rem;
+/* Purple accent override for the transactions page header icon */
+.transactions-container .queue-title-icon {
   background: linear-gradient(135deg, var(--purple) 0%, var(--violet) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
 }
 
-.header-icon svg {
+.transactions-container .queue-title-icon svg {
   width: 1.75rem;
   height: 1.75rem;
   stroke: currentColor;
-}
-
-.page-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
-  letter-spacing: -0.5px;
-}
-
-.page-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0 0;
-  transition: color 0.3s ease;
 }
 
 /* ===== Stats Grid ===== */
@@ -609,53 +571,54 @@ body {
   width: 100%;
 }
 
-.stat-card {
+/*
+ * All .stat-card rules are scoped under .transactions-container to win over
+ * the globally-loaded student_dashboard.css which also defines .stat-card
+ * with hover effects, left-alignment, and a ::before green overlay.
+ */
+.transactions-container .stat-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 0.95rem;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-
-
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
+  text-align: center;
+  transition: background 0.3s ease, border-color 0.3s ease;
   cursor: default;
-  position: relative;
-  overflow: hidden;
+  position: static;
+  overflow: visible;
 }
 
-.stat-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, transparent 100%);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+/* Suppress the dashboard ::before green-glow overlay */
+.transactions-container .stat-card::before {
+  content: none;
 }
 
-.stat-card:hover {
-  border-color: rgba(34, 197, 94, 0.3);
-  transform: translateY(-2px);
+/* Suppress the dashboard lift-on-hover */
+.transactions-container .stat-card:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(168, 85, 247, 0.2);
 }
 
-.stat-card:hover::before {
-  opacity: 1;
+[data-theme="light"] .transactions-container .stat-card {
+  background: rgba(248, 250, 252, 0.7);
 }
 
-.stat-icon-box {
+.transactions-container .stat-icon-box {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  z-index: 1;
+  margin: 0 auto 0.5rem;
+  border: 1px solid transparent;
 }
 
-.stat-icon-box svg {
+.transactions-container .stat-icon-box svg {
   width: 1.25rem;
   height: 1.25rem;
   stroke: currentColor;
@@ -663,44 +626,46 @@ body {
 
 .bg-blue-50 {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border-color: rgba(59, 130, 246, 0.2);
   color: var(--blue);
 }
 
 .bg-green-50 {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.2);
   color: var(--success);
 }
 
 .bg-orange-50 {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border-color: rgba(245, 158, 11, 0.2);
   color: var(--warning);
 }
 
 .bg-purple-50 {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
+  border-color: rgba(168, 85, 247, 0.2);
   color: var(--purple);
 }
 
-.stat-value {
-  font-size: 2rem;
-  font-weight: 800;
-  line-height: 1;
-  transition: color 0.3s ease;
-  position: relative;
-  z-index: 1;
-  margin-bottom: 0.2rem;
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  font-weight: 500;
+.transactions-container .stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.5rem;
+  text-align: center;
   transition: color 0.3s ease;
-  position: relative;
-  z-index: 1;
-  text-align: left;
+}
+
+.transactions-container .stat-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  width: 100%;
+  transition: color 0.3s ease;
 }
 
 .text-blue-600 {
@@ -732,7 +697,7 @@ body {
     gap: 0.75rem;
   }
 
-  .page-title {
+  .transactions-container .queue-title {
     font-size: 1.5rem;
   }
 }
@@ -740,10 +705,40 @@ body {
 /* ===== Filters Card ===== */
 .filters-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(34, 197, 94, 0.15);
   border-radius: 1rem;
-  padding: 1.25rem;
+  padding: 1rem 1.5rem 1.5rem;
   transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .filters-card {
+  background: linear-gradient(135deg, rgba(17, 22, 18, 0.9) 0%, rgba(15, 21, 16, 1) 100%);
+}
+
+[data-theme="light"] .filters-card {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.filters-header {
+  margin-bottom: 1.5rem;
+}
+
+.filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-family: "Inter", sans-serif;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* Scoped to beat queue.css which sets text-align: center on .filters-description */
+.transactions-container .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  transition: color 0.3s ease;
+  text-align: center;
 }
 
 .filters-grid {
@@ -752,16 +747,42 @@ body {
   gap: 1rem;
 }
 
-.filter-search {
+@media (min-width: 768px) {
+  .filters-grid {
+    gap: 1.5rem;
+  }
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Search group */
+.filter-search-wrapper {
   position: relative;
   display: flex;
   align-items: center;
   width: 100%;
 }
 
-.filter-search svg {
+.filter-search-wrapper svg {
   position: absolute;
-  left: 0.75rem;
+  left: 0.875rem;
   width: 1rem;
   height: 1rem;
   color: var(--text-tertiary);
@@ -770,72 +791,84 @@ body {
   z-index: 1;
 }
 
-.search-input {
+.filter-search-input {
   width: 100%;
-  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  padding: 0.75rem 1.25rem 0.75rem 2.5rem;
   background: var(--input-background);
-  border: 1px solid var(--input);
-  border-radius: 0.625rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
   color: var(--text-primary);
   font-size: 0.875rem;
+  font-family: "Inter", sans-serif;
   outline: none;
   transition: all 0.2s ease;
-  position: relative;
-  z-index: 0;
 }
 
-.search-input::placeholder {
+.filter-search-input::placeholder {
   color: var(--text-tertiary);
 }
 
-.search-input:focus {
-  border-color: rgba(34, 197, 94, 0.5);
+.filter-search-input:hover {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.filter-search-input:focus {
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
 }
 
+[data-theme="light"] .filter-search-input {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+/* Select inputs */
 .filter-select {
-  position: relative;
-  display: flex;
-  align-items: center;
   width: 100%;
-  margin: 0;
-  border: 0;
-  min-width: 0;
+  padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
 }
 
-.filter-select::after {
-  content: none;
+.filter-select:hover {
+  border-color: rgba(34, 197, 94, 0.3);
 }
 
-.filter-select {
-  padding-right: 2.25rem;
+.filter-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
 }
 
-.filter-select-wrapper {
-  position: relative;
-  width: 100%;
+.filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
 }
 
-.filter-chevron {
-  position: absolute;
-  right: 0.9rem;
-  width: 1rem;
-  height: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-tertiary);
-  pointer-events: none;
-  stroke: currentColor;
-  z-index: 2;
+[data-theme="light"] .filter-select {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
 }
 
-/* ===== Filters Select (queue-style chevron inside wrapper) ===== */
-/* Revert to the intended behavior: chevron is positioned absolutely inside the wrapper */
-.filter-select-wrapper {
-  position: relative;
-  width: 100%;
-  display: flex;
-  align-items: center;
+[data-theme="light"] .filter-select:focus {
+  border-color: var(--primary-color);
+}
+
+[data-theme="light"] .filter-select option {
+  background: white;
+  color: #1e293b;
 }
 
 .filter-chevron {
@@ -848,36 +881,23 @@ body {
   justify-content: center;
   width: 1.15rem;
   height: 1.15rem;
+  color: var(--text-tertiary);
   pointer-events: none;
   flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
-.select-input {
-  width: 100%;
-  padding: 0.75rem 2.5rem 0.75rem 1rem;
-  background: var(--input-background);
-  border: 1px solid var(--input);
-  border-radius: 0.625rem;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  outline: none;
-  appearance: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  z-index: 1;
+.filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
 }
 
-
-.select-input option {
-  background: var(--card-bg);
-  color: var(--text-primary);
-}
-
-.select-input:focus {
-  border-color: rgba(34, 197, 94, 0.5);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+.filter-select:hover + .filter-chevron,
+.filter-select:focus + .filter-chevron {
+  color: var(--primary-color);
 }
 
 @media (max-width: 768px) {
@@ -951,20 +971,44 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, transparent 100%);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
 .transaction-item:hover {
-  border-color: rgba(34, 197, 94, 0.3);
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
   transform: translateY(-2px);
 }
 
 .transaction-item:hover::before {
   opacity: 1;
+}
+
+/* Queue — blue */
+.transaction-type-queue::before {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, transparent 100%);
+}
+.transaction-type-queue:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1);
+}
+
+/* Document — orange */
+.transaction-type-document::before {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, transparent 100%);
+}
+.transaction-type-document:hover {
+  border-color: rgba(249, 115, 22, 0.3);
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.1);
+}
+
+/* Appointment — green */
+.transaction-type-appointment::before {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, transparent 100%);
+}
+.transaction-type-appointment:hover {
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.1);
 }
 
 .transaction-icon {
@@ -1021,7 +1065,7 @@ body {
 
 .transaction-title {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: var(--text-primary);
   margin: 0;
   transition: color 0.3s ease;
@@ -1065,7 +1109,7 @@ body {
 }
 
 .transaction-college {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0 0 0.375rem 0;
   transition: color 0.3s ease;
@@ -1073,7 +1117,7 @@ body {
 }
 
 .transaction-details {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
   margin: 0;
   transition: color 0.3s ease;
@@ -1096,7 +1140,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--text-tertiary);
   white-space: nowrap;
   transition: color 0.3s ease;
@@ -1392,7 +1436,7 @@ body {
     gap: 0.75rem;
   }
 
-  .page-title {
+  .transactions-container .queue-title {
     font-size: 1.5rem;
   }
 
