@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Hash,
+  Activity,
 } from "lucide-react";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
@@ -563,6 +564,7 @@ export default function QueueStatusPage() {
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const fromQueue = location.state?.fromQueue ?? false;
+  const fromTracking = location.state?.fromTracking ?? false;
   const [selectedQueueId, setSelectedQueueId] = useState(
     () => location.state?.queueId ?? null
   );
@@ -726,7 +728,7 @@ export default function QueueStatusPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -789,11 +791,33 @@ export default function QueueStatusPage() {
           <div className="queue-status-container">
             {/* Page Header */}
             <div className="queue-status-header">
-              <div className="queue-breadcrumb">
-                <Link to="/student/dashboard" className="breadcrumb-link">
-                  <ChevronLeft className="breadcrumb-icon" />
-                  Dashboard
-                </Link>
+              <div className="queue-breadcrumb" style={{ justifyContent: 'space-between' }}>
+                {fromTracking ? (
+                  <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue-tracking')}>
+                    <ChevronLeft className="breadcrumb-icon" />
+                    Queue Tracking
+                  </button>
+                ) : fromQueue ? (
+                  <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue')}>
+                    <ChevronLeft className="breadcrumb-icon" />
+                    Queue Management
+                  </button>
+                ) : (
+                  <Link to="/student/dashboard" className="breadcrumb-link">
+                    <ChevronLeft className="breadcrumb-icon" />
+                    Dashboard
+                  </Link>
+                )}
+                {!fromTracking && (
+                  <Link
+                    to="/student/queue-tracking"
+                    state={{ from: 'queue-status' }}
+                    className="queue-tracking-link-btn"
+                  >
+                    <Activity className="queue-tracking-link-btn-icon" />
+                    Queue Tracking
+                  </Link>
+                )}
               </div>
               <div className="queue-title-section">
                 <div className="queue-title-icon">

@@ -625,6 +625,30 @@ body {
   height: 1.25rem;
 }
 
+.queue-tracking-link-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.875rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: white;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.queue-tracking-link-btn:hover {
+  opacity: 0.85;
+  color: white;
+}
+
+.queue-tracking-link-btn-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
 .queue-title-section {
   display: flex;
   align-items: center;

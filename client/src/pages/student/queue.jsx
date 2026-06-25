@@ -21,9 +21,9 @@ const CloseIconChat = () => (
   </svg>
 );
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity } from 'lucide-react';
 import { toast } from 'sonner';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
@@ -142,6 +142,7 @@ export default function QueuePage() {
   } = useQueue();
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === 'dark');
 
@@ -219,6 +220,7 @@ export default function QueuePage() {
     if (!selectedSlot) return;
     const fresh = availableSlots.find((s) => s.slotId === selectedSlot.slotId);
     if (fresh) setSelectedSlot(fresh);
+    else setSelectedSlot(null);
   }, [availableSlots]);
 
   // Filter available slots client-side
@@ -445,7 +447,7 @@ export default function QueuePage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -497,7 +499,7 @@ export default function QueuePage() {
 
           {/* Header */}
           <div className="queue-header">
-            <div className="queue-breadcrumb">
+            <div className="queue-breadcrumb" style={{ justifyContent: 'space-between' }}>
               {selectedSlot ? (
                 <button className="breadcrumb-link" onClick={() => setSelectedSlot(null)}>
                   <ChevronLeft className="breadcrumb-icon" />
@@ -507,6 +509,16 @@ export default function QueuePage() {
                 <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
                   Dashboard
+                </Link>
+              )}
+              {!selectedSlot && (
+                <Link
+                  to="/student/queue-tracking"
+                  state={{ from: 'queue' }}
+                  className="queue-tracking-link-btn"
+                >
+                  <Activity className="queue-tracking-link-btn-icon" />
+                  Queue Tracking
                 </Link>
               )}
             </div>
@@ -830,7 +842,6 @@ export default function QueuePage() {
                             value={selectedService}
                             onChange={(e) => setSelectedService(e.target.value)}
                             aria-label="Filter by service"
-                            disabled={selectedCollege === 'all'}
                           >
                             <option value="all">All Services</option>
                             {serviceOptions.map((service) => (
@@ -1013,7 +1024,7 @@ export default function QueuePage() {
       <ActionConfirmModal
         show={leaveConfirmQueue !== null}
         onCancel={() => setLeaveConfirmQueue(null)}
-        onConfirm={() => { handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
+        onConfirm={async () => { await handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
         title="Leave Queue?"
         message={
           <>
