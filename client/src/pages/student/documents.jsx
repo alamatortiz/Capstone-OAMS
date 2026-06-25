@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
@@ -206,6 +206,7 @@ const SendIcon = () => (
 export default function DocumentsPage() {
   const { user: authUser, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const user = authUser
     ? {
@@ -228,6 +229,7 @@ export default function DocumentsPage() {
   // ── State ───────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
+  const [activeTab, setActiveTab] = useState("active");
   const [documents, setDocuments] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docsError, setDocsError] = useState(null);
@@ -524,7 +526,7 @@ export default function DocumentsPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="doc-nav-item"
+                  className={`doc-nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="doc-nav-icon" />
@@ -586,19 +588,19 @@ export default function DocumentsPage() {
         <div className="doc-content">
           {/* Header */}
           {docsError && <div className="doc-error-banner">{docsError}</div>}
-          <div className="doc-header-section">
-            <div className="doc-header-top">
-              <Link to="/student/dashboard" className="doc-back-link">
+          <div className="queue-header">
+            <div className="queue-breadcrumb">
+              <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeftIcon /> Dashboard
               </Link>
             </div>
-            <div className="doc-header-title">
+            <div className="queue-title-section">
               <div className="doc-title-icon">
                 <FileTextIcon />
               </div>
-              <div className="doc-title-text">
-                <h1>Document Requests</h1>
-                <p>Request and track your documents</p>
+              <div>
+                <h1 className="queue-title">Document Requests</h1>
+                <p className="queue-subtitle">Request and track your documents</p>
               </div>
             </div>
             <button
@@ -609,183 +611,168 @@ export default function DocumentsPage() {
             </button>
           </div>
 
-          {/* Active Requests */}
-          <section className="doc-section">
-            <div className="doc-section-header">
-              <h2>
-                <AlertCircleIcon /> Active Requests{" "}
-                <span className="doc-badge">{activeDocuments.length}</span>
-              </h2>
+          {/* Document Tabs */}
+          <div className="qt-tabs-container">
+            <div className="qt-tabs-list">
+              <button
+                className={`qt-tab ${activeTab === "active" ? "active" : ""}`}
+                onClick={() => setActiveTab("active")}
+              >
+                <AlertCircleIcon /> Active Requests ({activeDocuments.length})
+              </button>
+              <button
+                className={`qt-tab ${activeTab === "completed" ? "active" : ""}`}
+                onClick={() => setActiveTab("completed")}
+              >
+                <CheckCircleIcon /> Completed ({completedDocuments.length})
+              </button>
             </div>
 
-            {docsLoading ? (
-              <div className="doc-empty-state">
-                <FileTextIcon />
-                <h3>Loading documents...</h3>
-              </div>
-            ) : activeDocuments.length > 0 ? (
-              <div className="doc-cards-grid">
-                {activeDocuments.map((doc) => (
-                  <div key={doc.id} className="doc-card">
-                    <div className="doc-card-header">
-                      <div className="doc-card-icon-wrap">
-                        <FileTextIcon />
-                      </div>
-                      <div className="doc-card-title-section">
-                        <h3>{doc.type}</h3>
-                        <p className="doc-card-college">{doc.college}</p>
-                        <p className="doc-card-tracking">
-                          Tracking: <span>{doc.trackingNumber}</span>
-                        </p>
-                      </div>
-                      <span
-                        className={`doc-badge ${getStatusColor(doc.status)}`}
-                      >
-                        {getStatusIcon(doc.status)}
-                        {doc.status}
-                      </span>
-                    </div>
-
-                    <div className="doc-card-grid">
-                      <div className="doc-card-field">
-                        <label>Request Date</label>
-                        <p className="doc-card-date-value">
-                          {new Date(doc.requestDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
-                        </p>
-                      </div>
-                      {doc.estimatedCompletion && (
-                        <div className="doc-card-field">
-                          <label>Est. Completion</label>
-                          <p className="doc-card-date-value">
-                            {new Date(
-                              doc.estimatedCompletion,
-                            ).toLocaleDateString("en-US", {
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </p>
-                        </div>
-                      )}
-                      <div className="doc-card-field-full">
-                        <label>Purpose</label>
-                        <p>{doc.purpose}</p>
-                      </div>
-                    </div>
-
-                    {doc.notes && (
-                      <div className="doc-card-update">
-                        <p className="doc-update-title">Update</p>
-                        <p className="doc-update-text">{doc.notes}</p>
-                      </div>
-                    )}
-
-                    {doc.status === "ready" && (
-                      <button className="doc-card-claim-btn">
-                        <DownloadIcon /> Claim Document
-                      </button>
-                    )}
-
-                    {(doc.status === "pending" ||
-                      doc.status === "processing") && (
-                      <button
-                        className="doc-cancel-request-btn"
-                        onClick={() => setCancelTarget(doc)}
-                      >
-                        <XCircleIcon /> Cancel Request
-                      </button>
-                    )}
+            {/* Active Tab */}
+            {activeTab === "active" && (
+              <div className="qt-tab-content">
+                {docsLoading ? (
+                  <div className="doc-empty-state">
+                    <FileTextIcon />
+                    <h3>Loading documents...</h3>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="doc-empty-state">
-                <FileTextIcon />
-                <h3>No active requests</h3>
-                <p>Start by requesting a document</p>
+                ) : activeDocuments.length > 0 ? (
+                  <div className="doc-cards-grid">
+                    {activeDocuments.map((doc) => (
+                      <div key={doc.id} className="doc-card">
+                        <div className="doc-card-header">
+                          <div className="doc-card-icon-wrap">
+                            <FileTextIcon />
+                          </div>
+                          <div className="doc-card-title-section">
+                            <h3>{doc.type}</h3>
+                            <p className="doc-card-college">{doc.college}</p>
+                            <p className="doc-card-tracking">
+                              Tracking: <span>{doc.trackingNumber}</span>
+                            </p>
+                          </div>
+                          <span
+                            className={`doc-badge ${getStatusColor(doc.status)}`}
+                          >
+                            {getStatusIcon(doc.status)}
+                            {doc.status}
+                          </span>
+                        </div>
+
+                        <div className="doc-card-grid">
+                          <div className="doc-card-field">
+                            <label>Request Date</label>
+                            <p className="doc-card-date-value">
+                              {new Date(doc.requestDate).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "long",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}
+                            </p>
+                          </div>
+                          {doc.estimatedCompletion && (
+                            <div className="doc-card-field">
+                              <label>Est. Completion</label>
+                              <p className="doc-card-date-value">
+                                {new Date(
+                                  doc.estimatedCompletion,
+                                ).toLocaleDateString("en-US", {
+                                  month: "long",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </p>
+                            </div>
+                          )}
+                          <div className="doc-card-field-full">
+                            <label>Purpose</label>
+                            <p>{doc.purpose}</p>
+                          </div>
+                        </div>
+
+                        {doc.notes && (
+                          <div className="doc-card-update">
+                            <p className="doc-update-title">Update</p>
+                            <p className="doc-update-text">{doc.notes}</p>
+                          </div>
+                        )}
+
+                        {doc.status === "ready" && (
+                          <button className="doc-card-claim-btn">
+                            <DownloadIcon /> Claim Document
+                          </button>
+                        )}
+
+                        {(doc.status === "pending" ||
+                          doc.status === "processing") && (
+                          <button
+                            className="doc-cancel-request-btn"
+                            onClick={() => setCancelTarget(doc)}
+                          >
+                            <XCircleIcon /> Cancel Request
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="doc-empty-state">
+                    <FileTextIcon />
+                    <h3>No active requests</h3>
+                    <p>Start by requesting a document</p>
+                  </div>
+                )}
               </div>
             )}
-          </section>
 
-          {/* Completed Requests */}
-          {completedDocuments.length > 0 && (
-            <section className="doc-section">
-              <div className="doc-section-header">
-                <h2>
-                  <CheckCircleIcon /> Completed Requests{" "}
-                  <span className="doc-badge doc-badge-completed-count">
-                    {completedDocuments.length}
-                  </span>
-                </h2>
-              </div>
-              <div className="doc-cards-grid">
-                {completedDocuments.map((doc) => (
-                  <div key={doc.id} className="doc-card doc-card-completed">
-                    <div className="doc-card-header">
-                      <div className="doc-card-icon-wrap">
-                        <FileTextIcon />
+            {/* Completed Tab */}
+            {activeTab === "completed" && (
+              <div className="qt-tab-content">
+                {completedDocuments.length > 0 ? (
+                  <div className="doc-cards-grid">
+                    {completedDocuments.map((doc) => (
+                      <div key={doc.id} className="doc-card doc-card-completed">
+                        <div className="doc-card-header">
+                          <div className="doc-card-icon-wrap">
+                            <FileTextIcon />
+                          </div>
+                          <div className="doc-card-title-section">
+                            <h3>{doc.type}</h3>
+                            <p className="doc-card-college">{doc.college}</p>
+                            <p className="doc-card-tracking">
+                              {new Date(doc.requestDate).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}{" "}
+                              • {doc.trackingNumber}
+                            </p>
+                          </div>
+                          <span
+                            className={`doc-badge ${getStatusColor(doc.status)}`}
+                          >
+                            {doc.status}
+                          </span>
+                        </div>
                       </div>
-                      <div className="doc-card-title-section">
-                        <h3>{doc.type}</h3>
-                        <p className="doc-card-college">{doc.college}</p>
-                        <p className="doc-card-tracking">
-                          {new Date(doc.requestDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}{" "}
-                          • {doc.trackingNumber}
-                        </p>
-                      </div>
-                      <span
-                        className={`doc-badge ${getStatusColor(doc.status)}`}
-                      >
-                        {doc.status}
-                      </span>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="doc-empty-state">
+                    <CheckCircleIcon />
+                    <h3>No completed requests</h3>
+                    <p>Your completed and rejected requests will appear here</p>
+                  </div>
+                )}
               </div>
-            </section>
-          )}
-
-          {/* Processing Times */}
-          <section className="doc-processing-section">
-            <div className="doc-processing-header">
-              <h2>
-                <AlertCircleIcon /> Processing Times
-              </h2>
-              <p>Estimated completion times for documents</p>
-            </div>
-            <div className="doc-processing-grid">
-              <div className="doc-processing-box">
-                <p className="doc-processing-title">Regular Processing</p>
-                <ul className="doc-processing-list">
-                  <li>• Certificates: 3-5 business days</li>
-                  <li>• Transcript of Records: 5-7 business days</li>
-                  <li>• Diploma: 7-10 business days</li>
-                </ul>
-              </div>
-              <div className="doc-processing-box">
-                <p className="doc-processing-title">Rush Processing</p>
-                <ul className="doc-processing-list">
-                  <li>• Additional fee applies</li>
-                  <li>• 1-2 business days</li>
-                  <li>• Subject to availability</li>
-                </ul>
-              </div>
-            </div>
-          </section>
+            )}
+          </div>
         </div>
       </main>
 

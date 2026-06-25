@@ -460,54 +460,58 @@ body {
 }
 
 /* ===== DOCUMENT HEADER ===== */
-.doc-header-section {
+.queue-header {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  margin-bottom: 2rem;
-  position: relative;
 }
 
-.doc-header-top {
+.doc-content .queue-header {
+  margin-bottom: 1.5rem;
+}
+
+.queue-breadcrumb {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
+  gap: 1rem;
 }
 
-.doc-request-btn {
-  margin-left: auto;
-}
-
-.doc-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  color: var(--text-tertiary);
-  text-decoration: none;
-  font-size: 0.875rem;
+.breadcrumb-link,
+.breadcrumb-link:visited,
+.breadcrumb-link:active,
+.breadcrumb-link:focus {
+  outline: none;
   background: transparent;
   border: none;
+  color: var(--text-tertiary);
   cursor: pointer;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
   border-radius: 0.5rem;
   transition: all 0.2s ease;
-  margin-left: -0.75rem;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.doc-back-link:hover {
-  color: var(--primary-color);
+.breadcrumb-link:hover {
   background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
 }
 
-.doc-back-link svg {
-  width: 1rem;
-  height: 1rem;
+.breadcrumb-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
-.doc-header-title {
+.queue-title-section {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
 }
 
@@ -529,21 +533,17 @@ body {
   height: 1.75rem;
 }
 
-.doc-title-text {
-  flex: 1;
-  text-align: left;
-}
-
-.doc-title-text h1 {
+.queue-title {
   font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
   line-height: 1.2;
   transition: color 0.3s ease;
+  text-align: left;
 }
 
-.doc-title-text p {
+.queue-subtitle {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0.25rem 0 0 0;
@@ -554,7 +554,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 1rem;
   background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
   border: none;
@@ -564,6 +564,8 @@ body {
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+  white-space: nowrap;
+  align-self: flex-start;
 }
 
 .doc-request-btn:hover {
@@ -728,30 +730,68 @@ body {
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
-/* ===== SECTIONS ===== */
-.doc-section {
+/* ===== DOCUMENT TABS ===== */
+.qt-tabs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
   margin-bottom: 2rem;
 }
 
-.doc-section-header {
-  margin-bottom: 1.25rem;
+.qt-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+  transition: border-color 0.3s ease;
 }
 
-.doc-section-header h2 {
+.qt-tab {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
-.doc-section-header h2 svg {
-  width: 1.25rem;
-  height: 1.25rem;
+.qt-tab svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.qt-tab:hover {
   color: var(--primary-color);
+}
+
+.qt-tab.active {
+  color: var(--primary-color);
+}
+
+.qt-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-color);
+}
+
+.qt-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .doc-badge {
@@ -1150,76 +1190,6 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* ===== PROCESSING TIMES ===== */
-.doc-processing-section {
-  background: linear-gradient(135deg, var(--success), var(--primary-color));
-  border: 1px solid var(--success);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  color: white;
-  transition: all 0.3s ease;
-}
-
-.doc-processing-header {
-  margin-bottom: 1.5rem;
-  text-align: left;
-}
-
-.doc-processing-header h2 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: white;
-  margin: 0 0 0.5rem 0;
-  transition: color 0.3s ease;
-}
-
-.doc-processing-header h2 svg {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.doc-processing-header p {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.9);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.doc-processing-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  align-items: start;
-}
-
-.doc-processing-box {
-  text-align: left;
-}
-
-.doc-processing-title {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: white;
-  margin-bottom: 0.75rem;
-  transition: color 0.3s ease;
-}
-
-.doc-processing-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.doc-processing-list li {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 0.5rem;
-  transition: color 0.3s ease;
-  line-height: 1.6;
-}
 
 /* ===== SCROLLBAR ===== */
 .doc-sidebar::-webkit-scrollbar {
@@ -1468,19 +1438,6 @@ body {
 }
 
 /* ===== RESPONSIVE DESIGN ===== */
-@media (max-width: 1024px) {
-  .doc-header-section {
-    flex-direction: column;
-  }
-
-  .doc-request-btn {
-    align-self: flex-start;
-  }
-
-  .doc-processing-grid {
-    gap: 1.5rem;
-  }
-}
 
 @media (max-width: 768px) {
   .doc-mobile-header {
@@ -1509,13 +1466,13 @@ body {
     padding: 1rem;
   }
 
-  .doc-header-title {
+  .queue-title-section {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .doc-request-btn {
-    width: 100%;
+    align-self: stretch;
     justify-content: center;
   }
 
@@ -1525,11 +1482,6 @@ body {
 
   .doc-card-field-full {
     grid-column: 1;
-  }
-
-  .doc-processing-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
   }
 
   .chat-container {
@@ -1544,16 +1496,16 @@ body {
     padding: 0.75rem;
   }
 
-  .doc-title-text h1 {
+  .queue-title {
     font-size: 1.5rem;
+  }
+
+  .queue-header {
+    gap: 0.75rem;
   }
 
   .doc-dialog {
     width: 95%;
-  }
-
-  .doc-header-section {
-    gap: 0.75rem;
   }
 
   .chat-widget {

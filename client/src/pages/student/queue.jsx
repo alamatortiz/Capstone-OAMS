@@ -518,7 +518,7 @@ export default function QueuePage() {
               </div>
               <div>
                 <h1 className="queue-title">
-                  {selectedSlot ? 'Queue Details' : 'Queue Management'}
+                  {selectedSlot ? 'Queue Details' : 'Queue Manager'}
                 </h1>
                 <p className="queue-subtitle">
                   Join queues and track your position in real-time

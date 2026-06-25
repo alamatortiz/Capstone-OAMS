@@ -612,7 +612,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.4rem 0.875rem;
+  padding: 0.55rem 1rem;
   background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
   color: white;
   border-radius: 0.5rem;

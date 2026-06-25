@@ -154,7 +154,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling }) {
       {/* Breadcrumb */}
       <div className="queue-status-header">
         <div className="queue-breadcrumb">
-          <button type="button" className="qss-breadcrumb-link" onClick={onBack}>
+          <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             All Documents
           </button>
@@ -598,7 +598,7 @@ export default function DocumentStatusPage() {
             {/* Page Header */}
             <div className="queue-status-header">
               <div className="queue-breadcrumb">
-                <Link to="/student/dashboard" className="qss-breadcrumb-link">
+                <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
                   Dashboard
                 </Link>
@@ -607,9 +607,9 @@ export default function DocumentStatusPage() {
                 <div className="dss-title-icon">
                   <FileText style={{ width: "1.75rem", height: "1.75rem" }} />
                 </div>
-                <div className="queue-title-content">
-                  <h1>My Document Requests</h1>
-                  <p>Track and manage all your document requests</p>
+                <div>
+                  <h1 className="queue-title">My Document Requests</h1>
+                  <p className="queue-subtitle">Track and manage all your document requests</p>
                 </div>
               </div>
             </div>
