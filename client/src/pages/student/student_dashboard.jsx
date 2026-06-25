@@ -901,7 +901,7 @@ export default function StudentDashboard() {
                 </div>
                 <div className="card-content empty-content">
                   <p>No active queues</p>
-                  <Link to="/student/avail-service" className="primary-btn">
+                  <Link to="/student/queue" className="primary-btn">
                     Join a Queue
                   </Link>
                 </div>

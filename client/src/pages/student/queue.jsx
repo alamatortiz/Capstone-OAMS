@@ -21,7 +21,7 @@ const CloseIconChat = () => (
   </svg>
 );
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
@@ -499,7 +499,7 @@ export default function QueuePage() {
 
           {/* Header */}
           <div className="queue-header">
-            <div className="queue-breadcrumb">
+            <div className="queue-breadcrumb" style={{ justifyContent: 'space-between' }}>
               {selectedSlot ? (
                 <button className="breadcrumb-link" onClick={() => setSelectedSlot(null)}>
                   <ChevronLeft className="breadcrumb-icon" />
@@ -509,6 +509,16 @@ export default function QueuePage() {
                 <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
                   Dashboard
+                </Link>
+              )}
+              {!selectedSlot && (
+                <Link
+                  to="/student/queue-tracking"
+                  state={{ from: 'queue' }}
+                  className="queue-tracking-link-btn"
+                >
+                  <Activity className="queue-tracking-link-btn-icon" />
+                  Queue Tracking
                 </Link>
               )}
             </div>

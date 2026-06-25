@@ -413,10 +413,22 @@ export default function QueueTrackingPage() {
           {/* Page Header */}
           <div className="queue-header">
             <div className="queue-breadcrumb">
-              <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                Dashboard
-              </Link>
+              {location.state?.from === 'queue' ? (
+                <Link to="/student/queue" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Queue Management
+                </Link>
+              ) : location.state?.from === 'queue-status' ? (
+                <Link to="/student/queue-status" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  My Queue Status
+                </Link>
+              ) : (
+                <Link to="/student/dashboard" className="breadcrumb-link">
+                  <ChevronLeft className="breadcrumb-icon" />
+                  Dashboard
+                </Link>
+              )}
             </div>
             <div className="queue-title-section">
               <div className="queue-title-icon">
@@ -510,10 +522,10 @@ export default function QueueTrackingPage() {
                       services to join one.
                     </p>
                     <Link
-                      to="/student/avail-service"
+                      to="/student/queue"
                       className="qt-primary-btn"
                     >
-                      Browse Services
+                      Join a Queue
                     </Link>
                   </div>
                 ) : (
@@ -522,7 +534,11 @@ export default function QueueTrackingPage() {
                       const isLeaving = leavingId === queue.queueId;
 
                       return (
-                        <div key={queue.queueId} className="qt-queue-card">
+                        <div
+                          key={queue.queueId}
+                          className="qt-queue-card"
+                          onClick={() => navigate('/student/queue-status', { state: { fromTracking: true } })}
+                        >
                           {/* Card Header */}
                           <div className="qt-queue-header">
                             <div className="qt-queue-info">
@@ -662,18 +678,10 @@ export default function QueueTrackingPage() {
                           </div>
 
                           {/* Actions */}
-                          <div className="qt-queue-actions">
-                            <Link
-                              to="/student/queue-status"
-                              state={{ fromTracking: true }}
-                              className="qt-primary-btn"
-                              style={{ textAlign: "center" }}
-                            >
-                              View Full Detail
-                            </Link>
-                            {queue.status === "waiting" && (
+                          {queue.status === "waiting" && (
+                            <div className="qt-queue-actions">
                               <button
-                                onClick={() => setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName })}
+                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName }); }}
                                 className="qt-btn-cancel"
                                 disabled={isLeaving}
                               >
@@ -694,8 +702,8 @@ export default function QueueTrackingPage() {
                                   </>
                                 )}
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
