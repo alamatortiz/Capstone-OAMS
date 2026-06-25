@@ -499,7 +499,7 @@ export default function QueuePage() {
 
           {/* Header */}
           <div className="queue-header">
-            <div className="queue-breadcrumb" style={{ justifyContent: 'space-between' }}>
+            <div className="queue-breadcrumb">
               {selectedSlot ? (
                 <button className="breadcrumb-link" onClick={() => setSelectedSlot(null)}>
                   <ChevronLeft className="breadcrumb-icon" />
@@ -509,16 +509,6 @@ export default function QueuePage() {
                 <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
                   Dashboard
-                </Link>
-              )}
-              {!selectedSlot && (
-                <Link
-                  to="/student/queue-tracking"
-                  state={{ from: 'queue' }}
-                  className="queue-tracking-link-btn"
-                >
-                  <Activity className="queue-tracking-link-btn-icon" />
-                  Queue Tracking
                 </Link>
               )}
             </div>
@@ -537,6 +527,16 @@ export default function QueuePage() {
                 </p>
               </div>
             </div>
+            {!selectedSlot && (
+              <Link
+                to="/student/queue-tracking"
+                state={{ from: 'queue' }}
+                className="queue-tracking-link-btn"
+              >
+                <Activity className="queue-tracking-link-btn-icon" />
+                Queue Tracking
+              </Link>
+            )}
           </div>
 
           {/* ── DETAIL VIEW ── */}

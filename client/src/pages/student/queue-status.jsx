@@ -791,7 +791,7 @@ export default function QueueStatusPage() {
           <div className="queue-status-container">
             {/* Page Header */}
             <div className="queue-status-header">
-              <div className="queue-breadcrumb" style={{ justifyContent: 'space-between' }}>
+              <div className="queue-breadcrumb">
                 {fromTracking ? (
                   <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue-tracking')}>
                     <ChevronLeft className="breadcrumb-icon" />
@@ -808,16 +808,6 @@ export default function QueueStatusPage() {
                     Dashboard
                   </Link>
                 )}
-                {!fromTracking && (
-                  <Link
-                    to="/student/queue-tracking"
-                    state={{ from: 'queue-status' }}
-                    className="queue-tracking-link-btn"
-                  >
-                    <Activity className="queue-tracking-link-btn-icon" />
-                    Queue Tracking
-                  </Link>
-                )}
               </div>
               <div className="queue-title-section">
                 <div className="queue-title-icon">
@@ -828,6 +818,16 @@ export default function QueueStatusPage() {
                   <p className="queue-subtitle">View and manage your active queues</p>
                 </div>
               </div>
+              {!fromTracking && (
+                <Link
+                  to="/student/queue-tracking"
+                  state={{ from: 'queue-status' }}
+                  className="queue-tracking-link-btn"
+                >
+                  <Activity className="queue-tracking-link-btn-icon" />
+                  Queue Tracking
+                </Link>
+              )}
             </div>
 
             {/* Error */}

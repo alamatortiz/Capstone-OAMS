@@ -791,6 +791,8 @@ body {
   font-weight: 600;
   text-decoration: none;
   transition: opacity 0.2s ease;
+  align-self: flex-start;
+  width: fit-content;
 }
 
 .queue-tracking-link-btn:hover {
