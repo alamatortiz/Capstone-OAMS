@@ -605,13 +605,14 @@ export default function DocumentsPage() {
                 <p className="queue-subtitle">Request and track your documents</p>
               </div>
             </div>
-            <button
-              className="doc-request-btn"
-              onClick={() => setDialogOpen(true)}
-            >
-              <PlusIcon /> Request Document
-            </button>
           </div>
+
+          <button
+            className="doc-request-btn"
+            onClick={() => setDialogOpen(true)}
+          >
+            <PlusIcon /> Request Document
+          </button>
 
           {/* Document Tabs */}
           <div className="qt-tabs-container">

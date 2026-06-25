@@ -271,6 +271,7 @@
 
 .dss-list-item-completed {
   opacity: 0.72;
+  border-color: rgba(107, 114, 128, 0.25);
 }
 
 .dss-list-item-completed:hover {

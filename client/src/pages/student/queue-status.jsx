@@ -831,17 +831,18 @@ export default function QueueStatusPage() {
                   <p className="queue-subtitle">View and manage your active queues</p>
                 </div>
               </div>
-              {!fromTracking && (
-                <Link
-                  to="/student/queue-tracking"
-                  state={{ from: 'queue-status' }}
-                  className="queue-tracking-link-btn"
-                >
-                  <Activity className="queue-tracking-link-btn-icon" />
-                  Queue Tracking
-                </Link>
-              )}
             </div>
+
+            {!fromTracking && (
+              <Link
+                to="/student/queue-tracking"
+                state={{ from: 'queue-status' }}
+                className="queue-tracking-link-btn"
+              >
+                <Activity className="queue-tracking-link-btn-icon" />
+                Queue Tracking
+              </Link>
+            )}
 
             {/* Error */}
             {error && (

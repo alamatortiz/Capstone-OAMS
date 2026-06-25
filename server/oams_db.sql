@@ -298,6 +298,7 @@ CREATE TABLE document_requests (
     purpose                 VARCHAR(255) NOT NULL,
     status                  ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
     estimated_completion    DATE         NULL,
+    released_at             TIMESTAMP    NULL,
     notes                   TEXT         NULL,
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),

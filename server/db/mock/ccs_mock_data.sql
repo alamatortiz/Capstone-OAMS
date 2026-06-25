@@ -516,14 +516,14 @@ INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id,
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 9 · DOCUMENT REQUESTS
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, notes, created_at) VALUES
+INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
 -- Student 101: 1 processing, 1 released
-(1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', '2026-06-14', 'Document Test 1', NOW() - INTERVAL 3 DAY),
-(2,  101, 2, 'Transcript of Records',     'Local Doc Req 2', 'released',   '2026-06-14', 'Document Test 2', NOW() - INTERVAL 14 DAY),
+(1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', '2026-06-14', NULL,                        'Document Test 1', NOW() - INTERVAL 3 DAY),
+(2,  101, 2, 'Transcript of Records',     'Local Doc Req 2', 'released',   '2026-06-14', NOW() - INTERVAL 7 DAY,  'Document Test 2', NOW() - INTERVAL 14 DAY),
 -- Student 104: 2 pending, 1 released
-(3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', 'Document Test 3', NOW() - INTERVAL 1 DAY),
-(4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', 'Document Test 4', NOW() - INTERVAL 2 DAY),
-(5,  104, 3, 'Certificate of Enrollment', 'Local Doc Req 5', 'released',   '2026-06-14', 'Document Test 5', NOW() - INTERVAL 10 DAY);
+(3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', NULL,                        'Document Test 3', NOW() - INTERVAL 1 DAY),
+(4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', NULL,                        'Document Test 4', NOW() - INTERVAL 2 DAY),
+(5,  104, 3, 'Certificate of Enrollment', 'Local Doc Req 5', 'released',   '2026-06-14', NOW() - INTERVAL 5 DAY,  'Document Test 5', NOW() - INTERVAL 10 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────

@@ -233,12 +233,17 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
                 <span className="dss-detail-label">Request Date</span>
                 <span className="dss-detail-value">{formatDate(doc.requestDate)}</span>
               </div>
-              {doc.estimatedCompletion && (
+              {doc.status === "claimed" && doc.claimedDate ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Date Acquired</span>
+                  <span className="dss-detail-value">{formatDate(doc.claimedDate)}</span>
+                </div>
+              ) : doc.estimatedCompletion ? (
                 <div className="dss-detail-row">
                   <span className="dss-detail-label">Estimated Completion</span>
                   <span className="dss-detail-value">{formatDate(doc.estimatedCompletion)}</span>
                 </div>
-              )}
+              ) : null}
               <div className="dss-detail-row" style={{ borderBottom: "none" }}>
                 <span className="dss-detail-label">Purpose</span>
                 <span className="dss-detail-value">{doc.purpose}</span>
@@ -782,7 +787,9 @@ export default function DocumentStatusPage() {
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>
                                 <p className="dss-list-college">{doc.college}</p>
-                                <p className="dss-list-tracking">{doc.trackingNumber}</p>
+                                <p className="dss-list-tracking">
+                                  Tracking: <span>{doc.trackingNumber}</span>
+                                </p>
                               </div>
                               <span className={`dss-badge ${statusMeta.cls}`}>
                                 {statusMeta.label}
@@ -790,9 +797,15 @@ export default function DocumentStatusPage() {
                             </div>
                             <div className="dss-list-card-grid">
                               <div className="dss-list-card-field">
-                                <label>Request Date</label>
+                                <label>Date Requested</label>
                                 <p>{formatDateShort(doc.requestDate)}</p>
                               </div>
+                              {doc.claimedDate && (
+                                <div className="dss-list-card-field">
+                                  <label>Date Acquired</label>
+                                  <p>{formatDateShort(doc.claimedDate)}</p>
+                                </div>
+                              )}
                               <div className="dss-list-card-field-full">
                                 <label>Purpose</label>
                                 <p>{doc.purpose}</p>

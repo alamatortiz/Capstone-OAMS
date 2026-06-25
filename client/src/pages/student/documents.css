@@ -448,6 +448,9 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 /* ===== SIDEBAR OVERLAY ===== */
@@ -467,7 +470,7 @@ body {
 }
 
 .doc-content .queue-header {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
 }
 
 .queue-breadcrumb {
@@ -566,6 +569,7 @@ body {
   box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
   white-space: nowrap;
   align-self: flex-start;
+  width: fit-content;
 }
 
 .doc-request-btn:hover {

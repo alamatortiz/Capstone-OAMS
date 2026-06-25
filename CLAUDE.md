@@ -36,22 +36,19 @@ Before touching any file, read its current contents. Never assume what's already
 ## Rule 2: Challenge the direction
 Think critically. If a proposed approach isn't the most efficient path, say so and suggest a better alternative. Don't just execute — push back when there's a faster, cleaner, or more architecturally sound way to reach the goal.
 
-## Rule 3: Test before responding
-After making any code changes, verify the logic is sound and flag anything untested. Never say "done" if the code hasn't been verified. If a dev server or test suite should be run, say so explicitly.
-
-## Rule 4: Keep context lean
+## Rule 3: Keep context lean
 Always look for ways to reduce redundancy. If two files do the same thing, flag it. Remove or consolidate unnecessary files. Keep things simple — avoid over-engineering.
 
-## Rule 5: Match the existing patterns
+## Rule 4: Match the existing patterns
 - Backend routes are role-segmented: `adminRoutes.js`, `facultyRoutes.js`, `studentRoutes.js`
 - Pages are role-segmented: `pages/admin/`, `pages/professor/`, `pages/student/`
 - CSS files are co-located with their component (e.g. `queue.css` + `queue.jsx`)
 - New features follow this same pattern — do not deviate without flagging it first
 
-## Rule 6: Never break auth or routing
+## Rule 5: Never break auth or routing
 `AuthContext.tsx`, `ProtectedRoute.tsx`, `authMiddleware.js` are critical. Any change near these files must be explicitly reasoned and discussed before implementing.
 
-## Rule 7: Scope awareness
+## Rule 6: Scope awareness
 - `client-mobile/` is out of scope until web parity is reached — do not generate mobile code unless explicitly asked
 - AI/chatbot layer does not exist yet — do not fabricate integration code for it
 - Mock data is CCS-scoped (`ccs_mock_data.sql`) — do not assume all 6 colleges are wired up

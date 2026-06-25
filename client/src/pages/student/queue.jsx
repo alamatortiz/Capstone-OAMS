@@ -211,13 +211,19 @@ export default function QueuePage() {
     setSelectedService('all');
   }, [selectedCollege]);
 
-  // Sync selectedSlot from live availableSlots on each poll
+  // Sync selectedSlot from live availableSlots on each poll.
+  // If the student just joined this slot it will appear in queues, so
+  // navigate back to the list immediately instead of re-asserting the slot.
   useEffect(() => {
     if (!selectedSlot) return;
+    if (isAlreadyInQueue(selectedSlot.slotId)) {
+      setSelectedSlot(null);
+      return;
+    }
     const fresh = availableSlots.find((s) => s.slotId === selectedSlot.slotId);
     if (fresh) setSelectedSlot(fresh);
     else setSelectedSlot(null);
-  }, [availableSlots, selectedSlot]);
+  }, [availableSlots, selectedSlot, isAlreadyInQueue]);
 
   // Filter available slots client-side
   const filteredSlots = useMemo(
@@ -521,37 +527,50 @@ export default function QueuePage() {
                 </p>
               </div>
             </div>
-            {!selectedSlot && (
-              <Link
-                to="/student/queue-tracking"
-                state={{ from: 'queue' }}
-                className="queue-tracking-link-btn"
-              >
-                <Activity className="queue-tracking-link-btn-icon" />
-                Queue Tracking
-              </Link>
-            )}
           </div>
+
+          {!selectedSlot && (
+            <Link
+              to="/student/queue-tracking"
+              state={{ from: 'queue' }}
+              className="queue-tracking-link-btn"
+            >
+              <Activity className="queue-tracking-link-btn-icon" />
+              Queue Tracking
+            </Link>
+          )}
 
           {/* ── DETAIL VIEW ── */}
           {selectedSlot && (
             <div className="avail-services-details-section">
               {/* Hero */}
               <div className="avail-services-service-hero">
-                <h2>{selectedSlot.serviceName}</h2>
-                <p style={{ marginBottom: 0 }}>{selectedSlot.departmentName}</p>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-                  <div className="avail-services-service-hero-meta">
-                    <Clock className="avail-services-service-hero-icon" />
-                    <span>Avg. Wait: {selectedSlot.avgWaitTime}</span>
+                <div className="avail-services-hero-content">
+                  <div className="avail-services-hero-logo">
+                    <img
+                      src={getCollegeLogo(selectedSlot.departmentName)}
+                      alt={selectedSlot.departmentName}
+                    />
                   </div>
-                  <div className="avail-services-service-hero-meta">
-                    <Users className="avail-services-service-hero-icon" />
-                    <span>{selectedSlot.waitingCount} currently waiting</span>
-                  </div>
-                  <div className="avail-services-service-hero-meta">
-                    <CheckCircle2 className="avail-services-service-hero-icon" />
-                    <span>Now Serving: {selectedSlot.currentlyServing}</span>
+                  <div className="avail-services-hero-text">
+                    <div className="avail-services-hero-title">
+                      <p className="avail-services-hero-service-name">{selectedSlot.serviceName}</p>
+                      <p>{selectedSlot.departmentName}</p>
+                    </div>
+                    <div className="avail-services-hero-meta-row">
+                      <div className="avail-services-service-hero-meta">
+                        <Clock className="avail-services-service-hero-icon" />
+                        <span>Avg. Wait: {selectedSlot.avgWaitTime}</span>
+                      </div>
+                      <div className="avail-services-service-hero-meta">
+                        <Users className="avail-services-service-hero-icon" />
+                        <span>{selectedSlot.waitingCount} currently waiting</span>
+                      </div>
+                      <div className="avail-services-service-hero-meta">
+                        <CheckCircle2 className="avail-services-service-hero-icon" />
+                        <span>Now Serving: {selectedSlot.currentlyServing}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

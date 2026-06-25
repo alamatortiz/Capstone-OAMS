@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { FileText } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
@@ -440,7 +441,7 @@ export default function StudentDashboard() {
         : dashStats?.stats?.documents?.pending > 0
           ? `${dashStats.stats.documents.pending} pending approval`
           : "No pending documents",
-      icon: FileTextIcon,
+      icon: FileText,
       color: "text-orange-600",
       bgColor: "bg-orange-50 dark:bg-orange-950",
       link: "/student/document-status",

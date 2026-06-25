@@ -336,6 +336,7 @@ router.get(
            dr.purpose,
            dr.status,
            dr.estimated_completion,
+           dr.released_at,
            dr.notes,
            dr.created_at,
            d.department_name AS college
@@ -366,6 +367,7 @@ router.get(
         trackingNumber: d.tracking_number,
         notes: d.notes || undefined,
         estimatedCompletion: d.estimated_completion || undefined,
+        claimedDate: d.released_at || undefined,
       }));
 
       res.json({ documents });

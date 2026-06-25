@@ -1792,43 +1792,91 @@ body {
 }
 
 .avail-services-service-hero {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
-  border-radius: 1rem;
-  padding: 2.25rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
   color: white;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+  transition: all 0.3s ease;
+}
+
+.avail-services-hero-content {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.avail-services-hero-logo {
+  width: 5.5rem;
+  height: 5.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.avail-services-hero-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.5rem;
+}
+
+.avail-services-hero-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.avail-services-hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.avail-services-hero-service-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.2rem 0;
+  line-height: 1.2;
   text-align: left;
 }
 
-.avail-services-service-hero h2 {
-  font-size: 2rem;
-  font-weight: 800;
+.avail-services-hero-title p {
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.9);
   margin: 0;
-  margin-bottom: 0.625rem;
-  line-height: 1.2;
-  letter-spacing: -0.5px;
+  text-align: left;
 }
 
-.avail-services-service-hero p {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0;
-  font-weight: 500;
-  line-height: 1.5;
+.avail-services-hero-meta-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .avail-services-service-hero-meta {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
   font-size: 0.9375rem;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
+  text-align: left;
 }
 
 .avail-services-service-hero-icon {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1rem;
+  height: 1rem;
   stroke: currentColor;
+  flex-shrink: 0;
 }
 
 .avail-services-details-grid {
@@ -2042,21 +2090,35 @@ body {
   }
 
   .avail-services-service-hero {
-    padding: 1.75rem;
+    padding: 1.25rem;
   }
 
-  .avail-services-service-hero h2 {
-    font-size: 1.625rem;
+  .avail-services-hero-content {
+    gap: 1rem;
+  }
+
+  .avail-services-hero-logo {
+    width: 4rem;
+    height: 4rem;
   }
 }
 
 @media (max-width: 640px) {
   .avail-services-service-hero {
-    padding: 1.5rem;
+    padding: 1rem;
   }
 
-  .avail-services-service-hero h2 {
-    font-size: 1.375rem;
+  .avail-services-hero-content {
+    gap: 0.75rem;
+  }
+
+  .avail-services-hero-logo {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .avail-services-hero-meta-row {
+    gap: 0.625rem;
   }
 
   .avail-services-cta-card {
