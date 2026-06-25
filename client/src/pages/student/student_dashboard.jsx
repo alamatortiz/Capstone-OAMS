@@ -430,7 +430,7 @@ export default function StudentDashboard() {
       icon: CalendarIcon,
       color: "text-emerald-600",
       bgColor: "bg-emerald-50 dark:bg-emerald-950",
-      link: "/student/appointments",
+      link: "/student/appointment-status",
     },
     {
       title: "Documents",

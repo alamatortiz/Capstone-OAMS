@@ -1277,6 +1277,7 @@ router.get(
         id: row.appointment_id,
         title: row.service_name ?? row.faculty_role ?? "Faculty Consultation",
         college: row.college,
+        collegeAbbrev: row.college_abbrev ?? "",
         person: row.faculty_name,
         personRole: row.faculty_role ?? "Faculty",
         date:
@@ -1287,6 +1288,9 @@ router.get(
         location: row.location ?? "TBA",
         purpose: row.notes ?? "",
         status: row.status,
+        createdAt: row.created_at
+          ? new Date(row.created_at).toISOString().split("T")[0]
+          : null,
       }));
 
       res.json({ appointments: formatted });
