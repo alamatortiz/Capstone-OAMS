@@ -1,7 +1,13 @@
 import React, { Suspense, useEffect } from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -68,7 +74,6 @@ const AdminDataManagement = React.lazy(
   () => import("./pages/admin/admin_data_management.jsx"),
 );
 
-import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
 import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
@@ -155,10 +160,6 @@ createRoot(document.getElementById("root")).render(
               />
               <Route
                 path="/student/appointments"
-                element={<AppointmentsPage />}
-              />
-              <Route
-                path="/student/appointment-booking"
                 element={<AppointmentBookingPage />}
               />
               <Route path="/student/documents" element={<DocumentsPage />} />
@@ -382,7 +383,7 @@ createRoot(document.getElementById("root")).render(
             />
             <Route
               path="/student-appointments"
-              element={<AppointmentsPage />}
+              element={<AppointmentBookingPage />}
             />
             <Route
               path="/student-appointment-booking"

@@ -472,7 +472,7 @@ export default function StudentDashboard() {
       description:
         "Schedule appointments with professors and view available slots.",
       icon: CalendarIcon,
-      link: "/student/appointment-booking",
+      link: "/student/appointments",
       gradient: "from-indigo-500 to-purple-600",
       badge: "New Slots",
     },

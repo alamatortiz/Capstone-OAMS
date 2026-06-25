@@ -9,6 +9,7 @@ import "./appointment-booking.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";
+import CalendarGrid from "../../components/CalendarGrid";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -183,6 +184,12 @@ const SearchIcon = ({ className = "", style = {} }) => (
   >
     <circle cx="11" cy="11" r="8"></circle>
     <path d="m21 21-4.35-4.35"></path>
+  </svg>
+);
+
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
+    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 
@@ -384,12 +391,16 @@ export default function AppointmentBookingPage() {
 
   // ── Appointment / filter state ─────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedCollege, setSelectedCollege] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCollege, setSelectedCollege] = useState("");
+  const [selectedProfessorId, setSelectedProfessorId] = useState("");
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [purpose, setPurpose] = useState("");
   const [activeTab, setActiveTab] = useState("slots"); // "slots" | "bookings"
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  });
 
   // ── Fetch helpers ───────────────────────────────────────────────────────────
   const fetchSlots = async () => {
@@ -431,15 +442,11 @@ export default function AppointmentBookingPage() {
   const availableSlots = useMemo(() => {
     return slots.filter((slot) => {
       const matchesDate = !selectedDate || slot.date === selectedDate;
-      const matchesCollege =
-        selectedCollege === "all" || slot.college === selectedCollege;
-      const matchesSearch =
-        !searchQuery ||
-        slot.professorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        slot.location.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesDate && matchesCollege && matchesSearch;
+      const matchesCollege = !selectedCollege || slot.college === selectedCollege;
+      const matchesProfessor = !selectedProfessorId || String(slot.professorId) === selectedProfessorId;
+      return matchesDate && matchesCollege && matchesProfessor;
     });
-  }, [slots, selectedDate, selectedCollege, searchQuery]);
+  }, [slots, selectedDate, selectedCollege, selectedProfessorId]);
 
   // Group slots by date
   const slotsByDate = useMemo(() => {
@@ -485,8 +492,40 @@ export default function AppointmentBookingPage() {
     ]);
   }, [activeBookings]);
 
+  const availableProfessors = useMemo(() => {
+    if (!selectedCollege) return [];
+    const seen = new Set();
+    return slots
+      .filter((s) => s.college === selectedCollege)
+      .filter((s) => {
+        const id = String(s.professorId);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((s) => ({ id: String(s.professorId), name: s.professorName }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [slots, selectedCollege]);
+
+  const calendarDays = useMemo(() => {
+    if (!selectedProfessorId) return [];
+    const { year, month } = calendarMonth;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const profSlots = slots.filter((s) => String(s.professorId) === selectedProfessorId);
+    const slotDates = new Set(profSlots.map((s) => s.date));
+    const today = new Date().toISOString().split("T")[0];
+    const result = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      result.push({
+        date: dateStr,
+        status: dateStr >= today && slotDates.has(dateStr) ? "available" : "unavailable",
+      });
+    }
+    return result;
+  }, [slots, selectedProfessorId, calendarMonth]);
+
   const colleges = [
-    { value: "all", label: "All Colleges" },
     { value: "CCS", label: "CCS" },
     { value: "CBAA", label: "CBAA" },
     { value: "COED", label: "COED" },
@@ -770,55 +809,20 @@ export default function AppointmentBookingPage() {
       <main className="appointment-main">
         <div className="appointment-content">
           {/* Header */}
-          <div className="appointment-header">
-            <div className="header-backdrop header-backdrop-1"></div>
-            <div className="header-backdrop header-backdrop-2"></div>
-            <div className="header-content">
-              <h1 className="header-title">
+          <div className="queue-header">
+            <div className="queue-breadcrumb">
+              <button className="breadcrumb-link" onClick={() => navigate(-1)}>
+                <ChevronLeftIcon />
+                Dashboard
+              </button>
+            </div>
+            <div className="queue-title-section">
+              <div className="ab-title-icon">
                 <CalendarIcon />
-                Book Appointment
-              </h1>
-              <p className="header-subtitle">
-                Schedule consultations with professors
-              </p>
-            </div>
-          </div>
-
-          {/* Statistics */}
-          <div className="appointment-stats">
-            <div className="appointment-stat-card">
-              <div className="appointment-stat-icon">
-                <ChevronRightIcon />
               </div>
-              <div className="stat-body">
-                <p className="stat-label">Available Slots</p>
-                <p className="stat-value">
-                  {slotsLoading ? "—" : availableSlots.length}
-                </p>
-              </div>
-            </div>
-            <div className="appointment-stat-card">
-              <div className="appointment-stat-icon">
-                <CheckCircleIcon />
-              </div>
-              <div className="stat-body">
-                <p className="stat-label">My Bookings</p>
-                <p className="stat-value">
-                  {bookingsLoading ? "—" : activeBookings.length}
-                </p>
-              </div>
-            </div>
-            <div className="appointment-stat-card">
-              <div className="appointment-stat-icon">
-                <UsersIcon />
-              </div>
-              <div className="stat-body">
-                <p className="stat-label">Professors</p>
-                <p className="stat-value">
-                  {slotsLoading
-                    ? "—"
-                    : new Set(availableSlots.map((s) => s.professorId)).size}
-                </p>
+              <div>
+                <h1 className="ab-title">Book Appointment</h1>
+                <p className="ab-subtitle">Schedule consultations with professors</p>
               </div>
             </div>
           </div>
@@ -827,51 +831,22 @@ export default function AppointmentBookingPage() {
           <div className="filters-card">
             <div className="filters-header">
               <h2>Filter & Search</h2>
-              <p>Find the perfect time slot</p>
+              <p>Optionally filter by college, professor, or date</p>
             </div>
-            <div className="filters-grid">
+            <div className="filters-top-row">
               <div className="filter-group">
-                <label htmlFor="searchQuery">
-                  Search Professor or Location
-                </label>
-                <div
-                  className="search-input-wrapper"
-                  style={{
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <SearchIcon
-                    style={{
-                      position: "absolute",
-                      left: "0.85rem",
-                      width: "1rem",
-                      height: "1rem",
-                      opacity: 0.55,
-                      pointerEvents: "none",
-                    }}
-                  />
-
-                  <input
-                    id="searchQuery"
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="search-input"
-                    style={{ paddingLeft: "2.5rem", width: "100%" }}
-                  />
-                </div>
-              </div>
-              <div className="filter-group">
-                <label htmlFor="selectedCollege">College</label>
+                <label htmlFor="selectedCollege">1. Select College</label>
                 <select
                   id="selectedCollege"
                   value={selectedCollege}
-                  onChange={(e) => setSelectedCollege(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedCollege(e.target.value);
+                    setSelectedProfessorId("");
+                    setSelectedDate("");
+                  }}
                   className="filter-select"
                 >
+                  <option value="">— Choose a college —</option>
                   {colleges.map((college) => (
                     <option key={college.value} value={college.value}>
                       {college.label}
@@ -880,17 +855,71 @@ export default function AppointmentBookingPage() {
                 </select>
               </div>
               <div className="filter-group">
-                <label htmlFor="selectedDate">Date</label>
-                <input
-                  id="selectedDate"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  min={new Date().toISOString().split("T")[0]}
-                  className="filter-input"
-                />
+                <label htmlFor="selectedProfessor">2. Select Professor</label>
+                <select
+                  id="selectedProfessor"
+                  value={selectedProfessorId}
+                  onChange={(e) => {
+                    setSelectedProfessorId(e.target.value);
+                    setSelectedDate("");
+                  }}
+                  className="filter-select"
+                  disabled={!selectedCollege || slotsLoading || availableProfessors.length === 0}
+                >
+                  <option value="">
+                    {!selectedCollege
+                      ? "Select a college first"
+                      : slotsLoading
+                      ? "Loading…"
+                      : availableProfessors.length === 0
+                      ? "No professors available"
+                      : "— Choose a professor —"}
+                  </option>
+                  {availableProfessors.map((prof) => (
+                    <option key={prof.id} value={prof.id}>
+                      {prof.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
+            {selectedProfessorId && (
+              <div className="filter-group filter-group--calendar">
+                <label>3. Select Date</label>
+                <CalendarGrid
+                  year={calendarMonth.year}
+                  month={calendarMonth.month}
+                  days={calendarDays}
+                  selectedDate={selectedDate}
+                  onDateClick={(date, status) => {
+                    if (status === "available")
+                      setSelectedDate(date === selectedDate ? "" : date);
+                  }}
+                  onPrevMonth={() =>
+                    setCalendarMonth(({ year, month }) => {
+                      const d = new Date(year, month - 2, 1);
+                      return { year: d.getFullYear(), month: d.getMonth() + 1 };
+                    })
+                  }
+                  onNextMonth={() =>
+                    setCalendarMonth(({ year, month }) => {
+                      const d = new Date(year, month, 1);
+                      return { year: d.getFullYear(), month: d.getMonth() + 1 };
+                    })
+                  }
+                  disablePast={true}
+                  loading={slotsLoading}
+                />
+                {selectedDate && (
+                  <button
+                    className="clear-date-btn"
+                    onClick={() => setSelectedDate("")}
+                  >
+                    Clear date filter
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tabs Navigation */}
@@ -943,7 +972,7 @@ export default function AppointmentBookingPage() {
                   <CalendarIcon />
                   <h3>No Available Slots</h3>
                   <p>
-                    {selectedDate || selectedCollege !== "all" || searchQuery
+                    {selectedDate || selectedCollege || selectedProfessorId
                       ? "Try adjusting your filters to see more results"
                       : "No professors have published consultation hours yet"}
                   </p>
@@ -1019,7 +1048,7 @@ export default function AppointmentBookingPage() {
             </div>
           )}
           {/* My Bookings */}
-          <div className="bookings-container">
+          {activeTab === "bookings" && <div className="bookings-container">
             <div className="bookings-header">
               <h2>My Appointments</h2>
               <p>Your scheduled consultations</p>
@@ -1124,7 +1153,7 @@ export default function AppointmentBookingPage() {
                 ))}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </main>
 
