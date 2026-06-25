@@ -233,7 +233,6 @@ export default function QueueTrackingPage() {
   const totalJoined = metrics?.totalQueuesJoined ?? 0;
   const totalCompleted = metrics?.totalQueuesCompleted ?? 0;
   const totalCancelled = metrics?.totalQueuesCancelled ?? 0;
-  const avgWait = metrics?.averageWaitTime ?? "—";
   const successRate =
     totalJoined > 0 ? Math.round((totalCompleted / totalJoined) * 100) : 0;
 
@@ -244,11 +243,7 @@ export default function QueueTrackingPage() {
 
   const [leaveConfirmQueue, setLeaveConfirmQueue] = useState(null);
   const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
+    setIsDark((prev) => !prev);
   };
 
   const handleLeaveQueue = async (queueId) => {
@@ -298,7 +293,7 @@ export default function QueueTrackingPage() {
     if (i.includes("history"))
       return `You have ${queueHistory.length} past queue record(s) in your history.`;
     if (i.includes("analytics") || i.includes("stats"))
-      return `You've joined ${totalJoined} queue(s) total, completed ${totalCompleted}, with a ${successRate}% success rate. Average wait: ${avgWait}.`;
+      return `You've joined ${totalJoined} queue(s) total, completed ${totalCompleted}, with a ${successRate}% success rate.`;
     return "I can help with your active queues, history, and analytics. What would you like to know?";
   };
 
@@ -670,6 +665,7 @@ export default function QueueTrackingPage() {
                           <div className="qt-queue-actions">
                             <Link
                               to="/student/queue-status"
+                              state={{ fromTracking: true }}
                               className="qt-primary-btn"
                               style={{ textAlign: "center" }}
                             >
@@ -862,7 +858,7 @@ export default function QueueTrackingPage() {
       <ActionConfirmModal
         show={leaveConfirmQueue !== null}
         onCancel={() => setLeaveConfirmQueue(null)}
-        onConfirm={() => { handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
+        onConfirm={async () => { await handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
         title="Leave Queue?"
         message={
           <>

@@ -1166,28 +1166,16 @@ router.get(
         `SELECT
            COUNT(*) AS total_joined,
            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS total_completed,
-           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS total_cancelled,
-           SUM(
-             CASE WHEN status = 'completed'
-               THEN TIMESTAMPDIFF(MINUTE, created_at, completed_at)
-               ELSE 0
-             END
-           ) AS total_minutes
+           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS total_cancelled
          FROM queues
          WHERE student_id = ?`,
         [studentId],
       );
 
-      const totalCompleted = counts.total_completed || 0;
-      const totalMinutes = counts.total_minutes || 0;
-      const avgMinutes =
-        totalCompleted > 0 ? Math.round(totalMinutes / totalCompleted) : 0;
-
       res.json({
         totalQueuesJoined: counts.total_joined || 0,
-        totalQueuesCompleted: totalCompleted,
+        totalQueuesCompleted: counts.total_completed || 0,
         totalQueuesCancelled: counts.total_cancelled || 0,
-        averageWaitTime: totalCompleted > 0 ? `${avgMinutes} min` : "—",
       });
     } catch (error) {
       console.error("Queue metrics error:", error);
