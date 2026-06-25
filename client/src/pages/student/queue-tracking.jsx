@@ -540,7 +540,7 @@ export default function QueueTrackingPage() {
                         <div
                           key={queue.queueId}
                           className="qt-queue-card"
-                          onClick={() => navigate('/student/queue-status', { state: { fromTracking: true } })}
+                          onClick={() => navigate('/student/queue-status', { state: { fromTracking: true, queueId: queue.queueId } })}
                         >
                           {/* Card Header */}
                           <div className="qt-queue-header">

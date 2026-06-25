@@ -186,13 +186,22 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
 
   return (
     <div className="queue-status-container">
-      {/* Breadcrumb */}
+      {/* Page Header */}
       <div className="queue-status-header">
         <div className="queue-breadcrumb">
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             {backLabel}
           </button>
+        </div>
+        <div className="queue-title-section">
+          <div className="queue-title-icon">
+            <Clock className="icon" />
+          </div>
+          <div>
+            <h1 className="queue-title">Queue Details</h1>
+            <p className="queue-subtitle">View your position and estimated wait time</p>
+          </div>
         </div>
       </div>
 

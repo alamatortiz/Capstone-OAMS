@@ -20,6 +20,7 @@ import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import "./queue-status.css";
+import "./queue-tracking.css";
 import "./document-status.css";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
@@ -154,13 +155,22 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
 
   return (
     <div className="queue-status-container">
-      {/* Breadcrumb */}
+      {/* Page Header */}
       <div className="queue-status-header">
         <div className="queue-breadcrumb">
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             {backLabel}
           </button>
+        </div>
+        <div className="queue-title-section">
+          <div className="dss-title-icon">
+            <FileText style={{ width: "1.75rem", height: "1.75rem" }} />
+          </div>
+          <div>
+            <h1 className="queue-title">Document Details</h1>
+            <p className="queue-subtitle">Track your document request status</p>
+          </div>
         </div>
       </div>
 
@@ -388,6 +398,7 @@ export default function DocumentStatusPage() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
+  const messageIdRef = useRef(1);
 
   const selectedDoc = selectedDocId
     ? (documents.find((d) => d.id === selectedDocId) ?? null)
@@ -453,7 +464,7 @@ export default function DocumentStatusPage() {
     e.preventDefault();
     if (!inputValue.trim()) return;
     const userMsg = {
-      id: messages.length + 1,
+      id: ++messageIdRef.current,
       type: "user",
       text: inputValue,
       timestamp: new Date(),
@@ -463,7 +474,7 @@ export default function DocumentStatusPage() {
     setInputValue("");
     setTimeout(() => {
       const bot = {
-        id: messages.length + 2,
+        id: ++messageIdRef.current,
         type: "bot",
         text: generateBotResponse(captured),
         timestamp: new Date(),

@@ -324,6 +324,7 @@ export default function StudentDashboard() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
+  const messageIdRef = useRef(1);
 
   // ── Dashboard data state ──────────────────────────────────────────────────
   const [dashStats, setDashStats] = useState(null);
@@ -516,18 +517,19 @@ export default function StudentDashboard() {
     e.preventDefault();
     if (inputValue.trim() === "") return;
     const userMessage = {
-      id: messages.length + 1,
+      id: ++messageIdRef.current,
       type: "user",
       text: inputValue,
       timestamp: new Date(),
     };
-    setMessages([...messages, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
+    const capturedInput = inputValue;
     setInputValue("");
     setTimeout(() => {
       const botResponse = {
-        id: messages.length + 2,
+        id: ++messageIdRef.current,
         type: "bot",
-        text: generateBotResponse(inputValue),
+        text: generateBotResponse(capturedInput),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botResponse]);
@@ -724,8 +726,6 @@ export default function StudentDashboard() {
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
                   </div>
-                  <div className="stat-header"></div>
-
                   <p
                     className={`stat-value ${dashLoading ? "stat-loading" : ""}`}
                   >

@@ -7,7 +7,6 @@ import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import { toast } from "sonner";
 import "./documents.css";
-import "../../App.css";
 import api from "../../utils/api";
 
 import { applyTheme, getSavedTheme } from "../../utils/theme";
@@ -262,6 +261,7 @@ export default function DocumentsPage() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
+  const messageIdRef = useRef(1);
 
   // ── Effects ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -364,7 +364,7 @@ export default function DocumentsPage() {
     if (inputValue.trim() === "") return;
 
     const userMessage = {
-      id: messages.length + 1,
+      id: ++messageIdRef.current,
       type: "user",
       text: inputValue,
       timestamp: new Date(),
@@ -376,7 +376,7 @@ export default function DocumentsPage() {
 
     setTimeout(() => {
       const botResponse = {
-        id: messages.length + 2,
+        id: ++messageIdRef.current,
         type: "bot",
         text: generateBotResponse(nextInput),
         timestamp: new Date(),
@@ -714,7 +714,12 @@ export default function DocumentsPage() {
                         {doc.status === "ready" && (
                           <button
                             className="doc-card-claim-btn"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate("/student/document-status", {
+                                state: { from: "documents", docId: doc.id },
+                              });
+                            }}
                           >
                             <DownloadIcon /> Claim Document
                           </button>

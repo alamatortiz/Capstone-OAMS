@@ -353,6 +353,7 @@ router.get(
         processing: "processing",
         generated: "ready",
         released: "claimed",
+        rejected: "rejected",
       };
 
       const documents = rows.map((d) => ({
@@ -1765,27 +1766,6 @@ router.get(
   },
 );
 
-/**
- * ─────────────────────────────────────────────────────────────────────────
- * ADD THESE ROUTES TO studentRoutes.js
- * ─────────────────────────────────────────────────────────────────────────
- * Where to paste:
- *   Insert this block right after the existing
- *     DELETE /appointments/:appointmentId   (Cancel appointment)
- *   route, and BEFORE the
- *     // GET /api/student/transactions
- *   comment.
- *
- * Why no new tables are needed:
- *   - "Slots" are derived live from faculty_availability (already seeded
- *     in ccs_mock_data.sql, Section 14).
- *   - "Bookings" are just rows in the existing `appointments` table.
- *   - Your existing GET /appointments and DELETE /appointments/:id routes
- *     already cover "My Bookings" and "Cancel" — reuse them on the
- *     frontend instead of duplicating logic here.
- * ─────────────────────────────────────────────────────────────────────────
- */
-
 // ─────────────────────────────────────────────────────────────
 // BOOKING SLOTS ENDPOINTS (derived from faculty_availability)
 // ─────────────────────────────────────────────────────────────
@@ -2036,7 +2016,7 @@ router.post(
           personRole: newRow.faculty_role ?? "Faculty",
           college: newRow.college,
           date: String(newRow.appointment_date).split("T")[0],
-          time: formatTime12hLocal(chosenTime),
+          time: formatTime12h(chosenTime),
           location: newRow.location ?? "TBA",
           purpose: newRow.notes ?? "",
           status: newRow.status,
@@ -2240,8 +2220,6 @@ router.get(
   },
 );
 
-module.exports = router;
-
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
@@ -2269,9 +2247,7 @@ function formatRelativeTime(date) {
   return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
 }
 
-// ── Local helpers for the booking-slots routes ──────────────────────────
-// (If formatTime12h already exists lower in this file, reuse that one
-// instead and delete formatTime12hLocal to avoid a duplicate definition.)
+// ── Helpers for booking-slots routes ────────────────────────────────────
 function timeStrToMinutes(timeStr) {
   const [h, m] = String(timeStr).split(":").map(Number);
   return h * 60 + m;
@@ -2283,8 +2259,5 @@ function minutesToTimeStr(mins) {
   const m = (mins % 60).toString().padStart(2, "0");
   return `${h}:${m}:00`;
 }
-function formatTime12hLocal(timeStr) {
-  const [h, m] = String(timeStr).split(":").map(Number);
-  const suffix = h >= 12 ? "PM" : "AM";
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
-}
+
+module.exports = router;

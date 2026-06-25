@@ -1466,7 +1466,7 @@ body {
     padding: 1rem;
   }
 
-  .queue-title-section {
+  .doc-content .queue-title-section {
     flex-direction: column;
     align-items: flex-start;
   }
