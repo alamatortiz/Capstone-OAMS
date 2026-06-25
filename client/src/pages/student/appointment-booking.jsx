@@ -924,10 +924,10 @@ export default function AppointmentBookingPage() {
 
           {/* Tabs Navigation */}
           <div className="tabs-navigation">
-            <div className="tabs-header">
+            <div className="qt-tabs-list">
               <button
                 type="button"
-                className={`tab-button ${activeTab === "slots" ? "active" : ""}`}
+                className={`qt-tab ${activeTab === "slots" ? "active" : ""}`}
                 onClick={() => setActiveTab("slots")}
               >
                 <ChevronRightIcon />
@@ -935,7 +935,7 @@ export default function AppointmentBookingPage() {
               </button>
               <button
                 type="button"
-                className={`tab-button ${activeTab === "bookings" ? "active" : ""}`}
+                className={`qt-tab ${activeTab === "bookings" ? "active" : ""}`}
                 onClick={() => setActiveTab("bookings")}
               >
                 <CheckCircleIcon />
@@ -1050,8 +1050,17 @@ export default function AppointmentBookingPage() {
           {/* My Bookings */}
           {activeTab === "bookings" && <div className="bookings-container">
             <div className="bookings-header">
-              <h2>My Appointments</h2>
-              <p>Your scheduled consultations</p>
+              <div>
+                <h2>My Appointments</h2>
+                <p>Your scheduled consultations</p>
+              </div>
+              <Link
+                to="/student/appointment-status"
+                state={{ from: "booking" }}
+                className="ab-status-link"
+              >
+                View All Status →
+              </Link>
             </div>
             {bookingsLoading ? (
               <div className="empty-state">

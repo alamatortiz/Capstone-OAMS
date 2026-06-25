@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import api from "../../utils/api";
 
@@ -237,6 +237,7 @@ export default function AnnouncementsPage() {
       };
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── UI State ──────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -480,7 +481,7 @@ export default function AnnouncementsPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -533,61 +534,38 @@ export default function AnnouncementsPage() {
       {/* Main Content */}
       <main className="dashboard-main">
         <div className="announcements-page">
-          {/* Page Header */}
-          <div className="announcements-header-section">
-            <div className="announcements-header-top">
-              <button
-                className="announcements-back-link"
-                onClick={() => navigate("/student/dashboard")}
-              >
+          {/* Header */}
+          <div className="ann-page-header">
+            <div className="ann-breadcrumb">
+              <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeftIcon />
                 Dashboard
-              </button>
-
-              <div className="header-badge">
-                {annLoading ? "—" : announcements.length} Total
-              </div>
+              </Link>
             </div>
-
-            <div className="page-header">
-              <div className="header-left">
-                <div className="announcement-header-icon">
-                  <MegaphoneIcon />
-                </div>
-
-                <div className="header-text">
-                  <h1>Announcements</h1>
-                  <p>Stay updated with the latest notices</p>
-                </div>
+            <div className="ann-title-row">
+              <div className="ann-header-icon">
+                <MegaphoneIcon />
+              </div>
+              <div>
+                <h1 className="ann-page-title">Announcements</h1>
+                <p className="ann-page-subtitle">Stay updated with the latest notices</p>
               </div>
             </div>
           </div>
 
           {/* Error banner */}
           {annError && (
-            <div className="empty-state" style={{ marginBottom: "1rem" }}>
+            <div className="empty-state">
               <AlertCircleIcon />
               <p>{annError}</p>
-              <button
-                className="filter-tab"
-                style={{ marginTop: "0.5rem" }}
-                onClick={fetchAnnouncements}
-              >
+              <button className="filter-tab" onClick={fetchAnnouncements}>
                 Retry
               </button>
             </div>
           )}
 
           {/* Filter Tabs + College Filter */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "0.75rem",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
+          <div className="ann-filters-card">
             <div className="filter-tabs">
               {filterTabs.map((tab) => (
                 <button
@@ -599,29 +577,12 @@ export default function AnnouncementsPage() {
                 </button>
               ))}
             </div>
-
-            <div
-              style={{
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-              }}
-            >
+            <div className="ann-college-wrapper">
               <select
                 value={selectedCollege}
                 onChange={(e) => setSelectedCollege(e.target.value)}
                 aria-label="Filter by college"
-                style={{
-                  appearance: "none",
-                  padding: "0.5rem 2rem 0.5rem 0.85rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--card-border, #ccc)",
-                  background: "var(--card-bg, #fff)",
-                  color: "var(--text-primary, #111)",
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="ann-college-select"
               >
                 <option value="all">All Colleges</option>
                 {collegeOptions.map((opt) => (
@@ -630,16 +591,7 @@ export default function AnnouncementsPage() {
                   </option>
                 ))}
               </select>
-              <ChevronDownIcon
-                style={{
-                  position: "absolute",
-                  right: "0.6rem",
-                  width: "1rem",
-                  height: "1rem",
-                  pointerEvents: "none",
-                  opacity: 0.6,
-                }}
-              />
+              <ChevronDownIcon />
             </div>
           </div>
 

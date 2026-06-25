@@ -1,0 +1,207 @@
+/* ===== Appointment Status Page — Green-themed Overrides ===== */
+/* Base layout / sidebar / card styles from queue-status.css     */
+/* List structure / tabs / detail grid from document-status.css  */
+
+/* ─── Title Icon ─────────────────────────────────────────────────────────── */
+.apst-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.apst-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+}
+
+/* ─── Hero Card ──────────────────────────────────────────────────────────── */
+.apst-hero-card {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.2);
+  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
+}
+
+.apst-hero-card .dss-hero-badge {
+  background: white;
+  color: #16a34a;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ─── List Item Icon (green bg) ──────────────────────────────────────────── */
+.apst-list-icon-wrap {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: #22c55e;
+}
+
+[data-theme="light"] .apst-list-icon-wrap {
+  background: rgba(34, 197, 94, 0.08) !important;
+}
+
+/* ─── List Item Name (green, overrides orange from document-status) ───────── */
+.apst-list-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #22c55e;
+  margin: 0 0 0.25rem 0;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .apst-list-name {
+  color: #16a34a;
+}
+
+/* ─── Status Badges (appointment-specific) ───────────────────────────────── */
+.apst-badge-pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.apst-badge-approved {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.apst-badge-completed {
+  background: rgba(156, 163, 175, 0.15);
+  color: #e5e7eb;
+  border: 1px solid rgba(156, 163, 175, 0.35);
+}
+
+.apst-badge-rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.apst-badge-cancelled {
+  background: rgba(107, 114, 128, 0.15);
+  color: #d1d5db;
+  border: 1px solid rgba(107, 114, 128, 0.35);
+}
+
+/* Light mode */
+[data-theme="light"] .apst-badge-pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="light"] .apst-badge-approved {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="light"] .apst-badge-completed {
+  background: rgba(75, 85, 99, 0.1);
+  color: #1f2937;
+  border-color: rgba(75, 85, 99, 0.25);
+}
+
+[data-theme="light"] .apst-badge-rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+[data-theme="light"] .apst-badge-cancelled {
+  background: rgba(107, 114, 128, 0.08);
+  color: #374151;
+  border-color: rgba(107, 114, 128, 0.2);
+}
+
+/* ─── Cancel Button ──────────────────────────────────────────────────────── */
+.apst-cancel-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  color: #fca5a5;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.apst-cancel-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+.apst-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .apst-cancel-btn {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+  color: #991b1b;
+}
+
+[data-theme="light"] .apst-cancel-btn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #7f1d1d;
+}
+
+/* ─── Scrollable tab row (6 tabs don't wrap on small screens) ────────────── */
+.apst-tabs-scrollable {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.apst-tabs-scrollable::-webkit-scrollbar { display: none; }
+
+/* ─── Count pill inside each tab ─────────────────────────────────────────── */
+.apst-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  transition: background 0.2s;
+}
+
+.qt-tab.active .apst-tab-count {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+/* ─── Spin animation for loading icon ────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
