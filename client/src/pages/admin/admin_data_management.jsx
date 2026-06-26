@@ -237,6 +237,13 @@ export default function AdminDataManagement() {
   const [serviceForm, setServiceForm] = useState(emptyServiceForm());
   const [serviceSaving, setServiceSaving] = useState(false);
 
+  // Requirements & steps (inside service modal)
+  const [serviceRequirements, setServiceRequirements] = useState([]);
+  const [serviceSteps, setServiceSteps] = useState([]);
+  const [svcReqForm, setSvcReqForm] = useState({ name: "", description: "", isMandatory: true });
+  const [svcStepForm, setSvcStepForm] = useState({ title: "", description: "" });
+  const [svcReqLoading, setSvcReqLoading] = useState(false);
+
   // ── Audit Logs ─────────────────────────────────────────────
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -432,10 +439,14 @@ export default function AdminDataManagement() {
   const openAddServiceModal = () => {
     setEditingService(null);
     setServiceForm(emptyServiceForm());
+    setServiceRequirements([]);
+    setServiceSteps([]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+    setSvcStepForm({ title: "", description: "" });
     setShowServiceModal(true);
   };
 
-  const openEditServiceModal = (s) => {
+  const openEditServiceModal = async (s) => {
     setEditingService(s);
     setServiceForm({
       name: s.name,
@@ -444,13 +455,57 @@ export default function AdminDataManagement() {
       autoClose: s.autoClose,
       status: s.status,
     });
+    setServiceRequirements([]);
+    setServiceSteps([]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+    setSvcStepForm({ title: "", description: "" });
     setShowServiceModal(true);
+
+    setSvcReqLoading(true);
+    try {
+      const [reqRes, stepRes] = await Promise.all([
+        api.get(`/admin/data-management/service-types/${s.id}/requirements`),
+        api.get(`/admin/data-management/service-types/${s.id}/steps`),
+      ]);
+      setServiceRequirements(reqRes.data.requirements || []);
+      setServiceSteps(stepRes.data.steps || []);
+    } catch {
+      toast.error("Failed to load service details.");
+    } finally {
+      setSvcReqLoading(false);
+    }
   };
 
   const closeServiceModal = () => {
     setShowServiceModal(false);
     setEditingService(null);
     setServiceForm(emptyServiceForm());
+    setServiceRequirements([]);
+    setServiceSteps([]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+    setSvcStepForm({ title: "", description: "" });
+  };
+
+  const addServiceRequirement = () => {
+    if (!svcReqForm.name.trim()) { toast.error("Requirement name is required."); return; }
+    setServiceRequirements((prev) => [...prev, { ...svcReqForm, _tempId: Date.now() }]);
+    setSvcReqForm({ name: "", description: "", isMandatory: true });
+  };
+
+  const removeServiceRequirement = (index) => {
+    setServiceRequirements((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addServiceStep = () => {
+    if (!svcStepForm.title.trim()) { toast.error("Step title is required."); return; }
+    setServiceSteps((prev) => [...prev, { ...svcStepForm, stepNumber: prev.length + 1, _tempId: Date.now() }]);
+    setSvcStepForm({ title: "", description: "" });
+  };
+
+  const removeServiceStep = (index) => {
+    setServiceSteps((prev) =>
+      prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, stepNumber: i + 1 }))
+    );
   };
 
   const handleServiceSubmit = async () => {
@@ -469,13 +524,34 @@ export default function AdminDataManagement() {
         status: serviceForm.status,
       };
 
+      let serviceId;
       if (editingService) {
         await api.put(`/admin/data-management/service-types/${editingService.id}`, payload);
+        serviceId = editingService.id;
         toast.success("Service updated.");
       } else {
-        await api.post("/admin/data-management/service-types", payload);
+        const { data } = await api.post("/admin/data-management/service-types", payload);
+        serviceId = data.id;
         toast.success("Service created.");
       }
+
+      await Promise.all([
+        api.put(`/admin/data-management/service-types/${serviceId}/requirements`, {
+          requirements: serviceRequirements.map((r) => ({
+            name: r.name,
+            description: r.description || "",
+            isMandatory: r.isMandatory !== false,
+          })),
+        }),
+        api.put(`/admin/data-management/service-types/${serviceId}/steps`, {
+          steps: serviceSteps.map((s) => ({
+            stepNumber: s.stepNumber,
+            title: s.title,
+            description: s.description || "",
+          })),
+        }),
+      ]);
+
       closeServiceModal();
       fetchServiceTypes(serviceStatusFilter);
     } catch (err) {
@@ -1025,7 +1101,7 @@ export default function AdminDataManagement() {
       {/* ── Service Setting Modal ── */}
       {showServiceModal && (
         <div className="adm-modal-overlay" onClick={closeServiceModal}>
-          <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="adm-modal-header">
               <div>
                 <h3 className="adm-modal-title">{editingService ? "Edit Service" : "Add Service"}</h3>
@@ -1089,6 +1165,119 @@ export default function AdminDataManagement() {
                 />
                 <span className="adm-checkbox-label">Auto-close when capacity is reached</span>
               </label>
+
+              {/* ── Service Requirements ── */}
+              <div className="adm-req-section">
+                <div className="adm-req-header">
+                  <h4 className="adm-req-title">Service Requirements</h4>
+                  <p className="adm-req-subtitle">List what students need to bring or prepare</p>
+                </div>
+
+                {svcReqLoading && <div className="adm-loading adm-loading-sm">Loading...</div>}
+
+                {!svcReqLoading && serviceRequirements.length > 0 && (
+                  <div className="adm-req-list">
+                    {serviceRequirements.map((req, idx) => (
+                      <div key={req.id || req._tempId || idx} className="adm-req-item">
+                        <div className="adm-req-item-main">
+                          <div className="adm-req-item-top">
+                            <span className="adm-req-item-name">{req.name}</span>
+                            {(req.isMandatory !== false) && (
+                              <span className="adm-badge adm-badge-mandatory">Required</span>
+                            )}
+                            {req.isMandatory === false && (
+                              <span className="adm-badge adm-badge-optional">Optional</span>
+                            )}
+                          </div>
+                          {req.description && <p className="adm-req-item-desc">{req.description}</p>}
+                        </div>
+                        <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceRequirement(idx)} title="Remove">
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="adm-req-add-form">
+                  <div className="adm-req-add-fields">
+                    <input
+                      className="adm-form-input"
+                      placeholder="Requirement name *"
+                      value={svcReqForm.name}
+                      onChange={(e) => setSvcReqForm((p) => ({ ...p, name: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
+                    />
+                    <input
+                      className="adm-form-input"
+                      placeholder="Description (optional)"
+                      value={svcReqForm.description}
+                      onChange={(e) => setSvcReqForm((p) => ({ ...p, description: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
+                    />
+                    <label className="adm-checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        checked={svcReqForm.isMandatory}
+                        onChange={(e) => setSvcReqForm((p) => ({ ...p, isMandatory: e.target.checked }))}
+                      />
+                      <span className="adm-checkbox-label">Mandatory</span>
+                    </label>
+                  </div>
+                  <button className="adm-btn-add-req" onClick={addServiceRequirement} type="button">
+                    <PlusIcon /> Add Requirement
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Procedure Steps ── */}
+              <div className="adm-req-section">
+                <div className="adm-req-header">
+                  <h4 className="adm-req-title">Procedure Steps</h4>
+                  <p className="adm-req-subtitle">Step-by-step process students will follow</p>
+                </div>
+
+                {!svcReqLoading && serviceSteps.length > 0 && (
+                  <div className="adm-req-list">
+                    {serviceSteps.map((step, idx) => (
+                      <div key={step.id || step._tempId || idx} className="adm-req-item">
+                        <div className="adm-req-item-main">
+                          <div className="adm-req-item-top">
+                            <span className="adm-badge adm-badge-mandatory">Step {step.stepNumber}</span>
+                            <span className="adm-req-item-name">{step.title}</span>
+                          </div>
+                          {step.description && <p className="adm-req-item-desc">{step.description}</p>}
+                        </div>
+                        <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceStep(idx)} title="Remove">
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="adm-req-add-form">
+                  <div className="adm-req-add-fields">
+                    <input
+                      className="adm-form-input"
+                      placeholder="Step title *"
+                      value={svcStepForm.title}
+                      onChange={(e) => setSvcStepForm((p) => ({ ...p, title: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
+                    />
+                    <input
+                      className="adm-form-input"
+                      placeholder="Description (optional)"
+                      value={svcStepForm.description}
+                      onChange={(e) => setSvcStepForm((p) => ({ ...p, description: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
+                    />
+                  </div>
+                  <button className="adm-btn-add-req" onClick={addServiceStep} type="button">
+                    <PlusIcon /> Add Step
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="adm-modal-footer">
               <button className="adm-btn-outline" onClick={closeServiceModal}>Cancel</button>
