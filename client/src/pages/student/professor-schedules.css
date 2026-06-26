@@ -563,89 +563,57 @@ body {
 }
 
 /* ===== Page Header ===== */
-.page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.header-nav {
-  display: flex;
-  align-items: center;
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
+.breadcrumb-link,
+.breadcrumb-link:visited,
+.breadcrumb-link:active,
+.breadcrumb-link:focus {
+  outline: none;
   background: transparent;
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
-  padding: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border-radius: 0.5rem;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  margin-left: -0.5rem;
-}
-
-.back-btn:hover {
-  color: var(--primary-color);
-  background-color: rgba(34, 197, 94, 0.1);
-}
-
-.back-btn svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.header-title {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.header-icon-wrapper {
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, var(--cyan) 0%, var(--blue) 100%);
+  padding: 0.5rem 0.875rem 0.5rem 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.header-icon-wrapper svg {
+.breadcrumb-link:hover {
+  background-color: rgba(168, 85, 247, 0.1);
+  color: var(--purple);
+}
+
+.breadcrumb-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+}
+
+/* Violet accent for the professor schedule page header icon */
+.professor-schedule-page .queue-title-icon {
+  background: linear-gradient(135deg, var(--purple) 0%, var(--violet) 100%);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.professor-schedule-page .queue-title-icon svg {
   width: 1.5rem;
   height: 1.5rem;
-  stroke-width: 2;
+  stroke: currentColor;
 }
 
-.header-title h1 {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.header-title p {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-/* ===== Departments Grid ===== */
+/* ===== Departments List ===== */
 .departments-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
   width: 100%;
 }
 
@@ -663,23 +631,22 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
-  height: 100%;
 }
 
 .department-card::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, transparent 100%);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, transparent 100%);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
 .department-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  border-color: rgba(34, 197, 94, 0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  border-color: rgba(168, 85, 247, 0.4);
 }
 
 .department-card:hover::before {
@@ -691,13 +658,13 @@ body {
   height: 4rem;
   flex-shrink: 0;
   border-radius: 1.125rem;
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(168, 85, 247, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 1;
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.2);
 }
 
 .college-logo-img {
@@ -759,21 +726,21 @@ body {
 }
 
 .card-badge {
-  background: rgba(34, 197, 94, 0.18);
-  color: var(--primary-light);
+  background: rgba(168, 85, 247, 0.18);
+  color: var(--purple);
   padding: 0.4rem 0.95rem;
   border-radius: 0.625rem;
   font-size: 0.8rem;
   font-weight: 600;
   width: fit-content;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.3);
   transition: all 0.3s ease;
   margin-top: 0.25rem;
 }
 
 .department-card:hover .card-badge {
-  background: rgba(34, 197, 94, 0.28);
-  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(168, 85, 247, 0.28);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 /* ===== Schedules View ===== */
@@ -786,12 +753,12 @@ body {
 
 /* Department Header Card */
 .department-header-card {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, var(--purple) 0%, var(--violet) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 1.5rem;
   padding: 1.5rem;
   color: white;
-  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 10px 30px rgba(168, 85, 247, 0.2);
   transition: all 0.3s ease;
 }
 
@@ -867,7 +834,7 @@ body {
 
 .professor-card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  border-color: rgba(34, 197, 94, 0.25);
+  border-color: rgba(168, 85, 247, 0.25);
 }
 
 .professor-header {
@@ -876,20 +843,20 @@ body {
   gap: 1rem;
   margin-bottom: 1.5rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(34, 197, 94, 0.15);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
 }
 
 .professor-avatar {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--primary-color);
+  color: var(--purple);
   flex-shrink: 0;
-  border: 2px solid rgba(34, 197, 94, 0.3);
+  border: 2px solid rgba(168, 85, 247, 0.3);
 }
 
 .professor-avatar svg {
@@ -915,7 +882,7 @@ body {
 
 .professor-position {
   font-size: 0.875rem;
-  color: var(--primary-color);
+  color: var(--purple);
   font-weight: 600;
   margin: 0;
   margin-bottom: 0.25rem;
@@ -967,16 +934,16 @@ body {
 }
 
 .day-schedule {
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.15);
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.15);
   border-radius: 1rem;
   padding: 1rem;
   transition: all 0.3s ease;
 }
 
 .day-schedule:hover {
-  border-color: rgba(34, 197, 94, 0.25);
-  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(168, 85, 247, 0.25);
+  background: rgba(168, 85, 247, 0.12);
 }
 
 .day-header {
@@ -985,7 +952,7 @@ body {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   font-weight: 600;
-  color: var(--primary-color);
+  color: var(--purple);
 }
 
 .day-header svg {
@@ -1019,7 +986,7 @@ body {
 }
 
 .schedule-slot:hover {
-  border-color: rgba(34, 197, 94, 0.2);
+  border-color: rgba(168, 85, 247, 0.2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -1259,20 +1226,9 @@ body {
 }
 
 /* ===== Responsive ===== */
-@media (max-width: 1280px) {
-  .departments-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 @media (max-width: 1024px) {
   .professor-schedule-page {
     padding: 1rem;
-  }
-
-  .departments-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
   }
 }
 
@@ -1280,39 +1236,6 @@ body {
   .professor-schedule-page {
     padding: 0.75rem;
     gap: 1rem;
-  }
-
-  .header-title {
-    gap: 0.75rem;
-  }
-
-  .header-title h1 {
-    font-size: 1.5rem;
-  }
-
-  .departments-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  }
-
-  .department-card {
-    padding: 1.25rem;
-    flex-direction: column;
-    text-align: center;
-    gap: 0.75rem;
-  }
-
-  .card-image-wrapper {
-    width: 3rem;
-    height: 3rem;
-  }
-
-  .card-content {
-    width: 100%;
-  }
-
-  .card-title {
-    white-space: normal;
   }
 
   .chat-container {
@@ -1325,28 +1248,6 @@ body {
 @media (max-width: 640px) {
   .professor-schedule-page {
     padding: 0.5rem;
-    gap: 0.75rem;
-  }
-
-  .header-title {
-    flex-direction: column;
-  }
-
-  .header-icon-wrapper {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
-
-  .header-title h1 {
-    font-size: 1.25rem;
-  }
-
-  .header-title p {
-    font-size: 0.75rem;
-  }
-
-  .departments-grid {
-    grid-template-columns: 1fr;
     gap: 0.75rem;
   }
 

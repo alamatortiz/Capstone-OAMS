@@ -9,7 +9,7 @@ import api from "../../utils/api";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 
-import "./professor_schedule.css";
+import "./professor-schedules.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 
 // ─── Sidebar Icons (unchanged) ─────────────────────────────────────────────
@@ -536,32 +536,27 @@ export default function ProfessorSchedule() {
       <main className="dashboard-main">
         <div className="professor-schedule-page">
           {/* Header */}
-          <div className="page-header">
-            <div className="header-nav">
-              {viewMode === "schedules" && (
-                <button
-                  className="back-btn"
-                  onClick={handleBack}
-                  title="Back to Departments"
-                >
+          <div className="queue-header">
+            <div className="queue-breadcrumb">
+              {viewMode === "schedules" ? (
+                <button className="breadcrumb-link" onClick={handleBack}>
                   <ChevronLeftIcon />
-                  <span>Back to Departments</span>
+                  Back to Departments
                 </button>
-              )}
-              {viewMode === "departments" && (
-                <Link to="/student/dashboard" className="back-btn">
+              ) : (
+                <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeftIcon />
-                  <span>Dashboard</span>
+                  Dashboard
                 </Link>
               )}
             </div>
-            <div className="header-title">
-              <div className="header-icon-wrapper">
+            <div className="queue-title-section">
+              <div className="queue-title-icon">
                 <GraduationCapIcon />
               </div>
               <div>
-                <h1>Professor Schedules</h1>
-                <p>View faculty consultation hours and availability</p>
+                <h1 className="queue-title">Professor Schedules</h1>
+                <p className="queue-subtitle">View faculty consultation hours and availability</p>
               </div>
             </div>
           </div>
@@ -580,7 +575,7 @@ export default function ProfessorSchedule() {
               <AlertCircleIcon />
               <p>{loadError}</p>
               <button
-                className="back-btn"
+                className="breadcrumb-link"
                 style={{ marginTop: "0.5rem" }}
                 onClick={fetchSchedules}
               >

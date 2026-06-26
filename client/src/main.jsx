@@ -40,7 +40,7 @@ const AnnouncementsPage = React.lazy(
   () => import("./pages/student/announcements.jsx"),
 );
 const ProfessorSchedulePage = React.lazy(
-  () => import("./pages/student/ProfessorSchedule.jsx"),
+  () => import("./pages/student/professor-schedules.jsx"),
 );
 
 const AdminDocumentsPage = React.lazy(
