@@ -1234,6 +1234,7 @@ body {
 .chat-fab svg {
   width: 1.5rem;
   height: 1.5rem;
+  stroke: white;
 }
 
 .chat-fab.hidden {
@@ -1514,6 +1515,7 @@ body {
   .chat-fab svg {
     width: 1.25rem;
     height: 1.25rem;
+    stroke: white;
   }
 
   .chat-container {
