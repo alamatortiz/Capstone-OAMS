@@ -244,7 +244,7 @@ export default function AnnouncementsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
-  const [selectedFilter, setSelectedFilter] = useState("all");
+  const [selectedFilter, setSelectedFilter] = useState("pinned");
   const [selectedCollege, setSelectedCollege] = useState("all");
   const [messages, setMessages] = useState([
     {
@@ -282,6 +282,7 @@ export default function AnnouncementsPage() {
 
   // ── Filter tabs ────────────────────────────────────────────────────────────
   const filterTabs = [
+    { id: "pinned", label: "Pinned" },
     { id: "all", label: "All" },
     { id: "important", label: "Important" },
     { id: "event", label: "Events" },
@@ -309,7 +310,14 @@ export default function AnnouncementsPage() {
   // ── Filtered announcements (category tab + department dropdown both apply).
   //    Selecting a college (e.g. "CCS") shows that college's announcements
   //    PLUS global ("All Departments") ones -- never hides global notices. ──
-  const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
+  const pinnedAnnouncements = announcements
+    .filter((a) => a.isPinned)
+    .filter(
+      (a) =>
+        selectedCollege === "all" ||
+        a.departmentAbbrev === selectedCollege ||
+        a.departmentAbbrev === "ALL",
+    );
   const filteredAnnouncements = announcements
     .filter((a) => selectedFilter === "all" || a.category === selectedFilter)
     .filter(
@@ -604,13 +612,16 @@ export default function AnnouncementsPage() {
             </div>
           )}
 
-          {/* Pinned Announcements Section */}
-          {!annLoading &&
-            selectedFilter === "all" &&
-            selectedCollege === "all" &&
-            pinnedAnnouncements.length > 0 && (
-              <section className="announcements-section">
-                <h2 className="section-title">Pinned Announcements</h2>
+          {/* Pinned Tab Content */}
+          {!annLoading && selectedFilter === "pinned" && (
+            <section className="announcements-section">
+              <h2 className="section-title">Pinned Announcements</h2>
+              {pinnedAnnouncements.length === 0 ? (
+                <div className="empty-state">
+                  <BellIcon />
+                  <p>No pinned announcements</p>
+                </div>
+              ) : (
                 <div className="announcements-list">
                   {pinnedAnnouncements.map((announcement) => (
                     <div
@@ -654,11 +665,12 @@ export default function AnnouncementsPage() {
                     </div>
                   ))}
                 </div>
-              </section>
-            )}
+              )}
+            </section>
+          )}
 
-          {/* All Announcements Section */}
-          {!annLoading && (
+          {/* All / Category Tab Content */}
+          {!annLoading && selectedFilter !== "pinned" && (
             <section className="announcements-section">
               <h2 className="section-title">
                 {selectedFilter === "all"
