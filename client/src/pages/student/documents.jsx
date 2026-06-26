@@ -465,7 +465,7 @@ export default function DocumentsPage() {
   );
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
@@ -594,7 +594,7 @@ export default function DocumentsPage() {
           <div className="queue-header">
             <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeftIcon /> Dashboard
+                <ChevronLeftIcon /> Home
               </Link>
             </div>
             <div className="queue-title-section">

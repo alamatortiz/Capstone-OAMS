@@ -519,7 +519,7 @@ export default function DocumentStatusPage() {
   );
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
     { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
@@ -568,7 +568,7 @@ export default function DocumentStatusPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -636,7 +636,7 @@ export default function DocumentStatusPage() {
                   className="breadcrumb-link"
                 >
                   <ChevronLeft className="breadcrumb-icon" />
-                  {navState.from === "documents" ? "Documents" : "Dashboard"}
+                  {navState.from === "documents" ? "Documents" : "Home"}
                 </Link>
               </div>
               <div className="queue-title-section">

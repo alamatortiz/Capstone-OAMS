@@ -20,7 +20,7 @@ import "./index.css";
 import App from "./App.jsx";
 import Login from "./pages/Login.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
-import StudentDashboard from "./pages/student/student_dashboard.jsx";
+import StudentDashboard from "./pages/student/student-dashboard.jsx";
 import QueuePage from "./pages/student/queue.jsx";
 
 // ─── Lazy-loaded routes for better performance ───────────────────────────

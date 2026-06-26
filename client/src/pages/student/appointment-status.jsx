@@ -375,7 +375,7 @@ export default function AppointmentStatusPage() {
   const selectedAppt = appointments.find((a) => a.id === selectedId) ?? null;
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
     { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
@@ -411,7 +411,7 @@ export default function AppointmentStatusPage() {
           <nav className="sidebar-nav">
             <div className="nav-items">
               {navItems.map((item) => (
-                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className="nav-item" title={item.label}>
+                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className={`nav-item ${location.pathname === item.path ? "active" : ""}`} title={item.label}>
                   <item.icon className="nav-icon-medium" />
                   <span className="nav-label">{item.label}</span>
                 </Link>
@@ -464,7 +464,7 @@ export default function AppointmentStatusPage() {
                   className="breadcrumb-link"
                 >
                   <ChevronLeft className="breadcrumb-icon" />
-                  {navState.from === "booking" ? "Appointment Booking" : "Dashboard"}
+                  {navState.from === "booking" ? "Appointment Booking" : "Home"}
                 </Link>
               </div>
               <div className="queue-title-section">

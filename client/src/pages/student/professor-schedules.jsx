@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import api from "../../utils/api";
 
@@ -255,6 +255,7 @@ const AlertCircleIcon = () => (
 export default function ProfessorSchedule() {
   const { user: authUser, logout } = useAuth();
   const navigate = useNavigate(); // FIX: was missing in the original file
+  const location = useLocation();
 
   const user = authUser
     ? {
@@ -419,7 +420,7 @@ export default function ProfessorSchedule() {
   };
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
@@ -482,7 +483,7 @@ export default function ProfessorSchedule() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -546,7 +547,7 @@ export default function ProfessorSchedule() {
               ) : (
                 <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeftIcon />
-                  Dashboard
+                  Home
                 </Link>
               )}
             </div>

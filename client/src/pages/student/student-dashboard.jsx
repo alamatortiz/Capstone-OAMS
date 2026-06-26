@@ -5,13 +5,13 @@ import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { useQueue } from "../../contexts/QueueContext";
 
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
 
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 
-import "./student_dashboard.css";
+import "./student-dashboard.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 
@@ -311,6 +311,7 @@ export default function StudentDashboard() {
 
   const { getActiveQueues } = useQueue();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -567,7 +568,7 @@ export default function StudentDashboard() {
   };
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
@@ -631,7 +632,7 @@ export default function StudentDashboard() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />

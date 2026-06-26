@@ -399,7 +399,7 @@ export default function QueuePage() {
   };
 
   const navItems = [
-    { icon: HomeIcon, label: 'Dashboard', path: '/student/dashboard' },
+    { icon: HomeIcon, label: 'Home', path: '/student/dashboard' },
     { icon: QueueIconNav, label: 'Queue', path: '/student/queue' },
     { icon: CalendarIconNav, label: 'Appointments', path: '/student/appointments' },
     { icon: DocumentIconNav, label: 'Documents', path: '/student/documents' },
@@ -511,7 +511,7 @@ export default function QueuePage() {
               ) : (
                 <Link to="/student/dashboard" className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
-                  Dashboard
+                  Home
                 </Link>
               )}
             </div>

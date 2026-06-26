@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
 
 import ucLogo from "../../assets/Pnc-Logo.png";
@@ -235,6 +235,7 @@ export default function TransactionsPage() {
       };
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -450,7 +451,7 @@ export default function TransactionsPage() {
   };
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
@@ -514,9 +515,7 @@ export default function TransactionsPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className={`nav-item ${
-                    item.path === "/student/transactions" ? "active" : ""
-                  }`}
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -574,7 +573,7 @@ export default function TransactionsPage() {
             <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeftIcon />
-                Dashboard
+                Home
               </Link>
             </div>
             <div className="queue-title-section">

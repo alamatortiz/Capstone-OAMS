@@ -395,7 +395,7 @@ export default function AnnouncementsPage() {
   };
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
@@ -540,7 +540,7 @@ export default function AnnouncementsPage() {
             <div className="ann-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeftIcon />
-                Dashboard
+                Home
               </Link>
             </div>
             <div className="ann-title-row">

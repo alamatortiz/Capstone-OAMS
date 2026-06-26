@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./appointment-booking.css";
@@ -361,6 +361,7 @@ export default function AppointmentBookingPage() {
       };
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── Live data state (replaces INITIAL_SLOTS / local bookings array) ───────
   const [slots, setSlots] = useState([]);
@@ -694,7 +695,7 @@ export default function AppointmentBookingPage() {
   };
 
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
@@ -757,7 +758,7 @@ export default function AppointmentBookingPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -812,10 +813,10 @@ export default function AppointmentBookingPage() {
           {/* Header */}
           <div className="queue-header">
             <div className="queue-breadcrumb">
-              <button className="breadcrumb-link" onClick={() => navigate(-1)}>
+              <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeftIcon />
-                Dashboard
-              </button>
+                Home
+              </Link>
             </div>
             <div className="queue-title-section">
               <div className="ab-title-icon">

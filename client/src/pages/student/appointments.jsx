@@ -3,7 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { useQueue } from "../../contexts/QueueContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
@@ -232,6 +232,7 @@ export default function AppointmentsPage() {
       };
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── UI state ────────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -508,7 +509,7 @@ export default function AppointmentsPage() {
 
   // ── Derived lists ────────────────────────────────────────────────────────────
   const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/student/dashboard" },
+    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     {
       icon: CalendarIconNav,
@@ -583,7 +584,7 @@ export default function AppointmentsPage() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
@@ -640,7 +641,7 @@ export default function AppointmentsPage() {
             <div className="header-content">
               <Link to="/student/dashboard" className="back-link">
                 <ChevronLeftIcon />
-                <span className="back-link-text">Dashboard</span>
+                <span className="back-link-text">Home</span>
               </Link>
 
               <div className="header-title-row">

@@ -551,10 +551,10 @@ body {
   stroke: currentColor;
 }
 
-/* Purple accent override for the transactions page header icon */
+/* Green accent for the transactions page header icon */
 .transactions-container .queue-title-icon {
-  background: linear-gradient(135deg, var(--purple) 0%, var(--violet) 100%);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
 .transactions-container .queue-title-icon svg {
@@ -573,12 +573,12 @@ body {
 
 /*
  * All .stat-card rules are scoped under .transactions-container to win over
- * the globally-loaded student_dashboard.css which also defines .stat-card
+ * the globally-loaded student-dashboard.css which also defines .stat-card
  * with hover effects, left-alignment, and a ::before green overlay.
  */
 .transactions-container .stat-card {
   background: var(--card-bg);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 0.875rem;
   padding: 1rem;
   display: flex;
@@ -596,11 +596,11 @@ body {
   content: none;
 }
 
-/* Violet hover to match the page accent */
+/* Green hover to match the page accent */
 .transactions-container .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.45);
 }
 
 [data-theme="light"] .transactions-container .stat-card {
@@ -643,9 +643,9 @@ body {
 }
 
 .bg-purple-50 {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
-  border-color: rgba(168, 85, 247, 0.2);
-  color: var(--purple);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
 }
 
 .transactions-container .stat-label {
@@ -681,7 +681,7 @@ body {
 }
 
 .text-purple-600 {
-  color: var(--purple);
+  color: var(--primary-color);
 }
 
 @media (max-width: 1024px) {
