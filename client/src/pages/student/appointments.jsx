@@ -125,8 +125,9 @@ const CalendarIcon = () => (
   </svg>
 );
 
-const ChevronLeftIcon = () => (
+const ChevronLeftIcon = ({ className = "" }) => (
   <svg
+    className={className}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -637,29 +638,28 @@ export default function AppointmentsPage() {
       <main className="dashboard-main">
         <div className="appointments-page">
           {/* Header */}
-          <div className="appointments-header">
-            <div className="header-content">
-              <Link to="/student/dashboard" className="back-link">
-                <ChevronLeftIcon />
-                <span className="back-link-text">Home</span>
+          <div className="queue-header">
+            <div className="queue-breadcrumb">
+              <Link to="/student/dashboard" className="breadcrumb-link">
+                <ChevronLeftIcon className="breadcrumb-icon" />
+                Home
               </Link>
-
-              <div className="header-title-row">
-                <div className="header-icon">
-                  <CalendarIcon />
-                </div>
-                <div className="header-text">
-                  <h1>Appointments</h1>
-                  <p>Schedule and manage your appointments</p>
-                </div>
+            </div>
+            <div className="queue-title-section">
+              <div className="apmt-title-icon">
+                <CalendarIcon />
+              </div>
+              <div>
+                <h1 className="queue-title">Appointments</h1>
+                <p className="queue-subtitle">Schedule and manage your appointments</p>
               </div>
             </div>
-
-            <button className="book-btn" onClick={handleOpenBookDialog}>
-              <PlusIcon />
-              Book Appointment
-            </button>
           </div>
+
+          <button className="book-btn" onClick={handleOpenBookDialog}>
+            <PlusIcon />
+            Book Appointment
+          </button>
 
           {/* Book Dialog */}
           {showBookDialog && (

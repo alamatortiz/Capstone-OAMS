@@ -148,7 +148,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
 
   return (
     <div className="queue-status-container">
-      <div className="queue-status-header">
+      <div className="queue-header">
         <div className="queue-breadcrumb">
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
@@ -457,14 +457,14 @@ export default function AppointmentStatusPage() {
         ) : (
           <div className="queue-status-container">
             {/* Header */}
-            <div className="queue-status-header">
+            <div className="queue-header">
               <div className="queue-breadcrumb">
                 <Link
-                  to={navState.from === "booking" ? "/student/appointments" : "/student/dashboard"}
+                  to="/student/dashboard"
                   className="breadcrumb-link"
                 >
                   <ChevronLeft className="breadcrumb-icon" />
-                  {navState.from === "booking" ? "Appointment Booking" : "Home"}
+                  Home
                 </Link>
               </div>
               <div className="queue-title-section">
@@ -567,7 +567,7 @@ export default function AppointmentStatusPage() {
                           onClick={() => navigate("/student/appointments")}
                           style={{
                             marginTop: "1rem",
-                            background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                            background: "linear-gradient(135deg, #a855f7, #9333ea)",
                             color: "white",
                             border: "none",
                             padding: "0.75rem 1.5rem",

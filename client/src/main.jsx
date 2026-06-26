@@ -77,9 +77,9 @@ const AdminDataManagement = React.lazy(
   () => import("./pages/admin/admin_data_management.jsx"),
 );
 
+import AppointmentsPage from "./pages/student/appointments.jsx";
 import DocumentsPage from "./pages/student/documents.jsx";
 import TransactionsPage from "./pages/student/transactions.jsx";
-import AppointmentBookingPage from "./pages/student/appointment-booking.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 
 const ProfessorAppointmentsPage = React.lazy(
@@ -163,7 +163,7 @@ createRoot(document.getElementById("root")).render(
               />
               <Route
                 path="/student/appointments"
-                element={<AppointmentBookingPage />}
+                element={<AppointmentsPage />}
               />
               <Route
                 path="/student/appointment-status"
@@ -391,14 +391,6 @@ createRoot(document.getElementById("root")).render(
                   <ProfessorSchedulePage />
                 </Suspense>
               }
-            />
-            <Route
-              path="/student-appointments"
-              element={<AppointmentBookingPage />}
-            />
-            <Route
-              path="/student-appointment-booking"
-              element={<AppointmentBookingPage />}
             />
             <Route
               path="/student-appointment-status"
