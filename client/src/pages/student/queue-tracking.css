@@ -651,42 +651,47 @@ body {
 
 .qt-metric-card {
   background: var(--card-bg);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 0.875rem;
   padding: 1rem;
   transition: all 0.3s ease;
   text-align: center;
 }
 
+.qt-metric-card:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+}
+
 
 .qt-metric-icon {
   width: 2.5rem;
   height: 2.5rem;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1));
   border-radius: 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 0.5rem;
-  color: var(--primary-color);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid transparent;
 }
 
 .qt-metric-icon-joined {
-  color: var(--primary-color);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: var(--blue);
 }
 
 .qt-metric-icon-completed {
-  color: var(--primary-color);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.2);
+  color: var(--success);
 }
 
 .qt-metric-icon-cancelled {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.08) 100%);
+  border-color: rgba(239, 68, 68, 0.2);
   color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-[data-theme="light"] .qt-metric-icon {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.04));
 }
 
 .qt-metric-label {
@@ -707,11 +712,11 @@ body {
 }
 
 .qt-metric-value-joined {
-  color: var(--primary-color);
+  color: var(--blue);
 }
 
 .qt-metric-value-completed {
-  color: var(--primary-color);
+  color: var(--success);
 }
 
 .qt-metric-value-cancelled {
@@ -753,22 +758,22 @@ body {
   letter-spacing: 0.4px;
 }
 
-.qt-tab:hover {
-  color: var(--primary-color);
+.queue-tracking-page .qt-tab:hover {
+  color: var(--blue);
 }
 
-.qt-tab.active {
-  color: var(--primary-color);
+.queue-tracking-page .qt-tab.active {
+  color: var(--blue);
 }
 
-.qt-tab.active::after {
+.queue-tracking-page .qt-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--primary-color);
+  background: var(--blue);
 }
 
 /* ===== Tab Content ===== */
@@ -820,7 +825,7 @@ body {
 
 .qt-queue-card {
   background: var(--card-bg);
-  border: 2px solid rgba(34, 197, 94, 0.2);
+  border: 2px solid rgba(59, 130, 246, 0.2);
   border-radius: 1rem;
   padding: 1.5rem;
   transition: all 0.3s ease;
@@ -828,8 +833,8 @@ body {
 }
 
 .qt-queue-card:hover {
-  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .qt-queue-header {
@@ -937,7 +942,7 @@ body {
 .qt-position-number {
   font-size: 2.5rem;
   font-weight: 800;
-  color: var(--primary-color);
+  color: var(--blue);
   line-height: 1;
   transition: color 0.3s ease;
 }
@@ -960,7 +965,7 @@ body {
 
 .qt-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(90deg, var(--blue) 0%, #6366f1 100%);
   transition: width 0.3s ease;
 }
 
@@ -971,7 +976,7 @@ body {
 .qt-progress-card {
   width: 100%;
   background: rgba(17, 22, 18, 0.5);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 0.75rem;
   padding: 0.75rem 0.875rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -1044,15 +1049,21 @@ body {
 
 .qt-stat-box {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 0.75rem;
   padding: 0.75rem;
   transition: all 0.3s ease;
 }
 
+.qt-stat-box:hover {
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+}
+
 [data-theme="light"] .qt-stat-box {
   background: rgba(248, 250, 252, 0.7);
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .qt-stat-label {
@@ -1068,7 +1079,7 @@ body {
 .qt-stat-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--primary-color);
+  color: var(--blue);
   transition: color 0.3s ease;
 }
 
@@ -1144,6 +1155,13 @@ body {
   justify-content: space-between;
   gap: 1rem;
   transition: all 0.3s ease;
+  cursor: default;
+}
+
+.qt-history-item:hover {
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
 }
 
 
@@ -1186,7 +1204,7 @@ body {
 
 .qt-wait-time {
   font-weight: 700;
-  color: var(--primary-color);
+  color: var(--blue);
 }
 
 .qt-history-icon {

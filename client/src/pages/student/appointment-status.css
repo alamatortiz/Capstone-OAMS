@@ -200,6 +200,25 @@
   background: rgba(34, 197, 94, 0.25);
 }
 
+/* ─── Tab color scoped to appointment-status page ────────────────────────── */
+.apst-page .qt-tab:hover {
+  color: var(--primary-color);
+}
+
+.apst-page .qt-tab.active {
+  color: var(--primary-color);
+}
+
+.apst-page .qt-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-color);
+}
+
 /* ─── Spin animation for loading icon ────────────────────────────────────── */
 @keyframes spin {
   from { transform: rotate(0deg); }

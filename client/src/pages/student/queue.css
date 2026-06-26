@@ -495,7 +495,7 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.3rem;
   width: 100%;
 }
 
@@ -619,13 +619,14 @@ body {
   font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
-  transition: opacity 0.2s ease;
+  transition: all 0.3s ease;
   align-self: flex-start;
   width: fit-content;
 }
 
 .queue-tracking-link-btn:hover {
-  opacity: 0.85;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
   color: white;
 }
 
@@ -690,7 +691,7 @@ body {
 .section-icon {
   width: 1.625rem;
   height: 1.625rem;
-  color: var(--primary-color);
+  color: var(--blue);
   flex-shrink: 0;
   transition: color 0.3s ease;
 }
@@ -705,13 +706,13 @@ body {
 }
 
 .queue-badge {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--primary-light);
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 700;
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid rgba(59, 130, 246, 0.25);
   transition: all 0.3s ease;
 }
 
@@ -732,21 +733,21 @@ body {
 
 .active-queue-card {
   background: var(--card-bg);
-  border: 1px solid rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 .active-queue-card:hover {
-  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .available-queue-card {
-  border-color: rgba(34, 197, 94, 0.15);
+  border-color: rgba(59, 130, 246, 0.15);
 }
 
 .available-queue-card:hover {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  border-color: rgba(34, 197, 94, 0.3);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 [data-theme="light"] .available-queue-card:hover {
@@ -910,7 +911,7 @@ body {
 
 .queue-stat {
   background: rgba(17, 22, 18, 0.5);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 0.75rem;
   padding: 0.6rem 0.5rem;
   display: flex;
@@ -943,7 +944,7 @@ body {
 .queue-stat .queue-stat-value {
   font-size: 1.575rem;
   font-weight: 700;
-  color: var(--primary-color);
+  color: var(--blue);
   line-height: 1.2;
   margin-top: 0.25rem;
   text-align: center;
@@ -981,7 +982,7 @@ body {
   align-items: center;
   gap: 0.75rem;
   background: rgba(17, 22, 18, 0.5);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 0.75rem;
   padding: 0.6rem 0.75rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -1139,7 +1140,7 @@ body {
 /* ===== Filters Card ===== */
 .filters-card {
   background: var(--card-bg);
-  border: 1px solid rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.15);
   border-radius: 1rem;
   padding: 1rem 1.5rem 1.5rem;
   transition: all 0.3s ease;
@@ -1264,18 +1265,18 @@ body {
 }
 
 .filter-select:hover {
-  border-color: rgba(34, 197, 94, 0.3);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .filter-select:hover + .filter-chevron,
 .filter-select:focus + .filter-chevron {
-  color: var(--primary-color);
+  color: var(--blue);
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .filter-select option {
@@ -1702,7 +1703,7 @@ body {
 .qs-progress-card {
   width: 100%;
   background: rgba(17, 22, 18, 0.5);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 0.75rem;
   padding: 0.75rem 0.875rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -1893,7 +1894,7 @@ body {
 
 .avail-services-details-card {
   background: var(--card-bg);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 1rem;
   overflow: hidden;
   text-align: left;
@@ -1901,8 +1902,8 @@ body {
 
 .avail-services-details-card-header {
   padding: 1.375rem;
-  border-bottom: 1px solid rgba(34, 197, 94, 0.2);
-  background: rgba(34, 197, 94, 0.05);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .avail-services-details-card-title {
@@ -1921,7 +1922,7 @@ body {
 .avail-services-details-card-icon {
   width: 1.375rem;
   height: 1.375rem;
-  color: var(--primary-color);
+  color: var(--blue);
   stroke: currentColor;
 }
 
@@ -1956,7 +1957,7 @@ body {
 .avail-services-requirement-icon {
   width: 1.125rem;
   height: 1.125rem;
-  color: var(--success);
+  color: var(--blue);
   flex-shrink: 0;
   margin-top: 0.125rem;
   stroke: currentColor;
@@ -1990,7 +1991,7 @@ body {
   width: 1.625rem;
   height: 1.625rem;
   border-radius: 50%;
-  background: var(--primary-color);
+  background: #3b82f6;
   color: white;
   display: flex;
   align-items: center;
@@ -2011,8 +2012,8 @@ body {
 }
 
 .avail-services-cta-card {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 1rem;
   padding: 1.75rem;
   display: flex;

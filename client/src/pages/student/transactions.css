@@ -585,7 +585,7 @@ body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  transition: background 0.3s ease, border-color 0.3s ease;
+  transition: all 0.3s ease;
   cursor: default;
   position: static;
   overflow: visible;
@@ -596,11 +596,11 @@ body {
   content: none;
 }
 
-/* Suppress the dashboard lift-on-hover */
+/* Violet hover to match the page accent */
 .transactions-container .stat-card:hover {
-  transform: none;
-  box-shadow: none;
-  border-color: rgba(168, 85, 247, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.45);
 }
 
 [data-theme="light"] .transactions-container .stat-card {

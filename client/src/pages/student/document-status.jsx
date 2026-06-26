@@ -157,7 +157,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
   return (
     <div className="queue-status-container">
       {/* Page Header */}
-      <div className="queue-status-header">
+      <div className="queue-header">
         <div className="queue-breadcrumb">
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
@@ -613,7 +613,7 @@ export default function DocumentStatusPage() {
       </header>
 
       {/* Main Content */}
-      <main className="dashboard-main">
+      <main className="dashboard-main doc-status-page">
         {selectedDoc ? (
           <DocumentDetail
             doc={selectedDoc}
@@ -629,7 +629,7 @@ export default function DocumentStatusPage() {
         ) : (
           <div className="queue-status-container">
             {/* Page Header */}
-            <div className="queue-status-header">
+            <div className="queue-header">
               <div className="queue-breadcrumb">
                 <Link
                   to={navState.from === "documents" ? "/student/documents" : "/student/dashboard"}

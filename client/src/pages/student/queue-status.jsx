@@ -188,7 +188,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
   return (
     <div className="queue-status-container">
       {/* Page Header */}
-      <div className="queue-status-header">
+      <div className="queue-header">
         <div className="queue-breadcrumb">
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
@@ -795,8 +795,8 @@ export default function QueueStatusPage() {
         {selectedQueue ? (
           <QueueDetail
             queue={selectedQueue}
-            backLabel={fromQueue ? 'Available Queues' : 'All Queues'}
-            onBack={() => fromQueue ? navigate('/student/queue') : setSelectedQueueId(null)}
+            backLabel={fromTracking ? 'Queue Tracking' : fromQueue ? 'Available Queues' : 'All Queues'}
+            onBack={() => fromTracking ? navigate('/student/queue-tracking') : fromQueue ? navigate('/student/queue') : setSelectedQueueId(null)}
             onCancel={handleCancel}
             onSaveNotes={updateQueueNotes}
             cancelling={cancelling}
@@ -804,7 +804,7 @@ export default function QueueStatusPage() {
         ) : (
           <div className="queue-status-container">
             {/* Page Header */}
-            <div className="queue-status-header">
+            <div className="queue-header">
               <div className="queue-breadcrumb">
                 {fromTracking ? (
                   <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue-tracking')}>

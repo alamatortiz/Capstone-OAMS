@@ -227,7 +227,7 @@
   flex-direction: column;
   gap: 0.25rem;
   padding: 0.75rem 0;
-  border-bottom: 1px solid rgba(34, 197, 94, 0.08);
+  border-bottom: 1px solid rgba(249, 115, 22, 0.08);
   transition: border-color 0.3s ease;
 }
 
@@ -256,7 +256,7 @@
 
 .dss-list-item {
   background: var(--card);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1rem;
   padding: 1.5rem;
   cursor: pointer;
@@ -264,9 +264,9 @@
 }
 
 .dss-list-item:hover {
-  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.15);
   transform: translateY(-2px);
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: rgba(249, 115, 22, 0.4);
 }
 
 .dss-list-item-completed {
@@ -330,7 +330,7 @@
 .dss-list-card-field p {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--primary-color);
+  color: #f97316;
   margin: 0;
   line-height: 1.5;
   transition: color 0.3s ease;
@@ -449,7 +449,7 @@
 .dss-list-stat-value {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--primary-color);
+  color: #f97316;
   transition: color 0.3s ease;
 }
 
@@ -502,22 +502,43 @@
   flex-shrink: 0;
 }
 
-.qt-tab:hover {
-  color: var(--primary-color);
+.doc-status-page .qt-tab:hover {
+  color: #f97316;
 }
 
-.qt-tab.active {
-  color: var(--primary-color);
+.doc-status-page .qt-tab.active {
+  color: #f97316;
 }
 
-.qt-tab.active::after {
+.doc-status-page .qt-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--primary-color);
+  background: #f97316;
+}
+
+/* ─── qss-card orange accent overrides (document-status only) ───────────── */
+.doc-status-page .qss-card:not(.queue-cancel-card) {
+  border-color: rgba(249, 115, 22, 0.25);
+}
+
+.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-header {
+  border-bottom-color: rgba(249, 115, 22, 0.1);
+}
+
+.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-title svg {
+  color: #f97316;
+}
+
+.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-action {
+  color: #f97316;
+}
+
+.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-action:hover {
+  background: rgba(249, 115, 22, 0.1);
 }
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */

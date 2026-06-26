@@ -690,8 +690,8 @@ body {
 .doc-form-select:focus,
 .doc-form-textarea:focus {
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
   background-color: var(--input);
 }
 
@@ -774,22 +774,22 @@ body {
   flex-shrink: 0;
 }
 
-.qt-tab:hover {
-  color: var(--primary-color);
+.doc-content .qt-tab:hover {
+  color: #f97316;
 }
 
-.qt-tab.active {
-  color: var(--primary-color);
+.doc-content .qt-tab.active {
+  color: #f97316;
 }
 
-.qt-tab.active::after {
+.doc-content .qt-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--primary-color);
+  background: #f97316;
 }
 
 .qt-tab-content {
@@ -902,15 +902,15 @@ body {
 
 .doc-card {
   background-color: var(--card);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1rem;
   padding: 1.5rem;
   transition: all 0.3s ease;
 }
 
 .doc-card:hover {
-  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.4);
 }
 
 .doc-card-completed {
@@ -978,21 +978,19 @@ body {
 }
 
 .doc-card-tracking {
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--text-tertiary);
   margin: 0.25rem 0 0 0;
   transition: color 0.3s ease;
 }
 
 .doc-card-tracking span {
-  font-family: "Courier New", monospace;
   font-weight: 700;
-  color: #f59e0b;
-  letter-spacing: 0.03em;
+  color: var(--success);
 }
 
 [data-theme="light"] .doc-card-tracking span {
-  color: #d97706;
+  color: var(--success);
 }
 
 .doc-card-grid {
@@ -1030,7 +1028,7 @@ body {
 }
 
 .doc-card-field .doc-card-date-value {
-  color: var(--primary-color);
+  color: #f97316;
 }
 
 .doc-card-field-full {
@@ -1133,7 +1131,7 @@ body {
 /* ===== EMPTY STATE ===== */
 .doc-empty-state {
   background-color: var(--card);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1rem;
   padding: 3rem 1.5rem;
   display: flex;

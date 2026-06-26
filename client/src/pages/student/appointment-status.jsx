@@ -445,7 +445,7 @@ export default function AppointmentStatusPage() {
       </header>
 
       {/* Main */}
-      <main className="dashboard-main">
+      <main className="dashboard-main apst-page">
         {selectedAppt ? (
           <AppointmentDetail
             appt={selectedAppt}

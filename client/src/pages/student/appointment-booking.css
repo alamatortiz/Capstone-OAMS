@@ -814,15 +814,15 @@ body {
   stroke: currentColor;
 }
 
-.qt-tab:hover {
+.tabs-navigation .qt-tab:hover {
   color: var(--primary-color);
 }
 
-.qt-tab.active {
+.tabs-navigation .qt-tab.active {
   color: var(--primary-color);
 }
 
-.qt-tab.active::after {
+.tabs-navigation .qt-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
