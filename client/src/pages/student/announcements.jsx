@@ -536,20 +536,20 @@ export default function AnnouncementsPage() {
       <main className="dashboard-main">
         <div className="announcements-page">
           {/* Header */}
-          <div className="ann-page-header">
-            <div className="ann-breadcrumb">
+          <div className="queue-header">
+            <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeftIcon />
                 Home
               </Link>
             </div>
-            <div className="ann-title-row">
-              <div className="ann-header-icon">
+            <div className="queue-title-section">
+              <div className="queue-title-icon">
                 <MegaphoneIcon />
               </div>
               <div>
-                <h1 className="ann-page-title">Announcements</h1>
-                <p className="ann-page-subtitle">Stay updated with the latest notices</p>
+                <h1 className="queue-title">Announcements</h1>
+                <p className="queue-subtitle">Stay updated with the latest notices</p>
               </div>
             </div>
           </div>
@@ -559,19 +559,19 @@ export default function AnnouncementsPage() {
             <div className="empty-state">
               <AlertCircleIcon />
               <p>{annError}</p>
-              <button className="filter-tab" onClick={fetchAnnouncements}>
+              <button className="ann-retry-btn" onClick={fetchAnnouncements}>
                 Retry
               </button>
             </div>
           )}
 
-          {/* Filter Tabs + College Filter */}
-          <div className="ann-filters-card">
-            <div className="filter-tabs">
+          {/* Tabs + College Filter */}
+          <div className="ann-tabs-bar">
+            <div className="qt-tabs-list">
               {filterTabs.map((tab) => (
                 <button
                   key={tab.id}
-                  className={`filter-tab ${selectedFilter === tab.id ? "active" : ""}`}
+                  className={`qt-tab ${selectedFilter === tab.id ? "active" : ""}`}
                   onClick={() => setSelectedFilter(tab.id)}
                 >
                   {tab.label}

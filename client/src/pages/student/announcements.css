@@ -571,18 +571,7 @@ body {
   background: #475569;
 }
 
-/* ===== ANNOUNCEMENTS HEADER ===== */
-
-.ann-page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.ann-breadcrumb {
-  display: flex;
-  align-items: center;
-}
+/* ===== PAGE HEADER (queue-header pattern, green accent) ===== */
 
 .breadcrumb-link,
 .breadcrumb-link:visited,
@@ -618,67 +607,59 @@ body {
   stroke: currentColor;
 }
 
-.ann-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+.announcements-page .queue-title-icon {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
-.ann-header-icon {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 0.875rem;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--violet) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
-}
-
-.ann-header-icon svg {
+.announcements-page .queue-title-icon svg {
   width: 1.75rem;
   height: 1.75rem;
   stroke: currentColor;
 }
 
-.ann-page-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  letter-spacing: -0.5px;
-  transition: color 0.3s ease;
-}
+/* ===== TABS BAR ===== */
 
-.ann-page-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0 0;
-  transition: color 0.3s ease;
-}
-
-/* ===== FILTERS CARD ===== */
-
-.ann-filters-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 1rem 1.25rem;
+.ann-tabs-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  flex-wrap: wrap;
-  transition: all 0.3s ease;
+  border-bottom: 2px solid var(--card-border);
+  transition: border-color 0.3s ease;
 }
+
+.announcements-page .qt-tabs-list {
+  border-bottom: none;
+  flex: 1;
+}
+
+.announcements-page .qt-tab:hover {
+  color: var(--primary-color);
+}
+
+.announcements-page .qt-tab.active {
+  color: var(--primary-color);
+}
+
+.announcements-page .qt-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-color);
+}
+
+/* ===== COLLEGE SELECT (in tabs bar) ===== */
 
 .ann-college-wrapper {
   position: relative;
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  padding-bottom: 0.75rem;
 }
 
 .ann-college-wrapper svg {
@@ -716,38 +697,23 @@ body {
   color: var(--text-primary);
 }
 
-/* ===== FILTER TABS ===== */
-.filter-tabs {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.25rem 0;
-}
+/* ===== RETRY BUTTON ===== */
 
-
-.filter-tab {
-  padding: 0.625rem 1.125rem;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
+.ann-retry-btn {
+  padding: 0.625rem 1.5rem;
+  background: var(--primary-color);
+  border: none;
   border-radius: 0.75rem;
-  color: var(--text-secondary);
+  color: white;
   font-size: 0.875rem;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
-  text-transform: capitalize;
 }
 
-.filter-tab:hover {
-  border-color: rgba(34, 197, 94, 0.5);
-  background: rgba(34, 197, 94, 0.08);
-}
-
-.filter-tab.active {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+.ann-retry-btn:hover {
+  background: var(--primary-dark);
 }
 
 /* ===== ANNOUNCEMENTS SECTION ===== */
@@ -1167,7 +1133,7 @@ body {
     padding: 1rem;
   }
 
-  .ann-page-title {
+  .announcements-page .queue-title {
     font-size: 1.5rem;
   }
 }
@@ -1178,13 +1144,15 @@ body {
     gap: 1rem;
   }
 
-  .ann-filters-card {
+  .ann-tabs-bar {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.5rem;
   }
 
-  .ann-college-wrapper {
+  .ann-tabs-bar .ann-college-wrapper {
     width: 100%;
+    padding-bottom: 0.75rem;
   }
 
   .ann-college-select {
@@ -1214,17 +1182,8 @@ body {
     gap: 1rem;
   }
 
-  .ann-page-title {
+  .announcements-page .queue-title {
     font-size: 1.25rem;
-  }
-
-  .filter-tabs {
-    gap: 0.5rem;
-  }
-
-  .filter-tab {
-    padding: 0.5rem 0.875rem;
-    font-size: 0.8rem;
   }
 
   .announcement-card {
