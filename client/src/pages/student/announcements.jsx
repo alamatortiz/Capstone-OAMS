@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { Megaphone as LucideMegaphone } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -118,21 +119,7 @@ const MoonIcon = () => (
 );
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
-const MegaphoneIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 11v2" />
-    <path d="M6 10v4" />
-    <path d="M10 8l8-3v14l-8-3H6a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h4z" />
-    <path d="M10 16l1.5 4" />
-  </svg>
-);
+const MegaphoneIcon = () => <LucideMegaphone />;
 
 const AlertCircleIcon = () => (
   <svg

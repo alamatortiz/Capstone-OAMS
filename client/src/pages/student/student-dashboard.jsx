@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
@@ -227,18 +227,7 @@ const ActivityIcon = () => (
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
   </svg>
 );
-const GraduationCapIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21.21 15.89A10 10 0 1 1 8.11 2.05"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-  </svg>
-);
+const GraduationCapIcon = () => <LucideGraduationCap className="icon" />;
 const TimerIcon = () => (
   <svg
     className="icon"
@@ -252,18 +241,7 @@ const TimerIcon = () => (
     <path d="M7 2h10"></path>
   </svg>
 );
-const MegaphoneIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-  </svg>
-);
+const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
 const ChatIcon = () => (
   <svg
     className="icon"
@@ -453,8 +431,8 @@ export default function StudentDashboard() {
       value: dashLoading ? "—" : String(dashStats?.stats?.completed ?? 0),
       description: "Total transactions",
       icon: CheckCircleIcon,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50 dark:bg-purple-950",
+      color: "text-green-600",
+      bgColor: "bg-green-50 dark:bg-green-950",
       link: "/student/transactions",
     },
   ];

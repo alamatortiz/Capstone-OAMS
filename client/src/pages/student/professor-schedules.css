@@ -599,13 +599,13 @@ body {
 
 /* Green accent for the professor schedule page header icon */
 .professor-schedule-page .queue-title-icon {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
 .professor-schedule-page .queue-title-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 2.3rem;
+  height: 2.3rem;
   stroke: currentColor;
 }
 

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { GraduationCap as LucideGraduationCap } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
@@ -108,19 +109,8 @@ const MoonIcon = () => (
   </svg>
 );
 
-// ─── Content Icons (unchanged) ─────────────────────────────────────────────
-const GraduationCapIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21.21 15.89A10 10 0 1 1 8.11 2.05"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-  </svg>
-);
+// ─── Content Icons ─────────────────────────────────────────────────────────
+const GraduationCapIcon = () => <LucideGraduationCap />;
 const ChevronRightIcon = () => (
   <svg
     className="icon"

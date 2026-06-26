@@ -553,7 +553,7 @@ body {
 
 /* Green accent for the transactions page header icon */
 .transactions-container .queue-title-icon {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
