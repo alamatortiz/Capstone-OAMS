@@ -487,9 +487,6 @@ export default function ProfessorAnnouncementCreation() {
               <BellIcon />
               <h3 className="anc-empty-title">No Announcements Yet</h3>
               <p className="anc-empty-subtitle">Create your first announcement to get started</p>
-              <button className="anc-create-btn" onClick={() => setShowCreateModal(true)}>
-                <PlusIcon /> Create Announcement
-              </button>
             </div>
           )}
         </div>
