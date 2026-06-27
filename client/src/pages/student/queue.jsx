@@ -506,7 +506,7 @@ export default function QueuePage() {
               {selectedSlot ? (
                 <button className="breadcrumb-link" onClick={() => setSelectedSlot(null)}>
                   <ChevronLeft className="breadcrumb-icon" />
-                  Available Queues
+                  Queues
                 </button>
               ) : (
                 <Link to="/student/dashboard" className="breadcrumb-link">
@@ -521,7 +521,7 @@ export default function QueuePage() {
               </div>
               <div>
                 <h1 className="queue-title">
-                  {selectedSlot ? 'Queue Details' : 'Available Queues'}
+                  {selectedSlot ? 'Queue Details' : 'Queues'}
                 </h1>
                 <p className="queue-subtitle">
                   Join queues and track your position in real-time

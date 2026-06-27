@@ -592,7 +592,7 @@ export default function AppointmentStatusPage() {
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
       {/* AI Chat */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
+      <div className={`chat-widget apst-chat ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
           <div className="chat-container">
             <div className="chat-header">

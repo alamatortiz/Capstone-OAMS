@@ -10,6 +10,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
+import { ChevronDown, CalendarDays, ClipboardList } from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -464,8 +465,8 @@ export default function AppointmentsPage() {
                 <CalendarIcon />
               </div>
               <div>
-                <h1 className="ab-title">Appointments</h1>
-                <p className="ab-subtitle">Schedule consultations with professors</p>
+                <h1 className="queue-title">Appointments</h1>
+                <p className="queue-subtitle">Schedule consultations with professors</p>
               </div>
             </div>
           </div>
@@ -478,23 +479,29 @@ export default function AppointmentsPage() {
             </div>
             <div className="filters-top-row">
               <div className="filter-group">
-                <label htmlFor="selectedCollege">1. Select College</label>
-                <select id="selectedCollege" value={selectedCollege} onChange={(e) => { setSelectedCollege(e.target.value); setSelectedProfessorId(""); setSelectedDate(""); }} className="filter-select">
-                  <option value="">— Choose a college —</option>
-                  {colleges.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
+                <label htmlFor="selectedCollege">College</label>
+                <div className="filter-select-wrapper">
+                  <select id="selectedCollege" value={selectedCollege} onChange={(e) => { setSelectedCollege(e.target.value); setSelectedProfessorId(""); setSelectedDate(""); }} className="filter-select">
+                    <option value="">All Colleges</option>
+                    {colleges.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                  <ChevronDown className="filter-chevron" />
+                </div>
               </div>
               <div className="filter-group">
-                <label htmlFor="selectedProfessor">2. Select Professor</label>
-                <select id="selectedProfessor" value={selectedProfessorId} onChange={(e) => { setSelectedProfessorId(e.target.value); setSelectedDate(""); }} className="filter-select" disabled={!selectedCollege || slotsLoading || availableProfessors.length === 0}>
-                  <option value="">{!selectedCollege ? "Select a college first" : slotsLoading ? "Loading…" : availableProfessors.length === 0 ? "No professors available" : "— Choose a professor —"}</option>
-                  {availableProfessors.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <label htmlFor="selectedProfessor">Professor</label>
+                <div className="filter-select-wrapper">
+                  <select id="selectedProfessor" value={selectedProfessorId} onChange={(e) => { setSelectedProfessorId(e.target.value); setSelectedDate(""); }} className="filter-select" disabled={!selectedCollege || slotsLoading || availableProfessors.length === 0}>
+                    <option value="">{!selectedCollege ? "Select a college first" : slotsLoading ? "Loading…" : availableProfessors.length === 0 ? "No professors available" : "All Professors"}</option>
+                    {availableProfessors.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <ChevronDown className="filter-chevron" />
+                </div>
               </div>
             </div>
             {selectedProfessorId && (
               <div className="filter-group filter-group--calendar">
-                <label>3. Select Date</label>
+                <label>Date</label>
                 <CalendarGrid
                   year={calendarMonth.year} month={calendarMonth.month} days={calendarDays} selectedDate={selectedDate}
                   onDateClick={(date, status) => { if (status === "available") setSelectedDate(date === selectedDate ? "" : date); }}
@@ -511,10 +518,10 @@ export default function AppointmentsPage() {
           <div className="tabs-navigation">
             <div className="qt-tabs-list">
               <button type="button" className={`qt-tab ${activeTab === "slots" ? "active" : ""}`} onClick={() => setActiveTab("slots")}>
-                <ChevronRightIcon /> Available Slots ({slotsLoading ? "—" : availableSlots.length})
+                <CalendarDays className="qt-icon-xs" /> Available Slots ({slotsLoading ? "—" : availableSlots.length})
               </button>
               <button type="button" className={`qt-tab ${activeTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
-                <CheckCircleIcon /> My Bookings ({bookingsLoading ? "—" : activeBookings.length})
+                <ClipboardList className="qt-icon-xs" /> My Bookings ({bookingsLoading ? "—" : activeBookings.length})
               </button>
             </div>
           </div>

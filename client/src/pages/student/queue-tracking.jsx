@@ -420,7 +420,7 @@ export default function QueueTrackingPage() {
               {location.state?.from === 'queue' ? (
                 <Link to="/student/queue" className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
-                  Available Queues
+                  Queues
                 </Link>
               ) : location.state?.from === 'queue-status' ? (
                 <Link to="/student/queue-status" className="breadcrumb-link">
