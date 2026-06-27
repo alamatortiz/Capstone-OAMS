@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin-queue-hosting.css";
@@ -214,6 +214,7 @@ export default function AdminQueueHosting() {
     : { name: "Admin", role: "admin", college: "", departmentAbbrev: "CCS" };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [chatOpen, setChatOpen] = useState(false);
@@ -527,7 +528,7 @@ export default function AdminQueueHosting() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="aqh-nav-item"
+                  className={`aqh-nav-item${location.pathname === item.path ? " active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="aqh-nav-icon-medium" />
@@ -578,15 +579,20 @@ export default function AdminQueueHosting() {
       {/* Main Content */}
       <main className="aqh-dashboard-main">
         <div className="aqh-page-container">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Page Header */}
           <div className="aqh-page-header">
-            <div className="aqh-page-header-text">
-              <h1 className="aqh-page-title">Queue Hosting Management</h1>
-              <p className="aqh-page-subtitle">
-                {user.college} ({user.departmentAbbrev}) — open, manage, and
-                close your department's queue lines
-              </p>
+            <div className="aqh-title-section">
+              <div className="aqh-title-icon">
+                <QueueIconNav />
+              </div>
+              <div>
+                <h1 className="aqh-page-title">Queue Hosting Management</h1>
+                <p className="aqh-page-subtitle">
+                  {user.college} ({user.departmentAbbrev}) — open, manage, and
+                  close your department's queue lines
+                </p>
+              </div>
             </div>
             <button
               className="aqh-open-queue-btn"

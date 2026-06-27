@@ -968,7 +968,7 @@ export default function AdminQueueManagement() {
       {/* Main Content - List View */}
       <main className="aqm-dashboard-main">
         <div className="aqm-list-container">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           <div className="aqm-page-header">
             <h1 className="aqm-page-title">Queue Management</h1>
             <p className="aqm-page-subtitle">Monitor and manage all active queues</p>

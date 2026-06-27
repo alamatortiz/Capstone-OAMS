@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_queue.css";
@@ -253,6 +253,7 @@ export default function AdminQueue() {
       };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [chatOpen, setChatOpen] = useState(false);
@@ -592,7 +593,7 @@ export default function AdminQueue() {
                     key={item.path}
                     to={item.path}
                     onClick={() => setSidebarOpen(false)}
-                    className="nav-item"
+                    className={`nav-item${location.pathname === item.path ? " active" : ""}`}
                   >
                     <item.icon className="nav-icon-medium" />
                     <span className="nav-label">{item.label}</span>
@@ -1070,11 +1071,19 @@ export default function AdminQueue() {
       {/* Main Content */}
       <main className="admin-queue-main">
         <div className="queue-page-container">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Header */}
-          <div className="queue-page-header">
-            <h1>Centralized Queue Management</h1>
-            <p>Monitor and control queues for your department</p>
+          {/* Page Header */}
+          <div className="aq-page-header">
+            <div className="aq-title-section">
+              <div className="aq-title-icon">
+                <QueueIconNav />
+              </div>
+              <div>
+                <h1 className="aq-title">Centralized Queue Management</h1>
+                <p className="aq-subtitle">Monitor and control queues for {user?.college}</p>
+              </div>
+            </div>
           </div>
 
           {/* System Stats */}
@@ -1094,34 +1103,22 @@ export default function AdminQueue() {
               <div className="queue-stat-box-content">
                 <div className="queue-stat-box-text">
                   <p className="queue-stat-box-label">Total Waiting</p>
-                  <p
-                    className="queue-stat-box-value"
-                    style={{ color: "#3b82f6" }}
-                  >
+                  <p className="queue-stat-box-value">
                     {systemStats.totalWaiting}
                   </p>
                 </div>
-                <UsersIcon
-                  className="queue-stat-box-icon"
-                  style={{ color: "#3b82f6" }}
-                />
+                <UsersIcon className="queue-stat-box-icon" />
               </div>
             </div>
             <div className="queue-stat-box">
               <div className="queue-stat-box-content">
                 <div className="queue-stat-box-text">
                   <p className="queue-stat-box-label">Avg Wait Time</p>
-                  <p
-                    className="queue-stat-box-value"
-                    style={{ color: "#ef4444" }}
-                  >
+                  <p className="queue-stat-box-value">
                     {systemStats.avgWaitTime}
                   </p>
                 </div>
-                <ClockIcon
-                  className="queue-stat-box-icon"
-                  style={{ color: "#ef4444" }}
-                />
+                <ClockIcon className="queue-stat-box-icon" />
               </div>
             </div>
             <div className="queue-stat-box">

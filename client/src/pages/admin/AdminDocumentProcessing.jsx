@@ -436,7 +436,7 @@ export default function AdminDocumentProcessing() {
       {/* ── Main Content ─────────────────────────────────────────────────────── */}
       <main className="adp-main">
         <div className="adp-content">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Page Header */}
           <div className="adp-page-header">
             <div>

@@ -427,7 +427,7 @@ export default function AdminProfessorAvailability() {
       {/* Main Content */}
       <main className="apa-dashboard-main">
         <div className="apa-page-container">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Page Header */}
           <div className="apa-page-header">
             <h1 className="apa-page-title">Faculty Availability</h1>

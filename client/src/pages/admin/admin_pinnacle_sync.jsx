@@ -564,7 +564,7 @@ export default function AdminPinnacleSync() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="aps-page">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Hero Banner */}
           <div className="aps-hero-banner">
             <div className="aps-hero-content">

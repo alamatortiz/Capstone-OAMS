@@ -582,7 +582,7 @@ export default function AdminQueueAnalytics() {
       {/* Main Content */}
       <main className="aqa-main">
         <div className="aqa-content">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Banner */}
           <div className="aqa-banner">
             <div className="aqa-banner-icon">

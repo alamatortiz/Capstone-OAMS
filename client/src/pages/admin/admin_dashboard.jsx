@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_dashboard.css";
@@ -303,14 +303,14 @@ const HostQueueIcon = () => (
 const adminTools = [
   {
     icon: UserManagementIcon,
-    iconColor: "bg-orange-500",
+    iconColor: "bg-user-mgmt",
     title: "User Management",
     description: "Manage user accounts",
     path: "/admin/user-management",
   },
   {
     icon: DatabaseIcon,
-    iconColor: "bg-data-green",
+    iconColor: "bg-data-mgmt",
     title: "Data Management",
     description: "Configure settings",
     path: "/admin/data-management",
@@ -333,7 +333,7 @@ const adminTools = [
 const quickActions = [
   {
     icon: QRCodeIcon,
-    iconColor: "bg-green-500",
+    iconColor: "bg-scan-doc",
     title: "Scan Document",
     description: "Verify QR codes and view document details",
     path: "/admin/scan-document",
@@ -365,6 +365,7 @@ export default function AdminDashboard() {
       };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [chatOpen, setChatOpen] = useState(false);
@@ -437,7 +438,7 @@ export default function AdminDashboard() {
       value: loading ? "—" : String(s?.announcements ?? 0),
       description: "Published",
       icon: BellIcon,
-      bgColor: "bg-purple-50",
+      bgColor: "bg-blue-stat",
       isClickable: true,
       ctaAriaLabel: "View announcement management",
     },
@@ -641,7 +642,7 @@ export default function AdminDashboard() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item${location.pathname === item.path ? " active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />

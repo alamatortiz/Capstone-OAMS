@@ -598,7 +598,7 @@ export default function AdminAppointment() {
       {/* Main Content */}
       <main className="admin-appointment-main">
         <div className="admin-appointment-container">
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Header */}
           <div className="admin-appointment-page-header">
             <h1 className="admin-appointment-page-title">

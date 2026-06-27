@@ -545,7 +545,7 @@ export default function AdminAnnouncements() {
       <main className="admin-dashboard-main">
         <div className="ann-page">
           {/* Back button */}
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
 
           {/* Header */}
           <div className="ann-header-row">

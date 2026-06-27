@@ -580,7 +580,7 @@ export default function AdminDocuments() {
             <div className="admin-documents-error-banner">{docError}</div>
           )}
 
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Page Header */}
           <div className="admin-documents-page-header">
             <h1 className="admin-documents-page-title">

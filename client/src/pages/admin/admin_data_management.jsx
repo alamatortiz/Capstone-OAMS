@@ -740,7 +740,7 @@ export default function AdminDataManagement() {
       <main className="admin-dashboard-main">
         <div className="admin-dashboard">
 
-          <button className="admin-back-btn" onClick={() => navigate("/admin/dashboard")}><ChevronLeftIcon /><span>Dashboard</span></button>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Banner */}
           <div className="adm-banner">
             <div className="adm-banner-icon"><DatabaseIcon /></div>
