@@ -330,21 +330,21 @@ export default function ProfessorDashboard() {
       description: "Submit or track document requests",
       icon: FileEditIcon,
       path: "/professor/document-request",
-      colorClass: "qa-blue",
+      badge: "Documents",
     },
     {
       label: "Schedule Availability",
       description: "Set your consultation hours",
       icon: CalendarClockIcon,
       path: "/professor/schedule-availability",
-      colorClass: "qa-green",
+      badge: "Schedule",
     },
     {
       label: "Announcement Creation",
       description: "Post announcements to students",
       icon: MegaphoneIcon,
       path: "/professor/announcement-creation",
-      colorClass: "qa-orange",
+      badge: "Announce",
     },
   ];
 
@@ -571,18 +571,24 @@ export default function ProfessorDashboard() {
               <h2>Quick Actions</h2>
             </div>
             <div className="quick-actions-grid">
-              {quickActions.map((action) => (
+              {quickActions.map((action, index) => (
                 <Link key={action.path} to={action.path} className="quick-action-link">
-                  <div className={`quick-action-card ${action.colorClass}`}>
-                    <div className="quick-action-icon">
-                      <action.icon />
-                    </div>
-                    <div className="quick-action-text">
-                      <p className="quick-action-label">{action.label}</p>
-                      <p className="quick-action-desc">{action.description}</p>
-                    </div>
-                    <div className="quick-action-arrow">
-                      <ArrowRightIcon />
+                  <div className="quick-action-card">
+                    <div className="action-main">
+                      <div className={`action-icon action-gradient-${index + 1}`}>
+                        <action.icon />
+                      </div>
+                      <div className="action-body">
+                        <span className="action-badge action-badge-right">
+                          {action.badge}
+                        </span>
+                        <h3 className="action-title">{action.label}</h3>
+                        <p className="action-description">{action.description}</p>
+                        <div className="action-cta">
+                          <span>Open</span>
+                          <ChevronRightIcon />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -650,6 +656,9 @@ export default function ProfessorDashboard() {
                   <ActivityIcon />
                   Recent Activity
                 </h3>
+                <Link to="/professor/transactions" className="view-all-link">
+                  See All <ChevronRightIcon />
+                </Link>
               </div>
               <div className="card-content">
                 <div className="activity-list">

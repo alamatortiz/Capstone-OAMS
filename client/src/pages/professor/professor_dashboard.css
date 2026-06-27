@@ -496,26 +496,26 @@ body {
 .prof-breadcrumb {
   display: flex;
   align-items: center;
-  margin-bottom: 0.5rem;
 }
 .prof-breadcrumb-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
   text-decoration: none;
   background: transparent;
+  border: none;
   color: var(--text-tertiary);
-  padding: 0.4rem 0.6rem 0.4rem 0;
+  padding: 0.5rem 0.875rem 0.5rem 0;
   border-radius: 0.5rem;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
-  transition: color 0.2s ease, background 0.2s ease, padding-left 0.2s ease;
+  transition: all 0.2s ease;
 }
 .prof-breadcrumb-link:hover {
   color: var(--primary-color);
-  background: rgba(34, 197, 94, 0.08);
-  padding-left: 0.5rem;
+  background: rgba(34, 197, 94, 0.1);
 }
 
 /* ===== Main Content ===== */
@@ -696,19 +696,18 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
+  width: 100%;
 }
-
-/* Chevron right alignment inside stat cards */
-
-
 
 @media (min-width: 1024px) {
   .stats-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 .stat-card-link {
+  display: block;
+  width: 100%;
   text-decoration: none;
   color: inherit;
 }
@@ -720,7 +719,9 @@ body {
   padding: 1.25rem;
   transition: all 0.3s ease;
   cursor: pointer;
+  width: 100%;
   height: 100%;
+  box-sizing: border-box;
 }
 
 .stat-card:hover {
@@ -1063,7 +1064,7 @@ body {
 
 @media (min-width: 1024px) {
   .quick-actions-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -1214,6 +1215,107 @@ body {
 .qa-green:hover .quick-action-arrow { color: var(--primary-color); }
 .qa-orange:hover .quick-action-arrow { color: #f97316; }
 .qa-purple:hover .quick-action-arrow { color: #a855f7; }
+
+/* ── Student-style action card inner layout ──────────────────────────── */
+.action-main {
+  display: flex;
+  gap: 0.875rem;
+  align-items: stretch;
+  flex: 1;
+}
+
+.action-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  z-index: 1;
+}
+
+.action-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke-width: 2;
+  color: #fff;
+  stroke: #fff;
+}
+
+.quick-action-card:hover .action-icon {
+  transform: scale(1.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Professor-specific gradient colors (orange / violet / green) */
+.action-gradient-1 { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+.action-gradient-2 { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
+.action-gradient-3 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+.action-gradient-4 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+
+.action-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+  flex: 1;
+}
+
+.action-badge {
+  display: inline-block;
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--primary-color);
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid rgba(22, 163, 74, 0.22);
+  margin-bottom: 0.35rem;
+}
+
+.action-badge-right {
+  align-self: flex-start;
+  margin-top: 0;
+}
+
+.action-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  line-height: 1.3;
+  transition: color 0.3s ease;
+}
+
+.action-description {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
+  flex: 1;
+  transition: color 0.3s ease;
+}
+
+.action-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  transition: gap 0.2s ease, color 0.2s ease;
+}
+
+.action-cta svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.quick-action-card:hover .action-cta {
+  gap: 0.6rem;
+}
 
 @media (max-width: 640px) {
   .quick-actions-grid {
