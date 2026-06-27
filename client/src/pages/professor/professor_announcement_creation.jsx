@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./professor_dashboard.css";
@@ -152,6 +152,7 @@ export default function ProfessorAnnouncementCreation() {
       };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
@@ -351,7 +352,7 @@ export default function ProfessorAnnouncementCreation() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item${location.pathname === item.path ? " active" : ""}`}
                   title={item.label}
                 >
                   <item.icon />
@@ -405,9 +406,14 @@ export default function ProfessorAnnouncementCreation() {
 
           {/* Page Header */}
           <div className="anc-page-header">
-            <div className="anc-page-header-left">
-              <h1 className="anc-page-title">Announcement Management</h1>
-              <p className="anc-page-subtitle">Create and manage announcements for your students</p>
+            <div className="anc-title-section">
+              <div className="anc-title-icon">
+                <BellIcon />
+              </div>
+              <div>
+                <h1 className="anc-page-title">Announcement Management</h1>
+                <p className="anc-page-subtitle">Create and manage announcements for your students</p>
+              </div>
             </div>
             <button
               className="anc-create-btn"
@@ -421,11 +427,15 @@ export default function ProfessorAnnouncementCreation() {
           {/* Drafts Section */}
           {draftAnnouncements.length > 0 && (
             <section className="anc-section">
-              <h2 className="anc-section-title">Drafts ({draftAnnouncements.length})</h2>
+              <div className="anc-section-header">
+                <h2 className="anc-section-title">Drafts</h2>
+                <span className="anc-section-count">{draftAnnouncements.length}</span>
+              </div>
               <div className="anc-list">
                 {draftAnnouncements.map((ann) => (
                   <div key={ann.id} className="anc-card anc-card--draft">
                     <div className="anc-card-body">
+                      <div className="anc-card-icon"><BellIcon /></div>
                       <div className="anc-card-info">
                         <h3 className="anc-card-title">{ann.title}</h3>
                         <p className="anc-card-content">{ann.content}</p>
@@ -459,11 +469,15 @@ export default function ProfessorAnnouncementCreation() {
           {/* Published Section */}
           {publishedAnnouncements.length > 0 && (
             <section className="anc-section">
-              <h2 className="anc-section-title">Published ({publishedAnnouncements.length})</h2>
+              <div className="anc-section-header">
+                <h2 className="anc-section-title">Published</h2>
+                <span className="anc-section-count">{publishedAnnouncements.length}</span>
+              </div>
               <div className="anc-list">
                 {publishedAnnouncements.map((ann) => (
                   <div key={ann.id} className="anc-card anc-card--published">
                     <div className="anc-card-body">
+                      <div className="anc-card-icon"><BellIcon /></div>
                       <div className="anc-card-info">
                         <h3 className="anc-card-title">{ann.title}</h3>
                         <p className="anc-card-content">{ann.content}</p>

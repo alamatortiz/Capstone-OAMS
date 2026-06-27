@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./professor_dashboard.css";
@@ -220,6 +220,7 @@ export default function ProfessorSlotManagement() {
     : { name: "Faculty", role: "faculty", college: "", employeeId: "", departmentAbbrev: "CCS" };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
@@ -478,7 +479,7 @@ export default function ProfessorSlotManagement() {
             <div className="nav-items">
               {navItems.map((item) => (
                 <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}
-                  className="nav-item" title={item.label}>
+                  className={`nav-item${location.pathname === item.path ? " active" : ""}`} title={item.label}>
                   <item.icon className="nav-icon-medium" />
                   <span className="nav-label">{item.label}</span>
                 </Link>

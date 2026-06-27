@@ -317,24 +317,18 @@ export default function ProfessorTransactionsPage() {
 
           <nav className="sidebar-nav">
             <div className="nav-items">
-              {navItems.map((item) => {
-                // Transactions nav item is NEVER highlighted (even on /professor/transactions)
-                const isActive =
-                  item.path !== "/professor/transactions" &&
-                  location.pathname === item.path;
-                return (
+              {navItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
                     onClick={() => setSidebarOpen(false)}
-                    className={`nav-item${isActive ? " active" : ""}`}
+                    className={`nav-item${location.pathname === item.path ? " active" : ""}`}
                     title={item.label}
                   >
                     <item.icon className="nav-icon-medium" />
                     <span className="nav-label">{item.label}</span>
                   </Link>
-                );
-              })}
+              ))}
             </div>
           </nav>
 
@@ -492,7 +486,7 @@ export default function ProfessorTransactionsPage() {
               </div>
             ) : (
               filtered.map((txn) => (
-                <div key={txn.id} className={`txn-item txn-type-${txn.type}`}>
+                <div key={`${txn.type}-${txn.id}`} className={`txn-item txn-type-${txn.type}`}>
                   <div className="txn-item-icon">
                     <span className={`txn-icon-wrap txn-icon-${txn.type}`}>
                       {txn.type === "queue" ? <UserIcon /> : txn.type === "appointment" ? <CalendarSmIcon /> : <FileTextIconSm />}

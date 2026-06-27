@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import CalendarGrid from "../../components/CalendarGrid";
@@ -119,6 +119,7 @@ export default function ProfessorScheduleAvailability() {
     : { name: "Faculty", role: "faculty", college: "", employeeId: "", departmentAbbrev: "CCS" };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
@@ -318,7 +319,7 @@ export default function ProfessorScheduleAvailability() {
           <nav className="sidebar-nav">
             <div className="nav-items">
               {navItems.map((item) => (
-                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className="nav-item" title={item.label}>
+                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className={`nav-item${location.pathname === item.path ? " active" : ""}`} title={item.label}>
                   <item.icon /><span className="nav-label">{item.label}</span>
                 </Link>
               ))}
@@ -362,9 +363,14 @@ export default function ProfessorScheduleAvailability() {
 
           {/* Page Header */}
           <div className="sa-page-header">
-            <div>
-              <h1 className="sa-page-title">Schedule Availability</h1>
-              <p className="sa-page-desc">Set your available dates and times. Each date is set independently.</p>
+            <div className="sa-title-section">
+              <div className="sa-title-icon">
+                <CalendarIconNav />
+              </div>
+              <div>
+                <h1 className="sa-page-title">Schedule Availability</h1>
+                <p className="sa-page-desc">Set your available dates and time slots for student appointments.</p>
+              </div>
             </div>
             <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDate ?? todayStr)}>
               <PlusIcon /> Add Time Slot
