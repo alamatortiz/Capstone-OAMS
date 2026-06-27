@@ -407,8 +407,8 @@ export default function StudentDashboard() {
           ? `${dashStats.stats.appointments.pending} pending approval`
           : "No pending appointments",
       icon: CalendarIcon,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50 dark:bg-emerald-950",
+      color: "text-purple-600",
+      bgColor: "bg-purple-50 dark:bg-purple-950",
       link: "/student/appointment-status",
     },
     {
@@ -431,8 +431,8 @@ export default function StudentDashboard() {
       value: dashLoading ? "—" : String(dashStats?.stats?.completed ?? 0),
       description: "Total transactions",
       icon: CheckCircleIcon,
-      color: "text-green-600",
-      bgColor: "bg-green-50 dark:bg-green-950",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50 dark:bg-emerald-950",
       link: "/student/transactions",
     },
   ];

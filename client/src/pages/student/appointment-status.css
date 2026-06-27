@@ -280,45 +280,88 @@
   border-color: rgba(147, 51, 234, 0.35);
 }
 
-/* ─── Chat Widget — violet override (scoped to .apst-chat so it doesn't bleed) ─── */
-.apst-chat .chat-fab {
-  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+
+/* ─── Detail row separator — violet instead of orange (overrides document-status.css) ─── */
+.apst-page .dss-detail-row {
+  border-bottom-color: rgba(168, 85, 247, 0.1);
 }
 
-.apst-chat .chat-fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
+/* ─── List item title — violet (overrides amber/orange from document-status.css) ──────── */
+.apst-page .dss-list-title-section h3 {
+  color: #a855f7;
 }
 
-.apst-chat .chat-header {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.05) 100%);
+[data-theme="light"] .apst-page .dss-list-title-section h3 {
+  color: #9333ea;
 }
 
-.apst-chat .chat-close-btn:hover {
-  background-color: rgba(168, 85, 247, 0.1);
+/* ─── List card field values — violet (overrides orange from document-status.css) ─────── */
+.apst-page .dss-list-card-field p {
+  color: #a855f7;
 }
 
-.apst-chat .message-bot .message-content {
-  background: rgba(168, 85, 247, 0.15);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+[data-theme="light"] .apst-page .dss-list-card-field p {
+  color: #9333ea;
 }
 
-.apst-chat .message-user .message-content {
-  background: #a855f7;
+/* ─── Cancel Appointment card — red hue (mirrors queue-cancel-card) ─────── */
+.apst-cancel-card {
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background-color: rgba(239, 68, 68, 0.05);
 }
 
-.apst-chat .chat-input:focus {
-  border-color: #a855f7;
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.1);
+[data-theme="light"] .apst-cancel-card {
+  background-color: rgba(239, 68, 68, 0.03);
 }
 
-.apst-chat .chat-send-btn {
-  background: #a855f7;
+.apst-cancel-card .qss-card-header {
+  border-bottom-color: rgba(239, 68, 68, 0.15);
 }
 
-.apst-chat .chat-send-btn:hover {
-  background: #9333ea;
+.apst-cancel-title,
+.apst-cancel-card .qss-card-title svg {
+  color: #ef4444;
+}
+
+.apst-cancel-desc {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+/* ─── Detail row labels — violet, bold, larger ───────────────────────────── */
+.apst-page .dss-detail-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #a855f7;
+}
+
+[data-theme="light"] .apst-page .dss-detail-label {
+  color: #9333ea;
+}
+
+/* ─── Detail row values — larger text ────────────────────────────────────── */
+.apst-page .dss-detail-value {
+  font-size: 1.0625rem;
+}
+
+/* ─── Card header divider — violet (overrides blue from queue-status.css) ─── */
+.apst-page .qss-card-header {
+  border-bottom-color: rgba(168, 85, 247, 0.1);
+}
+
+[data-theme="light"] .apst-page .qss-card-header {
+  border-bottom-color: rgba(147, 51, 234, 0.1);
+}
+
+/* ─── Card title icons — violet ──────────────────────────────────────────── */
+.apst-page .qss-card-title svg {
+  color: #a855f7;
+}
+
+[data-theme="light"] .apst-page .qss-card-title svg {
+  color: #9333ea;
 }
 
 /* ─── Spin animation for loading icon ────────────────────────────────────── */

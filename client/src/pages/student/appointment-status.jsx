@@ -168,17 +168,16 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
 
       {/* Hero */}
       <div className="apst-hero-card">
-        <div className="dss-hero-content">
-          <div className="dss-hero-logo">
+        <div className="queue-hero-content">
+          <div className="queue-hero-logo">
             <img src={getCollegeLogo(appt.college)} alt={appt.college} />
           </div>
-          <div className="dss-hero-text">
-            <div className="dss-hero-header">
-              <div className="dss-hero-title">
-                <p className="dss-hero-doc-name">{appt.person}</p>
+          <div className="queue-hero-text">
+            <div className="queue-hero-header">
+              <div className="queue-hero-title">
+                <p className="queue-hero-service-name">{appt.person}</p>
                 <p>{appt.college}</p>
               </div>
-              <span className={`dss-badge ${statusCls}`}>{statusLabel}</span>
             </div>
           </div>
         </div>
@@ -188,7 +187,12 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
       <div className="queue-detail-grid">
         <div className="queue-detail-main">
           <div className="qss-card">
-            <h3 className="qss-card-title">Appointment Information</h3>
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <Calendar style={{ width: "1.25rem", height: "1.25rem" }} />
+                Appointment Information
+              </h3>
+            </div>
             <div className="qss-card-content">
               <div className="dss-detail-row">
                 <p className="dss-detail-label">Professor</p>
@@ -228,18 +232,27 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
 
         <div className="queue-detail-sidebar">
           <div className="qss-card">
-            <h3 className="qss-card-title">Status</h3>
-            <div className="qss-card-content" style={{ alignItems: "center", padding: "1.5rem 1rem" }}>
-              <span className={`dss-badge ${statusCls}`} style={{ fontSize: "1rem", padding: "0.5rem 1.25rem" }}>
-                {statusLabel}
-              </span>
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                Status
+              </h3>
+              <span className={`dss-badge ${statusCls}`}>{statusLabel}</span>
             </div>
           </div>
 
           {canCancel && (
-            <div className="qss-card">
-              <h3 className="qss-card-title">Actions</h3>
+            <div className="qss-card apst-cancel-card">
+              <div className="qss-card-header">
+                <h3 className="qss-card-title apst-cancel-title">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem", color: "#ef4444" }} />
+                  Cancel Appointment
+                </h3>
+              </div>
               <div className="qss-card-content">
+                <p className="apst-cancel-desc">
+                  Cancelling will permanently remove this appointment. You will need to book a new one if you change your mind.
+                </p>
                 <button
                   className="apst-cancel-btn"
                   onClick={() => setShowCancelDialog(true)}
@@ -592,7 +605,7 @@ export default function AppointmentStatusPage() {
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
       {/* AI Chat */}
-      <div className={`chat-widget apst-chat ${chatOpen ? "open" : ""}`}>
+      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
           <div className="chat-container">
             <div className="chat-header">
