@@ -60,6 +60,11 @@ const CloseIcon = () => (
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -225,8 +230,8 @@ function DocumentCard({ doc, onApprove, onReject, onProcess, onMarkReady, onView
 function DetailsDialog({ doc, onClose }) {
   if (!doc) return null;
   return (
-    <div className="docs-dialog-overlay" onClick={onClose}>
-      <div className="docs-dialog-box" onClick={(e) => e.stopPropagation()}>
+    <div className="docs-dialog-overlay">
+      <div className="docs-dialog-box">
         <button className="docs-dialog-close" onClick={onClose} aria-label="Close">
           <CloseIcon />
         </button>
@@ -451,6 +456,14 @@ export default function ProfessorDocumentsPage() {
       {/* Main Content */}
       <main className="dashboard-main">
         <div className="docs-page-content">
+
+          {/* Breadcrumb */}
+          <div className="prof-breadcrumb">
+            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
+              <ChevronLeftIcon />
+              Home
+            </Link>
+          </div>
 
           {/* Page Header */}
           <div className="docs-page-header">

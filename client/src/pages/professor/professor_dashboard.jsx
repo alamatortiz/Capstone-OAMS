@@ -304,14 +304,6 @@ export default function ProfessorDashboard() {
       link: "/professor/appointments",
     },
     {
-      title: "Student Requests",
-      value: loading ? "—" : String(s?.studentRequests ?? 0),
-      description: "Awaiting response",
-      icon: UsersIcon,
-      bgColor: "bg-emerald-50",
-      link: "/professor/appointments",
-    },
-    {
       title: "Documents",
       value: loading ? "—" : String(s?.documentsToReview ?? 0),
       description: "To review",
@@ -402,12 +394,12 @@ export default function ProfessorDashboard() {
     if (i.includes("appointment"))
       return `You have ${s?.pendingAppointments ?? 0} pending appointments, with ${s?.todayAppointments ?? 0} scheduled for today.`;
     if (i.includes("student"))
-      return `You currently have ${s?.studentRequests ?? 0} student requests awaiting your response.`;
+      return `You have ${s?.pendingAppointments ?? 0} pending appointments from students.`;
     if (i.includes("document"))
       return `You have ${s?.documentsToReview ?? 0} documents pending review.`;
     if (i.includes("schedule") || i.includes("office hours"))
       return "Your office hours are Monday to Friday, 8:00 AM - 5:00 PM, and Saturday 8:00 AM - 12:00 PM.";
-    return "I can help you with appointment management, student requests, and document reviews. What do you need?";
+    return "I can help you with appointment management and document reviews. What do you need?";
   };
 
   const navItems = [

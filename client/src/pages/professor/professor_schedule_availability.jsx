@@ -47,6 +47,11 @@ const CloseIcon = () => (
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
@@ -347,6 +352,14 @@ export default function ProfessorScheduleAvailability() {
       <main className="dashboard-main">
         <div className="sa-page">
 
+          {/* Breadcrumb */}
+          <div className="prof-breadcrumb">
+            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
+              <ChevronLeftIcon />
+              Home
+            </Link>
+          </div>
+
           {/* Page Header */}
           <div className="sa-page-header">
             <div>
@@ -484,8 +497,8 @@ export default function ProfessorScheduleAvailability() {
 
       {/* ── Add Time Slot Modal ── */}
       {showAddSlot && (
-        <div className="sa-modal-overlay" onClick={() => setShowAddSlot(false)}>
-          <div className="sa-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="sa-modal-overlay">
+          <div className="sa-modal">
             <div className="sa-modal-header">
               <h3>Add Time Slot</h3>
               <p>Set your availability for a specific date and time</p>

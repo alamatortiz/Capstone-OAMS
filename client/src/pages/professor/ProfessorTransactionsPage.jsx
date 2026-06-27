@@ -59,6 +59,11 @@ const CloseIcon = () => (
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -371,6 +376,14 @@ export default function ProfessorTransactionsPage() {
       {/* ── Main content ─────────────────────────────────────────────────── */}
       <main className="dashboard-main">
         <div className="transactions-page">
+
+          {/* Breadcrumb */}
+          <div className="prof-breadcrumb">
+            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
+              <ChevronLeftIcon />
+              Home
+            </Link>
+          </div>
 
           {/* Page header */}
           <div className="transactions-page-header">

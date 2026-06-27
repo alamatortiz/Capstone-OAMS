@@ -60,6 +60,11 @@ const CloseIcon = () => (
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
+    <polyline points="15 18 9 12 15 6"></polyline>
+  </svg>
+);
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -390,6 +395,14 @@ export default function ProfessorAnnouncementCreation() {
       <main className="dashboard-main">
         <div className="anc-page">
 
+          {/* Breadcrumb */}
+          <div className="prof-breadcrumb">
+            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
+              <ChevronLeftIcon />
+              Home
+            </Link>
+          </div>
+
           {/* Page Header */}
           <div className="anc-page-header">
             <div className="anc-page-header-left">
@@ -499,7 +512,7 @@ export default function ProfessorAnnouncementCreation() {
 
       {/* Create / Edit Modal */}
       {showCreateModal && (
-        <div className="anc-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
+        <div className="anc-modal-overlay">
           <div className="anc-modal">
             <div className="anc-modal-header">
               <h2 className="anc-modal-title">

@@ -60,6 +60,11 @@ const CloseIcon = () => (
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
+const ChevronLeftIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
+    <polyline points="15 18 9 12 15 6"></polyline>
+  </svg>
+);
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -187,8 +192,8 @@ const getStatusStyle = (status) => {
 function Modal({ show, title, description, onClose, children }) {
   if (!show) return null;
   return (
-    <div className="sm-modal-overlay" onClick={onClose}>
-      <div className="sm-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="sm-modal-overlay">
+      <div className="sm-modal">
         <div className="sm-modal-header">
           <div>
             <h3 className="sm-modal-title">{title}</h3>
@@ -509,6 +514,14 @@ export default function ProfessorSlotManagement() {
       {/* Main Content */}
       <main className="dashboard-main">
         <div className="sm-page">
+
+          {/* Breadcrumb */}
+          <div className="prof-breadcrumb">
+            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
+              <ChevronLeftIcon />
+              Home
+            </Link>
+          </div>
 
           {/* Header Banner */}
           <div className="sm-banner">
