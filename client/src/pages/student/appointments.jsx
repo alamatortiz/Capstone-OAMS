@@ -10,7 +10,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
-import { ChevronDown, CalendarDays, ClipboardList } from "lucide-react";
+import { ChevronDown, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle } from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -462,7 +462,7 @@ export default function AppointmentsPage() {
             </div>
             <div className="queue-title-section">
               <div className="ab-title-icon">
-                <CalendarIcon />
+                <Calendar style={{ width: "1.75rem", height: "1.75rem" }} />
               </div>
               <div>
                 <h1 className="queue-title">Appointments</h1>
@@ -540,7 +540,7 @@ export default function AppointmentsPage() {
                   {Object.keys(slotsByDate).sort().map((date) => (
                     <div key={date} className="slots-date-group">
                       <div className="date-header">
-                        <CalendarIcon />
+                        <Calendar style={{ width: "1.5rem", height: "1.5rem", color: "#a855f7" }} />
                         <h3>{formatDate(date)}</h3>
                         {isToday(date) && <span className="appointment-booking-badge today">Today</span>}
                         {isTomorrow(date) && <span className="appointment-booking-badge tomorrow">Tomorrow</span>}
@@ -554,9 +554,9 @@ export default function AppointmentsPage() {
                               <span className="college-badge">{slot.college}</span>
                             </div>
                             <div className="slot-details">
-                              <div className="slot-detail"><ClockIcon /><span>{formatTime(slot.startTime)} – {formatTime(slot.endTime)}</span></div>
-                              <div className="slot-detail"><MapPinIcon /><span>{slot.location}</span></div>
-                              <div className="slot-detail"><UsersIcon /><span>{slot.maxSlots - slot.currentBookings} of {slot.maxSlots} available</span></div>
+                              <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.startTime)} – {formatTime(slot.endTime)}</span></div>
+                              <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
+                              <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.maxSlots - slot.currentBookings} of {slot.maxSlots} available</span></div>
                             </div>
                             <button className="book-btn" onClick={() => { setSelectedSlot(slot); setShowBookDialog(true); }}>Book This Slot</button>
                           </div>
@@ -598,9 +598,9 @@ export default function AppointmentsPage() {
                             <span className="college-badge">{booking.college}</span>
                           </div>
                           <div className="booking-details">
-                            <div className="booking-detail"><CalendarIcon /><span>{formatDate(booking.date)}</span></div>
-                            <div className="booking-detail"><ClockIcon /><span>{booking.time}</span></div>
-                            <div className="booking-detail"><MapPinIcon /><span>{booking.location}</span></div>
+                            <div className="booking-detail"><Calendar style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatDate(booking.date)}</span></div>
+                            <div className="booking-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.time}</span></div>
+                            <div className="booking-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.location}</span></div>
                           </div>
                           {booking.purpose && (
                             <div className="purpose-box">
@@ -610,7 +610,7 @@ export default function AppointmentsPage() {
                           )}
                           {(status === "pending" || status === "approved") && (
                             <button className="cancel-btn" onClick={() => setCancelConfirmId(booking.id)} disabled={cancellingId === booking.id}>
-                              <XCircleIcon />{cancellingId === booking.id ? "Cancelling…" : "Cancel"}
+                              <XCircle style={{ width: "1.3rem", height: "1.3rem", color: "#ef4444", flexShrink: 0 }} />{cancellingId === booking.id ? "Cancelling…" : "Cancel"}
                             </button>
                           )}
                         </div>
