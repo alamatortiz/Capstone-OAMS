@@ -178,6 +178,7 @@
   flex-wrap: nowrap;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  padding-bottom: 2px;
 }
 .apst-tabs-scrollable::-webkit-scrollbar { display: none; }
 

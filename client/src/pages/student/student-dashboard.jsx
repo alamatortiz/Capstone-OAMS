@@ -995,32 +995,6 @@ export default function StudentDashboard() {
             </div>
           </section>
 
-          {/* Service Hours */}
-          <div className="service-hours-card">
-            <div className="hours-header">
-              <h3 className="hours-title">
-                <AlertCircleIcon />
-                Service Hours
-              </h3>
-              <p className="hours-subtitle">
-                Office operating hours for all colleges
-              </p>
-            </div>
-            <div className="hours-grid">
-              <div>
-                <p className="hours-label">Weekdays</p>
-                <p className="hours-time">Monday – Friday: 8:00 AM – 5:00 PM</p>
-              </div>
-              <div>
-                <p className="hours-label">Weekends</p>
-                <p className="hours-time">
-                  Saturday: 8:00 AM – 12:00 PM
-                  <br />
-                  Sunday: Closed
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </main>
 

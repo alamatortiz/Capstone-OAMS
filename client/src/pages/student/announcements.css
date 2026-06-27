@@ -635,11 +635,11 @@ body {
 }
 
 .announcements-page .qt-tab:hover {
-  color: #a855f7;
+  color: #22c55e;
 }
 
 .announcements-page .qt-tab.active {
-  color: #a855f7;
+  color: #22c55e;
 }
 
 .announcements-page .qt-tab.active::after {
@@ -649,19 +649,19 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: #a855f7;
+  background: #22c55e;
 }
 
 [data-theme="light"] .announcements-page .qt-tab:hover {
-  color: #9333ea;
+  color: #15803d;
 }
 
 [data-theme="light"] .announcements-page .qt-tab.active {
-  color: #9333ea;
+  color: #15803d;
 }
 
 [data-theme="light"] .announcements-page .qt-tab.active::after {
-  background: #9333ea;
+  background: #15803d;
 }
 
 /* ===== COLLEGE SELECT (in tabs bar) ===== */
