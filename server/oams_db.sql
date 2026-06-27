@@ -287,6 +287,23 @@ CREATE TABLE faculty_blocked_dates (
 );
 
 -- ─────────────────────────────────────────────────────────────
+-- FACULTY DATE-SPECIFIC AVAILABILITY
+-- Faculty sets exact dates + times instead of recurring day-of-week slots
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE faculty_date_availability (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    faculty_id     INT NOT NULL,
+    available_date DATE NOT NULL,
+    start_time     TIME NOT NULL,
+    end_time       TIME NOT NULL,
+    location       VARCHAR(150),
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    INDEX idx_fda_faculty (faculty_id),
+    INDEX idx_fda_date (available_date)
+);
+
+-- ─────────────────────────────────────────────────────────────
 -- 9. DOCUMENT PROCESSING
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE document_requests (

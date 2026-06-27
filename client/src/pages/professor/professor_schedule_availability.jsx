@@ -91,26 +91,19 @@ const ClockIcon = () => (
     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
   </svg>
 );
-const BanIcon = () => (
-  <svg style={{ width: "1rem", height: "1rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-  </svg>
-);
-const CheckIcon = () => (
-  <svg style={{ width: "1rem", height: "1rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-const ORDERED_DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
 function fmt12(t) {
   if (!t) return "";
   const [h, m] = t.split(":");
   const hour = parseInt(h, 10);
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
+}
+
+function toDateStr(val) {
+  if (!val) return "";
+  if (val instanceof Date) return val.toISOString().split("T")[0];
+  return String(val).split("T")[0];
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -125,14 +118,14 @@ export default function ProfessorScheduleAvailability() {
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [messages, setMessages] = useState([{ id: 1, type: "bot", text: "Hello! 👋 I'm your OAMS Assistant. How can I help with your schedule?", timestamp: new Date() }]);
+  const [messages, setMessages] = useState([{ id: 1, type: "bot", text: "Hello! I'm your OAMS Assistant. How can I help with your schedule?", timestamp: new Date() }]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
   // ── Data ────────────────────────────────────────────────────────────────────
-  const [availRows, setAvailRows] = useState([]);
-  const [blockedDates, setBlockedDates] = useState([]);
-  const [calendarLoading, setCalendarLoading] = useState(true);
+  // All slots indexed by "YYYY-MM-DD" for fast lookup
+  const [slotsByDate, setSlotsByDate] = useState({});
+  const [loading, setLoading] = useState(true);
 
   // ── Calendar state ──────────────────────────────────────────────────────────
   const now = new Date();
@@ -140,37 +133,33 @@ export default function ProfessorScheduleAvailability() {
   const [calMonth, setCalMonth] = useState(now.getMonth() + 1);
   const [calDays, setCalDays] = useState([]);
 
-  // ── "Add slot" form ─────────────────────────────────────────────────────────
+  // ── Selected date / Add slot form ───────────────────────────────────────────
+  const [selectedDate, setSelectedDate] = useState(null); // "YYYY-MM-DD"
   const [showAddSlot, setShowAddSlot] = useState(false);
-  const [addDay, setAddDay] = useState("Monday");
+  const [addDate, setAddDate] = useState("");
   const [addStart, setAddStart] = useState("");
   const [addEnd, setAddEnd] = useState("");
   const [addLocation, setAddLocation] = useState("");
   const [addSaving, setAddSaving] = useState(false);
 
-  // ── "Block date" dialog ─────────────────────────────────────────────────────
-  const [showBlockDialog, setShowBlockDialog] = useState(false);
-  const [blockDate, setBlockDate] = useState("");
-  const [blockReason, setBlockReason] = useState("");
-  const [blockSaving, setBlockSaving] = useState(false);
+  const todayStr = now.toISOString().split("T")[0];
 
-  // ── "Day detail" panel ──────────────────────────────────────────────────────
-  const [detailDate, setDetailDate] = useState(null); // "YYYY-MM-DD"
-
-  // ── Fetch ───────────────────────────────────────────────────────────────────
+  // ── Fetch date-specific availability ────────────────────────────────────────
   const fetchAll = async () => {
-    setCalendarLoading(true);
+    setLoading(true);
     try {
-      const [aRes, bRes] = await Promise.all([
-        api.get("/faculty/availability"),
-        api.get("/faculty/blocked-dates"),
-      ]);
-      setAvailRows(aRes.data);
-      setBlockedDates(bRes.data);
+      const res = await api.get("/faculty/date-availability");
+      const map = {};
+      res.data.forEach((slot) => {
+        const d = toDateStr(slot.available_date);
+        if (!map[d]) map[d] = [];
+        map[d].push(slot);
+      });
+      setSlotsByDate(map);
     } catch {
       toast.error("Failed to load schedule data");
     } finally {
-      setCalendarLoading(false);
+      setLoading(false);
     }
   };
 
@@ -178,67 +167,69 @@ export default function ProfessorScheduleAvailability() {
 
   // Rebuild calendar days whenever data or displayed month changes
   useEffect(() => {
-    if (calendarLoading) return;
-    const availDaySet = new Set(availRows.map((r) => r.day_of_week));
-    const blockedMap = {};
-    blockedDates.forEach((b) => {
-      const key = new Date(b.blocked_date).toISOString().split("T")[0];
-      blockedMap[key] = b.reason ?? "";
-    });
-
+    if (loading) return;
     const daysInMonth = new Date(calYear, calMonth, 0).getDate();
     const days = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(calYear, calMonth - 1, d);
       const dateStr = date.toISOString().split("T")[0];
-      const dayName = DAY_NAMES[date.getDay()];
-      let status = "unavailable";
-      let reason = undefined;
-      if (blockedMap[dateStr] !== undefined) {
-        status = "blocked";
-        reason = blockedMap[dateStr] || undefined;
-      } else if (availDaySet.has(dayName)) {
-        status = "available";
-      }
-      const entry = { date: dateStr, status };
-      if (reason) entry.reason = reason;
-      days.push(entry);
+      const hasSlots = !!(slotsByDate[dateStr]?.length);
+      days.push({ date: dateStr, status: hasSlots ? "available" : "unavailable" });
     }
     setCalDays(days);
-  }, [availRows, blockedDates, calYear, calMonth, calendarLoading]);
+  }, [slotsByDate, calYear, calMonth, loading]);
 
   // ── Calendar nav ────────────────────────────────────────────────────────────
   const handlePrevMonth = () => {
-    setDetailDate(null);
+    setSelectedDate(null);
     if (calMonth === 1) { setCalYear((y) => y - 1); setCalMonth(12); }
     else setCalMonth((m) => m - 1);
   };
   const handleNextMonth = () => {
-    setDetailDate(null);
+    setSelectedDate(null);
     if (calMonth === 12) { setCalYear((y) => y + 1); setCalMonth(1); }
     else setCalMonth((m) => m + 1);
   };
 
-  const handleDateClick = (date, status) => {
-    if (status === "available") setDetailDate(date === detailDate ? null : date);
+  const handleDateClick = (date) => {
+    setSelectedDate(date === selectedDate ? null : date);
   };
 
-  // ── Add availability slot ───────────────────────────────────────────────────
+  // ── Open "Add Slot" modal ───────────────────────────────────────────────────
+  const openAddSlot = (date) => {
+    setAddDate(date ?? todayStr);
+    setAddStart("");
+    setAddEnd("");
+    setAddLocation("");
+    setShowAddSlot(true);
+  };
+
+  // ── Save new slot ───────────────────────────────────────────────────────────
   const handleAddSlot = async () => {
-    if (!addStart || !addEnd || !addLocation.trim()) { toast.error("Please fill in all fields"); return; }
+    if (!addDate || !addStart || !addEnd || !addLocation.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
     if (addEnd <= addStart) { toast.error("End time must be after start time"); return; }
-    const duplicate = availRows.some(
-      (r) => r.day_of_week === addDay &&
-             r.start_time.substring(0, 5) === addStart &&
-             r.end_time.substring(0, 5) === addEnd
+    if (addDate < todayStr) { toast.error("Cannot add availability in the past"); return; }
+
+    const existingForDate = slotsByDate[addDate] ?? [];
+    const duplicate = existingForDate.some(
+      (s) => s.start_time.substring(0, 5) === addStart && s.end_time.substring(0, 5) === addEnd
     );
-    if (duplicate) { toast.error("A slot with the same day and time already exists"); return; }
+    if (duplicate) { toast.error("A slot with the same date and time already exists"); return; }
+
     setAddSaving(true);
     try {
-      await api.post("/faculty/availability", { day_of_week: addDay, start_time: addStart, end_time: addEnd, location: addLocation.trim() });
+      await api.post("/faculty/date-availability", {
+        available_date: addDate,
+        start_time: addStart,
+        end_time: addEnd,
+        location: addLocation.trim(),
+      });
       toast.success("Time slot added");
       setShowAddSlot(false);
-      setAddStart(""); setAddEnd(""); setAddLocation("");
+      if (!selectedDate) setSelectedDate(addDate);
       await fetchAll();
     } catch (err) {
       const msg = err?.response?.data?.message ?? "Failed to add time slot";
@@ -246,60 +237,23 @@ export default function ProfessorScheduleAvailability() {
     } finally { setAddSaving(false); }
   };
 
-  // ── Delete availability slot ────────────────────────────────────────────────
-  const handleDeleteSlot = async (id) => {
-    if (!confirm("Remove this time slot? This will affect all future weeks.")) return;
+  // ── Delete slot ─────────────────────────────────────────────────────────────
+  const handleDeleteSlot = async (id, date) => {
+    if (!confirm("Remove this time slot?")) return;
     try {
-      await api.delete(`/faculty/availability/${id}`);
+      await api.delete(`/faculty/date-availability/${id}`);
       toast.success("Time slot removed");
       await fetchAll();
+      // If this was the last slot for the selected date, deselect it
+      const remaining = (slotsByDate[date] ?? []).filter((s) => s.id !== id);
+      if (remaining.length === 0 && selectedDate === date) setSelectedDate(null);
     } catch { toast.error("Failed to remove time slot"); }
   };
 
-  // ── Block a specific date ───────────────────────────────────────────────────
-  const openBlockDialog = (date) => { setBlockDate(date ?? ""); setBlockReason(""); setShowBlockDialog(true); };
-
-  const handleBlockDate = async () => {
-    if (!blockDate) { toast.error("Please select a date"); return; }
-    setBlockSaving(true);
-    try {
-      await api.post("/faculty/blocked-dates", { date: blockDate, reason: blockReason.trim() || undefined });
-      toast.success("Date blocked");
-      setShowBlockDialog(false);
-      setDetailDate(null);
-      await fetchAll();
-    } catch { toast.error("Failed to block date"); }
-    finally { setBlockSaving(false); }
-  };
-
-  // ── Unblock a date ──────────────────────────────────────────────────────────
-  const handleUnblock = async (blockedId, date) => {
-    if (!confirm(`Unblock ${date}?`)) return;
-    try {
-      await api.delete(`/faculty/blocked-dates/${blockedId}`);
-      toast.success("Date unblocked");
-      if (detailDate === date) setDetailDate(null);
-      await fetchAll();
-    } catch { toast.error("Failed to unblock date"); }
-  };
-
-  // ── Grouped weekly patterns ─────────────────────────────────────────────────
-  const slotsByDay = {};
-  ORDERED_DAYS.forEach((d) => { slotsByDay[d] = []; });
-  availRows.forEach((r) => {
-    if (slotsByDay[r.day_of_week]) slotsByDay[r.day_of_week].push(r);
-  });
-
-  // ── Detail panel data ───────────────────────────────────────────────────────
-  const detailDayName = detailDate ? DAY_NAMES[new Date(detailDate + "T00:00:00").getDay()] : null;
-  const detailSlots = detailDate ? (slotsByDay[detailDayName] ?? []) : [];
-  const detailBlocked = detailDate ? blockedDates.find((b) => new Date(b.blocked_date).toISOString().split("T")[0] === detailDate) : null;
-
-  // ── Upcoming blocked dates (future only) ───────────────────────────────────
-  const todayStr = new Date().toISOString().split("T")[0];
-  const upcomingBlocked = blockedDates
-    .filter((b) => new Date(b.blocked_date).toISOString().split("T")[0] >= todayStr)
-    .sort((a, b) => new Date(a.blocked_date) - new Date(b.blocked_date));
+  // ── Upcoming availability list (today + future, sorted) ─────────────────────
+  const upcomingDates = Object.keys(slotsByDate)
+    .filter((d) => d >= todayStr)
+    .sort();
 
   // ── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -316,7 +270,7 @@ export default function ProfessorScheduleAvailability() {
     setMessages([...messages, userMsg]);
     setInputValue("");
     setTimeout(() => {
-      const bot = { id: messages.length + 2, type: "bot", text: "You can add weekly time slots in the panel below, or block specific dates by clicking a green day in the calendar.", timestamp: new Date() };
+      const bot = { id: messages.length + 2, type: "bot", text: "Click any date in the calendar to add time slots for that specific date. Green dates already have availability set.", timestamp: new Date() };
       setMessages((prev) => [...prev, bot]);
     }, 600);
   };
@@ -327,6 +281,8 @@ export default function ProfessorScheduleAvailability() {
     { icon: DocumentIconNav, label: "Documents", path: "/professor/documents" },
     { icon: HistoryIconNav, label: "Transactions", path: "/professor/transactions" },
   ];
+
+  const selectedSlots = selectedDate ? (slotsByDate[selectedDate] ?? []) : [];
 
   return (
     <div className="dashboard-with-sidebar">
@@ -394,17 +350,12 @@ export default function ProfessorScheduleAvailability() {
           {/* Page Header */}
           <div className="sa-page-header">
             <div>
-              <h1 className="sa-page-title">Schedule Management</h1>
-              <p className="sa-page-desc">Set your weekly availability and block specific dates</p>
+              <h1 className="sa-page-title">Schedule Availability</h1>
+              <p className="sa-page-desc">Set your available dates and times. Each date is set independently.</p>
             </div>
-            <div className="sa-header-actions">
-              <button className="sa-action-btn sa-action-btn--primary" onClick={() => setShowAddSlot(true)}>
-                <PlusIcon /> Add Time Slot
-              </button>
-              <button className="sa-action-btn sa-action-btn--danger" onClick={() => openBlockDialog("")}>
-                <BanIcon /> Block a Date
-              </button>
-            </div>
+            <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDate ?? todayStr)}>
+              <PlusIcon /> Add Time Slot
+            </button>
           </div>
 
           {/* Two-column layout: Calendar + Detail panel */}
@@ -412,133 +363,119 @@ export default function ProfessorScheduleAvailability() {
             {/* Left: Calendar */}
             <div className="sa-calendar-card">
               <h2 className="sa-section-heading">Monthly Overview</h2>
-              <p className="sa-section-desc">Click a green date to view or block it</p>
+              <p className="sa-section-desc">Green dates have availability set. Click any date to manage its slots.</p>
               <CalendarGrid
                 year={calYear}
                 month={calMonth}
                 days={calDays}
-                selectedDate={detailDate ?? ""}
-                onDateClick={handleDateClick}
+                selectedDate={selectedDate ?? ""}
+                onDateClick={(date) => handleDateClick(date)}
                 onPrevMonth={handlePrevMonth}
                 onNextMonth={handleNextMonth}
                 disablePast={false}
-                loading={calendarLoading}
+                loading={loading}
               />
             </div>
 
             {/* Right: Detail panel */}
             <div className="sa-detail-panel">
-              {detailDate ? (
+              {selectedDate ? (
                 <>
-                  <h2 className="sa-section-heading">
-                    {new Date(detailDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-                  </h2>
-                  {detailBlocked ? (
-                    <div className="sa-blocked-notice">
-                      <BanIcon />
-                      <div>
-                        <p className="sa-blocked-label">This date is blocked</p>
-                        {detailBlocked.reason && <p className="sa-blocked-reason">Reason: {detailBlocked.reason}</p>}
-                      </div>
-                      <button className="sa-unblock-btn" onClick={() => handleUnblock(detailBlocked.blocked_id, detailDate)}>
-                        <CheckIcon /> Unblock
-                      </button>
+                  <div className="sa-detail-header-row">
+                    <h2 className="sa-section-heading">
+                      {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                    </h2>
+                    <button
+                      className="sa-action-btn sa-action-btn--primary sa-btn-sm"
+                      onClick={() => openAddSlot(selectedDate)}
+                      disabled={selectedDate < todayStr}
+                      title={selectedDate < todayStr ? "Cannot add slots to past dates" : "Add a time slot for this date"}
+                    >
+                      <PlusIcon /> Add Slot
+                    </button>
+                  </div>
+
+                  {selectedSlots.length === 0 ? (
+                    <div className="sa-detail-empty">
+                      <p>No time slots set for this date.</p>
+                      {selectedDate >= todayStr && (
+                        <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDate)}>
+                          <PlusIcon /> Add your first slot
+                        </button>
+                      )}
                     </div>
                   ) : (
-                    <>
-                      <p className="sa-section-desc">Recurring slots for every <strong>{detailDayName}</strong>:</p>
-                      {detailSlots.length === 0 ? (
-                        <p className="sa-empty-text">No time slots set for {detailDayName}s.</p>
-                      ) : (
-                        <div className="sa-slot-list">
-                          {detailSlots.map((s) => (
-                            <div key={s.availability_id} className="sa-slot-row">
-                              <ClockIcon />
-                              <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
-                              {s.location && <span className="sa-slot-location">· {s.location}</span>}
-                            </div>
-                          ))}
+                    <div className="sa-slot-list">
+                      {selectedSlots.map((s) => (
+                        <div key={s.id} className="sa-slot-row">
+                          <ClockIcon />
+                          <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                          {s.location && <span className="sa-slot-location">· {s.location}</span>}
+                          {selectedDate >= todayStr && (
+                            <button className="sa-delete-btn" onClick={() => handleDeleteSlot(s.id, selectedDate)} title="Remove slot">
+                              <TrashIcon />
+                            </button>
+                          )}
                         </div>
-                      )}
-                      <button className="sa-action-btn sa-action-btn--danger sa-block-date-btn" onClick={() => openBlockDialog(detailDate)}>
-                        <BanIcon /> Block this date
-                      </button>
-                    </>
+                      ))}
+                    </div>
                   )}
                 </>
               ) : (
                 <div className="sa-detail-placeholder">
                   <CalendarIconNav />
-                  <p>Click a green date in the calendar to view its slots or block it for a specific day.</p>
+                  <p>Click any date in the calendar to view or add time slots for that specific date.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Weekly Patterns Section */}
+          {/* Upcoming Availability List */}
           <div className="sa-weekly-section">
             <div className="sa-section-header-row">
               <div>
-                <h2 className="sa-section-heading">Weekly Availability</h2>
-                <p className="sa-section-desc">Recurring time slots that repeat every week</p>
+                <h2 className="sa-section-heading">Upcoming Availability</h2>
+                <p className="sa-section-desc">Dates you have set as available from today onward</p>
               </div>
-              <button className="sa-action-btn sa-action-btn--primary" onClick={() => setShowAddSlot(true)}>
+              <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(todayStr)}>
                 <PlusIcon /> Add Slot
               </button>
             </div>
 
-            <div className="sa-weekly-grid">
-              {ORDERED_DAYS.map((day) => {
-                const slots = slotsByDay[day];
-                return (
-                  <div key={day} className={`sa-day-col ${slots.length > 0 ? "sa-day-col--active" : ""}`}>
-                    <p className="sa-day-col-name">{day}</p>
-                    {slots.length === 0 ? (
-                      <p className="sa-day-col-empty">No slots</p>
-                    ) : (
-                      slots.map((s) => (
-                        <div key={s.availability_id} className="sa-weekly-slot">
-                          <div className="sa-weekly-slot-info">
-                            <span className="sa-weekly-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
-                            {s.location && <span className="sa-weekly-loc">{s.location}</span>}
-                          </div>
-                          <button className="sa-delete-btn" onClick={() => handleDeleteSlot(s.availability_id)} title="Remove slot">
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Upcoming Blocked Dates */}
-          {upcomingBlocked.length > 0 && (
-            <div className="sa-blocked-section">
-              <h2 className="sa-section-heading">Upcoming Blocked Dates</h2>
-              <p className="sa-section-desc">Specific dates you have marked unavailable</p>
-              <div className="sa-blocked-list">
-                {upcomingBlocked.map((b) => {
-                  const dateStr = new Date(b.blocked_date).toISOString().split("T")[0];
+            {upcomingDates.length === 0 ? (
+              <div className="sa-empty-upcoming">
+                <p>No upcoming availability set. Click a date on the calendar or use "Add Time Slot" to get started.</p>
+              </div>
+            ) : (
+              <div className="sa-upcoming-list">
+                {upcomingDates.map((date) => {
+                  const slots = slotsByDate[date] ?? [];
+                  const label = new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
                   return (
-                    <div key={b.blocked_id} className="sa-blocked-item">
-                      <div className="sa-blocked-item-info">
-                        <span className="sa-blocked-item-date">
-                          {new Date(b.blocked_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                        </span>
-                        {b.reason && <span className="sa-blocked-item-reason">{b.reason}</span>}
+                    <div
+                      key={date}
+                      className={`sa-upcoming-item ${selectedDate === date ? "sa-upcoming-item--selected" : ""}`}
+                      onClick={() => { setSelectedDate(date); setCalYear(Number(date.slice(0, 4))); setCalMonth(Number(date.slice(5, 7))); }}
+                    >
+                      <div className="sa-upcoming-date-col">
+                        <span className="sa-upcoming-date-label">{label}</span>
+                        <span className="sa-upcoming-count">{slots.length} slot{slots.length !== 1 ? "s" : ""}</span>
                       </div>
-                      <button className="sa-unblock-btn" onClick={() => handleUnblock(b.blocked_id, dateStr)}>
-                        <CheckIcon /> Unblock
-                      </button>
+                      <div className="sa-upcoming-slots-col">
+                        {slots.map((s) => (
+                          <div key={s.id} className="sa-upcoming-slot-chip">
+                            <ClockIcon />
+                            <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                            {s.location && <span className="sa-chip-location">· {s.location}</span>}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
         </div>
       </main>
@@ -550,15 +487,19 @@ export default function ProfessorScheduleAvailability() {
         <div className="sa-modal-overlay" onClick={() => setShowAddSlot(false)}>
           <div className="sa-modal" onClick={(e) => e.stopPropagation()}>
             <div className="sa-modal-header">
-              <h3>Add Weekly Time Slot</h3>
-              <p>This slot will repeat every week on the selected day</p>
+              <h3>Add Time Slot</h3>
+              <p>Set your availability for a specific date and time</p>
             </div>
             <div className="sa-modal-body">
               <div className="sa-form-group">
-                <label>Day of Week *</label>
-                <select className="sa-select" value={addDay} onChange={(e) => setAddDay(e.target.value)}>
-                  {ORDERED_DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
+                <label>Date *</label>
+                <input
+                  className="sa-input"
+                  type="date"
+                  value={addDate}
+                  min={todayStr}
+                  onChange={(e) => setAddDate(e.target.value)}
+                />
               </div>
               <div className="sa-form-row">
                 <div className="sa-form-group">
@@ -572,41 +513,19 @@ export default function ProfessorScheduleAvailability() {
               </div>
               <div className="sa-form-group">
                 <label>Location *</label>
-                <input className="sa-input" type="text" placeholder="e.g. Room 301, Faculty Office" value={addLocation} onChange={(e) => setAddLocation(e.target.value)} />
+                <input
+                  className="sa-input"
+                  type="text"
+                  placeholder="e.g. Room 301, Faculty Office"
+                  value={addLocation}
+                  onChange={(e) => setAddLocation(e.target.value)}
+                />
               </div>
             </div>
             <div className="sa-modal-footer">
               <button className="sa-btn sa-btn--outline" onClick={() => setShowAddSlot(false)}>Cancel</button>
               <button className="sa-btn sa-btn--primary" onClick={handleAddSlot} disabled={addSaving}>
                 {addSaving ? "Saving…" : "Add Slot"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Block Date Modal ── */}
-      {showBlockDialog && (
-        <div className="sa-modal-overlay" onClick={() => setShowBlockDialog(false)}>
-          <div className="sa-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sa-modal-header">
-              <h3>Block a Specific Date</h3>
-              <p>Students won't be able to book on this date</p>
-            </div>
-            <div className="sa-modal-body">
-              <div className="sa-form-group">
-                <label>Date *</label>
-                <input className="sa-input" type="date" value={blockDate} min={todayStr} onChange={(e) => setBlockDate(e.target.value)} />
-              </div>
-              <div className="sa-form-group">
-                <label>Reason (optional)</label>
-                <textarea className="sa-textarea" rows={3} placeholder="e.g. Attending conference, Medical leave…" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} />
-              </div>
-            </div>
-            <div className="sa-modal-footer">
-              <button className="sa-btn sa-btn--outline" onClick={() => setShowBlockDialog(false)}>Cancel</button>
-              <button className="sa-btn sa-btn--danger" onClick={handleBlockDate} disabled={blockSaving || !blockDate}>
-                {blockSaving ? "Blocking…" : "Block Date"}
               </button>
             </div>
           </div>

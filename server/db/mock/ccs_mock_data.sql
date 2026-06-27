@@ -671,3 +671,67 @@ INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time,
 -- 111 Marco Dela Cruz
 (111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
 (111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401');
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 14B · FACULTY DATE-SPECIFIC AVAILABILITY
+-- Mirrors old weekly patterns as concrete upcoming dates
+-- Based on: today = 2026-06-27 (Saturday)
+--   Mon Jun 29, Tue Jun 30, Wed Jul 01, Thu Jul 02, Fri Jul 03
+--   Mon Jul 06, Tue Jul 07, Wed Jul 08, Thu Jul 09, Fri Jul 10
+--   Mon Jul 13, Tue Jul 14, Wed Jul 15, Thu Jul 16, Fri Jul 17
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, location) VALUES
+
+-- 102 Patrick Ogalesco (Mon AM+PM, Wed AM, Fri PM) — skips Jul 6 to simulate real-life gap
+('102', '2026-06-29', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+('102', '2026-06-29', '14:00:00', '17:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-01', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-03', '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-08', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-08', '14:00:00', '17:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-10', '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-13', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-15', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
+('102', '2026-07-17', '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
+
+-- 106 Marvin Bicua (Tue AM+PM, Thu AM+PM) — skips Jul 14 to simulate conflict
+('106', '2026-06-30', '10:00:00', '12:00:00', 'CCS Faculty Room 203'),
+('106', '2026-06-30', '14:00:00', '17:00:00', 'CCS Faculty Room 203'),
+('106', '2026-07-02', '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
+('106', '2026-07-02', '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
+('106', '2026-07-07', '10:00:00', '12:00:00', 'CCS Faculty Room 203'),
+('106', '2026-07-09', '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
+('106', '2026-07-09', '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
+('106', '2026-07-16', '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
+('106', '2026-07-16', '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
+
+-- 107 Janus Raymond Tan (Mon AM, Wed AM+PM, Fri AM)
+('107', '2026-06-29', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-01', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-01', '14:00:00', '16:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-03', '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-06', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-08', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-10', '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-13', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-15', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-15', '14:00:00', '16:00:00', 'CCS Dean\'s Office'),
+('107', '2026-07-17', '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
+
+-- 110 Lena Villanueva (Mon PM, Wed AM, Fri PM) — skips Jul 10 (out of office)
+('110', '2026-06-29', '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
+('110', '2026-07-01', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
+('110', '2026-07-03', '14:00:00', '17:00:00', 'CCS Faculty Room 105'),
+('110', '2026-07-06', '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
+('110', '2026-07-08', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
+('110', '2026-07-13', '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
+('110', '2026-07-15', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
+('110', '2026-07-17', '14:00:00', '17:00:00', 'CCS Faculty Room 105'),
+
+-- 111 Marco Dela Cruz (Tue AM, Thu PM)
+('111', '2026-06-30', '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
+('111', '2026-07-02', '13:00:00', '17:00:00', 'CCS Faculty Room 401'),
+('111', '2026-07-07', '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
+('111', '2026-07-09', '13:00:00', '17:00:00', 'CCS Faculty Room 401'),
+('111', '2026-07-14', '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
+('111', '2026-07-16', '13:00:00', '17:00:00', 'CCS Faculty Room 401');

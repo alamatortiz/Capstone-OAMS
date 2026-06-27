@@ -1125,15 +1125,13 @@ router.get(
       }
 
       const facultyIds = facultyList.map((f) => f.faculty_id);
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dayName = days[new Date().getDay()];
 
       const [availabilityRows] = await pool.query(
         `SELECT faculty_id, start_time, end_time, location
-         FROM faculty_availability
-         WHERE faculty_id IN (?) AND day_of_week = ?
+         FROM faculty_date_availability
+         WHERE faculty_id IN (?) AND available_date = CURDATE()
          ORDER BY faculty_id, start_time`,
-        [facultyIds, dayName],
+        [facultyIds],
       );
 
       const [appointmentRows] = await pool.query(

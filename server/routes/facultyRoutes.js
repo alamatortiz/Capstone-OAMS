@@ -571,6 +571,93 @@ router.delete(
 );
 
 // ─────────────────────────────────────────────────────────────
+// DATE-SPECIFIC AVAILABILITY (replaces recurring day_of_week model)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/date-availability
+// Optional query: ?year=2026&month=6  → filters to that month
+router.get(
+  "/date-availability",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { year, month } = req.query;
+    try {
+      let query = "SELECT * FROM faculty_date_availability WHERE faculty_id = ?";
+      const params = [facultyId];
+      if (year && month) {
+        query += " AND YEAR(available_date) = ? AND MONTH(available_date) = ?";
+        params.push(Number(year), Number(month));
+      }
+      query += " ORDER BY available_date ASC, start_time ASC";
+      const [rows] = await pool.query(query, params);
+      res.json(rows);
+    } catch (err) {
+      console.error("GET /date-availability error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// POST /api/faculty/date-availability
+// Body: { available_date, start_time, end_time, location }
+router.post(
+  "/date-availability",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { available_date, start_time, end_time, location } = req.body;
+    if (!available_date || !start_time || !end_time) {
+      return res.status(400).json({ message: "available_date, start_time, end_time are required" });
+    }
+    if (end_time <= start_time) {
+      return res.status(400).json({ message: "end_time must be after start_time" });
+    }
+    try {
+      const [existing] = await pool.query(
+        "SELECT id FROM faculty_date_availability WHERE faculty_id = ? AND available_date = ? AND start_time = ? AND end_time = ?",
+        [facultyId, available_date, start_time, end_time]
+      );
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "A slot with the same date and time already exists" });
+      }
+      const [result] = await pool.query(
+        "INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, location) VALUES (?,?,?,?,?)",
+        [facultyId, available_date, start_time, end_time, location ?? null]
+      );
+      res.status(201).json({ id: result.insertId, message: "Availability slot added" });
+    } catch (err) {
+      console.error("POST /date-availability error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// DELETE /api/faculty/date-availability/:id
+router.delete(
+  "/date-availability/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    try {
+      const [result] = await pool.query(
+        "DELETE FROM faculty_date_availability WHERE id = ? AND faculty_id = ?",
+        [id, facultyId]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Slot not found" });
+      res.json({ message: "Slot deleted" });
+    } catch (err) {
+      console.error("DELETE /date-availability/:id error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
 // ANNOUNCEMENTS (stored in faqs table)
 // ─────────────────────────────────────────────────────────────
 

@@ -1605,19 +1605,17 @@ router.get(
            f.specialization,
            f.email,
            f.department_id,
-           fa.availability_id,
-           fa.day_of_week,
-           fa.start_time,
-           fa.end_time,
-           fa.location
+           fda.id AS availability_id,
+           fda.available_date,
+           fda.start_time,
+           fda.end_time,
+           fda.location
          FROM faculty f
-         LEFT JOIN faculty_availability fa ON fa.faculty_id = f.faculty_id
-         ORDER BY f.department_id, f.last_name ASC,
-           CASE fa.day_of_week
-             WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3
-             WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 ELSE 6
-           END,
-           fa.start_time ASC`,
+         LEFT JOIN faculty_date_availability fda
+           ON fda.faculty_id = f.faculty_id
+           AND fda.available_date >= CURDATE()
+           AND fda.available_date < CURDATE() + INTERVAL 30 DAY
+         ORDER BY f.department_id, f.last_name ASC, fda.available_date ASC, fda.start_time ASC`,
       );
 
       // Group rows -> faculty (faculty_id -> { ...info, availability: [] })
@@ -1635,8 +1633,12 @@ router.get(
           });
         }
         if (row.availability_id) {
+          const dateStr =
+            row.available_date instanceof Date
+              ? row.available_date.toISOString().split("T")[0]
+              : String(row.available_date).split("T")[0];
           facultyMap.get(row.faculty_id).availability.push({
-            day: row.day_of_week,
+            date: dateStr,
             timeStart: formatTime12h(row.start_time),
             timeEnd: formatTime12h(row.end_time),
             location: row.location ?? "TBA",
@@ -1773,32 +1775,35 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
-// BOOKING SLOTS ENDPOINTS (derived from faculty_availability)
+// BOOKING SLOTS ENDPOINTS (derived from faculty_date_availability)
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/student/appointments/available-slots
-// Expands each faculty_availability row into per-day "slots" for the next
-// 14 days, with live capacity computed from the appointments table.
+// Returns date-specific availability slots for the next 30 days,
+// with live capacity computed from the appointments table.
 router.get(
   "/appointments/available-slots",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
-    const DAYS_AHEAD = 14;
+    const DAYS_AHEAD = 30;
 
     try {
       const [availability] = await pool.query(
         `SELECT
-           fa.availability_id, fa.faculty_id, fa.day_of_week,
-           fa.start_time, fa.end_time, fa.location,
+           fda.id AS availability_id, fda.faculty_id, fda.available_date,
+           fda.start_time, fda.end_time, fda.location,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.specialization,
            d.department_abbreviation AS college,
            d.department_id
-         FROM faculty_availability fa
-         JOIN faculty f ON fa.faculty_id = f.faculty_id
+         FROM faculty_date_availability fda
+         JOIN faculty f ON fda.faculty_id = f.faculty_id
          JOIN departments d ON f.department_id = d.department_id
-         ORDER BY fa.faculty_id, fa.day_of_week, fa.start_time`,
+         WHERE fda.available_date >= CURDATE()
+           AND fda.available_date < CURDATE() + INTERVAL ? DAY
+         ORDER BY fda.available_date ASC, fda.faculty_id, fda.start_time`,
+        [DAYS_AHEAD],
       );
 
       if (availability.length === 0) {
@@ -1807,8 +1812,6 @@ router.get(
 
       const facultyIds = [...new Set(availability.map((a) => a.faculty_id))];
 
-      // Pull every non-cancelled/rejected appointment for these faculty
-      // within the visible window, so we can compute live capacity.
       const [existing] = await pool.query(
         `SELECT faculty_id, appointment_date, appointment_time
          FROM appointments
@@ -1833,61 +1836,44 @@ router.get(
         );
       }
 
-      const DAY_NAMES = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-      ];
-
       const now = new Date();
       const slots = [];
 
-      for (let offset = 0; offset < DAYS_AHEAD; offset++) {
-        const d = new Date();
-        d.setDate(d.getDate() + offset);
-        const dateStr = d.toISOString().split("T")[0];
-        const dayName = DAY_NAMES[d.getDay()];
+      for (const a of availability) {
+        const dateStr =
+          a.available_date instanceof Date
+            ? a.available_date.toISOString().split("T")[0]
+            : String(a.available_date).split("T")[0];
 
-        for (const a of availability) {
-          if (a.day_of_week !== dayName) continue;
+        // Skip windows that have already fully elapsed today
+        const windowEnd = new Date(`${dateStr}T${a.end_time}`);
+        if (windowEnd <= now) continue;
 
-          // Skip windows that have already fully elapsed today
-          const windowEnd = new Date(`${dateStr}T${a.end_time}`);
-          if (windowEnd <= now) continue;
+        const startMin = timeStrToMinutes(a.start_time);
+        const endMin = timeStrToMinutes(a.end_time);
+        const maxSlots = Math.max(1, Math.floor((endMin - startMin) / 30));
 
-          const startMin = timeStrToMinutes(a.start_time);
-          const endMin = timeStrToMinutes(a.end_time);
-          // Each 30-minute increment within the window is one bookable slot
-          const maxSlots = Math.max(1, Math.floor((endMin - startMin) / 30));
+        const key = `${a.faculty_id}|${dateStr}`;
+        const currentBookings = Math.min(
+          maxSlots,
+          bookedCountByFacultyDate.get(key) || 0,
+        );
 
-          const key = `${a.faculty_id}|${dateStr}`;
-          const currentBookings = Math.min(
-            maxSlots,
-            bookedCountByFacultyDate.get(key) || 0,
-          );
+        if (currentBookings >= maxSlots) continue;
 
-          // Fully booked windows are simply omitted (matches old UI behavior
-          // of available slots only showing slots with room)
-          if (currentBookings >= maxSlots) continue;
-
-          slots.push({
-            id: `${a.availability_id}_${dateStr}`,
-            availabilityId: a.availability_id,
-            professorId: a.faculty_id,
-            professorName: a.faculty_name,
-            college: a.college,
-            date: dateStr,
-            startTime: a.start_time,
-            endTime: a.end_time,
-            location: a.location ?? "TBA",
-            maxSlots,
-            currentBookings,
-          });
-        }
+        slots.push({
+          id: `${a.availability_id}_${dateStr}`,
+          availabilityId: a.availability_id,
+          professorId: a.faculty_id,
+          professorName: a.faculty_name,
+          college: a.college,
+          date: dateStr,
+          startTime: a.start_time,
+          endTime: a.end_time,
+          location: a.location ?? "TBA",
+          maxSlots,
+          currentBookings,
+        });
       }
 
       res.json({ slots });
