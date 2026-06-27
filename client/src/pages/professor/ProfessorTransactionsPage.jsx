@@ -386,56 +386,57 @@ export default function ProfessorTransactionsPage() {
           </div>
 
           {/* Page header */}
-          <div className="transactions-page-header">
-            <h1>Transaction History</h1>
-            <p>View all your activities and transactions</p>
+          <div className="txn-page-header">
+            <div className="txn-title-section">
+              <div className="txn-title-icon">
+                <ActivityIcon />
+              </div>
+              <div>
+                <h1 className="txn-page-title">Transaction History</h1>
+                <p className="txn-page-subtitle">View all your activities and transactions</p>
+              </div>
+            </div>
           </div>
 
           {/* Stats */}
           <div className="transactions-stats-grid">
-            <div className="txn-stat-card primary">
-              <div className="txn-stat-info">
-                <p>Total Transactions</p>
-                <p className="txn-stat-value primary">{stats.total}</p>
-              </div>
-              <div className="txn-stat-icon primary"><ActivityIcon /></div>
+            <div className="txn-stat-card">
+              <div className="txn-stat-icon-box txn-icon-box-blue"><ActivityIcon /></div>
+              <p className="txn-stat-label">Total Transactions</p>
+              <p className="txn-stat-value txn-val-blue">{stats.total}</p>
             </div>
-
-            <div className="txn-stat-card blue">
-              <div className="txn-stat-info">
-                <p>Queue Services</p>
-                <p className="txn-stat-value blue">{stats.queue}</p>
-              </div>
-              <div className="txn-stat-icon blue"><UserIcon /></div>
+            <div className="txn-stat-card">
+              <div className="txn-stat-icon-box txn-icon-box-cyan"><UserIcon /></div>
+              <p className="txn-stat-label">Queue Services</p>
+              <p className="txn-stat-value txn-val-cyan">{stats.queue}</p>
             </div>
-
-            <div className="txn-stat-card green">
-              <div className="txn-stat-info">
-                <p>Appointments</p>
-                <p className="txn-stat-value green">{stats.appointments}</p>
-              </div>
-              <div className="txn-stat-icon green"><CalendarSmIcon /></div>
+            <div className="txn-stat-card">
+              <div className="txn-stat-icon-box txn-icon-box-green"><CalendarSmIcon /></div>
+              <p className="txn-stat-label">Appointments</p>
+              <p className="txn-stat-value txn-val-green">{stats.appointments}</p>
             </div>
-
-            <div className="txn-stat-card purple">
-              <div className="txn-stat-info">
-                <p>Documents</p>
-                <p className="txn-stat-value purple">{stats.documents}</p>
-              </div>
-              <div className="txn-stat-icon purple"><FileTextIconSm /></div>
+            <div className="txn-stat-card">
+              <div className="txn-stat-icon-box txn-icon-box-orange"><FileTextIconSm /></div>
+              <p className="txn-stat-label">Documents</p>
+              <p className="txn-stat-value txn-val-orange">{stats.documents}</p>
             </div>
           </div>
 
-          {/* Transaction log */}
-          <div className="transactions-log-card">
-            <div className="transactions-log-card-header">
-              <h2>Transaction Log</h2>
-              <p>Complete history of your activities</p>
+          {/* Filters */}
+          <div className="txn-filter-card">
+            <div className="txn-filters-header">
+              <div>
+                <h3 className="txn-filters-title">Transaction Filter</h3>
+                <p className="txn-filters-desc">Search and filter transactions</p>
+              </div>
+              <button className="txn-export-btn">
+                <DownloadIcon />
+                Export
+              </button>
             </div>
-
-            <div className="transactions-log-card-body">
-              {/* Filters */}
-              <div className="txn-filters-row">
+            <div className="txn-filters-grid">
+              <div className="txn-filter-group">
+                <label className="txn-filter-label">Search</label>
                 <div className="txn-search-wrapper">
                   <span className="txn-search-icon"><SearchIcon /></span>
                   <input
@@ -446,7 +447,9 @@ export default function ProfessorTransactionsPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-
+              </div>
+              <div className="txn-filter-group">
+                <label className="txn-filter-label">Type</label>
                 <select
                   className="txn-select"
                   value={filterType}
@@ -457,7 +460,9 @@ export default function ProfessorTransactionsPage() {
                   <option value="appointment">Appointment</option>
                   <option value="document">Document</option>
                 </select>
-
+              </div>
+              <div className="txn-filter-group">
+                <label className="txn-filter-label">Status</label>
                 <select
                   className="txn-select"
                   value={filterStatus}
@@ -469,53 +474,54 @@ export default function ProfessorTransactionsPage() {
                   <option value="rejected">Rejected</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
-
-                <button className="txn-export-btn">
-                  <DownloadIcon />
-                  Export
-                </button>
-              </div>
-
-              {/* List */}
-              <div className="txn-list">
-                {loading ? (
-                  <div className="txn-empty"><p>Loading transactions...</p></div>
-                ) : filtered.length === 0 ? (
-                  <div className="txn-empty">
-                    <ActivityIcon />
-                    <p>No transactions found</p>
-                  </div>
-                ) : (
-                  filtered.map((txn) => (
-                    <div key={txn.id} className="txn-item">
-                      <div className="txn-item-top">
-                        <div className="txn-item-badges">
-                          <span className={typeBadgeClass(txn.type)}>
-                            {typeLabel(txn.type)}
-                          </span>
-                          <span className={statusBadgeClass(txn.status)}>
-                            {capitalize(txn.status)}
-                          </span>
-                          <span className="txn-item-action">{txn.action}</span>
-                        </div>
-                        <div className="txn-item-timestamp">
-                          <CalendarSmIcon />
-                          {txn.timestamp}
-                        </div>
-                      </div>
-
-                      <div className="txn-item-student">
-                        <UserIcon />
-                        <span className="txn-item-student-name">{txn.studentName}</span>
-                        <span>({txn.studentId})</span>
-                      </div>
-
-                      <p className="txn-item-details">{txn.details}</p>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
+          </div>
+
+          {/* Transaction list */}
+          <div className="txn-list">
+            {loading ? (
+              <div className="txn-empty">
+                <ActivityIcon />
+                <p>Loading transactions...</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="txn-empty">
+                <ActivityIcon />
+                <p>No transactions found</p>
+              </div>
+            ) : (
+              filtered.map((txn) => (
+                <div key={txn.id} className={`txn-item txn-type-${txn.type}`}>
+                  <div className="txn-item-icon">
+                    <span className={`txn-icon-wrap txn-icon-${txn.type}`}>
+                      {txn.type === "queue" ? <UserIcon /> : txn.type === "appointment" ? <CalendarSmIcon /> : <FileTextIconSm />}
+                    </span>
+                  </div>
+                  <div className="txn-item-content">
+                    <div className="txn-item-header">
+                      <span className="txn-item-title">{txn.action}</span>
+                      <div className="txn-item-badges">
+                        <span className={typeBadgeClass(txn.type)}>{typeLabel(txn.type)}</span>
+                        <span className={statusBadgeClass(txn.status)}>{capitalize(txn.status)}</span>
+                      </div>
+                    </div>
+                    <div className="txn-item-student">
+                      <UserIcon />
+                      <span className="txn-item-student-name">{txn.studentName}</span>
+                      <span>({txn.studentId})</span>
+                    </div>
+                    {txn.details && <p className="txn-item-details">{txn.details}</p>}
+                  </div>
+                  <div className="txn-item-meta">
+                    <div className="txn-item-date">
+                      <CalendarSmIcon />
+                      {txn.timestamp}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </main>

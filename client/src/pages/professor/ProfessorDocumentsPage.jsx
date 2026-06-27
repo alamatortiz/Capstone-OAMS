@@ -161,36 +161,33 @@ function StatusBadge({ status }) {
 function DocumentCard({ doc, onApprove, onReject, onProcess, onMarkReady, onViewDetails }) {
   return (
     <div className="docs-card">
-      {/* Top row */}
-      <div className="docs-top-row">
-        <div className="docs-name-block">
-          <div className="docs-name-row">
-            <span className="docs-student-name">{doc.studentName}</span>
-            <span className="docs-student-id">({doc.studentId})</span>
-            {doc.urgency === "urgent" && (
-              <span className="docs-urgent-badge">
-                <AlertCircleIcon /> Urgent
-              </span>
-            )}
-          </div>
-          <p className="docs-doc-type">{doc.documentType}</p>
+      <div className="docs-card-header-row">
+        <div className="docs-card-icon-wrap">
+          <FileTextIcon className="docs-icon-md" />
         </div>
-        <StatusBadge status={doc.status} />
+        <div className="docs-card-title-section">
+          <h3 className="docs-card-name">{doc.studentName}</h3>
+          <p className="docs-card-sub">{doc.studentId}{doc.documentType ? ` · ${doc.documentType}` : ""}</p>
+        </div>
+        <div className="docs-card-badges">
+          {doc.urgency === "urgent" && (
+            <span className="docs-urgent-badge"><AlertCircleIcon /> Urgent</span>
+          )}
+          <StatusBadge status={doc.status} />
+        </div>
       </div>
 
-      {/* Meta */}
       <div className="docs-meta-grid">
-        <div>
-          <p className="docs-meta-label">Purpose</p>
-          <p className="docs-meta-value">{doc.purpose}</p>
+        <div className="docs-meta-field">
+          <label>Purpose</label>
+          <p>{doc.purpose}</p>
         </div>
-        <div>
-          <p className="docs-meta-label">Request Date</p>
-          <p className="docs-meta-value">{doc.requestDate}</p>
+        <div className="docs-meta-field">
+          <label>Request Date</label>
+          <p>{doc.requestDate}</p>
         </div>
       </div>
 
-      {/* Notes */}
       {doc.notes && (
         <div className="docs-notes-box">
           <p className="docs-meta-label" style={{ marginBottom: "0.25rem" }}>Notes</p>
@@ -198,7 +195,6 @@ function DocumentCard({ doc, onApprove, onReject, onProcess, onMarkReady, onView
         </div>
       )}
 
-      {/* Footer actions */}
       <div className="docs-footer">
         {doc.status === "pending" && (
           <>
@@ -272,6 +268,9 @@ function DetailsDialog({ doc, onClose }) {
             <p className="docs-notes-text">{doc.notes}</p>
           </div>
         )}
+        <div className="docs-dialog-footer">
+          <button className="docs-btn docs-btn-outline" onClick={onClose}>Back</button>
+        </div>
       </div>
     </div>
   );
@@ -467,90 +466,55 @@ export default function ProfessorDocumentsPage() {
 
           {/* Page Header */}
           <div className="docs-page-header">
-            <h1 className="docs-page-title">Document Management</h1>
-            <p className="docs-page-subtitle">Review and process student document requests</p>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="docs-stats-grid">
-            <div className="docs-stat-card docs-stat-pending">
-              <div>
-                <p className="docs-stat-label">Pending</p>
-                <p className="docs-stat-value docs-stat-value--yellow">{stats.pending}</p>
-              </div>
-              <span className="docs-stat-icon-wrap docs-stat-icon--yellow">
-                <AlertCircleIcon className="docs-icon-lg" />
-              </span>
-            </div>
-            <div className="docs-stat-card docs-stat-approved">
-              <div>
-                <p className="docs-stat-label">Approved</p>
-                <p className="docs-stat-value docs-stat-value--green">{stats.approved}</p>
-              </div>
-              <span className="docs-stat-icon-wrap docs-stat-icon--green">
-                <CheckCircle2Icon className="docs-icon-lg" />
-              </span>
-            </div>
-            <div className="docs-stat-card docs-stat-processing">
-              <div>
-                <p className="docs-stat-label">Processing</p>
-                <p className="docs-stat-value docs-stat-value--blue">{stats.processing}</p>
-              </div>
-              <span className="docs-stat-icon-wrap docs-stat-icon--blue">
-                <ClockIcon className="docs-icon-lg" />
-              </span>
-            </div>
-            <div className="docs-stat-card docs-stat-ready">
-              <div>
-                <p className="docs-stat-label">Ready</p>
-                <p className="docs-stat-value docs-stat-value--purple">{stats.ready}</p>
-              </div>
-              <span className="docs-stat-icon-wrap docs-stat-icon--purple">
+            <div className="docs-title-section">
+              <div className="docs-title-icon">
                 <FileTextIcon className="docs-icon-lg" />
-              </span>
+              </div>
+              <div>
+                <h1 className="docs-page-title">Document Management</h1>
+                <p className="docs-page-subtitle">Review and process student document requests</p>
+              </div>
             </div>
           </div>
 
-          {/* Main Card */}
-          <div className="docs-main-card">
-            <div className="docs-card-header">
-              <p className="docs-card-title">Document Requests</p>
-              <p className="docs-card-desc">Manage student document requests and certifications</p>
-            </div>
-
-            {/* Tabs */}
+          {/* Tabs */}
+          <div className="docs-tabs-nav">
             <div className="docs-tabs-list">
-              {TABS.map((tab) => (
-                <button
-                  key={tab}
-                  className={`docs-tab-trigger${activeTab === tab ? " active" : ""}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
+              {TABS.map((tab) => {
+                const count = tab === "all" ? documents.length : documents.filter((d) => d.status === tab).length;
+                return (
+                  <button
+                    key={tab}
+                    className={`docs-tab-trigger${activeTab === tab ? " active" : ""}`}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    <span className="docs-tab-count">{loading ? "—" : count}</span>
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            {/* List */}
-            <div className="docs-list">
-              {loading ? (
-                <div className="docs-empty">Loading document requests...</div>
-              ) : filtered.length === 0 ? (
-                <div className="docs-empty">No document requests found.</div>
-              ) : (
-                filtered.map((doc) => (
-                  <DocumentCard
-                    key={doc.id}
-                    doc={doc}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-                    onProcess={handleProcess}
-                    onMarkReady={handleMarkReady}
-                    onViewDetails={setSelectedDoc}
-                  />
-                ))
-              )}
-            </div>
+          {/* List */}
+          <div className="docs-list">
+            {loading ? (
+              <div className="docs-empty">Loading document requests...</div>
+            ) : filtered.length === 0 ? (
+              <div className="docs-empty">No document requests found.</div>
+            ) : (
+              filtered.map((doc) => (
+                <DocumentCard
+                  key={doc.id}
+                  doc={doc}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onProcess={handleProcess}
+                  onMarkReady={handleMarkReady}
+                  onViewDetails={setSelectedDoc}
+                />
+              ))
+            )}
           </div>
 
         </div>
