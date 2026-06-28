@@ -15,7 +15,7 @@ const SendIcon = () => (
 );
 
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity, Megaphone as LucideMegaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
@@ -124,6 +124,7 @@ const MoonIcon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
+const MegaphoneNavIcon = () => <LucideMegaphone />;
 
 
 export default function QueuePage() {
@@ -400,6 +401,7 @@ export default function QueuePage() {
 
   const navItems = [
     { icon: HomeIcon, label: 'Home', path: '/student/dashboard' },
+    { icon: MegaphoneNavIcon, label: 'Announcements', path: '/student/announcements' },
     { icon: QueueIconNav, label: 'Queue', path: '/student/queue' },
     { icon: CalendarIconNav, label: 'Appointments', path: '/student/appointments' },
     { icon: DocumentIconNav, label: 'Documents', path: '/student/documents' },

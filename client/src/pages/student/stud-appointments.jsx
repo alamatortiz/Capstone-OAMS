@@ -10,7 +10,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
-import { ChevronDown, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle } from "lucide-react";
+import { ChevronDown, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, Megaphone as LucideMegaphone } from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -105,6 +105,7 @@ const MoonIcon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
+const MegaphoneNavIcon = () => <LucideMegaphone />;
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CalendarIcon = () => (
@@ -395,6 +396,7 @@ export default function AppointmentsPage() {
 
   const navItems = [
     { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
+    { icon: MegaphoneNavIcon, label: "Announcements", path: "/student/announcements" },
     { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
     { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
     { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
