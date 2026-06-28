@@ -5,7 +5,7 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
-import "./appointments.css";
+import "./stud-appointments.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";

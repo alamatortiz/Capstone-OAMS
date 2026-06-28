@@ -8,7 +8,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
-import "./queue-tracking.css";
+import "./stud-queue-tracking.css";
 
 import {
   Users,

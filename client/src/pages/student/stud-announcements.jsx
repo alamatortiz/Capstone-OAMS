@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { GraduationCap as LucideGraduationCap } from "lucide-react";
-
+import { Megaphone as LucideMegaphone } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -10,16 +9,17 @@ import api from "../../utils/api";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 
-import "./professor-schedules.css";
+import "./stud-announcements.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 
-// ─── Sidebar Icons (unchanged) ─────────────────────────────────────────────
+// ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
     <polyline points="9 22 9 12 15 12 15 22"></polyline>
   </svg>
 );
+
 const QueueIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -28,6 +28,7 @@ const QueueIconNav = () => (
     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
   </svg>
 );
+
 const CalendarIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -36,6 +37,7 @@ const CalendarIconNav = () => (
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
+
 const DocumentIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -44,6 +46,7 @@ const DocumentIconNav = () => (
     <line x1="9" y1="15" x2="15" y2="15"></line>
   </svg>
 );
+
 const HistoryIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
@@ -52,6 +55,7 @@ const HistoryIconNav = () => (
     <line x1="8" y1="15" x2="12" y2="15"></line>
   </svg>
 );
+
 const LogOutIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -59,6 +63,7 @@ const LogOutIcon = () => (
     <line x1="21" y1="12" x2="9" y2="12"></line>
   </svg>
 );
+
 const MenuIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -66,18 +71,21 @@ const MenuIcon = () => (
     <line x1="3" y1="18" x2="21" y2="18"></line>
   </svg>
 );
+
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
+
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
     <circle cx="12" cy="7" r="4"></circle>
   </svg>
 );
+
 const SunIcon = () => (
   <svg
     className="sun-icon"
@@ -97,6 +105,7 @@ const SunIcon = () => (
     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
   </svg>
 );
+
 const MoonIcon = () => (
   <svg
     className="moon-icon"
@@ -109,114 +118,81 @@ const MoonIcon = () => (
   </svg>
 );
 
-// ─── Content Icons ─────────────────────────────────────────────────────────
-const GraduationCapIcon = () => <LucideGraduationCap />;
-const ChevronRightIcon = () => (
+// ─── Content Icons ────────────────────────────────────────────────────────────
+const MegaphoneIcon = () => <LucideMegaphone />;
+
+const AlertCircleIcon = () => (
   <svg
-    className="icon"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
-  >
-    <polyline points="9 18 15 12 9 6"></polyline>
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="15 18 9 12 15 6"></polyline>
-  </svg>
-);
-const BuildingIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <rect x="3" y="2" width="18" height="20" rx="2" ry="2"></rect>
-    <line x1="9" y1="2" x2="9" y2="22"></line>
-    <line x1="15" y1="2" x2="15" y2="22"></line>
-    <line x1="3" y1="7" x2="21" y2="7"></line>
-    <line x1="3" y1="12" x2="21" y2="12"></line>
-  </svg>
-);
-const ClockIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
   >
     <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
   </svg>
 );
-const MapPinIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-    <circle cx="12" cy="10" r="3"></circle>
-  </svg>
-);
+
 const CalendarIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
     <line x1="16" y1="2" x2="16" y2="6"></line>
     <line x1="8" y1="2" x2="8" y2="6"></line>
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
+
+const BellIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+  </svg>
+);
+
 const ChatIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
   </svg>
 );
+
 const SendIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="22" y1="2" x2="11" y2="13"></line>
     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
 );
-const Loader2Icon = () => (
+
+const ChevronLeftIcon = () => (
   <svg
-    className="icon"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
   >
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+
+const ChevronDownIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+const Loader2Icon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="12" y1="2" x2="12" y2="6"></line>
     <line x1="12" y1="18" x2="12" y2="22"></line>
     <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
@@ -227,26 +203,10 @@ const Loader2Icon = () => (
     <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
   </svg>
 );
-const AlertCircleIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>
-);
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function ProfessorSchedule() {
+export default function AnnouncementsPage() {
   const { user: authUser, logout } = useAuth();
-  const navigate = useNavigate(); // FIX: was missing in the original file
-  const location = useLocation();
-
   const user = authUser
     ? {
         ...authUser,
@@ -259,59 +219,103 @@ export default function ProfessorSchedule() {
         name: "Student",
         role: "student",
         college: "",
-        studentId: "",
         studentNumber: "N/A Student Number",
         departmentAbbrev: "",
         course: "",
       };
 
-  // ── UI state ──────────────────────────────────────────────────────────────
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // ── UI State ──────────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
-  const [viewMode, setViewMode] = useState("departments");
-  const [selectedDeptId, setSelectedDeptId] = useState(null);
+  const [selectedFilter, setSelectedFilter] = useState("pinned");
+  const [selectedCollege, setSelectedCollege] = useState("all");
   const [messages, setMessages] = useState([
     {
       id: 1,
       type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
+      text: "Hello! 👋 I'm your OAMS Assistant. Ask me about announcements or any college updates!",
       timestamp: new Date(),
     },
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  // ── Live data state ───────────────────────────────────────────────────────
-  const [departments, setDepartments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
+  const [announcements, setAnnouncements] = useState([]);
+  const [annLoading, setAnnLoading] = useState(true);
+  const [annError, setAnnError] = useState(null);
 
-  const fetchSchedules = async () => {
-    setLoading(true);
-    setLoadError(null);
+  const fetchAnnouncements = async () => {
+    setAnnLoading(true);
+    setAnnError(null);
     try {
-      const { data } = await api.get("/student/professor-schedules");
-      setDepartments(data.departments ?? []);
+      const { data } = await api.get("/student/announcements");
+      setAnnouncements(data.announcements ?? []);
     } catch (err) {
-      console.error("Fetch professor schedules error:", err);
-      setLoadError("Could not load professor schedules. Please try again.");
+      console.error("Fetch announcements error:", err);
+      setAnnError("Could not load announcements. Please try again.");
     } finally {
-      setLoading(false);
+      setAnnLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSchedules();
+    fetchAnnouncements();
   }, []);
 
-  // The department currently selected, derived from live data
-  const selectedDepartment = useMemo(
-    () => departments.find((d) => d.departmentId === selectedDeptId) ?? null,
-    [departments, selectedDeptId],
-  );
+  // ── Filter tabs ────────────────────────────────────────────────────────────
+  const filterTabs = [
+    { id: "pinned", label: "Pinned" },
+    { id: "all", label: "All" },
+    { id: "important", label: "Important" },
+    { id: "event", label: "Events" },
+    { id: "reminder", label: "Reminders" },
+    { id: "general", label: "General" },
+  ];
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── College options derived from live data: each department that actually
+  //    has at least one announcement, keyed by abbreviation (e.g. "CCS").
+  //    Global notices (departmentAbbrev "ALL") are excluded from the option
+  //    list itself but always remain visible regardless of which college is
+  //    selected, since they apply to every department by definition. ───────
+  const collegeOptions = useMemo(() => {
+    const seen = new Map();
+    announcements.forEach((a) => {
+      if (a.departmentAbbrev !== "ALL" && !seen.has(a.departmentAbbrev)) {
+        seen.set(a.departmentAbbrev, a.departmentName);
+      }
+    });
+    return [...seen.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([abbrev, name]) => ({ abbrev, name }));
+  }, [announcements]);
+
+  // ── Filtered announcements (category tab + department dropdown both apply).
+  //    Selecting a college (e.g. "CCS") shows that college's announcements
+  //    PLUS global ("All Departments") ones -- never hides global notices. ──
+  const pinnedAnnouncements = announcements
+    .filter((a) => a.isPinned)
+    .filter(
+      (a) =>
+        selectedCollege === "all" ||
+        a.departmentAbbrev === selectedCollege ||
+        a.departmentAbbrev === "ALL",
+    );
+  const filteredAnnouncements = announcements
+    .filter((a) => selectedFilter === "all" || a.category === selectedFilter)
+    .filter(
+      (a) =>
+        selectedCollege === "all" ||
+        a.departmentAbbrev === selectedCollege ||
+        a.departmentAbbrev === "ALL",
+    )
+    .filter((a) => !a.isPinned);
+
+  // ── Chat handlers ──────────────────────────────────────────────────────────
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -328,28 +332,9 @@ export default function ProfessorSchedule() {
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => { logout(); navigate("/login"); };
 
-  const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
-  };
-
-  const handleDepartmentSelect = (deptId) => {
-    setSelectedDeptId(deptId);
-    setViewMode("schedules");
-  };
-
-  const handleBack = () => {
-    setViewMode("departments");
-    setSelectedDeptId(null);
-  };
-
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (inputValue.trim() === "") return;
-
     const userMessage = {
       id: messages.length + 1,
       type: "user",
@@ -358,7 +343,6 @@ export default function ProfessorSchedule() {
     };
     setMessages([...messages, userMessage]);
     setInputValue("");
-
     setTimeout(() => {
       const botResponse = {
         id: messages.length + 2,
@@ -372,41 +356,37 @@ export default function ProfessorSchedule() {
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
-    if (
-      lowerInput.includes("schedule") ||
-      lowerInput.includes("professor") ||
-      lowerInput.includes("faculty")
+    if (lowerInput.includes("announcement")) {
+      const total = announcements.length;
+      const pinned = pinnedAnnouncements.length;
+      return `There are currently ${total} announcements, with ${pinned} pinned as important. You can filter by category or college using the controls above!`;
+    } else if (lowerInput.includes("important")) {
+      const importantCount = announcements.filter(
+        (a) => a.category === "important",
+      ).length;
+      return `Important announcements are marked with red badges. We have ${importantCount} important announcement(s) currently visible. Check them out to stay updated!`;
+    } else if (
+      lowerInput.includes("event") ||
+      lowerInput.includes("activity")
     ) {
-      return "You're currently viewing faculty consultation schedules. Each professor has multiple consultation hours throughout the week. Click on any department to see available professors and their availability.";
-    } else if (lowerInput.includes("appointment")) {
-      return "To book an appointment with a professor, check their consultation hours and visit the Appointment Booking section. You can schedule a meeting during their available times.";
-    } else if (lowerInput.includes("help") || lowerInput.includes("service")) {
-      return "I can help you with professor schedules, faculty information, consultation hours, and appointment booking. What would you like to know?";
+      const events = announcements.filter((a) => a.category === "event");
+      return `There are ${events.length} upcoming events. Click on 'Events' tab to see all of them!`;
+    } else if (
+      lowerInput.includes("college") ||
+      lowerInput.includes("department")
+    ) {
+      return "Use the College dropdown to filter announcements down to a specific department, or leave it on 'All Colleges' to see everything.";
     } else {
-      return "That's a great question! For more detailed assistance, please visit the respective section or contact your college office.";
+      return "I can help you find announcements, learn about upcoming events, deadlines, and more. What would you like to know?";
     }
   };
 
-  // Groups a faculty member's flat availability[] into day-ordered buckets
-  const getDaySchedules = (professor) => {
-    const dayOrder = [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
-    const groupedByDay = {};
-
-    (professor.availability ?? []).forEach((schedule) => {
-      if (!groupedByDay[schedule.day]) groupedByDay[schedule.day] = [];
-      groupedByDay[schedule.day].push(schedule);
+  const toggleDarkMode = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      applyTheme(next ? "dark" : "light");
+      return next;
     });
-
-    return dayOrder
-      .filter((day) => groupedByDay[day])
-      .map((day) => ({ day, schedules: groupedByDay[day] }));
   };
 
   const navItems = [
@@ -425,6 +405,30 @@ export default function ProfessorSchedule() {
     },
   ];
 
+  const getCategoryColor = (category) => {
+    const colors = {
+      important: "announcement-important",
+      event: "announcement-event",
+      reminder: "announcement-reminder",
+      general: "announcement-general",
+    };
+    return colors[category] || colors.general;
+  };
+
+  const getAnnouncementIcon = (category) => {
+    switch (category) {
+      case "important":
+        return <AlertCircleIcon />;
+      case "event":
+        return <CalendarIcon />;
+      case "reminder":
+        return <BellIcon />;
+      default:
+        return <AlertCircleIcon />;
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="dashboard-with-sidebar">
       {/* Sidebar */}
@@ -525,212 +529,193 @@ export default function ProfessorSchedule() {
 
       {/* Main Content */}
       <main className="dashboard-main">
-        <div className="professor-schedule-page">
+        <div className="announcements-page">
           {/* Header */}
           <div className="queue-header">
             <div className="queue-breadcrumb">
-              {viewMode === "schedules" ? (
-                <button className="breadcrumb-link" onClick={handleBack}>
-                  <ChevronLeftIcon />
-                  Back to Departments
-                </button>
-              ) : (
-                <Link to="/student/dashboard" className="breadcrumb-link">
-                  <ChevronLeftIcon />
-                  Home
-                </Link>
-              )}
+              <Link to="/student/dashboard" className="breadcrumb-link">
+                <ChevronLeftIcon />
+                Home
+              </Link>
             </div>
             <div className="queue-title-section">
               <div className="queue-title-icon">
-                <GraduationCapIcon />
+                <MegaphoneIcon />
               </div>
               <div>
-                <h1 className="queue-title">Professor Schedules</h1>
-                <p className="queue-subtitle">View faculty consultation hours and availability</p>
+                <h1 className="queue-title">Announcements</h1>
+                <p className="queue-subtitle">Stay updated with the latest notices</p>
               </div>
             </div>
           </div>
 
-          {/* Loading state */}
-          {loading && (
-            <div className="empty-state">
-              <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
-              <p>Loading professor schedules…</p>
-            </div>
-          )}
-
-          {/* Error state */}
-          {!loading && loadError && (
+          {/* Error banner */}
+          {annError && (
             <div className="empty-state">
               <AlertCircleIcon />
-              <p>{loadError}</p>
-              <button
-                className="breadcrumb-link"
-                style={{ marginTop: "0.5rem" }}
-                onClick={fetchSchedules}
-              >
+              <p>{annError}</p>
+              <button className="ann-retry-btn" onClick={fetchAnnouncements}>
                 Retry
               </button>
             </div>
           )}
 
-          {/* Departments View */}
-          {!loading && !loadError && viewMode === "departments" && (
-            <div className="departments-grid">
-              {departments.length === 0 ? (
-                <div className="empty-state">
-                  <AlertCircleIcon />
-                  <p>No faculty schedules are available yet.</p>
-                </div>
-              ) : (
-                departments.map((dept) => {
-                  const logoSrc = getCollegeLogo(dept.departmentName);
-                  const professorCount = dept.faculty?.length ?? 0;
+          {/* Tabs + College Filter */}
+          <div className="ann-tabs-bar">
+            <div className="qt-tabs-list">
+              {filterTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={`qt-tab ${selectedFilter === tab.id ? "active" : ""}`}
+                  onClick={() => setSelectedFilter(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="ann-college-wrapper">
+              <select
+                value={selectedCollege}
+                onChange={(e) => setSelectedCollege(e.target.value)}
+                aria-label="Filter by college"
+                className="ann-college-select"
+              >
+                <option value="all">All Colleges</option>
+                {collegeOptions.map((opt) => (
+                  <option key={opt.abbrev} value={opt.abbrev}>
+                    {opt.name} ({opt.abbrev})
+                  </option>
+                ))}
+              </select>
+              <ChevronDownIcon />
+            </div>
+          </div>
 
-                  return (
-                    <div
-                      key={dept.departmentId}
-                      className="department-card"
-                      onClick={() => handleDepartmentSelect(dept.departmentId)}
-                    >
-                      <div className="card-image-wrapper">
-                        <img
-                          src={logoSrc}
-                          alt={`${dept.departmentName} logo`}
-                          className="college-logo-img"
-                        />
-                      </div>
-                      <div className="card-content">
-                        <div className="card-right">
-                          <div className="card-right-text">
-                            <h3 className="card-title">
-                              {dept.departmentName}
-                            </h3>
-                            <p className="card-abbrev">
-                              {dept.departmentAbbrev}
-                            </p>
-                            <div className="card-badge">
-                              {professorCount}{" "}
-                              {professorCount === 1
-                                ? "Faculty"
-                                : "Faculty Members"}
-                            </div>
-                          </div>
-                          <ChevronRightIcon />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+          {/* Loading state */}
+          {annLoading && (
+            <div className="empty-state">
+              <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
+              <p>Loading announcements…</p>
             </div>
           )}
 
-          {/* Schedules View */}
-          {!loading &&
-            !loadError &&
-            viewMode === "schedules" &&
-            selectedDepartment && (
-              <div className="schedules-view">
-                {/* Department Header */}
-                <div className="department-header-card">
-                  <div className="department-header-content">
-                    <div className="department-logo-wrapper">
-                      <img
-                        src={getCollegeLogo(selectedDepartment.departmentName)}
-                        alt={selectedDepartment.departmentName}
-                        className="department-logo"
-                      />
-                    </div>
-                    <div>
-                      <div className="department-header-top">
-                        <BuildingIcon />
-                        <h2>{selectedDepartment.departmentName}</h2>
-                      </div>
-                      <p>Faculty consultation schedules and availability</p>
-                    </div>
-                  </div>
+          {/* Pinned Tab Content */}
+          {!annLoading && selectedFilter === "pinned" && (
+            <section className="announcements-section">
+              <h2 className="section-title">Pinned Announcements</h2>
+              {pinnedAnnouncements.length === 0 ? (
+                <div className="empty-state">
+                  <BellIcon />
+                  <p>No pinned announcements</p>
                 </div>
-
-                {/* Professors List */}
-                <div className="professors-list">
-                  {selectedDepartment.faculty.length === 0 ? (
-                    <div className="empty-state">
-                      <AlertCircleIcon />
-                      <p>No faculty members found for this department.</p>
-                    </div>
-                  ) : (
-                    selectedDepartment.faculty.map((professor) => (
-                      <div key={professor.facultyId} className="professor-card">
-                        <div className="professor-header">
-                          <div className="professor-avatar">
-                            <UserIcon />
-                          </div>
-                          <div className="professor-info">
-                            <h3 className="professor-name">{professor.name}</h3>
-                            <p className="professor-position">
-                              {professor.position}
-                            </p>
-                            <p className="professor-specialization">
-                              {professor.specialization}
-                            </p>
-                            <p className="professor-email">{professor.email}</p>
-                          </div>
+              ) : (
+                <div className="announcements-list">
+                  {pinnedAnnouncements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className={`announcement-card ${getCategoryColor(announcement.category)}`}
+                    >
+                      <div className="announcement-header">
+                        <div className="announcement-icon">
+                          {getAnnouncementIcon(announcement.category)}
                         </div>
-
-                        {/* Consultation Hours */}
-                        <div className="consultation-section">
-                          <h4 className="consultation-title">
-                            Consultation Hours
-                          </h4>
-                          {getDaySchedules(professor).length === 0 ? (
-                            <p style={{ opacity: 0.6, fontSize: "0.85rem" }}>
-                              No consultation hours have been set yet.
-                            </p>
-                          ) : (
-                            <div className="schedule-list">
-                              {getDaySchedules(professor).map(
-                                ({ day, schedules }) => (
-                                  <div key={day} className="day-schedule">
-                                    <div className="day-header">
-                                      <CalendarIcon />
-                                      <span className="day-name">{day}</span>
-                                    </div>
-                                    <div className="day-slots">
-                                      {schedules.map((schedule, idx) => (
-                                        <div
-                                          key={idx}
-                                          className="schedule-slot"
-                                        >
-                                          <div className="time-block">
-                                            <ClockIcon />
-                                            <span className="time-range">
-                                              {schedule.timeStart} –{" "}
-                                              {schedule.timeEnd}
-                                            </span>
-                                          </div>
-                                          <div className="location-block">
-                                            <MapPinIcon />
-                                            <span className="location">
-                                              {schedule.location}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ),
+                        <div className="announcement-content">
+                          <h3 className="announcement-title">
+                            {announcement.title}
+                          </h3>
+                          <p className="announcement-description">
+                            {announcement.description}
+                          </p>
+                          <div className="announcement-meta">
+                            <span className="announcement-college">
+                              {announcement.college}
+                            </span>
+                            <span className="announcement-date">
+                              {new Date(announcement.date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
                               )}
-                            </div>
-                          )}
+                            </span>
+                          </div>
                         </div>
+                        <span
+                          className={`announcement-badge badge-${announcement.category}`}
+                        >
+                          {announcement.category.charAt(0).toUpperCase() +
+                            announcement.category.slice(1)}
+                        </span>
                       </div>
-                    ))
-                  )}
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )}
+              )}
+            </section>
+          )}
+
+          {/* All / Category Tab Content */}
+          {!annLoading && selectedFilter !== "pinned" && (
+            <section className="announcements-section">
+              <h2 className="section-title">
+                {selectedFilter === "all"
+                  ? "All Announcements"
+                  : `${selectedFilter.charAt(0).toUpperCase() + selectedFilter.slice(1)} Announcements`}
+              </h2>
+              {filteredAnnouncements.length === 0 ? (
+                <div className="empty-state">
+                  <BellIcon />
+                  <p>No announcements match these filters</p>
+                </div>
+              ) : (
+                <div className="announcements-list">
+                  {filteredAnnouncements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className={`announcement-card ${getCategoryColor(announcement.category)}`}
+                    >
+                      <div className="announcement-header">
+                        <div className="announcement-icon">
+                          {getAnnouncementIcon(announcement.category)}
+                        </div>
+                        <div className="announcement-content">
+                          <h3 className="announcement-title">
+                            {announcement.title}
+                          </h3>
+                          <p className="announcement-description">
+                            {announcement.description}
+                          </p>
+                          <div className="announcement-meta">
+                            <span className="announcement-college">
+                              {announcement.college}
+                            </span>
+                            <span className="announcement-date">
+                              {new Date(announcement.date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`announcement-badge badge-${announcement.category}`}
+                        >
+                          {announcement.category.charAt(0).toUpperCase() +
+                            announcement.category.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </main>
 

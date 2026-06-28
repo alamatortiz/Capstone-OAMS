@@ -20,27 +20,27 @@ import "./index.css";
 import App from "./App.jsx";
 import Login from "./pages/Login.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
-import StudentDashboard from "./pages/student/student-dashboard.jsx";
-import QueuePage from "./pages/student/queue.jsx";
+import StudentDashboard from "./pages/student/stud-dashboard.jsx";
+import QueuePage from "./pages/student/stud-queue.jsx";
 
 // ─── Lazy-loaded routes for better performance ───────────────────────────
 const QueueStatusPage = React.lazy(
-  () => import("./pages/student/queue-status.jsx"),
+  () => import("./pages/student/stud-queue-status.jsx"),
 );
 const DocumentStatusPage = React.lazy(
-  () => import("./pages/student/document-status.jsx"),
+  () => import("./pages/student/stud-document-status.jsx"),
 );
 const AppointmentStatusPage = React.lazy(
-  () => import("./pages/student/appointment-status.jsx"),
+  () => import("./pages/student/stud-appointment-status.jsx"),
 );
 const QueueTrackingPage = React.lazy(
-  () => import("./pages/student/queue-tracking.jsx"),
+  () => import("./pages/student/stud-queue-tracking.jsx"),
 );
 const AnnouncementsPage = React.lazy(
-  () => import("./pages/student/announcements.jsx"),
+  () => import("./pages/student/stud-announcements.jsx"),
 );
 const ProfessorSchedulePage = React.lazy(
-  () => import("./pages/student/professor-schedules.jsx"),
+  () => import("./pages/student/stud-professor-schedules.jsx"),
 );
 
 const AdminDocumentsPage = React.lazy(
@@ -77,9 +77,9 @@ const AdminDataManagement = React.lazy(
   () => import("./pages/admin/admin_data_management.jsx"),
 );
 
-import AppointmentsPage from "./pages/student/appointments.jsx";
-import DocumentsPage from "./pages/student/documents.jsx";
-import TransactionsPage from "./pages/student/transactions.jsx";
+import AppointmentsPage from "./pages/student/stud-appointments.jsx";
+import DocumentsPage from "./pages/student/stud-documents.jsx";
+import TransactionsPage from "./pages/student/stud-transactions.jsx";
 import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
 
 const ProfessorAppointmentsPage = React.lazy(

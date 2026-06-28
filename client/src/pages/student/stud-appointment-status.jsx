@@ -16,10 +16,10 @@ import api from "../../utils/api";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import { getCollegeLogo } from "../../data/collegeLogo";
-import "./queue-status.css";
-import "./queue-tracking.css";
-import "./document-status.css";
-import "./appointment-status.css";
+import "./stud-queue-status.css";
+import "./stud-queue-tracking.css";
+import "./stud-document-status.css";
+import "./stud-appointment-status.css";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (

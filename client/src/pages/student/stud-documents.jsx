@@ -6,7 +6,7 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import { toast } from "sonner";
-import "./documents.css";
+import "./stud-documents.css";
 import api from "../../utils/api";
 
 import { applyTheme, getSavedTheme } from "../../utils/theme";

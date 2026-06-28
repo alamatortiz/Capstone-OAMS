@@ -239,31 +239,6 @@ CREATE TABLE queue_status_logs (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- 8. APPOINTMENT SYSTEM
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE appointments (
-    appointment_id      INT          AUTO_INCREMENT PRIMARY KEY,
-    student_id          INT          NOT NULL,
-    faculty_id          INT          NOT NULL,
-    department_id       INT          NOT NULL,
-    service_id          INT          NULL,
-    availability_id     INT          NULL,   -- FK to faculty_date_availability; links booking to the slot
-    appointment_date    DATE         NOT NULL,
-    appointment_time    TIME         NOT NULL,
-    status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
-    notes               TEXT,
-    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id)      REFERENCES students(student_id),
-    FOREIGN KEY (faculty_id)      REFERENCES faculty(faculty_id),
-    FOREIGN KEY (department_id)   REFERENCES departments(department_id),
-    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id)  ON DELETE SET NULL,
-    FOREIGN KEY (availability_id) REFERENCES faculty_date_availability(id)     ON DELETE SET NULL,
-    -- prevents duplicate bookings for the same student/faculty/date/time
-    UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
-    INDEX idx_appointments_dept_service (department_id, service_id)
-);
-
--- ─────────────────────────────────────────────────────────────
 -- FACULTY AVAILABILITY
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE faculty_availability (
@@ -309,6 +284,31 @@ CREATE TABLE faculty_date_availability (
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     INDEX idx_fda_faculty (faculty_id),
     INDEX idx_fda_date (available_date)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 8. APPOINTMENT SYSTEM
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE appointments (
+    appointment_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    student_id          INT          NOT NULL,
+    faculty_id          INT          NOT NULL,
+    department_id       INT          NOT NULL,
+    service_id          INT          NULL,
+    availability_id     INT          NULL,   -- FK to faculty_date_availability; links booking to the slot
+    appointment_date    DATE         NOT NULL,
+    appointment_time    TIME         NOT NULL,
+    status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
+    notes               TEXT,
+    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id)      REFERENCES students(student_id),
+    FOREIGN KEY (faculty_id)      REFERENCES faculty(faculty_id),
+    FOREIGN KEY (department_id)   REFERENCES departments(department_id),
+    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id)  ON DELETE SET NULL,
+    FOREIGN KEY (availability_id) REFERENCES faculty_date_availability(id)     ON DELETE SET NULL,
+    -- prevents duplicate bookings for the same student/faculty/date/time
+    UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
+    INDEX idx_appointments_dept_service (department_id, service_id)
 );
 
 -- ─────────────────────────────────────────────────────────────

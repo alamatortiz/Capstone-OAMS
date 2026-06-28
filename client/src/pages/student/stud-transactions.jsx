@@ -7,7 +7,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 
-import "./transactions.css";
+import "./stud-transactions.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 

@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
-import "./queue-status.css";
+import "./stud-queue-status.css";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
