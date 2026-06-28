@@ -2338,6 +2338,39 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
+// OFFICE HOURS ENDPOINT
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/office-hours
+router.get(
+  "/office-hours",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    try {
+      const [[dept]] = await pool.query(
+        `SELECT d.department_name, d.department_abbreviation, d.office_location, d.office_hours
+         FROM students s
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.student_id = ?`,
+        [studentId],
+      );
+      if (!dept) return res.status(404).json({ message: "Department not found" });
+      res.json({
+        departmentName: dept.department_name,
+        departmentAbbrev: dept.department_abbreviation,
+        officeLocation: dept.office_location ?? "",
+        officeHours: dept.office_hours ?? "",
+      });
+    } catch (error) {
+      console.error("Office hours error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
 

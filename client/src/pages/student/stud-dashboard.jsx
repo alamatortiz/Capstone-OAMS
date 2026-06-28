@@ -318,6 +318,10 @@ export default function StudentDashboard() {
   const [announcementsLoading, setAnnouncementsLoading] = useState(true);
   const [announcementsError, setAnnouncementsError] = useState(null);
 
+  // ── Office hours state ────────────────────────────────────────────────────
+  const [officeHours, setOfficeHours] = useState(null);
+  const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
+
   // ── Fetch dashboard stats from backend ───────────────────────────────────
   useEffect(() => {
     const fetchStats = async () => {
@@ -353,6 +357,33 @@ export default function StudentDashboard() {
 
     if (authUser) fetchAnnouncements();
   }, [authUser]);
+
+  // ── Fetch office hours from backend ───────────────────────────────────────
+  useEffect(() => {
+    const fetchOfficeHours = async () => {
+      try {
+        const res = await api.get("/student/office-hours");
+        setOfficeHours(res.data);
+      } catch (err) {
+        console.error("Failed to fetch office hours:", err);
+      } finally {
+        setOfficeHoursLoading(false);
+      }
+    };
+    if (authUser) fetchOfficeHours();
+  }, [authUser]);
+
+  const parseSchedule = (hoursStr) => {
+    if (!hoursStr) return [];
+    return hoursStr.split(/,\s*(?=[A-Z])/).map((entry) => {
+      const colonIdx = entry.indexOf(": ");
+      if (colonIdx === -1) return { day: entry.trim(), time: "" };
+      return {
+        day: entry.substring(0, colonIdx).trim(),
+        time: entry.substring(colonIdx + 2).trim(),
+      };
+    });
+  };
 
   // Pinned announcements only, capped to the top 2 for the dashboard preview
   const pinnedAnnouncements = announcements
@@ -805,14 +836,16 @@ export default function StudentDashboard() {
                     />
                     <div className="queue-service-details">
                       <div className="service-row">
-                        <p className="service-name">
-                          {mostRecentQueue.service}
-                        </p>
+                        <div className="service-name-stack">
+                          <p className="service-name">
+                            {mostRecentQueue.service}
+                          </p>
+                          <p className="college-name">{mostRecentQueue.college}</p>
+                        </div>
                         <span className="queue-number">
                           {mostRecentQueue.queueNumber}
                         </span>
                       </div>
-                      <p className="college-name">{mostRecentQueue.college}</p>
                     </div>
                   </div>
                   <div className="queue-stats">
@@ -945,9 +978,6 @@ export default function StudentDashboard() {
                     </Link>
                   ))
                 )}
-                <Link to="/student/announcements" className="secondary-btn">
-                  <BellIcon /> View All Announcements
-                </Link>
               </div>
             </div>
           </div>
@@ -993,6 +1023,45 @@ export default function StudentDashboard() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </section>
+
+          {/* Office Hours */}
+          <section className="stud-office-hours-card">
+            <div className="stud-hours-header">
+              <h2 className="stud-hours-title">
+                <ClockIcon />
+                Office Hours
+              </h2>
+              {!officeHoursLoading && officeHours && (
+                <span className="stud-hours-dept">
+                  {officeHours.departmentName} ({officeHours.departmentAbbrev})
+                </span>
+              )}
+            </div>
+            <div className="stud-hours-body">
+              {officeHoursLoading ? (
+                <p className="stud-hours-loading">Loading office hours...</p>
+              ) : !officeHours ? (
+                <p className="stud-hours-empty">No office hours available.</p>
+              ) : (
+                <>
+                  <div className="stud-hours-schedule">
+                    {parseSchedule(officeHours.officeHours).map((entry, i) => (
+                      <div key={i} className="stud-hours-item">
+                        <p className="stud-hours-day">{entry.day}</p>
+                        <p className="stud-hours-time">{entry.time}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {officeHours.officeLocation && (
+                    <div className="stud-hours-location">
+                      <span className="stud-hours-location-label">Location:</span>
+                      <span className="stud-hours-location-value">{officeHours.officeLocation}</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
