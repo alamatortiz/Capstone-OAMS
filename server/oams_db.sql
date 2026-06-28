@@ -18,7 +18,8 @@ CREATE TABLE departments (
     department_id       INT          AUTO_INCREMENT PRIMARY KEY,
     department_name     VARCHAR(100) NOT NULL,
     department_abbreviation VARCHAR(20) NOT NULL,  -- tightened from VARCHAR(100)
-    office_location     VARCHAR(100)
+    office_location     VARCHAR(100),
+    office_hours        TEXT         NULL
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -118,11 +119,11 @@ CREATE TABLE services (
     service_id            INT          AUTO_INCREMENT PRIMARY KEY,
     service_name          VARCHAR(100) NOT NULL,
     description           TEXT,
-    department_id         INT          NOT NULL,
+    department_id         INT          NULL,   -- NULL = available across all departments
     status                ENUM('active','inactive') NOT NULL DEFAULT 'active',
     average_service_time  INT          NOT NULL DEFAULT 15,
     auto_close            BOOLEAN      NOT NULL DEFAULT TRUE,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id)
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
 );
 
 CREATE TABLE service_requirements (
@@ -164,11 +165,12 @@ CREATE TABLE document_services (
     service_id       INT          AUTO_INCREMENT PRIMARY KEY,
     service_name     VARCHAR(100) NOT NULL,
     description      TEXT,
-    department_id    INT          NOT NULL,
+    department_id    INT          NULL,   -- NULL = available across all departments
+    recipient_type   ENUM('students','faculty','both') NOT NULL DEFAULT 'students',
     status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
     fee              DECIMAL(10,2) NOT NULL DEFAULT 0,
     processing_time  VARCHAR(100) NULL,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id)
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
 );
 
 CREATE TABLE document_requirements (
@@ -240,20 +242,23 @@ CREATE TABLE queue_status_logs (
 -- 8. APPOINTMENT SYSTEM
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE appointments (
-    appointment_id   INT          AUTO_INCREMENT PRIMARY KEY,
-    student_id       INT          NOT NULL,
-    faculty_id       INT          NOT NULL,
-    department_id    INT          NOT NULL,
-    service_id       INT          NULL,
-    appointment_date DATE         NOT NULL,
-    appointment_time TIME         NOT NULL,
-    status           ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
-    notes            TEXT,
-    created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES students(student_id),
-    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id),
-    FOREIGN KEY (department_id) REFERENCES departments(department_id),
-    FOREIGN KEY (service_id) REFERENCES appointment_services(service_id) ON DELETE SET NULL,    -- prevents duplicate bookings for the same student/faculty/date/time
+    appointment_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    student_id          INT          NOT NULL,
+    faculty_id          INT          NOT NULL,
+    department_id       INT          NOT NULL,
+    service_id          INT          NULL,
+    availability_id     INT          NULL,   -- FK to faculty_date_availability; links booking to the slot
+    appointment_date    DATE         NOT NULL,
+    appointment_time    TIME         NOT NULL,
+    status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
+    notes               TEXT,
+    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id)      REFERENCES students(student_id),
+    FOREIGN KEY (faculty_id)      REFERENCES faculty(faculty_id),
+    FOREIGN KEY (department_id)   REFERENCES departments(department_id),
+    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id)  ON DELETE SET NULL,
+    FOREIGN KEY (availability_id) REFERENCES faculty_date_availability(id)     ON DELETE SET NULL,
+    -- prevents duplicate bookings for the same student/faculty/date/time
     UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
     INDEX idx_appointments_dept_service (department_id, service_id)
 );
@@ -291,13 +296,16 @@ CREATE TABLE faculty_blocked_dates (
 -- Faculty sets exact dates + times instead of recurring day-of-week slots
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE faculty_date_availability (
-    id             INT AUTO_INCREMENT PRIMARY KEY,
-    faculty_id     INT NOT NULL,
-    available_date DATE NOT NULL,
-    start_time     TIME NOT NULL,
-    end_time       TIME NOT NULL,
-    location       VARCHAR(150),
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    id                    INT  AUTO_INCREMENT PRIMARY KEY,
+    faculty_id            INT  NOT NULL,
+    available_date        DATE NOT NULL,
+    start_time            TIME NOT NULL,
+    end_time              TIME NOT NULL,
+    max_students          INT  NULL,    -- NULL = indefinite (no cap on bookings)
+    slot_duration_minutes INT  NOT NULL DEFAULT 30,
+    status                ENUM('open','closed') NOT NULL DEFAULT 'open',
+    location              VARCHAR(150),
+    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     INDEX idx_fda_faculty (faculty_id),
     INDEX idx_fda_date (available_date)
@@ -460,15 +468,17 @@ CREATE TABLE notifications (
 -- 15. FACULTY DOCUMENT REQUESTS (faculty requesting their own documents)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS faculty_document_requests (
-    request_id          INT          AUTO_INCREMENT PRIMARY KEY,
-    tracking_number     VARCHAR(50)  NOT NULL UNIQUE,
-    faculty_id          INT          NOT NULL,
-    service_id          INT          NOT NULL,
-    request_type        VARCHAR(100) NOT NULL DEFAULT 'General',
-    purpose             VARCHAR(255) NOT NULL,
-    status              ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
-    notes               TEXT         NULL,
-    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    request_id           INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number      VARCHAR(50)  NOT NULL UNIQUE,
+    faculty_id           INT          NOT NULL,
+    service_id           INT          NOT NULL,
+    request_type         VARCHAR(100) NOT NULL DEFAULT 'General',
+    purpose              VARCHAR(255) NOT NULL,
+    status               ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
+    estimated_completion DATE         NULL,
+    released_at          TIMESTAMP    NULL,
+    notes                TEXT         NULL,
+    created_at           TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_faculty_doc_requests_faculty (faculty_id)

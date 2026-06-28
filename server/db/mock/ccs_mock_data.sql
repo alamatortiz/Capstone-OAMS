@@ -28,6 +28,7 @@ TRUNCATE TABLE system_settings;
 TRUNCATE TABLE external_sync_logs;
 TRUNCATE TABLE qr_tracking_logs;
 TRUNCATE TABLE generated_files;
+TRUNCATE TABLE faculty_document_requests;
 TRUNCATE TABLE document_requests;
 TRUNCATE TABLE appointments;
 TRUNCATE TABLE queue_status_logs;
@@ -36,6 +37,9 @@ TRUNCATE TABLE queue_slots;
 TRUNCATE TABLE service_requirements;
 TRUNCATE TABLE document_requirements;
 TRUNCATE TABLE appointment_services;
+TRUNCATE TABLE faculty_date_availability;
+TRUNCATE TABLE faculty_blocked_dates;
+TRUNCATE TABLE faculty_availability;
 TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
 TRUNCATE TABLE chat_messages;
@@ -73,13 +77,13 @@ DELIMITER ;
 -- SECTION 0 · DEPARTMENTS
 -- Fixed institution records. All 6 colleges seeded here.
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO departments (department_id, department_name, department_abbreviation, office_location) VALUES
-(1001, 'College of Computing Studies',                        'CCS',  'PNC Main Bldg. 2nd Floor'),
-(2001, 'College of Business, Accountancy and Administration', 'CBAA', 'PNC Main Bldg. 2nd Floor'),
-(3001, 'College of Education',                                'COED', 'PNC Main Bldg. 2nd Floor'),
-(4001, 'College of Engineering',                              'COE',  'PNC Main Bldg. 2nd Floor'),
-(5001, 'College of Arts and Sciences',                        'CAS',  'PNC Main Bldg. 2nd Floor'),
-(6001, 'College of Health and Allied Sciences',               'CHAS', 'PNC Main Bldg. 2nd Floor');
+INSERT INTO departments (department_id, department_name, department_abbreviation, office_location, office_hours) VALUES
+(1001, 'College of Computing Studies',                        'CCS',  'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 8:00 AM - 5:00 PM'),
+(2001, 'College of Business, Accountancy and Administration', 'CBAA', 'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 8:00 AM - 5:00 PM, Saturday: 8:00 AM - 12:00 PM'),
+(3001, 'College of Education',                                'COED', 'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 8:00 AM - 5:00 PM'),
+(4001, 'College of Engineering',                              'COE',  'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 7:30 AM - 5:00 PM'),
+(5001, 'College of Arts and Sciences',                        'CAS',  'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 8:00 AM - 5:00 PM'),
+(6001, 'College of Health and Allied Sciences',               'CHAS', 'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 8:00 AM - 5:00 PM, Saturday: 8:00 AM - 12:00 PM');
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -348,7 +352,8 @@ INSERT INTO services (service_id, service_name, description, department_id, stat
 (3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, 'active', 10, TRUE),
 (4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, 'active', 15, FALSE),
 (5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, 'active', 10, TRUE),
-(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 'active', 30, FALSE);
+(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 'active', 30, FALSE),
+(7, 'General Inquiry Counter',   'Walk-in general inquiries available to all departments', NULL, 'active', 10, TRUE);
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5a-REQ · SERVICE REQUIREMENTS
@@ -438,11 +443,14 @@ INSERT INTO appointment_services (service_id, service_name, description, faculty
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5c · DOCUMENT SERVICES
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO document_services (service_id, service_name, description, department_id, status, fee, processing_time) VALUES
-(1, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, 'active',  75.00, '2-3 business days'),
-(2, 'Transcript of Records',     'Request for official Transcript of Records',      1001, 'active', 150.00, '5-7 business days'),
-(3, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, 'active',  50.00, '1-2 business days'),
-(4, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 'active',   0.00, '3-5 business days');
+-- recipient_type: 'students' | 'faculty' | 'both'
+-- department_id NULL = available across all departments
+INSERT INTO document_services (service_id, service_name, description, department_id, recipient_type, status, fee, processing_time) VALUES
+(1, 'Good Moral Certificate',       'Request for Good Moral Certificate',              1001, 'students', 'active',  75.00, '2-3 business days'),
+(2, 'Transcript of Records',        'Request for official Transcript of Records',      1001, 'students', 'active', 150.00, '5-7 business days'),
+(3, 'Certificate of Enrollment',    'Request for Certificate of Enrollment',           2001, 'students', 'active',  50.00, '1-2 business days'),
+(4, 'Clearance Processing',         'Process student clearance for graduation/leave',  3001, 'students', 'active',   0.00, '3-5 business days'),
+(5, 'Certificate of Employment',    'Official certificate of employment for faculty',  NULL, 'faculty',  'active',   0.00, '2-3 business days');
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -502,15 +510,17 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 8 · APPOINTMENTS
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, appointment_date, appointment_time, status, notes, created_at) VALUES
+-- availability_id: NULL for legacy/pre-slot bookings; set when student picks from a faculty_date_availability slot
+-- service_id: FK to appointment_services (the faculty-defined service type for this appointment)
+INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, availability_id, appointment_date, appointment_time, status, notes, created_at) VALUES
 -- Student 101: 1 approved upcoming, 1 pending upcoming, 1 completed
-(1, 101, 102, 1001, 1, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
-(2, 101, 106, 1001, 3, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
-(3, 101, 107, 1001, 4, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
+(1, 101, 102, 1001, 1, NULL, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
+(2, 101, 106, 1001, 3, NULL, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
+(3, 101, 107, 1001, 4, NULL, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
 -- Student 104: 1 pending upcoming, 2 completed
-(4, 104, 102, 1001, 2, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
-(5, 104, 106, 1001, 3, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
-(6, 104, 107, 1001, 4, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
+(4, 104, 102, 1001, 2, NULL, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
+(5, 104, 106, 1001, 3, NULL, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
+(6, 104, 107, 1001, 4, NULL, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -680,58 +690,61 @@ INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time,
 --   Mon Jul 06, Tue Jul 07, Wed Jul 08, Thu Jul 09, Fri Jul 10
 --   Mon Jul 13, Tue Jul 14, Wed Jul 15, Thu Jul 16, Fri Jul 17
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, location) VALUES
+-- max_students: NULL = indefinite (no cap); N = total booking cap for the window
+-- slot_duration_minutes: length of each bookable slot students pick from within the window
+-- status: 'open' = bookable; 'closed' = faculty manually closed early
+INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, max_students, slot_duration_minutes, status, location) VALUES
 
--- 102 Patrick Ogalesco (Mon AM+PM, Wed AM, Fri PM) — skips Jul 6 to simulate real-life gap
-('102', '2026-06-29', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
-('102', '2026-06-29', '14:00:00', '17:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-01', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-03', '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-08', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-08', '14:00:00', '17:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-10', '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-13', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-15', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
-('102', '2026-07-17', '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
+-- 102 Patrick Ogalesco: 30-min slots, max 5 students per window (Mon AM+PM, Wed AM, Fri PM) — skips Jul 6
+('102', '2026-06-29', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-06-29', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-07-01', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-07-03', '13:00:00', '16:00:00',  5, 30, 'closed', 'CCS Faculty Room 201'),
+('102', '2026-07-08', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-07-08', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-07-10', '13:00:00', '16:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-07-13', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-07-15', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+('102', '2026-07-17', '13:00:00', '16:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
 
--- 106 Marvin Bicua (Tue AM+PM, Thu AM+PM) — skips Jul 14 to simulate conflict
-('106', '2026-06-30', '10:00:00', '12:00:00', 'CCS Faculty Room 203'),
-('106', '2026-06-30', '14:00:00', '17:00:00', 'CCS Faculty Room 203'),
-('106', '2026-07-02', '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
-('106', '2026-07-02', '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
-('106', '2026-07-07', '10:00:00', '12:00:00', 'CCS Faculty Room 203'),
-('106', '2026-07-09', '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
-('106', '2026-07-09', '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
-('106', '2026-07-16', '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
-('106', '2026-07-16', '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
+-- 106 Marvin Bicua: 60-min slots, indefinite students (Tue AM+PM, Thu AM+PM) — skips Jul 14
+('106', '2026-06-30', '10:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-06-30', '14:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-07-02', '09:00:00', '11:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-07-02', '13:00:00', '16:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-07-07', '10:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-07-09', '09:00:00', '11:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-07-09', '13:00:00', '16:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-07-16', '09:00:00', '11:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+('106', '2026-07-16', '13:00:00', '16:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
 
--- 107 Janus Raymond Tan (Mon AM, Wed AM+PM, Fri AM)
-('107', '2026-06-29', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-01', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-01', '14:00:00', '16:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-03', '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-06', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-08', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-10', '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-13', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-15', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-15', '14:00:00', '16:00:00', 'CCS Dean\'s Office'),
-('107', '2026-07-17', '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
+-- 107 Janus Raymond Tan: 30-min slots, max 3 students per window (Mon AM, Wed AM+PM, Fri AM)
+('107', '2026-06-29', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-01', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-01', '14:00:00', '16:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-03', '09:00:00', '12:00:00',  3, 30, 'closed', 'CCS Dean\'s Office'),
+('107', '2026-07-06', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-08', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-10', '09:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-13', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-15', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-15', '14:00:00', '16:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+('107', '2026-07-17', '09:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
 
--- 110 Lena Villanueva (Mon PM, Wed AM, Fri PM) — skips Jul 10 (out of office)
-('110', '2026-06-29', '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
-('110', '2026-07-01', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
-('110', '2026-07-03', '14:00:00', '17:00:00', 'CCS Faculty Room 105'),
-('110', '2026-07-06', '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
-('110', '2026-07-08', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
-('110', '2026-07-13', '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
-('110', '2026-07-15', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
-('110', '2026-07-17', '14:00:00', '17:00:00', 'CCS Faculty Room 105'),
+-- 110 Lena Villanueva: 30-min slots, max 5 students (Mon PM, Wed AM, Fri PM) — skips Jul 10
+('110', '2026-06-29', '13:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+('110', '2026-07-01', '10:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+('110', '2026-07-03', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+('110', '2026-07-06', '13:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+('110', '2026-07-08', '10:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+('110', '2026-07-13', '13:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+('110', '2026-07-15', '10:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+('110', '2026-07-17', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
 
--- 111 Marco Dela Cruz (Tue AM, Thu PM)
-('111', '2026-06-30', '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
-('111', '2026-07-02', '13:00:00', '17:00:00', 'CCS Faculty Room 401'),
-('111', '2026-07-07', '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
-('111', '2026-07-09', '13:00:00', '17:00:00', 'CCS Faculty Room 401'),
-('111', '2026-07-14', '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
-('111', '2026-07-16', '13:00:00', '17:00:00', 'CCS Faculty Room 401');
+-- 111 Marco Dela Cruz: 60-min slots, indefinite students (Tue AM, Thu PM)
+('111', '2026-06-30', '08:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
+('111', '2026-07-02', '13:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
+('111', '2026-07-07', '08:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
+('111', '2026-07-09', '13:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
+('111', '2026-07-14', '08:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
+('111', '2026-07-16', '13:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 401');
