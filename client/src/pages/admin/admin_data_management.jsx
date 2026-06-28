@@ -176,6 +176,8 @@ const emptyDocForm = () => ({
   processingTime: "",
   fee: "",
   status: "active",
+  scope: "department",
+  recipientType: "students",
 });
 
 const emptyServiceForm = () => ({
@@ -184,6 +186,7 @@ const emptyServiceForm = () => ({
   avgServiceTime: "",
   autoClose: true,
   status: "active",
+  scope: "department",
 });
 
 const emptyReqForm = () => ({ name: "", description: "", isMandatory: true });
@@ -353,6 +356,8 @@ export default function AdminDataManagement() {
       processingTime: doc.processingTime,
       fee: String(doc.fee),
       status: doc.status,
+      scope: doc.scope || "department",
+      recipientType: doc.recipientType || "students",
     });
     setRequirements([]);
     setReqForm(emptyReqForm());
@@ -401,6 +406,8 @@ export default function AdminDataManagement() {
         processingTime,
         fee: parseFloat(fee),
         status: docForm.status,
+        scope: docForm.scope,
+        recipientType: docForm.recipientType,
         requirements: requirements.map((r) => ({
           name: r.name,
           description: r.description || "",
@@ -454,6 +461,7 @@ export default function AdminDataManagement() {
       avgServiceTime: String(s.avgServiceTime),
       autoClose: s.autoClose,
       status: s.status,
+      scope: s.scope || "department",
     });
     setServiceRequirements([]);
     setServiceSteps([]);
@@ -522,6 +530,7 @@ export default function AdminDataManagement() {
         avgServiceTime: parseInt(serviceForm.avgServiceTime, 10),
         autoClose: serviceForm.autoClose,
         status: serviceForm.status,
+        scope: serviceForm.scope,
       };
 
       let serviceId;
@@ -816,7 +825,13 @@ export default function AdminDataManagement() {
                       <div className="adm-item-main">
                         <div className="adm-item-top-row">
                           <p className="adm-item-name">{doc.name}</p>
-                          <span className={`adm-badge adm-badge-status-${doc.status}`}>{doc.status}</span>
+                          <div className="adm-item-badges">
+                            {doc.scope === "all"
+                              ? <span className="adm-badge adm-badge-global">All Depts</span>
+                              : <span className="adm-badge adm-badge-dept">{doc.deptAbbrev}</span>}
+                            <span className="adm-badge adm-badge-recipient">{doc.recipientType || "students"}</span>
+                            <span className={`adm-badge adm-badge-status-${doc.status}`}>{doc.status}</span>
+                          </div>
                         </div>
                         <p className="adm-item-desc">{doc.description}</p>
                         <div className="adm-item-meta">
@@ -876,7 +891,12 @@ export default function AdminDataManagement() {
                       <div className="adm-item-main">
                         <div className="adm-item-top-row">
                           <p className="adm-item-name">{s.name}</p>
-                          <span className={`adm-badge adm-badge-status-${s.status}`}>{s.status}</span>
+                          <div className="adm-item-badges">
+                            {s.scope === "all"
+                              ? <span className="adm-badge adm-badge-global">All Depts</span>
+                              : <span className="adm-badge adm-badge-dept">{s.deptAbbrev}</span>}
+                            <span className={`adm-badge adm-badge-status-${s.status}`}>{s.status}</span>
+                          </div>
                         </div>
                         {s.description && <p className="adm-item-desc">{s.description}</p>}
                         <div className="adm-item-meta">
@@ -1023,6 +1043,36 @@ export default function AdminDataManagement() {
                 </select>
               </div>
 
+              <div className="adm-form-grid-2">
+                <div className="adm-form-group">
+                  <label className="adm-form-label">Availability</label>
+                  <div className="adm-scope-toggle">
+                    <label className={`adm-scope-option ${docForm.scope === "department" ? "adm-scope-selected" : ""}`}>
+                      <input type="radio" name="docScope" value="department" checked={docForm.scope === "department"}
+                        onChange={() => setDocForm((p) => ({ ...p, scope: "department" }))} />
+                      My Department
+                    </label>
+                    <label className={`adm-scope-option ${docForm.scope === "all" ? "adm-scope-selected" : ""}`}>
+                      <input type="radio" name="docScope" value="all" checked={docForm.scope === "all"}
+                        onChange={() => setDocForm((p) => ({ ...p, scope: "all" }))} />
+                      All Departments
+                    </label>
+                  </div>
+                </div>
+                <div className="adm-form-group">
+                  <label className="adm-form-label">Available To</label>
+                  <select
+                    className="adm-form-select"
+                    value={docForm.recipientType}
+                    onChange={(e) => setDocForm((p) => ({ ...p, recipientType: e.target.value }))}
+                  >
+                    <option value="students">Students</option>
+                    <option value="faculty">Faculty</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
+              </div>
+
               {/* ── Document Requirements ── */}
               <div className="adm-req-section">
                 <div className="adm-req-header">
@@ -1157,6 +1207,22 @@ export default function AdminDataManagement() {
                   </select>
                 </div>
               </div>
+              <div className="adm-form-group">
+                <label className="adm-form-label">Availability</label>
+                <div className="adm-scope-toggle">
+                  <label className={`adm-scope-option ${serviceForm.scope === "department" ? "adm-scope-selected" : ""}`}>
+                    <input type="radio" name="svcScope" value="department" checked={serviceForm.scope === "department"}
+                      onChange={() => setServiceForm((p) => ({ ...p, scope: "department" }))} />
+                    My Department
+                  </label>
+                  <label className={`adm-scope-option ${serviceForm.scope === "all" ? "adm-scope-selected" : ""}`}>
+                    <input type="radio" name="svcScope" value="all" checked={serviceForm.scope === "all"}
+                      onChange={() => setServiceForm((p) => ({ ...p, scope: "all" }))} />
+                    All Departments
+                  </label>
+                </div>
+              </div>
+
               <label className="adm-checkbox-wrapper">
                 <input
                   type="checkbox"

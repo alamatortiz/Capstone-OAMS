@@ -498,33 +498,49 @@ router.post(
 );
 
 // GET /api/student/documents/service-types
-// Returns service names and departments from document_services for the request form.
+// Returns document services visible to the student: their own dept + global (NULL dept),
+// filtered to recipient_type 'students' or 'both', active only.
 router.get(
   "/documents/service-types",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     try {
+      const studentId = req.user.userId;
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
       const [rows] = await pool.query(
-        `SELECT ds.service_id, ds.service_name,
-                d.department_id, d.department_name, d.department_abbreviation
+        `SELECT ds.service_id, ds.service_name, ds.department_id,
+                d.department_id AS dept_id, d.department_name, d.department_abbreviation
          FROM document_services ds
-         JOIN departments d ON ds.department_id = d.department_id
-         ORDER BY ds.service_name ASC`,
+         LEFT JOIN departments d ON ds.department_id = d.department_id
+         WHERE (ds.department_id = ? OR ds.department_id IS NULL)
+           AND ds.recipient_type IN ('students', 'both')
+           AND ds.status = 'active'
+         ORDER BY ds.department_id IS NULL ASC, ds.service_name ASC`,
+        [studentDeptId],
       );
 
+      // Group by department. Global services (NULL dept) go under a synthetic "All Departments" group.
+      const GLOBAL_KEY = 0;
       const departmentMap = new Map();
       const servicesByDepartmentId = {};
+
       for (const row of rows) {
-        if (!departmentMap.has(row.department_id)) {
-          departmentMap.set(row.department_id, {
-            id: row.department_id,
-            name: row.department_name,
-            abbrev: row.department_abbreviation,
+        const key = row.department_id ?? GLOBAL_KEY;
+        if (!departmentMap.has(key)) {
+          departmentMap.set(key, {
+            id: key,
+            name: row.department_id ? row.department_name : "All Departments",
+            abbrev: row.department_id ? row.department_abbreviation : "ALL",
           });
-          servicesByDepartmentId[row.department_id] = [];
+          servicesByDepartmentId[key] = [];
         }
-        servicesByDepartmentId[row.department_id].push(row.service_name);
+        servicesByDepartmentId[key].push(row.service_name);
       }
 
       res.json({
@@ -598,13 +614,22 @@ router.delete(
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/student/queues/available
-// Returns all open queue slots for today across all departments.
+// Returns open queue slots for today that the student can join:
+//   - Service belongs to the student's own department, OR
+//   - Service is global (department_id IS NULL) — hosted by any admin, shown to all students.
 router.get(
   "/queues/available",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     try {
+      const studentId = req.user.userId;
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
       const [slots] = await pool.query(
         `SELECT
            qs.slot_id,
@@ -616,10 +641,11 @@ router.get(
            qs.current_count,
            qs.status,
            s.service_name,
-           d.department_id,
-           d.department_name,
-           d.department_abbreviation,
-           -- Currently serving: latest queue entry with status='serving' in this slot
+           s.department_id AS svc_dept_id,
+           -- For dept-scoped services use the service's dept; for global use the admin's dept
+           COALESCE(d.department_id,   da.department_id)   AS department_id,
+           COALESCE(d.department_name, da.department_name) AS department_name,
+           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation,
            (
              SELECT q.queue_number
              FROM queues q
@@ -627,7 +653,6 @@ router.get(
              ORDER BY q.called_at DESC
              LIMIT 1
            ) AS currently_serving_number,
-           -- Simple wait estimate: current waiting count * 5 minutes
            (
              SELECT COUNT(*)
              FROM queues q2
@@ -635,10 +660,14 @@ router.get(
            ) AS waiting_count
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN departments d  ON s.department_id   = d.department_id
+         JOIN administrators adm  ON qs.admin_id       = adm.admin_id
+         JOIN departments    da   ON adm.department_id = da.department_id
          WHERE qs.slot_date = CURDATE()
            AND qs.status IN ('open', 'paused')
-         ORDER BY d.department_abbreviation, s.service_name`,
+           AND (s.department_id = ? OR s.department_id IS NULL)
+         ORDER BY department_abbreviation, s.service_name`,
+        [studentDeptId],
       );
 
       const formatted = slots.map((slot) => {
@@ -660,6 +689,7 @@ router.get(
           departmentId: slot.department_id,
           departmentName: slot.department_name,
           departmentAbbrev: deptAbbrev,
+          isGlobal: slot.svc_dept_id === null,
           slotDate: slot.slot_date,
           startTime: slot.start_time,
           endTime: slot.end_time,
