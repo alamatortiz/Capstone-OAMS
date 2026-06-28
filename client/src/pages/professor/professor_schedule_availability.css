@@ -487,6 +487,34 @@ html, body {
   gap: 0.4rem;
 }
 
+.sa-field-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.sa-slot-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  background: var(--dark-bg, rgba(0,0,0,0.05));
+  border: 1px solid var(--card-border);
+  border-radius: 0.625rem;
+}
+
+.sa-preview-chip {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .sa-form-group label {
   font-size: 0.875rem;
   font-weight: 600;
@@ -518,6 +546,17 @@ html, body {
 }
 
 .sa-input::placeholder { color: var(--text-tertiary); }
+
+select.sa-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a855f7' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
+
 .sa-input:hover,
 .sa-select:hover { border-color: rgba(168, 85, 247, 0.3); }
 

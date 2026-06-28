@@ -146,9 +146,40 @@ export default function ProfessorScheduleAvailability() {
   const [addStart, setAddStart] = useState("");
   const [addEnd, setAddEnd] = useState("");
   const [addLocation, setAddLocation] = useState("");
+  const [addMaxStudents, setAddMaxStudents] = useState("");
+  const [addSlotDuration, setAddSlotDuration] = useState("30");
   const [addSaving, setAddSaving] = useState(false);
 
   const todayStr = now.toISOString().split("T")[0];
+
+  // ── Auto-divide: slot_duration = floor(window / max_students) when max is set ─
+  const computedSlotDuration = (() => {
+    if (!addStart || !addEnd || !addMaxStudents.trim()) return null;
+    const [sh, sm] = addStart.split(":").map(Number);
+    const [eh, em] = addEnd.split(":").map(Number);
+    const totalMin = eh * 60 + em - (sh * 60 + sm);
+    const max = parseInt(addMaxStudents, 10);
+    if (totalMin <= 0 || isNaN(max) || max < 1) return null;
+    return Math.floor(totalMin / max);
+  })();
+
+  const effectiveDuration = computedSlotDuration ?? parseInt(addSlotDuration, 10);
+
+  const slotPreview = (() => {
+    if (!addStart || !addEnd || isNaN(effectiveDuration) || effectiveDuration < 1) return [];
+    const [sh, sm] = addStart.split(":").map(Number);
+    const [eh, em] = addEnd.split(":").map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    const capCount = addMaxStudents.trim() ? parseInt(addMaxStudents, 10) : 48;
+    const result = [];
+    for (let m = startMin; m < endMin && result.length < capCount; m += effectiveDuration) {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      result.push(`${(h % 12) || 12}:${String(min).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`);
+    }
+    return result;
+  })();
 
   // ── Fetch date-specific availability ────────────────────────────────────────
   const fetchAll = async () => {
@@ -207,17 +238,25 @@ export default function ProfessorScheduleAvailability() {
     setAddStart("");
     setAddEnd("");
     setAddLocation("");
+    setAddMaxStudents("");
+    setAddSlotDuration("30");
     setShowAddSlot(true);
   };
 
   // ── Save new slot ───────────────────────────────────────────────────────────
   const handleAddSlot = async () => {
     if (!addDate || !addStart || !addEnd || !addLocation.trim()) {
-      toast.error("Please fill in all fields");
+      toast.error("Please fill in date, times, and location");
       return;
     }
     if (addEnd <= addStart) { toast.error("End time must be after start time"); return; }
     if (addDate < todayStr) { toast.error("Cannot add availability in the past"); return; }
+
+    const maxStu = addMaxStudents.trim() ? parseInt(addMaxStudents, 10) : null;
+    if (addMaxStudents.trim() && (isNaN(maxStu) || maxStu < 1)) {
+      toast.error("Max students must be a positive number, or leave blank for indefinite");
+      return;
+    }
 
     const existingForDate = slotsByDate[addDate] ?? [];
     const duplicate = existingForDate.some(
@@ -232,6 +271,8 @@ export default function ProfessorScheduleAvailability() {
         start_time: addStart,
         end_time: addEnd,
         location: addLocation.trim(),
+        max_students: maxStu,
+        slot_duration_minutes: effectiveDuration,
       });
       toast.success("Time slot added");
       setShowAddSlot(false);
@@ -430,6 +471,9 @@ export default function ProfessorScheduleAvailability() {
                           <ClockIcon />
                           <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
                           {s.location && <span className="sa-slot-location">· {s.location}</span>}
+                          <span className="sa-slot-location">· {s.slot_duration_minutes ?? 30}min slots</span>
+                          <span className="sa-slot-location">· {s.max_students != null ? `Max ${s.max_students}` : "Indefinite"}</span>
+                          {s.status === "closed" && <span className="sa-slot-location" style={{ color: "#ef4444" }}>· Closed</span>}
                           {selectedDate >= todayStr && (
                             <button className="sa-delete-btn" onClick={() => handleDeleteSlot(s.id, selectedDate)} title="Remove slot">
                               <TrashIcon />
@@ -486,6 +530,8 @@ export default function ProfessorScheduleAvailability() {
                             <ClockIcon />
                             <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
                             {s.location && <span className="sa-chip-location">· {s.location}</span>}
+                            <span className="sa-chip-location">· {s.slot_duration_minutes ?? 30}min</span>
+                            {s.max_students != null && <span className="sa-chip-location">· Max {s.max_students}</span>}
                           </div>
                         ))}
                       </div>
@@ -540,6 +586,43 @@ export default function ProfessorScheduleAvailability() {
                   onChange={(e) => setAddLocation(e.target.value)}
                 />
               </div>
+              <div className="sa-form-group">
+                <label>Max Students</label>
+                <input
+                  className="sa-input"
+                  type="number"
+                  min="1"
+                  placeholder="Leave blank for indefinite"
+                  value={addMaxStudents}
+                  onChange={(e) => setAddMaxStudents(e.target.value)}
+                />
+                <p className="sa-field-hint">
+                  {addMaxStudents.trim() && computedSlotDuration
+                    ? `Window will be divided into ${slotPreview.length} slot${slotPreview.length !== 1 ? "s" : ""} of ${computedSlotDuration} min each`
+                    : "Leave blank to accept anyone within the time window"}
+                </p>
+              </div>
+              {!addMaxStudents.trim() && (
+                <div className="sa-form-group">
+                  <label>Slot Duration</label>
+                  <select className="sa-input" value={addSlotDuration} onChange={(e) => setAddSlotDuration(e.target.value)}>
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="45">45 minutes</option>
+                    <option value="60">60 minutes</option>
+                  </select>
+                </div>
+              )}
+              {slotPreview.length > 0 && (
+                <div className="sa-form-group">
+                  <label>Slot Preview</label>
+                  <div className="sa-slot-preview">
+                    {slotPreview.map((t) => (
+                      <span key={t} className="sa-preview-chip">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="sa-modal-footer">
               <button className="sa-btn sa-btn--outline" onClick={() => setShowAddSlot(false)}>Cancel</button>

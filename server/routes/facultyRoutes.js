@@ -601,20 +601,31 @@ router.get(
 );
 
 // POST /api/faculty/date-availability
-// Body: { available_date, start_time, end_time, location }
+// Body: { available_date, start_time, end_time, location, max_students?, slot_duration_minutes? }
 router.post(
   "/date-availability",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { available_date, start_time, end_time, location } = req.body;
+    const { available_date, start_time, end_time, location, max_students, slot_duration_minutes } = req.body;
     if (!available_date || !start_time || !end_time) {
       return res.status(400).json({ message: "available_date, start_time, end_time are required" });
     }
     if (end_time <= start_time) {
       return res.status(400).json({ message: "end_time must be after start_time" });
     }
+
+    const duration = slot_duration_minutes != null ? parseInt(slot_duration_minutes, 10) : 30;
+    if (isNaN(duration) || duration < 5) {
+      return res.status(400).json({ message: "slot_duration_minutes must be at least 5" });
+    }
+
+    const maxStu = max_students != null ? parseInt(max_students, 10) : null;
+    if (maxStu !== null && (isNaN(maxStu) || maxStu < 1)) {
+      return res.status(400).json({ message: "max_students must be a positive integer, or omit for indefinite" });
+    }
+
     try {
       const [existing] = await pool.query(
         "SELECT id FROM faculty_date_availability WHERE faculty_id = ? AND available_date = ? AND start_time = ? AND end_time = ?",
@@ -624,12 +635,73 @@ router.post(
         return res.status(409).json({ message: "A slot with the same date and time already exists" });
       }
       const [result] = await pool.query(
-        "INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, location) VALUES (?,?,?,?,?)",
-        [facultyId, available_date, start_time, end_time, location ?? null]
+        `INSERT INTO faculty_date_availability
+           (faculty_id, available_date, start_time, end_time, max_students, slot_duration_minutes, location)
+         VALUES (?,?,?,?,?,?,?)`,
+        [facultyId, available_date, start_time, end_time, maxStu, duration, location ?? null]
       );
-      res.status(201).json({ id: result.insertId, message: "Availability slot added" });
+      res.status(201).json({
+        id: result.insertId,
+        message: "Availability slot added",
+        max_students: maxStu,
+        slot_duration_minutes: duration,
+      });
     } catch (err) {
       console.error("POST /date-availability error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// PATCH /api/faculty/date-availability/:id
+// Body: { max_students?, slot_duration_minutes?, status?, location? }
+router.patch(
+  "/date-availability/:id",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    const { max_students, slot_duration_minutes, status, location } = req.body;
+
+    const updates = {};
+    if (max_students !== undefined) {
+      const maxStu = max_students === null ? null : parseInt(max_students, 10);
+      if (maxStu !== null && (isNaN(maxStu) || maxStu < 1)) {
+        return res.status(400).json({ message: "max_students must be a positive integer or null for indefinite" });
+      }
+      updates.max_students = maxStu;
+    }
+    if (slot_duration_minutes !== undefined) {
+      const dur = parseInt(slot_duration_minutes, 10);
+      if (isNaN(dur) || dur < 5) {
+        return res.status(400).json({ message: "slot_duration_minutes must be at least 5" });
+      }
+      updates.slot_duration_minutes = dur;
+    }
+    if (status !== undefined) {
+      if (!["open", "closed"].includes(status)) {
+        return res.status(400).json({ message: "status must be 'open' or 'closed'" });
+      }
+      updates.status = status;
+    }
+    if (location !== undefined) updates.location = location;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No updatable fields provided" });
+    }
+
+    try {
+      const setClause = Object.keys(updates).map((k) => `${k} = ?`).join(", ");
+      const values = [...Object.values(updates), id, facultyId];
+      const [result] = await pool.query(
+        `UPDATE faculty_date_availability SET ${setClause} WHERE id = ? AND faculty_id = ?`,
+        values
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Slot not found" });
+      res.json({ message: "Slot updated" });
+    } catch (err) {
+      console.error("PATCH /date-availability/:id error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
     }
   }

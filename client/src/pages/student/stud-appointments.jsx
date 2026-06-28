@@ -230,6 +230,7 @@ export default function AppointmentsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
+  const [selectedTime, setSelectedTime] = useState("");
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -350,12 +351,18 @@ export default function AppointmentsPage() {
   };
 
   const handleBookSlot = async () => {
-    if (!selectedSlot || !purpose.trim()) { toast.error("Please provide a purpose for consultation"); return; }
+    if (!selectedSlot) return;
+    if (!selectedTime) { toast.error("Please select a time slot"); return; }
+    if (!purpose.trim()) { toast.error("Please provide a purpose for consultation"); return; }
     setSubmitting(true);
     try {
-      await api.post("/student/appointments/book-slot", { facultyId: selectedSlot.professorId, date: selectedSlot.date, startTime: selectedSlot.startTime, endTime: selectedSlot.endTime, purpose: purpose.trim() });
+      await api.post("/student/appointments/book-slot", {
+        availabilityId: selectedSlot.availabilityId,
+        appointmentTime: selectedTime,
+        purpose: purpose.trim(),
+      });
       toast.success("Appointment booked successfully!");
-      setPurpose(""); setSelectedSlot(null); setShowBookDialog(false);
+      setPurpose(""); setSelectedTime(""); setSelectedSlot(null); setShowBookDialog(false);
       await Promise.all([fetchSlots(), fetchMyBookings()]);
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to book appointment. The slot may no longer be available.");
@@ -548,17 +555,17 @@ export default function AppointmentsPage() {
                       <p className="date-count">{slotsByDate[date].length} slots available</p>
                       <div className="slots-grid">
                         {slotsByDate[date].map((slot) => (
-                          <div key={slot.id} className="slot-card">
+                          <div key={slot.availabilityId} className="slot-card">
                             <div className="slot-header">
                               <h4>{slot.professorName}</h4>
                               <span className="college-badge">{slot.college}</span>
                             </div>
                             <div className="slot-details">
-                              <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.startTime)} – {formatTime(slot.endTime)}</span></div>
+                              <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</span></div>
                               <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
-                              <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.maxSlots - slot.currentBookings} of {slot.maxSlots} available</span></div>
+                              <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.availableCount} {slot.availableCount === 1 ? "slot" : "slots"} available {slot.maxStudents != null ? `(max ${slot.maxStudents})` : "(indefinite)"}</span></div>
                             </div>
-                            <button className="book-btn" onClick={() => { setSelectedSlot(slot); setShowBookDialog(true); }}>Book This Slot</button>
+                            <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedTime(""); setShowBookDialog(true); }}>Book This Slot</button>
                           </div>
                         ))}
                       </div>
@@ -639,16 +646,34 @@ export default function AppointmentsPage() {
                 <h4>{selectedSlot.professorName}</h4>
                 <div className="summary-details">
                   <div className="summary-item"><CalendarIcon /><span>{formatDate(selectedSlot.date)}</span></div>
-                  <div className="summary-item"><ClockIcon /><span>{formatTime(selectedSlot.startTime)} – {formatTime(selectedSlot.endTime)}</span></div>
+                  <div className="summary-item"><ClockIcon /><span>{formatTime(selectedSlot.windowStart)} – {formatTime(selectedSlot.windowEnd)}</span></div>
                   <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
                 </div>
               </div>
               <div className="form-group">
+                <label>Select Time Slot *</label>
+                <div className="time-slots-picker">
+                  {selectedSlot.timeSlots.filter((ts) => ts.available).map((ts) => (
+                    <button
+                      key={ts.time}
+                      type="button"
+                      className={`time-slot-btn${selectedTime === ts.time ? " selected" : ""}`}
+                      onClick={() => setSelectedTime(ts.time)}
+                    >
+                      {formatTime(ts.time)}
+                    </button>
+                  ))}
+                  {selectedSlot.timeSlots.filter((ts) => ts.available).length === 0 && (
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: 0 }}>No time slots available</p>
+                  )}
+                </div>
+              </div>
+              <div className="form-group">
                 <label htmlFor="purpose">Purpose of Consultation *</label>
-                <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={4} className="textarea"></textarea>
+                <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
               </div>
               <div className="dialog-actions">
-                <button className="btn-secondary" onClick={() => setShowBookDialog(false)} disabled={submitting}>Cancel</button>
+                <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedTime(""); }} disabled={submitting}>Cancel</button>
                 <button className="btn-primary" onClick={handleBookSlot} disabled={submitting}>{submitting ? "Booking…" : "Confirm Booking"}</button>
               </div>
             </div>
