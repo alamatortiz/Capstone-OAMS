@@ -10,7 +10,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
-import { ChevronDown, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, Megaphone as LucideMegaphone } from "lucide-react";
+import { ChevronDown, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -485,6 +485,18 @@ export default function AppointmentsPage() {
             </div>
           </div>
 
+          {/* Professor Schedules card */}
+          <Link to="/student/professor-schedules" className="appt-prof-sched-card">
+            <div className="appt-prof-sched-card-icon">
+              <LucideGraduationCap />
+            </div>
+            <div className="appt-prof-sched-card-text">
+              <span className="appt-prof-sched-card-title">Professor Schedules</span>
+              <span className="appt-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
+            </div>
+            <ChevronRightIcon />
+          </Link>
+
           {/* Filters */}
           <div className="filters-card">
             <div className="filters-header">
@@ -532,10 +544,12 @@ export default function AppointmentsPage() {
           <div className="tabs-navigation">
             <div className="qt-tabs-list">
               <button type="button" className={`qt-tab ${activeTab === "slots" ? "active" : ""}`} onClick={() => setActiveTab("slots")}>
-                <CalendarDays className="qt-icon-xs" /> Available Slots ({slotsLoading ? "—" : availableSlots.length})
+                <CalendarDays className="qt-icon-xs" /> Available Slots
+                <span className="apst-tab-count">{slotsLoading ? "—" : availableSlots.length}</span>
               </button>
               <button type="button" className={`qt-tab ${activeTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
-                <ClipboardList className="qt-icon-xs" /> My Bookings ({bookingsLoading ? "—" : activeBookings.length})
+                <ClipboardList className="qt-icon-xs" /> My Bookings
+                <span className="apst-tab-count">{bookingsLoading ? "—" : activeBookings.length}</span>
               </button>
             </div>
           </div>

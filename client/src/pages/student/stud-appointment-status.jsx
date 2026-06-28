@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
+  ChevronRight,
+  GraduationCap,
   Calendar,
   XCircle,
   Loader2,
@@ -505,6 +507,18 @@ export default function AppointmentStatusPage() {
                 </div>
               </div>
             </div>
+
+            {/* Professor Schedules card */}
+            <Link to="/student/professor-schedules" className="appt-prof-sched-card">
+              <div className="appt-prof-sched-card-icon">
+                <GraduationCap />
+              </div>
+              <div className="appt-prof-sched-card-text">
+                <span className="appt-prof-sched-card-title">Professor Schedules</span>
+                <span className="appt-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
+              </div>
+              <ChevronRight style={{ width: "1.375rem", height: "1.375rem", color: "#a855f7", opacity: 0.7, flexShrink: 0 }} />
+            </Link>
 
             {error && (
               <div className="queue-empty-state" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
