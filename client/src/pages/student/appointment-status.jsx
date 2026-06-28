@@ -507,17 +507,19 @@ export default function AppointmentStatusPage() {
 
             {!loading && !error && (
               <div className="qt-tabs-container">
-                <div className="qt-tabs-list apst-tabs-scrollable">
-                  {TABS.map(({ key, label }) => (
-                    <button
-                      key={key}
-                      className={`qt-tab ${activeTab === key ? "active" : ""}`}
-                      onClick={() => setActiveTab(key)}
-                    >
-                      {label}
-                      <span className="apst-tab-count">{tabLists[key].length}</span>
-                    </button>
-                  ))}
+                <div className="apst-tabs-scrollable">
+                  <div className="qt-tabs-list">
+                    {TABS.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        className={`qt-tab ${activeTab === key ? "active" : ""}`}
+                        onClick={() => setActiveTab(key)}
+                      >
+                        {label}
+                        <span className="apst-tab-count">{tabLists[key].length}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="dss-list-container">

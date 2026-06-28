@@ -1023,23 +1023,23 @@ body {
 }
 
 /* Gradient backgrounds for action icons */
-.action-gradient-1 {
+.student-dashboard .action-gradient-1 {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
 }
 
-.action-gradient-2 {
+.student-dashboard .action-gradient-2 {
   background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
 }
 
-.action-gradient-3 {
+.student-dashboard .action-gradient-3 {
   background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
 }
 
-.action-gradient-4 {
+.student-dashboard .action-gradient-4 {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
 }
 
-.action-gradient-5 {
+.student-dashboard .action-gradient-5 {
   background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
 }
 

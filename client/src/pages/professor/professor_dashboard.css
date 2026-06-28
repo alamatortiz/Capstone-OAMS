@@ -1250,10 +1250,10 @@ body {
 }
 
 /* Professor-specific gradient colors (orange / violet / green) */
-.action-gradient-1 { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
-.action-gradient-2 { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
-.action-gradient-3 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
-.action-gradient-4 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+.professor-dashboard .action-gradient-1 { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+.professor-dashboard .action-gradient-2 { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
+.professor-dashboard .action-gradient-3 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+.professor-dashboard .action-gradient-4 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
 
 .action-body {
   display: flex;

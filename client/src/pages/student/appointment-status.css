@@ -175,12 +175,14 @@
 /* ─── Scrollable tab row (6 tabs don't wrap on small screens) ────────────── */
 .apst-tabs-scrollable {
   overflow-x: auto;
-  flex-wrap: nowrap;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: 2px;
 }
 .apst-tabs-scrollable::-webkit-scrollbar { display: none; }
+.apst-tabs-scrollable .qt-tabs-list {
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
 
 /* ─── Count pill inside each tab ─────────────────────────────────────────── */
 .apst-tab-count {
