@@ -538,8 +538,16 @@ export default function QueuePage() {
               state={{ from: 'queue' }}
               className="queue-tracking-link-btn"
             >
-              <Activity className="queue-tracking-link-btn-icon" />
-              Queue Tracking
+              <div className="queue-tracking-link-btn-icon-box">
+                <Activity />
+              </div>
+              <div className="queue-tracking-link-btn-text">
+                <span className="queue-tracking-link-btn-title">Queue Tracking</span>
+                <span className="queue-tracking-link-btn-subtitle">Monitor your active queue positions in real-time</span>
+              </div>
+              <svg className="queue-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
             </Link>
           )}
 
