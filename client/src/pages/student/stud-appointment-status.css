@@ -172,6 +172,14 @@
   color: #7f1d1d;
 }
 
+/* ─── Icon inside each tab button ────────────────────────────────────────── */
+.qt-tab-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
 /* ─── Scrollable tab row (6 tabs don't wrap on small screens) ────────────── */
 .apst-tabs-scrollable {
   overflow-x: auto;

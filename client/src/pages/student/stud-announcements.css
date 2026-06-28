@@ -700,8 +700,8 @@ body {
 }
 
 .ann-college-select:focus {
-  border-color: rgba(168, 85, 247, 0.5);
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.1);
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
 }
 
 .ann-college-select option {

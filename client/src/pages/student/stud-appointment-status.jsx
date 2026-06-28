@@ -6,6 +6,9 @@ import {
   XCircle,
   Loader2,
   AlertCircle,
+  LayoutList,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
@@ -376,6 +379,15 @@ export default function AppointmentStatusPage() {
     cancelled: byStatus("cancelled"),
   };
 
+  const TAB_ICON_MAP = {
+    all:       LayoutList,
+    pending:   Clock,
+    approved:  CheckCircle2,
+    completed: CheckCircle2,
+    rejected:  XCircle,
+    cancelled: XCircle,
+  };
+
   const TABS = [
     { key: "all",       label: "All" },
     { key: "pending",   label: "Pending" },
@@ -509,16 +521,20 @@ export default function AppointmentStatusPage() {
               <div className="qt-tabs-container">
                 <div className="apst-tabs-scrollable">
                   <div className="qt-tabs-list">
-                    {TABS.map(({ key, label }) => (
-                      <button
-                        key={key}
-                        className={`qt-tab ${activeTab === key ? "active" : ""}`}
-                        onClick={() => setActiveTab(key)}
-                      >
-                        {label}
-                        <span className="apst-tab-count">{tabLists[key].length}</span>
-                      </button>
-                    ))}
+                    {TABS.map(({ key, label }) => {
+                      const TabIcon = TAB_ICON_MAP[key];
+                      return (
+                        <button
+                          key={key}
+                          className={`qt-tab ${activeTab === key ? "active" : ""}`}
+                          onClick={() => setActiveTab(key)}
+                        >
+                          {TabIcon && <TabIcon className="qt-tab-icon" />}
+                          {label}
+                          <span className="apst-tab-count">{tabLists[key].length}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
