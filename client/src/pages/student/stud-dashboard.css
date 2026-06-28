@@ -1036,7 +1036,7 @@ body {
 }
 
 .student-dashboard .action-gradient-4 {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
 }
 
 .student-dashboard .action-gradient-5 {
@@ -1060,6 +1060,52 @@ body {
 
 .quick-action-card:hover .action-badge {
   background: rgba(22, 163, 74, 0.25);
+}
+
+/* Violet badge — Appointments (gradient-2) & Professor Schedules (gradient-4) */
+.quick-action-card:has(.action-gradient-2) .action-badge,
+.quick-action-card:has(.action-gradient-4) .action-badge {
+  background: rgba(168, 85, 247, 0.15);
+  color: #d8b4fe;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.quick-action-card:has(.action-gradient-2):hover .action-badge,
+.quick-action-card:has(.action-gradient-4):hover .action-badge {
+  background: rgba(168, 85, 247, 0.25);
+}
+
+[data-theme="light"] .quick-action-card:has(.action-gradient-2) .action-badge,
+[data-theme="light"] .quick-action-card:has(.action-gradient-4) .action-badge {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+[data-theme="light"] .quick-action-card:has(.action-gradient-2):hover .action-badge,
+[data-theme="light"] .quick-action-card:has(.action-gradient-4):hover .action-badge {
+  background: rgba(147, 51, 234, 0.2);
+}
+
+/* Blue badge — Queue Tracking (gradient-3) */
+.quick-action-card:has(.action-gradient-3) .action-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.quick-action-card:has(.action-gradient-3):hover .action-badge {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="light"] .quick-action-card:has(.action-gradient-3) .action-badge {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .quick-action-card:has(.action-gradient-3):hover .action-badge {
+  background: rgba(37, 99, 235, 0.2);
 }
 
 .action-title {
