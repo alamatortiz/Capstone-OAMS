@@ -462,6 +462,35 @@
   max-width: 20rem;
 }
 
+/* ─── Count pill inside each tab ─────────────────────────────────────────── */
+.doc-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  transition: background 0.2s;
+}
+
+.qt-tab.active .doc-tab-count {
+  background: rgba(249, 115, 22, 0.25);
+}
+
+[data-theme="light"] .doc-tab-count {
+  background: rgba(234, 88, 12, 0.1);
+  color: #ea580c;
+}
+
+[data-theme="light"] .qt-tab.active .doc-tab-count {
+  background: rgba(234, 88, 12, 0.2);
+}
+
 /* ─── Tabs ───────────────────────────────────────────────────────────────── */
 .qt-tabs-container {
   display: flex;

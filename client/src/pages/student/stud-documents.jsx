@@ -622,13 +622,13 @@ export default function DocumentsPage() {
                 className={`qt-tab ${activeTab === "active" ? "active" : ""}`}
                 onClick={() => setActiveTab("active")}
               >
-                <AlertCircleIcon /> Active Requests ({activeDocuments.length})
+                <AlertCircleIcon /> Active Requests <span className="doc-tab-count">{activeDocuments.length}</span>
               </button>
               <button
                 className={`qt-tab ${activeTab === "completed" ? "active" : ""}`}
                 onClick={() => setActiveTab("completed")}
               >
-                <CheckCircleIcon /> Completed ({completedDocuments.length})
+                <CheckCircleIcon /> Completed <span className="doc-tab-count">{completedDocuments.length}</span>
               </button>
             </div>
 
