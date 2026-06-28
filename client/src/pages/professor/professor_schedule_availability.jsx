@@ -148,6 +148,8 @@ export default function ProfessorScheduleAvailability() {
   const [addLocation, setAddLocation] = useState("");
   const [addMaxStudents, setAddMaxStudents] = useState("");
   const [addSlotDuration, setAddSlotDuration] = useState("30");
+  const [addApptTypes, setAddApptTypes] = useState([]);   // string[]
+  const [addApptInput, setAddApptInput] = useState("");   // current tag input value
   const [addSaving, setAddSaving] = useState(false);
 
   const todayStr = now.toISOString().split("T")[0];
@@ -240,8 +242,19 @@ export default function ProfessorScheduleAvailability() {
     setAddLocation("");
     setAddMaxStudents("");
     setAddSlotDuration("30");
+    setAddApptTypes([]);
+    setAddApptInput("");
     setShowAddSlot(true);
   };
+
+  const commitApptTag = () => {
+    const val = addApptInput.trim();
+    if (!val || addApptTypes.includes(val) || addApptTypes.length >= 10) return;
+    setAddApptTypes((prev) => [...prev, val]);
+    setAddApptInput("");
+  };
+
+  const removeApptTag = (tag) => setAddApptTypes((prev) => prev.filter((t) => t !== tag));
 
   // ── Save new slot ───────────────────────────────────────────────────────────
   const handleAddSlot = async () => {
@@ -273,6 +286,7 @@ export default function ProfessorScheduleAvailability() {
         location: addLocation.trim(),
         max_students: maxStu,
         slot_duration_minutes: effectiveDuration,
+        appointmentTypes: addApptTypes,
       });
       toast.success("Time slot added");
       setShowAddSlot(false);
@@ -467,17 +481,26 @@ export default function ProfessorScheduleAvailability() {
                   ) : (
                     <div className="sa-slot-list">
                       {selectedSlots.map((s) => (
-                        <div key={s.id} className="sa-slot-row">
-                          <ClockIcon />
-                          <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
-                          {s.location && <span className="sa-slot-location">· {s.location}</span>}
-                          <span className="sa-slot-location">· {s.slot_duration_minutes ?? 30}min slots</span>
-                          <span className="sa-slot-location">· {s.max_students != null ? `Max ${s.max_students}` : "Indefinite"}</span>
-                          {s.status === "closed" && <span className="sa-slot-location" style={{ color: "#ef4444" }}>· Closed</span>}
-                          {selectedDate >= todayStr && (
-                            <button className="sa-delete-btn" onClick={() => handleDeleteSlot(s.id, selectedDate)} title="Remove slot">
-                              <TrashIcon />
-                            </button>
+                        <div key={s.id} className="sa-slot-card">
+                          <div className="sa-slot-row">
+                            <ClockIcon />
+                            <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                            {s.location && <span className="sa-slot-location">· {s.location}</span>}
+                            <span className="sa-slot-location">· {s.slot_duration_minutes ?? 30}min slots</span>
+                            <span className="sa-slot-location">· {s.max_students != null ? `Max ${s.max_students}` : "Indefinite"}</span>
+                            {s.status === "closed" && <span className="sa-slot-location" style={{ color: "#ef4444" }}>· Closed</span>}
+                            {selectedDate >= todayStr && (
+                              <button className="sa-delete-btn" onClick={() => handleDeleteSlot(s.id, selectedDate)} title="Remove slot">
+                                <TrashIcon />
+                              </button>
+                            )}
+                          </div>
+                          {s.appointmentTypes?.length > 0 && (
+                            <div className="sa-slot-types">
+                              {s.appointmentTypes.map((t) => (
+                                <span key={t.id} className="sa-preview-chip">{t.name}</span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ))}
@@ -623,6 +646,32 @@ export default function ProfessorScheduleAvailability() {
                   </div>
                 </div>
               )}
+              <div className="sa-form-group">
+                <label>Appointment Types <span style={{ fontWeight: 400, color: "var(--text-tertiary)", fontSize: "0.78rem" }}>(optional · press Enter to add)</span></label>
+                <div className={`sa-tag-input-box${addApptTypes.length > 0 ? " has-tags" : ""}`}>
+                  {addApptTypes.map((tag) => (
+                    <span key={tag} className="sa-tag-chip">
+                      {tag}
+                      <button type="button" className="sa-tag-remove" onClick={() => removeApptTag(tag)} aria-label={`Remove ${tag}`}>×</button>
+                    </span>
+                  ))}
+                  <input
+                    className="sa-tag-input"
+                    type="text"
+                    placeholder={addApptTypes.length === 0 ? "e.g. Thesis Consultation, Grade Inquiry…" : "Add another…"}
+                    value={addApptInput}
+                    onChange={(e) => setAddApptInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commitApptTag(); }
+                      if (e.key === "Backspace" && !addApptInput && addApptTypes.length > 0) {
+                        setAddApptTypes((prev) => prev.slice(0, -1));
+                      }
+                    }}
+                    onBlur={commitApptTag}
+                  />
+                </div>
+                <p className="sa-field-hint">Students will choose from these types when booking. Leave empty for no restriction.</p>
+              </div>
             </div>
             <div className="sa-modal-footer">
               <button className="sa-btn sa-btn--outline" onClick={() => setShowAddSlot(false)}>Cancel</button>

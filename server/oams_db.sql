@@ -286,6 +286,16 @@ CREATE TABLE faculty_date_availability (
     INDEX idx_fda_date (available_date)
 );
 
+-- Links which appointment_services a faculty offers for a specific availability slot
+CREATE TABLE slot_services (
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    availability_id   INT NOT NULL,
+    service_id        INT NOT NULL,
+    FOREIGN KEY (availability_id) REFERENCES faculty_date_availability(id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_slot_service (availability_id, service_id)
+);
+
 -- ─────────────────────────────────────────────────────────────
 -- 8. APPOINTMENT SYSTEM
 -- ─────────────────────────────────────────────────────────────
@@ -294,7 +304,7 @@ CREATE TABLE appointments (
     student_id          INT          NOT NULL,
     faculty_id          INT          NOT NULL,
     department_id       INT          NOT NULL,
-    service_id          INT          NULL,
+    service_id          INT          NULL,   -- FK to appointment_services (the chosen appointment type)
     availability_id     INT          NULL,   -- FK to faculty_date_availability; links booking to the slot
     appointment_date    DATE         NOT NULL,
     appointment_time    TIME         NOT NULL,

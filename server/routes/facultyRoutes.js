@@ -592,7 +592,25 @@ router.get(
       }
       query += " ORDER BY available_date ASC, start_time ASC";
       const [rows] = await pool.query(query, params);
-      res.json(rows);
+
+      if (rows.length === 0) return res.json([]);
+
+      // Attach appointment services (types) offered for each slot
+      const ids = rows.map((r) => r.id);
+      const [svcRows] = await pool.query(
+        `SELECT ss.availability_id, aps.service_id, aps.service_name
+         FROM slot_services ss
+         JOIN appointment_services aps ON ss.service_id = aps.service_id
+         WHERE ss.availability_id IN (?)
+         ORDER BY ss.id ASC`,
+        [ids]
+      );
+      const svcMap = {};
+      for (const s of svcRows) {
+        (svcMap[s.availability_id] ||= []).push({ id: s.service_id, name: s.service_name });
+      }
+      const result = rows.map((r) => ({ ...r, appointmentTypes: svcMap[r.id] ?? [] }));
+      res.json(result);
     } catch (err) {
       console.error("GET /date-availability error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
@@ -601,14 +619,14 @@ router.get(
 );
 
 // POST /api/faculty/date-availability
-// Body: { available_date, start_time, end_time, location, max_students?, slot_duration_minutes? }
+// Body: { available_date, start_time, end_time, location, max_students?, slot_duration_minutes?, appointmentTypes? }
 router.post(
   "/date-availability",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { available_date, start_time, end_time, location, max_students, slot_duration_minutes } = req.body;
+    const { available_date, start_time, end_time, location, max_students, slot_duration_minutes, appointmentTypes } = req.body;
     if (!available_date || !start_time || !end_time) {
       return res.status(400).json({ message: "available_date, start_time, end_time are required" });
     }
@@ -626,6 +644,11 @@ router.post(
       return res.status(400).json({ message: "max_students must be a positive integer, or omit for indefinite" });
     }
 
+    // Sanitize appointment types: unique, non-empty strings, max 20
+    const types = Array.isArray(appointmentTypes)
+      ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
+      : [];
+
     try {
       const [existing] = await pool.query(
         "SELECT id FROM faculty_date_availability WHERE faculty_id = ? AND available_date = ? AND start_time = ? AND end_time = ?",
@@ -640,11 +663,33 @@ router.post(
          VALUES (?,?,?,?,?,?,?)`,
         [facultyId, available_date, start_time, end_time, maxStu, duration, location ?? null]
       );
+      const newId = result.insertId;
+      const linkedServices = [];
+      for (const name of types) {
+        // Find existing service for this faculty with the same name, or create it
+        let [[svc]] = await pool.query(
+          "SELECT service_id, service_name FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
+          [facultyId, name]
+        );
+        if (!svc) {
+          const [ins] = await pool.query(
+            "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
+            [name, facultyId]
+          );
+          svc = { service_id: ins.insertId, service_name: name };
+        }
+        await pool.query(
+          "INSERT IGNORE INTO slot_services (availability_id, service_id) VALUES (?, ?)",
+          [newId, svc.service_id]
+        );
+        linkedServices.push({ id: svc.service_id, name: svc.service_name });
+      }
       res.status(201).json({
-        id: result.insertId,
+        id: newId,
         message: "Availability slot added",
         max_students: maxStu,
         slot_duration_minutes: duration,
+        appointmentTypes: linkedServices,
       });
     } catch (err) {
       console.error("POST /date-availability error:", err);
@@ -662,7 +707,7 @@ router.patch(
   async (req, res) => {
     const facultyId = req.user.userId;
     const { id } = req.params;
-    const { max_students, slot_duration_minutes, status, location } = req.body;
+    const { max_students, slot_duration_minutes, status, location, appointmentTypes } = req.body;
 
     const updates = {};
     if (max_students !== undefined) {
@@ -687,18 +732,51 @@ router.patch(
     }
     if (location !== undefined) updates.location = location;
 
-    if (Object.keys(updates).length === 0) {
+    const replaceTypes = Array.isArray(appointmentTypes);
+    const types = replaceTypes
+      ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
+      : null;
+
+    if (Object.keys(updates).length === 0 && !replaceTypes) {
       return res.status(400).json({ message: "No updatable fields provided" });
     }
 
     try {
-      const setClause = Object.keys(updates).map((k) => `${k} = ?`).join(", ");
-      const values = [...Object.values(updates), id, facultyId];
-      const [result] = await pool.query(
-        `UPDATE faculty_date_availability SET ${setClause} WHERE id = ? AND faculty_id = ?`,
-        values
-      );
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Slot not found" });
+      if (Object.keys(updates).length > 0) {
+        const setClause = Object.keys(updates).map((k) => `${k} = ?`).join(", ");
+        const values = [...Object.values(updates), id, facultyId];
+        const [result] = await pool.query(
+          `UPDATE faculty_date_availability SET ${setClause} WHERE id = ? AND faculty_id = ?`,
+          values
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ message: "Slot not found" });
+      }
+      if (replaceTypes) {
+        // Get the faculty_id that owns this slot (for upsert into appointment_services)
+        const [[slotOwner]] = await pool.query(
+          "SELECT faculty_id FROM faculty_date_availability WHERE id = ?", [id]
+        );
+        const ownerFacultyId = slotOwner?.faculty_id ?? facultyId;
+
+        await pool.query("DELETE FROM slot_services WHERE availability_id = ?", [id]);
+        for (const name of types) {
+          let [[svc]] = await pool.query(
+            "SELECT service_id FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
+            [ownerFacultyId, name]
+          );
+          if (!svc) {
+            const [ins] = await pool.query(
+              "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
+              [name, ownerFacultyId]
+            );
+            svc = { service_id: ins.insertId };
+          }
+          await pool.query(
+            "INSERT IGNORE INTO slot_services (availability_id, service_id) VALUES (?, ?)",
+            [id, svc.service_id]
+          );
+        }
+      }
       res.json({ message: "Slot updated" });
     } catch (err) {
       console.error("PATCH /date-availability/:id error:", err);

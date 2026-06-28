@@ -1276,6 +1276,7 @@ router.get(
       const formatted = rows.map((row) => ({
         id: row.appointment_id,
         title: row.service_name ?? row.faculty_role ?? "Faculty Consultation",
+        appointmentType: row.service_name ?? null,
         college: row.college,
         collegeAbbrev: row.college_abbrev ?? "",
         person: row.faculty_name,
@@ -1815,8 +1816,23 @@ router.get(
 
       if (availability.length === 0) return res.json({ slots: [] });
 
-      // Fetch bookings grouped by availability window + specific time
       const availabilityIds = availability.map((a) => a.availability_id);
+
+      // Fetch appointment services (types) linked to each slot
+      const [typeRows] = await pool.query(
+        `SELECT ss.availability_id, aps.service_id, aps.service_name
+         FROM slot_services ss
+         JOIN appointment_services aps ON ss.service_id = aps.service_id
+         WHERE ss.availability_id IN (?)
+         ORDER BY ss.id ASC`,
+        [availabilityIds],
+      );
+      const typeMap = {};
+      for (const t of typeRows) {
+        (typeMap[t.availability_id] ||= []).push({ id: t.service_id, name: t.service_name });
+      }
+
+      // Fetch bookings grouped by availability window + specific time
       const [bookings] = await pool.query(
         `SELECT availability_id, appointment_time, COUNT(*) AS cnt
          FROM appointments
@@ -1892,6 +1908,7 @@ router.get(
           totalBooked,
           availableCount,
           timeSlots,
+          appointmentTypes: typeMap[a.availability_id] ?? [],
         });
       }
 
@@ -1912,7 +1929,7 @@ router.post(
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { availabilityId, appointmentTime, purpose } = req.body;
+    const { availabilityId, appointmentTime, purpose, appointmentType } = req.body;
 
     if (!availabilityId || !appointmentTime || !purpose?.trim()) {
       return res.status(400).json({
@@ -2020,6 +2037,23 @@ router.post(
         });
       }
 
+      // Validate serviceId against the slot's linked appointment_services (if any)
+      const [slotServices] = await conn.query(
+        `SELECT ss.service_id FROM slot_services ss
+         WHERE ss.availability_id = ?`,
+        [availabilityId],
+      );
+      const validServiceIds = slotServices.map((r) => r.service_id);
+      const chosenServiceId = appointmentType ? parseInt(appointmentType, 10) : null;
+      if (validServiceIds.length > 0 && !chosenServiceId) {
+        await conn.rollback();
+        return res.status(400).json({ error: "Please select an appointment type" });
+      }
+      if (validServiceIds.length > 0 && !validServiceIds.includes(chosenServiceId)) {
+        await conn.rollback();
+        return res.status(400).json({ error: "Invalid appointment type for this slot" });
+      }
+
       const [[facultyRow]] = await conn.query(
         `SELECT department_id FROM faculty WHERE faculty_id = ?`,
         [slot.faculty_id],
@@ -2033,11 +2067,12 @@ router.post(
         `INSERT INTO appointments
            (student_id, faculty_id, department_id, service_id, availability_id,
             appointment_date, appointment_time, status, notes, created_at)
-         VALUES (?, ?, ?, NULL, ?, ?, ?, 'pending', ?, NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
         [
           studentId,
           slot.faculty_id,
           facultyRow.department_id,
+          chosenServiceId,
           availabilityId,
           slotDateStr,
           normalizedTime,

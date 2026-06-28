@@ -231,6 +231,7 @@ export default function AppointmentsPage() {
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
   const [selectedTime, setSelectedTime] = useState("");
+  const [selectedApptType, setSelectedApptType] = useState("");
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -353,16 +354,20 @@ export default function AppointmentsPage() {
   const handleBookSlot = async () => {
     if (!selectedSlot) return;
     if (!selectedTime) { toast.error("Please select a time slot"); return; }
+    if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
+      toast.error("Please select an appointment type"); return;
+    }
     if (!purpose.trim()) { toast.error("Please provide a purpose for consultation"); return; }
     setSubmitting(true);
     try {
       await api.post("/student/appointments/book-slot", {
         availabilityId: selectedSlot.availabilityId,
         appointmentTime: selectedTime,
+        appointmentType: selectedApptType || null,
         purpose: purpose.trim(),
       });
       toast.success("Appointment booked successfully!");
-      setPurpose(""); setSelectedTime(""); setSelectedSlot(null); setShowBookDialog(false);
+      setPurpose(""); setSelectedTime(""); setSelectedApptType(""); setSelectedSlot(null); setShowBookDialog(false);
       await Promise.all([fetchSlots(), fetchMyBookings()]);
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to book appointment. The slot may no longer be available.");
@@ -565,7 +570,7 @@ export default function AppointmentsPage() {
                               <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
                               <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.availableCount} {slot.availableCount === 1 ? "slot" : "slots"} available {slot.maxStudents != null ? `(max ${slot.maxStudents})` : "(indefinite)"}</span></div>
                             </div>
-                            <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedTime(""); setShowBookDialog(true); }}>Book This Slot</button>
+                            <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedTime(""); setSelectedApptType(""); setShowBookDialog(true); }}>Book This Slot</button>
                           </div>
                         ))}
                       </div>
@@ -604,6 +609,12 @@ export default function AppointmentsPage() {
                             <h4>{booking.person}</h4>
                             <span className="college-badge">{booking.college}</span>
                           </div>
+                          {booking.appointmentType && (
+                            <div className="booking-appt-type">
+                              <span className="booking-appt-type-label">Type:</span>
+                              <span className="booking-appt-type-value">{booking.appointmentType}</span>
+                            </div>
+                          )}
                           <div className="booking-details">
                             <div className="booking-detail"><Calendar style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatDate(booking.date)}</span></div>
                             <div className="booking-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.time}</span></div>
@@ -668,12 +679,30 @@ export default function AppointmentsPage() {
                   )}
                 </div>
               </div>
+              {selectedSlot.appointmentTypes?.length > 0 && (
+                <div className="form-group">
+                  <label>Appointment Type *</label>
+                  <div style={{ position: "relative" }}>
+                    <select
+                      className="appt-type-select"
+                      value={selectedApptType}
+                      onChange={(e) => setSelectedApptType(e.target.value)}
+                    >
+                      <option value="">Select appointment type…</option>
+                      {selectedSlot.appointmentTypes.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", width: "1rem", height: "1rem", color: "#a855f7", pointerEvents: "none" }} />
+                  </div>
+                </div>
+              )}
               <div className="form-group">
                 <label htmlFor="purpose">Purpose of Consultation *</label>
                 <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
               </div>
               <div className="dialog-actions">
-                <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedTime(""); }} disabled={submitting}>Cancel</button>
+                <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedTime(""); setSelectedApptType(""); }} disabled={submitting}>Cancel</button>
                 <button className="btn-primary" onClick={handleBookSlot} disabled={submitting}>{submitting ? "Booking…" : "Confirm Booking"}</button>
               </div>
             </div>

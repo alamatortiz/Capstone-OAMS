@@ -37,6 +37,7 @@ TRUNCATE TABLE queue_slots;
 TRUNCATE TABLE service_requirements;
 TRUNCATE TABLE document_requirements;
 TRUNCATE TABLE appointment_services;
+TRUNCATE TABLE slot_services;
 TRUNCATE TABLE faculty_date_availability;
 TRUNCATE TABLE faculty_blocked_dates;
 TRUNCATE TABLE faculty_availability;
