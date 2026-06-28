@@ -619,14 +619,15 @@ router.get(
 );
 
 // POST /api/faculty/date-availability
-// Body: { available_date, start_time, end_time, location, max_students?, slot_duration_minutes?, appointmentTypes? }
+// Body: { available_date, start_time, end_time, location, max_students, appointmentTypes? }
+// slot_duration_minutes is auto-computed: floor(windowMinutes / max_students)
 router.post(
   "/date-availability",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { available_date, start_time, end_time, location, max_students, slot_duration_minutes, appointmentTypes } = req.body;
+    const { available_date, start_time, end_time, location, max_students, appointmentTypes } = req.body;
     if (!available_date || !start_time || !end_time) {
       return res.status(400).json({ message: "available_date, start_time, end_time are required" });
     }
@@ -634,15 +635,18 @@ router.post(
       return res.status(400).json({ message: "end_time must be after start_time" });
     }
 
-    const duration = slot_duration_minutes != null ? parseInt(slot_duration_minutes, 10) : 30;
-    if (isNaN(duration) || duration < 5) {
-      return res.status(400).json({ message: "slot_duration_minutes must be at least 5" });
+    if (max_students == null || max_students === "") {
+      return res.status(400).json({ message: "max_students is required" });
+    }
+    const maxStu = parseInt(max_students, 10);
+    if (isNaN(maxStu) || maxStu < 1) {
+      return res.status(400).json({ message: "max_students must be a positive integer" });
     }
 
-    const maxStu = max_students != null ? parseInt(max_students, 10) : null;
-    if (maxStu !== null && (isNaN(maxStu) || maxStu < 1)) {
-      return res.status(400).json({ message: "max_students must be a positive integer, or omit for indefinite" });
-    }
+    const [sh, sm] = start_time.split(":").map(Number);
+    const [eh, em] = end_time.split(":").map(Number);
+    const windowMin = (eh * 60 + em) - (sh * 60 + sm);
+    const duration = Math.max(1, Math.floor(windowMin / maxStu));
 
     // Sanitize appointment types: unique, non-empty strings, max 20
     const types = Array.isArray(appointmentTypes)
@@ -699,7 +703,8 @@ router.post(
 );
 
 // PATCH /api/faculty/date-availability/:id
-// Body: { max_students?, slot_duration_minutes?, status?, location? }
+// Body: { max_students?, status?, location?, appointmentTypes? }
+// slot_duration_minutes is recomputed automatically when max_students changes.
 router.patch(
   "/date-availability/:id",
   authenticateToken,
@@ -707,22 +712,26 @@ router.patch(
   async (req, res) => {
     const facultyId = req.user.userId;
     const { id } = req.params;
-    const { max_students, slot_duration_minutes, status, location, appointmentTypes } = req.body;
+    const { max_students, status, location, appointmentTypes } = req.body;
 
     const updates = {};
     if (max_students !== undefined) {
-      const maxStu = max_students === null ? null : parseInt(max_students, 10);
-      if (maxStu !== null && (isNaN(maxStu) || maxStu < 1)) {
-        return res.status(400).json({ message: "max_students must be a positive integer or null for indefinite" });
+      const maxStu = parseInt(max_students, 10);
+      if (isNaN(maxStu) || maxStu < 1) {
+        return res.status(400).json({ message: "max_students must be a positive integer" });
       }
       updates.max_students = maxStu;
-    }
-    if (slot_duration_minutes !== undefined) {
-      const dur = parseInt(slot_duration_minutes, 10);
-      if (isNaN(dur) || dur < 5) {
-        return res.status(400).json({ message: "slot_duration_minutes must be at least 5" });
+      // Recompute slot_duration_minutes from the existing window
+      const [[row]] = await pool.query(
+        "SELECT start_time, end_time FROM faculty_date_availability WHERE id = ? AND faculty_id = ?",
+        [id, facultyId]
+      );
+      if (row) {
+        const [sh, sm] = row.start_time.split(":").map(Number);
+        const [eh, em] = row.end_time.split(":").map(Number);
+        const windowMin = (eh * 60 + em) - (sh * 60 + sm);
+        updates.slot_duration_minutes = Math.max(1, Math.floor(windowMin / maxStu));
       }
-      updates.slot_duration_minutes = dur;
     }
     if (status !== undefined) {
       if (!["open", "closed"].includes(status)) {

@@ -1638,14 +1638,13 @@ router.get(
            f.department_id,
            fda.id AS availability_id,
            fda.available_date,
+           DAYNAME(fda.available_date) AS day_of_week,
            fda.start_time,
            fda.end_time,
            fda.location
          FROM faculty f
          LEFT JOIN faculty_date_availability fda
            ON fda.faculty_id = f.faculty_id
-           AND fda.available_date >= CURDATE()
-           AND fda.available_date < CURDATE() + INTERVAL 30 DAY
          ORDER BY f.department_id, f.last_name ASC, fda.available_date ASC, fda.start_time ASC`,
       );
 
@@ -1670,6 +1669,7 @@ router.get(
               : String(row.available_date).split("T")[0];
           facultyMap.get(row.faculty_id).availability.push({
             date: dateStr,
+            day: row.day_of_week,
             timeStart: formatTime12h(row.start_time),
             timeEnd: formatTime12h(row.end_time),
             location: row.location ?? "TBA",
@@ -1901,7 +1901,7 @@ router.get(
           allSlotTimes.push(minutesToTimeStr(m)); // "HH:MM:SS"
         }
 
-        // Cap to max_students if set (first N slots in the window are the valid ones)
+        // Cap to max_students (first N slots are the valid ones)
         const cappedSlots = a.max_students != null
           ? allSlotTimes.slice(0, a.max_students)
           : allSlotTimes;
@@ -1909,17 +1909,19 @@ router.get(
         const windowBookings = bookingMap[a.availability_id] ?? {};
         const totalBooked = Object.values(windowBookings).reduce((s, c) => s + c, 0);
 
-        // Build per-slot availability (skip past sub-slots for today)
-        const timeSlots = cappedSlots
-          .map((slotTime) => {
-            const slotDt = new Date(`${dateStr}T${slotTime}`);
-            if (slotDt <= now) return null;
-            const hm = slotTime.slice(0, 5);
-            return { time: hm, available: !(windowBookings[hm] > 0) };
-          })
-          .filter(Boolean);
+        // Find the next unbooked slot that hasn't passed yet
+        let nextSlotTime = null;
+        let availableCount = 0;
+        for (const slotTime of cappedSlots) {
+          const slotDt = new Date(`${dateStr}T${slotTime}`);
+          if (slotDt <= now) continue;
+          const hm = slotTime.slice(0, 5);
+          if (!(windowBookings[hm] > 0)) {
+            availableCount++;
+            if (!nextSlotTime) nextSlotTime = hm;
+          }
+        }
 
-        const availableCount = timeSlots.filter((s) => s.available).length;
         if (availableCount === 0) continue;
 
         slots.push({
@@ -1933,11 +1935,10 @@ router.get(
           windowStart: String(a.start_time).slice(0, 5),
           windowEnd: String(a.end_time).slice(0, 5),
           location: a.location ?? "TBA",
-          slotDuration: duration,
           maxStudents: a.max_students,
           totalBooked,
           availableCount,
-          timeSlots,
+          nextSlotTime,
           appointmentTypes: typeMap[a.availability_id] ?? [],
         });
       }
@@ -1951,19 +1952,19 @@ router.get(
 );
 
 // POST /api/student/appointments/book-slot
-// Body: { availabilityId, appointmentTime, purpose }
-// Student picks a specific time slot from the faculty's availability window.
+// Body: { availabilityId, purpose, appointmentType? }
+// The system auto-assigns the next available slot (first come, first served).
 router.post(
   "/appointments/book-slot",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { availabilityId, appointmentTime, purpose, appointmentType } = req.body;
+    const { availabilityId, purpose, appointmentType } = req.body;
 
-    if (!availabilityId || !appointmentTime || !purpose?.trim()) {
+    if (!availabilityId || !purpose?.trim()) {
       return res.status(400).json({
-        error: "availabilityId, appointmentTime, and purpose are required",
+        error: "availabilityId and purpose are required",
       });
     }
 
@@ -1990,7 +1991,12 @@ router.post(
         return res.status(409).json({ error: "This availability slot is closed" });
       }
 
-      // Validate appointmentTime falls on a generated slot boundary
+      const slotDateStr =
+        slot.available_date instanceof Date
+          ? slot.available_date.toISOString().split("T")[0]
+          : String(slot.available_date).split("T")[0];
+
+      // Generate all slot times for this window
       const duration = slot.slot_duration_minutes || 30;
       const startMin = timeStrToMinutes(slot.start_time);
       const endMin   = timeStrToMinutes(slot.end_time);
@@ -2000,60 +2006,46 @@ router.post(
         allSlotTimes.push(minutesToTimeStr(m)); // "HH:MM:SS"
       }
 
-      // Normalize the chosen time to HH:MM:SS for comparison
-      const normalizedTime =
-        appointmentTime.length === 5 ? appointmentTime + ":00" : appointmentTime;
+      // Cap to max_students
+      const cappedSlots = slot.max_students != null
+        ? allSlotTimes.slice(0, slot.max_students)
+        : allSlotTimes;
 
-      if (!allSlotTimes.includes(normalizedTime)) {
-        await conn.rollback();
-        return res.status(400).json({
-          error: "Invalid appointment time — must be a valid slot start for this window",
-        });
-      }
-
-      // Reject past slots
-      const slotDateStr =
-        slot.available_date instanceof Date
-          ? slot.available_date.toISOString().split("T")[0]
-          : String(slot.available_date).split("T")[0];
-      if (new Date(`${slotDateStr}T${normalizedTime}`) <= new Date()) {
-        await conn.rollback();
-        return res.status(400).json({ error: "Cannot book a time slot that has already passed" });
-      }
-
-      // Enforce max_students capacity
-      if (slot.max_students != null) {
-        const cappedSlots = allSlotTimes.slice(0, slot.max_students);
-        if (!cappedSlots.includes(normalizedTime)) {
-          await conn.rollback();
-          return res.status(409).json({
-            error: "This time slot is outside the available capacity for this window",
-          });
-        }
-        const [[{ total }]] = await conn.query(
-          `SELECT COUNT(*) AS total FROM appointments
-           WHERE availability_id = ? AND status NOT IN ('cancelled', 'rejected')`,
-          [availabilityId],
-        );
-        if (total >= slot.max_students) {
-          await conn.rollback();
-          return res.status(409).json({ error: "This availability window is fully booked" });
-        }
-      }
-
-      // Ensure the specific time slot is not already taken (1-on-1 per slot)
-      const [[taken]] = await conn.query(
-        `SELECT appointment_id FROM appointments
-         WHERE availability_id = ? AND appointment_time = ?
-           AND status NOT IN ('cancelled', 'rejected')`,
-        [availabilityId, normalizedTime],
+      // Enforce overall capacity
+      const [[{ total }]] = await conn.query(
+        `SELECT COUNT(*) AS total FROM appointments
+         WHERE availability_id = ? AND status NOT IN ('cancelled', 'rejected')`,
+        [availabilityId],
       );
-      if (taken) {
+      if (slot.max_students != null && total >= slot.max_students) {
         await conn.rollback();
-        return res.status(409).json({ error: "This time slot is already booked" });
+        return res.status(409).json({ error: "This availability window is fully booked" });
       }
 
-      // Guard: same student cannot double-book same faculty at same time
+      // Find all already-booked times for this window
+      const [bookedRows] = await conn.query(
+        `SELECT appointment_time FROM appointments
+         WHERE availability_id = ? AND status NOT IN ('cancelled', 'rejected')`,
+        [availabilityId],
+      );
+      const bookedTimes = new Set(bookedRows.map((r) => String(r.appointment_time)));
+
+      // Auto-assign: first slot time that is not booked and hasn't passed
+      const now = new Date();
+      let normalizedTime = null;
+      for (const slotTime of cappedSlots) {
+        if (bookedTimes.has(slotTime)) continue;
+        if (new Date(`${slotDateStr}T${slotTime}`) <= now) continue;
+        normalizedTime = slotTime;
+        break;
+      }
+
+      if (!normalizedTime) {
+        await conn.rollback();
+        return res.status(409).json({ error: "No available slots remaining in this window" });
+      }
+
+      // Guard: same student cannot double-book the same faculty on the same date/time
       const [[dup]] = await conn.query(
         `SELECT appointment_id FROM appointments
          WHERE student_id = ? AND faculty_id = ?

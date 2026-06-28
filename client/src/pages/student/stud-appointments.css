@@ -1010,7 +1010,34 @@ body {
 .btn-secondary { background: transparent; color: var(--text-tertiary); border: 1px solid var(--card-border); }
 .btn-secondary:hover { background: rgba(168, 85, 247, 0.1); color: #a855f7; border-color: #a855f7; }
 
-/* ===== Time Slot Picker ===== */
+/* ===== Auto-assigned slot display ===== */
+.auto-slot-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: rgba(168, 85, 247, 0.08);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #c084fc;
+}
+
+.auto-slot-display svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: #a855f7;
+}
+
+.auto-slot-hint {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  margin: 0.35rem 0 0;
+}
+
+/* ===== Time Slot Picker (kept for reference) ===== */
 .time-slots-picker {
   display: flex;
   flex-wrap: wrap;

@@ -231,7 +231,6 @@ export default function AppointmentsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
-  const [selectedTime, setSelectedTime] = useState("");
   const [selectedApptType, setSelectedApptType] = useState("");
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -354,7 +353,6 @@ export default function AppointmentsPage() {
 
   const handleBookSlot = async () => {
     if (!selectedSlot) return;
-    if (!selectedTime) { toast.error("Please select a time slot"); return; }
     if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
       toast.error("Please select an appointment type"); return;
     }
@@ -363,12 +361,11 @@ export default function AppointmentsPage() {
     try {
       await api.post("/student/appointments/book-slot", {
         availabilityId: selectedSlot.availabilityId,
-        appointmentTime: selectedTime,
         appointmentType: selectedApptType || null,
         purpose: purpose.trim(),
       });
       toast.success("Appointment booked successfully!");
-      setPurpose(""); setSelectedTime(""); setSelectedApptType(""); setSelectedSlot(null); setShowBookDialog(false);
+      setPurpose(""); setSelectedApptType(""); setSelectedSlot(null); setShowBookDialog(false);
       await Promise.all([fetchSlots(), fetchMyBookings()]);
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to book appointment. The slot may no longer be available.");
@@ -586,7 +583,7 @@ export default function AppointmentsPage() {
                               <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
                               <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.availableCount} {slot.availableCount === 1 ? "slot" : "slots"} available {slot.maxStudents != null ? `(max ${slot.maxStudents})` : "(indefinite)"}</span></div>
                             </div>
-                            <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedTime(""); setSelectedApptType(""); setShowBookDialog(true); }}>Book This Slot</button>
+                            <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book This Slot</button>
                           </div>
                         ))}
                       </div>
@@ -677,24 +674,6 @@ export default function AppointmentsPage() {
                   <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
                 </div>
               </div>
-              <div className="form-group">
-                <label>Select Time Slot *</label>
-                <div className="time-slots-picker">
-                  {selectedSlot.timeSlots.filter((ts) => ts.available).map((ts) => (
-                    <button
-                      key={ts.time}
-                      type="button"
-                      className={`time-slot-btn${selectedTime === ts.time ? " selected" : ""}`}
-                      onClick={() => setSelectedTime(ts.time)}
-                    >
-                      {formatTime(ts.time)}
-                    </button>
-                  ))}
-                  {selectedSlot.timeSlots.filter((ts) => ts.available).length === 0 && (
-                    <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: 0 }}>No time slots available</p>
-                  )}
-                </div>
-              </div>
               {selectedSlot.appointmentTypes?.length > 0 && (
                 <div className="form-group">
                   <label>Appointment Type *</label>
@@ -718,7 +697,7 @@ export default function AppointmentsPage() {
                 <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
               </div>
               <div className="dialog-actions">
-                <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedTime(""); setSelectedApptType(""); }} disabled={submitting}>Cancel</button>
+                <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); }} disabled={submitting}>Cancel</button>
                 <button className="btn-primary" onClick={handleBookSlot} disabled={submitting}>{submitting ? "Booking…" : "Confirm Booking"}</button>
               </div>
             </div>

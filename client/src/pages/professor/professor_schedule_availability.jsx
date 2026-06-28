@@ -147,41 +147,11 @@ export default function ProfessorScheduleAvailability() {
   const [addEnd, setAddEnd] = useState("");
   const [addLocation, setAddLocation] = useState("");
   const [addMaxStudents, setAddMaxStudents] = useState("");
-  const [addSlotDuration, setAddSlotDuration] = useState("30");
   const [addApptTypes, setAddApptTypes] = useState([]);   // string[]
   const [addApptInput, setAddApptInput] = useState("");   // current tag input value
   const [addSaving, setAddSaving] = useState(false);
 
   const todayStr = now.toISOString().split("T")[0];
-
-  // ── Auto-divide: slot_duration = floor(window / max_students) when max is set ─
-  const computedSlotDuration = (() => {
-    if (!addStart || !addEnd || !addMaxStudents.trim()) return null;
-    const [sh, sm] = addStart.split(":").map(Number);
-    const [eh, em] = addEnd.split(":").map(Number);
-    const totalMin = eh * 60 + em - (sh * 60 + sm);
-    const max = parseInt(addMaxStudents, 10);
-    if (totalMin <= 0 || isNaN(max) || max < 1) return null;
-    return Math.floor(totalMin / max);
-  })();
-
-  const effectiveDuration = computedSlotDuration ?? parseInt(addSlotDuration, 10);
-
-  const slotPreview = (() => {
-    if (!addStart || !addEnd || isNaN(effectiveDuration) || effectiveDuration < 1) return [];
-    const [sh, sm] = addStart.split(":").map(Number);
-    const [eh, em] = addEnd.split(":").map(Number);
-    const startMin = sh * 60 + sm;
-    const endMin = eh * 60 + em;
-    const capCount = addMaxStudents.trim() ? parseInt(addMaxStudents, 10) : 48;
-    const result = [];
-    for (let m = startMin; m < endMin && result.length < capCount; m += effectiveDuration) {
-      const h = Math.floor(m / 60);
-      const min = m % 60;
-      result.push(`${(h % 12) || 12}:${String(min).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`);
-    }
-    return result;
-  })();
 
   // ── Fetch date-specific availability ────────────────────────────────────────
   const fetchAll = async () => {
@@ -241,7 +211,6 @@ export default function ProfessorScheduleAvailability() {
     setAddEnd("");
     setAddLocation("");
     setAddMaxStudents("");
-    setAddSlotDuration("30");
     setAddApptTypes([]);
     setAddApptInput("");
     setShowAddSlot(true);
@@ -265,9 +234,13 @@ export default function ProfessorScheduleAvailability() {
     if (addEnd <= addStart) { toast.error("End time must be after start time"); return; }
     if (addDate < todayStr) { toast.error("Cannot add availability in the past"); return; }
 
-    const maxStu = addMaxStudents.trim() ? parseInt(addMaxStudents, 10) : null;
-    if (addMaxStudents.trim() && (isNaN(maxStu) || maxStu < 1)) {
-      toast.error("Max students must be a positive number, or leave blank for indefinite");
+    if (!addMaxStudents.trim()) {
+      toast.error("Max students is required");
+      return;
+    }
+    const maxStu = parseInt(addMaxStudents, 10);
+    if (isNaN(maxStu) || maxStu < 1) {
+      toast.error("Max students must be a positive number");
       return;
     }
 
@@ -285,7 +258,6 @@ export default function ProfessorScheduleAvailability() {
         end_time: addEnd,
         location: addLocation.trim(),
         max_students: maxStu,
-        slot_duration_minutes: effectiveDuration,
         appointmentTypes: addApptTypes,
       });
       toast.success("Time slot added");
@@ -610,42 +582,17 @@ export default function ProfessorScheduleAvailability() {
                 />
               </div>
               <div className="sa-form-group">
-                <label>Max Students</label>
+                <label>Max Students *</label>
                 <input
                   className="sa-input"
                   type="number"
                   min="1"
-                  placeholder="Leave blank for indefinite"
+                  placeholder="e.g. 5"
                   value={addMaxStudents}
                   onChange={(e) => setAddMaxStudents(e.target.value)}
                 />
-                <p className="sa-field-hint">
-                  {addMaxStudents.trim() && computedSlotDuration
-                    ? `Window will be divided into ${slotPreview.length} slot${slotPreview.length !== 1 ? "s" : ""} of ${computedSlotDuration} min each`
-                    : "Leave blank to accept anyone within the time window"}
-                </p>
+                <p className="sa-field-hint">Students are assigned slots in order of booking (first come, first served).</p>
               </div>
-              {!addMaxStudents.trim() && (
-                <div className="sa-form-group">
-                  <label>Slot Duration</label>
-                  <select className="sa-input" value={addSlotDuration} onChange={(e) => setAddSlotDuration(e.target.value)}>
-                    <option value="15">15 minutes</option>
-                    <option value="30">30 minutes</option>
-                    <option value="45">45 minutes</option>
-                    <option value="60">60 minutes</option>
-                  </select>
-                </div>
-              )}
-              {slotPreview.length > 0 && (
-                <div className="sa-form-group">
-                  <label>Slot Preview</label>
-                  <div className="sa-slot-preview">
-                    {slotPreview.map((t) => (
-                      <span key={t} className="sa-preview-chip">{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
               <div className="sa-form-group">
                 <label>Appointment Types <span style={{ fontWeight: 400, color: "var(--text-tertiary)", fontSize: "0.78rem" }}>(optional · press Enter to add)</span></label>
                 <div className={`sa-tag-input-box${addApptTypes.length > 0 ? " has-tags" : ""}`}>
