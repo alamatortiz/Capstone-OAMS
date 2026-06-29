@@ -277,7 +277,6 @@ CREATE TABLE faculty_date_availability (
     start_time            TIME NOT NULL,
     end_time              TIME NOT NULL,
     max_students          INT  NULL,    -- NULL = indefinite (no cap on bookings)
-    slot_duration_minutes INT  NOT NULL DEFAULT 30,
     status                ENUM('open','closed') NOT NULL DEFAULT 'open',
     location              VARCHAR(150),
     created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -500,3 +499,8 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
 --   server/db/mock/ccs_mock_data.sql
 -- Run this file first, then ccs_mock_data.sql.
 -- ============================================================
+
+-- ─────────────────────────────────────────────────────────────
+-- MIGRATION: Run against existing databases (do not re-run on fresh installs)
+-- ─────────────────────────────────────────────────────────────
+-- ALTER TABLE faculty_date_availability DROP COLUMN slot_duration_minutes;

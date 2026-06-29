@@ -1283,7 +1283,6 @@ router.get(
         `SELECT
            a.appointment_id,
            a.appointment_date,
-           a.appointment_time,
            a.status,
            a.notes,
            a.created_at,
@@ -1292,14 +1291,17 @@ router.get(
            f.specialization                        AS faculty_role,
            d.department_name                       AS college,
            d.department_abbreviation               AS college_abbrev,
-           d.office_location                       AS location,
+           fda.start_time                          AS window_start,
+           fda.end_time                            AS window_end,
+           fda.location,
            s.service_name
          FROM appointments a
          JOIN faculty      f ON a.faculty_id    = f.faculty_id
          JOIN departments  d ON f.department_id = d.department_id
-         LEFT JOIN appointment_services s ON a.service_id   = s.service_id
+         LEFT JOIN faculty_date_availability fda ON a.availability_id = fda.id
+         LEFT JOIN appointment_services s ON a.service_id = s.service_id
          WHERE a.student_id = ?
-         ORDER BY a.appointment_date DESC, a.appointment_time DESC`,
+         ORDER BY a.appointment_date DESC, fda.start_time DESC`,
         [studentId],
       );
 
@@ -1315,7 +1317,8 @@ router.get(
           row.appointment_date instanceof Date
             ? row.appointment_date.toISOString().split("T")[0]
             : String(row.appointment_date).split("T")[0],
-        time: formatTime12h(row.appointment_time),
+        windowStart: row.window_start ? formatTime12h(row.window_start) : null,
+        windowEnd: row.window_end ? formatTime12h(row.window_end) : null,
         location: row.location ?? "TBA",
         purpose: row.notes ?? "",
         status: row.status,
@@ -1810,7 +1813,7 @@ router.get(
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/student/appointments/available-slots
-// Returns open availability windows with discrete time slots the student can pick from.
+// Returns open availability windows with occupancy counts.
 // Optional query params: ?facultyId=&date=
 router.get(
   "/appointments/available-slots",
@@ -1825,7 +1828,7 @@ router.get(
         SELECT
           fda.id AS availability_id, fda.faculty_id, fda.available_date,
           fda.start_time, fda.end_time, fda.location,
-          fda.max_students, fda.slot_duration_minutes,
+          fda.max_students,
           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
           f.specialization,
           d.department_abbreviation AS college,
@@ -1862,21 +1865,18 @@ router.get(
         (typeMap[t.availability_id] ||= []).push({ id: t.service_id, name: t.service_name });
       }
 
-      // Fetch bookings grouped by availability window + specific time
-      const [bookings] = await pool.query(
-        `SELECT availability_id, appointment_time, COUNT(*) AS cnt
+      // Count confirmed bookings per availability window
+      const [bookingCounts] = await pool.query(
+        `SELECT availability_id, COUNT(*) AS booked
          FROM appointments
          WHERE availability_id IN (?)
            AND status NOT IN ('cancelled', 'rejected')
-         GROUP BY availability_id, appointment_time`,
+         GROUP BY availability_id`,
         [availabilityIds],
       );
-
-      // bookingMap[availabilityId][HH:MM] = count
-      const bookingMap = {};
-      for (const b of bookings) {
-        if (!bookingMap[b.availability_id]) bookingMap[b.availability_id] = {};
-        bookingMap[b.availability_id][String(b.appointment_time).slice(0, 5)] = b.cnt;
+      const bookedMap = {};
+      for (const b of bookingCounts) {
+        bookedMap[b.availability_id] = b.booked;
       }
 
       const now = new Date();
@@ -1888,41 +1888,15 @@ router.get(
             ? a.available_date.toISOString().split("T")[0]
             : String(a.available_date).split("T")[0];
 
+        // Skip windows that have already ended
         const windowEnd = new Date(`${dateStr}T${a.end_time}`);
         if (windowEnd <= now) continue;
 
-        const duration = a.slot_duration_minutes || 30;
-        const startMin = timeStrToMinutes(a.start_time);
-        const endMin   = timeStrToMinutes(a.end_time);
+        const totalBooked = bookedMap[a.availability_id] ?? 0;
+        const spotsLeft = a.max_students != null ? a.max_students - totalBooked : null;
 
-        // Generate all discrete slot start-times within the window
-        const allSlotTimes = [];
-        for (let m = startMin; m < endMin; m += duration) {
-          allSlotTimes.push(minutesToTimeStr(m)); // "HH:MM:SS"
-        }
-
-        // Cap to max_students (first N slots are the valid ones)
-        const cappedSlots = a.max_students != null
-          ? allSlotTimes.slice(0, a.max_students)
-          : allSlotTimes;
-
-        const windowBookings = bookingMap[a.availability_id] ?? {};
-        const totalBooked = Object.values(windowBookings).reduce((s, c) => s + c, 0);
-
-        // Find the next unbooked slot that hasn't passed yet
-        let nextSlotTime = null;
-        let availableCount = 0;
-        for (const slotTime of cappedSlots) {
-          const slotDt = new Date(`${dateStr}T${slotTime}`);
-          if (slotDt <= now) continue;
-          const hm = slotTime.slice(0, 5);
-          if (!(windowBookings[hm] > 0)) {
-            availableCount++;
-            if (!nextSlotTime) nextSlotTime = hm;
-          }
-        }
-
-        if (availableCount === 0) continue;
+        // Skip fully booked windows
+        if (a.max_students != null && totalBooked >= a.max_students) continue;
 
         slots.push({
           availabilityId: a.availability_id,
@@ -1937,8 +1911,7 @@ router.get(
           location: a.location ?? "TBA",
           maxStudents: a.max_students,
           totalBooked,
-          availableCount,
-          nextSlotTime,
+          spotsLeft,
           appointmentTypes: typeMap[a.availability_id] ?? [],
         });
       }
@@ -1953,7 +1926,7 @@ router.get(
 
 // POST /api/student/appointments/book-slot
 // Body: { availabilityId, purpose, appointmentType? }
-// The system auto-assigns the next available slot (first come, first served).
+// Occupies one spot in the professor's availability window (first come, first served).
 router.post(
   "/appointments/book-slot",
   authenticateToken,
@@ -1975,7 +1948,7 @@ router.post(
       // Lock the availability window row to prevent race conditions
       const [[slot]] = await conn.query(
         `SELECT id, faculty_id, available_date, start_time, end_time,
-                max_students, slot_duration_minutes, status
+                max_students, status
          FROM faculty_date_availability
          WHERE id = ?
          FOR UPDATE`,
@@ -1996,22 +1969,7 @@ router.post(
           ? slot.available_date.toISOString().split("T")[0]
           : String(slot.available_date).split("T")[0];
 
-      // Generate all slot times for this window
-      const duration = slot.slot_duration_minutes || 30;
-      const startMin = timeStrToMinutes(slot.start_time);
-      const endMin   = timeStrToMinutes(slot.end_time);
-
-      const allSlotTimes = [];
-      for (let m = startMin; m < endMin; m += duration) {
-        allSlotTimes.push(minutesToTimeStr(m)); // "HH:MM:SS"
-      }
-
-      // Cap to max_students
-      const cappedSlots = slot.max_students != null
-        ? allSlotTimes.slice(0, slot.max_students)
-        : allSlotTimes;
-
-      // Enforce overall capacity
+      // Enforce capacity: count active bookings for this window
       const [[{ total }]] = await conn.query(
         `SELECT COUNT(*) AS total FROM appointments
          WHERE availability_id = ? AND status NOT IN ('cancelled', 'rejected')`,
@@ -2022,44 +1980,21 @@ router.post(
         return res.status(409).json({ error: "This availability window is fully booked" });
       }
 
-      // Find all already-booked times for this window
-      const [bookedRows] = await conn.query(
-        `SELECT appointment_time FROM appointments
-         WHERE availability_id = ? AND status NOT IN ('cancelled', 'rejected')`,
-        [availabilityId],
-      );
-      const bookedTimes = new Set(bookedRows.map((r) => String(r.appointment_time)));
-
-      // Auto-assign: first slot time that is not booked and hasn't passed
-      const now = new Date();
-      let normalizedTime = null;
-      for (const slotTime of cappedSlots) {
-        if (bookedTimes.has(slotTime)) continue;
-        if (new Date(`${slotDateStr}T${slotTime}`) <= now) continue;
-        normalizedTime = slotTime;
-        break;
-      }
-
-      if (!normalizedTime) {
-        await conn.rollback();
-        return res.status(409).json({ error: "No available slots remaining in this window" });
-      }
-
-      // Guard: same student cannot double-book the same faculty on the same date/time
+      // Guard: student cannot book the same availability window twice
       const [[dup]] = await conn.query(
         `SELECT appointment_id FROM appointments
-         WHERE student_id = ? AND faculty_id = ?
-           AND appointment_date = ? AND appointment_time = ?`,
-        [studentId, slot.faculty_id, slotDateStr, normalizedTime],
+         WHERE student_id = ? AND availability_id = ?
+           AND status NOT IN ('cancelled', 'rejected')`,
+        [studentId, availabilityId],
       );
       if (dup) {
         await conn.rollback();
         return res.status(409).json({
-          error: "You already have an appointment with this faculty member at that time",
+          error: "You already have a booking in this availability window",
         });
       }
 
-      // Validate serviceId against the slot's linked appointment_services (if any)
+      // Validate appointmentType against the slot's linked services (if any)
       const [slotServices] = await conn.query(
         `SELECT ss.service_id FROM slot_services ss
          WHERE ss.availability_id = ?`,
@@ -2085,6 +2020,9 @@ router.post(
         return res.status(404).json({ error: "Faculty member not found" });
       }
 
+      // Store the window's start_time as appointment_time for reference
+      const appointmentTime = String(slot.start_time).slice(0, 8);
+
       const [result] = await conn.query(
         `INSERT INTO appointments
            (student_id, faculty_id, department_id, service_id, availability_id,
@@ -2097,7 +2035,7 @@ router.post(
           chosenServiceId,
           availabilityId,
           slotDateStr,
-          normalizedTime,
+          appointmentTime,
           purpose.trim(),
         ],
       );
@@ -2106,14 +2044,16 @@ router.post(
 
       const [[newRow]] = await pool.query(
         `SELECT
-           a.appointment_id, a.appointment_date, a.appointment_time, a.status, a.notes,
+           a.appointment_id, a.appointment_date, a.status, a.notes,
+           fda.start_time AS window_start, fda.end_time AS window_end,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.specialization AS faculty_role,
            d.department_name AS college,
-           d.office_location AS location
+           fda.location
          FROM appointments a
          JOIN faculty f ON a.faculty_id = f.faculty_id
          JOIN departments d ON f.department_id = d.department_id
+         JOIN faculty_date_availability fda ON a.availability_id = fda.id
          WHERE a.appointment_id = ?`,
         [result.insertId],
       );
@@ -2127,7 +2067,8 @@ router.post(
           personRole: newRow.faculty_role ?? "Faculty",
           college: newRow.college,
           date: String(newRow.appointment_date).split("T")[0],
-          time: formatTime12h(normalizedTime),
+          windowStart: formatTime12h(newRow.window_start),
+          windowEnd: formatTime12h(newRow.window_end),
           location: newRow.location ?? "TBA",
           purpose: newRow.notes ?? "",
           status: newRow.status,
@@ -2387,19 +2328,6 @@ function formatRelativeTime(date) {
   if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? "s" : ""} ago`;
   const diffDay = Math.floor(diffHr / 24);
   return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
-}
-
-// ── Helpers for booking-slots routes ────────────────────────────────────
-function timeStrToMinutes(timeStr) {
-  const [h, m] = String(timeStr).split(":").map(Number);
-  return h * 60 + m;
-}
-function minutesToTimeStr(mins) {
-  const h = Math.floor(mins / 60)
-    .toString()
-    .padStart(2, "0");
-  const m = (mins % 60).toString().padStart(2, "0");
-  return `${h}:${m}:00`;
 }
 
 module.exports = router;

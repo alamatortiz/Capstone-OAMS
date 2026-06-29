@@ -458,8 +458,7 @@ export default function ProfessorScheduleAvailability() {
                             <ClockIcon />
                             <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
                             {s.location && <span className="sa-slot-location">· {s.location}</span>}
-                            <span className="sa-slot-location">· {s.slot_duration_minutes ?? 30}min slots</span>
-                            <span className="sa-slot-location">· {s.max_students != null ? `Max ${s.max_students}` : "Indefinite"}</span>
+                            <span className="sa-slot-location">· {s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}</span>
                             {s.status === "closed" && <span className="sa-slot-location" style={{ color: "#ef4444" }}>· Closed</span>}
                             {selectedDate >= todayStr && (
                               <button className="sa-delete-btn" onClick={() => handleDeleteSlot(s.id, selectedDate)} title="Remove slot">
@@ -525,7 +524,6 @@ export default function ProfessorScheduleAvailability() {
                             <ClockIcon />
                             <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
                             {s.location && <span className="sa-chip-location">· {s.location}</span>}
-                            <span className="sa-chip-location">· {s.slot_duration_minutes ?? 30}min</span>
                             {s.max_students != null && <span className="sa-chip-location">· Max {s.max_students}</span>}
                           </div>
                         ))}

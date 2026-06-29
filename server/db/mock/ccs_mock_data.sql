@@ -510,18 +510,37 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 8 · APPOINTMENTS
+-- appointment_time stores the availability window's start_time.
+-- availability_id references Section 14B IDs (set for all future bookings).
+-- Past completed appointments use availability_id NULL (those slots no longer exist).
+-- service_id: FK to appointment_services (must match the faculty and slot_services links).
 -- ─────────────────────────────────────────────────────────────
--- availability_id: NULL for legacy/pre-slot bookings; set when student picks from a faculty_date_availability slot
--- service_id: FK to appointment_services (the faculty-defined service type for this appointment)
 INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, availability_id, appointment_date, appointment_time, status, notes, created_at) VALUES
--- Student 101: 1 approved upcoming, 1 pending upcoming, 1 completed
-(1, 101, 102, 1001, 1, NULL, CURDATE() + INTERVAL 2 DAY, '10:00:00', 'approved',  'Thesis consultation',  NOW() - INTERVAL 1 DAY),
-(2, 101, 106, 1001, 3, NULL, CURDATE() + INTERVAL 4 DAY, '14:00:00', 'pending',   'Grade inquiry',        NOW() - INTERVAL 2 HOUR),
-(3, 101, 107, 1001, 4, NULL, CURDATE() - INTERVAL 5 DAY, '09:00:00', 'completed', 'Project review',       NOW() - INTERVAL 6 DAY),
--- Student 104: 1 pending upcoming, 2 completed
-(4, 104, 102, 1001, 2, NULL, CURDATE() + INTERVAL 1 DAY, '11:00:00', 'pending',   'Academic advising',    NOW() - INTERVAL 3 HOUR),
-(5, 104, 106, 1001, 3, NULL, CURDATE() - INTERVAL 2 DAY, '13:00:00', 'completed', 'Lab consultation',     NOW() - INTERVAL 3 DAY),
-(6, 104, 107, 1001, 4, NULL, CURDATE() - INTERVAL 8 DAY, '15:00:00', 'completed', 'Project presentation', NOW() - INTERVAL 9 DAY);
+
+-- ── Student 101 · Alvin Matthew Ortiz (2300544) ──────────────────────────────
+-- Upcoming approved: Prof Ogalesco · +2 days AM slot (ID 3 · 09:00–12:00)
+(1, 101, 102, 1001, 1,  3,    CURDATE() + INTERVAL 2 DAY,  '09:00:00', 'approved',  'Thesis consultation on web development',     NOW() - INTERVAL 1 DAY),
+-- Upcoming pending: Prof Tan · +9 days AM slot (ID 25 · 10:00–12:00)
+(2, 101, 107, 1001, 4,  25,   CURDATE() + INTERVAL 9 DAY,  '10:00:00', 'pending',   'Backend architecture for capstone project',  NOW() - INTERVAL 2 HOUR),
+-- Past completed: pre-system booking (no availability slot)
+(3, 101, 107, 1001, 4,  NULL, CURDATE() - INTERVAL 5 DAY,  '09:00:00', 'completed', 'Project review',                             NOW() - INTERVAL 6 DAY),
+
+-- ── Student 104 · Luiz Gabriel Rosales (2302494) ─────────────────────────────
+-- Upcoming pending: Prof Ogalesco · +9 days AM slot (ID 5 · 09:00–12:00)
+(4, 104, 102, 1001, 2,  5,    CURDATE() + INTERVAL 9 DAY,  '09:00:00', 'pending',   'Mobile app academic advising',               NOW() - INTERVAL 3 HOUR),
+-- Upcoming pending: Prof Dela Cruz · +1 day AM slot (ID 39 · 08:00–12:00)
+(5, 104, 111, 1001, 6,  39,   CURDATE() + INTERVAL 1 DAY,  '08:00:00', 'pending',   'Network security thesis consultation',        NOW() - INTERVAL 1 HOUR),
+-- Past completed: pre-system booking (no availability slot)
+(6, 104, 106, 1001, 3,  NULL, CURDATE() - INTERVAL 3 DAY,  '13:00:00', 'completed', 'Database lab consultation',                   NOW() - INTERVAL 4 DAY),
+
+-- ── Filler · other students in today's slots (realistic occupancy) ────────────
+-- Slot 1  (102 · today AM · max 5): 2 of 5 spots taken
+(7,  105, 102, 1001, 1,  1,  CURDATE(), '09:00:00', 'approved', 'Web dev thesis discussion',    NOW() - INTERVAL 4 HOUR),
+(8,  108, 102, 1001, 2,  1,  CURDATE(), '09:00:00', 'pending',  'Mobile app project inquiry',   NOW() - INTERVAL 2 HOUR),
+-- Slot 20 (107 · today AM · max 3): 1 of 3 spots taken
+(9,  109, 107, 1001, 4,  20, CURDATE(), '10:00:00', 'approved', 'Capstone backend review',      NOW() - INTERVAL 5 HOUR),
+-- Slot 31 (110 · today PM · max 5): 1 of 5 spots taken
+(10, 105, 110, 1001, 5,  31, CURDATE(), '13:00:00', 'pending',  'SDLC consultation for thesis', NOW() - INTERVAL 3 HOUR);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -636,16 +655,18 @@ INSERT INTO chatbot_knowledge_base (kb_id, intent, keywords, response_text, cate
 -- Sample notifications for named students and the admin.
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO notifications (user_id, message, is_read, created_at) VALUES
--- Student 101
-(101, CONCAT('Your appointment with Prof. Ogalesco on ', DATE_FORMAT(CURDATE() + INTERVAL 2 DAY, '%M %d'), ' has been approved.'),         FALSE, NOW() - INTERVAL 1 DAY),
-(101, 'Your Good Moral Certificate request is now being processed.',                                                                    FALSE, NOW() - INTERVAL 3 DAY),
-(101, 'Your Transcript of Records is ready for pickup at the CCS office.',                                                              TRUE,  NOW() - INTERVAL 14 DAY),
--- Student 104
-(104, 'Your appointment request with Prof. Ogalesco is pending approval.',                                                              FALSE, NOW() - INTERVAL 3 HOUR),
-(104, 'Your Good Moral Certificate request has been received and is pending review.',                                                   FALSE, NOW() - INTERVAL 1 DAY),
+-- Student 101 (Alvin Matthew Ortiz · 2300544)
+(101, CONCAT('Your appointment with Prof. Ogalesco on ', DATE_FORMAT(CURDATE() + INTERVAL 2 DAY, '%M %d'), ' (9:00 AM – 12:00 PM) has been approved.'), FALSE, NOW() - INTERVAL 1 DAY),
+(101, 'Your appointment request with Prof. Tan on July 08 (10:00 AM – 12:00 PM) is pending approval.',                                   FALSE, NOW() - INTERVAL 2 HOUR),
+(101, 'Your Good Moral Certificate request is now being processed.',                                                                      FALSE, NOW() - INTERVAL 3 DAY),
+(101, 'Your Transcript of Records is ready for pickup at the CCS office.',                                                                TRUE,  NOW() - INTERVAL 14 DAY),
+-- Student 104 (Luiz Gabriel Rosales · 2302494)
+(104, 'Your appointment request with Prof. Ogalesco on July 08 (9:00 AM – 12:00 PM) is pending approval.',                               FALSE, NOW() - INTERVAL 3 HOUR),
+(104, 'Your appointment request with Prof. Dela Cruz on June 30 (8:00 AM – 12:00 PM) is pending approval.',                              FALSE, NOW() - INTERVAL 1 HOUR),
+(104, 'Your Good Moral Certificate request has been received and is pending review.',                                                     FALSE, NOW() - INTERVAL 1 DAY),
 -- Admin 103
-(103, 'New document request submitted by Alvin Matthew Ortiz (Good Moral Certificate).',                                               TRUE,  NOW() - INTERVAL 3 DAY),
-(103, 'New document request submitted by Luiz Gabriel Rosales (Transcript of Records).',                                               TRUE,  NOW() - INTERVAL 2 DAY);
+(103, 'New document request submitted by Alvin Matthew Ortiz (Good Moral Certificate).',                                                 TRUE,  NOW() - INTERVAL 3 DAY),
+(103, 'New document request submitted by Luiz Gabriel Rosales (Transcript of Records).',                                                 TRUE,  NOW() - INTERVAL 2 DAY);
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 13 · FACULTY POSITIONS (update existing rows)
@@ -685,67 +706,101 @@ INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time,
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 14B · FACULTY DATE-SPECIFIC AVAILABILITY
--- Mirrors old weekly patterns as concrete upcoming dates
--- Based on: today = 2026-06-27 (Saturday)
---   Mon Jun 29, Tue Jun 30, Wed Jul 01, Thu Jul 02, Fri Jul 03
---   Mon Jul 06, Tue Jul 07, Wed Jul 08, Thu Jul 09, Fri Jul 10
---   Mon Jul 13, Tue Jul 14, Wed Jul 15, Thu Jul 16, Fri Jul 17
--- ─────────────────────────────────────────────────────────────
--- max_students: NULL = indefinite (no cap); N = total booking cap for the window
--- slot_duration_minutes: length of each bookable slot students pick from within the window
+-- Concrete upcoming dates for each professor's weekly pattern.
+-- Uses CURDATE() + INTERVAL N DAY so slots are always relative to the current date.
+-- Interval mapping (based on a Monday start): +0=today, +1=tomorrow, +2=Wed, +3=Thu,
+--   +4=Fri, +7=next Mon, +8=Tue, +9=Wed, +10=Thu, +11=Fri, +14=Mon+2wks … +18=Fri+2wks
+--
+-- max_students: NULL = indefinite; N = total occupancy cap for the window
 -- status: 'open' = bookable; 'closed' = faculty manually closed early
-INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, max_students, slot_duration_minutes, status, location) VALUES
+--
+-- Insertion order determines auto-increment IDs (used in Section 14C and 8):
+--   102 Ogalesco : IDs  1–10
+--   106 Bicua    : IDs 11–19
+--   107 Tan      : IDs 20–30
+--   110 Villanueva: IDs 31–38
+--   111 Dela Cruz: IDs 39–44
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, max_students, status, location) VALUES
 
--- 102 Patrick Ogalesco: 30-min slots, max 5 students per window (Mon AM+PM, Wed AM, Fri PM) — skips Jul 6
-('102', '2026-06-29', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-06-29', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-07-01', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-07-03', '13:00:00', '16:00:00',  5, 30, 'closed', 'CCS Faculty Room 201'),
-('102', '2026-07-08', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-07-08', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-07-10', '13:00:00', '16:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-07-13', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-07-15', '09:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
-('102', '2026-07-17', '13:00:00', '16:00:00',  5, 30, 'open',   'CCS Faculty Room 201'),
+-- 102 Patrick Ogalesco: max 5 students
+(102, CURDATE(),                        '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  1
+(102, CURDATE(),                        '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  2
+(102, CURDATE() + INTERVAL 2 DAY,      '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  3
+(102, CURDATE() + INTERVAL 4 DAY,      '13:00:00', '16:00:00',  5, 'closed', 'CCS Faculty Room 201'),  -- ID  4
+(102, CURDATE() + INTERVAL 9 DAY,      '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  5
+(102, CURDATE() + INTERVAL 9 DAY,      '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  6
+(102, CURDATE() + INTERVAL 11 DAY,     '13:00:00', '16:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  7
+(102, CURDATE() + INTERVAL 14 DAY,     '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  8
+(102, CURDATE() + INTERVAL 16 DAY,     '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  9
+(102, CURDATE() + INTERVAL 18 DAY,     '13:00:00', '16:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID 10
 
--- 106 Marvin Bicua: 60-min slots, indefinite students (Tue AM+PM, Thu AM+PM) — skips Jul 14
-('106', '2026-06-30', '10:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-06-30', '14:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-07-02', '09:00:00', '11:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-07-02', '13:00:00', '16:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-07-07', '10:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-07-09', '09:00:00', '11:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-07-09', '13:00:00', '16:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-07-16', '09:00:00', '11:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
-('106', '2026-07-16', '13:00:00', '16:00:00', NULL, 60, 'open',   'CCS Faculty Room 203'),
+-- 106 Marvin Bicua: indefinite capacity
+(106, CURDATE() + INTERVAL 1 DAY,      '10:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 11
+(106, CURDATE() + INTERVAL 1 DAY,      '14:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 12
+(106, CURDATE() + INTERVAL 3 DAY,      '09:00:00', '11:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 13
+(106, CURDATE() + INTERVAL 3 DAY,      '13:00:00', '16:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 14
+(106, CURDATE() + INTERVAL 8 DAY,      '10:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 15
+(106, CURDATE() + INTERVAL 10 DAY,     '09:00:00', '11:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 16
+(106, CURDATE() + INTERVAL 10 DAY,     '13:00:00', '16:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 17
+(106, CURDATE() + INTERVAL 17 DAY,     '09:00:00', '11:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 18
+(106, CURDATE() + INTERVAL 17 DAY,     '13:00:00', '16:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 19
 
--- 107 Janus Raymond Tan: 30-min slots, max 3 students per window (Mon AM, Wed AM+PM, Fri AM)
-('107', '2026-06-29', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-01', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-01', '14:00:00', '16:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-03', '09:00:00', '12:00:00',  3, 30, 'closed', 'CCS Dean\'s Office'),
-('107', '2026-07-06', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-08', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-10', '09:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-13', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-15', '10:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-15', '14:00:00', '16:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
-('107', '2026-07-17', '09:00:00', '12:00:00',  3, 30, 'open',   'CCS Dean\'s Office'),
+-- 107 Janus Raymond Tan: max 3 students
+(107, CURDATE(),                        '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 20
+(107, CURDATE() + INTERVAL 2 DAY,      '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 21
+(107, CURDATE() + INTERVAL 2 DAY,      '14:00:00', '16:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 22
+(107, CURDATE() + INTERVAL 4 DAY,      '09:00:00', '12:00:00',  3, 'closed', 'CCS Dean\'s Office'),    -- ID 23
+(107, CURDATE() + INTERVAL 7 DAY,      '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 24
+(107, CURDATE() + INTERVAL 9 DAY,      '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 25
+(107, CURDATE() + INTERVAL 11 DAY,     '09:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 26
+(107, CURDATE() + INTERVAL 14 DAY,     '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 27
+(107, CURDATE() + INTERVAL 16 DAY,     '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 28
+(107, CURDATE() + INTERVAL 16 DAY,     '14:00:00', '16:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 29
+(107, CURDATE() + INTERVAL 18 DAY,     '09:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 30
 
--- 110 Lena Villanueva: 30-min slots, max 5 students (Mon PM, Wed AM, Fri PM) — skips Jul 10
-('110', '2026-06-29', '13:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
-('110', '2026-07-01', '10:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
-('110', '2026-07-03', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
-('110', '2026-07-06', '13:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
-('110', '2026-07-08', '10:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
-('110', '2026-07-13', '13:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
-('110', '2026-07-15', '10:00:00', '12:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
-('110', '2026-07-17', '14:00:00', '17:00:00',  5, 30, 'open',   'CCS Faculty Room 105'),
+-- 110 Lena Villanueva: max 5 students
+(110, CURDATE(),                        '13:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 31
+(110, CURDATE() + INTERVAL 2 DAY,      '10:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 32
+(110, CURDATE() + INTERVAL 4 DAY,      '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 33
+(110, CURDATE() + INTERVAL 7 DAY,      '13:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 34
+(110, CURDATE() + INTERVAL 9 DAY,      '10:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 35
+(110, CURDATE() + INTERVAL 14 DAY,     '13:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 36
+(110, CURDATE() + INTERVAL 16 DAY,     '10:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 37
+(110, CURDATE() + INTERVAL 18 DAY,     '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 38
 
--- 111 Marco Dela Cruz: 60-min slots, indefinite students (Tue AM, Thu PM)
-('111', '2026-06-30', '08:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
-('111', '2026-07-02', '13:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
-('111', '2026-07-07', '08:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
-('111', '2026-07-09', '13:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
-('111', '2026-07-14', '08:00:00', '12:00:00', NULL, 60, 'open',   'CCS Faculty Room 401'),
-('111', '2026-07-16', '13:00:00', '17:00:00', NULL, 60, 'open',   'CCS Faculty Room 401');
+-- 111 Marco Dela Cruz: indefinite capacity
+(111, CURDATE() + INTERVAL 1 DAY,      '08:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 39
+(111, CURDATE() + INTERVAL 3 DAY,      '13:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 40
+(111, CURDATE() + INTERVAL 8 DAY,      '08:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 41
+(111, CURDATE() + INTERVAL 10 DAY,     '13:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 42
+(111, CURDATE() + INTERVAL 15 DAY,     '08:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 43
+(111, CURDATE() + INTERVAL 17 DAY,     '13:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 401'); -- ID 44
+
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 14C · SLOT SERVICES
+-- Links appointment_services types to availability windows.
+-- IDs reference Section 14B insertion order above.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO slot_services (availability_id, service_id) VALUES
+-- Prof 102 (Ogalesco): Web Dev (1) + Mobile App (2) on all open slots
+(1, 1), (1, 2),   -- Jun 29 AM
+(2, 1), (2, 2),   -- Jun 29 PM
+(3, 1), (3, 2),   -- Jul 01 AM
+(5, 1), (5, 2),   -- Jul 08 AM
+(6, 1), (6, 2),   -- Jul 08 PM
+(8, 1), (8, 2),   -- Jul 13 AM
+(9, 1), (9, 2),   -- Jul 15 AM
+(10,1), (10,2),   -- Jul 17 PM
+-- Prof 106 (Bicua): DB Design (3) on all slots
+(11,3), (12,3), (13,3), (14,3),
+(15,3), (16,3), (17,3), (18,3), (19,3),
+-- Prof 107 (Tan): Backend Architecture (4) on all open slots
+(20,4), (21,4), (22,4),
+(25,4), (26,4), (27,4), (28,4), (29,4), (30,4),
+-- Prof 110 (Villanueva): Software Engineering (5) on all slots
+(31,5), (32,5), (33,5), (34,5),
+(35,5), (36,5), (37,5), (38,5),
+-- Prof 111 (Dela Cruz): Network Security (6) on all slots
+(39,6), (40,6), (41,6), (42,6), (43,6), (44,6);

@@ -620,7 +620,6 @@ router.get(
 
 // POST /api/faculty/date-availability
 // Body: { available_date, start_time, end_time, location, max_students, appointmentTypes? }
-// slot_duration_minutes is auto-computed: floor(windowMinutes / max_students)
 router.post(
   "/date-availability",
   authenticateToken,
@@ -643,11 +642,6 @@ router.post(
       return res.status(400).json({ message: "max_students must be a positive integer" });
     }
 
-    const [sh, sm] = start_time.split(":").map(Number);
-    const [eh, em] = end_time.split(":").map(Number);
-    const windowMin = (eh * 60 + em) - (sh * 60 + sm);
-    const duration = Math.max(1, Math.floor(windowMin / maxStu));
-
     // Sanitize appointment types: unique, non-empty strings, max 20
     const types = Array.isArray(appointmentTypes)
       ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
@@ -663,9 +657,9 @@ router.post(
       }
       const [result] = await pool.query(
         `INSERT INTO faculty_date_availability
-           (faculty_id, available_date, start_time, end_time, max_students, slot_duration_minutes, location)
-         VALUES (?,?,?,?,?,?,?)`,
-        [facultyId, available_date, start_time, end_time, maxStu, duration, location ?? null]
+           (faculty_id, available_date, start_time, end_time, max_students, location)
+         VALUES (?,?,?,?,?,?)`,
+        [facultyId, available_date, start_time, end_time, maxStu, location ?? null]
       );
       const newId = result.insertId;
       const linkedServices = [];
@@ -692,7 +686,6 @@ router.post(
         id: newId,
         message: "Availability slot added",
         max_students: maxStu,
-        slot_duration_minutes: duration,
         appointmentTypes: linkedServices,
       });
     } catch (err) {
@@ -704,7 +697,6 @@ router.post(
 
 // PATCH /api/faculty/date-availability/:id
 // Body: { max_students?, status?, location?, appointmentTypes? }
-// slot_duration_minutes is recomputed automatically when max_students changes.
 router.patch(
   "/date-availability/:id",
   authenticateToken,
@@ -721,17 +713,6 @@ router.patch(
         return res.status(400).json({ message: "max_students must be a positive integer" });
       }
       updates.max_students = maxStu;
-      // Recompute slot_duration_minutes from the existing window
-      const [[row]] = await pool.query(
-        "SELECT start_time, end_time FROM faculty_date_availability WHERE id = ? AND faculty_id = ?",
-        [id, facultyId]
-      );
-      if (row) {
-        const [sh, sm] = row.start_time.split(":").map(Number);
-        const [eh, em] = row.end_time.split(":").map(Number);
-        const windowMin = (eh * 60 + em) - (sh * 60 + sm);
-        updates.slot_duration_minutes = Math.max(1, Math.floor(windowMin / maxStu));
-      }
     }
     if (status !== undefined) {
       if (!["open", "closed"].includes(status)) {

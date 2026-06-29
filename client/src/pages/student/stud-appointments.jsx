@@ -581,7 +581,7 @@ export default function AppointmentsPage() {
                             <div className="slot-details">
                               <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</span></div>
                               <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
-                              <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.availableCount} {slot.availableCount === 1 ? "slot" : "slots"} available {slot.maxStudents != null ? `(max ${slot.maxStudents})` : "(indefinite)"}</span></div>
+                              <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "spot" : "spots"} left` : "Unlimited"} {slot.maxStudents != null ? `(max ${slot.maxStudents})` : ""}</span></div>
                             </div>
                             <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book This Slot</button>
                           </div>
@@ -630,7 +630,7 @@ export default function AppointmentsPage() {
                           )}
                           <div className="booking-details">
                             <div className="booking-detail"><Calendar style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatDate(booking.date)}</span></div>
-                            <div className="booking-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.time}</span></div>
+                            <div className="booking-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.windowStart && booking.windowEnd ? `${booking.windowStart} – ${booking.windowEnd}` : "—"}</span></div>
                             <div className="booking-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.location}</span></div>
                           </div>
                           {booking.purpose && (

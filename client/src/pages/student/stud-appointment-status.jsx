@@ -214,8 +214,8 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
                 <p className="dss-detail-value">{formatDate(appt.date)}</p>
               </div>
               <div className="dss-detail-row">
-                <p className="dss-detail-label">Time</p>
-                <p className="dss-detail-value">{appt.time}</p>
+                <p className="dss-detail-label">Time Slot</p>
+                <p className="dss-detail-value">{appt.windowStart && appt.windowEnd ? `${appt.windowStart} – ${appt.windowEnd}` : "—"}</p>
               </div>
               <div className="dss-detail-row">
                 <p className="dss-detail-label">Location</p>
@@ -582,8 +582,8 @@ export default function AppointmentStatusPage() {
                               <p>{formatDateShort(appt.date)}</p>
                             </div>
                             <div className="dss-list-card-field">
-                              <label>Time</label>
-                              <p>{appt.time}</p>
+                              <label>Time Slot</label>
+                              <p>{appt.windowStart && appt.windowEnd ? `${appt.windowStart} – ${appt.windowEnd}` : "—"}</p>
                             </div>
                             <div className="dss-list-card-field">
                               <label>Location</label>

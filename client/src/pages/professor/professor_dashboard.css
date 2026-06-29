@@ -948,7 +948,7 @@ body {
   border-color: rgba(34, 197, 94, 0.6);
 }
 
-.appointment-icon {
+.appointment-item .appointment-icon {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
@@ -962,12 +962,12 @@ body {
   transition: all 0.3s ease;
 }
 
-.appointment-icon:hover {
+.appointment-item .appointment-icon:hover {
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.35) 0%, rgba(34, 197, 94, 0.25) 100%);
   border-color: rgba(34, 197, 94, 0.5);
 }
 
-.appointment-icon svg {
+.appointment-item .appointment-icon svg {
   width: 1.25rem;
   height: 1.25rem;
 }
