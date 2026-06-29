@@ -204,7 +204,7 @@ export default function ProfessorDocumentRequest() {
         processingTime: s.processing_time ?? "TBD",
         availability: s.status === "active" ? "Available" : "Unavailable",
         availabilityType: s.status === "active" ? "available" : "unavailable",
-        requirements: ["Valid ID", "Request form"],
+        requirements: s.requirements ?? [],
       })));
     } catch {
       toast.error("Failed to load document types");
@@ -448,8 +448,15 @@ export default function ProfessorDocumentRequest() {
 
           {/* Page Header */}
           <div className="pdr-page-header">
-            <h1 className="pdr-page-title">Document Requests</h1>
-            <p className="pdr-page-desc">Request official documents and track your submissions</p>
+            <div className="pdr-title-section">
+              <div className="pdr-title-icon">
+                <DocumentIconNav />
+              </div>
+              <div>
+                <h1 className="pdr-page-title">Document Requests</h1>
+                <p className="pdr-page-desc">Request official documents and track your submissions</p>
+              </div>
+            </div>
           </div>
 
           {/* Instructions */}

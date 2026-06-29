@@ -1032,10 +1032,24 @@ router.get(
         [facultyId]
       );
       const [rows] = await pool.query(
-        "SELECT * FROM document_services WHERE department_id = ? AND status = 'active' ORDER BY service_name",
+        "SELECT * FROM document_services WHERE (department_id = ? OR department_id IS NULL) AND recipient_type IN ('faculty', 'both') AND status = 'active' ORDER BY service_name",
         [fac.department_id]
       );
-      res.json(rows);
+
+      const serviceIds = rows.map((r) => r.service_id);
+      let requirementsMap = {};
+      if (serviceIds.length > 0) {
+        const [reqRows] = await pool.query(
+          "SELECT service_id, requirement_name FROM document_requirements WHERE service_id IN (?) ORDER BY is_mandatory DESC, requirement_id ASC",
+          [serviceIds]
+        );
+        for (const req of reqRows) {
+          if (!requirementsMap[req.service_id]) requirementsMap[req.service_id] = [];
+          requirementsMap[req.service_id].push(req.requirement_name);
+        }
+      }
+
+      res.json(rows.map((r) => ({ ...r, requirements: requirementsMap[r.service_id] ?? [] })));
     } catch (err) {
       console.error("GET /document-services error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });

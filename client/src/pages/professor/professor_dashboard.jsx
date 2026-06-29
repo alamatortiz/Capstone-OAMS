@@ -222,12 +222,6 @@ const CalendarClockIcon = () => (
     <polyline points="17 15.5 17 17 18 18"></polyline>
   </svg>
 );
-const MegaphoneIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 11l19-9-9 19-2-8-8-2z"></path>
-  </svg>
-);
-
 const ArrowRightIcon = () => (
   <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -339,13 +333,6 @@ export default function ProfessorDashboard() {
       icon: CalendarClockIcon,
       path: "/professor/schedule-availability",
       badge: "Schedule",
-    },
-    {
-      label: "Announcement Creation",
-      description: "Post announcements to students",
-      icon: MegaphoneIcon,
-      path: "/professor/announcement-creation",
-      badge: "Announce",
     },
   ];
 
