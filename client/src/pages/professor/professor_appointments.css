@@ -76,14 +76,9 @@ html, body {
   gap: 0.25rem;
   border-bottom: 2px solid var(--card-border);
   flex-wrap: wrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
   transition: border-color 0.3s ease;
   padding: 0;
 }
-
-.appt-tabs-list::-webkit-scrollbar { display: none; }
 
 .appt-tab-trigger {
   display: flex;

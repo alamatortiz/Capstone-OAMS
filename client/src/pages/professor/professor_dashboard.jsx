@@ -301,7 +301,7 @@ export default function ProfessorDashboard() {
     {
       title: "Documents",
       value: loading ? "—" : String(s?.documentsToReview ?? 0),
-      description: "To review",
+      description: "Pending requests",
       icon: FileTextIcon,
       bgColor: "bg-orange-50",
       link: "/professor/documents",
@@ -384,7 +384,7 @@ export default function ProfessorDashboard() {
     if (i.includes("student"))
       return `You have ${s?.pendingAppointments ?? 0} pending appointments from students.`;
     if (i.includes("document"))
-      return `You have ${s?.documentsToReview ?? 0} documents pending review.`;
+      return `You have ${s?.documentsToReview ?? 0} pending document requests.`;
     if (i.includes("schedule") || i.includes("office hours"))
       return "Your office hours are Monday to Friday, 8:00 AM - 5:00 PM, and Saturday 8:00 AM - 12:00 PM.";
     return "I can help you with appointment management and document reviews. What do you need?";
@@ -397,7 +397,7 @@ export default function ProfessorDashboard() {
       label: "Appointments",
       path: "/professor/appointments",
     },
-    { icon: DocumentIconNav, label: "Documents", path: "/professor/documents" },
+    { icon: DocumentIconNav, label: "Documents", path: "/professor/document-request" },
     {
       icon: HistoryIconNav,
       label: "Transactions",

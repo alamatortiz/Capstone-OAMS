@@ -306,7 +306,7 @@ export default function ProfessorAnnouncementCreation() {
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
     { icon: CalendarIconNav, label: "Appointments", path: "/professor/appointments" },
-    { icon: DocumentIconNav, label: "Documents", path: "/professor/documents" },
+    { icon: DocumentIconNav, label: "Documents", path: "/professor/document-request" },
     { icon: HistoryIconNav, label: "Transactions", path: "/professor/transactions" },
   ];
 

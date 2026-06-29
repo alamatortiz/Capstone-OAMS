@@ -514,7 +514,9 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 -- availability_id references Section 14B IDs (set for all future bookings).
 -- Past completed appointments use availability_id NULL (those slots no longer exist).
 -- service_id: FK to appointment_services (must match the faculty and slot_services links).
+-- FK checks disabled here because faculty_date_availability is seeded later (Section 14B).
 -- ─────────────────────────────────────────────────────────────
+SET FOREIGN_KEY_CHECKS = 0;
 INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, availability_id, appointment_date, appointment_time, status, notes, created_at) VALUES
 
 -- ── Student 101 · Alvin Matthew Ortiz (2300544) ──────────────────────────────
@@ -541,6 +543,7 @@ INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id,
 (9,  109, 107, 1001, 4,  20, CURDATE(), '10:00:00', 'approved', 'Capstone backend review',      NOW() - INTERVAL 5 HOUR),
 -- Slot 31 (110 · today PM · max 5): 1 of 5 spots taken
 (10, 105, 110, 1001, 5,  31, CURDATE(), '13:00:00', 'pending',  'SDLC consultation for thesis', NOW() - INTERVAL 3 HOUR);
+SET FOREIGN_KEY_CHECKS = 1;
 
 
 -- ─────────────────────────────────────────────────────────────

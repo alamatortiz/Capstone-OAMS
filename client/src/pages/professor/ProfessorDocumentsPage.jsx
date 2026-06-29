@@ -7,7 +7,6 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./professor_dashboard.css";
 import "./professor_documents.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
-import { toast } from "sonner";
 import api from "../../utils/api";
 
 // ── Nav Icons ─────────────────────────────────────────────────────────────────
@@ -100,8 +99,14 @@ const SendIcon = () => (
     <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1rem", height: "1rem" }}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
 
-// ── Document-specific icons ───────────────────────────────────────────────────
+// ── Content Icons ─────────────────────────────────────────────────────────────
 const AlertCircleIcon = ({ className = "docs-icon-sm" }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10" />
@@ -138,27 +143,31 @@ const FileTextIcon = ({ className = "docs-icon-sm" }) => (
   </svg>
 );
 
-// ── Status config ─────────────────────────────────────────────────────────────
-const STATUS = {
-  pending:    { badgeClass: "docs-badge-pending",    Icon: AlertCircleIcon },
-  approved:   { badgeClass: "docs-badge-approved",   Icon: CheckCircle2Icon },
-  rejected:   { badgeClass: "docs-badge-rejected",   Icon: XCircleIcon },
-  processing: { badgeClass: "docs-badge-processing", Icon: ClockIcon },
-  ready:      { badgeClass: "docs-badge-ready",      Icon: CheckCircle2Icon },
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const STATUS_CONFIG = {
+  pending:    { badgeClass: "docs-badge-pending",    Icon: AlertCircleIcon,  label: "Pending" },
+  processing: { badgeClass: "docs-badge-processing", Icon: ClockIcon,        label: "Processing" },
+  released:   { badgeClass: "docs-badge-ready",      Icon: CheckCircle2Icon, label: "Released" },
+  rejected:   { badgeClass: "docs-badge-rejected",   Icon: XCircleIcon,      label: "Rejected" },
 };
 
 function StatusBadge({ status }) {
-  const cfg = STATUS[status] || STATUS.pending;
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
   return (
     <span className={`docs-badge ${cfg.badgeClass}`}>
       <cfg.Icon />
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {cfg.label}
     </span>
   );
 }
 
-// ── Document Card ─────────────────────────────────────────────────────────────
-function DocumentCard({ doc, onApprove, onReject, onProcess, onMarkReady, onViewDetails }) {
+function formatDate(val) {
+  if (!val) return "—";
+  return new Date(val).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
+// ── Request Card ──────────────────────────────────────────────────────────────
+function RequestCard({ req, onViewDetails }) {
   return (
     <div className="docs-card">
       <div className="docs-card-header-row">
@@ -166,55 +175,46 @@ function DocumentCard({ doc, onApprove, onReject, onProcess, onMarkReady, onView
           <FileTextIcon className="docs-icon-md" />
         </div>
         <div className="docs-card-title-section">
-          <h3 className="docs-card-name">{doc.studentName}</h3>
-          <p className="docs-card-sub">{doc.studentId}{doc.documentType ? ` · ${doc.documentType}` : ""}</p>
+          <h3 className="docs-card-name">{req.service_name}</h3>
+          <p className="docs-card-sub">{req.tracking_number}</p>
         </div>
         <div className="docs-card-badges">
-          {doc.urgency === "urgent" && (
-            <span className="docs-urgent-badge"><AlertCircleIcon /> Urgent</span>
-          )}
-          <StatusBadge status={doc.status} />
+          <StatusBadge status={req.status} />
         </div>
       </div>
 
       <div className="docs-meta-grid">
         <div className="docs-meta-field">
           <label>Purpose</label>
-          <p>{doc.purpose}</p>
+          <p>{req.purpose}</p>
         </div>
         <div className="docs-meta-field">
-          <label>Request Date</label>
-          <p>{doc.requestDate}</p>
+          <label>Submitted</label>
+          <p>{formatDate(req.created_at)}</p>
         </div>
+        {req.estimated_completion && (
+          <div className="docs-meta-field">
+            <label>Est. Completion</label>
+            <p>{formatDate(req.estimated_completion)}</p>
+          </div>
+        )}
+        {req.processing_time && (
+          <div className="docs-meta-field">
+            <label>Processing Time</label>
+            <p>{req.processing_time}</p>
+          </div>
+        )}
       </div>
 
-      {doc.notes && (
+      {req.notes && (
         <div className="docs-notes-box">
           <p className="docs-meta-label" style={{ marginBottom: "0.25rem" }}>Notes</p>
-          <p className="docs-notes-text">{doc.notes}</p>
+          <p className="docs-notes-text">{req.notes}</p>
         </div>
       )}
 
       <div className="docs-footer">
-        {doc.status === "pending" && (
-          <>
-            <button className="docs-btn docs-btn-approve" onClick={() => onApprove(doc.id)}>
-              <CheckCircle2Icon /> Approve
-            </button>
-            <button className="docs-btn docs-btn-process" onClick={() => onProcess(doc.id)}>
-              <ClockIcon /> Process
-            </button>
-            <button className="docs-btn docs-btn-reject" onClick={() => onReject(doc.id)}>
-              <XCircleIcon /> Reject
-            </button>
-          </>
-        )}
-        {(doc.status === "approved" || doc.status === "processing") && (
-          <button className="docs-btn docs-btn-ready" onClick={() => onMarkReady(doc.id)}>
-            <CheckCircle2Icon /> Mark Ready
-          </button>
-        )}
-        <button className="docs-btn docs-btn-outline" onClick={() => onViewDetails(doc)}>
+        <button className="docs-btn docs-btn-outline" onClick={() => onViewDetails(req)}>
           View Details
         </button>
       </div>
@@ -223,53 +223,64 @@ function DocumentCard({ doc, onApprove, onReject, onProcess, onMarkReady, onView
 }
 
 // ── Details Dialog ────────────────────────────────────────────────────────────
-function DetailsDialog({ doc, onClose }) {
-  if (!doc) return null;
+function DetailsDialog({ req, onClose }) {
+  if (!req) return null;
   return (
     <div className="docs-dialog-overlay">
       <div className="docs-dialog-box">
         <button className="docs-dialog-close" onClick={onClose} aria-label="Close">
           <CloseIcon />
         </button>
-        <p className="docs-dialog-title">Document Details</p>
-        <p className="docs-dialog-desc">Detailed information about this document request.</p>
+        <p className="docs-dialog-title">Request Details</p>
+        <p className="docs-dialog-desc">Full details for your document request.</p>
 
         <div className="docs-name-row">
-          <span className="docs-student-name">{doc.studentName}</span>
-          <span className="docs-student-id">({doc.studentId})</span>
-          {doc.urgency === "urgent" && (
-            <span className="docs-urgent-badge"><AlertCircleIcon /> Urgent</span>
-          )}
+          <span className="docs-student-name">{req.service_name}</span>
         </div>
-        <p className="docs-doc-type" style={{ margin: "0.5rem 0 0.75rem" }}>{doc.documentType}</p>
+        <p className="docs-doc-type" style={{ margin: "0.25rem 0 0.75rem", opacity: 0.7, fontSize: "0.85rem" }}>
+          {req.tracking_number}
+        </p>
 
         <div className="docs-meta-grid">
           <div>
             <p className="docs-meta-label">Purpose</p>
-            <p className="docs-meta-value">{doc.purpose}</p>
+            <p className="docs-meta-value">{req.purpose}</p>
           </div>
           <div>
-            <p className="docs-meta-label">Request Date</p>
-            <p className="docs-meta-value">{doc.requestDate}</p>
+            <p className="docs-meta-label">Request Type</p>
+            <p className="docs-meta-value">{req.request_type || "General"}</p>
           </div>
           <div>
             <p className="docs-meta-label">Status</p>
-            <StatusBadge status={doc.status} />
+            <StatusBadge status={req.status} />
           </div>
           <div>
-            <p className="docs-meta-label">Urgency</p>
-            <p className="docs-meta-value">{doc.urgency === "urgent" ? "Urgent" : "Normal"}</p>
+            <p className="docs-meta-label">Submitted</p>
+            <p className="docs-meta-value">{formatDate(req.created_at)}</p>
           </div>
+          {req.estimated_completion && (
+            <div>
+              <p className="docs-meta-label">Est. Completion</p>
+              <p className="docs-meta-value">{formatDate(req.estimated_completion)}</p>
+            </div>
+          )}
+          {req.released_at && (
+            <div>
+              <p className="docs-meta-label">Released</p>
+              <p className="docs-meta-value">{formatDate(req.released_at)}</p>
+            </div>
+          )}
         </div>
 
-        {doc.notes && (
+        {req.notes && (
           <div className="docs-notes-box" style={{ marginTop: "0.5rem" }}>
             <p className="docs-meta-label" style={{ marginBottom: "0.25rem" }}>Notes</p>
-            <p className="docs-notes-text">{doc.notes}</p>
+            <p className="docs-notes-text">{req.notes}</p>
           </div>
         )}
+
         <div className="docs-dialog-footer">
-          <button className="docs-btn docs-btn-outline" onClick={onClose}>Back</button>
+          <button className="docs-btn docs-btn-outline" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>
@@ -277,7 +288,7 @@ function DetailsDialog({ doc, onClose }) {
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
-const TABS = ["all", "pending", "approved", "processing", "ready", "rejected"];
+const TABS = ["all", "pending", "processing", "released", "rejected"];
 
 export default function ProfessorDocumentsPage() {
   const { user: authUser, logout } = useAuth();
@@ -296,54 +307,31 @@ export default function ProfessorDocumentsPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [activeTab, setActiveTab] = useState("all");
-  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [selectedReq, setSelectedReq] = useState(null);
   const [messages, setMessages] = useState([
-    { id: 1, type: "bot", text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?", timestamp: new Date() },
+    { id: 1, type: "bot", text: "Hello! I'm your OAMS Assistant. How can I help you today?", timestamp: new Date() },
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
 
-  const [documents, setDocuments] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchDocuments = async () => {
+  const fetchRequests = async () => {
     try {
-      const res = await api.get("/faculty/document-requests");
-      setDocuments(res.data);
+      const res = await api.get("/faculty/my-document-requests");
+      setRequests(res.data);
     } catch {
-      toast.error("Failed to load document requests");
+      // silent — empty state handles it
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchDocuments(); }, []);
-
-  const stats = {
-    pending:    documents.filter((d) => d.status === "pending").length,
-    approved:   documents.filter((d) => d.status === "approved").length,
-    processing: documents.filter((d) => d.status === "processing").length,
-    ready:      documents.filter((d) => d.status === "generated" || d.status === "released").length,
-  };
+  useEffect(() => { fetchRequests(); }, []);
 
   const filtered =
-    activeTab === "all" ? documents : documents.filter((d) => d.status === activeTab);
-
-  const updateDocStatus = async (id, status, successMsg) => {
-    const doc = documents.find((d) => d.id === id);
-    try {
-      await api.patch(`/faculty/document-requests/${id}/status`, { status });
-      await fetchDocuments();
-      toast.success(successMsg.replace("{type}", doc?.documentType ?? "").replace("{name}", doc?.studentName ?? ""));
-    } catch {
-      toast.error("Failed to update document status");
-    }
-  };
-
-  const handleApprove  = (id) => updateDocStatus(id, "processing", "Processing {type} for {name}");
-  const handleReject   = (id) => updateDocStatus(id, "rejected",   "Rejected {type} for {name}");
-  const handleProcess  = (id) => updateDocStatus(id, "processing", "Document moved to processing");
-  const handleMarkReady = (id) => updateDocStatus(id, "generated", "Document marked as ready for pickup");
+    activeTab === "all" ? requests : requests.filter((r) => r.status === activeTab);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
@@ -357,10 +345,10 @@ export default function ProfessorDocumentsPage() {
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
-    if (i.includes("document") || i.includes("request")) return `You have ${stats.pending} pending document requests.`;
-    if (i.includes("pending")) return `There are ${stats.pending} pending requests awaiting your action.`;
-    if (i.includes("ready")) return `${stats.ready} document(s) are ready for pickup.`;
-    return "I can help you manage document requests. What do you need?";
+    const pending = requests.filter((r) => r.status === "pending").length;
+    if (i.includes("pending")) return `You have ${pending} pending document request(s).`;
+    if (i.includes("document") || i.includes("request")) return `You have ${requests.length} document request(s) in total.`;
+    return "I can help you track your document requests. What do you need?";
   };
 
   const handleSendMessage = (e) => {
@@ -378,7 +366,7 @@ export default function ProfessorDocumentsPage() {
   const navItems = [
     { icon: HomeIcon,        label: "Dashboard",    path: "/professor/dashboard" },
     { icon: CalendarIconNav, label: "Appointments", path: "/professor/appointments" },
-    { icon: DocumentIconNav, label: "Documents",    path: "/professor/documents" },
+    { icon: DocumentIconNav, label: "Documents",    path: "/professor/document-request" },
     { icon: HistoryIconNav,  label: "Transactions", path: "/professor/transactions" },
   ];
 
@@ -472,17 +460,20 @@ export default function ProfessorDocumentsPage() {
                 <FileTextIcon className="docs-icon-lg" />
               </div>
               <div>
-                <h1 className="docs-page-title">Document Management</h1>
-                <p className="docs-page-subtitle">Review and process student document requests</p>
+                <h1 className="docs-page-title">My Document Requests</h1>
+                <p className="docs-page-subtitle">Track the status of your submitted document requests</p>
               </div>
             </div>
+            <Link to="/professor/document-request" className="docs-btn-request">
+              <PlusIcon /> Request Document
+            </Link>
           </div>
 
           {/* Tabs */}
           <div className="docs-tabs-nav">
             <div className="docs-tabs-list">
               {TABS.map((tab) => {
-                const count = tab === "all" ? documents.length : documents.filter((d) => d.status === tab).length;
+                const count = tab === "all" ? requests.length : requests.filter((r) => r.status === tab).length;
                 return (
                   <button
                     key={tab}
@@ -500,19 +491,19 @@ export default function ProfessorDocumentsPage() {
           {/* List */}
           <div className="docs-list">
             {loading ? (
-              <div className="docs-empty">Loading document requests...</div>
+              <div className="docs-empty">Loading your document requests...</div>
             ) : filtered.length === 0 ? (
-              <div className="docs-empty">No document requests found.</div>
+              <div className="docs-empty">
+                {activeTab === "all"
+                  ? "You have no document requests yet. Click \"Request Document\" to get started."
+                  : `No ${activeTab} requests found.`}
+              </div>
             ) : (
-              filtered.map((doc) => (
-                <DocumentCard
-                  key={doc.id}
-                  doc={doc}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  onProcess={handleProcess}
-                  onMarkReady={handleMarkReady}
-                  onViewDetails={setSelectedDoc}
+              filtered.map((req) => (
+                <RequestCard
+                  key={req.request_id}
+                  req={req}
+                  onViewDetails={setSelectedReq}
                 />
               ))
             )}
@@ -523,9 +514,8 @@ export default function ProfessorDocumentsPage() {
 
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Details Dialog */}
-      {selectedDoc && (
-        <DetailsDialog doc={selectedDoc} onClose={() => setSelectedDoc(null)} />
+      {selectedReq && (
+        <DetailsDialog req={selectedReq} onClose={() => setSelectedReq(null)} />
       )}
 
       {/* AI Chatbot */}
@@ -564,6 +554,7 @@ export default function ProfessorDocumentsPage() {
           <ChatIcon />
         </button>
       </div>
+
       <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );

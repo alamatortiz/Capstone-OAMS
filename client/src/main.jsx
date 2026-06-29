@@ -203,12 +203,21 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              {/* ★ Documents page */}
+              {/* ★ Documents status list */}
               <Route
                 path="/professor/documents"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <ProfessorDocumentsPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Document request submission form */}
+              <Route
+                path="/professor/document-request"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorDocumentRequestPage />
                   </Suspense>
                 }
               />
@@ -218,15 +227,6 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <ProfessorTransactionsPage />
-                  </Suspense>
-                }
-              />
-              {/* ★ Document Request page */}
-              <Route
-                path="/professor/document-request"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <ProfessorDocumentRequestPage />
                   </Suspense>
                 }
               />
@@ -432,15 +432,6 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <ProfessorTransactionsPage />
-                </Suspense>
-              }
-            />
-            {/* ★ Backward-compatible temp route for professor document request */}
-            <Route
-              path="/professor-document-request"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfessorDocumentRequestPage />
                 </Suspense>
               }
             />

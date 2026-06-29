@@ -35,13 +35,11 @@ router.get(
         [facultyId],
       );
 
-      // 3. Documents to review (services under faculty's department)
+      // 3. Faculty's own pending document requests
       const [[docRow]] = await pool.query(
         `SELECT COUNT(*) AS doc_count
-         FROM document_requests dr
-         JOIN document_services s ON dr.service_id = s.service_id
-         JOIN faculty f ON f.department_id = s.department_id
-         WHERE f.faculty_id = ? AND dr.status IN ('pending', 'processing')`,
+         FROM faculty_document_requests
+         WHERE faculty_id = ? AND status IN ('pending', 'processing')`,
         [facultyId],
       );
 
@@ -247,86 +245,6 @@ router.patch(
 // DOCUMENT REQUESTS (student requests in faculty's department)
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/faculty/document-requests
-router.get(
-  "/document-requests",
-  authenticateToken,
-  authorizeRoles("faculty"),
-  async (req, res) => {
-    const facultyId = req.user.userId;
-    const { status } = req.query;
-    try {
-      let sql = `
-        SELECT
-          dr.request_id, dr.tracking_number, dr.request_type, dr.purpose,
-          dr.status, dr.notes, dr.created_at, dr.estimated_completion,
-          s.first_name, s.last_name, s.student_number,
-          ds.service_name
-        FROM document_requests dr
-        JOIN document_services ds ON dr.service_id = ds.service_id
-        JOIN students s ON dr.student_id = s.student_id
-        JOIN faculty f ON f.department_id = ds.department_id
-        WHERE f.faculty_id = ?`;
-      const params = [facultyId];
-      if (status && status !== "all") {
-        sql += " AND dr.status = ?";
-        params.push(status);
-      }
-      sql += " ORDER BY dr.created_at DESC";
-      const [rows] = await pool.query(sql, params);
-      res.json(rows.map((r) => ({
-        id: r.request_id,
-        trackingNumber: r.tracking_number,
-        studentName: `${r.first_name} ${r.last_name}`,
-        studentId: r.student_number,
-        documentType: r.service_name,
-        requestType: r.request_type,
-        purpose: r.purpose,
-        status: r.status,
-        notes: r.notes,
-        requestDate: r.created_at,
-        estimatedCompletion: r.estimated_completion,
-      })));
-    } catch (err) {
-      console.error("GET /document-requests error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
-    }
-  }
-);
-
-// PATCH /api/faculty/document-requests/:id/status
-router.patch(
-  "/document-requests/:id/status",
-  authenticateToken,
-  authorizeRoles("faculty"),
-  async (req, res) => {
-    const facultyId = req.user.userId;
-    const { id } = req.params;
-    const { status, notes } = req.body;
-    const allowed = ["processing", "generated", "released", "rejected"];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ message: "Invalid status value" });
-    }
-    try {
-      const [[doc]] = await pool.query(
-        `SELECT dr.request_id FROM document_requests dr
-         JOIN document_services ds ON dr.service_id = ds.service_id
-         JOIN faculty f ON f.department_id = ds.department_id
-         WHERE dr.request_id = ? AND f.faculty_id = ?`,
-        [id, facultyId]
-      );
-      if (!doc) return res.status(404).json({ message: "Document request not found" });
-      await pool.query(
-        "UPDATE document_requests SET status = ?, notes = COALESCE(?, notes) WHERE request_id = ?",
-        [status, notes ?? null, id]
-      );
-      res.json({ message: "Status updated" });
-    } catch (err) {
-      console.error("PATCH /document-requests/:id/status error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
-    }
-  }
-);
 
 // ─────────────────────────────────────────────────────────────
 // TRANSACTIONS (combined appointment + document history)
