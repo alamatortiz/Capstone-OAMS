@@ -712,6 +712,7 @@ body {
 /* ===== RETRY BUTTON ===== */
 
 .ann-retry-btn {
+  margin-top: 1rem;
   padding: 0.625rem 1.5rem;
   background: var(--primary-color);
   border: none;
@@ -905,26 +906,35 @@ body {
 
 /* ===== EMPTY STATE ===== */
 .empty-state {
-  text-align: center;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
   padding: 3rem 1.5rem;
-  color: var(--text-tertiary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  transition: color 0.3s ease;
+  text-align: center;
+  transition: all 0.3s ease;
 }
 
 .empty-state svg {
   width: 3rem;
   height: 3rem;
-  opacity: 0.5;
-  transition: opacity 0.3s ease;
+  color: var(--text-tertiary);
+  margin: 0 auto 1rem;
+  transition: color 0.3s ease;
+}
+
+.empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  transition: color 0.3s ease;
 }
 
 .empty-state p {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
   margin: 0;
-  font-size: 0.95rem;
+  transition: color 0.3s ease;
 }
 
 /* ===== Chat Widget ===== */
@@ -1192,6 +1202,10 @@ body {
   .announcements-page {
     padding: 0.5rem;
     gap: 1rem;
+  }
+
+  .empty-state {
+    padding: 2rem 1rem;
   }
 
   .announcements-page .queue-title {

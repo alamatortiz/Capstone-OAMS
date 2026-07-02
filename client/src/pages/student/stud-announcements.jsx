@@ -555,6 +555,7 @@ export default function AnnouncementsPage() {
           {annError && (
             <div className="empty-state">
               <AlertCircleIcon />
+              <h3>Something went wrong</h3>
               <p>{annError}</p>
               <button className="ann-retry-btn" onClick={fetchAnnouncements}>
                 Retry
@@ -608,7 +609,8 @@ export default function AnnouncementsPage() {
               {pinnedAnnouncements.length === 0 ? (
                 <div className="empty-state">
                   <BellIcon />
-                  <p>No pinned announcements</p>
+                  <h3>No Pinned Announcements</h3>
+                  <p>Announcements marked as important will appear here.</p>
                 </div>
               ) : (
                 <div className="announcements-list">
@@ -669,7 +671,8 @@ export default function AnnouncementsPage() {
               {filteredAnnouncements.length === 0 ? (
                 <div className="empty-state">
                   <BellIcon />
-                  <p>No announcements match these filters</p>
+                  <h3>No Announcements Found</h3>
+                  <p>Try adjusting your filters to see more results.</p>
                 </div>
               ) : (
                 <div className="announcements-list">

@@ -39,16 +39,10 @@ Think critically. If a proposed approach isn't the most efficient path, say so a
 ## Rule 3: Keep context lean
 Always look for ways to reduce redundancy. If two files do the same thing, flag it. Remove or consolidate unnecessary files. Keep things simple — avoid over-engineering.
 
-## Rule 4: Match the existing patterns
-- Backend routes are role-segmented: `adminRoutes.js`, `facultyRoutes.js`, `studentRoutes.js`
-- Pages are role-segmented: `pages/admin/`, `pages/professor/`, `pages/student/`
-- CSS files are co-located with their component (e.g. `queue.css` + `queue.jsx`)
-- New features follow this same pattern — do not deviate without flagging it first
-
-## Rule 5: Never break auth or routing
+## Rule 4: Never break auth or routing
 `AuthContext.tsx`, `ProtectedRoute.tsx`, `authMiddleware.js` are critical. Any change near these files must be explicitly reasoned and discussed before implementing.
 
-## Rule 6: Scope awareness
+## Rule 5: Scope awareness
 - `client-mobile/` is out of scope until web parity is reached — do not generate mobile code unless explicitly asked
 - AI/chatbot layer does not exist yet — do not fabricate integration code for it
 - Mock data is CCS-scoped (`ccs_mock_data.sql`) — do not assume all 6 colleges are wired up

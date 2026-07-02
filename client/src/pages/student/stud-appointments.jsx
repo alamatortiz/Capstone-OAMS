@@ -549,11 +549,11 @@ export default function AppointmentsPage() {
           {activeTab === "slots" && (
             <div className="slots-container">
               {slotsLoading ? (
-                <div className="empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading available slots…</h3></div>
+                <div className="appt-empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading available slots…</h3></div>
               ) : slotsError ? (
-                <div className="empty-state"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
+                <div className="appt-empty-state"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
               ) : Object.keys(slotsByDate).length === 0 ? (
-                <div className="empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedCollege || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published consultation hours yet"}</p></div>
+                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedCollege || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published consultation hours yet"}</p></div>
               ) : (
                 <div className="slots-list">
                   {Object.keys(slotsByDate).sort().map((date) => (
@@ -596,11 +596,11 @@ export default function AppointmentsPage() {
                 <Link to="/student/appointment-status" className="ab-status-link">View All Status →</Link>
               </div>
               {bookingsLoading ? (
-                <div className="empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
+                <div className="appt-empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
               ) : bookingsError ? (
-                <div className="empty-state"><CheckCircleIcon /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
+                <div className="appt-empty-state"><CheckCircleIcon /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
               ) : activeBookings.length === 0 ? (
-                <div className="empty-state"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>Browse available slots to schedule your first consultation</p></div>
+                <div className="appt-empty-state"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>Browse available slots to schedule your first consultation</p></div>
               ) : (
                 <div className="bookings-list">
                   {bookingsByStatus.map(([status, bookings]) => (

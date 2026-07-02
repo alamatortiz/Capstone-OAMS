@@ -1159,32 +1159,12 @@ body {
 
 /* ===== EMPTY STATE ===== */
 .doc-empty-state {
-  background-color: var(--card);
-  border: 1px solid rgba(249, 115, 22, 0.25);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 1rem;
   padding: 3rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   text-align: center;
-  gap: 0.5rem;
-  padding-left: 2rem;
-  padding-right: 2rem;
-}
-
-.doc-empty-btn {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .doc-empty-state svg {
@@ -1192,7 +1172,7 @@ body {
   height: 3rem;
   color: var(--text-tertiary);
   margin: 0 auto 1rem;
-  opacity: 0.5;
+  transition: color 0.3s ease;
 }
 
 .doc-empty-state h3 {
@@ -1206,7 +1186,7 @@ body {
 .doc-empty-state p {
   font-size: 0.875rem;
   color: var(--text-tertiary);
-  margin: 0 0 1.5rem 0;
+  margin: 0;
   transition: color 0.3s ease;
 }
 
@@ -1525,6 +1505,10 @@ body {
 @media (max-width: 640px) {
   .doc-content {
     padding: 0.75rem;
+  }
+
+  .doc-empty-state {
+    padding: 2rem 1rem;
   }
 
   .queue-title {
