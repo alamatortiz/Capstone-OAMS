@@ -390,12 +390,8 @@ body {
 }
 
 .available-queue-card:hover {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.15);
   border-color: rgba(59, 130, 246, 0.3);
-}
-
-[data-theme="light"] .available-queue-card:hover {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
 .available-queue-card .queue-card-content {
@@ -782,7 +778,10 @@ body {
 }
 
 /* ===== Filters Card ===== */
-.filters-card {
+/* Scoped to .queue-page so these generic class names don't bleed into/from
+   stud-transactions.css (orange) and stud-appointments.css (purple), which
+   define the same .filters-card/.filter-* class names for their own themes. */
+.queue-page .filters-card {
   background: var(--card-bg);
   border: 1px solid rgba(59, 130, 246, 0.15);
   border-radius: 1rem;
@@ -790,11 +789,11 @@ body {
   transition: all 0.3s ease;
 }
 
-.filters-header {
+.queue-page .filters-header {
   margin-bottom: 1.5rem;
 }
 
-.filters-title {
+.queue-page .filters-title {
   font-size: 1.375rem;
   font-weight: 700;
   font-family: "Inter", sans-serif;
@@ -803,8 +802,8 @@ body {
   transition: color 0.3s ease;
 }
 
-.filters-description,
-.filters-header .filters-description {
+.queue-page .filters-description,
+.queue-page .filters-header .filters-description {
   font-size: 0.9375rem;
   color: var(--text-tertiary);
   margin: 0.4rem 0 0 0;
@@ -812,26 +811,26 @@ body {
   text-align: center;
 }
 
-.filters-grid {
+.queue-page .filters-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1rem;
 }
 
 @media (min-width: 768px) {
-  .filters-grid {
+  .queue-page .filters-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
   }
 }
 
-.filter-group {
+.queue-page .filter-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.filter-label {
+.queue-page .filter-label {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -839,12 +838,12 @@ body {
   text-align: left;
 }
 
-.filter-select-wrapper {
+.queue-page .filter-select-wrapper {
   position: relative;
   width: 100%;
 }
 
-.filter-select {
+.queue-page .filter-select {
   width: 100%;
   padding: 0.75rem 1.25rem;
   padding-right: 2.75rem;
@@ -862,7 +861,7 @@ body {
 }
 
 /* Higher-specificity overrides to beat transactions.css and appointment-booking.css SPA bleed */
-.filters-card .filter-select {
+.queue-page .filters-card .filter-select {
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
   appearance: none !important;
@@ -875,16 +874,16 @@ body {
   background-size: initial !important;
 }
 
-.filters-card .filter-select-wrapper {
+.queue-page .filters-card .filter-select-wrapper {
   display: block !important;
 }
 
-.filters-card .filters-header {
+.queue-page .filters-card .filters-header {
   padding: 0 !important;
   border-bottom: none !important;
 }
 
-.filter-chevron {
+.queue-page .filter-chevron {
   position: absolute;
   right: 1rem;
   /* Match the vertical centering used in transactions page */
@@ -901,44 +900,44 @@ body {
   transition: all 0.2s ease;
 }
 
-.filter-chevron svg {
+.queue-page .filter-chevron svg {
   width: 1.15rem;
   height: 1.15rem;
   display: block;
   stroke-width: 2;
 }
 
-.filter-select:hover {
+.queue-page .filter-select:hover {
   border-color: rgba(59, 130, 246, 0.3);
 }
 
-.filter-select:hover + .filter-chevron,
-.filter-select:focus + .filter-chevron {
+.queue-page .filter-select:hover + .filter-chevron,
+.queue-page .filter-select:focus + .filter-chevron {
   color: var(--blue);
 }
 
-.filter-select:focus {
+.queue-page .filter-select:focus {
   outline: none;
   border-color: var(--blue);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-.filter-select option {
+.queue-page .filter-select option {
   background: var(--card-bg);
   color: var(--text-primary);
 }
 
-[data-theme="light"] .filter-select {
+[data-theme="light"] .queue-page .filter-select {
   background: #f8fafc;
   border-color: #e2e8f0;
   color: #1e293b;
 }
 
-[data-theme="light"] .filter-select:focus {
+[data-theme="light"] .queue-page .filter-select:focus {
   border-color: var(--primary-color);
 }
 
-[data-theme="light"] .filter-select option {
+[data-theme="light"] .queue-page .filter-select option {
   background: white;
   color: #1e293b;
 }
@@ -1213,7 +1212,7 @@ body {
     padding: 0.625rem 1rem;
   }
 
-  .filters-grid {
+  .queue-page .filters-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1277,7 +1276,7 @@ body {
     padding: 2rem 1rem;
   }
 
-  .filters-grid {
+  .queue-page .filters-grid {
     gap: 0.75rem;
   }
 
@@ -1316,7 +1315,7 @@ body {
   );
 }
 
-[data-theme="dark"] .filters-card {
+[data-theme="dark"] .queue-page .filters-card {
   background: linear-gradient(
     135deg,
     rgba(17, 22, 18, 0.9) 0%,
@@ -1333,7 +1332,7 @@ body {
   );
 }
 
-[data-theme="light"] .filters-card {
+[data-theme="light"] .queue-page .filters-card {
   background: rgba(255, 255, 255, 0.95);
 }
 

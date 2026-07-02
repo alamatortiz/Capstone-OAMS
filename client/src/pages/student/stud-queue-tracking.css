@@ -478,7 +478,7 @@ body {
 .qt-queue-header {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--card-border);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -593,12 +593,16 @@ body {
 
 .qt-progress-bar {
   width: 100%;
-  height: 0.5rem;
-  background: var(--card-border);
+  height: 0.375rem;
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 9999px;
   overflow: hidden;
   margin-bottom: 0.5rem;
   transition: background 0.3s ease;
+}
+
+[data-theme="light"] .qt-progress-bar {
+  background: #e2e8f0;
 }
 
 .qt-progress-fill {
@@ -691,12 +695,6 @@ body {
   border-radius: 0.75rem;
   padding: 0.75rem;
   transition: all 0.3s ease;
-}
-
-.qt-stat-box:hover {
-  border-color: rgba(59, 130, 246, 0.35);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-  transform: translateY(-1px);
 }
 
 [data-theme="light"] .qt-stat-box {

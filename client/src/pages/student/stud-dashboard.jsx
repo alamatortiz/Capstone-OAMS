@@ -287,9 +287,20 @@ export default function StudentDashboard() {
   };
 
   // Pinned announcements only, capped to the top 2 for the dashboard preview
-  const pinnedAnnouncements = announcements
-    .filter((a) => a.isPinned)
-    .slice(0, 2);
+  const allPinnedAnnouncements = announcements.filter((a) => a.isPinned);
+  const pinnedPreview = allPinnedAnnouncements.slice(0, 2);
+  const morePinnedCount = allPinnedAnnouncements.length - pinnedPreview.length;
+
+  const getAnnouncementIcon = (category) => {
+    switch (category) {
+      case "event":
+        return <CalendarIcon />;
+      case "reminder":
+        return <BellIcon />;
+      default:
+        return <AlertCircleIcon />;
+    }
+  };
 
   // ── Derived values from API response ─────────────────────────────────────
   const apiQueue = dashStats?.activeQueue ?? null;
@@ -323,7 +334,7 @@ export default function StudentDashboard() {
         ? "Loading..."
         : activeQueueCount > 0
           ? `Waiting in ${activeQueueCount} queue${activeQueueCount > 1 ? "s" : ""}`
-          : "No active queues",
+          : "No Active Queues",
       icon: ClockIcon,
       color: "text-blue-600",
       bgColor: "bg-blue-50 dark:bg-blue-950",
@@ -378,7 +389,7 @@ export default function StudentDashboard() {
       icon: MegaphoneIcon,
       link: "/student/announcements",
       gradient: "from-violet-500 to-purple-600",
-      badge: `${pinnedAnnouncements.length} Pinned`,
+      badge: `${allPinnedAnnouncements.length} Pinned`,
     },
     {
       title: "Appointment Booking",
@@ -679,9 +690,6 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                   </div>
-                  <Link to="/student/queue-status" className="primary-btn">
-                    View Full Queue Status
-                  </Link>
                 </div>
               </div>
             ) : (
@@ -693,10 +701,10 @@ export default function StudentDashboard() {
                   </h3>
                 </div>
                 <div className="card-content empty-content">
-                  <p>No active queues</p>
-                  <Link to="/student/queue" className="primary-btn">
-                    Join a Queue
-                  </Link>
+                  <div className="empty-icon">
+                    <ClockIcon />
+                  </div>
+                  <p>No Active Queues</p>
                 </div>
               </div>
             )}
@@ -719,32 +727,45 @@ export default function StudentDashboard() {
                   </p>
                 ) : announcementsError ? (
                   <p className="announcement-empty">{announcementsError}</p>
-                ) : pinnedAnnouncements.length === 0 ? (
+                ) : allPinnedAnnouncements.length === 0 ? (
                   <p className="announcement-empty">
                     No pinned announcements.
                   </p>
                 ) : (
-                  pinnedAnnouncements.map((ann) => (
+                  pinnedPreview.map((ann) => (
                     <Link
                       key={ann.id}
                       to="/student/announcements"
-                      className="announcement-item"
+                      className={`pinned-announcement-card pinned-announcement-${ann.category || "general"}`}
                     >
-                      <div className="announcement-icon">
-                        <AlertCircleIcon />
+                      <div className="pinned-announcement-icon">
+                        {getAnnouncementIcon(ann.category)}
                       </div>
-                      <div className="announcement-details">
-                        <p className="announcement-title">{ann.title}</p>
-                        <p className="announcement-college">{ann.college}</p>
-                        <p className="announcement-date">
-                          {new Date(ann.date).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
+                      <div className="pinned-announcement-content">
+                        <p className="pinned-announcement-title">
+                          {ann.title}
                         </p>
+                        {ann.description && (
+                          <p className="pinned-announcement-description">
+                            {ann.description}
+                          </p>
+                        )}
+                        <div className="pinned-announcement-meta">
+                          <span className="pinned-announcement-college">
+                            {ann.college}
+                          </span>
+                          <span className="pinned-announcement-date">
+                            {new Date(ann.date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
                       </div>
-                      <span className="announcement-badge">
+                      <span
+                        className={`pinned-announcement-badge pinned-badge-${ann.category || "general"}`}
+                      >
                         {ann.category
                           ? ann.category.charAt(0).toUpperCase() +
                             ann.category.slice(1)
@@ -752,6 +773,11 @@ export default function StudentDashboard() {
                       </span>
                     </Link>
                   ))
+                )}
+                {morePinnedCount > 0 && (
+                  <Link to="/student/announcements" className="pinned-more-link">
+                    + {morePinnedCount} more pinned
+                  </Link>
                 )}
               </div>
             </div>
