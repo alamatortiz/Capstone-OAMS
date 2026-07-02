@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { GraduationCap as LucideGraduationCap, Megaphone as LucideMegaphone } from "lucide-react";
+import { ChevronLeft, GraduationCap as LucideGraduationCap, Megaphone as LucideMegaphone } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
@@ -121,17 +121,6 @@ const ChevronRightIcon = () => (
     strokeWidth="2"
   >
     <polyline points="9 18 15 12 9 6"></polyline>
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="15 18 9 12 15 6"></polyline>
   </svg>
 );
 const BuildingIcon = () => (
@@ -533,12 +522,12 @@ export default function ProfessorSchedule() {
             <div className="queue-breadcrumb">
               {viewMode === "schedules" ? (
                 <button className="breadcrumb-link" onClick={handleBack}>
-                  <ChevronLeftIcon />
+                  <ChevronLeft className="breadcrumb-icon" />
                   Back to Departments
                 </button>
               ) : (
                 <Link to="/student/dashboard" className="breadcrumb-link">
-                  <ChevronLeftIcon />
+                  <ChevronLeft className="breadcrumb-icon" />
                   Home
                 </Link>
               )}

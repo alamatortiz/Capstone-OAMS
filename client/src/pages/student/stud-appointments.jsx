@@ -10,7 +10,7 @@ import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
-import { ChevronDown, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -137,12 +137,6 @@ const UsersIcon = () => (
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-  </svg>
-);
-
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 
@@ -467,7 +461,7 @@ export default function AppointmentsPage() {
           <div className="queue-header">
             <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeftIcon />
+                <ChevronLeft className="breadcrumb-icon" />
                 Home
               </Link>
             </div>

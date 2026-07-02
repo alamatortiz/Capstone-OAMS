@@ -1002,13 +1002,13 @@ body {
   box-shadow: 0 8px 24px rgba(249, 115, 22, 0.1);
 }
 
-/* Appointment — green */
+/* Appointment — violet/purple (matches stud-appointments.jsx theme) */
 .transaction-type-appointment::before {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, transparent 100%);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, transparent 100%);
 }
 .transaction-type-appointment:hover {
-  border-color: rgba(16, 185, 129, 0.3);
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.1);
+  border-color: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.1);
 }
 
 .transaction-icon {
@@ -1040,8 +1040,8 @@ body {
 }
 
 .badge-appointment {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
-  color: var(--success);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
+  color: var(--purple);
 }
 
 .badge-document {

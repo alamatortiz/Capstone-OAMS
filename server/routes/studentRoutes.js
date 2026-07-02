@@ -1787,11 +1787,14 @@ router.get(
           type: row.type,
           title: row.title,
           college: row.college,
-          date: eventDate.toISOString().split("T")[0],
+          date: eventDate.toLocaleDateString("en-CA", {
+            timeZone: "Asia/Manila",
+          }),
           time: eventDate.toLocaleTimeString("en-US", {
             hour: "numeric",
             minute: "2-digit",
             hour12: true,
+            timeZone: "Asia/Manila",
           }),
           status: statusMap[row.raw_status] ?? "ongoing",
           details: row.details || "No additional details provided.",

@@ -735,6 +735,7 @@ export default function TransactionsPage() {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
+                        timeZone: "Asia/Manila",
                       })}
                     </div>
                     <div className="transaction-time">
