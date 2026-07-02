@@ -59,14 +59,15 @@ CREATE TABLE students (
 );
 
 CREATE TABLE faculty (
-    faculty_id      INT          PRIMARY KEY,
-    employee_id     VARCHAR(20)  NOT NULL UNIQUE,
-    first_name      VARCHAR(50)  NOT NULL,
-    last_name       VARCHAR(50)  NOT NULL,
-    specialization  VARCHAR(100),
-    position        VARCHAR(100) NOT NULL DEFAULT 'Faculty Member',
-    email           VARCHAR(100) NOT NULL UNIQUE,
-    department_id   INT          NOT NULL,
+    faculty_id          INT          PRIMARY KEY,
+    employee_id         VARCHAR(20)  NOT NULL UNIQUE,
+    first_name          VARCHAR(50)  NOT NULL,
+    last_name           VARCHAR(50)  NOT NULL,
+    specialization      VARCHAR(100),
+    position            VARCHAR(100) NOT NULL DEFAULT 'Faculty Member',
+    email               VARCHAR(100) NOT NULL UNIQUE,
+    department_id       INT          NOT NULL,
+    availability_status ENUM('available','unavailable') NOT NULL DEFAULT 'available',
     FOREIGN KEY (faculty_id)    REFERENCES users(user_id)       ON DELETE CASCADE,
     FOREIGN KEY (department_id) REFERENCES departments(department_id),
     INDEX idx_faculty_dept (department_id)
@@ -240,6 +241,8 @@ CREATE TABLE queue_status_logs (
 
 -- ─────────────────────────────────────────────────────────────
 -- FACULTY AVAILABILITY
+-- Recurring weekly schedule: faculty sets a day-of-week + time
+-- window that repeats every week until edited/removed.
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE faculty_availability (
     availability_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -248,9 +251,20 @@ CREATE TABLE faculty_availability (
     start_time       TIME NOT NULL,
     end_time         TIME NOT NULL,
     location         VARCHAR(150),
+    max_students     INT NULL,    -- NULL = indefinite (no cap on bookings)
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     INDEX idx_faculty_availability_faculty (faculty_id)
+);
+
+-- Links which appointment_services a faculty offers for a recurring weekly slot
+CREATE TABLE faculty_availability_services (
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    availability_id   INT NOT NULL,
+    service_id        INT NOT NULL,
+    FOREIGN KEY (availability_id) REFERENCES faculty_availability(availability_id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_availability_service (availability_id, service_id)
 );
 
 -- ─────────────────────────────────────────────────────────────

@@ -251,13 +251,19 @@ html, body {
   transition: color 0.3s ease;
 }
 
-.sa-slot-row .sa-delete-btn { margin-left: auto; }
+.sa-slot-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
 
-/* ── Delete button ───────────────────────────────────────── */
+/* ── Edit / Delete buttons ───────────────────────────────── */
+.sa-edit-btn,
 .sa-delete-btn {
   background: none;
   border: none;
-  color: #ef4444;
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 0.375rem;
@@ -268,6 +274,10 @@ html, body {
   flex-shrink: 0;
 }
 
+.sa-edit-btn { color: #a855f7; }
+.sa-edit-btn:hover { opacity: 1; background: rgba(168, 85, 247, 0.12); }
+
+.sa-delete-btn { color: #ef4444; }
 .sa-delete-btn:hover { opacity: 1; background: rgba(239, 68, 68, 0.1); }
 
 /* ── Detail empty state ──────────────────────────────────── */
@@ -667,6 +677,108 @@ select.sa-input {
   color: #a855f7;
 }
 
+/* ── Weekly day list (left panel) ────────────────────────── */
+.sa-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 15rem;
+}
+
+.sa-day-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(168, 85, 247, 0.04);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.sa-day-btn:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.sa-day-btn--has-slots { border-color: rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.07); }
+
+.sa-day-btn--active {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.14);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.12);
+}
+
+[data-theme="light"] .sa-day-btn { background: rgba(147, 51, 234, 0.03); border-color: rgba(147, 51, 234, 0.12); }
+[data-theme="light"] .sa-day-btn:hover { background: rgba(147, 51, 234, 0.06); border-color: rgba(147, 51, 234, 0.3); }
+[data-theme="light"] .sa-day-btn--has-slots { border-color: rgba(147, 51, 234, 0.25); background: rgba(147, 51, 234, 0.05); }
+[data-theme="light"] .sa-day-btn--active { border-color: #9333ea; background: rgba(147, 51, 234, 0.1); }
+
+.sa-day-btn-name {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+}
+
+.sa-day-btn-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.sa-day-btn--has-slots .sa-day-btn-count,
+.sa-day-btn--active .sa-day-btn-count { color: #a855f7; }
+[data-theme="light"] .sa-day-btn--has-slots .sa-day-btn-count,
+[data-theme="light"] .sa-day-btn--active .sa-day-btn-count { color: #9333ea; }
+
+/* ── Day-of-week checkbox group (Add Slot modal) ─────────── */
+.sa-day-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sa-day-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: var(--input-background, var(--card));
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.sa-day-checkbox input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sa-day-checkbox:hover { border-color: rgba(168, 85, 247, 0.4); }
+
+.sa-day-checkbox.checked {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  border-color: rgba(168, 85, 247, 0.45);
+}
+
+[data-theme="light"] .sa-day-checkbox.checked { color: #9333ea; }
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .sa-page { padding: 1rem; }
@@ -676,6 +788,7 @@ select.sa-input {
   .sa-page-title { font-size: 1.5rem; }
   .sa-main-layout { grid-template-columns: 1fr; }
   .sa-page-header { flex-direction: column; align-items: flex-start; }
+  .sa-day-list { width: 100%; }
 }
 
 @media (max-width: 640px) {

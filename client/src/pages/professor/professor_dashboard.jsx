@@ -7,6 +7,7 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./professor_dashboard.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
+import { toast } from "sonner";
 
 // ── Icons (unchanged from original) ──────────────────────────────────────────
 const HomeIcon = () => (
@@ -267,12 +268,17 @@ export default function ProfessorDashboard() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
 
+  // ── Availability status (quick Available/Unavailable toggle) ──────────────
+  const [profStatus, setProfStatus] = useState("available");
+  const [statusSaving, setStatusSaving] = useState(false);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setDashLoading(true);
         const res = await api.get("/faculty/dashboard-stats");
         setDashStats(res.data);
+        setProfStatus(res.data?.availabilityStatus ?? "available");
       } catch (err) {
         console.error("Failed to fetch faculty dashboard stats:", err);
         setDashError("Could not load dashboard data.");
@@ -282,6 +288,26 @@ export default function ProfessorDashboard() {
     };
     if (authUser) fetchStats();
   }, [authUser]);
+
+  const handleToggleStatus = async () => {
+    const next = profStatus === "available" ? "unavailable" : "available";
+    const previous = profStatus;
+    setProfStatus(next); // optimistic
+    setStatusSaving(true);
+    try {
+      await api.patch("/faculty/availability-status", { status: next });
+      toast.success(
+        next === "available"
+          ? "You're marked Available to students"
+          : "You're marked Unavailable — your slots are hidden from students",
+      );
+    } catch {
+      setProfStatus(previous); // revert
+      toast.error("Failed to update availability status");
+    } finally {
+      setStatusSaving(false);
+    }
+  };
 
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;
@@ -530,6 +556,23 @@ export default function ProfessorDashboard() {
                 <span className="badge">Professor Portal</span>
                 <span className="badge">{user?.employeeId ?? ""}</span>
               </div>
+            </div>
+
+            <div className="banner-status-toggle">
+              <span className="status-toggle-label">
+                {profStatus === "available" ? "Available to students" : "Unavailable to students"}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={profStatus === "available"}
+                className={`status-toggle-switch ${profStatus === "available" ? "is-available" : "is-unavailable"}`}
+                onClick={handleToggleStatus}
+                disabled={statusSaving}
+                title="Toggle your availability status"
+              >
+                <span className="status-toggle-knob" />
+              </button>
             </div>
           </div>
 
