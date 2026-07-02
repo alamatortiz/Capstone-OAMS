@@ -477,7 +477,11 @@ export default function AppointmentsPage() {
           </div>
 
           {/* Professor Schedules card */}
-          <Link to="/student/professor-schedules" className="appt-prof-sched-card">
+          <Link
+            to="/student/professor-schedules"
+            state={{ from: "/student/appointments", fromLabel: "Appointments" }}
+            className="appt-prof-sched-card"
+          >
             <div className="appt-prof-sched-card-icon">
               <LucideGraduationCap />
             </div>

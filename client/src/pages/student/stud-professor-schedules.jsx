@@ -236,6 +236,8 @@ export default function ProfessorSchedule() {
   const { user: authUser, logout } = useAuth();
   const navigate = useNavigate(); // FIX: was missing in the original file
   const location = useLocation();
+  const cameFrom = location.state?.from ?? "/student/dashboard";
+  const cameFromLabel = location.state?.fromLabel ?? "Home";
 
   const user = authUser
     ? {
@@ -526,9 +528,9 @@ export default function ProfessorSchedule() {
                   Back to Departments
                 </button>
               ) : (
-                <Link to="/student/dashboard" className="breadcrumb-link">
+                <Link to={cameFrom} className="breadcrumb-link">
                   <ChevronLeft className="breadcrumb-icon" />
-                  Home
+                  {cameFromLabel}
                 </Link>
               )}
             </div>

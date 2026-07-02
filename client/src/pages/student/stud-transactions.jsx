@@ -10,7 +10,7 @@ import oamsLogo from "../../assets/oams_logo.png";
 import "./stud-transactions.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
-import { Megaphone as LucideMegaphone } from "lucide-react";
+import { Megaphone as LucideMegaphone, ChevronLeft } from "lucide-react";
 
 // ─── Sidebar Icons ────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -117,12 +117,6 @@ const MoonIcon = () => (
   </svg>
 );
 const MegaphoneNavIcon = () => <LucideMegaphone />;
-
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6"></polyline>
-  </svg>
-);
 
 const ClipboardListIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -575,7 +569,7 @@ export default function TransactionsPage() {
           <div className="queue-header">
             <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeftIcon />
+                <ChevronLeft className="breadcrumb-icon" />
                 Home
               </Link>
             </div>

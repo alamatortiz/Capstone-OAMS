@@ -509,7 +509,11 @@ export default function AppointmentStatusPage() {
             </div>
 
             {/* Professor Schedules card */}
-            <Link to="/student/professor-schedules" className="appt-prof-sched-card">
+            <Link
+              to="/student/professor-schedules"
+              state={{ from: "/student/appointment-status", fromLabel: "My Appointments" }}
+              className="appt-prof-sched-card"
+            >
               <div className="appt-prof-sched-card-icon">
                 <GraduationCap />
               </div>

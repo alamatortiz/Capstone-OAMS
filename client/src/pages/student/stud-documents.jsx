@@ -10,7 +10,7 @@ import "./stud-documents.css";
 import api from "../../utils/api";
 
 import { applyTheme, getSavedTheme } from "../../utils/theme";
-import { Megaphone as LucideMegaphone } from "lucide-react";
+import { Megaphone as LucideMegaphone, ChevronLeft } from "lucide-react";
 
 // ─── Document Object Structure (JSDoc) ────────────────────────────────────
 /**
@@ -132,12 +132,6 @@ const MoonIcon = () => (
   </svg>
 );
 const MegaphoneNavIcon = () => <LucideMegaphone />;
-
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6"></polyline>
-  </svg>
-);
 
 const FileTextIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -597,7 +591,7 @@ export default function DocumentsPage() {
           <div className="queue-header">
             <div className="queue-breadcrumb">
               <Link to="/student/dashboard" className="breadcrumb-link">
-                <ChevronLeftIcon /> Home
+                <ChevronLeft className="breadcrumb-icon" /> Home
               </Link>
             </div>
             <div className="queue-title-section">
