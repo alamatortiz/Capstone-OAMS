@@ -618,138 +618,188 @@ body {
 .departments-grid {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
+  gap: 0.75rem;
   width: 100%;
 }
 
 .department-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  position: relative;
   border-radius: 1.25rem;
-  padding: 1.25rem 1.5rem;
+  padding: 1.125rem 1.375rem;
   cursor: pointer;
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  gap: 1.125rem;
   overflow: hidden;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.18) 0%,
+    rgba(124, 58, 237, 0.09) 50%,
+    rgba(109, 40, 217, 0.18) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 2px 16px rgba(168, 85, 247, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Top shimmer line */
 .department-card::before {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, transparent 100%);
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s ease;
 }
 
 .department-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
-  border-color: rgba(168, 85, 247, 0.4);
+  transform: translateY(-3px);
+  border-color: rgba(168, 85, 247, 0.5);
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.28) 0%,
+    rgba(124, 58, 237, 0.16) 50%,
+    rgba(109, 40, 217, 0.28) 100%
+  );
+  box-shadow:
+    0 10px 36px rgba(168, 85, 247, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.department-card:hover::before {
-  opacity: 1;
+[data-theme="light"] .department-card {
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.09) 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(124, 58, 237, 0.07) 100%
+  );
+  border-color: rgba(168, 85, 247, 0.22);
+  box-shadow: 0 2px 14px rgba(168, 85, 247, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-.card-image-wrapper {
-  width: 4rem;
-  height: 4rem;
+[data-theme="light"] .department-card:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.16) 0%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(124, 58, 237, 0.13) 100%
+  );
+  box-shadow: 0 10px 32px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Logo wrap — frosted white chip */
+.card-logo-wrap {
+  width: 3.75rem;
+  height: 3.75rem;
   flex-shrink: 0;
-  border-radius: 1.125rem;
-  background: rgba(168, 85, 247, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.88);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  z-index: 1;
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  transition: box-shadow 0.3s ease;
+}
+
+.department-card:hover .card-logo-wrap {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="light"] .card-logo-wrap {
+  background: rgba(255, 255, 255, 0.97);
+  border-color: rgba(168, 85, 247, 0.15);
 }
 
 .college-logo-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 0.6rem;
+  padding: 0.5rem;
 }
 
-.card-content {
+/* Card info — name + abbreviation */
+.card-info {
   flex: 1;
   min-width: 0;
-  position: relative;
-  z-index: 1;
-  width: 100%;
-}
-
-.card-right {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.card-right-text {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  gap: 0.55rem;
+  gap: 0.3rem;
 }
-
-/* Chevron sizing + placement */
-.card-right svg {
-  width: 1.0rem;
-  height: 1.0rem;
-  flex-shrink: 0;
-}
-
 
 .card-title {
-  font-size: 1.125rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
   line-height: 1.3;
-  transition: color 0.3s ease;
   word-wrap: break-word;
   text-align: left;
+  transition: color 0.3s ease;
 }
 
 .card-abbrev {
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  transition: color 0.3s ease;
+  font-size: 0.78rem;
+  color: #a855f7;
+  font-weight: 600;
+  letter-spacing: 0.4px;
   text-align: left;
 }
 
+[data-theme="light"] .card-abbrev {
+  color: #9333ea;
+}
+
+/* Card meta — badge + chevron */
+.card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .card-badge {
-  background: rgba(168, 85, 247, 0.18);
+  background: rgba(168, 85, 247, 0.2);
   color: #a855f7;
-  padding: 0.4rem 0.95rem;
-  border-radius: 0.625rem;
-  font-size: 0.8rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
   font-weight: 600;
-  width: fit-content;
+  white-space: nowrap;
   border: 1px solid rgba(168, 85, 247, 0.3);
   transition: all 0.3s ease;
-  margin-top: 0.25rem;
 }
 
 [data-theme="light"] .card-badge {
   color: #9333ea;
+  background: rgba(147, 51, 234, 0.1);
+  border-color: rgba(147, 51, 234, 0.2);
 }
 
 .department-card:hover .card-badge {
-  background: rgba(168, 85, 247, 0.28);
-  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(168, 85, 247, 0.32);
+  border-color: rgba(168, 85, 247, 0.52);
+}
+
+.card-meta svg {
+  width: 1rem;
+  height: 1rem;
+  color: rgba(168, 85, 247, 0.65);
+  flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.department-card:hover .card-meta svg {
+  transform: translateX(3px);
+  color: #a855f7;
 }
 
 /* ===== Schedules View ===== */
@@ -1269,7 +1319,17 @@ body {
   }
 
   .department-card {
-    padding: 1rem;
+    padding: 0.875rem 1rem;
+    gap: 0.875rem;
+  }
+
+  .card-logo-wrap {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .card-meta {
+    gap: 0.375rem;
   }
 
   .professor-card {

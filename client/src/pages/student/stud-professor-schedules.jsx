@@ -596,31 +596,23 @@ export default function ProfessorSchedule() {
                       className="department-card"
                       onClick={() => handleDepartmentSelect(dept.departmentId)}
                     >
-                      <div className="card-image-wrapper">
+                      <div className="card-logo-wrap">
                         <img
                           src={logoSrc}
                           alt={`${dept.departmentName} logo`}
                           className="college-logo-img"
                         />
                       </div>
-                      <div className="card-content">
-                        <div className="card-right">
-                          <div className="card-right-text">
-                            <h3 className="card-title">
-                              {dept.departmentName}
-                            </h3>
-                            <p className="card-abbrev">
-                              {dept.departmentAbbrev}
-                            </p>
-                            <div className="card-badge">
-                              {professorCount}{" "}
-                              {professorCount === 1
-                                ? "Faculty"
-                                : "Faculty Members"}
-                            </div>
-                          </div>
-                          <ChevronRightIcon />
+                      <div className="card-info">
+                        <h3 className="card-title">{dept.departmentName}</h3>
+                        <span className="card-abbrev">{dept.departmentAbbrev}</span>
+                      </div>
+                      <div className="card-meta">
+                        <div className="card-badge">
+                          {professorCount}{" "}
+                          {professorCount === 1 ? "Faculty" : "Faculty Members"}
                         </div>
+                        <ChevronRightIcon />
                       </div>
                     </div>
                   );
@@ -647,7 +639,6 @@ export default function ProfessorSchedule() {
                     </div>
                     <div>
                       <div className="department-header-top">
-                        <BuildingIcon />
                         <h2>{selectedDepartment.departmentName}</h2>
                       </div>
                       <p>Faculty consultation schedules and availability</p>

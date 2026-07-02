@@ -489,14 +489,14 @@ export default function QueueTrackingPage() {
                 onClick={() => setActiveTab("active")}
               >
                 <Activity className="qt-icon-xs" />
-                Active ({activeQueues.length})
+                Active <span className="qt-tab-count">{activeQueues.length}</span>
               </button>
               <button
                 className={`qt-tab ${activeTab === "history" ? "active" : ""}`}
                 onClick={() => setActiveTab("history")}
               >
                 <History className="qt-icon-xs" />
-                History ({queueHistory.length})
+                History <span className="qt-tab-count">{queueHistory.length}</span>
               </button>
               <button
                 className={`qt-tab ${activeTab === "analytics" ? "active" : ""}`}
