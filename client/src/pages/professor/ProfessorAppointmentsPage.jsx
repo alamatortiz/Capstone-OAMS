@@ -316,7 +316,7 @@ function AppointmentCard({
           <h3 className="appt-card-name">{appointment.studentName}</h3>
           <p className="appt-card-sub">
             {appointment.studentId}
-            {appointment.purpose ? ` · ${appointment.purpose}` : ""}
+            {appointment.appointmentType ? ` · ${appointment.appointmentType}` : ""}
           </p>
         </div>
         <span
@@ -336,33 +336,14 @@ function AppointmentCard({
           <label>Time</label>
           <p>{appointment.time}</p>
         </div>
-        <div className="appt-info-field">
-          <label>Type</label>
-          <p>{appointment.type === "online" ? "Online" : "In-Person"}</p>
+        <div className="appt-info-field appt-info-field--full">
+          <label>Location</label>
+          <p>{appointment.location}</p>
         </div>
-        {appointment.location && (
+        {appointment.purpose && (
           <div className="appt-info-field appt-info-field--full">
-            <label>Location</label>
-            <p>{appointment.location}</p>
-          </div>
-        )}
-        {appointment.meetingLink && (
-          <div className="appt-info-field appt-info-field--full">
-            <label>Meeting Link</label>
-            <a
-              href={appointment.meetingLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="appt-meeting-link"
-            >
-              Join Meeting
-            </a>
-          </div>
-        )}
-        {appointment.notes && (
-          <div className="appt-info-field appt-info-field--full">
-            <label>Notes</label>
-            <p className="appt-notes-text">{appointment.notes}</p>
+            <label>Purpose</label>
+            <p className="appt-notes-text">{appointment.purpose}</p>
           </div>
         )}
       </div>

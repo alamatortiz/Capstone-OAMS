@@ -217,10 +217,13 @@ router.get(
           a.appointment_id, a.appointment_date, a.appointment_time,
           a.status, a.notes, a.created_at,
           s.first_name, s.last_name, s.student_number, s.course,
-          svc.service_name AS purpose
+          svc.service_name AS appointment_type,
+          fda.start_time AS window_start, fda.end_time AS window_end,
+          fda.location
         FROM appointments a
         JOIN students s ON a.student_id = s.student_id
         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
+        LEFT JOIN faculty_date_availability fda ON a.availability_id = fda.id
         WHERE a.faculty_id = ?`;
       const params = [facultyId];
       if (status && status !== "all") {
@@ -234,14 +237,18 @@ router.get(
         studentName: `${r.first_name} ${r.last_name}`,
         studentId: r.student_number,
         course: r.course,
-        purpose: r.purpose ?? r.notes ?? "No notes provided",
+        appointmentType: r.appointment_type ?? null,
+        purpose: r.notes || "No purpose specified",
         date:
           r.appointment_date instanceof Date
             ? r.appointment_date.toISOString().split("T")[0]
             : String(r.appointment_date).split("T")[0],
-        time: formatTime(r.appointment_time),
+        time:
+          r.window_start && r.window_end
+            ? `${formatTime(r.window_start)} – ${formatTime(r.window_end)}`
+            : formatTime(r.appointment_time),
+        location: r.location ?? "TBA",
         status: r.status,
-        notes: r.notes,
         requestedAt: r.created_at,
       })));
     } catch (err) {
