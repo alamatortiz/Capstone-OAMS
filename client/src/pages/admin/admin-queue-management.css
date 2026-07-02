@@ -580,11 +580,42 @@
   margin-bottom: 2rem;
 }
 
+.aqm-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.aqm-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  color: #fff;
+}
+
+.aqm-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+  color: #fff;
+}
+
+.aqm-icon-xl {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
 .aqm-page-title {
   font-size: 2rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem 0;
   transition: color 0.3s ease;
   text-align: left;
 }
@@ -595,6 +626,54 @@
   margin: 0;
   transition: color 0.3s ease;
   text-align: left;
+}
+
+/* ===== Toolbar (Service Type Filter) ===== */
+.aqm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 1.25rem;
+}
+
+.aqm-dropdown-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  font-family: 'Inter', sans-serif;
+}
+
+.aqm-dropdown {
+  padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  appearance: none;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+  min-width: 200px;
+}
+
+.aqm-dropdown:hover {
+  border-color: var(--primary-color);
+}
+
+.aqm-dropdown:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.aqm-dropdown-wrapper svg {
+  position: absolute;
+  right: 0.75rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
 }
 
 /* ===== Summary Grid (List View) ===== */
@@ -1424,6 +1503,12 @@
   border: 0.5px solid rgba(239, 68, 68, 0.4);
 }
 
+.aqm-entry-status-no-show {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.4);
+}
+
 .aqm-entry-queue-number {
   padding: 0.3rem 0.65rem;
   border: 1px solid var(--card-border);
@@ -1703,6 +1788,15 @@
 }
 
 @media (max-width: 768px) {
+  .aqm-toolbar {
+    justify-content: stretch;
+  }
+
+  .aqm-dropdown-wrapper,
+  .aqm-dropdown {
+    width: 100%;
+  }
+
   .aqm-summary-grid {
     grid-template-columns: repeat(2, 1fr);
   }

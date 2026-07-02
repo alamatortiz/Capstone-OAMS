@@ -63,6 +63,8 @@ const getStatusMeta = (status) => {
       return { label: "Completed", cls: "queue-status-completed", color: "#6b7280" };
     case "cancelled":
       return { label: "Cancelled", cls: "queue-status-cancelled", color: "#ef4444" };
+    case "no_show":
+      return { label: "Marked as No-Show", cls: "queue-status-no-show", color: "#f59e0b" };
     default:
       return { label: "Waiting", cls: "queue-status-waiting", color: "#f59e0b" };
   }

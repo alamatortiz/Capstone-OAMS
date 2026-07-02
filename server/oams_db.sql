@@ -197,6 +197,7 @@ CREATE TABLE queue_slots (
     end_time        TIME         NOT NULL,
     max_capacity    INT          NOT NULL DEFAULT 20,
     current_count   INT          NOT NULL DEFAULT 0,
+    no_show_timeout_minutes INT  NOT NULL DEFAULT 15,
     status          ENUM('open','paused','closed','cancelled') DEFAULT 'open',
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -215,7 +216,7 @@ CREATE TABLE queues (
     service_id      INT          NOT NULL,
     slot_id         INT          NULL,
     queue_number    INT          NOT NULL,
-    status          ENUM('waiting','serving','completed','cancelled') DEFAULT 'waiting',
+    status          ENUM('waiting','serving','completed','cancelled','no_show') DEFAULT 'waiting',
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     called_at       TIMESTAMP    NULL,
     completed_at    TIMESTAMP    NULL,
@@ -281,35 +282,6 @@ CREATE TABLE faculty_blocked_dates (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- FACULTY DATE-SPECIFIC AVAILABILITY
--- Faculty sets exact dates + times instead of recurring day-of-week slots
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE faculty_date_availability (
-    id                    INT  AUTO_INCREMENT PRIMARY KEY,
-    faculty_id            INT  NOT NULL,
-    available_date        DATE NOT NULL,
-    start_time            TIME NOT NULL,
-    end_time              TIME NOT NULL,
-    max_students          INT  NULL,    -- NULL = indefinite (no cap on bookings)
-    status                ENUM('open','closed') NOT NULL DEFAULT 'open',
-    location              VARCHAR(150),
-    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
-    INDEX idx_fda_faculty (faculty_id),
-    INDEX idx_fda_date (available_date)
-);
-
--- Links which appointment_services a faculty offers for a specific availability slot
-CREATE TABLE slot_services (
-    id                INT AUTO_INCREMENT PRIMARY KEY,
-    availability_id   INT NOT NULL,
-    service_id        INT NOT NULL,
-    FOREIGN KEY (availability_id) REFERENCES faculty_date_availability(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id) ON DELETE CASCADE,
-    UNIQUE KEY uq_slot_service (availability_id, service_id)
-);
-
--- ─────────────────────────────────────────────────────────────
 -- 8. APPOINTMENT SYSTEM
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE appointments (
@@ -318,7 +290,7 @@ CREATE TABLE appointments (
     faculty_id          INT          NOT NULL,
     department_id       INT          NOT NULL,
     service_id          INT          NULL,   -- FK to appointment_services (the chosen appointment type)
-    availability_id     INT          NULL,   -- FK to faculty_date_availability; links booking to the slot
+    availability_id     INT          NULL,   -- FK to faculty_availability; the recurring template this was booked against
     appointment_date    DATE         NOT NULL,
     appointment_time    TIME         NOT NULL,
     status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
@@ -327,8 +299,8 @@ CREATE TABLE appointments (
     FOREIGN KEY (student_id)      REFERENCES students(student_id),
     FOREIGN KEY (faculty_id)      REFERENCES faculty(faculty_id),
     FOREIGN KEY (department_id)   REFERENCES departments(department_id),
-    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id)  ON DELETE SET NULL,
-    FOREIGN KEY (availability_id) REFERENCES faculty_date_availability(id)     ON DELETE SET NULL,
+    FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id)     ON DELETE SET NULL,
+    FOREIGN KEY (availability_id) REFERENCES faculty_availability(availability_id) ON DELETE SET NULL,
     -- prevents duplicate bookings for the same student/faculty/date/time
     UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
     INDEX idx_appointments_dept_service (department_id, service_id)

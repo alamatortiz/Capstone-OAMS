@@ -112,12 +112,6 @@ const UsersIcon = ({ className }) => (
     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
   </svg>
 );
-const CheckCircleIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-  </svg>
-);
 const ClockIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
@@ -152,6 +146,8 @@ const MapPinIcon = ({ className }) => (
     <circle cx="12" cy="10" r="3"></circle>
   </svg>
 );
+
+const STATUS_TABS = ["all", "available", "busy", "unavailable"];
 
 export default function AdminProfessorAvailability() {
   const { user: authUser, logout } = useAuth();
@@ -273,13 +269,6 @@ export default function AdminProfessorAvailability() {
   const filteredFaculty = faculty.filter((f) =>
     statusFilter === "all" || f.status === statusFilter
   );
-
-  const stats = {
-    total: faculty.length,
-    available: faculty.filter((f) => f.status === "available").length,
-    busy: faculty.filter((f) => f.status === "busy").length,
-    unavailable: faculty.filter((f) => f.status === "unavailable").length,
-  };
 
   const getStatusBadgeClass = (status) => `apa-status-badge apa-status-${status}`;
   const getSlotClass = (status) => `apa-slot apa-slot-${status}`;
@@ -430,59 +419,34 @@ export default function AdminProfessorAvailability() {
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Page Header */}
           <div className="apa-page-header">
-            <h1 className="apa-page-title">Faculty Availability</h1>
-            <p className="apa-page-subtitle">
-              Monitor faculty consultation schedules and availability for your department
-            </p>
-          </div>
-
-          {/* Summary Stats */}
-          <div className="apa-summary-grid">
-            <div className="apa-summary-card apa-summary-total">
-              <div className="apa-summary-text">
-                <p className="apa-summary-label">Total Faculty</p>
-                <p className="apa-summary-value">{loading ? "—" : stats.total}</p>
+            <div className="apa-title-section">
+              <div className="apa-title-icon">
+                <UsersIcon className="apa-icon-lg" />
               </div>
-              <UsersIcon className="apa-summary-icon" />
-            </div>
-            <div className="apa-summary-card apa-summary-available">
-              <div className="apa-summary-text">
-                <p className="apa-summary-label">Available</p>
-                <p className="apa-summary-value">{loading ? "—" : stats.available}</p>
+              <div>
+                <h1 className="apa-page-title">Faculty Availability</h1>
+                <p className="apa-page-subtitle">
+                  Monitor faculty consultation schedules and availability for your department
+                </p>
               </div>
-              <CheckCircleIcon className="apa-summary-icon" />
-            </div>
-            <div className="apa-summary-card apa-summary-busy">
-              <div className="apa-summary-text">
-                <p className="apa-summary-label">Busy</p>
-                <p className="apa-summary-value">{loading ? "—" : stats.busy}</p>
-              </div>
-              <ClockIcon className="apa-summary-icon" />
-            </div>
-            <div className="apa-summary-card apa-summary-unavailable">
-              <div className="apa-summary-text">
-                <p className="apa-summary-label">Unavailable</p>
-                <p className="apa-summary-value">{loading ? "—" : stats.unavailable}</p>
-              </div>
-              <XCircleIcon className="apa-summary-icon" />
             </div>
           </div>
 
-          {/* Status Filter */}
-          <div className="apa-filters-card">
-            <div className="apa-filter-group apa-filter-group-narrow">
-              <select
-                className="apa-filter-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                aria-label="Filter by status"
-              >
-                <option value="all">All Status</option>
-                <option value="available">Available</option>
-                <option value="busy">Busy</option>
-                <option value="unavailable">Unavailable</option>
-              </select>
-            </div>
+          {/* Status Tabs */}
+          <div className="apa-tabs">
+            {STATUS_TABS.map((tab) => {
+              const count = tab === "all" ? faculty.length : faculty.filter((f) => f.status === tab).length;
+              return (
+                <button
+                  key={tab}
+                  className={`apa-tab ${statusFilter === tab ? "apa-tab-active" : ""}`}
+                  onClick={() => setStatusFilter(tab)}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  <span className="apa-tab-count">{loading ? "—" : count}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Faculty List */}

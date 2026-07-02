@@ -35,10 +35,9 @@ TRUNCATE TABLE queue_status_logs;
 TRUNCATE TABLE queues;
 TRUNCATE TABLE queue_slots;
 TRUNCATE TABLE service_requirements;
+TRUNCATE TABLE service_procedure_steps;
 TRUNCATE TABLE document_requirements;
 TRUNCATE TABLE appointment_services;
-TRUNCATE TABLE slot_services;
-TRUNCATE TABLE faculty_date_availability;
 TRUNCATE TABLE faculty_blocked_dates;
 TRUNCATE TABLE faculty_availability_services;
 TRUNCATE TABLE faculty_availability;
@@ -58,6 +57,7 @@ TRUNCATE TABLE departments;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- DYNAMIC GENERATOR TRIGGER FOR TRACKING NUMBER
+DROP TRIGGER IF EXISTS ts_auto_tracking_number;
 DELIMITER //
 
 CREATE TRIGGER ts_auto_tracking_number
@@ -510,41 +510,94 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 
 
 -- ─────────────────────────────────────────────────────────────
+-- SECTION 14 · FACULTY AVAILABILITY (recurring weekly consultation hours)
+-- Moved before SECTION 8 so appointments.availability_id (FK to this
+-- table) can reference these rows without disabling FK checks.
+-- Insertion order determines auto-increment IDs (used in Section 14D and 8):
+--   102 Ogalesco   : IDs 1–4
+--   106 Bicua      : IDs 5–8
+--   107 Tan        : IDs 9–12
+--   110 Villanueva : IDs 13–15
+--   111 Dela Cruz  : IDs 16–17
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES
+-- 102 Patrick Ogalesco: max 5 students
+(102, 'Monday',    '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
+(102, 'Monday',    '14:00:00', '17:00:00', 'CCS Faculty Room 201', 5),
+(102, 'Wednesday', '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
+(102, 'Friday',    '13:00:00', '16:00:00', 'CCS Faculty Room 201', 5),
+-- 106 Marvin Bicua: indefinite capacity
+(106, 'Tuesday',   '10:00:00', '12:00:00', 'CCS Faculty Room 203', NULL),
+(106, 'Tuesday',   '14:00:00', '17:00:00', 'CCS Faculty Room 203', NULL),
+(106, 'Thursday',  '09:00:00', '11:00:00', 'CCS Faculty Room 203', NULL),
+(106, 'Thursday',  '13:00:00', '16:00:00', 'CCS Faculty Room 203', NULL),
+-- 107 Janus Raymond Tan: max 3 students
+(107, 'Monday',    '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
+(107, 'Wednesday', '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
+(107, 'Wednesday', '14:00:00', '16:00:00', 'CCS Dean\'s Office', 3),
+(107, 'Friday',    '09:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
+-- 110 Lena Villanueva: max 5 students
+(110, 'Monday',    '13:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
+(110, 'Wednesday', '10:00:00', '12:00:00', 'CCS Faculty Room 105', 5),
+(110, 'Friday',    '14:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
+-- 111 Marco Dela Cruz: indefinite capacity
+(111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401', NULL),
+(111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401', NULL);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 14D · WEEKLY AVAILABILITY SERVICES
+-- Links appointment_services types to recurring weekly slots.
+-- IDs reference Section 14 insertion order above.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_availability_services (availability_id, service_id) VALUES
+-- Prof 102 (Ogalesco): Web Dev (1) + Mobile App (2) on all slots
+(1,1), (1,2), (2,1), (2,2), (3,1), (3,2), (4,1), (4,2),
+-- Prof 106 (Bicua): DB Design (3) on all slots
+(5,3), (6,3), (7,3), (8,3),
+-- Prof 107 (Tan): Backend Architecture (4) on all slots
+(9,4), (10,4), (11,4), (12,4),
+-- Prof 110 (Villanueva): Software Engineering (5) on all slots
+(13,5), (14,5), (15,5),
+-- Prof 111 (Dela Cruz): Network Security (6) on all slots
+(16,6), (17,6);
+
+-- ─────────────────────────────────────────────────────────────
 -- SECTION 8 · APPOINTMENTS
 -- appointment_time stores the availability window's start_time.
--- availability_id references Section 14B IDs (set for all future bookings).
--- Past completed appointments use availability_id NULL (those slots no longer exist).
--- service_id: FK to appointment_services (must match the faculty and slot_services links).
--- FK checks disabled here because faculty_date_availability is seeded later (Section 14B).
+-- availability_id references Section 14 (faculty_availability) recurring
+-- template IDs — one template now maps to many possible calendar dates, so
+-- appointment_date is computed as the next real-world occurrence of that
+-- template's day_of_week (via CURDATE() + days-until-next-weekday), keeping
+-- this file weekday-consistent no matter what day it's actually seeded on.
+-- Past completed appointments use availability_id NULL (pre-system booking).
+-- service_id: FK to appointment_services (must match the faculty's linked types).
 -- ─────────────────────────────────────────────────────────────
-SET FOREIGN_KEY_CHECKS = 0;
 INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, availability_id, appointment_date, appointment_time, status, notes, created_at) VALUES
 
 -- ── Student 101 · Alvin Matthew Ortiz (2300544) ──────────────────────────────
--- Upcoming approved: Prof Ogalesco · +2 days AM slot (ID 3 · 09:00–12:00)
-(1, 101, 102, 1001, 1,  3,    CURDATE() + INTERVAL 2 DAY,  '09:00:00', 'approved',  'Thesis consultation on web development',     NOW() - INTERVAL 1 DAY),
--- Upcoming pending: Prof Tan · +9 days AM slot (ID 25 · 10:00–12:00)
-(2, 101, 107, 1001, 4,  25,   CURDATE() + INTERVAL 9 DAY,  '10:00:00', 'pending',   'Backend architecture for capstone project',  NOW() - INTERVAL 2 HOUR),
+-- Upcoming approved: Prof Ogalesco · Wednesday AM template (ID 3 · 09:00–12:00)
+(1, 101, 102, 1001, 1,  3,    CURDATE() + INTERVAL ((2 - WEEKDAY(CURDATE()) + 7) % 7) DAY,       '09:00:00', 'approved',  'Thesis consultation on web development',     NOW() - INTERVAL 1 DAY),
+-- Upcoming pending: Prof Tan · Wednesday AM template, next week (ID 10 · 10:00–12:00)
+(2, 101, 107, 1001, 4,  10,   CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '10:00:00', 'pending',   'Backend architecture for capstone project',  NOW() - INTERVAL 2 HOUR),
 -- Past completed: pre-system booking (no availability slot)
-(3, 101, 107, 1001, 4,  NULL, CURDATE() - INTERVAL 5 DAY,  '09:00:00', 'completed', 'Project review',                             NOW() - INTERVAL 6 DAY),
+(3, 101, 107, 1001, 4,  NULL, CURDATE() - INTERVAL 5 DAY,                                        '09:00:00', 'completed', 'Project review',                             NOW() - INTERVAL 6 DAY),
 
 -- ── Student 104 · Luiz Gabriel Rosales (2302494) ─────────────────────────────
--- Upcoming pending: Prof Ogalesco · +9 days AM slot (ID 5 · 09:00–12:00)
-(4, 104, 102, 1001, 2,  5,    CURDATE() + INTERVAL 9 DAY,  '09:00:00', 'pending',   'Mobile app academic advising',               NOW() - INTERVAL 3 HOUR),
--- Upcoming pending: Prof Dela Cruz · +1 day AM slot (ID 39 · 08:00–12:00)
-(5, 104, 111, 1001, 6,  39,   CURDATE() + INTERVAL 1 DAY,  '08:00:00', 'pending',   'Network security thesis consultation',        NOW() - INTERVAL 1 HOUR),
+-- Upcoming pending: Prof Ogalesco · Wednesday AM template, next week (ID 3 · 09:00–12:00)
+(4, 104, 102, 1001, 2,  3,    CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '09:00:00', 'pending',   'Mobile app academic advising',               NOW() - INTERVAL 3 HOUR),
+-- Upcoming pending: Prof Dela Cruz · Tuesday AM template (ID 16 · 08:00–12:00)
+(5, 104, 111, 1001, 6,  16,   CURDATE() + INTERVAL ((1 - WEEKDAY(CURDATE()) + 7) % 7) DAY,       '08:00:00', 'pending',   'Network security thesis consultation',        NOW() - INTERVAL 1 HOUR),
 -- Past completed: pre-system booking (no availability slot)
-(6, 104, 106, 1001, 3,  NULL, CURDATE() - INTERVAL 3 DAY,  '13:00:00', 'completed', 'Database lab consultation',                   NOW() - INTERVAL 4 DAY),
+(6, 104, 106, 1001, 3,  NULL, CURDATE() - INTERVAL 3 DAY,                                        '13:00:00', 'completed', 'Database lab consultation',                   NOW() - INTERVAL 4 DAY),
 
--- ── Filler · other students in today's slots (realistic occupancy) ────────────
--- Slot 1  (102 · today AM · max 5): 2 of 5 spots taken
-(7,  105, 102, 1001, 1,  1,  CURDATE(), '09:00:00', 'approved', 'Web dev thesis discussion',    NOW() - INTERVAL 4 HOUR),
-(8,  108, 102, 1001, 2,  1,  CURDATE(), '09:00:00', 'pending',  'Mobile app project inquiry',   NOW() - INTERVAL 2 HOUR),
--- Slot 20 (107 · today AM · max 3): 1 of 3 spots taken
-(9,  109, 107, 1001, 4,  20, CURDATE(), '10:00:00', 'approved', 'Capstone backend review',      NOW() - INTERVAL 5 HOUR),
--- Slot 31 (110 · today PM · max 5): 1 of 5 spots taken
-(10, 105, 110, 1001, 5,  31, CURDATE(), '13:00:00', 'pending',  'SDLC consultation for thesis', NOW() - INTERVAL 3 HOUR);
-SET FOREIGN_KEY_CHECKS = 1;
+-- ── Filler · other students in the upcoming Monday templates (realistic occupancy) ──
+-- Template 1  (102 · Monday AM · max 5): 2 of 5 spots taken
+(7,  105, 102, 1001, 1,  1,  CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '09:00:00', 'approved', 'Web dev thesis discussion',    NOW() - INTERVAL 4 HOUR),
+(8,  108, 102, 1001, 2,  1,  CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '09:00:00', 'pending',  'Mobile app project inquiry',   NOW() - INTERVAL 2 HOUR),
+-- Template 9  (107 · Monday AM · max 3): 1 of 3 spots taken
+(9,  109, 107, 1001, 4,  9,  CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '10:00:00', 'approved', 'Capstone backend review',      NOW() - INTERVAL 5 HOUR),
+-- Template 13 (110 · Monday PM · max 5): 1 of 5 spots taken
+(10, 105, 110, 1001, 5,  13, CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '13:00:00', 'pending',  'SDLC consultation for thesis', NOW() - INTERVAL 3 HOUR);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -680,154 +733,3 @@ UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 106;
 UPDATE faculty SET position = 'Program Coordinator'  WHERE faculty_id = 107;
 UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 110;
 UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 111;
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 14 · FACULTY AVAILABILITY (recurring weekly consultation hours)
--- Insertion order determines auto-increment IDs (used in Section 14D):
---   102 Ogalesco   : IDs 1–4
---   106 Bicua      : IDs 5–8
---   107 Tan        : IDs 9–12
---   110 Villanueva : IDs 13–15
---   111 Dela Cruz  : IDs 16–17
--- ─────────────────────────────────────────────────────────────
-INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES
--- 102 Patrick Ogalesco: max 5 students
-(102, 'Monday',    '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
-(102, 'Monday',    '14:00:00', '17:00:00', 'CCS Faculty Room 201', 5),
-(102, 'Wednesday', '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
-(102, 'Friday',    '13:00:00', '16:00:00', 'CCS Faculty Room 201', 5),
--- 106 Marvin Bicua: indefinite capacity
-(106, 'Tuesday',   '10:00:00', '12:00:00', 'CCS Faculty Room 203', NULL),
-(106, 'Tuesday',   '14:00:00', '17:00:00', 'CCS Faculty Room 203', NULL),
-(106, 'Thursday',  '09:00:00', '11:00:00', 'CCS Faculty Room 203', NULL),
-(106, 'Thursday',  '13:00:00', '16:00:00', 'CCS Faculty Room 203', NULL),
--- 107 Janus Raymond Tan: max 3 students
-(107, 'Monday',    '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
-(107, 'Wednesday', '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
-(107, 'Wednesday', '14:00:00', '16:00:00', 'CCS Dean\'s Office', 3),
-(107, 'Friday',    '09:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
--- 110 Lena Villanueva: max 5 students
-(110, 'Monday',    '13:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
-(110, 'Wednesday', '10:00:00', '12:00:00', 'CCS Faculty Room 105', 5),
-(110, 'Friday',    '14:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
--- 111 Marco Dela Cruz: indefinite capacity
-(111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401', NULL),
-(111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401', NULL);
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 14D · WEEKLY AVAILABILITY SERVICES
--- Links appointment_services types to recurring weekly slots.
--- IDs reference Section 14 insertion order above.
--- ─────────────────────────────────────────────────────────────
-INSERT INTO faculty_availability_services (availability_id, service_id) VALUES
--- Prof 102 (Ogalesco): Web Dev (1) + Mobile App (2) on all slots
-(1,1), (1,2), (2,1), (2,2), (3,1), (3,2), (4,1), (4,2),
--- Prof 106 (Bicua): DB Design (3) on all slots
-(5,3), (6,3), (7,3), (8,3),
--- Prof 107 (Tan): Backend Architecture (4) on all slots
-(9,4), (10,4), (11,4), (12,4),
--- Prof 110 (Villanueva): Software Engineering (5) on all slots
-(13,5), (14,5), (15,5),
--- Prof 111 (Dela Cruz): Network Security (6) on all slots
-(16,6), (17,6);
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 14B · FACULTY DATE-SPECIFIC AVAILABILITY
--- Concrete upcoming dates for each professor's weekly pattern.
--- Uses CURDATE() + INTERVAL N DAY so slots are always relative to the current date.
--- Interval mapping (based on a Monday start): +0=today, +1=tomorrow, +2=Wed, +3=Thu,
---   +4=Fri, +7=next Mon, +8=Tue, +9=Wed, +10=Thu, +11=Fri, +14=Mon+2wks … +18=Fri+2wks
---
--- max_students: NULL = indefinite; N = total occupancy cap for the window
--- status: 'open' = bookable; 'closed' = faculty manually closed early
---
--- Insertion order determines auto-increment IDs (used in Section 14C and 8):
---   102 Ogalesco : IDs  1–10
---   106 Bicua    : IDs 11–19
---   107 Tan      : IDs 20–30
---   110 Villanueva: IDs 31–38
---   111 Dela Cruz: IDs 39–44
--- ─────────────────────────────────────────────────────────────
-INSERT INTO faculty_date_availability (faculty_id, available_date, start_time, end_time, max_students, status, location) VALUES
-
--- 102 Patrick Ogalesco: max 5 students
-(102, CURDATE(),                        '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  1
-(102, CURDATE(),                        '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  2
-(102, CURDATE() + INTERVAL 2 DAY,      '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  3
-(102, CURDATE() + INTERVAL 4 DAY,      '13:00:00', '16:00:00',  5, 'closed', 'CCS Faculty Room 201'),  -- ID  4
-(102, CURDATE() + INTERVAL 9 DAY,      '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  5
-(102, CURDATE() + INTERVAL 9 DAY,      '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  6
-(102, CURDATE() + INTERVAL 11 DAY,     '13:00:00', '16:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  7
-(102, CURDATE() + INTERVAL 14 DAY,     '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  8
-(102, CURDATE() + INTERVAL 16 DAY,     '09:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID  9
-(102, CURDATE() + INTERVAL 18 DAY,     '13:00:00', '16:00:00',  5, 'open',   'CCS Faculty Room 201'),  -- ID 10
-
--- 106 Marvin Bicua: indefinite capacity
-(106, CURDATE() + INTERVAL 1 DAY,      '10:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 11
-(106, CURDATE() + INTERVAL 1 DAY,      '14:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 12
-(106, CURDATE() + INTERVAL 3 DAY,      '09:00:00', '11:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 13
-(106, CURDATE() + INTERVAL 3 DAY,      '13:00:00', '16:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 14
-(106, CURDATE() + INTERVAL 8 DAY,      '10:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 15
-(106, CURDATE() + INTERVAL 10 DAY,     '09:00:00', '11:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 16
-(106, CURDATE() + INTERVAL 10 DAY,     '13:00:00', '16:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 17
-(106, CURDATE() + INTERVAL 17 DAY,     '09:00:00', '11:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 18
-(106, CURDATE() + INTERVAL 17 DAY,     '13:00:00', '16:00:00', NULL, 'open',   'CCS Faculty Room 203'), -- ID 19
-
--- 107 Janus Raymond Tan: max 3 students
-(107, CURDATE(),                        '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 20
-(107, CURDATE() + INTERVAL 2 DAY,      '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 21
-(107, CURDATE() + INTERVAL 2 DAY,      '14:00:00', '16:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 22
-(107, CURDATE() + INTERVAL 4 DAY,      '09:00:00', '12:00:00',  3, 'closed', 'CCS Dean\'s Office'),    -- ID 23
-(107, CURDATE() + INTERVAL 7 DAY,      '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 24
-(107, CURDATE() + INTERVAL 9 DAY,      '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 25
-(107, CURDATE() + INTERVAL 11 DAY,     '09:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 26
-(107, CURDATE() + INTERVAL 14 DAY,     '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 27
-(107, CURDATE() + INTERVAL 16 DAY,     '10:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 28
-(107, CURDATE() + INTERVAL 16 DAY,     '14:00:00', '16:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 29
-(107, CURDATE() + INTERVAL 18 DAY,     '09:00:00', '12:00:00',  3, 'open',   'CCS Dean\'s Office'),    -- ID 30
-
--- 110 Lena Villanueva: max 5 students
-(110, CURDATE(),                        '13:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 31
-(110, CURDATE() + INTERVAL 2 DAY,      '10:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 32
-(110, CURDATE() + INTERVAL 4 DAY,      '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 33
-(110, CURDATE() + INTERVAL 7 DAY,      '13:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 34
-(110, CURDATE() + INTERVAL 9 DAY,      '10:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 35
-(110, CURDATE() + INTERVAL 14 DAY,     '13:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 36
-(110, CURDATE() + INTERVAL 16 DAY,     '10:00:00', '12:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 37
-(110, CURDATE() + INTERVAL 18 DAY,     '14:00:00', '17:00:00',  5, 'open',   'CCS Faculty Room 105'), -- ID 38
-
--- 111 Marco Dela Cruz: indefinite capacity
-(111, CURDATE() + INTERVAL 1 DAY,      '08:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 39
-(111, CURDATE() + INTERVAL 3 DAY,      '13:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 40
-(111, CURDATE() + INTERVAL 8 DAY,      '08:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 41
-(111, CURDATE() + INTERVAL 10 DAY,     '13:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 42
-(111, CURDATE() + INTERVAL 15 DAY,     '08:00:00', '12:00:00', NULL, 'open',   'CCS Faculty Room 401'), -- ID 43
-(111, CURDATE() + INTERVAL 17 DAY,     '13:00:00', '17:00:00', NULL, 'open',   'CCS Faculty Room 401'); -- ID 44
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 14C · SLOT SERVICES
--- Links appointment_services types to availability windows.
--- IDs reference Section 14B insertion order above.
--- ─────────────────────────────────────────────────────────────
-INSERT INTO slot_services (availability_id, service_id) VALUES
--- Prof 102 (Ogalesco): Web Dev (1) + Mobile App (2) on all open slots
-(1, 1), (1, 2),   -- Jun 29 AM
-(2, 1), (2, 2),   -- Jun 29 PM
-(3, 1), (3, 2),   -- Jul 01 AM
-(5, 1), (5, 2),   -- Jul 08 AM
-(6, 1), (6, 2),   -- Jul 08 PM
-(8, 1), (8, 2),   -- Jul 13 AM
-(9, 1), (9, 2),   -- Jul 15 AM
-(10,1), (10,2),   -- Jul 17 PM
--- Prof 106 (Bicua): DB Design (3) on all slots
-(11,3), (12,3), (13,3), (14,3),
-(15,3), (16,3), (17,3), (18,3), (19,3),
--- Prof 107 (Tan): Backend Architecture (4) on all open slots
-(20,4), (21,4), (22,4),
-(25,4), (26,4), (27,4), (28,4), (29,4), (30,4),
--- Prof 110 (Villanueva): Software Engineering (5) on all slots
-(31,5), (32,5), (33,5), (34,5),
-(35,5), (36,5), (37,5), (38,5),
--- Prof 111 (Dela Cruz): Network Security (6) on all slots
-(39,6), (40,6), (41,6), (42,6), (43,6), (44,6);

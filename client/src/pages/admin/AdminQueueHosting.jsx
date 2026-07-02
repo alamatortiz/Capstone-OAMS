@@ -269,6 +269,7 @@ export default function AdminQueueHosting() {
   const [maxCapacity, setMaxCapacity] = useState("100");
   const [serviceStart, setServiceStart] = useState("08:00");
   const [serviceEnd, setServiceEnd] = useState("17:00");
+  const [noShowTimeout, setNoShowTimeout] = useState("15");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -347,6 +348,7 @@ export default function AdminQueueHosting() {
     setMaxCapacity("100");
     setServiceStart("08:00");
     setServiceEnd("17:00");
+    setNoShowTimeout("15");
   };
   const openModal = () => {
     resetForm();
@@ -371,6 +373,11 @@ export default function AdminQueueHosting() {
       toast.error("Start time must be before end time");
       return;
     }
+    const noShowTimeoutNum = parseInt(noShowTimeout, 10);
+    if (!noShowTimeoutNum || noShowTimeoutNum <= 0) {
+      toast.error("Please enter a valid no-show timeout in minutes");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -379,6 +386,7 @@ export default function AdminQueueHosting() {
         maxCapacity: capacityNum,
         startTime: `${serviceStart}:00`,
         endTime: `${serviceEnd}:00`,
+        noShowTimeoutMinutes: noShowTimeoutNum,
       });
       toast.success("Queue line opened successfully!");
       closeModal();
@@ -951,6 +959,24 @@ export default function AdminQueueHosting() {
                   value={maxCapacity}
                   onChange={(e) => setMaxCapacity(e.target.value)}
                 />
+              </div>
+
+              <div className="aqh-form-group">
+                <label className="aqh-form-label">
+                  No-Show Timeout (minutes) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  className="aqh-form-input"
+                  placeholder="e.g., 15"
+                  value={noShowTimeout}
+                  onChange={(e) => setNoShowTimeout(e.target.value)}
+                />
+                <p className="aqh-modal-subtitle">
+                  A called student who doesn't show up within this many
+                  minutes is automatically voided so you can call the next one.
+                </p>
               </div>
 
               <div className="aqh-form-row">

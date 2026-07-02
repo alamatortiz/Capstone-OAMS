@@ -5,8 +5,6 @@ import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_documents.css";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
-import editIcon from "../../assets/edit_icon.png";
-import deleteIcon from "../../assets/delete_icon.png";
 import api from "../../utils/api";
 import LogoutConfirmModal from "../../components/LogoutConfirmModal";
 
@@ -141,9 +139,9 @@ const ChevronDownIcon = () => (
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
-const FileTextIcon = () => (
+const FileTextIcon = ({ className = "icon" }) => (
   <svg
-    className="icon"
+    className={className}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -153,18 +151,6 @@ const FileTextIcon = () => (
     <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
 );
-const ClockIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-);
 const DownloadIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -172,70 +158,63 @@ const DownloadIcon = () => (
     <line x1="12" y1="15" x2="12" y2="3"></line>
   </svg>
 );
+const AlertCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="13"></line>
+    <circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="currentColor" strokeWidth="1" />
+  </svg>
+);
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12 6 12 12 16 14"></polyline>
+  </svg>
+);
+const CheckCircle2Icon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+  </svg>
+);
+const XCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="15" y1="9" x2="9" y2="15"></line>
+    <line x1="9" y1="9" x2="15" y2="15"></line>
+  </svg>
+);
 
-// ── Dummy Data ─────────────────────────────────────────────────────────────
-const DUMMY_DOCUMENTS = [
-  {
-    id: 1,
-    studentName: "Juan Dela Cruz",
-    studentId: "100123",
-    documentType: "Transcript of Records",
-    purpose: "Job Application",
-    requestDate: "2026-03-27 10:30 AM",
-    status: "Pending",
-    priority: "Urgent",
-    college: "CCS",
-    processor: null,
-  },
-  {
-    id: 2,
-    studentName: "Maria Garcia",
-    studentId: "100456",
-    documentType: "Certificate of Grades",
-    purpose: "Scholarship Application",
-    requestDate: "2026-03-26 02:15 PM",
-    status: "Processing",
-    priority: null,
-    college: "CBAA",
-    processor: "Prof. Ana Santos",
-  },
-  {
-    id: 3,
-    studentName: "Carlos Rodriguez",
-    studentId: "100789",
-    documentType: "Recommendation Letter",
-    purpose: "Graduate School",
-    requestDate: "2026-03-25 09:00 AM",
-    status: "Ready",
-    priority: null,
-    college: "COED",
-    processor: "Prof. Pedro Reyes",
-  },
-  {
-    id: 4,
-    studentName: "Lisa Fernandez",
-    studentId: "100234",
-    documentType: "Certificate of Enrollment",
-    purpose: "Student Visa",
-    requestDate: "2026-03-24 11:20 AM",
-    status: "Released",
-    priority: "Urgent",
-    college: "COE",
-    processor: "Prof. Maria Lopez",
-  },
-  {
-    id: 5,
-    studentName: "Marco Velasco",
-    studentId: "100567",
-    documentType: "Honorable Dismissal",
-    purpose: "Transfer",
-    requestDate: "2026-03-23 03:45 PM",
-    status: "Approved",
-    priority: null,
-    college: "CAS",
-    processor: "Prof. Sofia Cruz",
-  },
-];
+// ── Status config ─────────────────────────────────────────────────────────────
+const STATUS_CONFIG = {
+  pending: { badgeClass: "admin-documents-status-pending", Icon: AlertCircleIcon, label: "Pending" },
+  processing: { badgeClass: "admin-documents-status-processing", Icon: ClockIcon, label: "Processing" },
+  ready: { badgeClass: "admin-documents-status-ready", Icon: FileTextIcon, label: "Ready" },
+  released: { badgeClass: "admin-documents-status-released", Icon: CheckCircle2Icon, label: "Released" },
+  rejected: { badgeClass: "admin-documents-status-rejected", Icon: XCircleIcon, label: "Rejected" },
+};
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+  return (
+    <span className={`admin-documents-status-badge ${cfg.badgeClass}`}>
+      <cfg.Icon />
+      {cfg.label}
+    </span>
+  );
+}
+
+function formatDate(val) {
+  if (!val) return "—";
+  return new Date(val).toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+const TABS = ["all", "pending", "processing", "ready", "released", "rejected"];
+const COLLEGES = ["All Colleges", "CCS", "CBAA", "COED", "COE", "CAS", "CHAS"];
 
 export default function AdminDocuments() {
   const { user: authUser, logout } = useAuth();
@@ -270,78 +249,31 @@ export default function AdminDocuments() {
   const messagesEndRef = useRef(null);
 
   // ── Document data state ──────────────────────────────────────────────────
-  const [docStats, setDocStats] = useState(null);
-  const [docLoading, setDocLoading] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [docLoading, setDocLoading] = useState(true);
   const [docError, setDocError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCollege, setSelectedCollege] = useState("All Colleges");
-  const [activeTab, setActiveTab] = useState("All");
+  const [activeTab, setActiveTab] = useState("all");
+  const [selectedDoc, setSelectedDoc] = useState(null);
 
   useEffect(() => {
-    // Simulate loading with dummy data
-    const loadDummyData = () => {
-      setDocLoading(true);
-      setTimeout(() => {
-        const stats = {
-          totalRequests: DUMMY_DOCUMENTS.length,
-          pendingCount: DUMMY_DOCUMENTS.filter(
-            (d) => d.status === "Pending"
-          ).length,
-          processingCount: DUMMY_DOCUMENTS.filter(
-            (d) => d.status === "Processing"
-          ).length,
-          readyCount: DUMMY_DOCUMENTS.filter((d) => d.status === "Ready").length,
-          approvedCount: DUMMY_DOCUMENTS.filter(
-            (d) => d.status === "Approved"
-          ).length,
-          releasedCount: DUMMY_DOCUMENTS.filter(
-            (d) => d.status === "Released"
-          ).length,
-        };
-        setDocStats({
-          stats,
-          documents: DUMMY_DOCUMENTS,
-        });
+    const fetchDocuments = async () => {
+      try {
+        setDocLoading(true);
+        const res = await api.get("/admin/documents/monitoring");
+        setDocuments(res.data.documents ?? []);
+        setDocError(null);
+      } catch (err) {
+        console.error("Failed to fetch document monitoring data:", err);
+        setDocError("Could not load document requests.");
+      } finally {
         setDocLoading(false);
-      }, 500);
+      }
     };
 
-    loadDummyData();
+    fetchDocuments();
   }, []);
-
-  // ── Derived values ────────────────────────────────────────────────────────
-  const s = docStats?.stats;
-  const loading = docLoading;
-
-  const stats = [
-    {
-      title: "Total Requests",
-      value: loading ? "—" : String(s?.totalRequests ?? 0),
-      icon: FileTextIcon,
-      bgColor: "admin-documents-stat-bg-green",
-    },
-    {
-      title: "Pending",
-      value: loading ? "—" : String(s?.pendingCount ?? 0),
-      icon: ClockIcon,
-      bgColor: "admin-documents-stat-bg-orange",
-    },
-    {
-      title: "Processing",
-      value: loading ? "—" : String(s?.processingCount ?? 0),
-      icon: SearchIcon,
-      bgColor: "admin-documents-stat-bg-blue",
-    },
-    {
-      title: "Ready",
-      value: loading ? "—" : String(s?.readyCount ?? 0),
-      icon: FileTextIcon,
-      bgColor: "admin-documents-stat-bg-purple",
-    },
-  ];
-
-  const documents = docStats?.documents ?? [];
-  const colleges = ["All Colleges", "CCS", "CBAA", "COED", "COE", "CAS", "CHAS"];
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -362,6 +294,22 @@ export default function AdminDocuments() {
       applyTheme(next ? "dark" : "light");
       return next;
     });
+  };
+
+  const generateBotResponse = (input) => {
+    const i = input.toLowerCase();
+    const pendingCount = documents.filter((d) => d.status === "pending").length;
+    const processingCount = documents.filter((d) => d.status === "processing").length;
+    const readyCount = documents.filter((d) => d.status === "ready").length;
+    if (i.includes("pending") || i.includes("status"))
+      return `There are ${pendingCount} pending documents. Use the filters to view them.`;
+    if (i.includes("process") || i.includes("processing"))
+      return `Currently ${processingCount} documents are being processed.`;
+    if (i.includes("ready"))
+      return `${readyCount} documents are ready for release.`;
+    if (i.includes("export") || i.includes("download"))
+      return "You can export the currently filtered document list using the Export button in the toolbar.";
+    return "I can help with document status, filtering, exporting, and document details. What do you need?";
   };
 
   const handleSendMessage = (e) => {
@@ -386,30 +334,41 @@ export default function AdminDocuments() {
     }, 600);
   };
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("pending") || i.includes("status"))
-      return `There are ${s?.pendingCount ?? 0} pending documents. Use the filters to view them.`;
-    if (i.includes("process") || i.includes("processing"))
-      return `Currently ${s?.processingCount ?? 0} documents are being processed.`;
-    if (i.includes("ready"))
-      return `${s?.readyCount ?? 0} documents are ready for release.`;
-    if (i.includes("export") || i.includes("download"))
-      return "You can export document records using the Export button in the toolbar.";
-    return "I can help with document status, filtering, exporting, and document details. What do you need?";
-  };
-
-  const filteredDocuments = documents.filter((doc) => {
+  // ── Derived values ────────────────────────────────────────────────────────
+  // Search + college filters applied first so tab counts reflect the current context.
+  const baseFiltered = documents.filter((doc) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      doc.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.studentName?.toLowerCase().includes(q) ||
       doc.studentId?.toString().includes(searchQuery) ||
-      doc.documentType?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab =
-      activeTab === "All" || doc.status?.toLowerCase() === activeTab.toLowerCase();
+      doc.documentType?.toLowerCase().includes(q) ||
+      doc.trackingNumber?.toLowerCase().includes(q);
     const matchesCollege =
       selectedCollege === "All Colleges" || doc.college === selectedCollege;
-    return matchesSearch && matchesTab && matchesCollege;
+    return matchesSearch && matchesCollege;
   });
+
+  const filteredDocuments =
+    activeTab === "all"
+      ? baseFiltered
+      : baseFiltered.filter((doc) => doc.status === activeTab);
+
+  const handleExport = () => {
+    const header = ["Tracking Number", "Student", "Student ID", "College", "Document Type", "Purpose", "Status", "Request Date"];
+    const rows = filteredDocuments.map((d) => [
+      d.trackingNumber, d.studentName, d.studentId, d.college, d.documentType, d.purpose, d.status, formatDate(d.requestDate),
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `document-requests-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const navItems = [
     { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
@@ -583,33 +542,19 @@ export default function AdminDocuments() {
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Page Header */}
           <div className="admin-documents-page-header">
-            <h1 className="admin-documents-page-title">
-              Centralized Document Management
-            </h1>
-            <p className="admin-documents-page-subtitle">
-              Manage document processing workflow across all colleges
-            </p>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="admin-documents-stats-grid">
-            {stats.map((stat) => (
-              <div key={stat.title} className="admin-documents-stat-card">
-                <div className="admin-documents-stat-header">
-                  <div className={`admin-documents-stat-icon ${stat.bgColor}`}>
-                    <stat.icon />
-                  </div>
-                </div>
-                <p className="admin-documents-stat-title">{stat.title}</p>
-                <p
-                  className={`admin-documents-stat-value ${
-                    loading ? "admin-documents-stat-loading" : ""
-                  }`}
-                >
-                  {stat.value}
+            <div className="admin-documents-title-section">
+              <div className="admin-documents-title-icon">
+                <FileTextIcon className="admin-documents-icon-lg" />
+              </div>
+              <div>
+                <h1 className="admin-documents-page-title">
+                  Centralized Document Management
+                </h1>
+                <p className="admin-documents-page-subtitle">
+                  Monitor document processing workflow across all colleges
                 </p>
               </div>
-            ))}
+            </div>
           </div>
 
           {/* Toolbar */}
@@ -631,7 +576,7 @@ export default function AdminDocuments() {
                   value={selectedCollege}
                   onChange={(e) => setSelectedCollege(e.target.value)}
                 >
-                  {colleges.map((college) => (
+                  {COLLEGES.map((college) => (
                     <option key={college} value={college}>
                       {college}
                     </option>
@@ -639,7 +584,7 @@ export default function AdminDocuments() {
                 </select>
                 <ChevronDownIcon />
               </div>
-              <button className="admin-documents-export-btn">
+              <button className="admin-documents-export-btn" onClick={handleExport}>
                 <DownloadIcon />
                 Export
               </button>
@@ -657,8 +602,12 @@ export default function AdminDocuments() {
 
             {/* Tabs */}
             <div className="admin-documents-tabs">
-              {["All", "Pending", "Approved", "Processing", "Ready", "Released"].map(
-                (tab) => (
+              {TABS.map((tab) => {
+                const count =
+                  tab === "all"
+                    ? baseFiltered.length
+                    : baseFiltered.filter((d) => d.status === tab).length;
+                return (
                   <button
                     key={tab}
                     className={`admin-documents-tab ${
@@ -666,15 +615,18 @@ export default function AdminDocuments() {
                     }`}
                     onClick={() => setActiveTab(tab)}
                   >
-                    {tab}
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    <span className="admin-documents-tab-count">
+                      {docLoading ? "—" : count}
+                    </span>
                   </button>
-                )
-              )}
+                );
+              })}
             </div>
 
             {/* Documents List */}
             <div className="admin-documents-list">
-              {loading ? (
+              {docLoading ? (
                 <p className="admin-documents-loading">Loading documents...</p>
               ) : filteredDocuments.length === 0 ? (
                 <p className="admin-documents-empty">
@@ -694,23 +646,12 @@ export default function AdminDocuments() {
                               {doc.studentName}
                             </p>
                             <p className="admin-documents-student-id">
-                              ({doc.studentId})
+                              ({doc.studentId}) &middot; {doc.college}
                             </p>
                           </div>
                         </div>
                         <div className="admin-documents-card-badges">
-                          {doc.priority && (
-                            <span
-                              className={`admin-documents-priority-badge admin-documents-priority-${doc.priority.toLowerCase()}`}
-                            >
-                              {doc.priority}
-                            </span>
-                          )}
-                          <span
-                            className={`admin-documents-status-badge admin-documents-status-${doc.status.toLowerCase()}`}
-                          >
-                            {doc.status}
-                          </span>
+                          <StatusBadge status={doc.status} />
                         </div>
                       </div>
                       <h3 className="admin-documents-document-title">
@@ -732,30 +673,26 @@ export default function AdminDocuments() {
                           Request Date
                         </span>
                         <span className="admin-documents-detail-value">
-                          {doc.requestDate}
+                          {formatDate(doc.requestDate)}
                         </span>
                       </div>
-                      {doc.processor && (
-                        <div className="admin-documents-detail-row">
-                          <span className="admin-documents-detail-label">
-                            Processor
-                          </span>
-                          <span className="admin-documents-detail-value">
-                            {doc.processor}
-                          </span>
-                        </div>
-                      )}
+                      <div className="admin-documents-detail-row">
+                        <span className="admin-documents-detail-label">
+                          Tracking Number
+                        </span>
+                        <span className="admin-documents-detail-value">
+                          {doc.trackingNumber}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="admin-documents-card-footer">
-                      <button className="admin-documents-view-details-btn">
+                      <button
+                        className="admin-documents-view-details-btn"
+                        onClick={() => setSelectedDoc(doc)}
+                      >
                         View Details
                       </button>
-                      {doc.status === "Ready" && (
-                        <button className="admin-documents-action-btn admin-documents-action-mark-released">
-                          Mark Released
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))
@@ -764,6 +701,82 @@ export default function AdminDocuments() {
           </section>
         </div>
       </main>
+
+      {/* Details Modal */}
+      {selectedDoc && (
+        <div
+          className="admin-documents-dialog-overlay"
+          onClick={() => setSelectedDoc(null)}
+        >
+          <div
+            className="admin-documents-dialog-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="admin-documents-dialog-close"
+              onClick={() => setSelectedDoc(null)}
+              aria-label="Close"
+            >
+              <CloseIcon />
+            </button>
+            <p className="admin-documents-dialog-title">Request Details</p>
+            <p className="admin-documents-dialog-desc">
+              Full details for this document request.
+            </p>
+
+            <div className="admin-documents-dialog-name-row">
+              <span className="admin-documents-dialog-student-name">
+                {selectedDoc.studentName}
+              </span>
+              <span className="admin-documents-dialog-student-id">
+                ({selectedDoc.studentId})
+              </span>
+            </div>
+            <p className="admin-documents-dialog-doc-type">
+              {selectedDoc.documentType} &middot; {selectedDoc.trackingNumber}
+            </p>
+
+            <div className="admin-documents-meta-grid">
+              <div>
+                <p className="admin-documents-meta-label">College</p>
+                <p className="admin-documents-meta-value">{selectedDoc.college}</p>
+              </div>
+              <div>
+                <p className="admin-documents-meta-label">Status</p>
+                <StatusBadge status={selectedDoc.status} />
+              </div>
+              <div>
+                <p className="admin-documents-meta-label">Purpose</p>
+                <p className="admin-documents-meta-value">{selectedDoc.purpose}</p>
+              </div>
+              <div>
+                <p className="admin-documents-meta-label">Request Date</p>
+                <p className="admin-documents-meta-value">
+                  {formatDate(selectedDoc.requestDate)}
+                </p>
+              </div>
+            </div>
+
+            {selectedDoc.notes && (
+              <div className="admin-documents-notes-box">
+                <p className="admin-documents-meta-label" style={{ marginBottom: "0.25rem" }}>
+                  Notes
+                </p>
+                <p className="admin-documents-notes-text">{selectedDoc.notes}</p>
+              </div>
+            )}
+
+            <div className="admin-documents-dialog-footer">
+              <button
+                className="admin-documents-view-details-btn"
+                onClick={() => setSelectedDoc(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {sidebarOpen && (
         <div

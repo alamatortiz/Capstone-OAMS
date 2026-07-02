@@ -29,8 +29,8 @@ const HomeIcon = () => (
     <polyline points="9 22 9 12 15 12 15 22"></polyline>
   </svg>
 );
-const QueueIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const QueueIconNav = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
@@ -192,6 +192,7 @@ function mapQueueFromApi(q) {
     queueType: q.queueType,
     department: q.department,
     maxCapacity: q.maxCapacity,
+    noShowTimeoutMinutes: q.noShowTimeoutMinutes,
     currentCount: q.currentCount,
     servedCount: q.servedCount,
     status: q.status === 'open' ? 'active' : q.status,
@@ -242,8 +243,15 @@ export default function AdminQueueManagement() {
   const [error, setError] = useState(null);
   const [queueEntries, setQueueEntries] = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
 
   const selectedQueue = queues.find(q => q.id === selectedQueueId) || null;
+
+  const serviceTypes = [...new Set(queues.map((q) => q.queueType))].sort();
+  const filteredQueues =
+    serviceTypeFilter === 'all'
+      ? queues
+      : queues.filter((q) => q.queueType === serviceTypeFilter);
 
   // ─── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -433,10 +441,15 @@ export default function AdminQueueManagement() {
         return 'aqm-entry-status-completed';
       case 'cancelled':
         return 'aqm-entry-status-cancelled';
+      case 'no_show':
+        return 'aqm-entry-status-no-show';
       default:
         return 'aqm-entry-status-completed';
     }
   };
+
+  const getEntryStatusLabel = (status) =>
+    status === 'no_show' ? 'No-Show' : status;
 
   // ─── Details View ──────────────────────────────────────────────────────────
   if (selectedQueue) {
@@ -743,7 +756,7 @@ export default function AdminQueueManagement() {
                             </div>
                             <div className="aqm-entry-badges">
                               <span className={`aqm-entry-status ${getEntryStatusColor(entry.status)}`}>
-                                {entry.status}
+                                {getEntryStatusLabel(entry.status)}
                               </span>
                               <span className="aqm-entry-queue-number">{entry.queueNumber}</span>
                             </div>
@@ -784,6 +797,10 @@ export default function AdminQueueManagement() {
                     <div className="aqm-sidebar-item">
                       <span className="aqm-item-label">Avg. Time</span>
                       <span className="aqm-item-value">{selectedQueue.averageServiceTime}</span>
+                    </div>
+                    <div className="aqm-sidebar-item">
+                      <span className="aqm-item-label">No-show after</span>
+                      <span className="aqm-item-value">{selectedQueue.noShowTimeoutMinutes} min</span>
                     </div>
                   </div>
                 </div>
@@ -970,8 +987,15 @@ export default function AdminQueueManagement() {
         <div className="aqm-list-container">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           <div className="aqm-page-header">
-            <h1 className="aqm-page-title">Queue Management</h1>
-            <p className="aqm-page-subtitle">Monitor and manage all active queues</p>
+            <div className="aqm-title-section">
+              <div className="aqm-title-icon">
+                <QueueIconNav className="aqm-icon-xl" />
+              </div>
+              <div>
+                <h1 className="aqm-page-title">Queue Management</h1>
+                <p className="aqm-page-subtitle">Monitor and manage all active queues</p>
+              </div>
+            </div>
           </div>
 
           {/* Summary Cards */}
@@ -1013,6 +1037,24 @@ export default function AdminQueueManagement() {
             </div>
           </div>
 
+          {/* Toolbar */}
+          <div className="aqm-toolbar">
+            <div className="aqm-dropdown-wrapper">
+              <select
+                className="aqm-dropdown"
+                value={serviceTypeFilter}
+                onChange={(e) => setServiceTypeFilter(e.target.value)}
+                aria-label="Filter by service type"
+              >
+                <option value="all">All Service Types</option>
+                {serviceTypes.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              <ChevronDown />
+            </div>
+          </div>
+
           {/* Queue List */}
           <div className="aqm-queue-list">
             {loading ? (
@@ -1021,8 +1063,10 @@ export default function AdminQueueManagement() {
               <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-error, #e53e3e)' }}>{error}</p>
             ) : queues.length === 0 ? (
               <p style={{ padding: '2rem', textAlign: 'center', opacity: 0.6 }}>No queues opened today for your department.</p>
+            ) : filteredQueues.length === 0 ? (
+              <p style={{ padding: '2rem', textAlign: 'center', opacity: 0.6 }}>No queues match this service type.</p>
             ) : (
-              queues.map((queue) => (
+              filteredQueues.map((queue) => (
                 <div
                   key={queue.id}
                   className="aqm-queue-card"

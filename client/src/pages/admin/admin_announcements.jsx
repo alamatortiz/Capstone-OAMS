@@ -555,11 +555,12 @@ export default function AdminAnnouncements() {
                 Manage announcements for {user?.college || "your department"}
               </p>
             </div>
-            <button className="ann-btn-new" onClick={() => setIsCreating(true)}>
-              <PlusIconSmall />
-              New Announcement
-            </button>
           </div>
+
+          <button className="ann-btn-new" onClick={() => setIsCreating(true)}>
+            <PlusIconSmall />
+            New Announcement
+          </button>
 
           {/* Stats */}
           <div className="ann-stats-grid">

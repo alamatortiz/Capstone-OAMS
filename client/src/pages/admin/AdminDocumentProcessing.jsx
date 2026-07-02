@@ -100,8 +100,8 @@ const MoonIcon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
-const FileTextIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const FileTextIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
     <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
@@ -125,15 +125,17 @@ const XCircleIcon = () => (
     <line x1="9" y1="9" x2="15" y2="15"></line>
   </svg>
 );
+const AlertCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="13"></line>
+    <circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="currentColor" strokeWidth="1" />
+  </svg>
+);
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="11" cy="11" r="8"></circle>
     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-  </svg>
-);
-const FilterIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
   </svg>
 );
 const EyeIcon = () => (
@@ -145,11 +147,6 @@ const EyeIcon = () => (
 const ChevronLeftIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="15 18 9 12 15 6"></polyline>
-  </svg>
-);
-const ChevronDownIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
 
@@ -181,12 +178,10 @@ export default function AdminDocumentProcessing() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("all");
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [processingNotes, setProcessingNotes] = useState("");
-  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
-  const filterRef = useRef(null);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   const fetchDocuments = useCallback(async () => {
@@ -213,32 +208,21 @@ export default function AdminDocumentProcessing() {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) {
-        setFilterDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // ── Derived stats ─────────────────────────────────────────────────────────
-  const stats = {
-    pending: documents.filter((d) => d.status === "pending").length,
-    processing: documents.filter((d) => d.status === "processing").length,
-    ready: documents.filter((d) => d.status === "ready").length,
-    completed: documents.filter((d) => d.status === "completed").length,
-  };
-
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch =
-      doc.trackingNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.studentId.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  // ── Derived values ────────────────────────────────────────────────────────
+  // Search applied first so tab counts reflect the current search context.
+  const baseFiltered = documents.filter((doc) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      doc.trackingNumber.toLowerCase().includes(q) ||
+      doc.studentName.toLowerCase().includes(q) ||
+      doc.studentId.toLowerCase().includes(q)
+    );
   });
+
+  const filteredDocuments =
+    activeTab === "all"
+      ? baseFiltered
+      : baseFiltered.filter((doc) => doc.status === activeTab);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -262,10 +246,11 @@ export default function AdminDocumentProcessing() {
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
-    if (i.includes("pending")) return `There are ${stats.pending} pending documents awaiting processing.`;
-    if (i.includes("processing")) return `${stats.processing} document(s) are currently being processed.`;
-    if (i.includes("ready")) return `${stats.ready} document(s) are ready for student pickup.`;
-    if (i.includes("completed")) return `${stats.completed} document request(s) have been completed.`;
+    const count = (status) => documents.filter((d) => d.status === status).length;
+    if (i.includes("pending")) return `There are ${count("pending")} pending documents awaiting processing.`;
+    if (i.includes("processing")) return `${count("processing")} document(s) are currently being processed.`;
+    if (i.includes("ready")) return `${count("ready")} document(s) are ready for student pickup.`;
+    if (i.includes("completed")) return `${count("completed")} document request(s) have been completed.`;
     if (i.includes("search") || i.includes("find")) return "Use the search bar to look up by tracking number, student name, or student ID.";
     return "I can help you with document processing. Ask about pending, processing, ready, or completed documents!";
   };
@@ -301,7 +286,7 @@ export default function AdminDocumentProcessing() {
 
   const getStatusMeta = (status) => {
     switch (status) {
-      case "pending":     return { label: "Pending",    cls: "adp-badge-pending",    Icon: ClockIcon };
+      case "pending":     return { label: "Pending",    cls: "adp-badge-pending",    Icon: AlertCircleIcon };
       case "processing":  return { label: "Processing", cls: "adp-badge-processing", Icon: ClockIcon };
       case "ready":       return { label: "Ready",      cls: "adp-badge-ready",      Icon: CheckCircleIcon };
       case "completed":   return { label: "Completed",  cls: "adp-badge-completed",  Icon: CheckCircleIcon };
@@ -310,7 +295,7 @@ export default function AdminDocumentProcessing() {
     }
   };
 
-  const STATUS_OPTIONS = ["all", "pending", "processing", "ready", "completed", "rejected"];
+  const TABS = ["all", "pending", "processing", "ready", "completed", "rejected"];
 
   const navItems = [
     { icon: HomeIcon,        label: "Dashboard",    path: "/admin/dashboard" },
@@ -439,61 +424,18 @@ export default function AdminDocumentProcessing() {
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Page Header */}
           <div className="adp-page-header">
-            <div>
-              <h1 className="adp-page-title">Document Processing</h1>
-              <p className="adp-page-subtitle">Process and manage document requests</p>
-            </div>
-          </div>
-
-          {/* Stat Cards */}
-          <div className="adp-stats-grid">
-            <div className="adp-stat-card adp-stat-pending">
-              <div className="adp-stat-card-content">
-                <div>
-                  <p className="adp-stat-label">Pending</p>
-                  <p className="adp-stat-value">{stats.pending}</p>
-                </div>
-                <div className="adp-stat-icon-wrap adp-stat-icon-pending">
-                  <ClockIcon />
-                </div>
+            <div className="adp-title-section">
+              <div className="adp-title-icon">
+                <FileTextIcon className="adp-icon-lg" />
               </div>
-            </div>
-            <div className="adp-stat-card adp-stat-processing">
-              <div className="adp-stat-card-content">
-                <div>
-                  <p className="adp-stat-label">Processing</p>
-                  <p className="adp-stat-value">{stats.processing}</p>
-                </div>
-                <div className="adp-stat-icon-wrap adp-stat-icon-processing">
-                  <FileTextIcon />
-                </div>
-              </div>
-            </div>
-            <div className="adp-stat-card adp-stat-ready">
-              <div className="adp-stat-card-content">
-                <div>
-                  <p className="adp-stat-label">Ready</p>
-                  <p className="adp-stat-value">{stats.ready}</p>
-                </div>
-                <div className="adp-stat-icon-wrap adp-stat-icon-ready">
-                  <CheckCircleIcon />
-                </div>
-              </div>
-            </div>
-            <div className="adp-stat-card adp-stat-completed">
-              <div className="adp-stat-card-content">
-                <div>
-                  <p className="adp-stat-label">Completed</p>
-                  <p className="adp-stat-value">{stats.completed}</p>
-                </div>
-                <div className="adp-stat-icon-wrap adp-stat-icon-completed">
-                  <CheckCircleIcon />
-                </div>
+              <div>
+                <h1 className="adp-page-title">Document Processing</h1>
+                <p className="adp-page-subtitle">Process and manage document requests</p>
               </div>
             </div>
           </div>
 
-          {/* Search & Filter */}
+          {/* Search */}
           <div className="adp-filter-bar">
             <div className="adp-search-wrap">
               <span className="adp-search-icon"><SearchIcon /></span>
@@ -505,32 +447,26 @@ export default function AdminDocumentProcessing() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="adp-filter-dropdown-wrap" ref={filterRef}>
-              <button
-                className="adp-filter-btn"
-                onClick={() => setFilterDropdownOpen((p) => !p)}
-                aria-expanded={filterDropdownOpen}
-              >
-                <FilterIcon />
-                <span className="adp-filter-label">
-                  {statusFilter === "all" ? "All Status" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                </span>
-                <ChevronDownIcon />
-              </button>
-              {filterDropdownOpen && (
-                <div className="adp-filter-menu">
-                  {STATUS_OPTIONS.map((opt) => (
-                    <button
-                      key={opt}
-                      className={`adp-filter-option ${statusFilter === opt ? "active" : ""}`}
-                      onClick={() => { setStatusFilter(opt); setFilterDropdownOpen(false); }}
-                    >
-                      {opt === "all" ? "All Status" : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="adp-tabs">
+            {TABS.map((tab) => {
+              const count =
+                tab === "all"
+                  ? baseFiltered.length
+                  : baseFiltered.filter((d) => d.status === tab).length;
+              return (
+                <button
+                  key={tab}
+                  className={`adp-tab ${activeTab === tab ? "adp-tab-active" : ""}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  <span className="adp-tab-count">{loading ? "—" : count}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Documents List */}

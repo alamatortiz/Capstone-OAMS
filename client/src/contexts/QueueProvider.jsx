@@ -26,8 +26,21 @@ export function QueueProvider({ children }) {
   const prevQueuesRef = useRef(new Map());
   const hasLoadedOnceRef = useRef(false);
 
+  // ── Fetch queue history ───────────────────────────────────────────────────
+  const fetchQueueHistory = useCallback(async () => {
+    try {
+      const { data } = await api.get("/student/queues/history");
+      const history = data.history ?? [];
+      setQueueHistory(history);
+      return history;
+    } catch (err) {
+      console.error("fetchQueueHistory error:", err);
+      return [];
+    }
+  }, []);
+
   // ── Detect status changes since the last poll and notify the student ──────
-  const notifyQueueTransitions = useCallback((nextQueues) => {
+  const notifyQueueTransitions = useCallback(async (nextQueues) => {
     const prevMap = prevQueuesRef.current;
 
     for (const q of nextQueues) {
@@ -51,17 +64,30 @@ export function QueueProvider({ children }) {
     }
 
     // A queue that was "serving" and is no longer in the active list was
-    // just marked as served by the admin.
+    // either served by the admin or auto-voided as a no-show — check its
+    // resolved status in history so we don't tell a no-show student "thank
+    // you, you've been served."
     const nextIds = new Set(nextQueues.map((q) => q.queueId));
-    for (const [queueId, prev] of prevMap.entries()) {
-      if (prev.status === "serving" && !nextIds.has(queueId)) {
-        toast.success(`You've been served for ${prev.serviceName}. Thank you!`);
+    const vanishedServing = [...prevMap.entries()].filter(
+      ([queueId, prev]) => prev.status === "serving" && !nextIds.has(queueId),
+    );
+    if (vanishedServing.length > 0) {
+      const history = await fetchQueueHistory();
+      for (const [queueId, prev] of vanishedServing) {
+        const resolved = history.find((h) => h.id === queueId);
+        if (resolved?.status === "no_show") {
+          toast.warning(
+            `You were marked as a no-show for ${prev.serviceName} and your line was voided.`,
+          );
+        } else {
+          toast.success(`You've been served for ${prev.serviceName}. Thank you!`);
+        }
       }
     }
 
     prevMap.clear();
     for (const q of nextQueues) prevMap.set(q.queueId, q);
-  }, []);
+  }, [fetchQueueHistory]);
 
   // ── Fetch active queues ───────────────────────────────────────────────────
   const fetchActiveQueues = useCallback(async () => {
@@ -91,16 +117,6 @@ export function QueueProvider({ children }) {
     } catch (err) {
       console.error("fetchAvailableSlots error:", err);
       setError("Failed to load available queues.");
-    }
-  }, []);
-
-  // ── Fetch queue history ───────────────────────────────────────────────────
-  const fetchQueueHistory = useCallback(async () => {
-    try {
-      const { data } = await api.get("/student/queues/history");
-      setQueueHistory(data.history ?? []);
-    } catch (err) {
-      console.error("fetchQueueHistory error:", err);
     }
   }, []);
 

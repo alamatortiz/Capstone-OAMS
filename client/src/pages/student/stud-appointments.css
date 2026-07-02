@@ -527,6 +527,9 @@ body {
   border-color: rgba(168, 85, 247, 0.5);
 }
 
+.slot-card--unavailable { opacity: 0.6; border-color: var(--card-border); }
+.slot-card--unavailable:hover { box-shadow: none; transform: none; border-color: var(--card-border); }
+
 .slot-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
 .slot-header h4 { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0; flex: 1; transition: color 0.3s ease; }
 
@@ -569,6 +572,14 @@ body {
 
 .book-btn:hover { box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35); transform: translateY(-2px); }
 .book-btn:active { transform: translateY(0); }
+
+.book-btn--disabled, .book-btn--disabled:hover, .book-btn--disabled:active {
+  background: var(--card-border);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
 
 /* ===== Bookings Container ===== */
 .bookings-container { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 1rem; overflow: hidden; transition: all 0.3s ease; }

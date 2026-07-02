@@ -406,14 +406,27 @@ export default function ProfessorSchedule() {
                       <p>No faculty members found for this department.</p>
                     </div>
                   ) : (
-                    selectedDepartment.faculty.map((professor) => (
-                      <div key={professor.facultyId} className="professor-card">
+                    selectedDepartment.faculty.map((professor) => {
+                      const isUnavailable =
+                        professor.availabilityStatus === "unavailable";
+                      return (
+                      <div
+                        key={professor.facultyId}
+                        className={`professor-card${isUnavailable ? " professor-card-unavailable" : ""}`}
+                      >
                         <div className="professor-header">
                           <div className="professor-avatar">
                             <UserIcon />
                           </div>
                           <div className="professor-info">
-                            <h3 className="professor-name">{professor.name}</h3>
+                            <div className="professor-name-row">
+                              <h3 className="professor-name">{professor.name}</h3>
+                              {isUnavailable && (
+                                <span className="professor-unavailable-badge">
+                                  Unavailable
+                                </span>
+                              )}
+                            </div>
                             <p className="professor-position">
                               {professor.position}
                             </p>
@@ -429,7 +442,15 @@ export default function ProfessorSchedule() {
                           <h4 className="consultation-title">
                             Consultation Hours
                           </h4>
-                          {getDaySchedules(professor).length === 0 ? (
+                          {isUnavailable ? (
+                            <div className="consultation-unavailable-notice">
+                              <AlertCircleIcon />
+                              <p>
+                                This professor is currently unavailable and is
+                                not accepting consultations right now.
+                              </p>
+                            </div>
+                          ) : getDaySchedules(professor).length === 0 ? (
                             <p style={{ opacity: 0.6, fontSize: "0.85rem" }}>
                               No consultation hours have been set yet.
                             </p>
@@ -471,7 +492,8 @@ export default function ProfessorSchedule() {
                           )}
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

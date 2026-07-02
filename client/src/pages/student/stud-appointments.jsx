@@ -245,6 +245,7 @@ export default function AppointmentsPage() {
     try {
       await api.post("/student/appointments/book-slot", {
         availabilityId: selectedSlot.availabilityId,
+        appointmentDate: selectedSlot.date,
         appointmentType: selectedApptType || null,
         purpose: purpose.trim(),
       });
@@ -395,20 +396,27 @@ export default function AppointmentsPage() {
                       </div>
                       <p className="date-count">{slotsByDate[date].length} slots available</p>
                       <div className="slots-grid">
-                        {slotsByDate[date].map((slot) => (
-                          <div key={slot.availabilityId} className="slot-card">
-                            <div className="slot-header">
-                              <h4>{slot.professorName}</h4>
-                              <span className="college-badge">{slot.college}</span>
+                        {slotsByDate[date].map((slot) => {
+                          const isUnavailable = slot.professorAvailabilityStatus === "unavailable";
+                          return (
+                            <div key={slot.availabilityId} className={`slot-card${isUnavailable ? " slot-card--unavailable" : ""}`}>
+                              <div className="slot-header">
+                                <h4>{slot.professorName}</h4>
+                                <span className="college-badge">{slot.college}</span>
+                              </div>
+                              <div className="slot-details">
+                                <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</span></div>
+                                <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
+                                <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "spot" : "spots"} left` : "Unlimited"} {slot.maxStudents != null ? `(max ${slot.maxStudents})` : ""}</span></div>
+                              </div>
+                              {isUnavailable ? (
+                                <button className="book-btn book-btn--disabled" disabled>Currently Unavailable</button>
+                              ) : (
+                                <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book This Slot</button>
+                              )}
                             </div>
-                            <div className="slot-details">
-                              <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</span></div>
-                              <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
-                              <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "spot" : "spots"} left` : "Unlimited"} {slot.maxStudents != null ? `(max ${slot.maxStudents})` : ""}</span></div>
-                            </div>
-                            <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book This Slot</button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

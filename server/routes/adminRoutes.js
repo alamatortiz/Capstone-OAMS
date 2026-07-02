@@ -268,6 +268,7 @@ router.get(
            qs.slot_id,
            qs.service_id,
            qs.max_capacity,
+           qs.no_show_timeout_minutes,
            qs.start_time,
            qs.end_time,
            qs.status,
@@ -317,6 +318,7 @@ router.get(
           : "All Departments",
         college: q.department_abbreviation || "ALL",
         maxCapacity: q.max_capacity,
+        noShowTimeoutMinutes: q.no_show_timeout_minutes,
         currentCount: q.waiting_count || 0,
         servedCount: q.served_count || 0,
         status: q.status, // 'open' | 'paused' | 'closed' | 'cancelled'
@@ -353,7 +355,7 @@ router.post(
   authorizeRoles("admin"),
   async (req, res) => {
     const adminId = req.user.userId;
-    const { serviceId, maxCapacity, startTime, endTime } = req.body;
+    const { serviceId, maxCapacity, startTime, endTime, noShowTimeoutMinutes } = req.body;
 
     if (!serviceId || !maxCapacity || !startTime || !endTime) {
       return res.status(400).json({
@@ -370,6 +372,14 @@ router.post(
       return res
         .status(400)
         .json({ error: "Start time must be before end time" });
+    }
+    const noShowTimeoutNum = noShowTimeoutMinutes != null
+      ? parseInt(noShowTimeoutMinutes, 10)
+      : 15;
+    if (!noShowTimeoutNum || noShowTimeoutNum <= 0) {
+      return res
+        .status(400)
+        .json({ error: "noShowTimeoutMinutes must be a positive number" });
     }
 
     try {
@@ -397,9 +407,9 @@ router.post(
 
       const [result] = await pool.query(
         `INSERT INTO queue_slots
-           (service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, status)
-         VALUES (?, ?, CURDATE(), ?, ?, ?, 0, 'open')`,
-        [serviceId, adminId, startTime, endTime, capacityNum],
+           (service_id, admin_id, slot_date, start_time, end_time, max_capacity, no_show_timeout_minutes, current_count, status)
+         VALUES (?, ?, CURDATE(), ?, ?, ?, ?, 0, 'open')`,
+        [serviceId, adminId, startTime, endTime, capacityNum, noShowTimeoutNum],
       );
 
       res.status(201).json({
@@ -408,6 +418,7 @@ router.post(
           id: result.insertId,
           queueType: service.service_name,
           maxCapacity: capacityNum,
+          noShowTimeoutMinutes: noShowTimeoutNum,
           currentCount: 0,
           servedCount: 0,
           status: "open",
@@ -1094,6 +1105,70 @@ router.patch(
   },
 );
 
+// GET /api/admin/documents/monitoring
+// System-wide document request tracking across all colleges (not scoped to
+// the admin's own department, unlike /document-processing).
+// Optional query param: college=<department_abbreviation> to filter.
+router.get(
+  "/documents/monitoring",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const { college } = req.query;
+
+      const [rows] = await pool.query(
+        `SELECT
+           dr.request_id,
+           dr.tracking_number,
+           dr.request_type,
+           dr.purpose,
+           dr.status,
+           dr.notes,
+           dr.created_at,
+           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+           st.student_number AS student_id,
+           d.department_abbreviation AS college
+         FROM document_requests dr
+         JOIN students st ON dr.student_id = st.student_id
+         JOIN document_services s ON dr.service_id = s.service_id
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE (? IS NULL OR d.department_abbreviation = ?)
+         ORDER BY dr.created_at DESC`,
+        [college || null, college || null],
+      );
+
+      const statusMap = {
+        pending: "pending",
+        processing: "processing",
+        generated: "ready",
+        released: "released",
+        rejected: "rejected",
+      };
+
+      const documents = rows.map((r) => ({
+        id: String(r.request_id),
+        trackingNumber: r.tracking_number,
+        studentName: r.student_name,
+        studentId: r.student_id,
+        college: r.college,
+        documentType: r.request_type,
+        purpose: r.purpose,
+        requestDate: r.created_at instanceof Date
+          ? r.created_at.toISOString()
+          : String(r.created_at),
+        status: statusMap[r.status] ?? r.status,
+        notes: r.notes || "",
+      }));
+
+      res.json({ documents });
+    } catch (error) {
+      console.error("Document monitoring fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
 // GET /api/admin/faculty-availability
 // Returns all faculty in the admin's department with today's schedule and live status.
 router.get(
@@ -1113,6 +1188,7 @@ router.get(
            CONCAT(f.first_name, ' ', f.last_name) AS name,
            f.position,
            f.email,
+           f.availability_status,
            d.department_name,
            d.department_abbreviation
          FROM faculty f
@@ -1130,8 +1206,8 @@ router.get(
 
       const [availabilityRows] = await pool.query(
         `SELECT faculty_id, start_time, end_time, location
-         FROM faculty_date_availability
-         WHERE faculty_id IN (?) AND available_date = CURDATE()
+         FROM faculty_availability
+         WHERE faculty_id IN (?) AND day_of_week = DAYNAME(CURDATE())
          ORDER BY faculty_id, start_time`,
         [facultyIds],
       );
@@ -1215,7 +1291,14 @@ router.get(
           }
         }
 
-        const status = isBusy
+        // The professor's own toggle (faculty.availability_status) takes
+        // precedence over whatever the schedule/appointments would otherwise
+        // compute — if they've marked themselves unavailable, admin sees that.
+        const isToggledUnavailable = f.availability_status === "unavailable";
+
+        const status = isToggledUnavailable
+          ? "unavailable"
+          : isBusy
           ? "busy"
           : avails.length === 0
           ? "unavailable"
@@ -1227,10 +1310,15 @@ router.get(
           position: f.position,
           college: `${f.department_name} (${f.department_abbreviation})`,
           status,
-          currentActivity: isBusy ? "In consultation with student" : null,
-          nextAvailableSlot:
-            nextAvailableSlot ||
-            (avails.length === 0 ? "No schedule today" : "No more slots today"),
+          currentActivity: isToggledUnavailable
+            ? "Marked unavailable by professor"
+            : isBusy
+            ? "In consultation with student"
+            : null,
+          nextAvailableSlot: isToggledUnavailable
+            ? "Unavailable"
+            : nextAvailableSlot ||
+              (avails.length === 0 ? "No schedule today" : "No more slots today"),
           email: f.email,
           todaySchedule: schedule,
         };

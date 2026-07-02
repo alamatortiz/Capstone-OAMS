@@ -866,7 +866,7 @@ router.get(
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE q.student_id = ?
-           AND q.status IN ('completed', 'cancelled')
+           AND q.status IN ('completed', 'cancelled', 'no_show')
          ORDER BY q.created_at DESC
          LIMIT 50`,
         [studentId],
@@ -1298,7 +1298,7 @@ router.get(
          FROM appointments a
          JOIN faculty      f ON a.faculty_id    = f.faculty_id
          JOIN departments  d ON f.department_id = d.department_id
-         LEFT JOIN faculty_date_availability fda ON a.availability_id = fda.id
+         LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
          LEFT JOIN appointment_services s ON a.service_id = s.service_id
          WHERE a.student_id = ?
          ORDER BY a.appointment_date DESC, fda.start_time DESC`,
@@ -1639,16 +1639,18 @@ router.get(
            f.specialization,
            f.email,
            f.department_id,
-           fda.id AS availability_id,
-           fda.available_date,
-           DAYNAME(fda.available_date) AS day_of_week,
-           fda.start_time,
-           fda.end_time,
-           fda.location
+           f.availability_status,
+           fa.availability_id,
+           fa.day_of_week,
+           fa.start_time,
+           fa.end_time,
+           fa.location
          FROM faculty f
-         LEFT JOIN faculty_date_availability fda
-           ON fda.faculty_id = f.faculty_id
-         ORDER BY f.department_id, f.last_name ASC, fda.available_date ASC, fda.start_time ASC`,
+         LEFT JOIN faculty_availability fa
+           ON fa.faculty_id = f.faculty_id
+         ORDER BY f.department_id, f.last_name ASC,
+           FIELD(fa.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'),
+           fa.start_time ASC`,
       );
 
       // Group rows -> faculty (faculty_id -> { ...info, availability: [] })
@@ -1662,16 +1664,12 @@ router.get(
             specialization: row.specialization,
             email: row.email,
             departmentId: row.department_id,
+            availabilityStatus: row.availability_status,
             availability: [],
           });
         }
         if (row.availability_id) {
-          const dateStr =
-            row.available_date instanceof Date
-              ? row.available_date.toISOString().split("T")[0]
-              : String(row.available_date).split("T")[0];
           facultyMap.get(row.faculty_id).availability.push({
-            date: dateStr,
             day: row.day_of_week,
             timeStart: formatTime12h(row.start_time),
             timeEnd: formatTime12h(row.end_time),
@@ -1772,6 +1770,7 @@ router.get(
         serving: "ongoing",
         completed: "completed",
         cancelled: "cancelled",
+        no_show: "cancelled",
         pending: "ongoing",
         approved: "ongoing",
         rejected: "cancelled",
@@ -1812,8 +1811,13 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
-// BOOKING SLOTS ENDPOINTS (derived from faculty_date_availability)
+// BOOKING SLOTS ENDPOINTS (derived from faculty_availability — a recurring
+// weekly template is projected onto upcoming calendar dates below, so
+// students still pick from a list of concrete dated windows even though
+// only the day-of-week pattern is actually stored.)
 // ─────────────────────────────────────────────────────────────
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // GET /api/student/appointments/available-slots
 // Returns open availability windows with occupancy counts.
@@ -1827,40 +1831,37 @@ router.get(
     const { facultyId, date } = req.query;
 
     try {
-      let availQuery = `
+      // Professors toggled 'unavailable' are still included (with their
+      // status flagged) rather than filtered out, so students can see they
+      // exist but can't currently be booked, instead of the professor
+      // silently disappearing from the list.
+      let tmplQuery = `
         SELECT
-          fda.id AS availability_id, fda.faculty_id, fda.available_date,
-          fda.start_time, fda.end_time, fda.location,
-          fda.max_students,
+          fa.availability_id, fa.faculty_id, fa.day_of_week,
+          fa.start_time, fa.end_time, fa.location, fa.max_students,
           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
-          f.specialization,
+          f.specialization, f.availability_status,
           d.department_abbreviation AS college,
           d.department_id
-        FROM faculty_date_availability fda
-        JOIN faculty f ON fda.faculty_id = f.faculty_id
-        JOIN departments d ON f.department_id = d.department_id
-        WHERE fda.status = 'open'
-          AND fda.available_date >= CURDATE()
-          AND fda.available_date < CURDATE() + INTERVAL ? DAY`;
-      const params = [DAYS_AHEAD];
+        FROM faculty_availability fa
+        JOIN faculty f ON fa.faculty_id = f.faculty_id
+        JOIN departments d ON f.department_id = d.department_id`;
+      const tmplParams = [];
+      if (facultyId) { tmplQuery += " WHERE fa.faculty_id = ?"; tmplParams.push(facultyId); }
+      tmplQuery += " ORDER BY fa.faculty_id, fa.start_time";
 
-      if (facultyId) { availQuery += " AND fda.faculty_id = ?"; params.push(facultyId); }
-      if (date)      { availQuery += " AND fda.available_date = ?"; params.push(date); }
-      availQuery += " ORDER BY fda.available_date ASC, fda.faculty_id, fda.start_time";
+      const [templates] = await pool.query(tmplQuery, tmplParams);
+      if (templates.length === 0) return res.json({ slots: [] });
 
-      const [availability] = await pool.query(availQuery, params);
+      const availabilityIds = templates.map((t) => t.availability_id);
 
-      if (availability.length === 0) return res.json({ slots: [] });
-
-      const availabilityIds = availability.map((a) => a.availability_id);
-
-      // Fetch appointment services (types) linked to each slot
+      // Fetch appointment services (types) linked to each recurring template
       const [typeRows] = await pool.query(
-        `SELECT ss.availability_id, aps.service_id, aps.service_name
-         FROM slot_services ss
-         JOIN appointment_services aps ON ss.service_id = aps.service_id
-         WHERE ss.availability_id IN (?)
-         ORDER BY ss.id ASC`,
+        `SELECT fas.availability_id, aps.service_id, aps.service_name
+         FROM faculty_availability_services fas
+         JOIN appointment_services aps ON fas.service_id = aps.service_id
+         WHERE fas.availability_id IN (?)
+         ORDER BY fas.id ASC`,
         [availabilityIds],
       );
       const typeMap = {};
@@ -1868,56 +1869,75 @@ router.get(
         (typeMap[t.availability_id] ||= []).push({ id: t.service_id, name: t.service_name });
       }
 
-      // Count confirmed bookings per availability window
+      // Count confirmed bookings per (template, specific date) pair across the
+      // whole projection window in one query, to avoid one query per day.
       const [bookingCounts] = await pool.query(
-        `SELECT availability_id, COUNT(*) AS booked
+        `SELECT availability_id, appointment_date, COUNT(*) AS booked
          FROM appointments
          WHERE availability_id IN (?)
+           AND appointment_date >= CURDATE()
+           AND appointment_date < CURDATE() + INTERVAL ? DAY
            AND status NOT IN ('cancelled', 'rejected')
-         GROUP BY availability_id`,
-        [availabilityIds],
+         GROUP BY availability_id, appointment_date`,
+        [availabilityIds, DAYS_AHEAD],
       );
       const bookedMap = {};
       for (const b of bookingCounts) {
-        bookedMap[b.availability_id] = b.booked;
+        const dStr = b.appointment_date instanceof Date
+          ? b.appointment_date.toISOString().split("T")[0]
+          : String(b.appointment_date).split("T")[0];
+        bookedMap[`${b.availability_id}_${dStr}`] = b.booked;
       }
 
       const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
       const slots = [];
 
-      for (const a of availability) {
-        const dateStr =
-          a.available_date instanceof Date
-            ? a.available_date.toISOString().split("T")[0]
-            : String(a.available_date).split("T")[0];
+      // Project each template onto every matching weekday within the window.
+      const datesToCheck = date ? [date] : Array.from({ length: DAYS_AHEAD }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        return d.toISOString().split("T")[0];
+      });
 
-        // Skip windows that have already ended
-        const windowEnd = new Date(`${dateStr}T${a.end_time}`);
-        if (windowEnd <= now) continue;
+      for (const dateStr of datesToCheck) {
+        const weekday = WEEKDAY_NAMES[new Date(`${dateStr}T00:00:00`).getDay()];
+        for (const t of templates) {
+          if (t.day_of_week !== weekday) continue;
 
-        const totalBooked = bookedMap[a.availability_id] ?? 0;
-        const spotsLeft = a.max_students != null ? a.max_students - totalBooked : null;
+          // Skip windows that have already ended (only relevant for today)
+          if (dateStr === todayStr) {
+            const windowEnd = new Date(`${dateStr}T${t.end_time}`);
+            if (windowEnd <= now) continue;
+          }
 
-        // Skip fully booked windows
-        if (a.max_students != null && totalBooked >= a.max_students) continue;
+          const totalBooked = bookedMap[`${t.availability_id}_${dateStr}`] ?? 0;
+          const spotsLeft = t.max_students != null ? t.max_students - totalBooked : null;
 
-        slots.push({
-          availabilityId: a.availability_id,
-          professorId: a.faculty_id,
-          professorName: a.faculty_name,
-          specialization: a.specialization,
-          college: a.college,
-          departmentId: a.department_id,
-          date: dateStr,
-          windowStart: String(a.start_time).slice(0, 5),
-          windowEnd: String(a.end_time).slice(0, 5),
-          location: a.location ?? "TBA",
-          maxStudents: a.max_students,
-          totalBooked,
-          spotsLeft,
-          appointmentTypes: typeMap[a.availability_id] ?? [],
-        });
+          // Skip fully booked windows
+          if (t.max_students != null && totalBooked >= t.max_students) continue;
+
+          slots.push({
+            availabilityId: t.availability_id,
+            professorId: t.faculty_id,
+            professorName: t.faculty_name,
+            specialization: t.specialization,
+            college: t.college,
+            departmentId: t.department_id,
+            date: dateStr,
+            windowStart: String(t.start_time).slice(0, 5),
+            windowEnd: String(t.end_time).slice(0, 5),
+            location: t.location ?? "TBA",
+            maxStudents: t.max_students,
+            totalBooked,
+            spotsLeft,
+            appointmentTypes: typeMap[t.availability_id] ?? [],
+            professorAvailabilityStatus: t.availability_status,
+          });
+        }
       }
+
+      slots.sort((a, b) => a.date.localeCompare(b.date) || a.professorId - b.professorId);
 
       res.json({ slots });
     } catch (error) {
@@ -1928,32 +1948,37 @@ router.get(
 );
 
 // POST /api/student/appointments/book-slot
-// Body: { availabilityId, purpose, appointmentType? }
-// Occupies one spot in the professor's availability window (first come, first served).
+// Body: { availabilityId, appointmentDate, purpose, appointmentType? }
+// availabilityId identifies the recurring weekly template (faculty_availability);
+// appointmentDate is the specific projected date the student is booking into,
+// since one template now spans many possible calendar dates.
+// Occupies one spot in that (template, date) pair (first come, first served).
 router.post(
   "/appointments/book-slot",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { availabilityId, purpose, appointmentType } = req.body;
+    const { availabilityId, appointmentDate, purpose, appointmentType } = req.body;
 
-    if (!availabilityId || !purpose?.trim()) {
+    if (!availabilityId || !appointmentDate || !purpose?.trim()) {
       return res.status(400).json({
-        error: "availabilityId and purpose are required",
+        error: "availabilityId, appointmentDate, and purpose are required",
       });
+    }
+    if (appointmentDate < new Date().toISOString().split("T")[0]) {
+      return res.status(400).json({ error: "Appointment date cannot be in the past" });
     }
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
-      // Lock the availability window row to prevent race conditions
+      // Lock the recurring template row to prevent race conditions
       const [[slot]] = await conn.query(
-        `SELECT id, faculty_id, available_date, start_time, end_time,
-                max_students, status
-         FROM faculty_date_availability
-         WHERE id = ?
+        `SELECT availability_id, faculty_id, day_of_week, start_time, end_time, max_students
+         FROM faculty_availability
+         WHERE availability_id = ?
          FOR UPDATE`,
         [availabilityId],
       );
@@ -1962,33 +1987,44 @@ router.post(
         await conn.rollback();
         return res.status(404).json({ error: "Availability slot not found" });
       }
-      if (slot.status === "closed") {
+
+      // The chosen date must actually fall on this template's weekday —
+      // guards against a tampered/stale request pairing a template with an
+      // unrelated date.
+      const weekday = WEEKDAY_NAMES[new Date(`${appointmentDate}T00:00:00`).getDay()];
+      if (weekday !== slot.day_of_week) {
         await conn.rollback();
-        return res.status(409).json({ error: "This availability slot is closed" });
+        return res.status(400).json({ error: `${appointmentDate} is not a ${slot.day_of_week}` });
       }
 
-      const slotDateStr =
-        slot.available_date instanceof Date
-          ? slot.available_date.toISOString().split("T")[0]
-          : String(slot.available_date).split("T")[0];
+      // Guard against the professor toggling themselves unavailable between
+      // the student loading the slot list and submitting this booking.
+      const [[facultyStatus]] = await conn.query(
+        `SELECT availability_status FROM faculty WHERE faculty_id = ?`,
+        [slot.faculty_id],
+      );
+      if (facultyStatus?.availability_status === "unavailable") {
+        await conn.rollback();
+        return res.status(409).json({ error: "This professor is currently unavailable for booking" });
+      }
 
-      // Enforce capacity: count active bookings for this window
+      // Enforce capacity: count active bookings for this (template, date) pair
       const [[{ total }]] = await conn.query(
         `SELECT COUNT(*) AS total FROM appointments
-         WHERE availability_id = ? AND status NOT IN ('cancelled', 'rejected')`,
-        [availabilityId],
+         WHERE availability_id = ? AND appointment_date = ? AND status NOT IN ('cancelled', 'rejected')`,
+        [availabilityId, appointmentDate],
       );
       if (slot.max_students != null && total >= slot.max_students) {
         await conn.rollback();
         return res.status(409).json({ error: "This availability window is fully booked" });
       }
 
-      // Guard: student cannot book the same availability window twice
+      // Guard: student cannot book the same (template, date) pair twice
       const [[dup]] = await conn.query(
         `SELECT appointment_id FROM appointments
-         WHERE student_id = ? AND availability_id = ?
+         WHERE student_id = ? AND availability_id = ? AND appointment_date = ?
            AND status NOT IN ('cancelled', 'rejected')`,
-        [studentId, availabilityId],
+        [studentId, availabilityId, appointmentDate],
       );
       if (dup) {
         await conn.rollback();
@@ -1997,13 +2033,13 @@ router.post(
         });
       }
 
-      // Validate appointmentType against the slot's linked services (if any)
-      const [slotServices] = await conn.query(
-        `SELECT ss.service_id FROM slot_services ss
-         WHERE ss.availability_id = ?`,
+      // Validate appointmentType against the template's linked services (if any)
+      const [tmplServices] = await conn.query(
+        `SELECT fas.service_id FROM faculty_availability_services fas
+         WHERE fas.availability_id = ?`,
         [availabilityId],
       );
-      const validServiceIds = slotServices.map((r) => r.service_id);
+      const validServiceIds = tmplServices.map((r) => r.service_id);
       const chosenServiceId = appointmentType ? parseInt(appointmentType, 10) : null;
       if (validServiceIds.length > 0 && !chosenServiceId) {
         await conn.rollback();
@@ -2037,7 +2073,7 @@ router.post(
           facultyRow.department_id,
           chosenServiceId,
           availabilityId,
-          slotDateStr,
+          appointmentDate,
           appointmentTime,
           purpose.trim(),
         ],
@@ -2048,15 +2084,15 @@ router.post(
       const [[newRow]] = await pool.query(
         `SELECT
            a.appointment_id, a.appointment_date, a.status, a.notes,
-           fda.start_time AS window_start, fda.end_time AS window_end,
+           fa.start_time AS window_start, fa.end_time AS window_end,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.specialization AS faculty_role,
            d.department_name AS college,
-           fda.location
+           fa.location
          FROM appointments a
          JOIN faculty f ON a.faculty_id = f.faculty_id
          JOIN departments d ON f.department_id = d.department_id
-         JOIN faculty_date_availability fda ON a.availability_id = fda.id
+         JOIN faculty_availability fa ON a.availability_id = fa.availability_id
          WHERE a.appointment_id = ?`,
         [result.insertId],
       );
