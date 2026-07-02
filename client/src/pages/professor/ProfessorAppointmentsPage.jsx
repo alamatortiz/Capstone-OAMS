@@ -255,6 +255,30 @@ const TAB_ICON_MAP = {
   rejected: XCircle,
 };
 
+const ALL_RANGE_LABELS = {
+  week: "This Week",
+  month: "This Month",
+  all: "All Time",
+};
+
+// Week starts on Sunday, matching the appointment booking calendar elsewhere in the app.
+function getWeekRange(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+  return { start, end };
+}
+
+function getMonthRange(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+}
+
+function isWithinRange(dateStr, range) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d >= range.start && d <= range.end;
+}
+
 // ── AppointmentCard ────────────────────────────────────────────────────────────
 function AppointmentCard({
   appointment,
@@ -315,10 +339,6 @@ function AppointmentCard({
         <div className="appt-info-field">
           <label>Type</label>
           <p>{appointment.type === "online" ? "Online" : "In-Person"}</p>
-        </div>
-        <div className="appt-info-field">
-          <label>Duration</label>
-          <p>{appointment.duration || "—"}</p>
         </div>
         {appointment.location && (
           <div className="appt-info-field appt-info-field--full">
@@ -413,6 +433,7 @@ export default function ProfessorAppointmentsPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [activeTab, setActiveTab] = useState("all");
+  const [allRange, setAllRange] = useState("week");
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -444,9 +465,16 @@ export default function ProfessorAppointmentsPage() {
 
   const TABS = ["all", "pending", "approved", "completed", "rejected"];
 
+  const allRangeAppointments =
+    allRange === "all"
+      ? appointments
+      : appointments.filter((a) =>
+          isWithinRange(a.date, allRange === "week" ? getWeekRange() : getMonthRange()),
+        );
+
   const filteredAppointments =
     activeTab === "all"
-      ? appointments
+      ? allRangeAppointments
       : appointments.filter((a) => a.status === activeTab);
 
   const updateStatus = async (id, status, successMsg, errorMsg) => {
@@ -674,10 +702,43 @@ export default function ProfessorAppointmentsPage() {
             <div className="appt-tabs-list">
               {TABS.map((tab) => {
                 const TabIcon = TAB_ICON_MAP[tab];
-                const count =
-                  tab === "all"
-                    ? appointments.length
-                    : appointments.filter((a) => a.status === tab).length;
+
+                if (tab === "all") {
+                  return (
+                    <div
+                      key={tab}
+                      role="button"
+                      tabIndex={0}
+                      className={`appt-tab-trigger appt-tab-trigger--dropdown${activeTab === tab ? " active" : ""}`}
+                      onClick={() => setActiveTab("all")}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") setActiveTab("all");
+                      }}
+                    >
+                      {TabIcon && <TabIcon className="appt-tab-icon" />}
+                      <select
+                        className="appt-range-select"
+                        value={allRange}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          setAllRange(e.target.value);
+                          setActiveTab("all");
+                        }}
+                      >
+                        {Object.entries(ALL_RANGE_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="appt-tab-count">
+                        {loading ? "—" : allRangeAppointments.length}
+                      </span>
+                    </div>
+                  );
+                }
+
+                const count = appointments.filter((a) => a.status === tab).length;
                 return (
                   <button
                     key={tab}

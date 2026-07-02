@@ -82,7 +82,7 @@
 
 /* ── Scanner viewport ────────────────────────────────────────────────────── */
 .asd-scanner-viewport {
-  background: #0f172a;
+  background: var(--input-background);
   border-radius: 0.5rem;
   min-height: 300px;
   display: flex;
@@ -149,14 +149,14 @@
 
 .asd-scanner-hint {
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin: 0;
   text-align: center;
 }
 
 .asd-scanner-hint-small {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-tertiary);
   margin: 0;
   text-align: center;
 }
@@ -199,8 +199,8 @@
 .asd-input {
   flex: 1;
   padding: 0.65rem 0.85rem;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
   border-radius: 0.4rem;
   color: var(--text-primary, #f1f5f9);
   font-size: 0.875rem;
@@ -209,11 +209,11 @@
 }
 
 .asd-input:focus {
-  border-color: #22c55e;
+  border-color: var(--primary-color);
 }
 
 .asd-input::placeholder {
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .asd-btn-verify {
@@ -241,7 +241,7 @@
 
 .asd-quick-label {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-tertiary);
   margin: 0;
 }
 
@@ -253,10 +253,10 @@
 
 .asd-quick-code-btn {
   padding: 0.3rem 0.65rem;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
   border-radius: 0.3rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   font-size: 0.75rem;
   cursor: pointer;
   transition:
@@ -265,8 +265,8 @@
 }
 
 .asd-quick-code-btn:hover {
-  border-color: #22c55e;
-  color: #22c55e;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 /* ── Recent Scans ────────────────────────────────────────────────────────── */
@@ -278,9 +278,9 @@
 
 .asd-recent-item {
   padding: 0.75rem;
-  background: #0f172a;
+  background: var(--input-background);
   border-radius: 0.5rem;
-  border: 1px solid #1e293b;
+  border: 1px solid var(--card-border);
 }
 
 .asd-recent-info {
@@ -303,7 +303,7 @@
 
 .asd-recent-doctype {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -316,12 +316,12 @@
 
 .asd-recent-tracking {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .asd-recent-time {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 /* ── Status badges ───────────────────────────────────────────────────────── */
@@ -364,7 +364,7 @@
 
 .asd-tips-list li {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   padding-left: 0.85rem;
   position: relative;
 }
@@ -373,7 +373,7 @@
   content: "•";
   position: absolute;
   left: 0;
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 /* ── Modal ───────────────────────────────────────────────────────────────── */
@@ -389,7 +389,7 @@
 }
 
 .asd-modal {
-  background: #1e293b;
+  background: var(--card-bg);
   border-radius: 0.75rem;
   width: 100%;
   max-width: 600px;
@@ -412,13 +412,13 @@
 .asd-modal-title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--text-primary);
   margin: 0 0 0.2rem 0;
 }
 
 .asd-modal-subtitle {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -429,7 +429,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #94a3b8;
+  color: var(--text-secondary);
   padding: 0.2rem;
   border-radius: 0.25rem;
   display: flex;
@@ -438,7 +438,7 @@
 }
 
 .asd-modal-close:hover {
-  color: #f1f5f9;
+  color: var(--text-primary);
 }
 
 .asd-modal-close svg {
@@ -504,7 +504,7 @@
 
 .asd-meta-label {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -512,7 +512,7 @@
 .asd-meta-value {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--text-primary);
 }
 
 .asd-doc-content-section {
@@ -524,20 +524,20 @@
 .asd-doc-content-title {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .asd-doc-content-pre {
-  background: #0f172a;
+  background: var(--input-background);
   border-radius: 0.4rem;
   padding: 1rem;
   font-size: 0.78rem;
-  color: #cbd5e1;
+  color: var(--text-secondary);
   white-space: pre-wrap;
   font-family: "Courier New", monospace;
   line-height: 1.6;
-  border: 1px solid #1e293b;
+  border: 1px solid var(--card-border);
   margin: 0;
   max-height: 260px;
   overflow-y: auto;
@@ -551,20 +551,20 @@
 
 .asd-modal-footer-info p {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .asd-modal-footer-info strong {
-  color: #f1f5f9;
+  color: var(--text-primary);
 }
 
 .asd-modal-actions {
   display: flex;
   gap: 0.65rem;
   padding: 1rem 1.25rem;
-  border-top: 1px solid #334155;
-  background: #1e293b;
+  border-top: 1px solid var(--card-border);
+  background: var(--card-bg);
 }
 
 .asd-btn-print,
@@ -584,23 +584,25 @@
 }
 
 .asd-btn-print {
-  background: #0f172a;
-  color: #f1f5f9;
-  border: 1px solid #334155;
+  background: var(--input-background);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
 }
 
 .asd-btn-print:hover {
-  background: #1e293b;
+  background: var(--card-bg);
+  border-color: var(--primary-color);
 }
 
 .asd-btn-download {
-  background: #0f172a;
-  color: #f1f5f9;
-  border: 1px solid #334155;
+  background: var(--input-background);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
 }
 
 .asd-btn-download:hover {
-  background: #1e293b;
+  background: var(--card-bg);
+  border-color: var(--primary-color);
 }
 
 .asd-btn-close-modal {
@@ -619,9 +621,9 @@
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
-  background: #1e293b;
-  border: 1px solid #22c55e;
-  color: #22c55e;
+  background: var(--card-bg);
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   display: flex;

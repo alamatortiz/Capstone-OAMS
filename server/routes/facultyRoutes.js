@@ -235,7 +235,10 @@ router.get(
         studentId: r.student_number,
         course: r.course,
         purpose: r.purpose ?? r.notes ?? "No notes provided",
-        date: r.appointment_date,
+        date:
+          r.appointment_date instanceof Date
+            ? r.appointment_date.toISOString().split("T")[0]
+            : String(r.appointment_date).split("T")[0],
         time: formatTime(r.appointment_time),
         status: r.status,
         notes: r.notes,
