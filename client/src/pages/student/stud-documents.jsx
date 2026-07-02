@@ -1,16 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import { Link, useNavigate } from "react-router-dom";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
-import ucLogo from "../../assets/Pnc-Logo.png";
-import oamsLogo from "../../assets/oams_logo.png";
+import StudentSidebar from "../../components/StudentSidebar";
 import { toast } from "sonner";
 import "./stud-documents.css";
 import api from "../../utils/api";
 
-import { applyTheme, getSavedTheme } from "../../utils/theme";
-import { Megaphone as LucideMegaphone, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 // ─── Document Object Structure (JSDoc) ────────────────────────────────────
 /**
@@ -27,111 +23,12 @@ import { Megaphone as LucideMegaphone, ChevronLeft } from "lucide-react";
  */
 
 // ─── Icons ────────────────────────────────────────────────────────────────
-const HomeIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-  </svg>
-);
-
-const QueueIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-    <circle cx="9" cy="7" r="4"></circle>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-  </svg>
-);
-
-const CalendarIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-    <line x1="16" y1="2" x2="16" y2="6"></line>
-    <line x1="8" y1="2" x2="8" y2="6"></line>
-    <line x1="3" y1="10" x2="21" y2="10"></line>
-  </svg>
-);
-
-const DocumentIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="12" y1="13" x2="12" y2="17"></line>
-    <line x1="9" y1="15" x2="15" y2="15"></line>
-  </svg>
-);
-
-const HistoryIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-    <line x1="8" y1="11" x2="16" y2="11"></line>
-    <line x1="8" y1="15" x2="12" y2="15"></line>
-  </svg>
-);
-
-const LogOutIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-    <polyline points="16 17 21 12 16 7"></polyline>
-    <line x1="21" y1="12" x2="9" y2="12"></line>
-  </svg>
-);
-
-const MenuIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="3" y1="6" x2="21" y2="6"></line>
-    <line x1="3" y1="12" x2="21" y2="12"></line>
-    <line x1="3" y1="18" x2="21" y2="18"></line>
-  </svg>
-);
-
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
-
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-    <circle cx="12" cy="7" r="4"></circle>
-  </svg>
-);
-
-const SunIcon = () => (
-  <svg
-    className="sun-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="5"></circle>
-    <line x1="12" y1="1" x2="12" y2="3"></line>
-    <line x1="12" y1="21" x2="12" y2="23"></line>
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-    <line x1="1" y1="12" x2="3" y2="12"></line>
-    <line x1="21" y1="12" x2="23" y2="12"></line>
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-  </svg>
-);
-
-const MoonIcon = () => (
-  <svg
-    className="moon-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-  </svg>
-);
-const MegaphoneNavIcon = () => <LucideMegaphone />;
 
 const FileTextIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -202,31 +99,9 @@ const SendIcon = () => (
 
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function DocumentsPage() {
-  const { user: authUser, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const user = authUser
-    ? {
-        ...authUser,
-        college: authUser.departmentName ?? "N/A College",
-        studentNumber: authUser.studentNumber ?? "N/A Student Number",
-        departmentAbbrev: authUser.departmentAbbrev ?? "N/A Abbreviation",
-        course: authUser.course ?? "N/A Course",
-      }
-    : {
-        name: "Student",
-        role: "student",
-        college: "",
-        studentId: "",
-        studentNumber: "N/A Student Number",
-        departmentAbbrev: "",
-        course: "",
-      };
 
   // ── State ───────────────────────────────────────────────────────────────
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [activeTab, setActiveTab] = useState("active");
   const [documents, setDocuments] = useState([]);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -261,10 +136,6 @@ export default function DocumentsPage() {
   const messageIdRef = useRef(1);
 
   // ── Effects ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    applyTheme(isDark ? "dark" : "light");
-  }, [isDark]);
-
   useEffect(() => {
     const fetchServiceTypes = async () => {
       setFormOptionsLoading(true);
@@ -304,18 +175,6 @@ export default function DocumentsPage() {
   }, []);
 
   // ── Handlers ────────────────────────────────────────────────────────────
-  const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
-  };
-
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const handleLogout = () => setShowLogoutConfirm(true);
-  const confirmLogout = () => { logout(); navigate("/login"); };
-
   const handleSubmitRequest = async () => {
     if (!formData.type || !formData.college || !formData.purpose) {
       toast.error("Please fill in all required fields");
@@ -460,128 +319,10 @@ export default function DocumentsPage() {
     (doc) => doc.status === "claimed" || doc.status === "rejected",
   );
 
-  const navItems = [
-    { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
-    { icon: MegaphoneNavIcon, label: "Announcements", path: "/student/announcements" },
-    { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
-    {
-      icon: CalendarIconNav,
-      label: "Appointments",
-      path: "/student/appointments",
-    },
-    { icon: DocumentIconNav, label: "Documents", path: "/student/documents" },
-    {
-      icon: HistoryIconNav,
-      label: "Transactions",
-      path: "/student/transactions",
-    },
-  ];
-
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="documents-container">
-      {/* Sidebar */}
-      <aside className={`doc-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="doc-sidebar-inner">
-          <div className="doc-sidebar-logo">
-            <div className="doc-logo-container">
-              <img src={ucLogo} alt="UC Logo" className="doc-logo-img" />
-              <img
-                src={oamsLogo}
-                alt="OAMS Logo"
-                className="doc-logo-img doc-oams-logo"
-              />
-            </div>
-            <button
-              className="doc-theme-toggle"
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-          </div>
-
-          <div className="doc-sidebar-user">
-            <div className="doc-user-top">
-              <div className="doc-user-avatar">
-                <UserIcon />
-              </div>
-              <div className="doc-user-info">
-                <p className="doc-user-name">{user?.name ?? "Student"}</p>
-                <span className="doc-user-role">Student</span>
-              </div>
-            </div>
-            <div className="doc-user-college">
-              <p className="doc-college-text">
-                {user?.college} ({user?.departmentAbbrev})
-              </p>
-            </div>
-          </div>
-
-          <nav className="doc-sidebar-nav">
-            <div className="doc-nav-items">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`doc-nav-item ${location.pathname === item.path ? "active" : ""}`}
-                  title={item.label}
-                >
-                  <item.icon className="doc-nav-icon" />
-                  <span className="doc-nav-label">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </nav>
-
-          <div className="doc-sidebar-logout">
-            <button className="doc-logout-btn" onClick={handleLogout}>
-              <LogOutIcon />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile Header */}
-      <header className="doc-mobile-header">
-        <div className="doc-mobile-header-content">
-          <div className="doc-mobile-logo">
-            <img src={ucLogo} alt="UC Logo" className="doc-logo-img" />
-            <img
-              src={oamsLogo}
-              alt="OAMS Logo"
-              className="doc-logo-img doc-oams-logo"
-            />
-          </div>
-          <div className="doc-mobile-header-actions">
-            <button
-              className="doc-theme-toggle"
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button
-              className="doc-sidebar-toggle"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Toggle sidebar"
-            >
-              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Sidebar Overlay */}
-      {sidebarOpen && (
-        <div
-          className="doc-sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <StudentSidebar />
 
       {/* Main Content */}
       <main className="doc-main">
@@ -990,7 +731,6 @@ export default function DocumentsPage() {
           <ChatIcon />
         </button>
       </div>
-      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }
