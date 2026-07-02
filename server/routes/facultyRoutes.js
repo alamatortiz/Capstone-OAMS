@@ -15,6 +15,12 @@ router.get(
     const facultyId = req.user.userId;
 
     try {
+      // 0. Current availability status (global Available/Unavailable toggle)
+      const [[statusRow]] = await pool.query(
+        "SELECT availability_status FROM faculty WHERE faculty_id = ?",
+        [facultyId],
+      );
+
       // 1. Pending + today's appointments
       const [[apptRow]] = await pool.query(
         `SELECT
@@ -91,6 +97,7 @@ router.get(
       );
 
       res.json({
+        availabilityStatus: statusRow?.availability_status ?? "available",
         stats: {
           pendingAppointments: apptRow.pending_count || 0,
           todayAppointments: apptRow.today_count || 0,
@@ -119,6 +126,33 @@ router.get(
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/faculty/availability-status
+// Global Available/Unavailable toggle. When 'unavailable', the professor's
+// weekly slots are hidden from student browsing/booking without deleting them.
+// Body: { status: 'available' | 'unavailable' }
+router.patch(
+  "/availability-status",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { status } = req.body;
+    if (!["available", "unavailable"].includes(status)) {
+      return res.status(400).json({ message: "status must be 'available' or 'unavailable'" });
+    }
+    try {
+      await pool.query(
+        "UPDATE faculty SET availability_status = ? WHERE faculty_id = ?",
+        [status, facultyId],
+      );
+      res.json({ message: "Availability status updated", availabilityStatus: status });
+    } catch (err) {
+      console.error("PATCH /availability-status error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
     }
   },
 );
@@ -317,6 +351,9 @@ router.get(
 
 // ─────────────────────────────────────────────────────────────
 // SCHEDULE / AVAILABILITY
+// Recurring weekly schedule: faculty sets a day-of-week + time
+// window (with location, capacity, and appointment types) that
+// repeats every week until edited or removed.
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/faculty/availability
@@ -331,7 +368,25 @@ router.get(
         "SELECT * FROM faculty_availability WHERE faculty_id = ? ORDER BY FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'), start_time",
         [facultyId]
       );
-      res.json(rows);
+
+      if (rows.length === 0) return res.json([]);
+
+      // Attach appointment services (types) offered for each recurring slot
+      const ids = rows.map((r) => r.availability_id);
+      const [svcRows] = await pool.query(
+        `SELECT fas.availability_id, aps.service_id, aps.service_name
+         FROM faculty_availability_services fas
+         JOIN appointment_services aps ON fas.service_id = aps.service_id
+         WHERE fas.availability_id IN (?)
+         ORDER BY fas.id ASC`,
+        [ids]
+      );
+      const svcMap = {};
+      for (const s of svcRows) {
+        (svcMap[s.availability_id] ||= []).push({ id: s.service_id, name: s.service_name });
+      }
+      const result = rows.map((r) => ({ ...r, appointmentTypes: svcMap[r.availability_id] ?? [] }));
+      res.json(result);
     } catch (err) {
       console.error("GET /availability error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
@@ -340,29 +395,83 @@ router.get(
 );
 
 // POST /api/faculty/availability
+// Body: { day_of_week, start_time, end_time, location, max_students, appointmentTypes? }
 router.post(
   "/availability",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { day_of_week, start_time, end_time, location } = req.body;
+    const { day_of_week, start_time, end_time, location, max_students, appointmentTypes } = req.body;
     if (!day_of_week || !start_time || !end_time) {
       return res.status(400).json({ message: "day_of_week, start_time, end_time are required" });
     }
+    if (end_time <= start_time) {
+      return res.status(400).json({ message: "end_time must be after start_time" });
+    }
+
+    if (max_students == null || max_students === "") {
+      return res.status(400).json({ message: "max_students is required" });
+    }
+    const maxStu = parseInt(max_students, 10);
+    if (isNaN(maxStu) || maxStu < 1) {
+      return res.status(400).json({ message: "max_students must be a positive integer" });
+    }
+
+    // Sanitize appointment types: unique, non-empty strings, max 20
+    const types = Array.isArray(appointmentTypes)
+      ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
+      : [];
+
     try {
-      const [existing] = await pool.query(
-        "SELECT availability_id FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ? AND start_time = ? AND end_time = ?",
-        [facultyId, day_of_week, start_time, end_time]
+      // Reject any slot whose window intersects an existing slot on the same
+      // day — a professor can't run two overlapping consultation blocks at
+      // once (different rooms/caps/types would make booking ambiguous).
+      const [sameDay] = await pool.query(
+        "SELECT start_time, end_time FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ?",
+        [facultyId, day_of_week]
       );
-      if (existing.length > 0) {
-        return res.status(409).json({ message: "A slot with the same day and time already exists" });
+      const overlap = sameDay.find((s) => {
+        const sStart = String(s.start_time).slice(0, 5);
+        const sEnd = String(s.end_time).slice(0, 5);
+        return start_time < sEnd && sStart < end_time;
+      });
+      if (overlap) {
+        return res.status(409).json({
+          message: `This time overlaps an existing slot on ${day_of_week} (${String(overlap.start_time).slice(0, 5)}–${String(overlap.end_time).slice(0, 5)})`,
+        });
       }
       const [result] = await pool.query(
-        "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location) VALUES (?,?,?,?,?)",
-        [facultyId, day_of_week, start_time, end_time, location ?? null]
+        "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES (?,?,?,?,?,?)",
+        [facultyId, day_of_week, start_time, end_time, location ?? null, maxStu]
       );
-      res.status(201).json({ availability_id: result.insertId, message: "Availability added" });
+      const newId = result.insertId;
+      const linkedServices = [];
+      for (const name of types) {
+        // Find existing service for this faculty with the same name, or create it
+        let [[svc]] = await pool.query(
+          "SELECT service_id, service_name FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
+          [facultyId, name]
+        );
+        if (!svc) {
+          const [ins] = await pool.query(
+            "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
+            [name, facultyId]
+          );
+          svc = { service_id: ins.insertId, service_name: name };
+        }
+        await pool.query(
+          "INSERT IGNORE INTO faculty_availability_services (availability_id, service_id) VALUES (?, ?)",
+          [newId, svc.service_id]
+        );
+        linkedServices.push({ id: svc.service_id, name: svc.service_name });
+      }
+      res.status(201).json({
+        availability_id: newId,
+        message: "Availability added",
+        max_students: maxStu,
+        appointmentTypes: linkedServices,
+      });
     } catch (err) {
       console.error("POST /availability error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
@@ -371,6 +480,7 @@ router.post(
 );
 
 // PATCH /api/faculty/availability/:id
+// Body: { day_of_week?, start_time?, end_time?, location?, max_students?, appointmentTypes? }
 router.patch(
   "/availability/:id",
   authenticateToken,
@@ -378,18 +488,85 @@ router.patch(
   async (req, res) => {
     const facultyId = req.user.userId;
     const { id } = req.params;
-    const { day_of_week, start_time, end_time, location } = req.body;
+    const { day_of_week, start_time, end_time, location, max_students, appointmentTypes } = req.body;
+
+    let maxStu;
+    if (max_students !== undefined) {
+      maxStu = parseInt(max_students, 10);
+      if (isNaN(maxStu) || maxStu < 1) {
+        return res.status(400).json({ message: "max_students must be a positive integer" });
+      }
+    }
+
+    const replaceTypes = Array.isArray(appointmentTypes);
+    const types = replaceTypes
+      ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
+      : null;
+
     try {
+      const [[current]] = await pool.query(
+        "SELECT day_of_week, start_time, end_time FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
+        [id, facultyId]
+      );
+      if (!current) return res.status(404).json({ message: "Availability not found" });
+
+      // Resolve the effective day/time window this edit would produce (falling
+      // back to the current row for any field not included in the request),
+      // then apply the same overlap rule as creation — see POST /availability.
+      const effectiveDay = day_of_week ?? current.day_of_week;
+      const effectiveStart = start_time ?? String(current.start_time).slice(0, 5);
+      const effectiveEnd = end_time ?? String(current.end_time).slice(0, 5);
+      if (effectiveEnd <= effectiveStart) {
+        return res.status(400).json({ message: "end_time must be after start_time" });
+      }
+
+      const [sameDay] = await pool.query(
+        "SELECT start_time, end_time FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ? AND availability_id != ?",
+        [facultyId, effectiveDay, id]
+      );
+      const overlap = sameDay.find((s) => {
+        const sStart = String(s.start_time).slice(0, 5);
+        const sEnd = String(s.end_time).slice(0, 5);
+        return effectiveStart < sEnd && sStart < effectiveEnd;
+      });
+      if (overlap) {
+        return res.status(409).json({
+          message: `This time overlaps an existing slot on ${effectiveDay} (${String(overlap.start_time).slice(0, 5)}–${String(overlap.end_time).slice(0, 5)})`,
+        });
+      }
+
       const [result] = await pool.query(
         `UPDATE faculty_availability
          SET day_of_week = COALESCE(?, day_of_week),
              start_time = COALESCE(?, start_time),
              end_time = COALESCE(?, end_time),
-             location = COALESCE(?, location)
+             location = COALESCE(?, location),
+             max_students = COALESCE(?, max_students)
          WHERE availability_id = ? AND faculty_id = ?`,
-        [day_of_week ?? null, start_time ?? null, end_time ?? null, location ?? null, id, facultyId]
+        [day_of_week ?? null, start_time ?? null, end_time ?? null, location ?? null, maxStu ?? null, id, facultyId]
       );
       if (result.affectedRows === 0) return res.status(404).json({ message: "Availability not found" });
+
+      if (replaceTypes) {
+        await pool.query("DELETE FROM faculty_availability_services WHERE availability_id = ?", [id]);
+        for (const name of types) {
+          let [[svc]] = await pool.query(
+            "SELECT service_id FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
+            [facultyId, name]
+          );
+          if (!svc) {
+            const [ins] = await pool.query(
+              "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
+              [name, facultyId]
+            );
+            svc = { service_id: ins.insertId };
+          }
+          await pool.query(
+            "INSERT IGNORE INTO faculty_availability_services (availability_id, service_id) VALUES (?, ?)",
+            [id, svc.service_id]
+          );
+        }
+      }
       res.json({ message: "Availability updated" });
     } catch (err) {
       console.error("PATCH /availability/:id error:", err);

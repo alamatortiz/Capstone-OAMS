@@ -40,6 +40,7 @@ TRUNCATE TABLE appointment_services;
 TRUNCATE TABLE slot_services;
 TRUNCATE TABLE faculty_date_availability;
 TRUNCATE TABLE faculty_blocked_dates;
+TRUNCATE TABLE faculty_availability_services;
 TRUNCATE TABLE faculty_availability;
 TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
@@ -681,31 +682,54 @@ UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 110;
 UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 111;
 
 -- ─────────────────────────────────────────────────────────────
--- SECTION 14 · FACULTY AVAILABILITY (consultation hours)
+-- SECTION 14 · FACULTY AVAILABILITY (recurring weekly consultation hours)
+-- Insertion order determines auto-increment IDs (used in Section 14D):
+--   102 Ogalesco   : IDs 1–4
+--   106 Bicua      : IDs 5–8
+--   107 Tan        : IDs 9–12
+--   110 Villanueva : IDs 13–15
+--   111 Dela Cruz  : IDs 16–17
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location) VALUES
--- 102 Patrick Ogalesco
-(102, 'Monday',    '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
-(102, 'Monday',    '14:00:00', '17:00:00', 'CCS Faculty Room 201'),
-(102, 'Wednesday', '09:00:00', '12:00:00', 'CCS Faculty Room 201'),
-(102, 'Friday',    '13:00:00', '16:00:00', 'CCS Faculty Room 201'),
--- 106 Marvin Bicua
-(106, 'Tuesday',   '10:00:00', '12:00:00', 'CCS Faculty Room 203'),
-(106, 'Tuesday',   '14:00:00', '17:00:00', 'CCS Faculty Room 203'),
-(106, 'Thursday',  '09:00:00', '11:00:00', 'CCS Faculty Room 203'),
-(106, 'Thursday',  '13:00:00', '16:00:00', 'CCS Faculty Room 203'),
--- 107 Janus Raymond Tan
-(107, 'Monday',    '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-(107, 'Wednesday', '10:00:00', '12:00:00', 'CCS Dean\'s Office'),
-(107, 'Wednesday', '14:00:00', '16:00:00', 'CCS Dean\'s Office'),
-(107, 'Friday',    '09:00:00', '12:00:00', 'CCS Dean\'s Office'),
--- 110 Lena Villanueva
-(110, 'Monday',    '13:00:00', '17:00:00', 'CCS Faculty Room 105'),
-(110, 'Wednesday', '10:00:00', '12:00:00', 'CCS Faculty Room 105'),
-(110, 'Friday',    '14:00:00', '17:00:00', 'CCS Faculty Room 105'),
--- 111 Marco Dela Cruz
-(111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401'),
-(111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401');
+INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES
+-- 102 Patrick Ogalesco: max 5 students
+(102, 'Monday',    '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
+(102, 'Monday',    '14:00:00', '17:00:00', 'CCS Faculty Room 201', 5),
+(102, 'Wednesday', '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
+(102, 'Friday',    '13:00:00', '16:00:00', 'CCS Faculty Room 201', 5),
+-- 106 Marvin Bicua: indefinite capacity
+(106, 'Tuesday',   '10:00:00', '12:00:00', 'CCS Faculty Room 203', NULL),
+(106, 'Tuesday',   '14:00:00', '17:00:00', 'CCS Faculty Room 203', NULL),
+(106, 'Thursday',  '09:00:00', '11:00:00', 'CCS Faculty Room 203', NULL),
+(106, 'Thursday',  '13:00:00', '16:00:00', 'CCS Faculty Room 203', NULL),
+-- 107 Janus Raymond Tan: max 3 students
+(107, 'Monday',    '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
+(107, 'Wednesday', '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
+(107, 'Wednesday', '14:00:00', '16:00:00', 'CCS Dean\'s Office', 3),
+(107, 'Friday',    '09:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
+-- 110 Lena Villanueva: max 5 students
+(110, 'Monday',    '13:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
+(110, 'Wednesday', '10:00:00', '12:00:00', 'CCS Faculty Room 105', 5),
+(110, 'Friday',    '14:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
+-- 111 Marco Dela Cruz: indefinite capacity
+(111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401', NULL),
+(111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401', NULL);
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 14D · WEEKLY AVAILABILITY SERVICES
+-- Links appointment_services types to recurring weekly slots.
+-- IDs reference Section 14 insertion order above.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_availability_services (availability_id, service_id) VALUES
+-- Prof 102 (Ogalesco): Web Dev (1) + Mobile App (2) on all slots
+(1,1), (1,2), (2,1), (2,2), (3,1), (3,2), (4,1), (4,2),
+-- Prof 106 (Bicua): DB Design (3) on all slots
+(5,3), (6,3), (7,3), (8,3),
+-- Prof 107 (Tan): Backend Architecture (4) on all slots
+(9,4), (10,4), (11,4), (12,4),
+-- Prof 110 (Villanueva): Software Engineering (5) on all slots
+(13,5), (14,5), (15,5),
+-- Prof 111 (Dela Cruz): Network Security (6) on all slots
+(16,6), (17,6);
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 14B · FACULTY DATE-SPECIFIC AVAILABILITY
