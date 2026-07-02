@@ -975,7 +975,8 @@ export default function QueueStatusPage() {
                     <Users className="queue-empty-icon" />
                     <h3 className="queue-empty-title">No Active Queues</h3>
                     <p className="queue-empty-text">
-                      You haven't joined any queues yet today.
+                      You're not currently in any queues. Browse available
+                      queues to join one.
                     </p>
                     <button
                       onClick={() => navigate("/student/queue")}
@@ -991,7 +992,7 @@ export default function QueueStatusPage() {
                         fontWeight: 600,
                       }}
                     >
-                      Browse Services
+                      Join a Queue
                     </button>
                   </div>
                 )}

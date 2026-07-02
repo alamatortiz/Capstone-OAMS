@@ -816,23 +816,23 @@ body {
 .qt-empty-state {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 1rem;
+  border-radius: 1.125rem;
   padding: 3rem 1.5rem;
   text-align: center;
   transition: all 0.3s ease;
 }
 
 .qt-empty-icon {
-  width: 4rem;
-  height: 4rem;
+  width: 3rem;
+  height: 3rem;
   margin: 0 auto 1rem;
   color: var(--text-tertiary);
-  opacity: 0.5;
   stroke: currentColor;
+  transition: color 0.3s ease;
 }
 
 .qt-empty-title {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 0.5rem;
@@ -840,8 +840,8 @@ body {
 }
 
 .qt-empty-description {
+  font-size: 0.875rem;
   color: var(--text-tertiary);
-  margin-bottom: 1.5rem;
   transition: color 0.3s ease;
 }
 
@@ -1148,6 +1148,17 @@ body {
   color: white;
   flex: 1;
   min-width: 150px;
+}
+
+/* Empty-state "Join a Queue" button mirrors queue-empty-state's compact,
+   inline-sized button instead of the full-width card-action sizing above. */
+.qt-empty-state .qt-primary-btn {
+  display: inline-flex;
+  flex: none;
+  width: auto;
+  min-width: 0;
+  padding: 0.75rem 1.5rem;
+  margin-top: 1rem;
 }
 
 .qt-primary-btn:hover {

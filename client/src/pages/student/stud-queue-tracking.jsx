@@ -17,7 +17,6 @@ import {
   Activity,
   BarChart3,
   History,
-  AlertCircle,
   Target,
   Loader2,
   ChevronLeft,
@@ -522,11 +521,11 @@ export default function QueueTrackingPage() {
                   </div>
                 ) : activeQueues.length === 0 ? (
                   <div className="qt-empty-state">
-                    <AlertCircle className="qt-empty-icon" />
+                    <Users className="qt-empty-icon" />
                     <h3 className="qt-empty-title">No Active Queues</h3>
                     <p className="qt-empty-description">
                       You're not currently in any queues. Browse available
-                      services to join one.
+                      queues to join one.
                     </p>
                     <Link
                       to="/student/queue"
