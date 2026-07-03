@@ -38,7 +38,6 @@ TRUNCATE TABLE service_requirements;
 TRUNCATE TABLE service_procedure_steps;
 TRUNCATE TABLE document_requirements;
 TRUNCATE TABLE appointment_services;
-TRUNCATE TABLE faculty_blocked_dates;
 TRUNCATE TABLE faculty_availability_services;
 TRUNCATE TABLE faculty_availability;
 TRUNCATE TABLE document_services;
@@ -454,6 +453,16 @@ INSERT INTO document_services (service_id, service_name, description, department
 (4, 'Clearance Processing',         'Process student clearance for graduation/leave',  3001, 'students', 'active',   0.00, '3-5 business days'),
 (5, 'Certificate of Employment',    'Official certificate of employment for faculty',  NULL, 'faculty',  'active',   0.00, '2-3 business days');
 
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 5c-REQ · DOCUMENT REQUIREMENTS
+-- Documents/items required for document (non-queue) service requests.
+-- Only service_id 5 is queried today (GET /api/faculty/document-services).
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES
+-- Certificate of Employment (service_id 5, faculty-only)
+(5, 'Completed COE Request Form', 'Certificate of Employment request form filled out in full', TRUE),
+(5, 'Valid Employee ID',          'Current school year faculty/employee ID',                    TRUE);
+
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 6 · QUEUE SLOTS (open slots for today)
@@ -463,14 +472,14 @@ INSERT INTO document_services (service_id, service_name, description, department
 --   Slot 2: queue_number 5    =  1 waiting entry    → current_count  1
 --   Slot 3: queue_number 3 (completed, not active)  → current_count  0
 --   Slot 4: queue_number 11 (completed, not active) → current_count  0
+--   Slot 5: no-show sweeper demo, 5-minute custom timeout (see Section 7)
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, status) VALUES
--- (1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 'open'),
--- (2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 'open'),
-(1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 0, 'open'),
-(2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  0, 'open'),
-(3, 3, 103, CURDATE(), '13:00:00', '17:00:00', 15,  0, 'open'),
-(4, 4, 103, CURDATE(), '08:00:00', '12:00:00', 20,  0, 'open');
+INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, no_show_timeout_minutes, status) VALUES
+(1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 15, 'open'),
+(2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 15, 'open'),
+(3, 3, 103, CURDATE(), '13:00:00', '17:00:00', 15,  0, 15, 'open'),
+(4, 4, 103, CURDATE(), '08:00:00', '12:00:00', 20,  0, 15, 'open'),
+(5, 1, 103, CURDATE(), '13:00:00', '17:00:00', 10,  0,  5, 'open');
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -480,33 +489,42 @@ INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, e
 -- Student 104 (Luiz Gabriel Rosales) : queue_number 11 in slot 1 (waiting)
 --                                      + queue_number 5 in slot 2 (waiting)
 -- Students 105, 108, 109 fill positions 1–7 and 9–10 in slot 1
--- queue_ids 6–9 intentionally skipped (reserved for future test cases)
+-- Slot 5 demonstrates the automatic no-show voiding sweeper
+-- (server/jobs/queueNoShowSweeper.js) against its 5-minute custom timeout:
+--   Student 108 was called 10 min ago (past the 5-min timeout) -> auto-voided
+--                                       to 'no_show' within 30s of server start
+--   Student 109 was called 2 min ago (still within timeout)    -> stays 'serving'
 -- ─────────────────────────────────────────────────────────────
 
 -- Student 101: 1 active + 2 historical completed
--- INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at, called_at, completed_at) VALUES
--- (1, 101, 1, 1,  8,  'waiting',   NOW() - INTERVAL 20 MINUTE, NULL, NULL),
--- (2, 101, 3, 3,  3,  'completed', NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY + INTERVAL 30 MINUTE, NOW() - INTERVAL 3 DAY + INTERVAL 45 MINUTE),
--- (3, 101, 4, 4, 11,  'completed', NOW() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY + INTERVAL 20 MINUTE, NOW() - INTERVAL 7 DAY + INTERVAL 40 MINUTE);
+INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at, called_at, completed_at) VALUES
+(1, 101, 1, 1,  8,  'waiting',   NOW() - INTERVAL 20 MINUTE, NULL, NULL),
+(2, 101, 3, 3,  3,  'completed', NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY + INTERVAL 30 MINUTE, NOW() - INTERVAL 3 DAY + INTERVAL 45 MINUTE),
+(3, 101, 4, 4, 11,  'completed', NOW() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY + INTERVAL 20 MINUTE, NOW() - INTERVAL 7 DAY + INTERVAL 40 MINUTE);
 
 -- Student 104: 2 active
--- INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
--- (4, 104, 1, 1, 11, 'waiting', NOW() - INTERVAL  5 MINUTE),
--- (5, 104, 2, 2,  5, 'waiting', NOW() - INTERVAL 10 MINUTE);
+INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
+(4, 104, 1, 1, 11, 'waiting', NOW() - INTERVAL  5 MINUTE),
+(5, 104, 2, 2,  5, 'waiting', NOW() - INTERVAL 10 MINUTE);
 
 -- Filler entries for slot 1 positions 1–7 and 9–10 (queue position math correctness)
--- INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
--- (10, 105, 1, 1,  1, 'waiting', NOW() - INTERVAL 60 MINUTE),
--- (11, 108, 1, 1,  2, 'waiting', NOW() - INTERVAL 55 MINUTE),
--- (12, 109, 1, 1,  3, 'waiting', NOW() - INTERVAL 50 MINUTE),
--- (13, 105, 1, 1,  4, 'waiting', NOW() - INTERVAL 45 MINUTE),
--- (14, 108, 1, 1,  5, 'waiting', NOW() - INTERVAL 40 MINUTE),
--- (15, 109, 1, 1,  6, 'waiting', NOW() - INTERVAL 35 MINUTE),
--- (16, 105, 1, 1,  7, 'waiting', NOW() - INTERVAL 30 MINUTE),
+INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
+(10, 105, 1, 1,  1, 'waiting', NOW() - INTERVAL 60 MINUTE),
+(11, 108, 1, 1,  2, 'waiting', NOW() - INTERVAL 55 MINUTE),
+(12, 109, 1, 1,  3, 'waiting', NOW() - INTERVAL 50 MINUTE),
+(13, 105, 1, 1,  4, 'waiting', NOW() - INTERVAL 45 MINUTE),
+(14, 108, 1, 1,  5, 'waiting', NOW() - INTERVAL 40 MINUTE),
+(15, 109, 1, 1,  6, 'waiting', NOW() - INTERVAL 35 MINUTE),
+(16, 105, 1, 1,  7, 'waiting', NOW() - INTERVAL 30 MINUTE),
 -- position 8 = student 101 (queue_id 1 above)
--- (17, 108, 1, 1,  9, 'waiting', NOW() - INTERVAL 15 MINUTE),
--- (18, 109, 1, 1, 10, 'waiting', NOW() - INTERVAL 12 MINUTE);
+(17, 108, 1, 1,  9, 'waiting', NOW() - INTERVAL 15 MINUTE),
+(18, 109, 1, 1, 10, 'waiting', NOW() - INTERVAL 12 MINUTE);
 -- position 11 = student 104 (queue_id 4 above)
+
+-- Slot 5: no-show sweeper demo (queue_ids 6–9 intentionally skipped, reserved for future test cases)
+INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at, called_at) VALUES
+(19, 108, 1, 5, 1, 'serving', NOW() - INTERVAL 12 MINUTE, NOW() - INTERVAL 10 MINUTE),
+(20, 109, 1, 5, 2, 'serving', NOW() - INTERVAL  3 MINUTE, NOW() - INTERVAL  2 MINUTE);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -610,7 +628,7 @@ INSERT INTO document_requests (request_id, student_id, service_id, request_type,
 -- Student 104: 2 pending, 1 released
 (3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', NULL,                        'Document Test 3', NOW() - INTERVAL 1 DAY),
 (4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', NULL,                        'Document Test 4', NOW() - INTERVAL 2 DAY),
-(5,  104, 3, 'Certificate of Enrollment', 'Local Doc Req 5', 'released',   '2026-06-14', NOW() - INTERVAL 5 DAY,  'Document Test 5', NOW() - INTERVAL 10 DAY);
+(5,  104, 1, 'Good Moral Certificate',    'Local Doc Req 5', 'released',   '2026-06-14', NOW() - INTERVAL 5 DAY,  'Document Test 5', NOW() - INTERVAL 10 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -620,7 +638,7 @@ INSERT INTO document_requests (request_id, student_id, service_id, request_type,
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO generated_files (file_id, request_id, file_name, file_path, qr_code, generated_at) VALUES
 (1, 2, 'TOR-2100001.pdf', '/files/TOR-2100001.pdf', 'REQ-00002-QR', NOW() - INTERVAL 12 DAY),
-(2, 5, 'COE-2100065.pdf', '/files/COE-2100065.pdf', 'REQ-00005-QR', NOW() - INTERVAL 8 DAY);
+(2, 5, 'GMC-2100065.pdf', '/files/GMC-2100065.pdf', 'REQ-00005-QR', NOW() - INTERVAL 8 DAY);
 
 INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time) VALUES
 (1, 103, 'CCS Office', NOW() - INTERVAL 2 MINUTE),
@@ -636,6 +654,16 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('pinnacle_api_key',       '',                                    'PinnaCle API authentication key'),
 ('pinnacle_sync_interval', '60',                                  'Auto-sync interval in minutes'),
 ('pinnacle_sync_enabled',  'false',                               'Whether auto-sync is active');
+
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 9d · FACULTY DOCUMENT REQUESTS (faculty requesting their own documents)
+-- All reference the faculty-only "Certificate of Employment" service (service_id 5).
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faculty_document_requests (request_id, tracking_number, faculty_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
+(1, 'FDR-00001', 102, 5, 'Certificate of Employment', 'Bank loan requirement', 'released',   '2026-06-10', NOW() - INTERVAL 4 DAY, 'Faculty Doc Req 1', NOW() - INTERVAL 9 DAY),
+(2, 'FDR-00002', 106, 5, 'Certificate of Employment', 'Visa application',      'processing', '2026-06-16', NULL,                    'Faculty Doc Req 2', NOW() - INTERVAL 2 DAY),
+(3, 'FDR-00003', 110, 5, 'Certificate of Employment', 'HR records update',     'pending',    '2026-06-18', NULL,                    'Faculty Doc Req 3', NOW() - INTERVAL 1 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────

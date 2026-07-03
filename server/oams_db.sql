@@ -269,19 +269,6 @@ CREATE TABLE faculty_availability_services (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- FACULTY BLOCKED DATES (specific-date overrides for availability)
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE faculty_blocked_dates (
-    blocked_id   INT AUTO_INCREMENT PRIMARY KEY,
-    faculty_id   INT NOT NULL,
-    blocked_date DATE NOT NULL,
-    reason       VARCHAR(255),
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_faculty_blocked (faculty_id, blocked_date),
-    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
-);
-
--- ─────────────────────────────────────────────────────────────
 -- 8. APPOINTMENT SYSTEM
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE appointments (

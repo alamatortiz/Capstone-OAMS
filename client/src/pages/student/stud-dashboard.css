@@ -411,6 +411,32 @@ body {
   transition: color 0.3s ease;
 }
 
+.stat-queue-number-badge {
+  display: inline-block;
+  background: var(--primary-color);
+  color: white;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+
+  flex: none;
+  flex-shrink: 0;
+  flex-grow: 0;
+
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    opacity 0.3s ease;
+
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  align-self: flex-start;
+  width: fit-content;
+  white-space: nowrap;
+}
+
 .stat-title {
   font-size: 0.8rem;
   font-weight: 700;

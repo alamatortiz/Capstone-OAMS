@@ -555,8 +555,10 @@ export default function DocumentsPage() {
         >
           <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="doc-dialog-header">
-              <h2>New Document Request</h2>
-              <p>Submit a request for official documents</p>
+              <div>
+                <h2>New Document Request</h2>
+                <p>Submit a request for official documents</p>
+              </div>
               <button
                 className="doc-dialog-close"
                 onClick={() => setDialogOpen(false)}
@@ -642,13 +644,22 @@ export default function DocumentsPage() {
                 />
               </div>
 
-              <button
-                onClick={handleSubmitRequest}
-                className="doc-form-submit"
-                disabled={submitting}
-              >
-                {submitting ? "Submitting..." : "Submit Request"}
-              </button>
+              <div className="doc-dialog-actions">
+                <button
+                  className="doc-btn-secondary"
+                  onClick={() => setDialogOpen(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitRequest}
+                  className="doc-form-submit"
+                  disabled={submitting}
+                >
+                  {submitting ? "Submitting..." : "Submit Request"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

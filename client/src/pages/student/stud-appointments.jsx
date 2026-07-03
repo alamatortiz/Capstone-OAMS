@@ -180,6 +180,15 @@ export default function AppointmentsPage() {
 
   const activeBookings = myBookings.filter((b) => b.status === "pending" || b.status === "approved");
 
+  // Mirrors the server-side dup guard in POST /appointments/book-slot, which
+  // blocks rebooking the same (availabilityId, date) pair unless the prior
+  // booking was cancelled or rejected.
+  const bookedSlotKeys = useMemo(() => new Set(
+    myBookings
+      .filter((b) => b.status !== "cancelled" && b.status !== "rejected")
+      .map((b) => `${b.availabilityId}_${b.date}`)
+  ), [myBookings]);
+
   const STATUS_ORDER = ["pending", "approved", "completed", "rejected", "cancelled"];
   const STATUS_LABELS = { pending: "Pending Approval", approved: "Approved", completed: "Completed", rejected: "Rejected", cancelled: "Cancelled" };
 
@@ -398,6 +407,7 @@ export default function AppointmentsPage() {
                       <div className="slots-grid">
                         {slotsByDate[date].map((slot) => {
                           const isUnavailable = slot.professorAvailabilityStatus === "unavailable";
+                          const isAlreadyBooked = bookedSlotKeys.has(`${slot.availabilityId}_${slot.date}`);
                           return (
                             <div key={slot.availabilityId} className={`slot-card${isUnavailable ? " slot-card--unavailable" : ""}`}>
                               <div className="slot-header">
@@ -411,8 +421,10 @@ export default function AppointmentsPage() {
                               </div>
                               {isUnavailable ? (
                                 <button className="book-btn book-btn--disabled" disabled>Currently Unavailable</button>
+                              ) : isAlreadyBooked ? (
+                                <button className="book-btn book-btn--disabled" disabled>Already Booked</button>
                               ) : (
-                                <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book This Slot</button>
+                                <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book this Slot</button>
                               )}
                             </div>
                           );
