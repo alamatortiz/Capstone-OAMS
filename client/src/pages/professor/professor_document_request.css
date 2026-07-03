@@ -1,7 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
 
-html, body {
-  font-family: 'Inter', sans-serif;
+html,
+body {
+  font-family: "Inter", sans-serif;
 }
 
 /* ── Page Layout ────────────────────────────────── */
@@ -52,6 +53,7 @@ html, body {
   color: var(--text-primary);
   margin: 0;
   line-height: 1.2;
+  text-align: start;
 }
 
 .pdr-page-desc {
@@ -130,13 +132,6 @@ html, body {
   gap: 1rem;
 }
 
-.pdr-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
 .pdr-section-title {
   font-size: 1.15rem;
   font-weight: 700;
@@ -147,7 +142,7 @@ html, body {
 
 /* ── Request Document Button ─────────────────────── */
 .pdr-request-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.55rem 1.1rem;
@@ -161,6 +156,7 @@ html, body {
   transition: all 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .pdr-request-btn:hover {
@@ -294,6 +290,88 @@ html, body {
 
 .pdr-req-item span {
   color: var(--text-primary);
+}
+
+/* ── My Requests Tabs ─────────────────────────────── */
+.pdr-tabs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.pdr-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+}
+
+.pdr-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.pdr-tab svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.pdr-tab:hover {
+  color: #f97316;
+}
+
+.pdr-tab.active {
+  color: #f97316;
+}
+
+.pdr-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #f97316;
+}
+
+.pdr-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  transition: background 0.2s;
+}
+
+.pdr-tab.active .pdr-tab-count {
+  background: rgba(249, 115, 22, 0.25);
+}
+
+[data-theme="light"] .pdr-tab-count {
+  background: rgba(234, 88, 12, 0.1);
+  color: #ea580c;
+}
+
+[data-theme="light"] .pdr-tab.active .pdr-tab-count {
+  background: rgba(234, 88, 12, 0.2);
 }
 
 /* ── My Requests List ────────────────────────────── */
@@ -431,11 +509,21 @@ html, body {
   color: #ef4444;
 }
 
-[data-theme="light"] .pdr-status-pending { color: #b45309; }
-[data-theme="light"] .pdr-status-processing { color: #1d4ed8; }
-[data-theme="light"] .pdr-status-ready { color: #15803d; }
-[data-theme="light"] .pdr-status-completed { color: #475569; }
-[data-theme="light"] .pdr-status-rejected { color: #dc2626; }
+[data-theme="light"] .pdr-status-pending {
+  color: #b45309;
+}
+[data-theme="light"] .pdr-status-processing {
+  color: #1d4ed8;
+}
+[data-theme="light"] .pdr-status-ready {
+  color: #15803d;
+}
+[data-theme="light"] .pdr-status-completed {
+  color: #475569;
+}
+[data-theme="light"] .pdr-status-rejected {
+  color: #dc2626;
+}
 
 /* View Details Button */
 .pdr-view-btn {
@@ -492,8 +580,14 @@ html, body {
 }
 
 @keyframes pdrModalIn {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .pdr-modal-header {
@@ -702,11 +796,21 @@ html, body {
   color: #fff;
 }
 
-.pdr-status-icon-ready { background: #22c55e; }
-.pdr-status-icon-processing { background: #3b82f6; }
-.pdr-status-icon-pending { background: #f59e0b; }
-.pdr-status-icon-completed { background: #64748b; }
-.pdr-status-icon-rejected { background: #ef4444; }
+.pdr-status-icon-ready {
+  background: #22c55e;
+}
+.pdr-status-icon-processing {
+  background: #3b82f6;
+}
+.pdr-status-icon-pending {
+  background: #f59e0b;
+}
+.pdr-status-icon-completed {
+  background: #64748b;
+}
+.pdr-status-icon-rejected {
+  background: #ef4444;
+}
 
 .pdr-status-banner-title {
   font-weight: 700;
@@ -830,11 +934,6 @@ html, body {
 @media (max-width: 768px) {
   .pdr-doc-types-grid {
     grid-template-columns: 1fr;
-  }
-
-  .pdr-section-header {
-    flex-direction: column;
-    align-items: flex-start;
   }
 
   .pdr-request-card {
