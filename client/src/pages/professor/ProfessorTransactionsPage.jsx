@@ -174,6 +174,34 @@ export default function ProfessorTransactionsPage() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ── Badge helpers ─────────────────────────────────────────────────────────
+  const typeBadgeClass = (type) =>
+    ({
+      queue: "txn-badge txn-badge-queue",
+      appointment: "txn-badge txn-badge-appointment",
+      document: "txn-badge txn-badge-document",
+    }[type] ?? "txn-badge");
+
+  const typeLabel = (type) =>
+    ({ queue: "Queue", appointment: "Appointment", document: "Document" }[type] ?? type);
+
+  const statusBadgeClass = (status) =>
+    ({
+      completed: "txn-badge txn-badge-completed",
+      approved: "txn-badge txn-badge-approved",
+      rejected: "txn-badge txn-badge-rejected",
+      cancelled: "txn-badge txn-badge-cancelled",
+      pending: "txn-badge txn-badge-pending",
+      processing: "txn-badge txn-badge-processing",
+      generated: "txn-badge txn-badge-generated",
+      released: "txn-badge txn-badge-released",
+    }[status] ?? "txn-badge");
+
+  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const statusLabel = (status) =>
+    status === "generated" ? "Ready for Pickup" : capitalize(status);
+
   const fetchTransactions = async () => {
     try {
       const params = {};
@@ -183,7 +211,7 @@ export default function ProfessorTransactionsPage() {
       const res = await api.get("/faculty/transactions", { params });
       setTransactions(res.data.map((t) => ({
         ...t,
-        action: `${capitalize(t.status)} ${typeLabel(t.type)}`,
+        action: `${statusLabel(t.status)} ${typeLabel(t.type)}`,
         details: t.description ?? "",
         timestamp: t.date ? new Date(t.date).toLocaleString() : "",
       })));
@@ -256,27 +284,6 @@ export default function ProfessorTransactionsPage() {
 
   // Server already handles filtering; just use transactions directly
   const filtered = transactions;
-
-  // ── Badge helpers ─────────────────────────────────────────────────────────
-  const typeBadgeClass = (type) =>
-    ({
-      queue: "txn-badge txn-badge-queue",
-      appointment: "txn-badge txn-badge-appointment",
-      document: "txn-badge txn-badge-document",
-    }[type] ?? "txn-badge");
-
-  const typeLabel = (type) =>
-    ({ queue: "Queue", appointment: "Appointment", document: "Document" }[type] ?? type);
-
-  const statusBadgeClass = (status) =>
-    ({
-      completed: "txn-badge txn-badge-completed",
-      approved: "txn-badge txn-badge-approved",
-      rejected: "txn-badge txn-badge-rejected",
-      cancelled: "txn-badge txn-badge-cancelled",
-    }[status] ?? "txn-badge");
-
-  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
     <div className="dashboard-with-sidebar">
@@ -463,8 +470,12 @@ export default function ProfessorTransactionsPage() {
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
                   <option value="all">All Status</option>
-                  <option value="completed">Completed</option>
+                  <option value="pending">Pending</option>
                   <option value="approved">Approved</option>
+                  <option value="processing">Processing</option>
+                  <option value="generated">Ready for Pickup</option>
+                  <option value="released">Released</option>
+                  <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
@@ -497,14 +508,25 @@ export default function ProfessorTransactionsPage() {
                       <span className="txn-item-title">{txn.action}</span>
                       <div className="txn-item-badges">
                         <span className={typeBadgeClass(txn.type)}>{typeLabel(txn.type)}</span>
-                        <span className={statusBadgeClass(txn.status)}>{capitalize(txn.status)}</span>
+                        <span className={statusBadgeClass(txn.status)}>{statusLabel(txn.status)}</span>
                       </div>
                     </div>
-                    <div className="txn-item-student">
-                      <UserIcon />
-                      <span className="txn-item-student-name">{txn.studentName}</span>
-                      <span>({txn.studentId})</span>
-                    </div>
+                    {txn.type === "document" ? (
+                      txn.trackingNumber && (
+                        <div className="txn-item-student">
+                          <FileTextIconSm />
+                          <span className="txn-item-student-name">{txn.trackingNumber}</span>
+                        </div>
+                      )
+                    ) : (
+                      txn.studentName && (
+                        <div className="txn-item-student">
+                          <UserIcon />
+                          <span className="txn-item-student-name">{txn.studentName}</span>
+                          <span>({txn.studentId})</span>
+                        </div>
+                      )
+                    )}
                     {txn.details && <p className="txn-item-details">{txn.details}</p>}
                   </div>
                   <div className="txn-item-meta">

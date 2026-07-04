@@ -303,13 +303,6 @@ router.get(
     const facultyId = req.user.userId;
     const { search = "", filterType = "all", filterStatus = "all" } = req.query;
     try {
-      const [[fac]] = await pool.query(
-        "SELECT department_id FROM faculty WHERE faculty_id = ?",
-        [facultyId]
-      );
-      if (!fac) return res.status(404).json({ message: "Faculty not found" });
-      const deptId = fac.department_id;
-
       let rows = [];
 
       if (filterType === "all" || filterType === "appointment") {
@@ -331,21 +324,22 @@ router.get(
         rows = rows.concat(appts);
       }
 
+      // Faculty only see their OWN document requests here (not students' —
+      // department-wide student document requests are admin-only data).
       if (filterType === "all" || filterType === "document") {
         let sql = `
           SELECT
-            dr.request_id AS id, 'document' AS type,
-            CONCAT(s.first_name,' ',s.last_name) AS studentName,
-            s.student_number AS studentId,
+            fdr.request_id AS id, 'document' AS type,
             ds.service_name AS description,
-            dr.status, dr.created_at AS date, dr.created_at
-          FROM document_requests dr
-          JOIN document_services ds ON dr.service_id = ds.service_id
-          JOIN students s ON dr.student_id = s.student_id
-          WHERE ds.department_id = ?`;
-        const params = [deptId];
-        if (filterStatus !== "all") { sql += " AND dr.status = ?"; params.push(filterStatus); }
-        if (search) { sql += " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_number LIKE ?)"; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+            fdr.status, fdr.created_at AS date, fdr.created_at,
+            fdr.tracking_number AS trackingNumber,
+            fdr.purpose
+          FROM faculty_document_requests fdr
+          JOIN document_services ds ON fdr.service_id = ds.service_id
+          WHERE fdr.faculty_id = ?`;
+        const params = [facultyId];
+        if (filterStatus !== "all") { sql += " AND fdr.status = ?"; params.push(filterStatus); }
+        if (search) { sql += " AND (ds.service_name LIKE ? OR fdr.purpose LIKE ? OR fdr.tracking_number LIKE ?)"; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
         const [docs] = await pool.query(sql, params);
         rows = rows.concat(docs);
       }
