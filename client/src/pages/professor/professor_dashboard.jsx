@@ -1,99 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import LogoutConfirmModal from "../../components/LogoutConfirmModal";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import ucLogo from "../../assets/Pnc-Logo.png";
-import oamsLogo from "../../assets/oams_logo.png";
+import { Link } from "react-router-dom";
+import ProfessorSidebar from "../../components/ProfessorSidebar";
 import "./professor_dashboard.css";
-import { applyTheme, getSavedTheme } from "../../utils/theme";
 import api from "../../utils/api";
-import { toast } from "sonner";
 
 // ── Icons (unchanged from original) ──────────────────────────────────────────
-const HomeIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-  </svg>
-);
-
-const CalendarIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-    <line x1="16" y1="2" x2="16" y2="6"></line>
-    <line x1="8" y1="2" x2="8" y2="6"></line>
-    <line x1="3" y1="10" x2="21" y2="10"></line>
-  </svg>
-);
-const DocumentIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="12" y1="13" x2="12" y2="17"></line>
-    <line x1="9" y1="15" x2="15" y2="15"></line>
-  </svg>
-);
-const HistoryIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36"></path>
-  </svg>
-);
-const LogOutIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-    <polyline points="16 17 21 12 16 7"></polyline>
-    <line x1="21" y1="12" x2="9" y2="12"></line>
-  </svg>
-);
-const MenuIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="3" y1="6" x2="21" y2="6"></line>
-    <line x1="3" y1="12" x2="21" y2="12"></line>
-    <line x1="3" y1="18" x2="21" y2="18"></line>
-  </svg>
-);
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-    <circle cx="12" cy="7" r="4"></circle>
-  </svg>
-);
-const SunIcon = () => (
-  <svg
-    className="sun-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="5"></circle>
-    <line x1="12" y1="1" x2="12" y2="3"></line>
-    <line x1="12" y1="21" x2="12" y2="23"></line>
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-    <line x1="1" y1="12" x2="3" y2="12"></line>
-    <line x1="21" y1="12" x2="23" y2="12"></line>
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-  </svg>
-);
-const MoonIcon = () => (
-  <svg
-    className="moon-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 const CalendarIcon = () => (
@@ -223,15 +139,9 @@ const CalendarClockIcon = () => (
     <polyline points="17 15.5 17 17 18 18"></polyline>
   </svg>
 );
-const ArrowRightIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="5" y1="12" x2="19" y2="12"></line>
-    <polyline points="12 5 19 12 12 19"></polyline>
-  </svg>
-);
 
 export default function ProfessorDashboard() {
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -247,11 +157,7 @@ export default function ProfessorDashboard() {
         departmentAbbrev: "CCS",
       };
 
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -268,17 +174,12 @@ export default function ProfessorDashboard() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
 
-  // ── Availability status (quick Available/Unavailable toggle) ──────────────
-  const [profStatus, setProfStatus] = useState("available");
-  const [statusSaving, setStatusSaving] = useState(false);
-
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setDashLoading(true);
         const res = await api.get("/faculty/dashboard-stats");
         setDashStats(res.data);
-        setProfStatus(res.data?.availabilityStatus ?? "available");
       } catch (err) {
         console.error("Failed to fetch faculty dashboard stats:", err);
         setDashError("Could not load dashboard data.");
@@ -288,26 +189,6 @@ export default function ProfessorDashboard() {
     };
     if (authUser) fetchStats();
   }, [authUser]);
-
-  const handleToggleStatus = async () => {
-    const next = profStatus === "available" ? "unavailable" : "available";
-    const previous = profStatus;
-    setProfStatus(next); // optimistic
-    setStatusSaving(true);
-    try {
-      await api.patch("/faculty/availability-status", { status: next });
-      toast.success(
-        next === "available"
-          ? "You're marked Available to students"
-          : "You're marked Unavailable — your slots are hidden from students",
-      );
-    } catch {
-      setProfStatus(previous); // revert
-      toast.error("Failed to update availability status");
-    } finally {
-      setStatusSaving(false);
-    }
-  };
 
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;
@@ -366,20 +247,6 @@ export default function ProfessorDashboard() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-  useEffect(() => {
-    applyTheme(isDark ? "dark" : "light");
-  }, [isDark]);
-
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const handleLogout = () => setShowLogoutConfirm(true);
-  const confirmLogout = () => { logout(); navigate("/login"); };
-  const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
-  };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -416,115 +283,9 @@ export default function ProfessorDashboard() {
     return "I can help you with appointment management and document reviews. What do you need?";
   };
 
-  const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
-    {
-      icon: CalendarIconNav,
-      label: "Appointments",
-      path: "/professor/appointments",
-    },
-    { icon: DocumentIconNav, label: "Documents", path: "/professor/document-request" },
-    {
-      icon: HistoryIconNav,
-      label: "Transactions",
-      path: "/professor/transactions",
-    },
-  ];
-
-
   return (
     <div className="dashboard-with-sidebar">
-      {/* Sidebar */}
-      <aside className={`dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-inner">
-          <div className="sidebar-logo">
-            <div className="logo-container">
-              <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img
-                src={oamsLogo}
-                alt="OAMS Logo"
-                className="logo-img oams-logo-img"
-              />
-            </div>
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-          </div>
-          <div className="sidebar-user-section">
-            <div className="user-top-row">
-              <div className="user-avatar-large">
-                <UserIcon />
-              </div>
-              <div className="user-info-content">
-                <p className="user-name-large">{user.name ?? "Professor"}</p>
-                <span className="user-role-badge">Professor</span>
-              </div>
-            </div>
-            <div className="user-college-wrapper">
-              <p className="user-college-text">
-                {user?.college} ({user?.departmentAbbrev})
-              </p>
-            </div>
-          </div>
-          <nav className="sidebar-nav">
-            <div className="nav-items">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`nav-item${location.pathname === item.path ? " active" : ""}`}
-                  title={item.label}
-                >
-                  <item.icon className="nav-icon-medium" />
-                  <span className="nav-label">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </nav>
-          <div className="sidebar-logout">
-            <button className="logout-btn" onClick={handleLogout}>
-              <LogOutIcon />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile Header */}
-      <header className="mobile-header">
-        <div className="mobile-header-content">
-          <div className="mobile-logo">
-            <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img
-              src={oamsLogo}
-              alt="OAMS Logo"
-              className="logo-img oams-logo-img"
-            />
-          </div>
-          <div className="mobile-header-actions">
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button
-              className="sidebar-toggle"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Toggle sidebar"
-            >
-              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
-            </button>
-          </div>
-        </div>
-      </header>
+      <ProfessorSidebar />
 
       {/* Main Content */}
       <main className="dashboard-main">
@@ -537,7 +298,7 @@ export default function ProfessorDashboard() {
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
               <p className="banner-greeting">
-                Welcome back, Prof. {user?.name?.split(" ")[0]}! 👋
+                Welcome back, Prof. {user?.name?.split(" ")[0]}!
               </p>
               <div className="banner-title-row">
                 <img
@@ -556,23 +317,6 @@ export default function ProfessorDashboard() {
                 <span className="badge">Professor Portal</span>
                 <span className="badge">{user?.employeeId ?? ""}</span>
               </div>
-            </div>
-
-            <div className="banner-status-toggle">
-              <span className="status-toggle-label">
-                {profStatus === "available" ? "Available to students" : "Unavailable to students"}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={profStatus === "available"}
-                className={`status-toggle-switch ${profStatus === "available" ? "is-available" : "is-unavailable"}`}
-                onClick={handleToggleStatus}
-                disabled={statusSaving}
-                title="Toggle your availability status"
-              >
-                <span className="status-toggle-knob" />
-              </button>
             </div>
           </div>
 
@@ -741,13 +485,6 @@ export default function ProfessorDashboard() {
         </div>
       </main>
 
-      {sidebarOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
       {/* AI Chatbot */}
       <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
         {chatOpen && (
@@ -796,7 +533,6 @@ export default function ProfessorDashboard() {
           <ChatIcon />
         </button>
       </div>
-      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
     </div>
   );
 }

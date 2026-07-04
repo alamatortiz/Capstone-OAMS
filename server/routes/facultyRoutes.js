@@ -130,6 +130,28 @@ router.get(
   },
 );
 
+// GET /api/faculty/availability-status
+// Lightweight lookup for the global Available/Unavailable toggle, used by the
+// sidebar on every faculty page (avoids pulling the full dashboard-stats payload).
+router.get(
+  "/availability-status",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [[row]] = await pool.query(
+        "SELECT availability_status FROM faculty WHERE faculty_id = ?",
+        [facultyId],
+      );
+      res.json({ availabilityStatus: row?.availability_status ?? "available" });
+    } catch (err) {
+      console.error("GET /availability-status error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  },
+);
+
 // PATCH /api/faculty/availability-status
 // Global Available/Unavailable toggle. When 'unavailable', the professor's
 // weekly slots are hidden from student browsing/booking without deleting them.
