@@ -668,9 +668,12 @@ export default function AdminQueue() {
               </button>
             </div>
 
-            {/* Queue Header Card */}
+            {/* Queue Header */}
             <div className="queue-monitoring-header">
               <div className="queue-header-content">
+                <div className="queue-monitoring-title-icon">
+                  <QueueIconNav />
+                </div>
                 <div className="queue-header-text">
                   <h1 className="queue-monitoring-title">
                     {monitoringQueue.queueType}
@@ -762,7 +765,7 @@ export default function AdminQueue() {
                   </div>
                   <div className="queue-actions-grid">
                     <button
-                      className="queue-action-btn"
+                      className="queue-action-btn queue-action-btn--primary"
                       onClick={() => handleCallNext(monitoringQueue.id)}
                       disabled={
                         !!monitoringQueue.currentlyServingStudentNumber ||
@@ -774,7 +777,7 @@ export default function AdminQueue() {
                     </button>
                     {monitoringQueue.status === "paused" ? (
                       <button
-                        className="queue-action-btn"
+                        className="queue-action-btn queue-action-btn--success"
                         onClick={() => handleResumeQueue(monitoringQueue.id)}
                       >
                         <AlertCircleIcon />
@@ -782,7 +785,7 @@ export default function AdminQueue() {
                       </button>
                     ) : (
                       <button
-                        className="queue-action-btn"
+                        className="queue-action-btn queue-action-btn--warning"
                         onClick={() => handlePauseQueue(monitoringQueue.id)}
                       >
                         <AlertCircleIcon />
@@ -790,13 +793,13 @@ export default function AdminQueue() {
                       </button>
                     )}
                     <button
-                      className="queue-action-btn"
+                      className="queue-action-btn queue-action-btn--danger"
                       onClick={() => handleStopQueue(monitoringQueue.id)}
                     >
                       <CloseIcon />
                       Stop Queue
                     </button>
-                    <button className="queue-action-btn">
+                    <button className="queue-action-btn queue-action-btn--neutral">
                       <TrendingUpIcon />
                       Export Data
                     </button>
@@ -820,7 +823,7 @@ export default function AdminQueue() {
                       {monitoringQueue.queueType}
                     </p>
                     <button
-                      className="queue-action-btn"
+                      className="queue-action-btn queue-action-btn--success"
                       style={{ width: "100%", marginTop: "0.75rem" }}
                       onClick={() => handleMarkAsServed(monitoringQueue.id)}
                       disabled={!monitoringQueue.currentlyServingStudentNumber}
@@ -1022,7 +1025,7 @@ export default function AdminQueue() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="nav-item"
+                  className={`nav-item${location.pathname === item.path ? " active" : ""}`}
                 >
                   <item.icon className="nav-icon-medium" />
                   <span className="nav-label">{item.label}</span>

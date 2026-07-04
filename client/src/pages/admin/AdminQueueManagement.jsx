@@ -77,6 +77,11 @@ const ChevronLeftIcon = () => (
     <polyline points="15 18 9 12 15 6" />
   </svg>
 );
+const ChevronRightIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -244,6 +249,7 @@ export default function AdminQueueManagement() {
   const [queueEntries, setQueueEntries] = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
+  const [entriesPage, setEntriesPage] = useState(0);
 
   const selectedQueue = queues.find(q => q.id === selectedQueueId) || null;
 
@@ -252,6 +258,13 @@ export default function AdminQueueManagement() {
     serviceTypeFilter === 'all'
       ? queues
       : queues.filter((q) => q.queueType === serviceTypeFilter);
+
+  // ─── Queue entries pagination ────────────────────────────────────────────
+  const ENTRIES_PER_PAGE = 5;
+  const totalEntryPages = Math.max(1, Math.ceil(queueEntries.length / ENTRIES_PER_PAGE));
+  const currentEntriesPage = Math.min(entriesPage, totalEntryPages - 1);
+  const entriesStartIndex = currentEntriesPage * ENTRIES_PER_PAGE;
+  const paginatedEntries = queueEntries.slice(entriesStartIndex, entriesStartIndex + ENTRIES_PER_PAGE);
 
   // ─── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -351,6 +364,7 @@ export default function AdminQueueManagement() {
 
   const handleViewDetails = (queue) => {
     setSelectedQueueId(queue.id);
+    setEntriesPage(0);
   };
 
   const handleBack = () => {
@@ -599,18 +613,21 @@ export default function AdminQueueManagement() {
               </button>
             </div>
 
-            {/* Queue Header Card */}
-            <div className={`aqm-queue-header-card ${getStatusColor(selectedQueue.status)}`}>
-              <div className="aqm-queue-header-content">
+            {/* Queue Header */}
+            <div className="aqm-page-header">
+              <div className="aqm-title-section">
+                <div className="aqm-title-icon">
+                  <QueueIconNav className="aqm-icon-xl" />
+                </div>
                 <div>
-                  <h1 className="aqm-queue-title">{selectedQueue.queueType}</h1>
+                  <h1 className="aqm-page-title">{selectedQueue.queueType}</h1>
                   <p className="aqm-queue-department">{selectedQueue.department}</p>
                   <p className="aqm-queue-location">Location: {selectedQueue.location}</p>
                 </div>
-                <div className={`aqm-status-badge ${getStatusColor(selectedQueue.status)}`}>
-                  {selectedQueue.status}
-                </div>
               </div>
+              <span className={`aqm-queue-status-badge ${getStatusColor(selectedQueue.status)}`}>
+                {selectedQueue.status}
+              </span>
             </div>
 
             <div className="aqm-details-grid">
@@ -660,7 +677,7 @@ export default function AdminQueueManagement() {
                   </div>
                   <div className="aqm-actions-grid">
                     <button
-                      className="aqm-action-btn"
+                      className="aqm-action-btn aqm-action-btn-primary"
                       onClick={handleCallNext}
                       disabled={
                         !!queueEntries.find(e => e.status === 'serving') ||
@@ -671,19 +688,19 @@ export default function AdminQueueManagement() {
                       Call Next
                     </button>
                     <button
-                      className="aqm-action-btn"
+                      className="aqm-action-btn aqm-action-btn-success"
                       onClick={handleMarkServed}
                       disabled={!queueEntries.find(e => e.status === 'serving')}
                     >
                       Mark as Served
                     </button>
                     {selectedQueue.status === 'paused' ? (
-                      <button className="aqm-action-btn" onClick={handleResume}>
+                      <button className="aqm-action-btn aqm-action-btn-success" onClick={handleResume}>
                         Resume Queue
                       </button>
                     ) : (
                       <button
-                        className="aqm-action-btn"
+                        className="aqm-action-btn aqm-action-btn-warning"
                         onClick={handlePause}
                         disabled={selectedQueue.status !== 'active'}
                       >
@@ -743,13 +760,13 @@ export default function AdminQueueManagement() {
                     ) : queueEntries.length === 0 ? (
                       <p style={{ padding: '1rem', textAlign: 'center', opacity: 0.6 }}>No students in queue.</p>
                     ) : (
-                      queueEntries.map((entry, index) => (
+                      paginatedEntries.map((entry, index) => (
                         <div
                           key={entry.queueNumber}
                           className={`aqm-entry-item ${entry.status === 'serving' ? 'aqm-entry-serving' : ''}`}
                         >
                           <div className="aqm-entry-top">
-                            <div className="aqm-entry-number">{index + 1}</div>
+                            <div className="aqm-entry-number">{entriesStartIndex + index + 1}</div>
                             <div className="aqm-entry-info">
                               <h4 className="aqm-entry-name">{entry.studentName}</h4>
                               <p className="aqm-entry-id">ID: {entry.studentId}</p>
@@ -774,6 +791,29 @@ export default function AdminQueueManagement() {
                       ))
                     )}
                   </div>
+                  {!loadingEntries && queueEntries.length > ENTRIES_PER_PAGE && (
+                    <div className="aqm-entries-pagination">
+                      <button
+                        className="aqm-entries-page-btn"
+                        onClick={() => setEntriesPage((p) => Math.max(0, p - 1))}
+                        disabled={currentEntriesPage === 0}
+                        aria-label="Previous batch"
+                      >
+                        <ChevronLeftIcon />
+                      </button>
+                      <span className="aqm-entries-page-label">
+                        {entriesStartIndex + 1}–{Math.min(queueEntries.length, entriesStartIndex + ENTRIES_PER_PAGE)} of {queueEntries.length}
+                      </span>
+                      <button
+                        className="aqm-entries-page-btn"
+                        onClick={() => setEntriesPage((p) => Math.min(totalEntryPages - 1, p + 1))}
+                        disabled={currentEntriesPage >= totalEntryPages - 1}
+                        aria-label="Next batch"
+                      >
+                        <ChevronRightIcon />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

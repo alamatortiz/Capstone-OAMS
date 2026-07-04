@@ -616,6 +616,11 @@
 
 /* ===== Page Header (List View) ===== */
 .aqm-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
@@ -1059,98 +1064,21 @@
   stroke: currentColor;
 }
 
-/* Queue Header Card */
-.aqm-queue-header-card {
-  border-radius: 1.5rem;
-  padding: 2rem;
-  color: white;
-  margin-bottom: 2rem;
-  position: relative;
-  overflow: hidden;
-}
-
-.aqm-status-badge-active {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
-}
-
-.aqm-queue-header-card.aqm-status-badge-active {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
-  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.2);
-}
-
-.aqm-queue-header-card.aqm-status-badge-paused {
-  background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
-  box-shadow: 0 10px 30px rgba(245, 158, 11, 0.2);
-}
-
-.aqm-queue-header-card.aqm-status-badge-closed {
-  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
-  box-shadow: 0 10px 30px rgba(107, 114, 128, 0.2);
-}
-
-.aqm-queue-header-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.aqm-queue-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 0 0 0.5rem 0;
-  line-height: 1.2;
-  transition: all 0.3s ease;
-  text-align: left;
-}
-
 .aqm-queue-department {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-secondary);
   font-size: 0.95rem;
   font-weight: 400;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem 0;
   transition: all 0.3s ease;
   text-align: left;
 }
 
 .aqm-queue-location {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-tertiary);
   font-size: 0.85rem;
   margin: 0;
   transition: all 0.3s ease;
   text-align: left;
-}
-
-.aqm-status-badge {
-  padding: 0.75rem 1.25rem;
-  border-radius: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: capitalize;
-  white-space: nowrap;
-  transition: all 0.3s ease;
-}
-
-.aqm-status-badge.aqm-status-badge-active {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px);
-}
-
-.aqm-status-badge.aqm-status-badge-paused {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px);
-}
-
-.aqm-status-badge.aqm-status-badge-closed {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px);
 }
 
 /* Details Grid */
@@ -1310,6 +1238,33 @@
   border-color: rgba(239, 68, 68, 0.7);
 }
 
+.aqm-action-btn.aqm-action-btn-primary {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.08);
+}
+.aqm-action-btn.aqm-action-btn-primary:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.7);
+}
+
+.aqm-action-btn.aqm-action-btn-success {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.08);
+}
+.aqm-action-btn.aqm-action-btn-success:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.7);
+}
+
+.aqm-action-btn.aqm-action-btn-warning {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.08);
+}
+.aqm-action-btn.aqm-action-btn-warning:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.7);
+}
+
 /* Progress Card */
 .aqm-progress-card {
   background: var(--card-bg);
@@ -1442,6 +1397,57 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.aqm-entries-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--card-border);
+  transition: border-color 0.3s ease;
+}
+
+.aqm-entries-page-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.aqm-entries-page-btn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+.aqm-entries-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.aqm-entries-page-btn svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+.aqm-entries-page-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  transition: color 0.3s ease;
 }
 
 .aqm-entry-item {
@@ -1852,10 +1858,6 @@
     font-size: 1.5rem;
   }
 
-  .aqm-queue-title {
-    font-size: 1.5rem;
-  }
-
   .aqm-chat-container {
     width: 280px;
     height: 400px;
@@ -1890,10 +1892,6 @@
   }
 
   .aqm-page-title {
-    font-size: 1.25rem;
-  }
-
-  .aqm-queue-title {
     font-size: 1.25rem;
   }
 

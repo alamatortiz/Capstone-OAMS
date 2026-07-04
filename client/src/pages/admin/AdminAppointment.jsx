@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import ucLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./admin_appointment.css";
@@ -186,6 +186,7 @@ export default function AdminAppointment() {
     : { name: "Admin", role: "admin", college: "", departmentAbbrev: "CCS" };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [chatOpen, setChatOpen] = useState(false);
@@ -543,7 +544,7 @@ export default function AdminAppointment() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)}
-                  className="admin-appointment-nav-item"
+                  className={`admin-appointment-nav-item${location.pathname === item.path ? " active" : ""}`}
                   title={item.label}
                 >
                   <item.icon className="admin-appointment-nav-icon-medium" />

@@ -187,6 +187,12 @@ const ChevronDownIcon = () => (
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
+const SearchIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="11" cy="11" r="8"></circle>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  </svg>
+);
 
 const formatDateTime = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
@@ -262,6 +268,11 @@ export default function AdminQueueHosting() {
     };
     if (authUser) init();
   }, [authUser, fetchQueues, fetchServices]);
+
+  // ── Search & filter state ──────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   // ── "Open New Queue Line" modal state ─────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
@@ -436,9 +447,26 @@ export default function AdminQueueHosting() {
   };
 
   // ── Derived values ─────────────────────────────────────────────────────────
-  const activeQueues = queues.filter((q) => q.status === "open");
-  const pausedQueues = queues.filter((q) => q.status === "paused");
-  const closedQueues = queues.filter((q) => q.status === "closed");
+  // Unique service types currently hosted, regardless of how many queue lines
+  // of that same type are open/paused/closed today — always computed from the
+  // full queue list so the dropdown options don't shift as filters are applied.
+  const serviceTypeOptions = [...new Set(queues.map((q) => q.queueType))].sort();
+
+  const filteredQueues = queues.filter((q) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      q.queueType.toLowerCase().includes(query) ||
+      (q.department || "").toLowerCase().includes(query);
+    const matchesStatus = statusFilter === "all" || q.status === statusFilter;
+    const matchesType = typeFilter === "all" || q.queueType === typeFilter;
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const activeQueues = filteredQueues.filter((q) => q.status === "open");
+  const pausedQueues = filteredQueues.filter((q) => q.status === "paused");
+  const closedQueues = filteredQueues.filter((q) => q.status === "closed");
+  const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "all" || typeFilter !== "all";
 
   return (
     <div className="aqh-dashboard-with-sidebar">
@@ -645,6 +673,54 @@ export default function AdminQueueHosting() {
               </div>
               <div className="aqh-summary-icon aqh-icon-closed">
                 <CloseIcon />
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filters */}
+          <div className="aqh-filters-card">
+            <div className="aqh-filter-bar">
+              <div className="aqh-search-wrapper">
+                <SearchIcon />
+                <input
+                  type="text"
+                  className="aqh-form-input aqh-search-input"
+                  placeholder="Search by service or department..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="aqh-form-select-wrap aqh-filter-select-wrap">
+                <select
+                  className="aqh-form-select"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  aria-label="Filter by status"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="open">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="closed">Closed</option>
+                </select>
+                <span className="aqh-select-chevron">
+                  <ChevronDownIcon />
+                </span>
+              </div>
+              <div className="aqh-form-select-wrap aqh-filter-select-wrap">
+                <select
+                  className="aqh-form-select"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  aria-label="Filter by service type"
+                >
+                  <option value="all">All Service Types</option>
+                  {serviceTypeOptions.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+                <span className="aqh-select-chevron">
+                  <ChevronDownIcon />
+                </span>
               </div>
             </div>
           </div>
@@ -888,6 +964,24 @@ export default function AdminQueueHosting() {
                 No queue lines yet today for {user.departmentAbbrev}. Open one
                 to start serving students.
               </p>
+            </div>
+          )}
+
+          {!loading && queues.length > 0 && filteredQueues.length === 0 && (
+            <div className="aqh-empty-state">
+              <p>No queue lines match your search or filters.</p>
+              {hasActiveFilters && (
+                <button
+                  className="aqh-clear-filters-btn"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("all");
+                    setTypeFilter("all");
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           )}
         </div>

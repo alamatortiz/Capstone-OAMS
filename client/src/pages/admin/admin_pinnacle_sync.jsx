@@ -134,7 +134,6 @@ const DatabaseIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
-    style={{ width: "1.5rem", height: "1.5rem" }}
   >
     <ellipse cx="12" cy="5" rx="9" ry="3" fill="none" />
     <path d="M21 5v6c0 1.66-4.03 3-9 3S3 12.66 3 11V5" fill="none" />
@@ -565,26 +564,24 @@ export default function AdminPinnacleSync() {
       <main className="admin-dashboard-main">
         <div className="aps-page">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Hero Banner */}
-          <div className="aps-hero-banner">
-            <div className="aps-hero-content">
-              <div className="aps-hero-left">
-                <div className="aps-banner-icon">
-                  <DatabaseIcon />
-                </div>
-                <div className="aps-banner-text">
-                  <h1 className="aps-hero-title">Pinnacle Integration</h1>
-                  <p className="aps-hero-subtitle">
-                    Sync user data from Pinnacle microservice
-                  </p>
-                </div>
+          {/* Header */}
+          <div className="aps-page-header">
+            <div className="aps-title-section">
+              <div className="aps-title-icon">
+                <DatabaseIcon />
               </div>
-              <div
-                className={`aps-sync-badge ${syncEnabled ? "aps-sync-badge--enabled" : "aps-sync-badge--disabled"}`}
-              >
-                <span className="aps-sync-dot"></span>
-                {syncEnabled ? "Sync Enabled" : "Sync Disabled"}
+              <div>
+                <h1 className="aps-page-title">Pinnacle Integration</h1>
+                <p className="aps-page-subtitle">
+                  Sync user data from Pinnacle microservice
+                </p>
               </div>
+            </div>
+            <div
+              className={`aps-sync-badge ${syncEnabled ? "aps-sync-badge--enabled" : "aps-sync-badge--disabled"}`}
+            >
+              <span className="aps-sync-dot"></span>
+              {syncEnabled ? "Sync Enabled" : "Sync Disabled"}
             </div>
           </div>
 
@@ -708,7 +705,7 @@ export default function AdminPinnacleSync() {
                 </label>
                 <input
                   type="number"
-                  className="aps-input"
+                  className="aps-input aps-input--sm"
                   value={syncInterval}
                   onChange={(e) => setSyncInterval(Number(e.target.value))}
                   min={15}

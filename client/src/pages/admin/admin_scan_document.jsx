@@ -129,11 +129,7 @@ const MoonIcon = () => (
   </svg>
 );
 const QRScanIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    style={{ width: "1.2rem", height: "1.2rem" }}
-  >
+  <svg viewBox="0 0 24 24" fill="currentColor">
     <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 17h2v2h-2zM19 13h2v2h-2z" />
   </svg>
 );
@@ -500,12 +496,19 @@ export default function AdminScanDocument() {
       <main className="admin-dashboard-main">
         <div className="asd-page">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Page Title */}
+          {/* Page Header */}
           <div className="asd-page-header">
-            <h1 className="asd-page-title">Document Scanner</h1>
-            <p className="asd-page-subtitle">
-              Scan QR codes to verify and view document details
-            </p>
+            <div className="asd-title-section">
+              <div className="asd-title-icon">
+                <QRScanIcon />
+              </div>
+              <div>
+                <h1 className="asd-page-title">Document Scanner</h1>
+                <p className="asd-page-subtitle">
+                  Scan QR codes to verify and view document details
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="asd-content-grid">

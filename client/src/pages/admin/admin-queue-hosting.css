@@ -742,6 +742,74 @@
   background: #64748b;
 }
 
+/* ===== Search & Filter Bar ===== */
+.aqh-filters-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.aqh-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.aqh-search-wrapper {
+  position: relative;
+  flex: 1 1 260px;
+}
+
+.aqh-search-wrapper svg {
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.aqh-form-input.aqh-search-input {
+  padding-left: 2.5rem;
+}
+
+.aqh-filter-select-wrap {
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+
+.aqh-clear-filters-btn {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1.25rem;
+  background: transparent;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 0.625rem;
+  color: #3b82f6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aqh-clear-filters-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+@media (max-width: 640px) {
+  .aqh-filter-select-wrap {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
 /* ===== Section + Queue Cards ===== */
 .aqh-section {
   display: flex;
@@ -1367,6 +1435,9 @@
   .aqh-page-container {
     padding: 0.75rem;
     gap: 1rem;
+  }
+  .aqh-filters-card {
+    padding: 1rem;
   }
   .aqh-page-title {
     font-size: 1.5rem;

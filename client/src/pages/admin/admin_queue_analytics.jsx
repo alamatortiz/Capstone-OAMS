@@ -583,16 +583,18 @@ export default function AdminQueueAnalytics() {
       <main className="aqa-main">
         <div className="aqa-content">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Banner */}
-          <div className="aqa-banner">
-            <div className="aqa-banner-icon">
-              <BarChartIcon />
-            </div>
-            <div className="aqa-banner-text">
-              <h1 className="aqa-banner-title">Queue Analytics</h1>
-              <p className="aqa-banner-subtitle">
-                Real-time queue performance metrics and insights
-              </p>
+          {/* Header */}
+          <div className="aqa-page-header">
+            <div className="aqa-title-section">
+              <div className="aqa-title-icon">
+                <BarChartIcon />
+              </div>
+              <div>
+                <h1 className="aqa-page-title">Queue Analytics</h1>
+                <p className="aqa-page-subtitle">
+                  Real-time queue performance metrics and insights
+                </p>
+              </div>
             </div>
           </div>
 
