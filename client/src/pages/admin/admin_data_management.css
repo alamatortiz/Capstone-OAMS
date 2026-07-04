@@ -4,53 +4,53 @@ html, body {
     font-family: 'Inter', sans-serif;
 }
 
-/* ===== Banner ===== */
-.adm-banner {
+/* ===== Page Header ===== */
+.adm-page-header {
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
-  border-radius: 1.5rem;
-  padding: 1.75rem 2rem;
-  color: white;
-  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.25);
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.adm-banner-icon {
-  flex-shrink: 0;
+.adm-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.adm-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3.5rem;
-  height: 3.5rem;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  color: #fff;
 }
 
-.adm-banner-icon svg {
-  width: 2rem;
-  height: 2rem;
-  stroke: white;
+.adm-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+  color: #fff;
 }
 
-.adm-banner-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.adm-banner-title {
-  font-size: 1.75rem;
+.adm-page-title {
+  font-size: 1.875rem;
   font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
-  line-height: 1.2;
+  transition: color 0.3s ease;
   text-align: left;
 }
 
-.adm-banner-subtitle {
+.adm-page-subtitle {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.88);
-  margin: 0;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0;
+  transition: color 0.3s ease;
   text-align: left;
 }
 
@@ -633,13 +633,15 @@ html, body {
   border-radius: 0.25rem;
 }
 
-/* ===== Filter Bar ===== */
+/* ===== Filter Bar (underline categorization style) ===== */
 .adm-filter-bar {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.25rem;
   margin-bottom: 1.25rem;
   flex-wrap: nowrap;
+  border-bottom: 2px solid var(--card-border);
+  transition: border-color 0.3s ease;
 }
 
 .adm-filter-bar-wrap {
@@ -647,68 +649,48 @@ html, body {
 }
 
 .adm-filter-pill {
-  padding: 0.3rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.775rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  border: 1px solid var(--card-border);
+  border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-family: 'Inter', sans-serif;
-  transition: all 0.18s ease;
+  transition: all 0.2s ease;
   white-space: nowrap;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .adm-filter-pill:hover {
-  border-color: rgba(34, 197, 94, 0.4);
-  color: var(--text-primary);
-  background: rgba(34, 197, 94, 0.06);
+  color: var(--pill-accent, var(--primary-color));
 }
 
 .adm-filter-pill.adm-filter-pill-active {
-  background: rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.5);
-  color: #22c55e;
+  color: var(--pill-accent, var(--primary-color));
+}
+
+.adm-filter-pill.adm-filter-pill-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--pill-accent, var(--primary-color));
 }
 
 /* Action-specific pill accent colors when active */
-.adm-filter-pill-create.adm-filter-pill-active {
-  background: rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.5);
-  color: #22c55e;
-}
-
-.adm-filter-pill-update.adm-filter-pill-active {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.5);
-  color: #60a5fa;
-}
-
-.adm-filter-pill-delete.adm-filter-pill-active {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.5);
-  color: #f87171;
-}
-
-.adm-filter-pill-login.adm-filter-pill-active,
-.adm-filter-pill-logout.adm-filter-pill-active {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.5);
-  color: #c084fc;
-}
-
-.adm-filter-pill-export.adm-filter-pill-active {
-  background: rgba(251, 191, 36, 0.15);
-  border-color: rgba(251, 191, 36, 0.5);
-  color: #fbbf24;
-}
-
-.adm-filter-pill-read.adm-filter-pill-active {
-  background: rgba(20, 184, 166, 0.15);
-  border-color: rgba(20, 184, 166, 0.5);
-  color: #2dd4bf;
-}
+.adm-filter-pill-action-create { --pill-accent: #22c55e; }
+.adm-filter-pill-action-update { --pill-accent: #60a5fa; }
+.adm-filter-pill-action-delete { --pill-accent: #f87171; }
+.adm-filter-pill-action-login,
+.adm-filter-pill-action-logout { --pill-accent: #c084fc; }
+.adm-filter-pill-action-export { --pill-accent: #fbbf24; }
+.adm-filter-pill-action-read   { --pill-accent: #2dd4bf; }
 
 /* ===== Loading State ===== */
 .adm-loading {
@@ -904,15 +886,8 @@ html, body {
 
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
-  .adm-banner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.875rem;
-    padding: 1.25rem;
-  }
-
-  .adm-banner-title {
-    font-size: 1.35rem;
+  .adm-page-title {
+    font-size: 1.5rem;
   }
 
   .adm-tabs-bar {

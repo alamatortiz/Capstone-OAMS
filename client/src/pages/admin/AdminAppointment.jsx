@@ -216,9 +216,6 @@ export default function AdminAppointment() {
   const stats = {
     total: appointments.length,
     pending: appointments.filter((a) => a.status === "pending").length,
-    approved: appointments.filter((a) => a.status === "approved").length,
-    today: appointments.filter((a) => a.isToday && a.status !== "cancelled")
-      .length,
   };
 
   useEffect(() => {
@@ -292,21 +289,29 @@ export default function AdminAppointment() {
     return "I can help with appointment management, filtering, and scheduling. What would you like to do?";
   };
 
-  const filterAppointments = (status) => {
-    let filtered = appointments;
-    if (status !== "all")
-      filtered = filtered.filter((a) => a.status === status);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (a) =>
+  const searchFiltered = searchQuery
+    ? appointments.filter((a) => {
+        const q = searchQuery.toLowerCase();
+        return (
           a.studentName.toLowerCase().includes(q) ||
           a.studentId.toLowerCase().includes(q) ||
-          a.professor.toLowerCase().includes(q),
-      );
-    }
-    return filtered;
+          a.professor.toLowerCase().includes(q)
+        );
+      })
+    : appointments;
+
+  const tabCounts = {
+    all: searchFiltered.length,
+    pending: searchFiltered.filter((a) => a.status === "pending").length,
+    approved: searchFiltered.filter((a) => a.status === "approved").length,
+    completed: searchFiltered.filter((a) => a.status === "completed").length,
+    rejected: searchFiltered.filter((a) => a.status === "rejected").length,
   };
+
+  const filterAppointments = (status) =>
+    status === "all"
+      ? searchFiltered
+      : searchFiltered.filter((a) => a.status === status);
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -601,43 +606,18 @@ export default function AdminAppointment() {
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Header */}
           <div className="admin-appointment-page-header">
-            <h1 className="admin-appointment-page-title">
-              Centralized Appointment Management
-            </h1>
-            <p className="admin-appointment-page-subtitle">
-              Oversee appointment system across all colleges
-            </p>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="admin-appointment-stats-grid">
-            <div className="admin-appointment-stat-card">
-              <div className="admin-appointment-stat-icon">
+            <div className="admin-appointment-title-section">
+              <div className="admin-appointment-title-icon">
                 <CalendarIconNav />
               </div>
-              <p className="admin-appointment-stat-label">Total Appointments</p>
-              <p className="admin-appointment-stat-value">{stats.total}</p>
-            </div>
-            <div className="admin-appointment-stat-card admin-appointment-stat-card-warning">
-              <div className="admin-appointment-stat-icon">
-                <AlertCircleIcon />
+              <div>
+                <h1 className="admin-appointment-page-title">
+                  Centralized Appointment Management
+                </h1>
+                <p className="admin-appointment-page-subtitle">
+                  Oversee appointment system across all colleges
+                </p>
               </div>
-              <p className="admin-appointment-stat-label">Pending</p>
-              <p className="admin-appointment-stat-value">{stats.pending}</p>
-            </div>
-            <div className="admin-appointment-stat-card admin-appointment-stat-card-success">
-              <div className="admin-appointment-stat-icon">
-                <CheckCircleIcon />
-              </div>
-              <p className="admin-appointment-stat-label">Approved</p>
-              <p className="admin-appointment-stat-value">{stats.approved}</p>
-            </div>
-            <div className="admin-appointment-stat-card admin-appointment-stat-card-info">
-              <div className="admin-appointment-stat-icon">
-                <CalendarIconNav />
-              </div>
-              <p className="admin-appointment-stat-label">Today</p>
-              <p className="admin-appointment-stat-value">{stats.today}</p>
             </div>
           </div>
 
@@ -679,6 +659,9 @@ export default function AdminAppointment() {
                       }`}
                     >
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      <span className="admin-appointment-tab-count">
+                        {loading ? "—" : tabCounts[tab]}
+                      </span>
                     </button>
                   ),
                 )}

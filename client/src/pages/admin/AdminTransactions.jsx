@@ -612,10 +612,17 @@ export default function AdminTransaction() {
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
           {/* Header */}
           <div className="admin-transaction-header">
-            <h1 className="admin-transaction-title">Transaction Logs</h1>
-            <p className="admin-transaction-subtitle">
-              View transaction logs for {user.college} ({user.departmentAbbrev})
-            </p>
+            <div className="admin-transaction-title-section">
+              <div className="admin-transaction-title-icon">
+                <ActivityIcon />
+              </div>
+              <div>
+                <h1 className="admin-transaction-title">Transaction Logs</h1>
+                <p className="admin-transaction-subtitle">
+                  View transaction logs for {user.college} ({user.departmentAbbrev})
+                </p>
+              </div>
+            </div>
           </div>
 
           {error && (

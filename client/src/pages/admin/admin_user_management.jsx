@@ -107,17 +107,11 @@ const MoonIcon = () => (
 
 // ─── Page-specific Icons ──────────────────────────────────────────────────────
 const UsersHeaderIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="30" height="30">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
     <circle cx="9" cy="7" r="4" />
     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-const PlusIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15">
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
 const SearchIcon = () => (
@@ -167,6 +161,18 @@ const TrashIconSvg = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+);
+const BanIconSvg = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+  </svg>
+);
+const CheckCircleIconSvg = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
 
@@ -247,14 +253,13 @@ export default function AdminUserManagement() {
     if (i.includes("student"))   return `There are ${users.filter(u => u.role === "student").length} student accounts in the system.`;
     if (i.includes("professor") || i.includes("faculty")) return `There are ${users.filter(u => u.role === "professor").length} professor accounts.`;
     if (i.includes("suspend"))   return `There are ${users.filter(u => u.status === "suspended").length} suspended accounts. Edit a user to reactivate.`;
-    if (i.includes("user") || i.includes("account")) return "Use the Add User button to create accounts, or click the edit icon to modify existing ones.";
+    if (i.includes("user") || i.includes("account")) return "Accounts are synced in via Pinnacle Sync. Click the edit icon to modify a user, or the ban icon to suspend an account.";
     return "I can help with user accounts, filtering, and password resets. What do you need?";
   };
 
   // ── Handlers: CRUD ───────────────────────────────────────────────────────────
   const setField = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  const openAddModal = () => { setForm(BLANK_FORM); setEditingUser(null); setShowModal(true); };
   const openEditModal = (u) => {
     setEditingUser(u);
     setForm({ name: u.name, email: u.email, role: u.role, college: u.college, employeeId: u.employeeId || "", studentId: u.studentId || "", status: u.status });
@@ -268,14 +273,8 @@ export default function AdminUserManagement() {
     if (form.role === "student" && !form.studentId)  return toast.error("Student ID is required for students");
     if (form.role !== "student" && !form.employeeId) return toast.error("Employee ID is required for professors and admins");
 
-    if (editingUser) {
-      setUsers((p) => p.map((u) => u.id === editingUser.id ? { ...u, ...form } : u));
-      toast.success("User updated successfully");
-    } else {
-      const newUser = { id: Date.now().toString(), ...form, employeeId: form.role !== "student" ? form.employeeId : undefined, studentId: form.role === "student" ? form.studentId : undefined, createdDate: new Date().toISOString().split("T")[0] };
-      setUsers((p) => [newUser, ...p]);
-      toast.success("User created successfully");
-    }
+    setUsers((p) => p.map((u) => u.id === editingUser.id ? { ...u, ...form } : u));
+    toast.success("User updated successfully");
     closeModal();
   };
 
@@ -287,6 +286,12 @@ export default function AdminUserManagement() {
   const handleResetPassword = (u) => {
     if (!window.confirm(`Reset password for ${u.name}? A temporary password will be sent to ${u.email}`)) return;
     toast.success(`Password reset email sent to ${u.email}`);
+  };
+  const handleToggleSuspend = (u) => {
+    const suspending = u.status !== "suspended";
+    if (!window.confirm(`${suspending ? "Suspend" : "Reactivate"} ${u.name}'s account?`)) return;
+    setUsers((p) => p.map((x) => x.id === u.id ? { ...x, status: suspending ? "suspended" : "active" } : x));
+    toast.success(`Account ${suspending ? "suspended" : "reactivated"}`);
   };
 
   // ── Filtered / grouped users ─────────────────────────────────────────────────
@@ -301,15 +306,6 @@ export default function AdminUserManagement() {
 
   const displayUsers = activeTab === "students" ? students : activeTab === "professors" ? professors : activeTab === "admins" ? admins : filtered;
   const tabMeta = { all: { title: "All Users", desc: "Complete list of all user accounts" }, students: { title: "Student Accounts", desc: "Manage student user accounts" }, professors: { title: "Professor Accounts", desc: "Manage professor/faculty user accounts" }, admins: { title: "Admin Accounts", desc: "Manage administrator user accounts" } };
-
-  const statCards = [
-    { label: "Total Users",  value: users.length,                                     cls: "aum-sv-blue" },
-    { label: "Students",     value: users.filter((u) => u.role === "student").length,   cls: "aum-sv-green" },
-    { label: "Professors",   value: users.filter((u) => u.role === "professor").length, cls: "aum-sv-purple" },
-    { label: "Admins",       value: users.filter((u) => u.role === "admin").length,     cls: "aum-sv-orange" },
-    { label: "Active",       value: users.filter((u) => u.status === "active").length,  cls: "aum-sv-emerald" },
-    { label: "Suspended",    value: users.filter((u) => u.status === "suspended").length, cls: "aum-sv-red" },
-  ];
 
   const navItems = [
     { icon: HomeIcon,        label: "Dashboard",    path: "/admin/dashboard" },
@@ -408,28 +404,17 @@ export default function AdminUserManagement() {
         <div className="aum-content">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
 
-          {/* Header Banner */}
-          <div className="aum-header">
-            <div className="aum-header-left">
-              <div className="aum-header-title-row">
+          {/* Header */}
+          <div className="aum-page-header">
+            <div className="aum-title-section">
+              <div className="aum-title-icon">
                 <UsersHeaderIcon />
-                <h1 className="aum-header-title">User Account Management</h1>
               </div>
-              <p className="aum-header-subtitle">Manage all user accounts across the OAMS system</p>
+              <div>
+                <h1 className="aum-page-title">User Account Management</h1>
+                <p className="aum-page-subtitle">Manage all user accounts across the OAMS system</p>
+              </div>
             </div>
-            <button className="aum-add-btn" onClick={openAddModal}>
-              <PlusIcon /> Add User
-            </button>
-          </div>
-
-          {/* Stats */}
-          <div className="aum-stats-grid">
-            {statCards.map((s) => (
-              <div key={s.label} className="aum-stat-card">
-                <p className="aum-stat-label">{s.label}</p>
-                <p className={`aum-stat-value ${s.cls}`}>{s.value}</p>
-              </div>
-            ))}
           </div>
 
           {/* Filter & Search */}
@@ -478,10 +463,10 @@ export default function AdminUserManagement() {
           <div className="aum-tabs-wrapper">
             <div className="aum-tab-list">
               {[
-                { key: "all",        label: `All Users (${filtered.length})` },
-                { key: "students",   label: `Students (${students.length})` },
-                { key: "professors", label: `Professors (${professors.length})` },
-                { key: "admins",     label: `Admins (${admins.length})` },
+                { key: "all",        label: "All Users" },
+                { key: "students",   label: "Students" },
+                { key: "professors", label: "Professors" },
+                { key: "admins",     label: "Admins" },
               ].map((t) => (
                 <button key={t.key} className={`aum-tab-btn ${activeTab === t.key ? "aum-tab-active" : ""}`} onClick={() => setActiveTab(t.key)}>
                   {t.label}
@@ -517,6 +502,13 @@ export default function AdminUserManagement() {
                       </div>
                       <div className="aum-user-actions">
                         <button className="aum-icon-btn aum-icon-btn-edit"   onClick={() => openEditModal(u)}      title="Edit user"><EditIconSvg /></button>
+                        <button
+                          className={`aum-icon-btn ${u.status === "suspended" ? "aum-icon-btn-reactivate" : "aum-icon-btn-suspend"}`}
+                          onClick={() => handleToggleSuspend(u)}
+                          title={u.status === "suspended" ? "Reactivate account" : "Suspend account"}
+                        >
+                          {u.status === "suspended" ? <CheckCircleIconSvg /> : <BanIconSvg />}
+                        </button>
                         <button className="aum-icon-btn aum-icon-btn-key"    onClick={() => handleResetPassword(u)} title="Reset password"><KeyIconSvg /></button>
                         <button className="aum-icon-btn aum-icon-btn-delete" onClick={() => handleDelete(u.id)}    title="Delete user"><TrashIconSvg /></button>
                       </div>
@@ -536,8 +528,8 @@ export default function AdminUserManagement() {
           <div className="aum-modal">
             <div className="aum-modal-header">
               <div>
-                <h2 className="aum-modal-title">{editingUser ? "Edit User Account" : "Create New User Account"}</h2>
-                <p className="aum-modal-desc">{editingUser ? "Update user account information" : "Add a new user to the OAMS system"}</p>
+                <h2 className="aum-modal-title">Edit User Account</h2>
+                <p className="aum-modal-desc">Update user account information</p>
               </div>
               <button className="aum-modal-close" onClick={closeModal} aria-label="Close modal"><CloseIcon /></button>
             </div>
@@ -595,7 +587,7 @@ export default function AdminUserManagement() {
             </div>
             <div className="aum-modal-footer">
               <button className="aum-btn-cancel" onClick={closeModal}>Cancel</button>
-              <button className="aum-btn-submit" onClick={handleSave}>{editingUser ? "Update User" : "Create User"}</button>
+              <button className="aum-btn-submit" onClick={handleSave}>Update User</button>
             </div>
           </div>
         </div>

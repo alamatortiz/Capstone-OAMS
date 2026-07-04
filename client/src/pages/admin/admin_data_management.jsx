@@ -750,14 +750,18 @@ export default function AdminDataManagement() {
         <div className="admin-dashboard">
 
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Banner */}
-          <div className="adm-banner">
-            <div className="adm-banner-icon"><DatabaseIcon /></div>
-            <div className="adm-banner-text">
-              <h1 className="adm-banner-title">Data Management</h1>
-              <p className="adm-banner-subtitle">
-                {user?.college} ({user?.departmentAbbrev}) — Configure document types and queue services
-              </p>
+          {/* Header */}
+          <div className="adm-page-header">
+            <div className="adm-title-section">
+              <div className="adm-title-icon">
+                <DatabaseIcon />
+              </div>
+              <div>
+                <h1 className="adm-page-title">Data Management</h1>
+                <p className="adm-page-subtitle">
+                  {user?.college} ({user?.departmentAbbrev}) — Configure document types and queue services
+                </p>
+              </div>
             </div>
           </div>
 

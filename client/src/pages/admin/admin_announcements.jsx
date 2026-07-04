@@ -313,8 +313,13 @@ export default function AdminAnnouncements() {
     archived:  announcements.filter((a) => a.status === "archived").length,
   };
 
-  const getFiltered = (status) => {
-    let list = announcements.filter((a) => a.status === status);
+  const getFiltered = (tab) => {
+    let list = announcements.filter((a) => {
+      if (tab === "archived") return a.status === "archived";
+      if (tab === "pinned") return a.status === "active" && a.isPinned;
+      if (tab === "unpinned") return a.status === "active" && !a.isPinned;
+      return a.status === "active";
+    });
     if (selectedType !== "all") list = list.filter((a) => a.type === selectedType);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -501,7 +506,7 @@ export default function AdminAnnouncements() {
               </div>
             </div>
             <div className="user-college-wrapper">
-              <p className="user-college-text">{user?.college}</p>
+              <p className="user-college-text">{user?.college} ({user?.departmentAbbrev})</p>
             </div>
           </div>
           <nav className="sidebar-nav">
@@ -549,11 +554,16 @@ export default function AdminAnnouncements() {
 
           {/* Header */}
           <div className="ann-header-row">
-            <div>
-              <h1 className="ann-page-title">Announcements Management</h1>
-              <p className="ann-page-subtitle">
-                Manage announcements for {user?.college || "your department"}
-              </p>
+            <div className="ann-title-section">
+              <div className="ann-title-icon">
+                <MegaphoneIcon />
+              </div>
+              <div>
+                <h1 className="ann-page-title">Announcements Management</h1>
+                <p className="ann-page-subtitle">
+                  Manage announcements for {user?.college || "your department"}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -612,6 +622,12 @@ export default function AdminAnnouncements() {
             <div className="ann-tabs">
               <button className={`ann-tab ${activeTab === "active" ? "ann-tab-active" : ""}`} onClick={() => setActiveTab("active")}>
                 Active
+              </button>
+              <button className={`ann-tab ${activeTab === "pinned" ? "ann-tab-active" : ""}`} onClick={() => setActiveTab("pinned")}>
+                Pinned
+              </button>
+              <button className={`ann-tab ${activeTab === "unpinned" ? "ann-tab-active" : ""}`} onClick={() => setActiveTab("unpinned")}>
+                Unpinned
               </button>
               <button className={`ann-tab ${activeTab === "archived" ? "ann-tab-active" : ""}`} onClick={() => setActiveTab("archived")}>
                 Archived

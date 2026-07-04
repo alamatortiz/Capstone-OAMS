@@ -496,7 +496,7 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.3rem;
+  gap: 1.5rem;
 }
 
 /* ===== Sidebar Overlay (Mobile) ===== */
@@ -706,12 +706,15 @@ body {
   height: 1.25rem;
 }
 
-/* ===== Breadcrumb (mirrors professor/student pages) ===== */
-.prof-breadcrumb {
+/* ===== Breadcrumb (self-contained so its rendered height/gap can't be
+   clobbered by whichever other admin page's CSS happened to load last) ===== */
+.queue-page-container .prof-breadcrumb,
+.queue-monitoring-container .prof-breadcrumb {
   display: flex;
   align-items: center;
 }
-.prof-breadcrumb-link {
+.queue-page-container .prof-breadcrumb-link,
+.queue-monitoring-container .prof-breadcrumb-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -727,11 +730,13 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.prof-breadcrumb-link:hover {
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
+.queue-page-container .prof-breadcrumb-link:hover,
+.queue-monitoring-container .prof-breadcrumb-link:hover {
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.1);
 }
-.prof-breadcrumb-link svg {
+.queue-page-container .prof-breadcrumb-link svg,
+.queue-monitoring-container .prof-breadcrumb-link svg {
   width: 1rem;
   height: 1rem;
   stroke: currentColor;
@@ -767,7 +772,7 @@ body {
   stroke-width: 2;
 }
 .aq-title {
-  font-size: 1.5rem;
+  font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
