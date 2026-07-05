@@ -1,76 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
-import ucLogo from "../../assets/Pnc-Logo.png";
-import oamsLogo from "../../assets/oams_logo.png";
+import { Link } from "react-router-dom";
 import "./admin_dashboard.css";
 import "./admin_data_management.css";
-import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import AdminSidebar from "../../components/AdminSidebar";
+import ChatWidget from "../../components/ChatWidget";
 
 // ── Shared sidebar / chatbot icons ────────────────────────────────────────────
-const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-  </svg>
-);
-const HomeIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
-  </svg>
-);
-const QueueIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-const CalendarIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-);
-const DocumentIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="12" y1="13" x2="12" y2="17" />
-    <line x1="9" y1="15" x2="15" y2="15" />
-  </svg>
-);
-const HistoryIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36" />
-  </svg>
-);
-const LogOutIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
-const MenuIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-);
 const ChevronLeftIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="15 18 9 12 15 6" />
@@ -82,31 +20,6 @@ const CloseIcon = () => (
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-const SunIcon = () => (
-  <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="5" />
-    <line x1="12" y1="1" x2="12" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="23" />
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-    <line x1="1" y1="12" x2="3" y2="12" />
-    <line x1="21" y1="12" x2="23" y2="12" />
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-  </svg>
-);
-const MoonIcon = () => (
-  <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </svg>
-);
-
 // ── Page-specific icons ───────────────────────────────────────────────────────
 const DatabaseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -193,7 +106,7 @@ const emptyReqForm = () => ({ name: "", description: "", isMandatory: true });
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function AdminDataManagement() {
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -201,18 +114,6 @@ export default function AdminDataManagement() {
         departmentAbbrev: authUser.departmentAbbrev ?? "",
       }
     : { name: "Admin", role: "admin", college: "", departmentAbbrev: "" };
-
-  const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
-
-  // Chatbot
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { id: 1, type: "bot", text: "Hello! I'm your OAMS Assistant. Need help with Data Management?", timestamp: new Date() },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
 
   // Tabs
   const [activeTab, setActiveTab] = useState("documents");
@@ -253,9 +154,6 @@ export default function AdminDataManagement() {
   const [auditActionFilter, setAuditActionFilter] = useState("all");
 
   // ── Effects ────────────────────────────────────────────────
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-  useEffect(() => { applyTheme(isDark ? "dark" : "light"); }, [isDark]);
-
   const fetchDocumentTypes = useCallback(async (status = "all") => {
     setDocLoading(true);
     try {
@@ -306,27 +204,6 @@ export default function AdminDataManagement() {
   useEffect(() => {
     if (activeTab === "audit") fetchAuditLogs(auditActionFilter);
   }, [activeTab, auditActionFilter, fetchAuditLogs]);
-
-  // ── Handlers: sidebar / theme / chat ──────────────────────
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const handleLogout = () => setShowLogoutConfirm(true);
-  const confirmLogout = () => { logout(); navigate("/login"); };
-
-  const toggleDarkMode = () => {
-    setIsDark((prev) => { const next = !prev; applyTheme(next ? "dark" : "light"); return next; });
-  };
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = { id: messages.length + 1, type: "user", text: inputValue, timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInputValue("");
-    setTimeout(() => {
-      const bot = { id: messages.length + 2, type: "bot", text: generateBotResponse(inputValue), timestamp: new Date() };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
-  };
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
@@ -581,15 +458,6 @@ export default function AdminDataManagement() {
     }
   };
 
-  // ── Nav items ──────────────────────────────────────────────
-  const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
-    { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
-    { icon: CalendarIconNav, label: "Appointments", path: "/admin/appointments" },
-    { icon: DocumentIconNav, label: "Documents", path: "/admin/documents" },
-    { icon: HistoryIconNav, label: "Transactions", path: "/admin/transactions" },
-  ];
-
   // ── Filter constants ───────────────────────────────────────
   const STATUS_FILTERS = [
     { value: "all", label: "All" },
@@ -645,105 +513,7 @@ export default function AdminDataManagement() {
   // ── Render ─────────────────────────────────────────────────
   return (
     <div className="admin-dashboard-with-sidebar">
-      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
-
-      {/* ── AI Chatbot ── */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button className="chat-close-btn" onClick={() => setChatOpen(false)} aria-label="Close chat">
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button type="submit" className="chat-send-btn" aria-label="Send message">
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button className={`chat-fab ${chatOpen ? "hidden" : ""}`} onClick={() => setChatOpen(true)} aria-label="Open chat">
-          <ChatIcon />
-        </button>
-      </div>
-
-      {/* ── Sidebar ── */}
-      <aside className={`admin-dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-inner">
-          <div className="sidebar-logo">
-            <div className="logo-container">
-              <img src={ucLogo} alt="UC Logo" className="logo-img" />
-              <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
-            </div>
-            <button className="theme-toggle-btn" onClick={toggleDarkMode} aria-label="Toggle dark mode">
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-          </div>
-          <div className="sidebar-user-section">
-            <div className="user-top-row">
-              <div className="user-avatar-large"><UserIcon /></div>
-              <div className="user-info-content">
-                <p className="user-name-large">{user?.name}</p>
-                <span className="user-role-badge">Administrator</span>
-              </div>
-            </div>
-            <div className="user-college-wrapper">
-              <p className="user-college-text">{user?.college} ({user?.departmentAbbrev})</p>
-            </div>
-          </div>
-          <nav className="sidebar-nav">
-            <div className="nav-items">
-              {navItems.map((item) => (
-                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className="nav-item" title={item.label}>
-                  <item.icon className="nav-icon-medium" />
-                  <span className="nav-label">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </nav>
-          <div className="sidebar-logout">
-            <button className="logout-btn" onClick={handleLogout}>
-              <LogOutIcon />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Mobile Header ── */}
-      <header className="mobile-header">
-        <div className="mobile-header-content">
-          <div className="mobile-logo">
-            <img src={ucLogo} alt="UC Logo" className="logo-img" />
-            <img src={oamsLogo} alt="OAMS Logo" className="logo-img oams-logo-img" />
-          </div>
-          <div className="mobile-header-actions">
-            <button className="theme-toggle-btn" onClick={toggleDarkMode} aria-label="Toggle dark mode">
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar">
-              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
-            </button>
-          </div>
-        </div>
-      </header>
+      <AdminSidebar />
 
       {/* ── Main Content ── */}
       <main className="admin-dashboard-main">
@@ -974,8 +744,10 @@ export default function AdminDataManagement() {
         </div>
       </main>
 
-      {/* ── Sidebar overlay (mobile) ── */}
-      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      <ChatWidget
+        initialGreeting="Hello! I'm your OAMS Assistant. Need help with Data Management?"
+        getBotResponse={generateBotResponse}
+      />
 
       {/* ── Document Type Modal ── */}
       {showDocModal && (

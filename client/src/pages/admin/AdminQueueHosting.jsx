@@ -1,50 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import ucLogo from "../../assets/Pnc-Logo.png";
-import oamsLogo from "../../assets/oams_logo.png";
+import { Link } from "react-router-dom";
 import "./admin-queue-hosting.css";
-import { applyTheme, getSavedTheme } from "../../utils/theme";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import LogoutConfirmModal from "../../components/LogoutConfirmModal";
+import AdminSidebar from "../../components/AdminSidebar";
+import ChatWidget from "../../components/ChatWidget";
 
 // ── Icons ──────────────────────────────────────────────────────
-const ChatIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-const SendIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
-const HomeIcon = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-  </svg>
-);
 const QueueIconNav = ({ className }) => (
   <svg
     className={className}
@@ -57,61 +20,6 @@ const QueueIconNav = ({ className }) => (
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
-const CalendarIconNav = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-    <line x1="16" y1="2" x2="16" y2="6"></line>
-    <line x1="8" y1="2" x2="8" y2="6"></line>
-    <line x1="3" y1="10" x2="21" y2="10"></line>
-  </svg>
-);
-const DocumentIconNav = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="12" y1="13" x2="12" y2="17"></line>
-    <line x1="9" y1="15" x2="15" y2="15"></line>
-  </svg>
-);
-const HistoryIconNav = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36"></path>
-  </svg>
-);
-const LogOutIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-    <polyline points="16 17 21 12 16 7"></polyline>
-    <line x1="21" y1="12" x2="9" y2="12"></line>
-  </svg>
-);
-const MenuIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="3" y1="6" x2="21" y2="6"></line>
-    <line x1="3" y1="12" x2="21" y2="12"></line>
-    <line x1="3" y1="18" x2="21" y2="18"></line>
-  </svg>
-);
 const ChevronLeftIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="15 18 9 12 15 6" />
@@ -121,42 +29,6 @@ const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-    <circle cx="12" cy="7" r="4"></circle>
-  </svg>
-);
-const SunIcon = () => (
-  <svg
-    className="sun-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="5"></circle>
-    <line x1="12" y1="1" x2="12" y2="3"></line>
-    <line x1="12" y1="21" x2="12" y2="23"></line>
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-    <line x1="1" y1="12" x2="3" y2="12"></line>
-    <line x1="21" y1="12" x2="23" y2="12"></line>
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-  </svg>
-);
-const MoonIcon = () => (
-  <svg
-    className="moon-icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 const PlusIcon = () => (
@@ -210,7 +82,7 @@ const getCollegeLogo = (code) =>
   ).href;
 
 export default function AdminQueueHosting() {
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -218,22 +90,6 @@ export default function AdminQueueHosting() {
         departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
       }
     : { name: "Admin", role: "admin", college: "", departmentAbbrev: "CCS" };
-
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: `Hello! 👋 I'm your OAMS Assistant. How can I help you host queues for ${user.departmentAbbrev} today?`,
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
 
   // ── Real queue + service data (scoped server-side to admin's dept) ───────
   const [queues, setQueues] = useState([]);
@@ -282,24 +138,6 @@ export default function AdminQueueHosting() {
   const [serviceEnd, setServiceEnd] = useState("17:00");
   const [noShowTimeout, setNoShowTimeout] = useState("15");
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-  useEffect(() => {
-    applyTheme(isDark ? "dark" : "light");
-  }, [isDark]);
-
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const handleLogout = () => setShowLogoutConfirm(true);
-  const confirmLogout = () => { logout(); navigate("/login"); };
-  const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      applyTheme(next ? "dark" : "light");
-      return next;
-    });
-  };
-
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
     if (i.includes("open") || i.includes("new queue") || i.includes("host"))
@@ -314,44 +152,6 @@ export default function AdminQueueHosting() {
       return "Capacity shows how many students are currently waiting relative to the queue's maximum.";
     return `I can help with opening, pausing, resuming, and closing queue lines for ${user.departmentAbbrev}. What do you need?`;
   };
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = {
-      id: messages.length + 1,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInputValue("");
-    setTimeout(() => {
-      const bot = {
-        id: messages.length + 2,
-        type: "bot",
-        text: generateBotResponse(inputValue),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
-  };
-
-  const navItems = [
-    { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
-    { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
-    {
-      icon: CalendarIconNav,
-      label: "Appointments",
-      path: "/admin/appointments",
-    },
-    { icon: DocumentIconNav, label: "Documents", path: "/admin/documents" },
-    {
-      icon: HistoryIconNav,
-      label: "Transactions",
-      path: "/admin/transactions",
-    },
-  ];
 
   // ── Modal handlers ─────────────────────────────────────────────────────────
   const resetForm = () => {
@@ -470,147 +270,7 @@ export default function AdminQueueHosting() {
 
   return (
     <div className="aqh-dashboard-with-sidebar">
-      <LogoutConfirmModal show={showLogoutConfirm} onConfirm={confirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="chat-send-btn"
-                aria-label="Send message"
-              >
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <aside className={`aqh-dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="aqh-sidebar-inner">
-          <div className="aqh-sidebar-logo">
-            <div className="aqh-logo-container">
-              <img src={ucLogo} alt="UC Logo" className="aqh-logo-img" />
-              <img
-                src={oamsLogo}
-                alt="OAMS Logo"
-                className="aqh-logo-img aqh-oams-logo-img"
-              />
-            </div>
-            <button
-              className="aqh-theme-toggle-btn"
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-          </div>
-          <div className="aqh-sidebar-user-section">
-            <div className="aqh-user-top-row">
-              <div className="aqh-user-avatar-large">
-                <UserIcon />
-              </div>
-              <div className="aqh-user-info-content">
-                <p className="aqh-user-name-large">{user?.name}</p>
-                <span className="aqh-user-role-badge">Administrator</span>
-              </div>
-            </div>
-            <div className="aqh-user-college-wrapper">
-              <p className="aqh-user-college-text">
-                {user?.college} ({user?.departmentAbbrev})
-              </p>
-            </div>
-          </div>
-          <nav className="aqh-sidebar-nav">
-            <div className="aqh-nav-items">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`aqh-nav-item${location.pathname === item.path ? " active" : ""}`}
-                  title={item.label}
-                >
-                  <item.icon className="aqh-nav-icon-medium" />
-                  <span className="aqh-nav-label">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </nav>
-          <div className="aqh-sidebar-logout">
-            <button className="aqh-logout-btn" onClick={handleLogout}>
-              <LogOutIcon />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile Header */}
-      <header className="aqh-mobile-header">
-        <div className="aqh-mobile-header-content">
-          <div className="aqh-mobile-logo">
-            <img src={ucLogo} alt="UC Logo" className="aqh-logo-img" />
-            <img
-              src={oamsLogo}
-              alt="OAMS Logo"
-              className="aqh-logo-img aqh-oams-logo-img"
-            />
-          </div>
-          <div className="aqh-mobile-header-actions">
-            <button
-              className="aqh-theme-toggle-btn"
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button
-              className="aqh-sidebar-toggle"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Toggle sidebar"
-            >
-              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
-            </button>
-          </div>
-        </div>
-      </header>
+      <AdminSidebar />
 
       {/* Main Content */}
       <main className="aqh-dashboard-main">
@@ -987,12 +647,10 @@ export default function AdminQueueHosting() {
         </div>
       </main>
 
-      {sidebarOpen && (
-        <div
-          className="aqh-sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <ChatWidget
+        initialGreeting={`Hello! 👋 I'm your OAMS Assistant. How can I help you host queues for ${user.departmentAbbrev} today?`}
+        getBotResponse={generateBotResponse}
+      />
 
       {/* Open New Queue Line Modal */}
       {showModal && (
