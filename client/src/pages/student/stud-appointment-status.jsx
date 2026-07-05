@@ -258,8 +258,8 @@ export default function AppointmentStatusPage() {
 
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main apst-page"
+      outerClassName="apst-with-sidebar"
+      mainClassName="apst-main"
       overlay={
         <ChatWidget
           initialGreeting="Hello! I can help you with your appointments."
@@ -299,14 +299,14 @@ export default function AppointmentStatusPage() {
             <Link
               to="/student/professor-schedules"
               state={{ from: "/student/appointment-status", fromLabel: "My Appointments" }}
-              className="appt-prof-sched-card"
+              className="apst-prof-sched-card"
             >
-              <div className="appt-prof-sched-card-icon">
+              <div className="apst-prof-sched-card-icon">
                 <GraduationCap />
               </div>
-              <div className="appt-prof-sched-card-text">
-                <span className="appt-prof-sched-card-title">Professor Schedules</span>
-                <span className="appt-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
+              <div className="apst-prof-sched-card-text">
+                <span className="apst-prof-sched-card-title">Professor Schedules</span>
+                <span className="apst-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
               </div>
               <ChevronRight style={{ width: "1.375rem", height: "1.375rem", color: "#a855f7", opacity: 0.7, flexShrink: 0 }} />
             </Link>

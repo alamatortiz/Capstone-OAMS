@@ -121,7 +121,7 @@ body {
 }
 
 /* ===== Dashboard Layout ===== */
-.dashboard-with-sidebar {
+.psched-with-sidebar {
   display: flex;
   min-height: 100vh;
   background-color: var(--dark-bg);
@@ -129,7 +129,7 @@ body {
 }
 
 /* ===== Main Content ===== */
-.dashboard-main {
+.psched-main {
   flex: 1;
   margin-left: var(--sidebar-width);
   overflow-y: auto;
@@ -147,7 +147,7 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .dashboard-main {
+  .psched-main {
     margin-left: 0;
     margin-top: 4rem;
   }
@@ -272,7 +272,7 @@ body {
   text-align: left;
 }
 
-.card-title {
+.psched-card-title {
   font-size: 0.9rem;
   font-weight: 700;
   color: #a855f7;
@@ -282,7 +282,7 @@ body {
   transition: color 0.3s ease;
 }
 
-[data-theme="light"] .card-title {
+[data-theme="light"] .psched-card-title {
   color: #6d28d9;
 }
 

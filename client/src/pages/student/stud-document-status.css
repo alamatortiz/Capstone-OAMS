@@ -1,5 +1,27 @@
 /* ===== Document Status Page — Overrides & Extensions ===== */
-/* Base layout / sidebar / card / dialog styles come from queue-status.css  */
+/* Fully self-contained — no longer depends on other pages' CSS. */
+
+/* ─── Page Shell ─────────────────────────────────────────────────────────── */
+.dss-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+.dss-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+  .dss-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
 
 /* ─── Title Icon (orange, matching Documents color) ─────────────────────── */
 .dss-title-icon {
@@ -463,7 +485,7 @@
 }
 
 /* ─── Count pill inside each tab ─────────────────────────────────────────── */
-.doc-tab-count {
+.dss-tab-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -478,21 +500,21 @@
   transition: background 0.2s;
 }
 
-.qt-tab.active .doc-tab-count {
+.dss-tab.active .dss-tab-count {
   background: rgba(249, 115, 22, 0.25);
 }
 
-[data-theme="light"] .doc-tab-count {
+[data-theme="light"] .dss-tab-count {
   background: rgba(234, 88, 12, 0.1);
   color: #ea580c;
 }
 
-[data-theme="light"] .qt-tab.active .doc-tab-count {
+[data-theme="light"] .dss-tab.active .dss-tab-count {
   background: rgba(234, 88, 12, 0.2);
 }
 
 /* ─── Tabs ───────────────────────────────────────────────────────────────── */
-.qt-tabs-container {
+.dss-tabs-container {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -500,7 +522,7 @@
   margin-bottom: 2rem;
 }
 
-.qt-tabs-list {
+.dss-tabs-list {
   display: flex;
   gap: 0.5rem;
   border-bottom: 2px solid var(--card-border);
@@ -508,7 +530,7 @@
   transition: border-color 0.3s ease;
 }
 
-.qt-tab {
+.dss-tab {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -525,21 +547,21 @@
   letter-spacing: 0.4px;
 }
 
-.qt-tab svg {
+.dss-tab svg {
   width: 1rem;
   height: 1rem;
   flex-shrink: 0;
 }
 
-.doc-status-page .qt-tab:hover {
+.doc-status-page .dss-tab:hover {
   color: #f97316;
 }
 
-.doc-status-page .qt-tab.active {
+.doc-status-page .dss-tab.active {
   color: #f97316;
 }
 
-.doc-status-page .qt-tab.active::after {
+.doc-status-page .dss-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
@@ -551,12 +573,15 @@
 
 /* ─── Card shell (self-contained, orange accent) ─────────────────────────── */
 .dss-card {
-  background: var(--queue-card-bg);
-  border: 1px solid var(--queue-card-border);
+  background: #111612;
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1.125rem;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-color: rgba(249, 115, 22, 0.25);
+}
+
+[data-theme="light"] .dss-card {
+  background: #ffffff;
 }
 
 .dss-card-header {

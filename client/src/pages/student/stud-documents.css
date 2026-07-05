@@ -451,7 +451,7 @@ body {
   transition: background 0.2s;
 }
 
-.qt-tab.active .doc-tab-count {
+.doc-tab.active .doc-tab-count {
   background: rgba(249, 115, 22, 0.25);
 }
 
@@ -460,12 +460,12 @@ body {
   color: #ea580c;
 }
 
-[data-theme="light"] .qt-tab.active .doc-tab-count {
+[data-theme="light"] .doc-tab.active .doc-tab-count {
   background: rgba(234, 88, 12, 0.2);
 }
 
 /* ===== DOCUMENT TABS ===== */
-.qt-tabs-container {
+.doc-tabs-container {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -473,7 +473,7 @@ body {
   margin-bottom: 2rem;
 }
 
-.qt-tabs-list {
+.doc-tabs-list {
   display: flex;
   gap: 0.5rem;
   border-bottom: 2px solid var(--card-border);
@@ -481,7 +481,7 @@ body {
   transition: border-color 0.3s ease;
 }
 
-.qt-tab {
+.doc-tab {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -498,21 +498,21 @@ body {
   letter-spacing: 0.4px;
 }
 
-.qt-tab svg {
+.doc-tab svg {
   width: 1rem;
   height: 1rem;
   flex-shrink: 0;
 }
 
-.doc-content .qt-tab:hover {
+.doc-content .doc-tab:hover {
   color: #f97316;
 }
 
-.doc-content .qt-tab.active {
+.doc-content .doc-tab.active {
   color: #f97316;
 }
 
-.doc-content .qt-tab.active::after {
+.doc-content .doc-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
@@ -522,7 +522,7 @@ body {
   background: #f97316;
 }
 
-.qt-tab-content {
+.doc-tab-content {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;

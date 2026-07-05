@@ -205,8 +205,8 @@ export default function ProfessorSchedule() {
 
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main"
+      outerClassName="psched-with-sidebar"
+      mainClassName="psched-main"
       overlay={
         <ChatWidget
           initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
@@ -285,7 +285,7 @@ export default function ProfessorSchedule() {
                         />
                       </div>
                       <div className="card-info">
-                        <h3 className="card-title">{dept.departmentName}</h3>
+                        <h3 className="psched-card-title">{dept.departmentName}</h3>
                         <span className="card-abbrev">{dept.departmentAbbrev}</span>
                       </div>
                       <div className="card-meta">

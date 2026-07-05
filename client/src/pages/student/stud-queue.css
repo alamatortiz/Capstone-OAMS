@@ -116,7 +116,7 @@ body {
 }
 
 /* ===== Dashboard With Sidebar Layout ===== */
-.dashboard-with-sidebar {
+.qpage-with-sidebar {
   display: flex;
   min-height: 100vh;
   background-color: var(--dark-bg);
@@ -124,7 +124,7 @@ body {
 }
 
 /* ===== Main Content ===== */
-.dashboard-main {
+.qpage-main {
   flex: 1;
   margin-left: var(--sidebar-width);
   overflow-y: auto;
@@ -142,7 +142,7 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .dashboard-main {
+  .qpage-main {
     margin-left: 0;
     margin-top: 4rem;
   }
@@ -193,7 +193,7 @@ body {
   height: 1.25rem;
 }
 
-.queue-tracking-link-btn {
+.qp-tracking-link-btn {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -207,7 +207,7 @@ body {
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
 }
 
-.queue-tracking-link-btn:hover {
+.qp-tracking-link-btn:hover {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.14) 100%);
   border-color: rgba(59, 130, 246, 0.55);
   box-shadow: 0 6px 20px rgba(59, 130, 246, 0.22);
@@ -215,7 +215,7 @@ body {
   color: var(--text-primary);
 }
 
-.queue-tracking-link-btn-icon-box {
+.qp-tracking-link-btn-icon-box {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 0.625rem;
@@ -227,14 +227,14 @@ body {
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
 }
 
-.queue-tracking-link-btn-icon-box svg {
+.qp-tracking-link-btn-icon-box svg {
   width: 1.375rem;
   height: 1.375rem;
   color: white;
   stroke: white;
 }
 
-.queue-tracking-link-btn-text {
+.qp-tracking-link-btn-text {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -244,19 +244,19 @@ body {
   text-align: left;
 }
 
-.queue-tracking-link-btn-title {
+.qp-tracking-link-btn-title {
   font-size: 0.9rem;
   font-weight: 700;
   color: #3b82f6;
 }
 
-.queue-tracking-link-btn-subtitle {
+.qp-tracking-link-btn-subtitle {
   font-size: 0.78rem;
   color: var(--text-tertiary);
   line-height: 1.4;
 }
 
-.queue-tracking-chevron {
+.qp-tracking-chevron {
   width: 1.375rem;
   height: 1.375rem;
   flex-shrink: 0;
@@ -265,17 +265,17 @@ body {
   opacity: 0.7;
 }
 
-[data-theme="light"] .queue-tracking-link-btn {
+[data-theme="light"] .qp-tracking-link-btn {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.07) 0%, rgba(79, 70, 229, 0.04) 100%);
   border-color: rgba(37, 99, 235, 0.25);
 }
 
-[data-theme="light"] .queue-tracking-link-btn:hover {
+[data-theme="light"] .qp-tracking-link-btn:hover {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.13) 0%, rgba(79, 70, 229, 0.09) 100%);
   border-color: rgba(37, 99, 235, 0.45);
 }
 
-[data-theme="light"] .queue-tracking-link-btn-title {
+[data-theme="light"] .qp-tracking-link-btn-title {
   color: #2563eb;
 }
 
@@ -326,7 +326,7 @@ body {
   gap: 1rem;
 }
 
-.section-title-wrapper {
+.qp-section-title-wrapper {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -340,7 +340,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.section-title {
+.qp-section-title {
   font-size: 1.375rem;
   font-weight: 700;
   font-family: "Inter", sans-serif;
@@ -394,15 +394,15 @@ body {
   border-color: rgba(59, 130, 246, 0.3);
 }
 
-.available-queue-card .queue-card-content {
+.available-queue-card .qp-card-content {
   align-items: center;
 }
 
-.available-queue-card .queue-left {
+.available-queue-card .qp-left {
   align-items: flex-start;
 }
 
-.available-queue-card .queue-header-row {
+.available-queue-card .qp-header-row {
   align-items: center;
 }
 
@@ -411,44 +411,45 @@ body {
   flex-shrink: 0;
 }
 
-.queue-card-content {
+.qp-card-content {
   padding: 1.5rem;
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1.5rem;
+  text-align: left;
 }
 
 @media (max-width: 768px) {
-  .queue-card-content {
+  .qp-card-content {
     flex-direction: column;
     align-items: stretch;
     padding: 1.25rem;
   }
 }
 
-.queue-left {
+.qp-left {
   display: flex;
   gap: 1.25rem;
   flex: 1;
   min-width: 0;
 }
 
-.queue-college-logo {
+.qp-college-logo {
   width: 3.5rem;
   height: 3.5rem;
   object-fit: contain;
   flex-shrink: 0;
 }
 
-.queue-college-logo-sm {
+.qp-college-logo-sm {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.queue-logo-wrapper {
+.qp-logo-wrapper {
   width: 4rem;
   height: 4rem;
   border-radius: 50%;
@@ -461,12 +462,12 @@ body {
   flex-shrink: 0;
 }
 
-[data-theme="light"] .queue-logo-wrapper {
+[data-theme="light"] .qp-logo-wrapper {
   background: #f1f5f9;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.queue-info {
+.qp-info {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -474,14 +475,15 @@ body {
   gap: 0.75rem;
 }
 
-.queue-header-row {
+.qp-header-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  text-align: left;
 }
 
-.queue-service-name {
+.qp-service-name {
   font-weight: 700;
   font-size: 0.95rem;
   color: var(--text-primary);
@@ -489,14 +491,14 @@ body {
   transition: color 0.3s ease;
 }
 
-.queue-college-name {
+.qp-college-name {
   font-size: 0.8rem;
   color: var(--text-tertiary);
   margin: 0.15rem 0 0 0;
   transition: color 0.3s ease;
 }
 
-.queue-number-badge,
+.qp-number-badge,
 .queue-status-badge {
   background: var(--primary-color);
   color: white;
@@ -529,7 +531,7 @@ body {
 }
 
 /* ===== Queue Stats Grid ===== */
-.queue-stats-grid {
+.qp-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
@@ -537,19 +539,19 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .queue-stats-grid {
+  .qp-stats-grid {
     gap: 0.75rem;
   }
 }
 
 @media (max-width: 768px) {
-  .queue-stats-grid {
+  .qp-stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }
 }
 
-.queue-stat {
+.qp-stat {
   background: rgba(17, 22, 18, 0.5);
   border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 0.75rem;
@@ -564,13 +566,13 @@ body {
   backdrop-filter: blur(10px);
 }
 
-[data-theme="light"] .queue-stat {
+[data-theme="light"] .qp-stat {
   background: rgba(248, 250, 252, 0.7);
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.queue-stat-label {
+.qp-stat-label {
   font-size: 0.7rem;
   color: var(--text-tertiary);
   margin: 0;
@@ -581,7 +583,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.queue-stat .queue-stat-value {
+.qp-stat .qp-stat-value {
   font-size: 1.575rem;
   font-weight: 700;
   color: var(--blue);
@@ -591,7 +593,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.queue-stat-value-sm {
+.qp-stat-value-sm {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -985,20 +987,20 @@ body {
     font-size: 1.5rem;
   }
 
-  .queue-stats-grid {
+  .qp-stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .queue-card-content {
+  .qp-card-content {
     padding: 1rem;
   }
 
-  .queue-college-logo {
+  .qp-college-logo {
     width: 3.5rem;
     height: 3.5rem;
   }
 
-  .queue-service-name {
+  .qp-service-name {
     font-size: 0.95rem;
   }
 
@@ -1027,26 +1029,26 @@ body {
     gap: 0.75rem;
   }
 
-  .queue-card-content {
+  .qp-card-content {
     padding: 1rem;
     gap: 1rem;
   }
 
-  .queue-stats-grid {
+  .qp-stats-grid {
     grid-template-columns: 1fr;
     gap: 0.75rem;
   }
 
-  .queue-stat {
+  .qp-stat {
     padding: 0.625rem;
   }
 
-  .queue-college-logo {
+  .qp-college-logo {
     width: 3rem;
     height: 3rem;
   }
 
-  .queue-service-name {
+  .qp-service-name {
     font-size: 0.9375rem;
   }
 
@@ -1110,7 +1112,7 @@ body {
   background: rgba(255, 255, 255, 0.95);
 }
 
-[data-theme="light"] .queue-stat {
+[data-theme="light"] .qp-stat {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
 }

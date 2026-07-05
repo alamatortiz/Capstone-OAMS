@@ -212,8 +212,8 @@ export default function AnnouncementsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main"
+      outerClassName="ann-with-sidebar"
+      mainClassName="ann-main"
       overlay={
         <ChatWidget
           initialGreeting="Hello! 👋 I'm your OAMS Assistant. Ask me about announcements or any college updates!"
@@ -237,7 +237,7 @@ export default function AnnouncementsPage() {
 
           {/* Error banner */}
           {annError && (
-            <div className="empty-state">
+            <div className="ann-empty-state">
               <AlertCircleIcon />
               <h3>Something went wrong</h3>
               <p>{annError}</p>
@@ -249,11 +249,11 @@ export default function AnnouncementsPage() {
 
           {/* Tabs + College Filter */}
           <div className="ann-tabs-bar">
-            <div className="qt-tabs-list">
+            <div className="ann-tabs-list">
               {filterTabs.map((tab) => (
                 <button
                   key={tab.id}
-                  className={`qt-tab ${selectedFilter === tab.id ? "active" : ""}`}
+                  className={`ann-tab ${selectedFilter === tab.id ? "active" : ""}`}
                   onClick={() => setSelectedFilter(tab.id)}
                 >
                   {tab.label}
@@ -280,7 +280,7 @@ export default function AnnouncementsPage() {
 
           {/* Loading state */}
           {annLoading && (
-            <div className="empty-state">
+            <div className="ann-empty-state">
               <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
               <p>Loading announcements…</p>
             </div>
@@ -289,9 +289,9 @@ export default function AnnouncementsPage() {
           {/* Pinned Tab Content */}
           {!annLoading && selectedFilter === "pinned" && (
             <section className="announcements-section">
-              <h2 className="section-title">Pinned Announcements</h2>
+              <h2 className="ann-section-title">Pinned Announcements</h2>
               {pinnedAnnouncements.length === 0 ? (
-                <div className="empty-state">
+                <div className="ann-empty-state">
                   <BellIcon />
                   <h3>No Pinned Announcements</h3>
                   <p>Announcements marked as important will appear here.</p>
@@ -347,13 +347,13 @@ export default function AnnouncementsPage() {
           {/* All / Category Tab Content */}
           {!annLoading && selectedFilter !== "pinned" && (
             <section className="announcements-section">
-              <h2 className="section-title">
+              <h2 className="ann-section-title">
                 {selectedFilter === "all"
                   ? "All Announcements"
                   : `${selectedFilter.charAt(0).toUpperCase() + selectedFilter.slice(1)} Announcements`}
               </h2>
               {filteredAnnouncements.length === 0 ? (
-                <div className="empty-state">
+                <div className="ann-empty-state">
                   <BellIcon />
                   <h3>No Announcements Found</h3>
                   <p>Try adjusting your filters to see more results.</p>

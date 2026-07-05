@@ -195,7 +195,7 @@ body {
 }
 
 /* ===== Stats Grid ===== */
-.stats-grid {
+.tx-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
@@ -203,11 +203,11 @@ body {
 }
 
 /*
- * All .stat-card rules are scoped under .transactions-container to win over
- * the globally-loaded student-dashboard.css which also defines .stat-card
+ * All .tx-stat-card rules are scoped under .transactions-container to win over
+ * the globally-loaded student-dashboard.css which also defines .tx-stat-card
  * with hover effects, left-alignment, and a ::before green overlay.
  */
-.transactions-container .stat-card {
+.transactions-container .tx-stat-card {
   background: var(--card-bg);
   border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 0.875rem;
@@ -223,18 +223,18 @@ body {
 }
 
 /* Suppress the dashboard ::before green-glow overlay */
-.transactions-container .stat-card::before {
+.transactions-container .tx-stat-card::before {
   content: none;
 }
 
 /* Green hover to match the page accent */
-.transactions-container .stat-card:hover {
+.transactions-container .tx-stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
   border-color: rgba(34, 197, 94, 0.45);
 }
 
-[data-theme="light"] .transactions-container .stat-card {
+[data-theme="light"] .transactions-container .tx-stat-card {
   background: rgba(248, 250, 252, 0.7);
 }
 
@@ -255,31 +255,31 @@ body {
   stroke: currentColor;
 }
 
-.bg-blue-50 {
+.tx-bg-blue-50 {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
   border-color: rgba(59, 130, 246, 0.2);
   color: var(--blue);
 }
 
-.bg-green-50 {
+.tx-bg-green-50 {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
   border-color: rgba(16, 185, 129, 0.2);
   color: var(--success);
 }
 
-.bg-orange-50 {
+.tx-bg-orange-50 {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
   border-color: rgba(245, 158, 11, 0.2);
   color: var(--warning);
 }
 
-.bg-purple-50 {
+.tx-bg-purple-50 {
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
   border-color: rgba(34, 197, 94, 0.2);
   color: var(--primary-color);
 }
 
-.transactions-container .stat-label {
+.transactions-container .tx-stat-label {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-tertiary);
@@ -290,7 +290,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.transactions-container .stat-value {
+.transactions-container .tx-stat-value {
   font-size: 2.5rem;
   font-weight: 800;
   line-height: 1;
@@ -316,14 +316,14 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .stats-grid {
+  .tx-stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
   }
 }
 
 @media (max-width: 640px) {
-  .stats-grid {
+  .tx-stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }
@@ -549,7 +549,7 @@ body {
   gap: 0.875rem;
 }
 
-.empty-state {
+.tx-empty-state {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1rem;
@@ -558,7 +558,7 @@ body {
   transition: all 0.3s ease;
 }
 
-.empty-state svg {
+.tx-empty-state svg {
   width: 3rem;
   height: 3rem;
   color: var(--text-tertiary);
@@ -566,7 +566,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.empty-state h3 {
+.tx-empty-state h3 {
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -574,7 +574,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.empty-state p {
+.tx-empty-state p {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0;
@@ -664,17 +664,17 @@ body {
   fill: none;
 }
 
-.badge-queue {
+.tx-badge-queue {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
   color: var(--blue);
 }
 
-.badge-appointment {
+.tx-badge-appointment {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
   color: var(--purple);
 }
 
-.badge-document {
+.tx-badge-document {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
   color: var(--warning);
 }
@@ -708,7 +708,7 @@ body {
   gap: 0.5rem;
 }
 
-.badge {
+.tx-badge {
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.625rem;
@@ -720,19 +720,19 @@ body {
   transition: all 0.3s ease;
 }
 
-.badge-completed {
+.tx-badge-completed {
   background: rgba(16, 185, 129, 0.15);
   color: var(--success);
   border: 0.5px solid rgba(16, 185, 129, 0.3);
 }
 
-.badge-ongoing {
+.tx-badge-ongoing {
   background: rgba(59, 130, 246, 0.15);
   color: var(--blue);
   border: 0.5px solid rgba(59, 130, 246, 0.3);
 }
 
-.badge-cancelled {
+.tx-badge-cancelled {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
   border: 0.5px solid rgba(239, 68, 68, 0.3);
@@ -833,7 +833,7 @@ body {
     gap: 0.75rem;
   }
 
-  .empty-state {
+  .tx-empty-state {
     padding: 2rem 1rem;
   }
 
@@ -841,7 +841,7 @@ body {
     font-size: 1.5rem;
   }
 
-  .stats-grid {
+  .tx-stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }

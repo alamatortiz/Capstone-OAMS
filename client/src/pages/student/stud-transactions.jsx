@@ -117,21 +117,21 @@ export default function TransactionsPage() {
       label: "Total",
       value: transactions.length,
       color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      bgColor: "tx-bg-blue-50",
       icon: "list",
     },
     {
       label: "Completed",
       value: transactions.filter((t) => t.status === "completed").length,
       color: "text-green-600",
-      bgColor: "bg-green-50",
+      bgColor: "tx-bg-green-50",
       icon: "check",
     },
     {
       label: "Ongoing",
       value: transactions.filter((t) => t.status === "ongoing").length,
       color: "text-orange-600",
-      bgColor: "bg-orange-50",
+      bgColor: "tx-bg-orange-50",
       icon: "clock",
     },
     {
@@ -144,7 +144,7 @@ export default function TransactionsPage() {
         );
       }).length,
       color: "text-purple-600",
-      bgColor: "bg-purple-50",
+      bgColor: "tx-bg-purple-50",
       icon: "calendar",
     },
   ];
@@ -219,26 +219,26 @@ export default function TransactionsPage() {
   const getTypeColor = (type) => {
     switch (type) {
       case "queue":
-        return "badge-queue";
+        return "tx-badge-queue";
       case "appointment":
-        return "badge-appointment";
+        return "tx-badge-appointment";
       case "document":
-        return "badge-document";
+        return "tx-badge-document";
       default:
-        return "badge-default";
+        return "tx-badge-default";
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case "completed":
-        return "badge-completed";
+        return "tx-badge-completed";
       case "ongoing":
-        return "badge-ongoing";
+        return "tx-badge-ongoing";
       case "cancelled":
-        return "badge-cancelled";
+        return "tx-badge-cancelled";
       default:
-        return "badge-default";
+        return "tx-badge-default";
     }
   };
 
@@ -270,17 +270,17 @@ export default function TransactionsPage() {
           />
 
           {/* Stats Grid */}
-          <div className="stats-grid">
+          <div className="tx-stats-grid">
             {stats.map((stat) => (
-              <div key={stat.label} className="stat-card">
+              <div key={stat.label} className="tx-stat-card">
                 <div className={`stat-icon-box ${stat.bgColor}`}>
                   {stat.icon === "list" && <ClipboardListIcon />}
                   {stat.icon === "check" && <CheckCircleIcon />}
                   {stat.icon === "clock" && <ClockIcon />}
                   {stat.icon === "calendar" && <CalendarIcon />}
                 </div>
-                <p className="stat-label">{stat.label}</p>
-                <p className={`stat-value ${stat.color}`}>{stat.value}</p>
+                <p className="tx-stat-label">{stat.label}</p>
+                <p className={`tx-stat-value ${stat.color}`}>{stat.value}</p>
               </div>
             ))}
           </div>
@@ -344,18 +344,18 @@ export default function TransactionsPage() {
           {/* Transaction List */}
           <div className="transactions-list">
             {txLoading ? (
-              <div className="empty-state">
+              <div className="tx-empty-state">
                 <SearchIcon />
                 <h3>Loading transactions…</h3>
               </div>
             ) : txError ? (
-              <div className="empty-state">
+              <div className="tx-empty-state">
                 <AlertCircleIcon />
                 <h3>Could not load transactions</h3>
                 <p>{txError}</p>
               </div>
             ) : filteredTransactions.length === 0 ? (
-              <div className="empty-state">
+              <div className="tx-empty-state">
                 <SearchIcon />
                 <h3>No transactions found</h3>
                 <p>Try adjusting your search or filters</p>
@@ -376,12 +376,12 @@ export default function TransactionsPage() {
                       <h3 className="transaction-title">{transaction.title}</h3>
                       <div className="transaction-badges">
                         <span
-                          className={`badge ${getTypeColor(transaction.type)}`}
+                          className={`tx-badge ${getTypeColor(transaction.type)}`}
                         >
                           {transaction.type}
                         </span>
                         <span
-                          className={`badge ${getStatusColor(
+                          className={`tx-badge ${getStatusColor(
                             transaction.status,
                           )}`}
                         >

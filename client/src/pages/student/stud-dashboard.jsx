@@ -296,7 +296,7 @@ export default function StudentDashboard() {
           : "No Active Queues",
       icon: ClockIcon,
       color: "text-blue-600",
-      bgColor: "bg-blue-50 dark:bg-blue-950",
+      bgColor: "dash-bg-blue-50 dark:bg-blue-950",
       link: "/student/queue-status",
     },
     {
@@ -311,7 +311,7 @@ export default function StudentDashboard() {
           : "No pending appointments",
       icon: CalendarIcon,
       color: "text-purple-600",
-      bgColor: "bg-purple-50 dark:bg-purple-950",
+      bgColor: "dash-bg-purple-50 dark:bg-purple-950",
       link: "/student/appointment-status",
     },
     {
@@ -326,7 +326,7 @@ export default function StudentDashboard() {
           : "No pending documents",
       icon: FileText,
       color: "text-orange-600",
-      bgColor: "bg-orange-50 dark:bg-orange-950",
+      bgColor: "dash-bg-orange-50 dark:bg-orange-950",
       link: "/student/document-status",
     },
     {
@@ -405,8 +405,8 @@ export default function StudentDashboard() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main"
+      outerClassName="dash-with-sidebar"
+      mainClassName="dash-main"
       overlay={
         <ChatWidget
           initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
@@ -443,9 +443,9 @@ export default function StudentDashboard() {
                 <h1 className="banner-title">{user?.name ?? "Student"}</h1>
               </div>
               <div className="banner-badges">
-                <span className="badge">Student Portal</span>
-                <span className="badge">AY 2025–2026</span>
-                <span className="badge">
+                <span className="dash-badge">Student Portal</span>
+                <span className="dash-badge">AY 2025–2026</span>
+                <span className="dash-badge">
                   {user?.studentNumber ?? "Student Number"}
                 </span>
               </div>
@@ -453,15 +453,15 @@ export default function StudentDashboard() {
           </div>
 
           {/* Stats Grid */}
-          <div className="stats-grid">
+          <div className="dash-stats-grid">
             {stats.map((stat) => (
-              <Link key={stat.title} to={stat.link} className="stat-card-link">
-                <div className="stat-card">
+              <Link key={stat.title} to={stat.link} className="dash-stat-card-link">
+                <div className="dash-stat-card">
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
                   </div>
                   <p
-                    className={`stat-value ${dashLoading ? "stat-loading" : ""}`}
+                    className={`dash-stat-value ${dashLoading ? "stat-loading" : ""}`}
                   >
                     {stat.value}
                   </p>
@@ -525,7 +525,7 @@ export default function StudentDashboard() {
             {mostRecentQueue ? (
               <div className="queue-preview-card">
                 <div className="card-header">
-                  <h3 className="card-title">
+                  <h3 className="dash-card-title">
                     <TimerIcon />
                     Active Queue
                   </h3>
@@ -555,19 +555,19 @@ export default function StudentDashboard() {
                     </div>
                   </div>
                   <div className="queue-stats">
-                    <div className="queue-stat">
+                    <div className="dash-queue-stat">
                       <p className="stat-num">{mostRecentQueue.position}</p>
-                      <p className="stat-label">Position</p>
+                      <p className="dash-stat-label">Position</p>
                     </div>
-                    <div className="queue-stat">
+                    <div className="dash-queue-stat">
                       <p className="stat-num">{mostRecentQueue.totalWaiting}</p>
-                      <p className="stat-label">Waiting</p>
+                      <p className="dash-stat-label">Waiting</p>
                     </div>
-                    <div className="queue-stat">
+                    <div className="dash-queue-stat">
                       <p className="stat-num-sm">
                         {mostRecentQueue.estimatedWaitTime}
                       </p>
-                      <p className="stat-label">Est. Wait</p>
+                      <p className="dash-stat-label">Est. Wait</p>
                     </div>
                   </div>
                   <QueueProgressBars
@@ -583,7 +583,7 @@ export default function StudentDashboard() {
             ) : (
               <div className="queue-preview-card empty">
                 <div className="card-header">
-                  <h3 className="card-title">
+                  <h3 className="dash-card-title">
                     <TimerIcon />
                     Active Queue
                   </h3>
@@ -600,7 +600,7 @@ export default function StudentDashboard() {
             {/* Pinned Announcements */}
             <div className="announcements-card">
               <div className="card-header">
-                <h3 className="card-title">
+                <h3 className="dash-card-title">
                   <MegaphoneIcon />
                   Pinned Announcements
                 </h3>

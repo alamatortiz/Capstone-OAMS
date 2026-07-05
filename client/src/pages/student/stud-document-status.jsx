@@ -358,8 +358,8 @@ export default function DocumentStatusPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main doc-status-page"
+      outerClassName="dss-with-sidebar"
+      mainClassName="dss-main doc-status-page"
       overlay={
         <ChatWidget
           initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your document requests?"
@@ -426,21 +426,21 @@ export default function DocumentStatusPage() {
 
             {/* Document Tabs */}
             {!loading && !error && (
-              <div className="qt-tabs-container">
-                <div className="qt-tabs-list">
+              <div className="dss-tabs-container">
+                <div className="dss-tabs-list">
                   <button
-                    className={`qt-tab ${activeTab === "active" ? "active" : ""}`}
+                    className={`dss-tab ${activeTab === "active" ? "active" : ""}`}
                     onClick={() => setActiveTab("active")}
                   >
                     <AlertCircle />
-                    Active Requests <span className="doc-tab-count">{activeDocuments.length}</span>
+                    Active Requests <span className="dss-tab-count">{activeDocuments.length}</span>
                   </button>
                   <button
-                    className={`qt-tab ${activeTab === "completed" ? "active" : ""}`}
+                    className={`dss-tab ${activeTab === "completed" ? "active" : ""}`}
                     onClick={() => setActiveTab("completed")}
                   >
                     <CheckCircleIcon />
-                    Completed <span className="doc-tab-count">{completedDocuments.length}</span>
+                    Completed <span className="dss-tab-count">{completedDocuments.length}</span>
                   </button>
                 </div>
 

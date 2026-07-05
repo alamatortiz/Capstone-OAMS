@@ -446,16 +446,16 @@ export default function DocumentsPage() {
           </button>
 
           {/* Document Tabs */}
-          <div className="qt-tabs-container">
-            <div className="qt-tabs-list">
+          <div className="doc-tabs-container">
+            <div className="doc-tabs-list">
               <button
-                className={`qt-tab ${activeTab === "active" ? "active" : ""}`}
+                className={`doc-tab ${activeTab === "active" ? "active" : ""}`}
                 onClick={() => setActiveTab("active")}
               >
                 <AlertCircleIcon /> Active Requests <span className="doc-tab-count">{activeDocuments.length}</span>
               </button>
               <button
-                className={`qt-tab ${activeTab === "completed" ? "active" : ""}`}
+                className={`doc-tab ${activeTab === "completed" ? "active" : ""}`}
                 onClick={() => setActiveTab("completed")}
               >
                 <CheckCircleIcon /> Completed <span className="doc-tab-count">{completedDocuments.length}</span>
@@ -464,7 +464,7 @@ export default function DocumentsPage() {
 
             {/* Active Tab */}
             {activeTab === "active" && (
-              <div className="qt-tab-content">
+              <div className="doc-tab-content">
                 {docsLoading ? (
                   <div className="doc-empty-state">
                     <FileTextIcon />
@@ -584,7 +584,7 @@ export default function DocumentsPage() {
 
             {/* Completed Tab */}
             {activeTab === "completed" && (
-              <div className="qt-tab-content">
+              <div className="doc-tab-content">
                 {completedDocuments.length > 0 ? (
                   <div className="doc-cards-grid">
                     {completedDocuments.map((doc) => (

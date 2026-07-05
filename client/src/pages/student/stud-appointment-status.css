@@ -1,6 +1,27 @@
 /* ===== Appointment Status Page — Purple-themed Overrides ===== */
-/* Base layout / sidebar / card styles from queue-status.css     */
-/* List structure / tabs / detail grid from document-status.css  */
+/* Fully self-contained — no longer depends on other pages' CSS. */
+
+/* ─── Page Shell ─────────────────────────────────────────────────────────── */
+.apst-with-sidebar {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--dark-bg);
+  transition: background-color 0.3s ease;
+}
+
+.apst-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+  .apst-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+}
 
 /* ─── Title Icon ─────────────────────────────────────────────────────────── */
 .apst-title-icon {
@@ -35,7 +56,7 @@
 }
 
 /* ─── Professor Schedules Card ───────────────────────────────────────────── */
-.appt-prof-sched-card {
+.apst-prof-sched-card {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -49,7 +70,7 @@
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
 }
 
-.appt-prof-sched-card:hover {
+.apst-prof-sched-card:hover {
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(168, 85, 247, 0.14) 100%);
   border-color: rgba(168, 85, 247, 0.55);
   box-shadow: 0 6px 20px rgba(124, 58, 237, 0.22);
@@ -57,7 +78,7 @@
   color: var(--text-primary);
 }
 
-.appt-prof-sched-card-icon {
+.apst-prof-sched-card-icon {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 0.625rem;
@@ -69,14 +90,14 @@
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
 }
 
-.appt-prof-sched-card-icon svg {
+.apst-prof-sched-card-icon svg {
   width: 1.375rem;
   height: 1.375rem;
   color: white;
   stroke: white;
 }
 
-.appt-prof-sched-card-text {
+.apst-prof-sched-card-text {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -86,29 +107,29 @@
   text-align: left;
 }
 
-.appt-prof-sched-card-title {
+.apst-prof-sched-card-title {
   font-size: 0.9rem;
   font-weight: 700;
   color: #a855f7;
 }
 
-.appt-prof-sched-card-subtitle {
+.apst-prof-sched-card-subtitle {
   font-size: 0.78rem;
   color: var(--text-tertiary);
   line-height: 1.4;
 }
 
-[data-theme="light"] .appt-prof-sched-card {
+[data-theme="light"] .apst-prof-sched-card {
   background: linear-gradient(135deg, rgba(109, 40, 217, 0.07) 0%, rgba(147, 51, 234, 0.04) 100%);
   border-color: rgba(147, 51, 234, 0.25);
 }
 
-[data-theme="light"] .appt-prof-sched-card:hover {
+[data-theme="light"] .apst-prof-sched-card:hover {
   background: linear-gradient(135deg, rgba(109, 40, 217, 0.13) 0%, rgba(147, 51, 234, 0.09) 100%);
   border-color: rgba(147, 51, 234, 0.45);
 }
 
-[data-theme="light"] .appt-prof-sched-card-title {
+[data-theme="light"] .apst-prof-sched-card-title {
   color: #6d28d9;
 }
 
@@ -556,11 +577,15 @@
 
 /* ─── Card shell (self-contained, violet accent) ──────────────────────────── */
 .apst-card {
-  background: var(--queue-card-bg);
-  border: 1px solid var(--queue-card-border);
+  background: #111612;
+  border: 1px solid rgba(168, 85, 247, 0.2);
   border-radius: 1.125rem;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="light"] .apst-card {
+  background: #ffffff;
 }
 
 .apst-card-header {

@@ -222,8 +222,8 @@ export default function QueuePage() {
 
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main"
+      outerClassName="qpage-with-sidebar"
+      mainClassName="qpage-main"
       overlay={
         <>
           <ChatWidget
@@ -278,16 +278,16 @@ export default function QueuePage() {
             <Link
               to="/student/queue-tracking"
               state={{ from: 'queue' }}
-              className="queue-tracking-link-btn"
+              className="qp-tracking-link-btn"
             >
-              <div className="queue-tracking-link-btn-icon-box">
+              <div className="qp-tracking-link-btn-icon-box">
                 <Activity />
               </div>
-              <div className="queue-tracking-link-btn-text">
-                <span className="queue-tracking-link-btn-title">Queue Tracking</span>
-                <span className="queue-tracking-link-btn-subtitle">Monitor your active queue positions in real-time</span>
+              <div className="qp-tracking-link-btn-text">
+                <span className="qp-tracking-link-btn-title">Queue Tracking</span>
+                <span className="qp-tracking-link-btn-subtitle">Monitor your active queue positions in real-time</span>
               </div>
-              <svg className="queue-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="qp-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"></polyline>
               </svg>
             </Link>
@@ -454,9 +454,9 @@ export default function QueuePage() {
               {/* My Active Queues */}
               {!isLoading && queues.length > 0 && (
                 <section className="my-queues-section">
-                  <div className="section-title-wrapper">
+                  <div className="qp-section-title-wrapper">
                     <Clock className="section-icon" />
-                    <h2 className="section-title">My Active Queues</h2>
+                    <h2 className="qp-section-title">My Active Queues</h2>
                     <span className="queue-badge">{queues.length}</span>
                   </div>
                   <div className="queues-list">
@@ -467,37 +467,37 @@ export default function QueuePage() {
                         onClick={() => navigate('/student/queue-status', { state: { queueId: queue.queueId, fromQueue: true } })}
                         style={{ cursor: 'pointer' }}
                       >
-                        <div className="queue-card-content">
-                          <div className="queue-left">
+                        <div className="qp-card-content">
+                          <div className="qp-left">
                             <img
                               src={getCollegeLogo(queue.departmentName)}
                               alt={queue.departmentName}
-                              className="queue-college-logo"
+                              className="qp-college-logo"
                             />
-                            <div className="queue-info">
-                              <div className="queue-header-row">
+                            <div className="qp-info">
+                              <div className="qp-header-row">
                                 <div>
-                                  <h3 className="queue-service-name">{queue.serviceName}</h3>
-                                  <p className="queue-college-name">{queue.departmentName}</p>
+                                  <h3 className="qp-service-name">{queue.serviceName}</h3>
+                                  <p className="qp-college-name">{queue.departmentName}</p>
                                 </div>
-                                <span className="queue-number-badge">{queue.queueNumberBadge}</span>
+                                <span className="qp-number-badge">{queue.queueNumberBadge}</span>
                               </div>
-                              <div className="queue-stats-grid">
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Your Position</p>
-                                  <p className="queue-stat-value">{queue.position}</p>
+                              <div className="qp-stats-grid">
+                                <div className="qp-stat">
+                                  <p className="qp-stat-label">Your Position</p>
+                                  <p className="qp-stat-value">{queue.position}</p>
                                 </div>
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Total Waiting</p>
-                                  <p className="queue-stat-value">{queue.totalWaiting}</p>
+                                <div className="qp-stat">
+                                  <p className="qp-stat-label">Total Waiting</p>
+                                  <p className="qp-stat-value">{queue.totalWaiting}</p>
                                 </div>
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Est. Wait Time</p>
-                                  <p className="queue-stat-value-sm">{queue.estimatedWait}</p>
+                                <div className="qp-stat">
+                                  <p className="qp-stat-label">Est. Wait Time</p>
+                                  <p className="qp-stat-value-sm">{queue.estimatedWait}</p>
                                 </div>
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Joined At</p>
-                                  <p className="queue-stat-value-sm">{queue.joinedAt}</p>
+                                <div className="qp-stat">
+                                  <p className="qp-stat-label">Joined At</p>
+                                  <p className="qp-stat-value-sm">{queue.joinedAt}</p>
                                 </div>
                               </div>
                               <QueueProgressBars
@@ -579,20 +579,20 @@ export default function QueuePage() {
                             onClick={() => setSelectedSlot(slot)}
                             style={{ cursor: 'pointer' }}
                           >
-                            <div className="queue-card-content">
-                              <div className="queue-left">
-                                <div className="queue-logo-wrapper">
+                            <div className="qp-card-content">
+                              <div className="qp-left">
+                                <div className="qp-logo-wrapper">
                                   <img
                                     src={getCollegeLogo(slot.departmentName)}
                                     alt={slot.departmentName}
-                                    className="queue-college-logo-sm"
+                                    className="qp-college-logo-sm"
                                   />
                                 </div>
-                                <div className="queue-info">
-                                  <div className="queue-header-row">
+                                <div className="qp-info">
+                                  <div className="qp-header-row">
                                     <div>
-                                      <h3 className="queue-service-name">{slot.serviceName}</h3>
-                                      <p className="queue-college-name">{slot.departmentName}</p>
+                                      <h3 className="qp-service-name">{slot.serviceName}</h3>
+                                      <p className="qp-college-name">{slot.departmentName}</p>
                                     </div>
                                     <span className="queue-status-badge">
                                       {atCapacity ? 'Full' : 'Open'}

@@ -121,7 +121,7 @@ body {
 }
 
 /* ===== Dashboard With Sidebar Layout ===== */
-.dashboard-with-sidebar {
+.ann-with-sidebar {
   display: flex;
   min-height: 100vh;
   background-color: var(--dark-bg);
@@ -129,7 +129,7 @@ body {
 }
 
 /* ===== Main Content ===== */
-.dashboard-main {
+.ann-main {
   flex: 1;
   margin-left: var(--sidebar-width);
   overflow-y: auto;
@@ -147,7 +147,7 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .dashboard-main {
+  .ann-main {
     margin-left: 0;
     margin-top: 4rem;
   }
@@ -211,20 +211,40 @@ body {
   transition: border-color 0.3s ease;
 }
 
-.announcements-page .qt-tabs-list {
-  border-bottom: none;
+.ann-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   flex: 1;
 }
 
-.announcements-page .qt-tab:hover {
+.ann-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ann-tab:hover {
   color: #22c55e;
 }
 
-.announcements-page .qt-tab.active {
+.ann-tab.active {
   color: #22c55e;
 }
 
-.announcements-page .qt-tab.active::after {
+.ann-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
@@ -234,15 +254,15 @@ body {
   background: #22c55e;
 }
 
-[data-theme="light"] .announcements-page .qt-tab:hover {
+[data-theme="light"] .ann-tab:hover {
   color: #15803d;
 }
 
-[data-theme="light"] .announcements-page .qt-tab.active {
+[data-theme="light"] .ann-tab.active {
   color: #15803d;
 }
 
-[data-theme="light"] .announcements-page .qt-tab.active::after {
+[data-theme="light"] .ann-tab.active::after {
   background: #15803d;
 }
 
@@ -318,7 +338,7 @@ body {
   gap: 1rem;
 }
 
-.section-title {
+.ann-section-title {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -486,7 +506,7 @@ body {
 }
 
 /* ===== EMPTY STATE ===== */
-.empty-state {
+.ann-empty-state {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1rem;
@@ -495,7 +515,7 @@ body {
   transition: all 0.3s ease;
 }
 
-.empty-state svg {
+.ann-empty-state svg {
   width: 3rem;
   height: 3rem;
   color: var(--text-tertiary);
@@ -503,7 +523,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.empty-state h3 {
+.ann-empty-state h3 {
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -511,7 +531,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.empty-state p {
+.ann-empty-state p {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0;
@@ -520,7 +540,7 @@ body {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
-  .dashboard-main {
+  .ann-main {
     padding-left: 0;
     padding-top: 0;
   }
@@ -572,7 +592,7 @@ body {
     gap: 1rem;
   }
 
-  .empty-state {
+  .ann-empty-state {
     padding: 2rem 1rem;
   }
 

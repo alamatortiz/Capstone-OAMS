@@ -346,14 +346,14 @@ export default function AppointmentsPage() {
           <Link
             to="/student/professor-schedules"
             state={{ from: "/student/appointments", fromLabel: "Appointments" }}
-            className="appt-prof-sched-card"
+            className="ab-prof-sched-card"
           >
-            <div className="appt-prof-sched-card-icon">
+            <div className="ab-prof-sched-card-icon">
               <LucideGraduationCap />
             </div>
-            <div className="appt-prof-sched-card-text">
-              <span className="appt-prof-sched-card-title">Professor Schedules</span>
-              <span className="appt-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
+            <div className="ab-prof-sched-card-text">
+              <span className="ab-prof-sched-card-title">Professor Schedules</span>
+              <span className="ab-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
             </div>
             <ChevronRightIcon />
           </Link>
@@ -405,14 +405,14 @@ export default function AppointmentsPage() {
 
           {/* Tabs */}
           <div className="tabs-navigation">
-            <div className="qt-tabs-list">
-              <button type="button" className={`qt-tab ${activeTab === "slots" ? "active" : ""}`} onClick={() => setActiveTab("slots")}>
-                <CalendarDays className="qt-icon-xs" /> Available Slots
-                <span className="apst-tab-count">{slotsLoading ? "—" : availableSlots.length}</span>
+            <div className="ab-tabs-list">
+              <button type="button" className={`ab-tab ${activeTab === "slots" ? "active" : ""}`} onClick={() => setActiveTab("slots")}>
+                <CalendarDays className="ab-tab-icon" /> Available Slots
+                <span className="ab-tab-count">{slotsLoading ? "—" : availableSlots.length}</span>
               </button>
-              <button type="button" className={`qt-tab ${activeTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
-                <ClipboardList className="qt-icon-xs" /> My Bookings
-                <span className="apst-tab-count">{bookingsLoading ? "—" : activeBookings.length}</span>
+              <button type="button" className={`ab-tab ${activeTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
+                <ClipboardList className="ab-tab-icon" /> My Bookings
+                <span className="ab-tab-count">{bookingsLoading ? "—" : activeBookings.length}</span>
               </button>
             </div>
           </div>

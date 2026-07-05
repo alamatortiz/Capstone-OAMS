@@ -466,8 +466,8 @@ export default function QueueStatusPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main"
+      outerClassName="qstatus-with-sidebar"
+      mainClassName="qstatus-main"
       overlay={
         <ChatWidget
           initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you track your queue?"
@@ -517,16 +517,16 @@ export default function QueueStatusPage() {
               <Link
                 to="/student/queue-tracking"
                 state={{ from: 'queue-status' }}
-                className="queue-tracking-link-btn"
+                className="qsl-tracking-link-btn"
               >
-                <div className="queue-tracking-link-btn-icon-box">
+                <div className="qsl-tracking-link-btn-icon-box">
                   <Activity />
                 </div>
-                <div className="queue-tracking-link-btn-text">
-                  <span className="queue-tracking-link-btn-title">Queue Tracking</span>
-                  <span className="queue-tracking-link-btn-subtitle">Monitor your active queue positions in real-time</span>
+                <div className="qsl-tracking-link-btn-text">
+                  <span className="qsl-tracking-link-btn-title">Queue Tracking</span>
+                  <span className="qsl-tracking-link-btn-subtitle">Monitor your active queue positions in real-time</span>
                 </div>
-                <svg className="queue-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="qsl-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
               </Link>
@@ -569,37 +569,37 @@ export default function QueueStatusPage() {
                         onClick={() => setSelectedQueueId(queue.queueId)}
                         style={{ cursor: "pointer" }}
                       >
-                        <div className="queue-card-content">
-                          <div className="queue-left">
+                        <div className="qsl-card-content">
+                          <div className="qsl-left">
                             <img
                               src={getCollegeLogo(queue.departmentName)}
                               alt={queue.departmentName}
-                              className="queue-college-logo"
+                              className="qsl-college-logo"
                             />
-                            <div className="queue-info">
-                              <div className="queue-header-row">
+                            <div className="qsl-info">
+                              <div className="qsl-header-row">
                                 <div>
-                                  <h3 className="queue-service-name">{queue.serviceName}</h3>
-                                  <p className="queue-college-name">{queue.departmentName}</p>
+                                  <h3 className="qsl-service-name">{queue.serviceName}</h3>
+                                  <p className="qsl-college-name">{queue.departmentName}</p>
                                 </div>
-                                <span className="queue-number-badge">{queue.queueNumberBadge}</span>
+                                <span className="qsl-number-badge">{queue.queueNumberBadge}</span>
                               </div>
-                              <div className="queue-stats-grid">
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Your Position</p>
-                                  <p className="queue-stat-value">{queue.position}</p>
+                              <div className="qsl-stats-grid">
+                                <div className="qsl-stat">
+                                  <p className="qsl-stat-label">Your Position</p>
+                                  <p className="qsl-stat-value">{queue.position}</p>
                                 </div>
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Total Waiting</p>
-                                  <p className="queue-stat-value">{queue.totalWaiting}</p>
+                                <div className="qsl-stat">
+                                  <p className="qsl-stat-label">Total Waiting</p>
+                                  <p className="qsl-stat-value">{queue.totalWaiting}</p>
                                 </div>
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Est. Wait Time</p>
-                                  <p className="queue-stat-value-sm">{queue.estimatedWait}</p>
+                                <div className="qsl-stat">
+                                  <p className="qsl-stat-label">Est. Wait Time</p>
+                                  <p className="qsl-stat-value-sm">{queue.estimatedWait}</p>
                                 </div>
-                                <div className="queue-stat">
-                                  <p className="queue-stat-label">Joined At</p>
-                                  <p className="queue-stat-value-sm">{queue.joinedAt}</p>
+                                <div className="qsl-stat">
+                                  <p className="qsl-stat-label">Joined At</p>
+                                  <p className="qsl-stat-value-sm">{queue.joinedAt}</p>
                                 </div>
                               </div>
                               <QueueProgressBars

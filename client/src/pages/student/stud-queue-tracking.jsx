@@ -123,8 +123,8 @@ export default function QueueTrackingPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
-      outerClassName="dashboard-with-sidebar"
-      mainClassName="dashboard-main"
+      outerClassName="qtrack-with-sidebar"
+      mainClassName="qtrack-main"
       overlay={
         <>
           <ChatWidget
