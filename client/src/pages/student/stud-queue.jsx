@@ -6,6 +6,8 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
+import QueueProgressBars from "../../components/QueueProgressBars";
+import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { useQueue } from '../../contexts/QueueContext';
@@ -498,44 +500,14 @@ export default function QueuePage() {
                                   <p className="queue-stat-value-sm">{queue.joinedAt}</p>
                                 </div>
                               </div>
-                              <div className="qs-progress-card">
-                                <div className="queue-progress-group">
-                                  <div className="queue-progress-wrapper">
-                                    <div className="qs-progress-label-row">
-                                      <p className="qs-progress-label">People in Queue</p>
-                                      <p className="qs-progress-value">
-                                        {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
-                                        <span className="qs-progress-percent">
-                                          &nbsp;({queue.queueOccupancyPercent ?? 0}%)
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div className="qs-progress-bar">
-                                      <div
-                                        className="qs-progress-fill"
-                                        style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="queue-progress-wrapper">
-                                    <div className="qs-progress-label-row">
-                                      <p className="qs-progress-label">Serviced</p>
-                                      <p className="qs-progress-value">
-                                        {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
-                                        <span className="qs-progress-percent">
-                                          &nbsp;({queue.servicedPercent ?? 0}%)
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div className="qs-progress-bar">
-                                      <div
-                                        className="qs-progress-fill qs-progress-fill-serviced"
-                                        style={{ width: `${queue.servicedPercent ?? 0}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                              <QueueProgressBars
+                                occupancyCurrent={queue.totalInQueue ?? 0}
+                                occupancyTotal={queue.maxCapacity ?? 0}
+                                occupancyPercent={queue.queueOccupancyPercent ?? 0}
+                                servicedCurrent={queue.servicedCount ?? 0}
+                                servicedTotal={queue.totalInQueue ?? 0}
+                                servicedPercent={queue.servicedPercent ?? 0}
+                              />
                               <button
                                 className="queue-leave-btn"
                                 onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName }); }}
@@ -573,50 +545,24 @@ export default function QueuePage() {
                       </p>
                     </div>
                     <div className="filters-grid">
-                      <div className="filter-group">
-                        <label className="filter-label" htmlFor="college-select">
-                          College
-                        </label>
-                        <div className="filter-select-wrapper">
-                          <select
-                            id="college-select"
-                            className="filter-select"
-                            value={selectedCollege}
-                            onChange={(e) => setSelectedCollege(e.target.value)}
-                            aria-label="Filter by college"
-                          >
-                            <option value="all">All Colleges</option>
-                            {collegeOptions.map((college) => (
-                              <option key={college.name} value={college.name}>
-                                {college.abbrev} — {college.name}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="filter-chevron" />
-                        </div>
-                      </div>
-                      <div className="filter-group">
-                        <label className="filter-label" htmlFor="service-select">
-                          Service
-                        </label>
-                        <div className="filter-select-wrapper">
-                          <select
-                            id="service-select"
-                            className="filter-select"
-                            value={selectedService}
-                            onChange={(e) => setSelectedService(e.target.value)}
-                            aria-label="Filter by service"
-                          >
-                            <option value="all">All Services</option>
-                            {serviceOptions.map((service) => (
-                              <option key={service} value={service}>
-                                {service}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="filter-chevron" />
-                        </div>
-                      </div>
+                      <FilterSelect
+                        id="college-select"
+                        label="College"
+                        value={selectedCollege}
+                        onChange={(e) => setSelectedCollege(e.target.value)}
+                        ariaLabel="Filter by college"
+                        options={[{ value: "all", label: "All Colleges" }, ...collegeOptions.map((college) => ({ value: college.name, label: `${college.abbrev} — ${college.name}` }))]}
+                        chevronIcon={<ChevronDown className="filter-chevron" />}
+                      />
+                      <FilterSelect
+                        id="service-select"
+                        label="Service"
+                        value={selectedService}
+                        onChange={(e) => setSelectedService(e.target.value)}
+                        ariaLabel="Filter by service"
+                        options={[{ value: "all", label: "All Services" }, ...serviceOptions.map((service) => ({ value: service, label: service }))]}
+                        chevronIcon={<ChevronDown className="filter-chevron" />}
+                      />
                     </div>
                   </div>
 

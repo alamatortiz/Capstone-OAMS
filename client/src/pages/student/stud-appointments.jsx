@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
+import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
@@ -364,26 +365,28 @@ export default function AppointmentsPage() {
               <p>Optionally filter by college, professor, or date</p>
             </div>
             <div className="filters-top-row">
-              <div className="filter-group">
-                <label htmlFor="selectedCollege">College</label>
-                <div className="filter-select-wrapper">
-                  <select id="selectedCollege" value={selectedCollege} onChange={(e) => { setSelectedCollege(e.target.value); setSelectedProfessorId(""); setSelectedDate(""); }} className="filter-select">
-                    <option value="">All Colleges</option>
-                    {colleges.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
-                  <ChevronDown className="filter-chevron" />
-                </div>
-              </div>
-              <div className="filter-group">
-                <label htmlFor="selectedProfessor">Professor</label>
-                <div className="filter-select-wrapper">
-                  <select id="selectedProfessor" value={selectedProfessorId} onChange={(e) => { setSelectedProfessorId(e.target.value); setSelectedDate(""); }} className="filter-select" disabled={!selectedCollege || slotsLoading || availableProfessors.length === 0}>
-                    <option value="">{!selectedCollege ? "Select a college first" : slotsLoading ? "Loading…" : availableProfessors.length === 0 ? "No professors available" : "All Professors"}</option>
-                    {availableProfessors.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                  <ChevronDown className="filter-chevron" />
-                </div>
-              </div>
+              <FilterSelect
+                id="selectedCollege"
+                label="College"
+                labelClassName={undefined}
+                value={selectedCollege}
+                onChange={(e) => { setSelectedCollege(e.target.value); setSelectedProfessorId(""); setSelectedDate(""); }}
+                options={[{ value: "", label: "All Colleges" }, ...colleges.map((c) => ({ value: c.value, label: c.label }))]}
+                chevronIcon={<ChevronDown className="filter-chevron" />}
+              />
+              <FilterSelect
+                id="selectedProfessor"
+                label="Professor"
+                labelClassName={undefined}
+                value={selectedProfessorId}
+                onChange={(e) => { setSelectedProfessorId(e.target.value); setSelectedDate(""); }}
+                disabled={!selectedCollege || slotsLoading || availableProfessors.length === 0}
+                options={[
+                  { value: "", label: !selectedCollege ? "Select a college first" : slotsLoading ? "Loading…" : availableProfessors.length === 0 ? "No professors available" : "All Professors" },
+                  ...availableProfessors.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                chevronIcon={<ChevronDown className="filter-chevron" />}
+              />
             </div>
             {selectedProfessorId && (
               <div className="filter-group filter-group--calendar">

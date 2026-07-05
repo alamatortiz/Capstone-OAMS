@@ -4,6 +4,7 @@ import { FileText, Megaphone as LucideMegaphone, GraduationCap as LucideGraduati
 import { useAuth } from "../../context/AuthContext";
 import { useQueue } from "../../contexts/QueueContext";
 import StudentPageShell from "../../components/StudentPageShell";
+import QueueProgressBars from "../../components/QueueProgressBars";
 import ChatWidget from "../../components/ChatWidget";
 
 import { Link } from "react-router-dom";
@@ -569,46 +570,14 @@ export default function StudentDashboard() {
                       <p className="stat-label">Est. Wait</p>
                     </div>
                   </div>
-                  <div className="qs-progress-card">
-                    <div className="queue-progress-group">
-                      <div className="queue-progress-wrapper">
-                        <div className="qs-progress-label-row">
-                          <p className="qs-progress-label">People in Queue</p>
-                          <p className="qs-progress-value">
-                            {mostRecentQueue.totalInQueue ?? 0}/
-                            {mostRecentQueue.maxCapacity ?? 0}
-                            <span className="qs-progress-percent">
-                              &nbsp;({queueOccupancyPercent}%)
-                            </span>
-                          </p>
-                        </div>
-                        <div className="qs-progress-bar">
-                          <div
-                            className="qs-progress-fill"
-                            style={{ width: `${queueOccupancyPercent}%` }}
-                          />
-                        </div>
-                      </div>
-                      <div className="queue-progress-wrapper">
-                        <div className="qs-progress-label-row">
-                          <p className="qs-progress-label">Serviced</p>
-                          <p className="qs-progress-value">
-                            {mostRecentQueue.servicedCount ?? 0}/
-                            {mostRecentQueue.totalInQueue ?? 0}
-                            <span className="qs-progress-percent">
-                              &nbsp;({servicedPercent}%)
-                            </span>
-                          </p>
-                        </div>
-                        <div className="qs-progress-bar">
-                          <div
-                            className="qs-progress-fill qs-progress-fill-serviced"
-                            style={{ width: `${servicedPercent}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <QueueProgressBars
+                    occupancyCurrent={mostRecentQueue.totalInQueue ?? 0}
+                    occupancyTotal={mostRecentQueue.maxCapacity ?? 0}
+                    occupancyPercent={queueOccupancyPercent}
+                    servicedCurrent={mostRecentQueue.servicedCount ?? 0}
+                    servicedTotal={mostRecentQueue.totalInQueue ?? 0}
+                    servicedPercent={servicedPercent}
+                  />
                 </div>
               </div>
             ) : (

@@ -17,8 +17,6 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
-import "./stud-queue-status.css";
-import "./stud-queue-tracking.css";
 import "./stud-document-status.css";
 
 const CheckCircleIcon = () => (
@@ -65,7 +63,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
   const canCancel = doc.status === "pending" || doc.status === "processing";
 
   return (
-    <div className="queue-status-container">
+    <div className="dss-status-container">
       {/* Page Header */}
       <PageHeader
         breadcrumb={
@@ -120,13 +118,13 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
       )}
 
       {/* Detail Grid */}
-      <div className="queue-detail-grid">
+      <div className="dss-detail-grid">
         {/* Main column */}
-        <div className="queue-detail-main">
+        <div className="dss-detail-main">
           {/* Request details card */}
-          <div className="qss-card">
-            <div className="qss-card-header">
-              <h3 className="qss-card-title">
+          <div className="dss-card">
+            <div className="dss-card-header">
+              <h3 className="dss-card-title">
                 <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
                 Request Details
               </h3>
@@ -134,7 +132,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
                 {statusMeta.label}
               </span>
             </div>
-            <div className="qss-card-content">
+            <div className="dss-card-content">
               <div className="dss-detail-row">
                 <span className="dss-detail-label">Request Date</span>
                 <span className="dss-detail-value">{formatDate(doc.requestDate)}</span>
@@ -159,31 +157,31 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
 
           {/* Notes card */}
           {doc.notes && (
-            <div className="qss-card">
-              <div className="qss-card-header">
-                <h3 className="qss-card-title">
+            <div className="dss-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title">
                   <MessageSquare style={{ width: "1.25rem", height: "1.25rem" }} />
                   Notes
                 </h3>
               </div>
-              <div className="qss-card-content">
-                <p className="queue-concern-text">{doc.notes}</p>
+              <div className="dss-card-content">
+                <p className="dss-concern-text">{doc.notes}</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Sidebar */}
-        <div className="queue-detail-sidebar">
+        <div className="dss-detail-sidebar">
           {/* Tracking number card */}
-          <div className="qss-card">
-            <div className="qss-card-header">
-              <h3 className="qss-card-title">
+          <div className="dss-card">
+            <div className="dss-card-header">
+              <h3 className="dss-card-title">
                 <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
                 Tracking Number
               </h3>
             </div>
-            <div className="qss-card-content" style={{ textAlign: "center" }}>
+            <div className="dss-card-content" style={{ textAlign: "center" }}>
               <div
                 style={{
                   fontSize: "1.5rem",
@@ -209,14 +207,14 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
 
           {/* Cancel card (only for pending/processing) */}
           {canCancel && (
-            <div className="qss-card queue-cancel-card">
-              <div className="qss-card-header">
-                <h3 className="qss-card-title queue-cancel-title">
+            <div className="dss-card dss-cancel-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title dss-cancel-title">
                   <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
                   Cancel Request
                 </h3>
               </div>
-              <div className="qss-card-content">
+              <div className="dss-card-content">
                 <p
                   style={{
                     fontSize: "0.8rem",
@@ -228,7 +226,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
                   to resubmit if you change your mind.
                 </p>
                 <button
-                  className="queue-cancel-btn"
+                  className="dss-cancel-btn"
                   onClick={() => setShowCancelDialog(true)}
                 >
                   Cancel Request
@@ -383,7 +381,7 @@ export default function DocumentStatusPage() {
             cancelling={cancelling}
           />
         ) : (
-          <div className="queue-status-container">
+          <div className="dss-status-container">
             {/* Page Header */}
             <PageHeader
               breadcrumb={
@@ -404,25 +402,25 @@ export default function DocumentStatusPage() {
             {/* Error */}
             {error && (
               <div
-                className="queue-empty-state"
+                className="dss-empty-state"
                 style={{ borderColor: "rgba(239,68,68,0.3)" }}
               >
                 <AlertCircle
-                  className="queue-empty-icon"
+                  className="dss-empty-icon"
                   style={{ color: "#ef4444" }}
                 />
-                <p className="queue-empty-text">{error}</p>
+                <p className="dss-empty-text">{error}</p>
               </div>
             )}
 
             {/* Loading */}
             {loading && (
-              <div className="queue-empty-state">
+              <div className="dss-empty-state">
                 <Loader2
-                  className="queue-empty-icon"
+                  className="dss-empty-icon"
                   style={{ animation: "spin 1s linear infinite" }}
                 />
-                <p className="queue-empty-text">Loading your documents…</p>
+                <p className="dss-empty-text">Loading your documents…</p>
               </div>
             )}
 
@@ -493,10 +491,10 @@ export default function DocumentStatusPage() {
                         );
                       })
                     ) : (
-                      <div className="queue-empty-state">
-                        <FileText className="queue-empty-icon" />
-                        <h3 className="queue-empty-title">No Active Requests</h3>
-                        <p className="queue-empty-text">
+                      <div className="dss-empty-state">
+                        <FileText className="dss-empty-icon" />
+                        <h3 className="dss-empty-title">No Active Requests</h3>
+                        <p className="dss-empty-text">
                           You have no active document requests.
                         </p>
                         <button
@@ -567,10 +565,10 @@ export default function DocumentStatusPage() {
                         );
                       })
                     ) : (
-                      <div className="queue-empty-state">
-                        <CheckCircle2 className="queue-empty-icon" />
-                        <h3 className="queue-empty-title">No Completed Requests</h3>
-                        <p className="queue-empty-text">
+                      <div className="dss-empty-state">
+                        <CheckCircle2 className="dss-empty-icon" />
+                        <h3 className="dss-empty-title">No Completed Requests</h3>
+                        <p className="dss-empty-text">
                           Your completed and rejected requests will appear here.
                         </p>
                       </div>

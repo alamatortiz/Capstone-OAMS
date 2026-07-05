@@ -196,7 +196,7 @@
 }
 
 /* ─── Detail Grid ────────────────────────────────────────────────────────── */
-.queue-detail-grid {
+.dss-detail-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.5rem;
@@ -204,24 +204,24 @@
 }
 
 @media (min-width: 1024px) {
-  .queue-detail-grid {
+  .dss-detail-grid {
     grid-template-columns: 2fr 1fr;
   }
 }
 
-.queue-detail-main {
+.dss-detail-main {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-.queue-detail-sidebar {
+.dss-detail-sidebar {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-/* ─── Detail Rows (inside qss-card-content) ──────────────────────────────── */
+/* ─── Detail Rows (inside dss-card-content) ──────────────────────────────── */
 .dss-detail-row {
   display: flex;
   flex-direction: column;
@@ -549,25 +549,167 @@
   background: #f97316;
 }
 
-/* ─── qss-card orange accent overrides (document-status only) ───────────── */
-.doc-status-page .qss-card:not(.queue-cancel-card) {
+/* ─── Card shell (self-contained, orange accent) ─────────────────────────── */
+.dss-card {
+  background: var(--queue-card-bg);
+  border: 1px solid var(--queue-card-border);
+  border-radius: 1.125rem;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-color: rgba(249, 115, 22, 0.25);
 }
 
-.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-header {
-  border-bottom-color: rgba(249, 115, 22, 0.1);
+.dss-card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.3s ease;
 }
 
-.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-title svg {
+.dss-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.dss-card-title svg {
+  width: 1.25rem;
+  height: 1.25rem;
   color: #f97316;
+  stroke: currentColor;
 }
 
-.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-action {
-  color: #f97316;
+.dss-card-content {
+  padding: 1.25rem;
 }
 
-.doc-status-page .qss-card:not(.queue-cancel-card) .qss-card-action:hover {
-  background: rgba(249, 115, 22, 0.1);
+/* ─── Cancel card (self-contained copy of queue-status's cancel card) ────── */
+.dss-cancel-card {
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+[data-theme="light"] .dss-cancel-card {
+  background-color: rgba(239, 68, 68, 0.03);
+}
+
+.dss-cancel-title {
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dss-cancel-title svg {
+  color: #ef4444;
+}
+
+.dss-cancel-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.dss-cancel-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* ─── Empty state (self-contained copy) ──────────────────────────────────── */
+.dss-empty-state {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.125rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.dss-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  margin: 0 auto 1rem;
+  stroke: currentColor;
+  transition: color 0.3s ease;
+}
+
+.dss-empty-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.dss-empty-text {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin-bottom: 1.5rem;
+  transition: color 0.3s ease;
+}
+
+/* ─── Concern/notes text (self-contained copy) ───────────────────────────── */
+.dss-concern-text {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  transition: color 0.3s ease;
+}
+
+/* ─── Page container (self-contained copy) ───────────────────────────────── */
+.dss-status-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+  width: 100%;
+}
+
+/* ─── Breadcrumb (self-contained copy) ───────────────────────────────────── */
+.breadcrumb-link {
+  outline: none;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.breadcrumb-link:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
+.breadcrumb-icon {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */

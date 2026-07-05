@@ -34,17 +34,6 @@
   margin-bottom: 1.5rem;
 }
 
-.apst-hero-card .dss-hero-badge {
-  background: white;
-  color: #9333ea;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  font-weight: 700;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
 /* ─── Professor Schedules Card ───────────────────────────────────────────── */
 .appt-prof-sched-card {
   display: flex;
@@ -123,15 +112,40 @@
   color: #6d28d9;
 }
 
-/* ─── List Item Icon (purple bg) ─────────────────────────────────────────── */
+/* ─── List Item Icon (purple bg, active items) ───────────────────────────── */
 .apst-list-icon-wrap {
-  background: rgba(168, 85, 247, 0.12) !important;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+  background: rgba(168, 85, 247, 0.12);
   color: #a855f7;
 }
 
 [data-theme="light"] .apst-list-icon-wrap {
-  background: rgba(168, 85, 247, 0.08) !important;
+  background: rgba(168, 85, 247, 0.08);
   color: #9333ea;
+}
+
+/* ─── List Item Icon (completed/dim items) ───────────────────────────────── */
+.apst-list-icon-wrap-completed {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+  background: rgba(107, 114, 128, 0.1);
+}
+
+[data-theme="light"] .apst-list-icon-wrap-completed {
+  background: rgba(249, 115, 22, 0.08);
 }
 
 /* ─── List Item Name (purple, overrides from document-status) ────────────── */
@@ -251,7 +265,7 @@
 }
 
 /* ─── Icon inside each tab button ────────────────────────────────────────── */
-.qt-tab-icon {
+.apst-tab-icon {
   width: 1rem;
   height: 1rem;
   flex-shrink: 0;
@@ -265,7 +279,7 @@
   scrollbar-width: none;
 }
 .apst-tabs-scrollable::-webkit-scrollbar { display: none; }
-.apst-tabs-scrollable .qt-tabs-list {
+.apst-tabs-scrollable .apst-tabs-list {
   flex-wrap: nowrap;
   min-width: max-content;
 }
@@ -286,7 +300,7 @@
   transition: background 0.2s;
 }
 
-.qt-tab.active .apst-tab-count {
+.apst-tab.active .apst-tab-count {
   background: rgba(168, 85, 247, 0.25);
 }
 
@@ -295,20 +309,59 @@
   color: #9333ea;
 }
 
-[data-theme="light"] .qt-tab.active .apst-tab-count {
+[data-theme="light"] .apst-tab.active .apst-tab-count {
   background: rgba(147, 51, 234, 0.2);
 }
 
-/* ─── Tab color scoped to appointment-status page ────────────────────────── */
-.apst-page .qt-tab:hover {
+/* ─── Tab shell + color (self-contained) ──────────────────────────────────── */
+.apst-tabs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.apst-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+  transition: border-color 0.3s ease;
+}
+
+.apst-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.apst-tab svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.apst-tab:hover {
   color: #a855f7;
 }
 
-.apst-page .qt-tab.active {
+.apst-tab.active {
   color: #a855f7;
 }
 
-.apst-page .qt-tab.active::after {
+.apst-tab.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
@@ -318,74 +371,413 @@
   background: #a855f7;
 }
 
-[data-theme="light"] .apst-page .qt-tab:hover {
+[data-theme="light"] .apst-tab:hover {
   color: #9333ea;
 }
 
-[data-theme="light"] .apst-page .qt-tab.active {
+[data-theme="light"] .apst-tab.active {
   color: #9333ea;
 }
 
-[data-theme="light"] .apst-page .qt-tab.active::after {
+[data-theme="light"] .apst-tab.active::after {
   background: #9333ea;
 }
 
-/* ─── Breadcrumb hover scoped to appointment-status page ─────────────────── */
-.apst-page .breadcrumb-link:hover {
+/* ─── Breadcrumb (self-contained copy) ────────────────────────────────────── */
+.breadcrumb-link {
+  outline: none;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  border-radius: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.breadcrumb-link:hover {
   background-color: rgba(34, 197, 94, 0.1);
   color: var(--primary-color);
 }
 
-/* ─── Appointment list item — violet hover (overrides orange from document-status.css) ─── */
-.apst-page .dss-list-item {
-  border-color: rgba(168, 85, 247, 0.2);
+.breadcrumb-icon {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
-.apst-page .dss-list-item:hover {
+/* ─── Appointment list item shell (self-contained, violet accent) ────────── */
+.apst-list-item {
+  background: var(--card);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.apst-list-item:hover {
   box-shadow: 0 12px 28px rgba(168, 85, 247, 0.15);
+  transform: translateY(-2px);
   border-color: rgba(168, 85, 247, 0.4);
 }
 
-.apst-page .dss-list-item-completed {
+.apst-list-item-completed {
+  opacity: 0.72;
   border-color: rgba(107, 114, 128, 0.25);
 }
 
-.apst-page .dss-list-item-completed:hover {
+.apst-list-item-completed:hover {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   border-color: rgba(107, 114, 128, 0.3);
 }
 
-[data-theme="light"] .apst-page .dss-list-item {
+[data-theme="light"] .apst-list-item {
   border-color: rgba(147, 51, 234, 0.18);
 }
 
-[data-theme="light"] .apst-page .dss-list-item:hover {
+[data-theme="light"] .apst-list-item:hover {
   box-shadow: 0 12px 28px rgba(147, 51, 234, 0.1);
   border-color: rgba(147, 51, 234, 0.35);
 }
 
-
-/* ─── Detail row separator — violet instead of orange (overrides document-status.css) ─── */
-.apst-page .dss-detail-row {
-  border-bottom-color: rgba(168, 85, 247, 0.1);
+/* ─── List layout (self-contained) ───────────────────────────────────────── */
+.apst-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
 }
 
-/* ─── List item title — violet (overrides amber/orange from document-status.css) ──────── */
-.apst-page .dss-list-title-section h3 {
+.apst-list-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.apst-list-title-section {
+  flex: 1;
+  text-align: left;
+}
+
+.apst-list-title-section h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
   color: #a855f7;
+  margin: 0 0 0.25rem 0;
+  transition: color 0.3s ease;
 }
 
-[data-theme="light"] .apst-page .dss-list-title-section h3 {
+[data-theme="light"] .apst-list-title-section h3 {
   color: #9333ea;
 }
 
-/* ─── List card field values — violet (overrides orange from document-status.css) ─────── */
-.apst-page .dss-list-card-field p {
-  color: #a855f7;
+.apst-list-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
 
-[data-theme="light"] .apst-page .dss-list-card-field p {
+.apst-list-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.apst-list-card-field label,
+.apst-list-card-field-full label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.apst-list-card-field p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #a855f7;
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .apst-list-card-field p {
   color: #9333ea;
+}
+
+.apst-list-card-field-full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.apst-list-card-field-full p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.apst-list-college {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ─── Status badge base shape (self-contained; color modifiers above) ────── */
+.apst-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+/* ─── Card shell (self-contained, violet accent) ──────────────────────────── */
+.apst-card {
+  background: var(--queue-card-bg);
+  border: 1px solid var(--queue-card-border);
+  border-radius: 1.125rem;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.apst-card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.3s ease;
+}
+
+[data-theme="light"] .apst-card-header {
+  border-bottom-color: rgba(147, 51, 234, 0.1);
+}
+
+.apst-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.apst-card-title svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #a855f7;
+  stroke: currentColor;
+}
+
+[data-theme="light"] .apst-card-title svg {
+  color: #9333ea;
+}
+
+.apst-card-content {
+  padding: 1.25rem;
+}
+
+/* ─── Detail rows (self-contained, violet accent) ─────────────────────────── */
+.apst-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+  transition: border-color 0.3s ease;
+}
+
+.apst-detail-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #a855f7;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .apst-detail-label {
+  color: #9333ea;
+}
+
+.apst-detail-value {
+  font-size: 1.0625rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  transition: color 0.3s ease;
+}
+
+/* ─── Detail grid layout (self-contained) ────────────────────────────────── */
+.apst-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .apst-detail-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.apst-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.apst-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ─── Hero interior (self-contained; .apst-hero-card supplies the gradient) ─ */
+.apst-hero-content {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.apst-hero-logo {
+  width: 5.5rem;
+  height: 5.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.apst-hero-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.5rem;
+}
+
+.apst-hero-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.apst-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+}
+
+.apst-hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+  align-items: flex-start;
+}
+
+.apst-hero-title h2 {
+  font-size: 0.875rem;
+  font-weight: 400;
+  margin: 0 0 0.25rem 0;
+  line-height: 1.1;
+  text-align: left;
+  opacity: 0.85;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.apst-hero-title p {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  text-align: left;
+}
+
+.apst-hero-service-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.2rem 0;
+  text-align: left;
+  line-height: 1.2;
+}
+
+/* ─── Empty state (self-contained copy) ──────────────────────────────────── */
+.apst-empty-state {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.125rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.apst-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  margin: 0 auto 1rem;
+  stroke: currentColor;
+  transition: color 0.3s ease;
+}
+
+.apst-empty-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.apst-empty-text {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin-bottom: 1.5rem;
+  transition: color 0.3s ease;
+}
+
+/* ─── Page container (self-contained copy) ───────────────────────────────── */
+.apst-status-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+  width: 100%;
 }
 
 /* ─── Cancel Appointment card — red hue (mirrors queue-cancel-card) ─────── */
@@ -398,12 +790,12 @@
   background-color: rgba(239, 68, 68, 0.03);
 }
 
-.apst-cancel-card .qss-card-header {
+.apst-cancel-card .apst-card-header {
   border-bottom-color: rgba(239, 68, 68, 0.15);
 }
 
 .apst-cancel-title,
-.apst-cancel-card .qss-card-title svg {
+.apst-cancel-card .apst-card-title svg {
   color: #ef4444;
 }
 
@@ -412,40 +804,6 @@
   color: var(--text-tertiary);
   margin-bottom: 0.75rem;
   line-height: 1.5;
-}
-
-/* ─── Detail row labels — violet, bold, larger ───────────────────────────── */
-.apst-page .dss-detail-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #a855f7;
-}
-
-[data-theme="light"] .apst-page .dss-detail-label {
-  color: #9333ea;
-}
-
-/* ─── Detail row values — larger text ────────────────────────────────────── */
-.apst-page .dss-detail-value {
-  font-size: 1.0625rem;
-}
-
-/* ─── Card header divider — violet (overrides blue from queue-status.css) ─── */
-.apst-page .qss-card-header {
-  border-bottom-color: rgba(168, 85, 247, 0.1);
-}
-
-[data-theme="light"] .apst-page .qss-card-header {
-  border-bottom-color: rgba(147, 51, 234, 0.1);
-}
-
-/* ─── Card title icons — violet ──────────────────────────────────────────── */
-.apst-page .qss-card-title svg {
-  color: #a855f7;
-}
-
-[data-theme="light"] .apst-page .qss-card-title svg {
-  color: #9333ea;
 }
 
 /* ─── Spin animation for loading icon ────────────────────────────────────── */

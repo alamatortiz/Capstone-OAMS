@@ -4,6 +4,7 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { useQueue } from "../../contexts/QueueContext";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
+import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-tracking.css";
@@ -343,52 +344,14 @@ export default function QueueTrackingPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="qt-progress-card">
-                              <div className="qt-progress-group">
-                                <div className="qt-progress-wrapper">
-                                  <div className="qt-progress-label-row">
-                                    <p className="qt-progress-name">
-                                      People in Queue
-                                    </p>
-                                    <p className="qt-progress-value">
-                                      {queue.totalInQueue ?? 0}/
-                                      {queue.maxCapacity ?? 0}
-                                      <span className="qt-progress-value-percent">
-                                        ({queue.queueOccupancyPercent ?? 0}%)
-                                      </span>
-                                    </p>
-                                  </div>
-                                  <div className="qt-progress-bar">
-                                    <div
-                                      className="qt-progress-fill"
-                                      style={{
-                                        width: `${queue.queueOccupancyPercent ?? 0}%`,
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                                <div className="qt-progress-wrapper">
-                                  <div className="qt-progress-label-row">
-                                    <p className="qt-progress-name">Serviced</p>
-                                    <p className="qt-progress-value">
-                                      {queue.servicedCount ?? 0}/
-                                      {queue.totalInQueue ?? 0}
-                                      <span className="qt-progress-value-percent">
-                                        ({queue.servicedPercent ?? 0}%)
-                                      </span>
-                                    </p>
-                                  </div>
-                                  <div className="qt-progress-bar">
-                                    <div
-                                      className="qt-progress-fill qt-progress-fill-serviced"
-                                      style={{
-                                        width: `${queue.servicedPercent ?? 0}%`,
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                            <QueueProgressBars
+                              occupancyCurrent={queue.totalInQueue ?? 0}
+                              occupancyTotal={queue.maxCapacity ?? 0}
+                              occupancyPercent={queue.queueOccupancyPercent ?? 0}
+                              servicedCurrent={queue.servicedCount ?? 0}
+                              servicedTotal={queue.totalInQueue ?? 0}
+                              servicedPercent={queue.servicedPercent ?? 0}
+                            />
                           </div>
 
                           {/* Stats */}

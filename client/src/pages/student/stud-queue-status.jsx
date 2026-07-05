@@ -17,6 +17,7 @@ import { useQueue } from "../../contexts/QueueContext";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
+import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-status.css";
@@ -164,44 +165,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
                 </div>
 
                 <div className="queue-progress-section">
-                  <div className="qs-progress-card">
-                    <div className="queue-progress-group">
-                      <div className="queue-progress-wrapper">
-                        <div className="qs-progress-label-row">
-                          <p className="qs-progress-label">People in Queue</p>
-                          <p className="qs-progress-value">
-                            {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
-                            <span className="qs-progress-percent">
-                              &nbsp;({queue.queueOccupancyPercent ?? 0}%)
-                            </span>
-                          </p>
-                        </div>
-                        <div className="qs-progress-bar">
-                          <div
-                            className="qs-progress-fill"
-                            style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
-                          />
-                        </div>
-                      </div>
-                      <div className="queue-progress-wrapper">
-                        <div className="qs-progress-label-row">
-                          <p className="qs-progress-label">Serviced</p>
-                          <p className="qs-progress-value">
-                            {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
-                            <span className="qs-progress-percent">
-                              &nbsp;({queue.servicedPercent ?? 0}%)
-                            </span>
-                          </p>
-                        </div>
-                        <div className="qs-progress-bar">
-                          <div
-                            className="qs-progress-fill qs-progress-fill-serviced"
-                            style={{ width: `${queue.servicedPercent ?? 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <QueueProgressBars
+                    occupancyCurrent={queue.totalInQueue ?? 0}
+                    occupancyTotal={queue.maxCapacity ?? 0}
+                    occupancyPercent={queue.queueOccupancyPercent ?? 0}
+                    servicedCurrent={queue.servicedCount ?? 0}
+                    servicedTotal={queue.totalInQueue ?? 0}
+                    servicedPercent={queue.servicedPercent ?? 0}
+                  />
                 </div>
               </div>
             </div>
@@ -631,44 +602,14 @@ export default function QueueStatusPage() {
                                   <p className="queue-stat-value-sm">{queue.joinedAt}</p>
                                 </div>
                               </div>
-                              <div className="qs-progress-card">
-                                <div className="queue-progress-group">
-                                  <div className="queue-progress-wrapper">
-                                    <div className="qs-progress-label-row">
-                                      <p className="qs-progress-label">People in Queue</p>
-                                      <p className="qs-progress-value">
-                                        {queue.totalInQueue ?? 0}/{queue.maxCapacity ?? 0}
-                                        <span className="qs-progress-percent">
-                                          &nbsp;({queue.queueOccupancyPercent ?? 0}%)
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div className="qs-progress-bar">
-                                      <div
-                                        className="qs-progress-fill"
-                                        style={{ width: `${queue.queueOccupancyPercent ?? 0}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="queue-progress-wrapper">
-                                    <div className="qs-progress-label-row">
-                                      <p className="qs-progress-label">Serviced</p>
-                                      <p className="qs-progress-value">
-                                        {queue.servicedCount ?? 0}/{queue.totalInQueue ?? 0}
-                                        <span className="qs-progress-percent">
-                                          &nbsp;({queue.servicedPercent ?? 0}%)
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div className="qs-progress-bar">
-                                      <div
-                                        className="qs-progress-fill qs-progress-fill-serviced"
-                                        style={{ width: `${queue.servicedPercent ?? 0}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                              <QueueProgressBars
+                                occupancyCurrent={queue.totalInQueue ?? 0}
+                                occupancyTotal={queue.maxCapacity ?? 0}
+                                occupancyPercent={queue.queueOccupancyPercent ?? 0}
+                                servicedCurrent={queue.servicedCount ?? 0}
+                                servicedTotal={queue.totalInQueue ?? 0}
+                                servicedPercent={queue.servicedPercent ?? 0}
+                              />
                             </div>
                           </div>
                         </div>

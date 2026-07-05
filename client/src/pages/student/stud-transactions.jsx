@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import StudentPageShell from "../../components/StudentPageShell";
+import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
@@ -310,45 +311,33 @@ export default function TransactionsPage() {
                 </div>
               </div>
 
-              <div className="filter-group">
-                <label className="filter-label" htmlFor="tx-type-select">
-                  Type
-                </label>
-                <div className="filter-select-wrapper">
-                  <select
-                    id="tx-type-select"
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="filter-select"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="queue">Queue</option>
-                    <option value="appointment">Appointment</option>
-                    <option value="document">Document</option>
-                  </select>
-                  <ChevronDownIcon className="filter-chevron" />
-                </div>
-              </div>
+              <FilterSelect
+                id="tx-type-select"
+                label="Type"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                options={[
+                  { value: "all", label: "All Types" },
+                  { value: "queue", label: "Queue" },
+                  { value: "appointment", label: "Appointment" },
+                  { value: "document", label: "Document" },
+                ]}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
 
-              <div className="filter-group">
-                <label className="filter-label" htmlFor="tx-status-select">
-                  Status
-                </label>
-                <div className="filter-select-wrapper">
-                  <select
-                    id="tx-status-select"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="filter-select"
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="completed">Completed</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                  <ChevronDownIcon className="filter-chevron" />
-                </div>
-              </div>
+              <FilterSelect
+                id="tx-status-select"
+                label="Status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                options={[
+                  { value: "all", label: "All Statuses" },
+                  { value: "completed", label: "Completed" },
+                  { value: "ongoing", label: "Ongoing" },
+                  { value: "cancelled", label: "Cancelled" },
+                ]}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
             </div>
           </div>
 

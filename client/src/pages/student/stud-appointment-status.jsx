@@ -19,9 +19,6 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
-import "./stud-queue-status.css";
-import "./stud-queue-tracking.css";
-import "./stud-document-status.css";
 import "./stud-appointment-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,7 +53,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
   const canCancel = appt.status === "pending" || appt.status === "approved";
 
   return (
-    <div className="queue-status-container">
+    <div className="apst-status-container">
       <PageHeader
         breadcrumb={
           <button type="button" className="breadcrumb-link" onClick={onBack}>
@@ -72,14 +69,14 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
 
       {/* Hero */}
       <div className="apst-hero-card">
-        <div className="queue-hero-content">
-          <div className="queue-hero-logo">
+        <div className="apst-hero-content">
+          <div className="apst-hero-logo">
             <img src={getCollegeLogo(appt.college)} alt={appt.college} />
           </div>
-          <div className="queue-hero-text">
-            <div className="queue-hero-header">
-              <div className="queue-hero-title">
-                <p className="queue-hero-service-name">{appt.person}</p>
+          <div className="apst-hero-text">
+            <div className="apst-hero-header">
+              <div className="apst-hero-title">
+                <p className="apst-hero-service-name">{appt.person}</p>
                 <p>{appt.college}</p>
               </div>
             </div>
@@ -88,72 +85,72 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
       </div>
 
       {/* Detail grid */}
-      <div className="queue-detail-grid">
-        <div className="queue-detail-main">
-          <div className="qss-card">
-            <div className="qss-card-header">
-              <h3 className="qss-card-title">
+      <div className="apst-detail-grid">
+        <div className="apst-detail-main">
+          <div className="apst-card">
+            <div className="apst-card-header">
+              <h3 className="apst-card-title">
                 <Calendar style={{ width: "1.25rem", height: "1.25rem" }} />
                 Appointment Information
               </h3>
             </div>
-            <div className="qss-card-content">
-              <div className="dss-detail-row">
-                <p className="dss-detail-label">Professor</p>
-                <p className="dss-detail-value">{appt.person}</p>
+            <div className="apst-card-content">
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Professor</p>
+                <p className="apst-detail-value">{appt.person}</p>
               </div>
-              <div className="dss-detail-row">
-                <p className="dss-detail-label">College / Department</p>
-                <p className="dss-detail-value">{appt.college}</p>
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">College / Department</p>
+                <p className="apst-detail-value">{appt.college}</p>
               </div>
-              <div className="dss-detail-row">
-                <p className="dss-detail-label">Date</p>
-                <p className="dss-detail-value">{formatDate(appt.date)}</p>
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Date</p>
+                <p className="apst-detail-value">{formatDate(appt.date)}</p>
               </div>
-              <div className="dss-detail-row">
-                <p className="dss-detail-label">Time Slot</p>
-                <p className="dss-detail-value">{appt.windowStart && appt.windowEnd ? `${appt.windowStart} – ${appt.windowEnd}` : "—"}</p>
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Time Slot</p>
+                <p className="apst-detail-value">{appt.windowStart && appt.windowEnd ? `${appt.windowStart} – ${appt.windowEnd}` : "—"}</p>
               </div>
-              <div className="dss-detail-row">
-                <p className="dss-detail-label">Location</p>
-                <p className="dss-detail-value">{appt.location}</p>
+              <div className="apst-detail-row">
+                <p className="apst-detail-label">Location</p>
+                <p className="apst-detail-value">{appt.location}</p>
               </div>
               {appt.purpose && (
-                <div className="dss-detail-row">
-                  <p className="dss-detail-label">Purpose</p>
-                  <p className="dss-detail-value">{appt.purpose}</p>
+                <div className="apst-detail-row">
+                  <p className="apst-detail-label">Purpose</p>
+                  <p className="apst-detail-value">{appt.purpose}</p>
                 </div>
               )}
               {appt.createdAt && (
-                <div className="dss-detail-row" style={{ borderBottom: "none" }}>
-                  <p className="dss-detail-label">Booked On</p>
-                  <p className="dss-detail-value">{formatDateShort(appt.createdAt)}</p>
+                <div className="apst-detail-row" style={{ borderBottom: "none" }}>
+                  <p className="apst-detail-label">Booked On</p>
+                  <p className="apst-detail-value">{formatDateShort(appt.createdAt)}</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="queue-detail-sidebar">
-          <div className="qss-card">
-            <div className="qss-card-header">
-              <h3 className="qss-card-title">
+        <div className="apst-detail-sidebar">
+          <div className="apst-card">
+            <div className="apst-card-header">
+              <h3 className="apst-card-title">
                 <AlertCircle style={{ width: "1.25rem", height: "1.25rem" }} />
                 Status
               </h3>
-              <span className={`dss-badge ${statusCls}`}>{statusLabel}</span>
+              <span className={`apst-badge ${statusCls}`}>{statusLabel}</span>
             </div>
           </div>
 
           {canCancel && (
-            <div className="qss-card apst-cancel-card">
-              <div className="qss-card-header">
-                <h3 className="qss-card-title apst-cancel-title">
+            <div className="apst-card apst-cancel-card">
+              <div className="apst-card-header">
+                <h3 className="apst-card-title apst-cancel-title">
                   <XCircle style={{ width: "1.25rem", height: "1.25rem", color: "#ef4444" }} />
                   Cancel Appointment
                 </h3>
               </div>
-              <div className="qss-card-content">
+              <div className="apst-card-content">
                 <p className="apst-cancel-desc">
                   Cancelling will permanently remove this appointment. You will need to book a new one if you change your mind.
                 </p>
@@ -280,7 +277,7 @@ export default function AppointmentStatusPage() {
             cancelling={cancelling}
           />
         ) : (
-          <div className="queue-status-container">
+          <div className="apst-status-container">
             {/* Header */}
             <PageHeader
               breadcrumb={
@@ -315,32 +312,32 @@ export default function AppointmentStatusPage() {
             </Link>
 
             {error && (
-              <div className="queue-empty-state" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
-                <AlertCircle className="queue-empty-icon" style={{ color: "#ef4444" }} />
-                <p className="queue-empty-text">{error}</p>
+              <div className="apst-empty-state" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
+                <AlertCircle className="apst-empty-icon" style={{ color: "#ef4444" }} />
+                <p className="apst-empty-text">{error}</p>
               </div>
             )}
 
             {loading && (
-              <div className="queue-empty-state">
-                <Loader2 className="queue-empty-icon" style={{ animation: "spin 1s linear infinite" }} />
-                <p className="queue-empty-text">Loading your appointments…</p>
+              <div className="apst-empty-state">
+                <Loader2 className="apst-empty-icon" style={{ animation: "spin 1s linear infinite" }} />
+                <p className="apst-empty-text">Loading your appointments…</p>
               </div>
             )}
 
             {!loading && !error && (
-              <div className="qt-tabs-container">
+              <div className="apst-tabs-container">
                 <div className="apst-tabs-scrollable">
-                  <div className="qt-tabs-list">
+                  <div className="apst-tabs-list">
                     {TABS.map(({ key, label }) => {
                       const TabIcon = TAB_ICON_MAP[key];
                       return (
                         <button
                           key={key}
-                          className={`qt-tab ${activeTab === key ? "active" : ""}`}
+                          className={`apst-tab ${activeTab === key ? "active" : ""}`}
                           onClick={() => setActiveTab(key)}
                         >
-                          {TabIcon && <TabIcon className="qt-tab-icon" />}
+                          {TabIcon && <TabIcon className="apst-tab-icon" />}
                           {label}
                           <span className="apst-tab-count">{tabLists[key].length}</span>
                         </button>
@@ -349,7 +346,7 @@ export default function AppointmentStatusPage() {
                   </div>
                 </div>
 
-                <div className="dss-list-container">
+                <div className="apst-list-container">
                   {tabLists[activeTab].length > 0 ? (
                     tabLists[activeTab].map((appt) => {
                       const { label, cls } = getStatusMeta(appt.status);
@@ -357,34 +354,34 @@ export default function AppointmentStatusPage() {
                       return (
                         <div
                           key={appt.id}
-                          className={`dss-list-item ${isDim ? "dss-list-item-completed" : ""}`}
+                          className={`apst-list-item ${isDim ? "apst-list-item-completed" : ""}`}
                           onClick={() => setSelectedId(appt.id)}
                         >
-                          <div className="dss-list-header">
-                            <div className={`dss-list-icon-wrap ${isDim ? "" : "apst-list-icon-wrap"}`}>
+                          <div className="apst-list-header">
+                            <div className={isDim ? "apst-list-icon-wrap-completed" : "apst-list-icon-wrap"}>
                               <Calendar style={{ width: "1.5rem", height: "1.5rem", color: isDim ? "var(--text-tertiary)" : undefined }} />
                             </div>
-                            <div className="dss-list-title-section">
+                            <div className="apst-list-title-section">
                               <h3 className="apst-list-name" style={isDim ? { color: "var(--text-tertiary)" } : undefined}>{appt.person}</h3>
-                              <p className="dss-list-college">{appt.college}</p>
+                              <p className="apst-list-college">{appt.college}</p>
                             </div>
-                            <span className={`dss-badge ${cls}`}>{label}</span>
+                            <span className={`apst-badge ${cls}`}>{label}</span>
                           </div>
-                          <div className="dss-list-card-grid">
-                            <div className="dss-list-card-field">
+                          <div className="apst-list-card-grid">
+                            <div className="apst-list-card-field">
                               <label>Date</label>
                               <p>{formatDateShort(appt.date)}</p>
                             </div>
-                            <div className="dss-list-card-field">
+                            <div className="apst-list-card-field">
                               <label>Time Slot</label>
                               <p>{appt.windowStart && appt.windowEnd ? `${appt.windowStart} – ${appt.windowEnd}` : "—"}</p>
                             </div>
-                            <div className="dss-list-card-field">
+                            <div className="apst-list-card-field">
                               <label>Location</label>
                               <p>{appt.location}</p>
                             </div>
                             {appt.purpose && (
-                              <div className="dss-list-card-field-full">
+                              <div className="apst-list-card-field-full">
                                 <label>Purpose</label>
                                 <p>{appt.purpose}</p>
                               </div>
@@ -394,12 +391,12 @@ export default function AppointmentStatusPage() {
                       );
                     })
                   ) : (
-                    <div className="queue-empty-state">
-                      <Calendar className="queue-empty-icon" />
-                      <h3 className="queue-empty-title">
+                    <div className="apst-empty-state">
+                      <Calendar className="apst-empty-icon" />
+                      <h3 className="apst-empty-title">
                         {activeTab === "all" ? "No Appointments Yet" : `No ${TABS.find(t => t.key === activeTab)?.label} Appointments`}
                       </h3>
-                      <p className="queue-empty-text">
+                      <p className="apst-empty-text">
                         {activeTab === "all" || activeTab === "pending"
                           ? "Book an appointment to get started."
                           : `You have no ${activeTab} appointments.`}
