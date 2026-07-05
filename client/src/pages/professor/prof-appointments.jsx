@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   XCircle,
   LayoutList,
+  Loader2,
 } from "lucide-react";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -348,16 +349,15 @@ export default function ProfessorAppointmentsPage() {
       {/* Main Content */}
       <main className="dashboard-main">
         <div className="appt-page-content">
-          {/* Breadcrumb */}
-          <div className="prof-breadcrumb">
-            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
-              <ChevronLeftIcon />
-              Home
-            </Link>
-          </div>
+          {/* Header */}
+          <div className="appt-header">
+            <div className="prof-breadcrumb">
+              <Link to="/professor/dashboard" className="prof-breadcrumb-link">
+                <ChevronLeftIcon />
+                Home
+              </Link>
+            </div>
 
-          {/* Page Header */}
-          <div className="appt-page-header">
             <div className="appt-title-section">
               <div className="appt-title-icon">
                 <Calendar style={{ width: "1.75rem", height: "1.75rem" }} />
@@ -433,9 +433,27 @@ export default function ProfessorAppointmentsPage() {
           {/* List */}
           <div className="appt-list">
             {loading ? (
-              <div className="appt-empty">Loading appointments...</div>
+              <div className="appt-empty-state">
+                <Loader2
+                  className="appt-empty-icon"
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                <p className="appt-empty-text">Loading appointments…</p>
+              </div>
             ) : filteredAppointments.length === 0 ? (
-              <div className="appt-empty">No appointments found.</div>
+              <div className="appt-empty-state">
+                <Calendar className="appt-empty-icon" />
+                <h3 className="appt-empty-title">
+                  {activeTab === "all"
+                    ? "No Appointments Yet"
+                    : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                </h3>
+                <p className="appt-empty-text">
+                  {activeTab === "all"
+                    ? "New appointment requests from students will appear here."
+                    : `You have no ${activeTab} appointments.`}
+                </p>
+              </div>
             ) : (
               filteredAppointments.map((apt) => (
                 <AppointmentCard
