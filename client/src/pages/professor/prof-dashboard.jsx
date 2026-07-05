@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
-import "./professor_dashboard.css";
+import "./prof-dashboard.css";
 import api from "../../utils/api";
 
 // ── Icons (unchanged from original) ──────────────────────────────────────────

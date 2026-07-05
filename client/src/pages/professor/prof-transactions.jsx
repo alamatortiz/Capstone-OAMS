@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
-import "../professor/professor_dashboard.css";
-import "./professor_transactions.css";
+import "./prof-dashboard.css";
+import "./prof-transactions.css";
 import api from "../../utils/api";
 
 // ── Icons ────────────────────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
-import "./professor_dashboard.css";
-import "./professor_schedule_availability.css";
+import "./prof-dashboard.css";
+import "./prof-schedule-availability.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
 

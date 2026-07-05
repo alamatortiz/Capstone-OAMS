@@ -80,22 +80,22 @@ const AdminDataManagement = React.lazy(
 import AppointmentsPage from "./pages/student/stud-appointments.jsx";
 import DocumentsPage from "./pages/student/stud-documents.jsx";
 import TransactionsPage from "./pages/student/stud-transactions.jsx";
-import ProfessorDashboard from "./pages/professor/professor_dashboard.jsx";
+import ProfessorDashboard from "./pages/professor/prof-dashboard.jsx";
 
 const ProfessorAppointmentsPage = React.lazy(
-  () => import("./pages/professor/ProfessorAppointmentsPage.jsx"),
+  () => import("./pages/professor/prof-appointments.jsx"),
 );
 const ProfessorDocumentsPage = React.lazy(
-  () => import("./pages/professor/ProfessorDocumentsPage.jsx"),
+  () => import("./pages/professor/prof-document-status.jsx"),
 );
 const ProfessorTransactionsPage = React.lazy(
-  () => import("./pages/professor/ProfessorTransactionsPage.jsx"),
+  () => import("./pages/professor/prof-transactions.jsx"),
 );
 const ProfessorDocumentRequestPage = React.lazy(
-  () => import("./pages/professor/professor_document_request.jsx"),
+  () => import("./pages/professor/prof-documents.jsx"),
 );
 const ProfessorScheduleAvailabilityPage = React.lazy(
-  () => import("./pages/professor/professor_schedule_availability.jsx"),
+  () => import("./pages/professor/prof-schedule-availability.jsx"),
 );
 
 import AdminDashboard from "./pages/admin/admin_dashboard.jsx";
