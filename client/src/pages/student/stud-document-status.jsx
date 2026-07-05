@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -14,28 +14,13 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
-import StudentSidebar from "../../components/StudentSidebar";
+import StudentPageShell from "../../components/StudentPageShell";
+import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-status.css";
 import "./stud-queue-tracking.css";
 import "./stud-document-status.css";
 
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
 const CheckCircleIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -82,23 +67,18 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
   return (
     <div className="queue-status-container">
       {/* Page Header */}
-      <div className="queue-header">
-        <div className="queue-breadcrumb">
+      <PageHeader
+        breadcrumb={
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             {backLabel}
           </button>
-        </div>
-        <div className="queue-title-section">
-          <div className="dss-title-icon">
-            <FileText style={{ width: "1.75rem", height: "1.75rem" }} />
-          </div>
-          <div>
-            <h1 className="queue-title">Document Details</h1>
-            <p className="queue-subtitle">Track your document request status</p>
-          </div>
-        </div>
-      </div>
+        }
+        icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
+        iconClassName="dss-title-icon"
+        title="Document Details"
+        subtitle="Track your document request status"
+      />
 
       {/* Hero */}
       <div className="dss-hero-card">
@@ -307,18 +287,6 @@ export default function DocumentStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you with your document requests?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
-  const messageIdRef = useRef(1);
 
   const selectedDoc = selectedDocId
     ? (documents.find((d) => d.id === selectedDocId) ?? null)
@@ -327,10 +295,6 @@ export default function DocumentStatusPage() {
   useEffect(() => {
     if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
   }, [loading, selectedDocId, selectedDoc]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -364,29 +328,6 @@ export default function DocumentStatusPage() {
     }
   };
 
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = {
-      id: ++messageIdRef.current,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    const captured = inputValue;
-    setInputValue("");
-    setTimeout(() => {
-      const bot = {
-        id: ++messageIdRef.current,
-        type: "bot",
-        text: generateBotResponse(captured),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
-  };
-
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
     const pending = documents.filter((d) => d.status === "pending").length;
@@ -418,11 +359,17 @@ export default function DocumentStatusPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="dashboard-with-sidebar">
-      <StudentSidebar />
-
-      {/* Main Content */}
-      <main className="dashboard-main doc-status-page">
+    <StudentPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main doc-status-page"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your document requests?"
+          getBotResponse={generateBotResponse}
+          sendButtonAriaLabel="Send"
+        />
+      }
+    >
         {selectedDoc ? (
           <DocumentDetail
             doc={selectedDoc}
@@ -438,8 +385,8 @@ export default function DocumentStatusPage() {
         ) : (
           <div className="queue-status-container">
             {/* Page Header */}
-            <div className="queue-header">
-              <div className="queue-breadcrumb">
+            <PageHeader
+              breadcrumb={
                 <Link
                   to={navState.from === "documents" ? "/student/documents" : "/student/dashboard"}
                   className="breadcrumb-link"
@@ -447,17 +394,12 @@ export default function DocumentStatusPage() {
                   <ChevronLeft className="breadcrumb-icon" />
                   {navState.from === "documents" ? "Documents" : "Home"}
                 </Link>
-              </div>
-              <div className="queue-title-section">
-                <div className="dss-title-icon">
-                  <FileText style={{ width: "1.75rem", height: "1.75rem" }} />
-                </div>
-                <div>
-                  <h1 className="queue-title">My Document Requests</h1>
-                  <p className="queue-subtitle">Track and manage all your document requests</p>
-                </div>
-              </div>
-            </div>
+              }
+              icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
+              iconClassName="dss-title-icon"
+              title="My Document Requests"
+              subtitle="Track and manage all your document requests"
+            />
 
             {/* Error */}
             {error && (
@@ -639,52 +581,6 @@ export default function DocumentStatusPage() {
             )}
           </div>
         )}
-      </main>
-
-      {/* AI Chat */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button type="submit" className="chat-send-btn" aria-label="Send">
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+    </StudentPageShell>
   );
 }

@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
-import StudentSidebar from "../../components/StudentSidebar";
+import StudentPageShell from "../../components/StudentPageShell";
+import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
 import "./stud-appointments.css";
 import api from "../../utils/api";
@@ -44,19 +46,6 @@ const UsersIcon = () => (
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-  </svg>
-);
-
-const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
 );
 
@@ -125,13 +114,6 @@ export default function AppointmentsPage() {
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
   const [selectedApptType, setSelectedApptType] = useState("");
-
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { id: 1, type: "bot", text: "Hello! I can help you find and book appointments. Just ask!", timestamp: new Date() },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
 
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedCollege, setSelectedCollege] = useState("");
@@ -225,23 +207,13 @@ export default function AppointmentsPage() {
     { value: "COE", label: "COE" }, { value: "CAS", label: "CAS" }, { value: "CHAS", label: "CHAS" },
   ];
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMessage = { id: messages.length + 1, type: "user", text: inputValue, timestamp: new Date() };
-    setMessages([...messages, userMessage]);
-    setInputValue("");
-    setTimeout(() => {
-      const lowerInput = inputValue.toLowerCase();
-      let text = "I can help you with booking appointments, finding slots, or managing your consultations. What would you like to know?";
-      if (lowerInput.includes("slot") || lowerInput.includes("available")) text = `We have ${availableSlots.length} available slots. Filter by professor, college, or date to find the perfect time!`;
-      else if (lowerInput.includes("book") || lowerInput.includes("appointment")) text = "Select a slot from the available slots section and provide your consultation purpose.";
-      else if (lowerInput.includes("professor")) text = `There are ${new Set(availableSlots.map((s) => s.professorId)).size} professors with available consultation slots.`;
-      else if (lowerInput.includes("cancel")) text = "Go to your bookings and click the cancel button on the appointment you want to remove.";
-      setMessages((prev) => [...prev, { id: prev.length + 1, type: "bot", text, timestamp: new Date() }]);
-    }, 600);
+  const generateBotResponse = (userInput) => {
+    const lowerInput = userInput.toLowerCase();
+    if (lowerInput.includes("slot") || lowerInput.includes("available")) return `We have ${availableSlots.length} available slots. Filter by professor, college, or date to find the perfect time!`;
+    if (lowerInput.includes("book") || lowerInput.includes("appointment")) return "Select a slot from the available slots section and provide your consultation purpose.";
+    if (lowerInput.includes("professor")) return `There are ${new Set(availableSlots.map((s) => s.professorId)).size} professors with available consultation slots.`;
+    if (lowerInput.includes("cancel")) return "Go to your bookings and click the cancel button on the appointment you want to remove.";
+    return "I can help you with booking appointments, finding slots, or managing your consultations. What would you like to know?";
   };
 
   const handleBookSlot = async () => {
@@ -286,30 +258,88 @@ export default function AppointmentsPage() {
   const isTomorrow = (dateString) => { const t = new Date(); t.setDate(t.getDate() + 1); return t.toDateString() === new Date(`${dateString}T00:00:00`).toDateString(); };
 
   return (
-    <div className="appointment-with-sidebar">
-      <StudentSidebar />
+    <StudentPageShell
+      outerClassName="appointment-with-sidebar"
+      mainClassName="appointment-main"
+      overlay={
+        <>
+          {/* Book Appointment Dialog */}
+          {showBookDialog && selectedSlot && (
+            <div className="dialog-overlay" onClick={() => !submitting && setShowBookDialog(false)}>
+              <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
+                <div className="dialog-header">
+                  <h3>Confirm Appointment</h3>
+                  <button className="dialog-close" onClick={() => setShowBookDialog(false)} disabled={submitting}><CloseIcon /></button>
+                </div>
+                <div className="dialog-body">
+                  <div className="slot-summary">
+                    <h4>{selectedSlot.professorName}</h4>
+                    <div className="summary-details">
+                      <div className="summary-item"><CalendarIcon /><span>{formatDate(selectedSlot.date)}</span></div>
+                      <div className="summary-item"><ClockIcon /><span>{formatTime(selectedSlot.windowStart)} – {formatTime(selectedSlot.windowEnd)}</span></div>
+                      <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
+                    </div>
+                  </div>
+                  {selectedSlot.appointmentTypes?.length > 0 && (
+                    <div className="form-group">
+                      <label>Appointment Type *</label>
+                      <div style={{ position: "relative" }}>
+                        <select
+                          className="appt-type-select"
+                          value={selectedApptType}
+                          onChange={(e) => setSelectedApptType(e.target.value)}
+                        >
+                          <option value="">Select appointment type…</option>
+                          {selectedSlot.appointmentTypes.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", width: "1rem", height: "1rem", color: "#a855f7", pointerEvents: "none" }} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label htmlFor="purpose">Purpose of Consultation *</label>
+                    <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
+                  </div>
+                  <div className="dialog-actions">
+                    <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); }} disabled={submitting}>Cancel</button>
+                    <button className="btn-primary" onClick={handleBookSlot} disabled={submitting}>{submitting ? "Booking…" : "Confirm Booking"}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-      {/* Main Content */}
-      <main className="appointment-main">
+          <ChatWidget initialGreeting="Hello! I can help you find and book appointments. Just ask!" getBotResponse={generateBotResponse} />
+
+          <ActionConfirmModal
+            show={cancelConfirmId !== null}
+            onCancel={() => setCancelConfirmId(null)}
+            onConfirm={doCancel}
+            title="Cancel Appointment?"
+            message="Are you sure you want to cancel this appointment? This action cannot be undone."
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="10" y1="14" x2="14" y2="18"></line><line x1="14" y1="14" x2="10" y2="18"></line></svg>}
+            cancelText="Keep Appointment"
+            confirmText="Cancel Appointment"
+          />
+        </>
+      }
+    >
         <div className="appointment-content">
           {/* Header */}
-          <div className="queue-header">
-            <div className="queue-breadcrumb">
+          <PageHeader
+            breadcrumb={
               <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeft className="breadcrumb-icon" />
                 Home
               </Link>
-            </div>
-            <div className="queue-title-section">
-              <div className="ab-title-icon">
-                <Calendar style={{ width: "1.75rem", height: "1.75rem" }} />
-              </div>
-              <div>
-                <h1 className="queue-title">Appointments</h1>
-                <p className="queue-subtitle">Schedule consultations with professors</p>
-              </div>
-            </div>
-          </div>
+            }
+            icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+            iconClassName="ab-title-icon"
+            title="Appointments"
+            subtitle="Schedule consultations with professors"
+          />
 
           {/* Professor Schedules card */}
           <Link
@@ -496,91 +526,6 @@ export default function AppointmentsPage() {
             </div>
           )}
         </div>
-      </main>
-
-      {/* Book Appointment Dialog */}
-      {showBookDialog && selectedSlot && (
-        <div className="dialog-overlay" onClick={() => !submitting && setShowBookDialog(false)}>
-          <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <h3>Confirm Appointment</h3>
-              <button className="dialog-close" onClick={() => setShowBookDialog(false)} disabled={submitting}><CloseIcon /></button>
-            </div>
-            <div className="dialog-body">
-              <div className="slot-summary">
-                <h4>{selectedSlot.professorName}</h4>
-                <div className="summary-details">
-                  <div className="summary-item"><CalendarIcon /><span>{formatDate(selectedSlot.date)}</span></div>
-                  <div className="summary-item"><ClockIcon /><span>{formatTime(selectedSlot.windowStart)} – {formatTime(selectedSlot.windowEnd)}</span></div>
-                  <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
-                </div>
-              </div>
-              {selectedSlot.appointmentTypes?.length > 0 && (
-                <div className="form-group">
-                  <label>Appointment Type *</label>
-                  <div style={{ position: "relative" }}>
-                    <select
-                      className="appt-type-select"
-                      value={selectedApptType}
-                      onChange={(e) => setSelectedApptType(e.target.value)}
-                    >
-                      <option value="">Select appointment type…</option>
-                      {selectedSlot.appointmentTypes.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", width: "1rem", height: "1rem", color: "#a855f7", pointerEvents: "none" }} />
-                  </div>
-                </div>
-              )}
-              <div className="form-group">
-                <label htmlFor="purpose">Purpose of Consultation *</label>
-                <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
-              </div>
-              <div className="dialog-actions">
-                <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); }} disabled={submitting}>Cancel</button>
-                <button className="btn-primary" onClick={handleBookSlot} disabled={submitting}>{submitting ? "Booking…" : "Confirm Booking"}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button className="chat-close-btn" onClick={() => setChatOpen(false)} aria-label="Close chat"><CloseIcon /></button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input type="text" className="chat-input" placeholder="Ask me anything..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-              <button type="submit" className="chat-send-btn" aria-label="Send message"><SendIcon /></button>
-            </form>
-          </div>
-        )}
-        <button className={`chat-fab ${chatOpen ? "hidden" : ""}`} onClick={() => setChatOpen(true)} aria-label="Open chat"><ChatIcon /></button>
-      </div>
-
-      <ActionConfirmModal
-        show={cancelConfirmId !== null}
-        onCancel={() => setCancelConfirmId(null)}
-        onConfirm={doCancel}
-        title="Cancel Appointment?"
-        message="Are you sure you want to cancel this appointment? This action cannot be undone."
-        icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="10" y1="14" x2="14" y2="18"></line><line x1="14" y1="14" x2="10" y2="18"></line></svg>}
-        cancelText="Keep Appointment"
-        confirmText="Cancel Appointment"
-      />
-    </div>
+    </StudentPageShell>
   );
 }

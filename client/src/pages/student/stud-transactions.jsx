@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from "react";
-import StudentSidebar from "../../components/StudentSidebar";
+import { useState, useEffect } from "react";
+import StudentPageShell from "../../components/StudentPageShell";
+import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
 
@@ -8,13 +10,6 @@ import api from "../../utils/api";
 import { ChevronLeft } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-
 const ClipboardListIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
@@ -78,19 +73,6 @@ const AlertCircleIcon = () => (
   </svg>
 );
 
-const ChatIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
-
 const CalendarIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -109,19 +91,6 @@ const FileTextIcon = () => (
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
-  // ── UI state ──────────────────────────────────────────────────────────────
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you with your transactions?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
-
   // ── Transaction data state ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -180,14 +149,6 @@ export default function TransactionsPage() {
   ];
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
@@ -204,30 +165,6 @@ export default function TransactionsPage() {
     };
     fetchTransactions();
   }, []);
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (inputValue.trim() === "") return;
-
-    const userMessage = {
-      id: messages.length + 1,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
-    };
-    setMessages([...messages, userMessage]);
-    setInputValue("");
-
-    setTimeout(() => {
-      const botResponse = {
-        id: messages.length + 2,
-        type: "bot",
-        text: generateBotResponse(inputValue),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botResponse]);
-    }, 600);
-  };
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
@@ -306,32 +243,30 @@ export default function TransactionsPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="transactions-with-sidebar">
-      <StudentSidebar />
-
-      {/* Main Content */}
-      <main className="transactions-main">
+    <StudentPageShell
+      outerClassName="transactions-with-sidebar"
+      mainClassName="transactions-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your transactions?"
+          getBotResponse={generateBotResponse}
+          showUnreadDot
+        />
+      }
+    >
         <div className="transactions-container">
           {/* Header */}
-          <div className="queue-header">
-            <div className="queue-breadcrumb">
+          <PageHeader
+            breadcrumb={
               <Link to="/student/dashboard" className="breadcrumb-link">
                 <ChevronLeft className="breadcrumb-icon" />
                 Home
               </Link>
-            </div>
-            <div className="queue-title-section">
-              <div className="queue-title-icon">
-                <ClipboardListIcon />
-              </div>
-              <div>
-                <h1 className="queue-title">Transaction History</h1>
-                <p className="queue-subtitle">
-                  View all your activities and transactions
-                </p>
-              </div>
-            </div>
-          </div>
+            }
+            icon={<ClipboardListIcon />}
+            title="Transaction History"
+            subtitle="View all your activities and transactions"
+          />
 
           {/* Stats Grid */}
           <div className="stats-grid">
@@ -489,59 +424,6 @@ export default function TransactionsPage() {
             )}
           </div>
         </div>
-      </main>
-
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`message message-${message.type}`}
-                >
-                  <div className="message-content">{message.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="chat-send-btn"
-                aria-label="Send message"
-              >
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+    </StudentPageShell>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import {
   Clock,
@@ -16,38 +16,10 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { toast } from "sonner";
-import StudentSidebar from "../../components/StudentSidebar";
+import StudentPageShell from "../../components/StudentPageShell";
+import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-status.css";
-
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-const ChatIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-const SendIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getProgress = (position, totalWaiting) => {
@@ -97,23 +69,17 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
   return (
     <div className="queue-status-container">
       {/* Page Header */}
-      <div className="queue-header">
-        <div className="queue-breadcrumb">
+      <PageHeader
+        breadcrumb={
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             {backLabel}
           </button>
-        </div>
-        <div className="queue-title-section">
-          <div className="queue-title-icon">
-            <Clock className="icon" />
-          </div>
-          <div>
-            <h1 className="queue-title">Queue Details</h1>
-            <p className="queue-subtitle">View your position and estimated wait time</p>
-          </div>
-        </div>
-      </div>
+        }
+        icon={<Clock className="icon" />}
+        title="Queue Details"
+        subtitle="View your position and estimated wait time"
+      />
 
       {/* Hero */}
       <div className="queue-hero-card">
@@ -483,18 +449,6 @@ export default function QueueStatusPage() {
     () => location.state?.queueId ?? null
   );
   const [cancelling, setCancelling] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you track your queue?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
-  const messageIdRef = useRef(1);
 
   // Auto-deselect if the queue disappears (cancelled/served)
   const selectedQueue = selectedQueueId
@@ -504,10 +458,6 @@ export default function QueueStatusPage() {
   useEffect(() => {
     if (selectedQueueId && !selectedQueue) setSelectedQueueId(null);
   }, [selectedQueueId, selectedQueue]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleCancel = async (queueId) => {
@@ -521,29 +471,6 @@ export default function QueueStatusPage() {
     } finally {
       setCancelling(false);
     }
-  };
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = {
-      id: ++messageIdRef.current,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    const captured = inputValue;
-    setInputValue("");
-    setTimeout(() => {
-      const bot = {
-        id: ++messageIdRef.current,
-        type: "bot",
-        text: generateBotResponse(captured),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
   };
 
   const generateBotResponse = (input) => {
@@ -567,11 +494,18 @@ export default function QueueStatusPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="dashboard-with-sidebar">
-      <StudentSidebar />
-
-      {/* Main Content */}
-      <main className="dashboard-main">
+    <StudentPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you track your queue?"
+          getBotResponse={generateBotResponse}
+          sendButtonAriaLabel="Send"
+          shrinkIconOnMobile={false}
+        />
+      }
+    >
         {selectedQueue ? (
           <QueueDetail
             queue={selectedQueue}
@@ -584,9 +518,9 @@ export default function QueueStatusPage() {
         ) : (
           <div className="queue-status-container">
             {/* Page Header */}
-            <div className="queue-header">
-              <div className="queue-breadcrumb">
-                {fromTracking ? (
+            <PageHeader
+              breadcrumb={
+                fromTracking ? (
                   <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue-tracking')}>
                     <ChevronLeft className="breadcrumb-icon" />
                     Queue Tracking
@@ -601,18 +535,12 @@ export default function QueueStatusPage() {
                     <ChevronLeft className="breadcrumb-icon" />
                     Home
                   </Link>
-                )}
-              </div>
-              <div className="queue-title-section">
-                <div className="queue-title-icon">
-                  <Clock className="icon" />
-                </div>
-                <div>
-                  <h1 className="queue-title">My Queue Status</h1>
-                  <p className="queue-subtitle">View and manage your active queues</p>
-                </div>
-              </div>
-            </div>
+                )
+              }
+              icon={<Clock className="icon" />}
+              title="My Queue Status"
+              subtitle="View and manage your active queues"
+            />
 
             {!fromTracking && (
               <Link
@@ -777,52 +705,6 @@ export default function QueueStatusPage() {
             )}
           </div>
         )}
-      </main>
-
-      {/* AI Chat */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button type="submit" className="chat-send-btn" aria-label="Send">
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+    </StudentPageShell>
   );
 }

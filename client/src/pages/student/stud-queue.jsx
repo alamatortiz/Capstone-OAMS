@@ -1,32 +1,13 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-
-// ===== Chat Widget Icons =====
-const ChatIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
 import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
 import ActionConfirmModal from "../../components/ActionConfirmModal";
-import StudentSidebar from "../../components/StudentSidebar";
+import StudentPageShell from "../../components/StudentPageShell";
+import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import { useQueue } from '../../contexts/QueueContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import api from '../../utils/api';
@@ -54,18 +35,6 @@ export default function QueuePage() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [servicesData, setServicesData] = useState([]);
 
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: 'bot',
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you with your queue today?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState('');
-  const messagesEndRef = useRef(null);
-  const messageIdRef = useRef(1); // initial bot message uses id:1
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [selectedCollege, setSelectedCollege] = useState('all');
@@ -131,11 +100,6 @@ export default function QueuePage() {
       }),
     [availableSlots, selectedCollege, selectedService, isAlreadyInQueue],
   );
-
-  // ── Chat ──────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   // ── Fetch services data for requirements lookup ───────────────────────────
   useEffect(() => {
@@ -236,31 +200,6 @@ export default function QueuePage() {
 
   const [leaveConfirmQueue, setLeaveConfirmQueue] = useState(null);
 
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (inputValue.trim() === '') return;
-
-    const capturedInput = inputValue;
-    const userMessage = {
-      id: ++messageIdRef.current,
-      type: 'user',
-      text: capturedInput,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue('');
-
-    setTimeout(() => {
-      const botResponse = {
-        id: ++messageIdRef.current,
-        type: 'bot',
-        text: generateBotResponse(capturedInput),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botResponse]);
-    }, 600);
-  };
-
   const generateBotResponse = (userInput) => {
     const lower = userInput.toLowerCase();
     if (lower.includes('queue') || lower.includes('position')) {
@@ -280,17 +219,43 @@ export default function QueuePage() {
   };
 
   return (
-    <div className="dashboard-with-sidebar">
-      <StudentSidebar />
-
-      {/* Main Content */}
-      <main className="dashboard-main">
+    <StudentPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main"
+      overlay={
+        <>
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your queue today?"
+            getBotResponse={generateBotResponse}
+            shrinkIconOnMobile={false}
+            customScrollbar={false}
+          />
+          <ActionConfirmModal
+            show={leaveConfirmQueue !== null}
+            onCancel={() => setLeaveConfirmQueue(null)}
+            onConfirm={async () => { await handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
+            title="Leave Queue?"
+            message={
+              <>
+                You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
+                Leaving will permanently remove your spot — you will need to rejoin
+                and wait from the back of the line if you change your mind.
+              </>
+            }
+            icon={<XCircle width={22} height={22} />}
+            cancelText="Stay in Queue"
+            confirmText={leavingQueueId === leaveConfirmQueue?.queueId ? "Leaving…" : "Leave Queue"}
+            confirmDisabled={leavingQueueId === leaveConfirmQueue?.queueId}
+          />
+        </>
+      }
+    >
         <div className="queue-page">
 
           {/* Header */}
-          <div className="queue-header">
-            <div className="queue-breadcrumb">
-              {selectedSlot ? (
+          <PageHeader
+            breadcrumb={
+              selectedSlot ? (
                 <button className="breadcrumb-link" onClick={() => setSelectedSlot(null)}>
                   <ChevronLeft className="breadcrumb-icon" />
                   Queues
@@ -300,22 +265,12 @@ export default function QueuePage() {
                   <ChevronLeft className="breadcrumb-icon" />
                   Home
                 </Link>
-              )}
-            </div>
-            <div className="queue-title-section">
-              <div className="queue-title-icon">
-                <Users className="icon" />
-              </div>
-              <div>
-                <h1 className="queue-title">
-                  {selectedSlot ? 'Queue Details' : 'Queues'}
-                </h1>
-                <p className="queue-subtitle">
-                  Join queues and track your position in real-time
-                </p>
-              </div>
-            </div>
-          </div>
+              )
+            }
+            icon={<Users className="icon" />}
+            title={selectedSlot ? 'Queue Details' : 'Queues'}
+            subtitle="Join queues and track your position in real-time"
+          />
 
           {!selectedSlot && (
             <Link
@@ -779,69 +734,6 @@ export default function QueuePage() {
             </>
           )}
         </div>
-      </main>
-
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? 'open' : ''}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((message) => (
-                <div key={message.id} className={`message message-${message.type}`}>
-                  <div className="message-content">{message.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button type="submit" className="chat-send-btn" aria-label="Send message">
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? 'hidden' : ''}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-      <ActionConfirmModal
-        show={leaveConfirmQueue !== null}
-        onCancel={() => setLeaveConfirmQueue(null)}
-        onConfirm={async () => { await handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
-        title="Leave Queue?"
-        message={
-          <>
-            You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
-            Leaving will permanently remove your spot — you will need to rejoin
-            and wait from the back of the line if you change your mind.
-          </>
-        }
-        icon={<XCircle width={22} height={22} />}
-        cancelText="Stay in Queue"
-        confirmText={leavingQueueId === leaveConfirmQueue?.queueId ? "Leaving…" : "Leave Queue"}
-        confirmDisabled={leavingQueueId === leaveConfirmQueue?.queueId}
-      />
-    </div>
+    </StudentPageShell>
   );
 }

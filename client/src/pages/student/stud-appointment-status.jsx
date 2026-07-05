@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -16,29 +16,13 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
-import StudentSidebar from "../../components/StudentSidebar";
+import StudentPageShell from "../../components/StudentPageShell";
+import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-status.css";
 import "./stud-queue-tracking.css";
 import "./stud-document-status.css";
 import "./stud-appointment-status.css";
-
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-  </svg>
-);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getStatusMeta = (status) => {
@@ -73,23 +57,18 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
 
   return (
     <div className="queue-status-container">
-      <div className="queue-header">
-        <div className="queue-breadcrumb">
+      <PageHeader
+        breadcrumb={
           <button type="button" className="breadcrumb-link" onClick={onBack}>
             <ChevronLeft className="breadcrumb-icon" />
             {backLabel}
           </button>
-        </div>
-        <div className="queue-title-section">
-          <div className="apst-title-icon">
-            <Calendar style={{ width: "1.75rem", height: "1.75rem" }} />
-          </div>
-          <div>
-            <h1 className="queue-title">Appointment Details</h1>
-            <p className="queue-subtitle">View the status of your appointment</p>
-          </div>
-        </div>
-      </div>
+        }
+        icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+        iconClassName="apst-title-icon"
+        title="Appointment Details"
+        subtitle="View the status of your appointment"
+      />
 
       {/* Hero */}
       <div className="apst-hero-card">
@@ -219,13 +198,6 @@ export default function AppointmentStatusPage() {
   const [cancelling, setCancelling] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
 
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { id: 1, type: "bot", text: "Hello! I can help you with your appointments.", timestamp: new Date() },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
-
   const fetchAppointments = async () => {
     setLoading(true);
     setError(null);
@@ -255,21 +227,7 @@ export default function AppointmentStatusPage() {
     }
   };
 
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = { id: messages.length + 1, type: "user", text: inputValue, timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInputValue("");
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { id: prev.length + 1, type: "bot", text: "I can help you track your appointments. Click on any appointment card for details.", timestamp: new Date() },
-      ]);
-    }, 600);
-  };
-
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const generateBotResponse = () => "I can help you track your appointments. Click on any appointment card for details.";
 
   const byStatus = (status) => appointments.filter((a) => a.status === status);
   const tabLists = {
@@ -302,11 +260,17 @@ export default function AppointmentStatusPage() {
   const selectedAppt = appointments.find((a) => a.id === selectedId) ?? null;
 
   return (
-    <div className="dashboard-with-sidebar">
-      <StudentSidebar />
-
-      {/* Main */}
-      <main className="dashboard-main apst-page">
+    <StudentPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main apst-page"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! I can help you with your appointments."
+          getBotResponse={generateBotResponse}
+          sendButtonAriaLabel="Send"
+        />
+      }
+    >
         {selectedAppt ? (
           <AppointmentDetail
             appt={selectedAppt}
@@ -318,8 +282,8 @@ export default function AppointmentStatusPage() {
         ) : (
           <div className="queue-status-container">
             {/* Header */}
-            <div className="queue-header">
-              <div className="queue-breadcrumb">
+            <PageHeader
+              breadcrumb={
                 <Link
                   to="/student/dashboard"
                   className="breadcrumb-link"
@@ -327,17 +291,12 @@ export default function AppointmentStatusPage() {
                   <ChevronLeft className="breadcrumb-icon" />
                   Home
                 </Link>
-              </div>
-              <div className="queue-title-section">
-                <div className="apst-title-icon">
-                  <Calendar style={{ width: "1.75rem", height: "1.75rem" }} />
-                </div>
-                <div>
-                  <h1 className="queue-title">My Appointments</h1>
-                  <p className="queue-subtitle">Track and manage all your appointment bookings</p>
-                </div>
-              </div>
-            </div>
+              }
+              icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+              iconClassName="apst-title-icon"
+              title="My Appointments"
+              subtitle="Track and manage all your appointment bookings"
+            />
 
             {/* Professor Schedules card */}
             <Link
@@ -470,36 +429,6 @@ export default function AppointmentStatusPage() {
             )}
           </div>
         )}
-      </main>
-
-      {/* AI Chat */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button className="chat-close-btn" onClick={() => setChatOpen(false)} aria-label="Close chat">
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input type="text" className="chat-input" placeholder="Ask me anything..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-              <button type="submit" className="chat-send-btn" aria-label="Send"><SendIcon /></button>
-            </form>
-          </div>
-        )}
-        <button className={`chat-fab ${chatOpen ? "hidden" : ""}`} onClick={() => setChatOpen(true)} aria-label="Open chat">
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+    </StudentPageShell>
   );
 }

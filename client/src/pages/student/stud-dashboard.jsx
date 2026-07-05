@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import { useQueue } from "../../contexts/QueueContext";
-import StudentSidebar from "../../components/StudentSidebar";
+import StudentPageShell from "../../components/StudentPageShell";
+import ChatWidget from "../../components/ChatWidget";
 
 import { Link } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
@@ -12,12 +13,6 @@ import "./stud-dashboard.css";
 import api from "../../utils/api";
 
 // ─── Dashboard Content Icons ──────────────────────────────────────────────────
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
 const ClockIcon = () => (
   <svg
     className="icon"
@@ -148,29 +143,6 @@ const TimerIcon = () => (
   </svg>
 );
 const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
-const ChatIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-const SendIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
@@ -194,20 +166,6 @@ export default function StudentDashboard() {
       };
 
   const { getActiveQueues } = useQueue();
-
-  // ── UI state ──────────────────────────────────────────────────────────────
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
-  const messageIdRef = useRef(1);
 
   // ── Dashboard data state ──────────────────────────────────────────────────
   const [dashStats, setDashStats] = useState(null);
@@ -423,37 +381,6 @@ export default function StudentDashboard() {
   const recentActivity = dashStats?.recentActivity ?? [];
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (inputValue.trim() === "") return;
-    const userMessage = {
-      id: ++messageIdRef.current,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    const capturedInput = inputValue;
-    setInputValue("");
-    setTimeout(() => {
-      const botResponse = {
-        id: ++messageIdRef.current,
-        type: "bot",
-        text: generateBotResponse(capturedInput),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botResponse]);
-    }, 600);
-  };
-
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
     if (lowerInput.includes("queue") || lowerInput.includes("position")) {
@@ -476,11 +403,17 @@ export default function StudentDashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="dashboard-with-sidebar">
-      <StudentSidebar />
-
-      {/* Main Content */}
-      <main className="dashboard-main">
+    <StudentPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+          getBotResponse={generateBotResponse}
+          accent="dark"
+        />
+      }
+    >
         <div className="student-dashboard">
           {/* Error banner */}
           {dashError && (
@@ -854,59 +787,6 @@ export default function StudentDashboard() {
           </section>
 
         </div>
-      </main>
-
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`message message-${message.type}`}
-                >
-                  <div className="message-content">{message.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="chat-send-btn"
-                aria-label="Send message"
-              >
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+    </StudentPageShell>
   );
 }
