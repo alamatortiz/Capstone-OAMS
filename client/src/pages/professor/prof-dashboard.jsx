@@ -235,10 +235,10 @@ export default function ProfessorDashboard() {
       badge: "Documents",
     },
     {
-      label: "Schedule Availability",
+      label: "Schedule Manager",
       description: "Set your consultation hours",
       icon: CalendarClockIcon,
-      path: "/professor/schedule-availability",
+      path: "/professor/schedule-manager",
       badge: "Schedule",
     },
   ];

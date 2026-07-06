@@ -81,9 +81,9 @@ html, body {
 /* ── Main two-column layout ──────────────────────────────── */
 .sa-main-layout {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 2fr 3fr;
   gap: 1.3rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* ── Cards ───────────────────────────────────────────────── */
@@ -117,6 +117,21 @@ html, body {
   border-color: rgba(147, 51, 234, 0.3);
 }
 
+/* Calendar card and detail panel share the same fixed length; the detail
+   panel scrolls internally instead of growing when it holds many slots. */
+.sa-calendar-card {
+  display: flex;
+  flex-direction: column;
+  height: 28rem;
+}
+
+.sa-detail-panel {
+  display: flex;
+  flex-direction: column;
+  height: 28rem;
+  overflow: hidden;
+}
+
 /* ── Section headings ────────────────────────────────────── */
 .sa-section-heading {
   font-size: 1.125rem;
@@ -141,7 +156,8 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 220px;
+  flex: 1;
+  min-height: 0;
   gap: 0.875rem;
   color: var(--text-tertiary);
   text-align: center;
@@ -165,6 +181,7 @@ html, body {
   gap: 0.75rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .sa-detail-header-row .sa-section-heading { margin-bottom: 0; }
@@ -175,6 +192,10 @@ html, body {
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .sa-slot-row {
@@ -258,6 +279,8 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  flex: 1;
+  min-height: 0;
   gap: 0.875rem;
   padding: 2.5rem 1rem;
   text-align: center;
@@ -654,7 +677,10 @@ select.sa-input {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  width: 15rem;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sa-day-btn {
@@ -662,6 +688,7 @@ select.sa-input {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  width: 100%;
   padding: 0.75rem 1rem;
   background: rgba(168, 85, 247, 0.04);
   border: 1px solid rgba(168, 85, 247, 0.15);
@@ -670,6 +697,7 @@ select.sa-input {
   font-family: inherit;
   text-align: left;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .sa-day-btn:hover {
@@ -759,6 +787,11 @@ select.sa-input {
 @media (max-width: 768px) {
   .sa-main-layout { grid-template-columns: 1fr; }
   .sa-day-list { width: 100%; }
+  .sa-calendar-card,
+  .sa-detail-panel {
+    height: auto;
+    max-height: 28rem;
+  }
 }
 
 @media (max-width: 640px) {

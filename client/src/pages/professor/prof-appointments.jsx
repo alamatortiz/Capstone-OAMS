@@ -11,9 +11,11 @@ import {
   Clock,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   XCircle,
   LayoutList,
   Loader2,
+  CalendarClock,
 } from "lucide-react";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -350,9 +352,25 @@ export default function ProfessorAppointmentsPage() {
             }
             icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
             iconClassName="appt-title-icon"
-            title="Appointment Management"
+            title="Appointment Manager"
             subtitle="Review and manage student appointment requests"
           />
+
+          {/* Schedule Manager card */}
+          <Link
+            to="/professor/schedule-manager"
+            state={{ from: "/professor/appointments", fromLabel: "Appointment Manager" }}
+            className="appt-sched-avail-card"
+          >
+            <div className="appt-sched-avail-card-icon">
+              <CalendarClock />
+            </div>
+            <div className="appt-sched-avail-card-text">
+              <span className="appt-sched-avail-card-title">Schedule Manager</span>
+              <span className="appt-sched-avail-card-subtitle">Set your weekly consultation hours so students can book with you</span>
+            </div>
+            <ChevronRight className="appt-sched-avail-card-chevron" />
+          </Link>
 
           {/* Tabs */}
           <div className="appt-tabs-nav">

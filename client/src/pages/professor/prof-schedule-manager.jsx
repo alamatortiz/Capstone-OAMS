@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
 import PageHeader from "../../components/PageHeader";
 import "./prof-dashboard.css";
-import "./prof-schedule-availability.css";
+import "./prof-schedule-manager.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
 
@@ -64,7 +64,11 @@ function fmt12(t) {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function ProfessorScheduleAvailability() {
+export default function ProfessorScheduleManager() {
+  const location = useLocation();
+  const cameFrom = location.state?.from ?? "/professor/dashboard";
+  const cameFromLabel = location.state?.fromLabel ?? "Home";
+
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([{ id: 1, type: "bot", text: "Hello! I'm your OAMS Assistant. How can I help with your schedule?", timestamp: new Date() }]);
   const [inputValue, setInputValue] = useState("");
@@ -278,14 +282,14 @@ export default function ProfessorScheduleAvailability() {
           {/* Page Header */}
           <PageHeader
             breadcrumb={
-              <Link to="/professor/dashboard" className="breadcrumb-link">
+              <Link to={cameFrom} className="breadcrumb-link">
                 <ChevronLeft className="breadcrumb-icon" />
-                Home
+                {cameFromLabel}
               </Link>
             }
             icon={<CalendarIconNav />}
             iconClassName="sa-title-icon"
-            title="Schedule Availability"
+            title="Schedule Manager"
             subtitle="Set your weekly recurring availability by day. It repeats every week until you edit or remove it."
           />
 

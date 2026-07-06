@@ -480,7 +480,7 @@ export default function QueueStatusPage() {
         {selectedQueue ? (
           <QueueDetail
             queue={selectedQueue}
-            backLabel={fromTracking ? 'Queue Tracking' : fromQueue ? 'Queues' : 'My Queue Status'}
+            backLabel={fromTracking ? 'Queue Tracking' : fromQueue ? 'Queues' : 'My Queues'}
             onBack={() => fromTracking ? navigate('/student/queue-tracking') : fromQueue ? navigate('/student/queue') : setSelectedQueueId(null)}
             onCancel={handleCancel}
             onSaveNotes={updateQueueNotes}
