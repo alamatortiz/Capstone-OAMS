@@ -202,7 +202,7 @@ export default function ProfessorDashboard() {
         ? "Loading..."
         : `${s?.todayAppointments ?? 0} for today`,
       icon: CalendarIcon,
-      bgColor: "bg-blue-50",
+      bgColor: "bg-violet-50",
       link: "/professor/appointments",
     },
     {
@@ -218,7 +218,7 @@ export default function ProfessorDashboard() {
       value: loading ? "—" : String(s?.completedThisMonth ?? 0),
       description: "This month",
       icon: CheckCircleIcon,
-      bgColor: "bg-purple-50",
+      bgColor: "bg-green-50",
       link: "/professor/transactions",
     },
   ];
@@ -328,7 +328,6 @@ export default function ProfessorDashboard() {
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
                   </div>
-                  <div className="stat-header"></div>
                   <p className={`stat-value ${loading ? "stat-loading" : ""}`}>
                     {stat.value}
                   </p>

@@ -335,7 +335,7 @@ export default function StudentDashboard() {
       description: "Total transactions",
       icon: CheckCircleIcon,
       color: "text-emerald-600",
-      bgColor: "bg-emerald-50 dark:bg-emerald-950",
+      bgColor: "dash-bg-emerald-50 dark:bg-emerald-950",
       link: "/student/transactions",
     },
   ];
