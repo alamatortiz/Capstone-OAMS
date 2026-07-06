@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 html, body {
   font-family: 'Inter', sans-serif;
@@ -15,19 +14,7 @@ html, body {
   gap: 1.3rem;
 }
 
-/* ── Page header ─────────────────────────────────────────── */
-.txn-page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.txn-title-section {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
+/* ── Header icon accent (structure comes from the shared PageHeader classes in prof-dashboard.css) ─ */
 .txn-title-icon {
   width: 3.5rem;
   height: 3.5rem;
@@ -46,24 +33,6 @@ html, body {
   height: 1.75rem;
   stroke: #fff;
   color: #fff;
-}
-
-.txn-page-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.1;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.txn-page-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0;
-  text-align: left;
-  transition: color 0.3s ease;
 }
 
 /* ── Stats grid ──────────────────────────────────────────── */
@@ -598,7 +567,6 @@ html, body {
 
 @media (max-width: 640px) {
   .transactions-page { padding: 0.5rem; gap: 1rem; }
-  .txn-page-title { font-size: 1.5rem; }
 }
 
 @media (max-width: 500px) {

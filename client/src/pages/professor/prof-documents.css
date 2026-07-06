@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
 
 html,
 body {
@@ -16,18 +15,7 @@ body {
   width: 100%;
 }
 
-/* ── Page Header ─────────────────────────────────── */
-.pdr-page-header {
-  display: flex;
-  align-items: center;
-}
-
-.pdr-title-section {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
+/* ── Header icon accent (structure comes from the shared PageHeader classes in prof-dashboard.css) ─ */
 .pdr-title-icon {
   width: 3.5rem;
   height: 3.5rem;
@@ -45,21 +33,6 @@ body {
   height: 1.75rem;
   stroke: white;
   stroke-width: 2;
-}
-
-.pdr-page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.2;
-  text-align: start;
-}
-
-.pdr-page-desc {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0 0;
 }
 
 /* ── Info/Instructions Card ──────────────────────── */
@@ -317,6 +290,7 @@ body {
   color: var(--text-tertiary);
   font-size: 0.875rem;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
@@ -958,10 +932,6 @@ body {
 @media (max-width: 640px) {
   .pdr-page {
     padding: 0.875rem 0.75rem;
-  }
-
-  .pdr-page-title {
-    font-size: 1.4rem;
   }
 
   .pdr-modal {

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
+import PageHeader from "../../components/PageHeader";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
@@ -10,11 +12,6 @@ const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const UserIcon = () => (
@@ -184,26 +181,19 @@ export default function ProfessorTransactionsPage() {
       <main className="dashboard-main">
         <div className="transactions-page">
 
-          {/* Breadcrumb */}
-          <div className="prof-breadcrumb">
-            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
-              <ChevronLeftIcon />
-              Home
-            </Link>
-          </div>
-
           {/* Page header */}
-          <div className="txn-page-header">
-            <div className="txn-title-section">
-              <div className="txn-title-icon">
-                <ActivityIcon />
-              </div>
-              <div>
-                <h1 className="txn-page-title">Transaction History</h1>
-                <p className="txn-page-subtitle">View all your activities and transactions</p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={
+              <Link to="/professor/dashboard" className="breadcrumb-link">
+                <ChevronLeft className="breadcrumb-icon" />
+                Home
+              </Link>
+            }
+            icon={<ActivityIcon />}
+            iconClassName="txn-title-icon"
+            title="Transaction History"
+            subtitle="View all your activities and transactions"
+          />
 
           {/* Stats */}
           <div className="transactions-stats-grid">

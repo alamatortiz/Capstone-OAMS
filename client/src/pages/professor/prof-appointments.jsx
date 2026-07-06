@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
+import PageHeader from "../../components/PageHeader";
 import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
+  ChevronLeft,
   XCircle,
   LayoutList,
   Loader2,
@@ -19,17 +21,6 @@ const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    style={{ width: "1.25rem", height: "1.25rem" }}
-  >
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const ChatIcon = () => (
@@ -350,26 +341,18 @@ export default function ProfessorAppointmentsPage() {
       <main className="dashboard-main">
         <div className="appt-page-content">
           {/* Header */}
-          <div className="appt-header">
-            <div className="prof-breadcrumb">
-              <Link to="/professor/dashboard" className="prof-breadcrumb-link">
-                <ChevronLeftIcon />
+          <PageHeader
+            breadcrumb={
+              <Link to="/professor/dashboard" className="breadcrumb-link">
+                <ChevronLeft className="breadcrumb-icon" />
                 Home
               </Link>
-            </div>
-
-            <div className="appt-title-section">
-              <div className="appt-title-icon">
-                <Calendar style={{ width: "1.75rem", height: "1.75rem" }} />
-              </div>
-              <div>
-                <h1 className="appt-page-title">Appointment Management</h1>
-                <p className="appt-page-subtitle">
-                  Review and manage student appointment requests
-                </p>
-              </div>
-            </div>
-          </div>
+            }
+            icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+            iconClassName="appt-title-icon"
+            title="Appointment Management"
+            subtitle="Review and manage student appointment requests"
+          />
 
           {/* Tabs */}
           <div className="appt-tabs-nav">

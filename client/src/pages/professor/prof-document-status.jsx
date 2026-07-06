@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
+import PageHeader from "../../components/PageHeader";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 import api from "../../utils/api";
@@ -10,11 +12,6 @@ const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const ChatIcon = () => (
@@ -278,29 +275,23 @@ export default function ProfessorDocumentsPage() {
       <main className="dashboard-main">
         <div className="docs-page-content">
 
-          {/* Breadcrumb */}
-          <div className="prof-breadcrumb">
-            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
-              <ChevronLeftIcon />
-              Home
-            </Link>
-          </div>
-
           {/* Page Header */}
-          <div className="docs-page-header">
-            <div className="docs-title-section">
-              <div className="docs-title-icon">
-                <FileTextIcon className="docs-icon-lg" />
-              </div>
-              <div>
-                <h1 className="docs-page-title">My Document Requests</h1>
-                <p className="docs-page-subtitle">Track the status of your submitted document requests</p>
-              </div>
-            </div>
-            <Link to="/professor/document-request" className="docs-btn-request">
-              <PlusIcon /> Request Document
-            </Link>
-          </div>
+          <PageHeader
+            breadcrumb={
+              <Link to="/professor/dashboard" className="breadcrumb-link">
+                <ChevronLeft className="breadcrumb-icon" />
+                Home
+              </Link>
+            }
+            icon={<FileTextIcon className="docs-icon-lg" />}
+            iconClassName="docs-title-icon"
+            title="My Document Requests"
+            subtitle="Track the status of your submitted document requests"
+          />
+
+          <Link to="/professor/document-request" className="docs-btn-request">
+            <PlusIcon /> Request Document
+          </Link>
 
           {/* Tabs */}
           <div className="docs-tabs-nav">

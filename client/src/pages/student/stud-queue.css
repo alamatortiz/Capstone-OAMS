@@ -1,5 +1,4 @@
 /* ===== IMPORT EXISTING STUDENT DASHBOARD CSS VARIABLES ===== */
-@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
 
 /* ===== DARK MODE (DEFAULT) ===== */
 :root,
@@ -351,13 +350,13 @@ body {
 
 .queue-badge {
   background: rgba(59, 130, 246, 0.15);
-  color: #93c5fd;
+  color: var(--blue);
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 700;
   border: 1px solid rgba(59, 130, 246, 0.25);
-  transition: all 0.3s ease;
+  transition: all 0.3s ease, color 0.3s ease;
 }
 
 .queues-list {

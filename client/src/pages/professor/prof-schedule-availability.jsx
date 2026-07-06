@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
+import PageHeader from "../../components/PageHeader";
 import "./prof-dashboard.css";
 import "./prof-schedule-availability.css";
 import api from "../../utils/api";
@@ -15,11 +17,6 @@ const CalendarIconNav = () => (
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1.25rem", height: "1.25rem" }}>
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const ChatIcon = () => (
@@ -278,29 +275,23 @@ export default function ProfessorScheduleAvailability() {
       <main className="dashboard-main">
         <div className="sa-page">
 
-          {/* Breadcrumb */}
-          <div className="prof-breadcrumb">
-            <Link to="/professor/dashboard" className="prof-breadcrumb-link">
-              <ChevronLeftIcon />
-              Home
-            </Link>
-          </div>
-
           {/* Page Header */}
-          <div className="sa-page-header">
-            <div className="sa-title-section">
-              <div className="sa-title-icon">
-                <CalendarIconNav />
-              </div>
-              <div>
-                <h1 className="sa-page-title">Schedule Availability</h1>
-                <p className="sa-page-desc">Set your weekly recurring availability by day. It repeats every week until you edit or remove it.</p>
-              </div>
-            </div>
-            <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
-              <PlusIcon /> Add Time Slot
-            </button>
-          </div>
+          <PageHeader
+            breadcrumb={
+              <Link to="/professor/dashboard" className="breadcrumb-link">
+                <ChevronLeft className="breadcrumb-icon" />
+                Home
+              </Link>
+            }
+            icon={<CalendarIconNav />}
+            iconClassName="sa-title-icon"
+            title="Schedule Availability"
+            subtitle="Set your weekly recurring availability by day. It repeats every week until you edit or remove it."
+          />
+
+          <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
+            <PlusIcon /> Add Time Slot
+          </button>
 
           {/* Two-column layout: Weekly overview + Detail panel */}
           <div className="sa-main-layout">

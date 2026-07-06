@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Akt:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 /* ===== DARK MODE (DEFAULT) ===== */
 :root,
@@ -128,12 +127,23 @@ body {
   transition: background-color 0.3s ease;
 }
 
-/* ===== Back-to-Home breadcrumb (shared across all faculty pages) ===== */
-.prof-breadcrumb {
+/* ===== PageHeader (shared across all faculty pages — mirrors the student module) ===== */
+.queue-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.queue-breadcrumb {
   display: flex;
   align-items: center;
 }
-.prof-breadcrumb-link {
+
+.breadcrumb-link,
+.breadcrumb-link:visited,
+.breadcrumb-link:active,
+.breadcrumb-link:focus {
+  outline: none;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -148,10 +158,41 @@ body {
   font-family: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
 }
-.prof-breadcrumb-link:hover {
+.breadcrumb-link:hover {
   color: var(--primary-color);
   background: rgba(34, 197, 94, 0.1);
+}
+
+.breadcrumb-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.queue-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.queue-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.queue-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
 }
 
 /* ===== Main Content ===== */
@@ -1383,6 +1424,10 @@ body {
   .professor-dashboard {
     padding: 0.75rem;
     gap: 1rem;
+  }
+
+  .queue-title {
+    font-size: 1.5rem;
   }
 
   .stats-grid {
