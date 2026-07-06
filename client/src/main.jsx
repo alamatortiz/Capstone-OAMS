@@ -43,9 +43,6 @@ const ProfessorSchedulePage = React.lazy(
   () => import("./pages/student/stud-professor-schedules.jsx"),
 );
 
-const AdminDocumentsPage = React.lazy(
-  () => import("./pages/admin/AdminDocuments.jsx"),
-);
 const AdminQueueManagement = React.lazy(
   () => import("./pages/admin/AdminQueueManagement.jsx"),
 );
@@ -253,14 +250,6 @@ createRoot(document.getElementById("root")).render(
                 element={<AdminTransaction />}
               />
               <Route path="/admin/queue" element={<AdminQueue />} />
-              <Route
-                path="/admin/documents"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AdminDocumentsPage />
-                  </Suspense>
-                }
-              />
               <Route
                 path="/admin/queue-management"
                 element={

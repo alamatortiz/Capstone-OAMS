@@ -95,7 +95,7 @@ const navItems = [
   { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
   { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
   { icon: CalendarIconNav, label: "Appointments", path: "/admin/appointments" },
-  { icon: DocumentIconNav, label: "Documents", path: "/admin/documents" },
+  { icon: DocumentIconNav, label: "Documents", path: "/admin/document-processing" },
   { icon: HistoryIconNav, label: "Transactions", path: "/admin/transactions" },
 ];
 
