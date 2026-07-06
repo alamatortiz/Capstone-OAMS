@@ -64,8 +64,14 @@ const ChevronLeftIcon = () => (
 );
 
 
+const SOURCES = [
+  { id: "student", label: "Students", endpoint: "document-processing" },
+  { id: "faculty", label: "Faculty", endpoint: "faculty-document-processing" },
+];
+
 export default function AdminDocumentProcessing() {
   // ── Document processing state ─────────────────────────────────────────────
+  const [source, setSource] = useState("student");
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,18 +80,20 @@ export default function AdminDocumentProcessing() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [processingNotes, setProcessingNotes] = useState("");
 
+  const sourceEndpoint = SOURCES.find((s) => s.id === source).endpoint;
+
   // ── Effects ───────────────────────────────────────────────────────────────
   const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/admin/document-processing");
+      const res = await api.get(`/admin/${sourceEndpoint}`);
       setDocuments(res.data.documents ?? []);
     } catch (err) {
       toast.error("Failed to load document requests");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sourceEndpoint]);
 
   useEffect(() => {
     fetchDocuments();
@@ -97,8 +105,8 @@ export default function AdminDocumentProcessing() {
     const q = searchQuery.toLowerCase();
     return (
       doc.trackingNumber.toLowerCase().includes(q) ||
-      doc.studentName.toLowerCase().includes(q) ||
-      doc.studentId.toLowerCase().includes(q)
+      doc.requesterName.toLowerCase().includes(q) ||
+      doc.requesterIdValue.toLowerCase().includes(q)
     );
   });
 
@@ -128,7 +136,7 @@ export default function AdminDocumentProcessing() {
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedDocument) return;
     try {
-      await api.patch(`/admin/document-processing/${selectedDocument.id}/status`, {
+      await api.patch(`/admin/${sourceEndpoint}/${selectedDocument.id}/status`, {
         status: newStatus,
         notes: processingNotes,
       });
@@ -182,6 +190,23 @@ export default function AdminDocumentProcessing() {
             </div>
           </div>
 
+          {/* Source toggle */}
+          <div className="adp-source-toggle">
+            {SOURCES.map((s) => (
+              <button
+                key={s.id}
+                className={`adp-source-btn ${source === s.id ? "adp-source-btn-active" : ""}`}
+                onClick={() => {
+                  setSource(s.id);
+                  setActiveTab("all");
+                  setSearchQuery("");
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
           {/* Search */}
           <div className="adp-filter-bar">
             <div className="adp-search-wrap">
@@ -189,7 +214,7 @@ export default function AdminDocumentProcessing() {
               <input
                 type="text"
                 className="adp-search-input"
-                placeholder="Search by tracking number, student name, or ID..."
+                placeholder="Search by tracking number, name, or ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -241,11 +266,11 @@ export default function AdminDocumentProcessing() {
                         <div className="adp-doc-header-row">
                           <div>
                             <div className="adp-doc-name-row">
-                              <h3 className="adp-doc-student-name">{doc.studentName}</h3>
+                              <h3 className="adp-doc-student-name">{doc.requesterName}</h3>
                               <span className="adp-college-badge adp-college-badge--outline">{doc.college}</span>
                             </div>
                             <p className="adp-doc-type">{doc.documentType}</p>
-                            <p className="adp-doc-meta">ID: {doc.studentId} • Purpose: {doc.purpose}</p>
+                            <p className="adp-doc-meta">{doc.requesterIdLabel}: {doc.requesterIdValue} • Purpose: {doc.purpose}</p>
                           </div>
                         </div>
                         <div className="adp-doc-tags-row">
@@ -310,12 +335,12 @@ export default function AdminDocumentProcessing() {
                   </div>
                 </div>
                 <div className="adp-modal-field">
-                  <label className="adp-modal-label">Student Name</label>
-                  <p className="adp-modal-value">{selectedDocument.studentName}</p>
+                  <label className="adp-modal-label">Name</label>
+                  <p className="adp-modal-value">{selectedDocument.requesterName}</p>
                 </div>
                 <div className="adp-modal-field">
-                  <label className="adp-modal-label">Student ID</label>
-                  <p className="adp-modal-value">{selectedDocument.studentId}</p>
+                  <label className="adp-modal-label">{selectedDocument.requesterIdLabel}</label>
+                  <p className="adp-modal-value">{selectedDocument.requesterIdValue}</p>
                 </div>
                 <div className="adp-modal-field">
                   <label className="adp-modal-label">College</label>

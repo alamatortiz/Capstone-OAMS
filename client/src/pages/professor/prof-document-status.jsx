@@ -1,381 +1,597 @@
-import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
-import ProfessorSidebar from "../../components/ProfessorSidebar";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import {
+  ChevronLeft,
+  FileText,
+  XCircle,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Hash,
+  MessageSquare,
+} from "lucide-react";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
+import { toast } from "sonner";
+import api from "../../utils/api";
+import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
-import api from "../../utils/api";
 
-// ── Nav Icons ─────────────────────────────────────────────────────────────────
-const CloseIcon = () => (
+const CheckCircleIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-  </svg>
-);
-const PlusIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "1rem", height: "1rem" }}>
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
 
-// ── Content Icons ─────────────────────────────────────────────────────────────
-const AlertCircleIcon = ({ className = "docs-icon-sm" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="13" />
-    <circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="currentColor" strokeWidth="1" />
-  </svg>
-);
-const CheckCircle2Icon = ({ className = "docs-icon-sm" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
-const XCircleIcon = ({ className = "docs-icon-sm" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="15" y1="9" x2="9" y2="15" />
-    <line x1="9" y1="9" x2="15" y2="15" />
-  </svg>
-);
-const ClockIcon = ({ className = "docs-icon-sm" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-const FileTextIcon = ({ className = "docs-icon-sm" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
-  </svg>
-);
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const STATUS_CONFIG = {
-  pending:    { badgeClass: "docs-badge-pending",    Icon: AlertCircleIcon,  label: "Pending" },
-  processing: { badgeClass: "docs-badge-processing", Icon: ClockIcon,        label: "Processing" },
-  released:   { badgeClass: "docs-badge-ready",      Icon: CheckCircle2Icon, label: "Released" },
-  rejected:   { badgeClass: "docs-badge-rejected",   Icon: XCircleIcon,      label: "Rejected" },
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const getStatusMeta = (status) => {
+  switch (status) {
+    case "pending":    return { label: "Pending",          cls: "dss-badge-pending" };
+    case "processing": return { label: "Processing",       cls: "dss-badge-processing" };
+    case "generated":  return { label: "Ready for Pickup", cls: "dss-badge-ready" };
+    case "released":   return { label: "Released",         cls: "dss-badge-claimed" };
+    case "rejected":   return { label: "Rejected",         cls: "dss-badge-rejected" };
+    default:           return { label: status,             cls: "dss-badge-pending" };
+  }
 };
 
-function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-  return (
-    <span className={`docs-badge ${cfg.badgeClass}`}>
-      <cfg.Icon />
-      {cfg.label}
-    </span>
-  );
-}
+const formatDate = (dateStr) => {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
-function formatDate(val) {
-  if (!val) return "—";
-  return new Date(val).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
-}
+const formatDateShort = (dateStr) => {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
-// ── Request Card ──────────────────────────────────────────────────────────────
-function RequestCard({ req, onViewDetails }) {
+// ─── Detail View ──────────────────────────────────────────────────────────────
+function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Requests" }) {
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const statusMeta = getStatusMeta(doc.status);
+  const canCancel = doc.status === "pending" || doc.status === "processing";
+
   return (
-    <div className="docs-card">
-      <div className="docs-card-header-row">
-        <div className="docs-card-icon-wrap">
-          <FileTextIcon className="docs-icon-md" />
-        </div>
-        <div className="docs-card-title-section">
-          <h3 className="docs-card-name">{req.service_name}</h3>
-          <p className="docs-card-sub">{req.tracking_number}</p>
-        </div>
-        <div className="docs-card-badges">
-          <StatusBadge status={req.status} />
+    <div className="dss-status-container">
+      {/* Page Header */}
+      <PageHeader
+        breadcrumb={
+          <button type="button" className="breadcrumb-link" onClick={onBack}>
+            <ChevronLeft className="breadcrumb-icon" />
+            {backLabel}
+          </button>
+        }
+        icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
+        iconClassName="dss-title-icon"
+        title="Document Details"
+        subtitle="Track your document request status"
+      />
+
+      {/* Hero */}
+      <div className="dss-hero-card">
+        <div className="dss-hero-content">
+          <div className="dss-hero-logo">
+            <FileText style={{ width: "2.25rem", height: "2.25rem", color: "white" }} />
+          </div>
+          <div className="dss-hero-text">
+            <div className="dss-hero-header">
+              <div className="dss-hero-title">
+                <p className="dss-hero-doc-name">{doc.type}</p>
+                <p>{doc.college}</p>
+              </div>
+              <div className="dss-hero-badge">{doc.trackingNumber}</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="docs-meta-grid">
-        <div className="docs-meta-field">
-          <label>Purpose</label>
-          <p>{req.purpose}</p>
-        </div>
-        <div className="docs-meta-field">
-          <label>Submitted</label>
-          <p>{formatDate(req.created_at)}</p>
-        </div>
-        {req.estimated_completion && (
-          <div className="docs-meta-field">
-            <label>Est. Completion</label>
-            <p>{formatDate(req.estimated_completion)}</p>
-          </div>
-        )}
-        {req.processing_time && (
-          <div className="docs-meta-field">
-            <label>Processing Time</label>
-            <p>{req.processing_time}</p>
-          </div>
-        )}
-      </div>
-
-      {req.notes && (
-        <div className="docs-notes-box">
-          <p className="docs-meta-label" style={{ marginBottom: "0.25rem" }}>Notes</p>
-          <p className="docs-notes-text">{req.notes}</p>
+      {/* Ready alert */}
+      {doc.status === "generated" && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+            borderRadius: "1rem",
+            padding: "1rem 1.5rem",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            fontWeight: 700,
+            fontSize: "1rem",
+            boxShadow: "0 8px 24px rgba(34,197,94,0.3)",
+          }}
+        >
+          <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
+          Your document is ready for pickup — please visit the HR/Records office!
         </div>
       )}
 
-      <div className="docs-footer">
-        <button className="docs-btn docs-btn-outline" onClick={() => onViewDetails(req)}>
-          View Details
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Details Dialog ────────────────────────────────────────────────────────────
-function DetailsDialog({ req, onClose }) {
-  if (!req) return null;
-  return (
-    <div className="docs-dialog-overlay">
-      <div className="docs-dialog-box">
-        <button className="docs-dialog-close" onClick={onClose} aria-label="Close">
-          <CloseIcon />
-        </button>
-        <p className="docs-dialog-title">Request Details</p>
-        <p className="docs-dialog-desc">Full details for your document request.</p>
-
-        <div className="docs-name-row">
-          <span className="docs-student-name">{req.service_name}</span>
-        </div>
-        <p className="docs-doc-type" style={{ margin: "0.25rem 0 0.75rem", opacity: 0.7, fontSize: "0.85rem" }}>
-          {req.tracking_number}
-        </p>
-
-        <div className="docs-meta-grid">
-          <div>
-            <p className="docs-meta-label">Purpose</p>
-            <p className="docs-meta-value">{req.purpose}</p>
-          </div>
-          <div>
-            <p className="docs-meta-label">Request Type</p>
-            <p className="docs-meta-value">{req.request_type || "General"}</p>
-          </div>
-          <div>
-            <p className="docs-meta-label">Status</p>
-            <StatusBadge status={req.status} />
-          </div>
-          <div>
-            <p className="docs-meta-label">Submitted</p>
-            <p className="docs-meta-value">{formatDate(req.created_at)}</p>
-          </div>
-          {req.estimated_completion && (
-            <div>
-              <p className="docs-meta-label">Est. Completion</p>
-              <p className="docs-meta-value">{formatDate(req.estimated_completion)}</p>
+      {/* Detail Grid */}
+      <div className="dss-detail-grid">
+        {/* Main column */}
+        <div className="dss-detail-main">
+          {/* Request details card */}
+          <div className="dss-card">
+            <div className="dss-card-header">
+              <h3 className="dss-card-title">
+                <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
+                Request Details
+              </h3>
+              <span className={`dss-badge ${statusMeta.cls}`}>
+                {statusMeta.label}
+              </span>
             </div>
-          )}
-          {req.released_at && (
-            <div>
-              <p className="docs-meta-label">Released</p>
-              <p className="docs-meta-value">{formatDate(req.released_at)}</p>
+            <div className="dss-card-content">
+              <div className="dss-detail-row">
+                <span className="dss-detail-label">Request Date</span>
+                <span className="dss-detail-value">{formatDate(doc.requestDate)}</span>
+              </div>
+              {doc.status === "released" && doc.releasedDate ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Date Released</span>
+                  <span className="dss-detail-value">{formatDate(doc.releasedDate)}</span>
+                </div>
+              ) : doc.estimatedCompletion ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Estimated Completion</span>
+                  <span className="dss-detail-value">{formatDate(doc.estimatedCompletion)}</span>
+                </div>
+              ) : null}
+              <div className="dss-detail-row" style={{ borderBottom: "none" }}>
+                <span className="dss-detail-label">Purpose</span>
+                <span className="dss-detail-value">{doc.purpose}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes card */}
+          {doc.notes && (
+            <div className="dss-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title">
+                  <MessageSquare style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Notes
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                <p className="dss-concern-text">{doc.notes}</p>
+              </div>
             </div>
           )}
         </div>
 
-        {req.notes && (
-          <div className="docs-notes-box" style={{ marginTop: "0.5rem" }}>
-            <p className="docs-meta-label" style={{ marginBottom: "0.25rem" }}>Notes</p>
-            <p className="docs-notes-text">{req.notes}</p>
+        {/* Sidebar */}
+        <div className="dss-detail-sidebar">
+          {/* Tracking number card */}
+          <div className="dss-card">
+            <div className="dss-card-header">
+              <h3 className="dss-card-title">
+                <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
+                Tracking Number
+              </h3>
+            </div>
+            <div className="dss-card-content" style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 800,
+                  color: "var(--primary-color)",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {doc.trackingNumber}
+              </div>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--text-tertiary)",
+                  marginTop: "0.25rem",
+                }}
+              >
+                {doc.college}
+              </div>
+            </div>
           </div>
-        )}
 
-        <div className="docs-dialog-footer">
-          <button className="docs-btn docs-btn-outline" onClick={onClose}>Close</button>
+          {/* Cancel card (only for pending/processing) */}
+          {canCancel && (
+            <div className="dss-card dss-cancel-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title dss-cancel-title">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Cancel Request
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                <p
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "var(--text-tertiary)",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  Cancelling will permanently remove this request. You'll need
+                  to resubmit if you change your mind.
+                </p>
+                <button
+                  className="dss-cancel-btn"
+                  onClick={() => setShowCancelDialog(true)}
+                >
+                  Cancel Request
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Cancel Confirm Dialog */}
+      <ActionConfirmModal
+        show={showCancelDialog}
+        onCancel={() => setShowCancelDialog(false)}
+        onConfirm={() => onCancel(doc.id)}
+        title="Cancel Request?"
+        message={
+          <>
+            You are about to cancel your request for{" "}
+            <strong>{doc.type}</strong>. This will permanently remove your
+            request — you will need to submit a new one if you change your mind.
+          </>
+        }
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="10" y1="13" x2="14" y2="17"></line>
+            <line x1="14" y1="13" x2="10" y2="17"></line>
+          </svg>
+        }
+        cancelText="Keep Request"
+        confirmText={cancelling ? "Cancelling…" : "Cancel Request"}
+        confirmDisabled={cancelling}
+      />
     </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
-const TABS = ["all", "pending", "processing", "released", "rejected"];
-
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ProfessorDocumentsPage() {
-  const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
-  const [selectedReq, setSelectedReq] = useState(null);
-  const [messages, setMessages] = useState([
-    { id: 1, type: "bot", text: "Hello! I'm your OAMS Assistant. How can I help you today?", timestamp: new Date() },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [requests, setRequests] = useState([]);
+  const navState = location.state ?? {};
+
+  const fromRequestPage = navState.from === "document-request";
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [selectedDocId, setSelectedDocId] = useState(navState.docId ?? null);
+  const [detailOpenedFromExternal, setDetailOpenedFromExternal] = useState(
+    fromRequestPage && !!navState.docId,
+  );
+  const [activeTab, setActiveTab] = useState("active");
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
 
-  const fetchRequests = async () => {
+  const selectedDoc = selectedDocId
+    ? (documents.find((d) => d.id === selectedDocId) ?? null)
+    : null;
+
+  useEffect(() => {
+    if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
+  }, [loading, selectedDocId, selectedDoc]);
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get("/faculty/my-document-requests");
+        setDocuments(
+          res.data.map((r) => ({
+            id: String(r.request_id),
+            type: r.service_name,
+            college: r.college,
+            purpose: r.purpose,
+            requestDate: r.created_at,
+            status: r.status,
+            trackingNumber: r.tracking_number,
+            notes: r.notes || undefined,
+            estimatedCompletion: r.estimated_completion || undefined,
+            releasedDate: r.released_at || undefined,
+          })),
+        );
+        setError(null);
+      } catch (err) {
+        console.error("Failed to fetch document requests:", err);
+        setError("Could not load your document requests.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDocuments();
+  }, []);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+  const handleCancel = async (requestId) => {
+    setCancelling(true);
     try {
-      const res = await api.get("/faculty/my-document-requests");
-      setRequests(res.data);
-    } catch {
-      // silent — empty state handles it
+      await api.delete(`/faculty/my-document-requests/${requestId}`);
+      setDocuments((prev) => prev.filter((d) => d.id !== requestId));
+      toast.success("Document request cancelled.");
+      setSelectedDocId(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.message ?? "Failed to cancel request.");
     } finally {
-      setLoading(false);
+      setCancelling(false);
     }
   };
 
-  useEffect(() => { fetchRequests(); }, []);
-
-  const filtered =
-    activeTab === "all" ? requests : requests.filter((r) => r.status === activeTab);
-
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
-    const pending = requests.filter((r) => r.status === "pending").length;
-    if (i.includes("pending")) return `You have ${pending} pending document request(s).`;
-    if (i.includes("document") || i.includes("request")) return `You have ${requests.length} document request(s) in total.`;
-    return "I can help you track your document requests. What do you need?";
+    const pending = documents.filter((d) => d.status === "pending").length;
+    const ready = documents.filter((d) => d.status === "generated").length;
+    if (i.includes("status") || i.includes("document")) {
+      return pending > 0
+        ? `You have ${pending} pending request(s) and ${ready} ready for pickup.`
+        : ready > 0
+          ? `You have ${ready} document(s) ready for pickup!`
+          : "All your document requests have been completed.";
+    }
+    if (i.includes("cancel")) {
+      return "Click on a pending or processing request, then use the 'Cancel Request' button to cancel it.";
+    }
+    if (i.includes("ready") || i.includes("pickup")) {
+      return ready > 0
+        ? `You have ${ready} document(s) ready for pickup. Please visit the HR/Records office.`
+        : "None of your documents are ready for pickup yet.";
+    }
+    return "I can help with document statuses. Try: 'What documents are ready?' or 'How many pending requests?'";
   };
 
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = { id: messages.length + 1, type: "user", text: inputValue, timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInputValue("");
-    setTimeout(() => {
-      const bot = { id: messages.length + 2, type: "bot", text: generateBotResponse(inputValue), timestamp: new Date() };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
-  };
+  const activeDocuments = documents.filter(
+    (d) => d.status !== "released" && d.status !== "rejected",
+  );
+  const completedDocuments = documents.filter(
+    (d) => d.status === "released" || d.status === "rejected",
+  );
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="dashboard-with-sidebar">
-      <ProfessorSidebar />
-
-      {/* Main Content */}
-      <main className="dashboard-main">
-        <div className="docs-page-content">
-
+    <ProfessorPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main doc-status-page"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your document requests?"
+          getBotResponse={generateBotResponse}
+          sendButtonAriaLabel="Send"
+        />
+      }
+    >
+      {selectedDoc ? (
+        <DocumentDetail
+          doc={selectedDoc}
+          backLabel={detailOpenedFromExternal ? "Document Requests" : "All Requests"}
+          onBack={() =>
+            detailOpenedFromExternal
+              ? navigate("/professor/document-request")
+              : setSelectedDocId(null)
+          }
+          onCancel={handleCancel}
+          cancelling={cancelling}
+        />
+      ) : (
+        <div className="dss-status-container">
           {/* Page Header */}
           <PageHeader
             breadcrumb={
-              <Link to="/professor/dashboard" className="breadcrumb-link">
+              <Link
+                to={navState.from === "document-request" ? "/professor/document-request" : "/professor/dashboard"}
+                className="breadcrumb-link"
+              >
                 <ChevronLeft className="breadcrumb-icon" />
-                Home
+                {navState.from === "document-request" ? "Document Requests" : "Home"}
               </Link>
             }
-            icon={<FileTextIcon className="docs-icon-lg" />}
-            iconClassName="docs-title-icon"
+            icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
+            iconClassName="dss-title-icon"
             title="My Document Requests"
-            subtitle="Track the status of your submitted document requests"
+            subtitle="Track and manage all your document requests"
           />
 
-          <Link to="/professor/document-request" className="docs-btn-request">
-            <PlusIcon /> Request Document
-          </Link>
-
-          {/* Tabs */}
-          <div className="docs-tabs-nav">
-            <div className="docs-tabs-list">
-              {TABS.map((tab) => {
-                const count = tab === "all" ? requests.length : requests.filter((r) => r.status === tab).length;
-                return (
-                  <button
-                    key={tab}
-                    className={`docs-tab-trigger${activeTab === tab ? " active" : ""}`}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    <span className="docs-tab-count">{loading ? "—" : count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* List */}
-          <div className="docs-list">
-            {loading ? (
-              <div className="docs-empty">Loading your document requests...</div>
-            ) : filtered.length === 0 ? (
-              <div className="docs-empty">
-                {activeTab === "all"
-                  ? "You have no document requests yet. Click \"Request Document\" to get started."
-                  : `No ${activeTab} requests found.`}
-              </div>
-            ) : (
-              filtered.map((req) => (
-                <RequestCard
-                  key={req.request_id}
-                  req={req}
-                  onViewDetails={setSelectedReq}
-                />
-              ))
-            )}
-          </div>
-
-        </div>
-      </main>
-
-      {selectedReq && (
-        <DetailsDialog req={selectedReq} onClose={() => setSelectedReq(null)} />
-      )}
-
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button className="chat-close-btn" onClick={() => setChatOpen(false)} aria-label="Close chat">
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+          {/* Error */}
+          {error && (
+            <div
+              className="dss-empty-state"
+              style={{ borderColor: "rgba(239,68,68,0.3)" }}
+            >
+              <AlertCircle
+                className="dss-empty-icon"
+                style={{ color: "#ef4444" }}
               />
-              <button type="submit" className="chat-send-btn" aria-label="Send message">
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button className={`chat-fab ${chatOpen ? "hidden" : ""}`} onClick={() => setChatOpen(true)} aria-label="Open chat">
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+              <p className="dss-empty-text">{error}</p>
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && (
+            <div className="dss-empty-state">
+              <Loader2
+                className="dss-empty-icon"
+                style={{ animation: "spin 1s linear infinite" }}
+              />
+              <p className="dss-empty-text">Loading your document requests…</p>
+            </div>
+          )}
+
+          {/* Document Tabs */}
+          {!loading && !error && (
+            <div className="dss-tabs-container">
+              <div className="dss-tabs-list">
+                <button
+                  className={`dss-tab ${activeTab === "active" ? "active" : ""}`}
+                  onClick={() => setActiveTab("active")}
+                >
+                  <AlertCircle />
+                  Active Requests <span className="dss-tab-count">{activeDocuments.length}</span>
+                </button>
+                <button
+                  className={`dss-tab ${activeTab === "completed" ? "active" : ""}`}
+                  onClick={() => setActiveTab("completed")}
+                >
+                  <CheckCircleIcon />
+                  Completed <span className="dss-tab-count">{completedDocuments.length}</span>
+                </button>
+              </div>
+
+              {/* Active Tab */}
+              {activeTab === "active" && (
+                <div className="dss-list-container">
+                  {activeDocuments.length > 0 ? (
+                    activeDocuments.map((doc) => {
+                      const statusMeta = getStatusMeta(doc.status);
+                      return (
+                        <div
+                          key={doc.id}
+                          className="dss-list-item"
+                          onClick={() => { setDetailOpenedFromExternal(false); setSelectedDocId(doc.id); }}
+                        >
+                          <div className="dss-list-header">
+                            <div className="dss-list-icon-wrap">
+                              <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
+                            </div>
+                            <div className="dss-list-title-section">
+                              <h3>{doc.type}</h3>
+                              <p className="dss-list-college">{doc.college}</p>
+                              <p className="dss-list-tracking">
+                                Tracking: <span>{doc.trackingNumber}</span>
+                              </p>
+                            </div>
+                            <span className={`dss-badge ${statusMeta.cls}`}>
+                              {statusMeta.label}
+                            </span>
+                          </div>
+                          <div className="dss-list-card-grid">
+                            <div className="dss-list-card-field">
+                              <label>Request Date</label>
+                              <p>{formatDateShort(doc.requestDate)}</p>
+                            </div>
+                            {doc.estimatedCompletion && (
+                              <div className="dss-list-card-field">
+                                <label>Est. Completion</label>
+                                <p>{formatDateShort(doc.estimatedCompletion)}</p>
+                              </div>
+                            )}
+                            <div className="dss-list-card-field-full">
+                              <label>Purpose</label>
+                              <p>{doc.purpose}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="dss-empty-state">
+                      <FileText className="dss-empty-icon" />
+                      <h3 className="dss-empty-title">No Active Requests</h3>
+                      <p className="dss-empty-text">
+                        You have no active document requests.
+                      </p>
+                      <button
+                        onClick={() => navigate("/professor/document-request")}
+                        style={{
+                          marginTop: "1rem",
+                          background: "linear-gradient(135deg, #f97316, #ea580c)",
+                          color: "white",
+                          border: "none",
+                          padding: "0.75rem 1.5rem",
+                          borderRadius: "0.75rem",
+                          cursor: "pointer",
+                          fontSize: "0.875rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Request a Document
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Completed Tab */}
+              {activeTab === "completed" && (
+                <div className="dss-list-container">
+                  {completedDocuments.length > 0 ? (
+                    completedDocuments.map((doc) => {
+                      const statusMeta = getStatusMeta(doc.status);
+                      return (
+                        <div
+                          key={doc.id}
+                          className="dss-list-item dss-list-item-completed"
+                          onClick={() => { setDetailOpenedFromExternal(false); setSelectedDocId(doc.id); }}
+                        >
+                          <div className="dss-list-header">
+                            <div className="dss-list-icon-wrap">
+                              <FileText style={{ width: "1.5rem", height: "1.5rem", color: "var(--text-tertiary)" }} />
+                            </div>
+                            <div className="dss-list-title-section">
+                              <h3>{doc.type}</h3>
+                              <p className="dss-list-college">{doc.college}</p>
+                              <p className="dss-list-tracking">
+                                Tracking: <span>{doc.trackingNumber}</span>
+                              </p>
+                            </div>
+                            <span className={`dss-badge ${statusMeta.cls}`}>
+                              {statusMeta.label}
+                            </span>
+                          </div>
+                          <div className="dss-list-card-grid">
+                            <div className="dss-list-card-field">
+                              <label>Date Requested</label>
+                              <p>{formatDateShort(doc.requestDate)}</p>
+                            </div>
+                            {doc.releasedDate && (
+                              <div className="dss-list-card-field">
+                                <label>Date Released</label>
+                                <p>{formatDateShort(doc.releasedDate)}</p>
+                              </div>
+                            )}
+                            <div className="dss-list-card-field-full">
+                              <label>Purpose</label>
+                              <p>{doc.purpose}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="dss-empty-state">
+                      <CheckCircle2 className="dss-empty-icon" />
+                      <h3 className="dss-empty-title">No Completed Requests</h3>
+                      <p className="dss-empty-text">
+                        Your released and rejected requests will appear here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </ProfessorPageShell>
   );
 }

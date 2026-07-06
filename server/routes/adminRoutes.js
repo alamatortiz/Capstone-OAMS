@@ -1029,6 +1029,9 @@ router.get(
         trackingNumber: r.tracking_number,
         studentName: r.student_name,
         studentId: r.student_id,
+        requesterName: r.student_name,
+        requesterIdLabel: "Student ID",
+        requesterIdValue: r.student_id,
         college: r.college,
         documentType: r.request_type,
         purpose: r.purpose,
@@ -1042,6 +1045,129 @@ router.get(
       res.json({ documents });
     } catch (error) {
       console.error("Document processing fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/faculty-document-processing
+// Returns all faculty document requests scoped to the admin's own department.
+router.get(
+  "/faculty-document-processing",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+           fdr.request_id,
+           fdr.tracking_number,
+           fdr.request_type,
+           fdr.purpose,
+           fdr.status,
+           fdr.notes,
+           fdr.created_at,
+           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+           f.employee_id AS faculty_employee_id,
+           COALESCE(d.department_abbreviation, 'ALL') AS college
+         FROM faculty_document_requests fdr
+         JOIN faculty f ON fdr.faculty_id = f.faculty_id
+         JOIN document_services s ON fdr.service_id = s.service_id
+         LEFT JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ? OR s.department_id IS NULL
+         ORDER BY fdr.created_at DESC`,
+        [deptId],
+      );
+
+      const statusMap = {
+        pending: "pending",
+        processing: "processing",
+        generated: "ready",
+        released: "completed",
+        rejected: "rejected",
+      };
+
+      const documents = rows.map((r) => ({
+        id: String(r.request_id),
+        trackingNumber: r.tracking_number,
+        requesterName: r.faculty_name,
+        requesterIdLabel: "Employee ID",
+        requesterIdValue: r.faculty_employee_id,
+        college: r.college,
+        documentType: r.request_type,
+        purpose: r.purpose,
+        requestDate: r.created_at instanceof Date
+          ? r.created_at.toISOString().split("T")[0]
+          : String(r.created_at).split("T")[0],
+        status: statusMap[r.status] ?? r.status,
+        notes: r.notes || "",
+      }));
+
+      res.json({ documents });
+    } catch (error) {
+      console.error("Faculty document processing fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/faculty-document-processing/:requestId/status
+// Body: { status, notes }
+// Validates the request belongs to the admin's department before updating.
+router.patch(
+  "/faculty-document-processing/:requestId/status",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const requestId = parseInt(req.params.requestId, 10);
+    const { status, notes } = req.body;
+
+    const dbStatusMap = {
+      pending: "pending",
+      processing: "processing",
+      ready: "generated",
+      completed: "released",
+      rejected: "rejected",
+    };
+
+    if (!dbStatusMap[status]) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[request]] = await pool.query(
+        `SELECT fdr.request_id, s.department_id
+         FROM faculty_document_requests fdr
+         JOIN document_services s ON fdr.service_id = s.service_id
+         WHERE fdr.request_id = ?`,
+        [requestId],
+      );
+
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.department_id !== null && request.department_id !== deptId) {
+        return res.status(403).json({ error: "You can only update documents for your own department" });
+      }
+
+      await pool.query(
+        `UPDATE faculty_document_requests SET status = ?, notes = ? WHERE request_id = ?`,
+        [dbStatusMap[status], notes !== undefined ? notes : null, requestId],
+      );
+
+      res.json({ message: "Document status updated", requestId, status });
+    } catch (error) {
+      console.error("Faculty document status update error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
     }
   },

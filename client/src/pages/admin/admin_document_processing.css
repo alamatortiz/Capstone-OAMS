@@ -181,6 +181,36 @@ html, body {
 [data-theme="light"] .adp-tab-count { background: rgba(234, 88, 12, 0.1); color: #ea580c; }
 [data-theme="light"] .adp-tab-active .adp-tab-count { background: rgba(234, 88, 12, 0.2); }
 
+/* ── Source Toggle ───────────────────────────────────────────────────────── */
+.adp-source-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+  width: fit-content;
+}
+.adp-source-btn {
+  padding: 0.5rem 1.1rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.adp-source-btn:hover:not(.adp-source-btn-active) { color: var(--text-primary); }
+.adp-source-btn-active {
+  background: #f97316;
+  color: #fff;
+  cursor: default;
+}
+[data-theme="light"] .adp-source-btn-active { background: #ea580c; }
+
 /* ── Filter Bar ──────────────────────────────────────────────────────────── */
 .adp-filter-bar {
   display: flex;

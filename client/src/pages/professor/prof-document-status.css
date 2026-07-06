@@ -1,21 +1,16 @@
+/* ===== Professor Document Status — styled to match the student Document Status page ===== */
+/* :root theme variables, .dashboard-with-sidebar/.dashboard-main, and the shared
+   PageHeader classes (.queue-*, .breadcrumb-*) already come from prof-dashboard.css. */
 
-html, body {
-  font-family: 'Inter', sans-serif;
+@media (max-width: 1024px) {
+  .dashboard-main.doc-status-page {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
 }
 
-/* ── Page layout ─────────────────────────────────────────── */
-.docs-page-content {
-  padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 1.3rem;
-}
-
-/* ── Header icon accent (structure comes from the shared PageHeader classes in prof-dashboard.css) ─ */
-.docs-title-icon {
+/* ─── Title Icon (orange, matching Documents color) ─────────────────────── */
+.dss-title-icon {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.75rem;
@@ -23,79 +18,389 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: white;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-  color: #fff;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
 }
 
-.docs-title-icon svg {
+.dss-title-icon svg {
   width: 1.75rem;
   height: 1.75rem;
-  stroke: #fff;
-  color: #fff;
+  stroke: currentColor;
 }
 
-/* ── Tabs ────────────────────────────────────────────────── */
-.docs-tabs-nav {
-  margin-bottom: 0.5rem;
+/* ─── Hero Card ──────────────────────────────────────────────────────────── */
+.dss-hero-card {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 10px 30px rgba(249, 115, 22, 0.2);
+  transition: all 0.3s ease;
 }
 
-.docs-tabs-list {
+.dss-hero-content {
   display: flex;
-  gap: 0.25rem;
-  border-bottom: 2px solid var(--card-border);
-  flex-wrap: wrap;
-  transition: border-color 0.3s ease;
-  padding: 0;
+  gap: 1.5rem;
+  align-items: center;
 }
 
-.docs-tab-trigger {
+.dss-hero-logo {
+  width: 5.5rem;
+  height: 5.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-tertiary);
-  font-size: 0.78rem;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: color 0.2s ease;
-  position: relative;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dss-hero-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dss-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+}
+
+.dss-hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+  align-items: flex-start;
+}
+
+.dss-hero-doc-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.2rem 0;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.dss-hero-title p {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  text-align: left;
+}
+
+.dss-hero-badge {
+  background: white;
+  color: #ea580c;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: "Courier New", monospace;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
-.docs-tab-trigger:hover:not(.active) { color: #f97316; }
+@media (max-width: 640px) {
+  .dss-hero-content {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .dss-hero-doc-name {
+    font-size: 1.1rem;
+  }
+  .dss-hero-badge {
+    width: 100%;
+    text-align: center;
+  }
+}
 
-.docs-tab-trigger.active {
-  color: #f97316;
+/* ─── Status Badges ──────────────────────────────────────────────────────── */
+.dss-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.dss-badge-pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.dss-badge-processing {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.dss-badge-ready {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.dss-badge-claimed {
+  background: rgba(156, 163, 175, 0.15);
+  color: #e5e7eb;
+  border: 1px solid rgba(156, 163, 175, 0.35);
+}
+
+.dss-badge-rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="light"] .dss-badge-pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+[data-theme="light"] .dss-badge-processing {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+[data-theme="light"] .dss-badge-ready {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .dss-badge-claimed {
+  background: rgba(75, 85, 99, 0.1);
+  color: #1f2937;
+  border-color: rgba(75, 85, 99, 0.25);
+}
+[data-theme="light"] .dss-badge-rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* ─── Detail Grid ────────────────────────────────────────────────────────── */
+.dss-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .dss-detail-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.dss-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dss-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ─── Detail Rows (inside dss-card-content) ──────────────────────────────── */
+.dss-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.08);
+  transition: border-color 0.3s ease;
+}
+
+.dss-detail-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
   font-weight: 600;
-  background: transparent;
-  box-shadow: none;
-  cursor: default;
-  pointer-events: none;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
 }
 
-.docs-tab-trigger.active::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #f97316;
+.dss-detail-value {
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  transition: color 0.3s ease;
 }
 
-[data-theme="light"] .docs-tab-trigger:hover:not(.active) { color: #ea580c; }
-[data-theme="light"] .docs-tab-trigger.active { color: #ea580c; }
-[data-theme="light"] .docs-tab-trigger.active::after { background: #ea580c; }
+/* ─── Document List ──────────────────────────────────────────────────────── */
+.dss-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
 
-/* ── Count pill inside each tab ──────────────────────────── */
-.docs-tab-count {
+.dss-list-item {
+  background: var(--card);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.dss-list-item:hover {
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+.dss-list-item-completed {
+  opacity: 0.72;
+  border-color: rgba(107, 114, 128, 0.25);
+}
+
+.dss-list-item-completed:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+/* ─── Doc-card layout inside list items ──────────────────────────────────── */
+.dss-list-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.dss-list-title-section {
+  flex: 1;
+  text-align: left;
+}
+
+.dss-list-title-section h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f59e0b;
+  margin: 0 0 0.25rem 0;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .dss-list-title-section h3 {
+  color: #d97706;
+}
+
+.dss-list-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.dss-list-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.dss-list-card-field label,
+.dss-list-card-field-full label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.dss-list-card-field p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #f97316;
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.dss-list-card-field-full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.dss-list-card-field-full p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.dss-list-icon-wrap {
+  width: 3rem;
+  height: 3rem;
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+
+.dss-list-item-completed .dss-list-icon-wrap {
+  background: rgba(107, 114, 128, 0.1);
+}
+
+[data-theme="light"] .dss-list-icon-wrap {
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.dss-list-college {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.dss-list-tracking {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0;
+  transition: color 0.3s ease;
+}
+
+.dss-list-tracking span {
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.03em;
+}
+
+[data-theme="light"] .dss-list-tracking span {
+  color: #d97706;
+}
+
+/* ─── Count pill inside each tab ─────────────────────────────────────────── */
+.dss-tab-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -110,435 +415,217 @@ html, body {
   transition: background 0.2s;
 }
 
-.docs-tab-trigger.active .docs-tab-count {
+.dss-tab.active .dss-tab-count {
   background: rgba(249, 115, 22, 0.25);
 }
 
-[data-theme="light"] .docs-tab-count {
+[data-theme="light"] .dss-tab-count {
   background: rgba(234, 88, 12, 0.1);
   color: #ea580c;
 }
 
-[data-theme="light"] .docs-tab-trigger.active .docs-tab-count {
+[data-theme="light"] .dss-tab.active .dss-tab-count {
   background: rgba(234, 88, 12, 0.2);
 }
 
-/* ── Documents list ──────────────────────────────────────── */
-.docs-list {
+/* ─── Tabs ───────────────────────────────────────────────────────────────── */
+.dss-tabs-container {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
+  gap: 1.5rem;
+  width: 100%;
+  margin-bottom: 2rem;
 }
 
-.docs-empty {
-  text-align: center;
-  padding: 3rem 0;
+.dss-tabs-list {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  flex-wrap: wrap;
+  transition: border-color 0.3s ease;
+}
+
+.dss-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
   color: var(--text-tertiary);
   font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
-/* ── Individual document card ────────────────────────────── */
-.docs-card {
+.dss-tab svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.doc-status-page .dss-tab:hover {
+  color: #f97316;
+}
+
+.doc-status-page .dss-tab.active {
+  color: #f97316;
+}
+
+.doc-status-page .dss-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #f97316;
+}
+
+/* ─── Card shell (self-contained, orange accent) ─────────────────────────── */
+.dss-card {
   background: var(--card);
-  border: 1px solid rgba(249, 115, 22, 0.2);
-  border-radius: 1rem;
-  padding: 1.5rem;
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 1.125rem;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dss-card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.3s ease;
+}
+
+.dss-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.dss-card-title svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #f97316;
+  stroke: currentColor;
+}
+
+.dss-card-content {
+  padding: 1.25rem;
+}
+
+/* ─── Cancel card ─────────────────────────────────────────────────────────── */
+.dss-cancel-card {
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+[data-theme="light"] .dss-cancel-card {
+  background-color: rgba(239, 68, 68, 0.03);
+}
+
+.dss-cancel-title {
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dss-cancel-title svg {
+  color: #ef4444;
+}
+
+.dss-cancel-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.dss-cancel-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* ─── Empty state ─────────────────────────────────────────────────────────── */
+.dss-empty-state {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.125rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
   transition: all 0.3s ease;
 }
 
-.docs-card:hover {
-  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.15);
-  transform: translateY(-2px);
-  border-color: rgba(249, 115, 22, 0.4);
-}
-
-[data-theme="light"] .docs-card { border-color: rgba(234, 88, 12, 0.18); }
-[data-theme="light"] .docs-card:hover {
-  box-shadow: 0 12px 28px rgba(234, 88, 12, 0.1);
-  border-color: rgba(234, 88, 12, 0.35);
-}
-
-/* ── Card header row ─────────────────────────────────────── */
-.docs-card-header-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
-}
-
-.docs-card-icon-wrap {
+.dss-empty-icon {
   width: 3rem;
   height: 3rem;
-  background: rgba(249, 115, 22, 0.12);
-  border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #f97316;
-  flex-shrink: 0;
-  transition: background 0.3s ease;
-}
-
-[data-theme="light"] .docs-card-icon-wrap {
-  background: rgba(249, 115, 22, 0.08);
-  color: #ea580c;
-}
-
-.docs-card-title-section {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.docs-card-name {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #f97316;
-  margin: 0 0 0.25rem;
+  color: var(--text-tertiary);
+  margin: 0 auto 1rem;
+  stroke: currentColor;
   transition: color 0.3s ease;
 }
 
-[data-theme="light"] .docs-card-name { color: #ea580c; }
+.dss-empty-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
+}
 
-.docs-card-sub {
+.dss-empty-text {
   font-size: 0.875rem;
   color: var(--text-tertiary);
-  margin: 0;
+  margin-bottom: 1.5rem;
   transition: color 0.3s ease;
 }
 
-.docs-card-badges {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+/* ─── Concern/notes text ──────────────────────────────────────────────────── */
+.dss-concern-text {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  transition: color 0.3s ease;
 }
 
-/* ── Status badges ───────────────────────────────────────── */
-.docs-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  min-width: 5.5rem;
-  padding: 0.375rem 0.875rem;
-  border-radius: 0.625rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.3s ease;
-  justify-content: center;
-}
-
-.docs-badge svg { width: 0.875rem; height: 0.875rem; }
-
-.docs-badge-pending {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fcd34d;
-  border: 1px solid rgba(251, 191, 36, 0.4);
-}
-.docs-badge-approved {
-  background: rgba(34, 197, 94, 0.18);
-  color: #86efac;
-  border: 1px solid rgba(34, 197, 94, 0.35);
-}
-.docs-badge-rejected {
-  background: rgba(239, 68, 68, 0.18);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-}
-.docs-badge-processing {
-  background: rgba(59, 130, 246, 0.18);
-  color: #93c5fd;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-}
-.docs-badge-ready {
-  background: rgba(168, 85, 247, 0.18);
-  color: #d8b4fe;
-  border: 1px solid rgba(168, 85, 247, 0.35);
-}
-
-[data-theme="light"] .docs-badge-pending   { background: rgba(217,119,6,0.1);   color: #92400e; border-color: rgba(217,119,6,0.3); }
-[data-theme="light"] .docs-badge-approved  { background: rgba(5,150,105,0.1);   color: #065f46; border-color: rgba(5,150,105,0.25); }
-[data-theme="light"] .docs-badge-rejected  { background: rgba(220,38,38,0.08);  color: #991b1b; border-color: rgba(220,38,38,0.2); }
-[data-theme="light"] .docs-badge-processing{ background: rgba(37,99,235,0.1);   color: #1d4ed8; border-color: rgba(37,99,235,0.25); }
-[data-theme="light"] .docs-badge-ready     { background: rgba(126,34,206,0.08); color: #6b21a8; border-color: rgba(126,34,206,0.2); }
-
-/* ── Urgent badge ────────────────────────────────────────── */
-.docs-urgent-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.55rem;
-  border-radius: 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  background: rgba(220, 38, 38, 0.18);
-  color: #fca5a5;
-  border: 1px solid rgba(220, 38, 38, 0.35);
-}
-
-.docs-urgent-badge svg { width: 0.75rem; height: 0.75rem; }
-
-/* ── Meta grid (2-col info fields) ──────────────────────── */
-.docs-meta-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
-}
-
-.docs-meta-field {
+/* ─── Page container ──────────────────────────────────────────────────────── */
+.dss-status-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  text-align: left;
-}
-
-.docs-meta-field label,
-.docs-meta-label {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: color 0.3s ease;
-}
-
-.docs-meta-field p,
-.docs-meta-value {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.5;
-  transition: color 0.3s ease;
-}
-
-/* ── Notes box ───────────────────────────────────────────── */
-.docs-notes-box {
-  background: rgba(249, 115, 22, 0.06);
-  border: 1px solid rgba(249, 115, 22, 0.15);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-}
-
-.docs-notes-text {
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.5;
-  text-align: left;
-}
-
-/* ── Footer row ──────────────────────────────────────────── */
-.docs-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(249, 115, 22, 0.1);
-  flex-wrap: wrap;
-}
-
-[data-theme="light"] .docs-footer { border-top-color: rgba(234, 88, 12, 0.1); }
-
-/* ── Action buttons ──────────────────────────────────────── */
-.docs-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: opacity 0.2s ease, transform 0.1s ease;
-}
-
-.docs-btn:hover  { opacity: 0.88; }
-.docs-btn:active { transform: scale(0.97); }
-
-.docs-btn svg,
-.docs-btn .docs-icon-sm {
-  width: 1rem;
-  height: 1rem;
-  flex-shrink: 0;
-}
-
-.docs-btn-approve  { background: #16a34a; color: #fff; }
-.docs-btn-reject   { background: #dc2626; color: #fff; }
-.docs-btn-process  { background: #2563eb; color: #fff; }
-.docs-btn-ready    { background: #9333ea; color: #fff; }
-.docs-btn-outline {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--card-border);
-}
-.docs-btn-request {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  color: white;
-  border: none;
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  width: fit-content;
-  align-self: flex-start;
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
-  transition: all 0.3s ease;
-  font-family: inherit;
-}
-.docs-btn-request:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
-}
-.docs-btn-request svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* ── Icon sizes ──────────────────────────────────────────── */
-.docs-icon-sm { width: 14px; height: 14px; }
-.docs-icon-md { width: 1.5rem; height: 1.5rem; }
-.docs-icon-lg { width: 1.75rem; height: 1.75rem; }
-
-/* ── Details dialog ──────────────────────────────────────── */
-.docs-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  backdrop-filter: blur(2px);
-}
-
-.docs-dialog-box {
-  background: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 1.5rem;
+  gap: 1.3rem;
   width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
-.docs-dialog-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.25rem;
-  text-align: left;
-  padding-right: 2rem;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.docs-dialog-desc {
-  font-size: 0.82rem;
-  color: var(--text-tertiary);
-  margin: 0 0 1rem;
-  text-align: left;
-}
-
-.docs-dialog-close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--text-tertiary);
-  display: flex;
-  align-items: center;
-  padding: 0.35rem;
-  border-radius: 0.5rem;
-  transition: all 0.2s ease;
-}
-
-.docs-dialog-close:hover {
-  background: rgba(249, 115, 22, 0.1);
-  color: #f97316;
-}
-
-.docs-dialog-close svg { width: 1.125rem; height: 1.125rem; }
-
-.docs-dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 1rem;
-  margin-top: 1rem;
-  border-top: 1px solid rgba(249, 115, 22, 0.1);
-}
-
-[data-theme="light"] .docs-dialog-footer { border-top-color: rgba(234, 88, 12, 0.1); }
-
-/* Dialog reuses docs-meta-grid, docs-meta-field, docs-meta-label, docs-meta-value,
-   docs-name-row, docs-student-name, docs-student-id, docs-doc-type, docs-notes-box */
-
-.docs-name-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.25rem;
-  flex-wrap: wrap;
-}
-
-.docs-student-name {
-  font-weight: 700;
-  color: #f97316;
-  font-size: 1rem;
-}
-
-[data-theme="light"] .docs-student-name { color: #ea580c; }
-
-.docs-student-id {
-  font-size: 0.82rem;
-  color: var(--text-tertiary);
-}
-
-.docs-doc-type {
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  font-weight: 600;
-  margin: 0;
-  text-align: left;
-}
-
-/* ── Responsive ──────────────────────────────────────────── */
-@media (max-width: 1024px) {
-  .docs-page-content { padding: 1rem; }
-}
-
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .docs-page-content { padding: 0.5rem; gap: 1rem; }
-}
-
-@media (max-width: 768px) {
-  .docs-meta-grid { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-width: 480px) {
-  .docs-card { padding: 1rem; }
-  .docs-tab-trigger { font-size: 0.72rem; padding: 0.5rem 0.75rem; }
-  .docs-card-header-row { gap: 0.75rem; }
-  .docs-card-icon-wrap { width: 2.5rem; height: 2.5rem; }
-  .docs-card-name { font-size: 1rem; }
-  .docs-meta-grid { grid-template-columns: 1fr; }
-  .docs-dialog-box { padding: 1rem; }
+  .dss-list-item {
+    padding: 1rem;
+  }
 }

@@ -768,9 +768,11 @@ router.get(
     const facultyId = req.user.userId;
     try {
       const [rows] = await pool.query(
-        `SELECT fdr.*, ds.service_name, ds.processing_time
+        `SELECT fdr.*, ds.service_name, ds.processing_time,
+                COALESCE(d.department_name, 'All Departments') AS college
          FROM faculty_document_requests fdr
          JOIN document_services ds ON fdr.service_id = ds.service_id
+         LEFT JOIN departments d ON ds.department_id = d.department_id
          WHERE fdr.faculty_id = ?
          ORDER BY fdr.created_at DESC`,
         [facultyId]
@@ -793,15 +795,73 @@ router.post(
     const { service_id, request_type, purpose, notes } = req.body;
     if (!service_id || !purpose) return res.status(400).json({ message: "service_id and purpose are required" });
     try {
-      const tracking_number = `FDR-${Date.now()}-${facultyId}`;
       const [result] = await pool.query(
-        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, notes, tracking_number)
-         VALUES (?,?,?,?,?,?)`,
-        [facultyId, service_id, request_type ?? "General", purpose, notes ?? null, tracking_number]
+        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, notes)
+         VALUES (?,?,?,?,?)`,
+        [facultyId, service_id, request_type ?? "General", purpose, notes ?? null]
       );
-      res.status(201).json({ request_id: result.insertId, tracking_number, message: "Request submitted" });
+      const [[newRequest]] = await pool.query(
+        `SELECT request_id, tracking_number FROM faculty_document_requests WHERE request_id = ?`,
+        [result.insertId]
+      );
+      res.status(201).json({
+        request_id: newRequest.request_id,
+        tracking_number: newRequest.tracking_number,
+        message: "Request submitted",
+      });
     } catch (err) {
       console.error("POST /my-document-requests error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  }
+);
+
+// DELETE /api/faculty/my-document-requests/:requestId
+// Cancels (removes) a pending or processing document request owned by the faculty member.
+router.delete(
+  "/my-document-requests/:requestId",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const requestId = parseInt(req.params.requestId, 10);
+
+    if (!requestId || isNaN(requestId)) {
+      return res.status(400).json({ message: "Invalid requestId" });
+    }
+
+    try {
+      const [[request]] = await pool.query(
+        `SELECT request_id, faculty_id, status
+         FROM faculty_document_requests WHERE request_id = ?`,
+        [requestId]
+      );
+
+      if (!request) {
+        return res.status(404).json({ message: "Document request not found" });
+      }
+      if (request.faculty_id !== facultyId) {
+        return res
+          .status(403)
+          .json({ message: "You can only cancel your own document requests" });
+      }
+      if (!["pending", "processing"].includes(request.status)) {
+        return res.status(409).json({
+          message: `Cannot cancel a request that is already ${request.status}`,
+        });
+      }
+
+      await pool.query(
+        `DELETE FROM faculty_document_requests WHERE request_id = ?`,
+        [requestId]
+      );
+
+      res.json({
+        message: "Document request cancelled successfully",
+        requestId,
+      });
+    } catch (err) {
+      console.error("DELETE /my-document-requests/:requestId error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
     }
   }

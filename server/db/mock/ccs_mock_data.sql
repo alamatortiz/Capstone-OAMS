@@ -74,6 +74,23 @@ END//
 
 DELIMITER ;
 
+-- Mirrors ts_auto_tracking_number above, but for faculty's own document requests.
+DROP TRIGGER IF EXISTS ts_auto_tracking_number_faculty;
+DELIMITER //
+
+CREATE TRIGGER ts_auto_tracking_number_faculty
+BEFORE INSERT ON faculty_document_requests
+FOR EACH ROW
+BEGIN
+    DECLARE next_id INT;
+
+    SELECT COALESCE(MAX(request_id), 0) + 1 INTO next_id FROM faculty_document_requests;
+
+    SET NEW.tracking_number = CONCAT('FDR-', LPAD(next_id, 5, '0'));
+END//
+
+DELIMITER ;
+
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 0 · DEPARTMENTS
 -- Fixed institution records. All 6 colleges seeded here.
