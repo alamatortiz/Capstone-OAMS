@@ -12,8 +12,8 @@ export default function LogoutConfirmModal({ show, onConfirm, onCancel }) {
   if (!show) return null;
 
   return (
-    <div className="logout-modal-overlay" onClick={onCancel}>
-      <div className="logout-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="logout-modal-overlay">
+      <div className="logout-modal">
         <div className="logout-modal-icon">
           <LogOutIcon />
         </div>

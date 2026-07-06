@@ -654,7 +654,7 @@ export default function AdminQueueHosting() {
 
       {/* Open New Queue Line Modal */}
       {showModal && (
-        <div className="aqh-modal-overlay" onClick={closeModal}>
+        <div className="aqh-modal-overlay">
           <div className="aqh-modal" onClick={(e) => e.stopPropagation()}>
             <div className="aqh-modal-header">
               <div>

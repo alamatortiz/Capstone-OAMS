@@ -1488,7 +1488,7 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_id FROM document_services WHERE service_id = ? AND department_id = ?`,
+        `SELECT service_id FROM document_services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Document type not found in your department" });

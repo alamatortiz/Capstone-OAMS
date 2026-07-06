@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import "./admin_queue_analytics.css";
+import "./admin-queue-analytics.css";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import api from "../../utils/api";

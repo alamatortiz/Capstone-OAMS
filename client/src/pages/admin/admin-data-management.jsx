@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import "./admin_dashboard.css";
-import "./admin_data_management.css";
+import "./admin-dashboard.css";
+import "./admin-data-management.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";
@@ -751,7 +751,7 @@ export default function AdminDataManagement() {
 
       {/* ── Document Type Modal ── */}
       {showDocModal && (
-        <div className="adm-modal-overlay" onClick={closeDocModal}>
+        <div className="adm-modal-overlay">
           <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="adm-modal-header">
               <div>
@@ -926,7 +926,7 @@ export default function AdminDataManagement() {
 
       {/* ── Service Setting Modal ── */}
       {showServiceModal && (
-        <div className="adm-modal-overlay" onClick={closeServiceModal}>
+        <div className="adm-modal-overlay">
           <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="adm-modal-header">
               <div>

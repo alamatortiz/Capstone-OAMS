@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import "./admin_user_management.css";
+import "./admin-user-management.css";
 import { toast } from "sonner";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
@@ -312,7 +312,7 @@ export default function AdminUserManagement() {
 
       {/* ── Add / Edit Modal ───────────────────────────────────────────────────── */}
       {showModal && (
-        <div className="aum-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+        <div className="aum-modal-overlay">
           <div className="aum-modal">
             <div className="aum-modal-header">
               <div>

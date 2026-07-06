@@ -1,4 +1,3 @@
-
 /* ===== DARK MODE (DEFAULT) ===== */
 :root,
 [data-theme="dark"] {
@@ -130,7 +129,6 @@ body {
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
-
 
 /* ===== Main Content ===== */
 .admin-appointment-main {
@@ -355,7 +353,7 @@ body {
   font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0;
+  margin: 0 0 0.25rem 0;
   transition: color 0.3s ease;
   text-align: left;
 }

@@ -266,7 +266,7 @@ export default function AppointmentsPage() {
         <>
           {/* Book Appointment Dialog */}
           {showBookDialog && selectedSlot && (
-            <div className="dialog-overlay" onClick={() => !submitting && setShowBookDialog(false)}>
+            <div className="dialog-overlay">
               <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
                 <div className="dialog-header">
                   <h3>Confirm Appointment</h3>

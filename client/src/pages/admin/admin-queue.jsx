@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import "./admin_queue.css";
+import "./admin-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";

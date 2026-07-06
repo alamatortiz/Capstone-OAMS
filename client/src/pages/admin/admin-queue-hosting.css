@@ -1,4 +1,3 @@
-
 /* ===== DARK MODE (DEFAULT) ===== */
 :root,
 [data-theme="dark"] {
@@ -203,7 +202,7 @@
 }
 
 .aqh-page-title {
-  font-size: 1.5rem;
+  font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -1077,4 +1076,3 @@
     min-height: 1.85rem;
   }
 }
-

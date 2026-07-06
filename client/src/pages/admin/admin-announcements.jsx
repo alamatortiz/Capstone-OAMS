@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import editIcon from "../../assets/edit_icon.png";
 import deleteIcon from "../../assets/delete_icon.png";
-import "./admin_dashboard.css";
-import "./admin_announcements.css";
+import "./admin-dashboard.css";
+import "./admin-announcements.css";
 import { Link } from "react-router-dom";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
@@ -475,7 +475,7 @@ export default function AdminAnnouncements() {
 
       {/* View Modal */}
       {viewingAnnouncement && (
-        <div className="ann-modal-overlay" onClick={() => setViewingAnnouncement(null)}>
+        <div className="ann-modal-overlay">
           <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ann-modal-header">
               <div>
@@ -536,7 +536,7 @@ export default function AdminAnnouncements() {
 
       {/* Edit Modal */}
       {editingAnnouncement && (
-        <div className="ann-modal-overlay" onClick={closeEdit}>
+        <div className="ann-modal-overlay">
           <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ann-modal-header">
               <div>
@@ -576,7 +576,7 @@ export default function AdminAnnouncements() {
 
       {/* Create Modal */}
       {isCreating && (
-        <div className="ann-modal-overlay" onClick={closeCreate}>
+        <div className="ann-modal-overlay">
           <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ann-modal-header">
               <div>

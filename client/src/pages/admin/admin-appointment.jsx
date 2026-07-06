@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import "./admin_appointment.css";
+import "./admin-appointment.css";
 import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
@@ -356,10 +356,7 @@ export default function AdminAppointment() {
       />
 
       {selectedAppointment && (
-        <div
-          className="admin-appointment-modal-overlay"
-          onClick={handleCloseDetails}
-        >
+        <div className="admin-appointment-modal-overlay">
           <div
             className="admin-appointment-modal"
             onClick={(e) => e.stopPropagation()}

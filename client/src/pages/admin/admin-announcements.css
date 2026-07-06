@@ -1,11 +1,10 @@
-
 .ann-page {
   padding: 1.5rem;
   max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.45rem;
   text-align: left;
 }
 
@@ -62,7 +61,11 @@
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -98,7 +101,11 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   color: #ffffff;
   border: none;
   border-radius: 0.75rem;
@@ -180,20 +187,34 @@
 .ann-stat-total {
   border-color: rgba(34, 197, 94, 0.45);
 }
-.ann-stat-total .ann-stat-icon { color: var(--primary-color); }
+.ann-stat-total .ann-stat-icon {
+  color: var(--primary-color);
+}
 
-.ann-stat-pinned .ann-stat-value { color: var(--primary-color); }
-.ann-stat-pinned .ann-stat-icon { color: var(--primary-color); }
+.ann-stat-pinned .ann-stat-value {
+  color: var(--primary-color);
+}
+.ann-stat-pinned .ann-stat-icon {
+  color: var(--primary-color);
+}
 
 .ann-stat-important {
   border-color: rgba(239, 68, 68, 0.45);
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.08);
 }
-.ann-stat-important .ann-stat-value { color: #ef4444; }
-.ann-stat-important .ann-stat-icon { color: #ef4444; }
+.ann-stat-important .ann-stat-value {
+  color: #ef4444;
+}
+.ann-stat-important .ann-stat-icon {
+  color: #ef4444;
+}
 
-.ann-stat-archived .ann-stat-value { color: var(--text-tertiary); }
-.ann-stat-archived .ann-stat-icon { color: var(--text-tertiary); }
+.ann-stat-archived .ann-stat-value {
+  color: var(--text-tertiary);
+}
+.ann-stat-archived .ann-stat-icon {
+  color: var(--text-tertiary);
+}
 
 /* ===== Filters ===== */
 .ann-filters-card {
@@ -257,8 +278,13 @@
 }
 
 @media (max-width: 640px) {
-  .ann-select { min-width: 100%; }
-  .ann-btn-new { align-self: stretch; justify-content: center; }
+  .ann-select {
+    min-width: 100%;
+  }
+  .ann-btn-new {
+    align-self: stretch;
+    justify-content: center;
+  }
 }
 
 /* ===== List card ===== */
@@ -321,7 +347,7 @@
 }
 
 .ann-tab-active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -2px;
   left: 0;
@@ -386,10 +412,22 @@
   height: 1.25rem;
 }
 
-.ann-icon-important { background: rgba(239, 68, 68, 0.18); color: #ef4444; }
-.ann-icon-event { background: rgba(59, 130, 246, 0.18); color: #3b82f6; }
-.ann-icon-reminder { background: rgba(245, 158, 11, 0.18); color: var(--warning); }
-.ann-icon-general { background: rgba(148, 163, 184, 0.18); color: var(--text-tertiary); }
+.ann-icon-important {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+}
+.ann-icon-event {
+  background: rgba(59, 130, 246, 0.18);
+  color: #3b82f6;
+}
+.ann-icon-reminder {
+  background: rgba(245, 158, 11, 0.18);
+  color: var(--warning);
+}
+.ann-icon-general {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-tertiary);
+}
 
 .ann-item-body {
   flex: 1;
@@ -437,10 +475,26 @@
   white-space: nowrap;
 }
 
-.ann-badge-important { background: rgba(239, 68, 68, 0.18); color: #ef4444; border: 0.5px solid rgba(239, 68, 68, 0.4); }
-.ann-badge-event { background: rgba(59, 130, 246, 0.18); color: #60a5fa; border: 0.5px solid rgba(59, 130, 246, 0.4); }
-.ann-badge-reminder { background: rgba(245, 158, 11, 0.18); color: var(--warning); border: 0.5px solid rgba(245, 158, 11, 0.4); }
-.ann-badge-general { background: rgba(148, 163, 184, 0.18); color: var(--text-tertiary); border: 0.5px solid rgba(148, 163, 184, 0.35); }
+.ann-badge-important {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
+}
+.ann-badge-event {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border: 0.5px solid rgba(59, 130, 246, 0.4);
+}
+.ann-badge-reminder {
+  background: rgba(245, 158, 11, 0.18);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.4);
+}
+.ann-badge-general {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-tertiary);
+  border: 0.5px solid rgba(148, 163, 184, 0.35);
+}
 
 .ann-item-desc {
   font-size: 0.85rem;
@@ -702,7 +756,11 @@
   font-weight: 700;
   cursor: pointer;
   border: none;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   color: #ffffff;
 }
 
@@ -717,7 +775,11 @@
 
 /* View modal specifics */
 .ann-view-banner {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   border-radius: 1rem;
   padding: 1.25rem;
   color: #ffffff;
@@ -829,8 +891,14 @@
   font-weight: 700;
 }
 
-.ann-status-active { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); }
-.ann-status-archived { background: rgba(148, 163, 184, 0.18); color: var(--text-tertiary); }
+.ann-status-active {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+}
+.ann-status-archived {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-tertiary);
+}
 
 /* ===== Toasts ===== */
 .ann-toast-stack {
@@ -863,8 +931,14 @@
 }
 
 @keyframes ann-toast-in {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ===== Dash error banner reuse (kept local) ===== */
@@ -891,7 +965,9 @@
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   align-self: flex-start;
 }
 .ann-back-btn:hover {
@@ -918,5 +994,7 @@
   animation: ann-spin 0.7s linear infinite;
 }
 @keyframes ann-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }

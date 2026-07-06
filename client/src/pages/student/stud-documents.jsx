@@ -273,10 +273,7 @@ export default function DocumentsPage() {
         <>
           {/* Request Document Dialog */}
           {dialogOpen && (
-            <div
-              className="doc-dialog-overlay"
-              onClick={() => setDialogOpen(false)}
-            >
+            <div className="doc-dialog-overlay">
               <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
                 <div className="doc-dialog-header">
                   <div>

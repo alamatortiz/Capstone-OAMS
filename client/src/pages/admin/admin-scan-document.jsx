@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import "./admin_scan_document.css";
+import "./admin-scan-document.css";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import api from "../../utils/api";
@@ -435,7 +435,7 @@ export default function AdminScanDocument() {
 
       {/* Document Verification Modal */}
       {modalOpen && verifiedDoc && (
-        <div className="asd-modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="asd-modal-overlay">
           <div className="asd-modal" onClick={(e) => e.stopPropagation()}>
             <div className="asd-modal-header">
               <div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import "./admin_document_processing.css";
+import "./admin-document-processing.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import AdminSidebar from "../../components/AdminSidebar";

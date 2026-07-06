@@ -14,8 +14,8 @@ export default function ActionConfirmModal({
   if (!show) return null;
 
   return (
-    <div className="acm-overlay" onClick={onCancel}>
-      <div className="acm-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="acm-overlay">
+      <div className="acm-modal">
         {icon && <div className="acm-icon">{icon}</div>}
         <h3 className="acm-title">{title}</h3>
         <div className="acm-message">{message}</div>

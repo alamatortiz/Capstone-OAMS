@@ -4,6 +4,10 @@ html, body {
 }
 
 /* ── Layout ─────────────────────────────────────────────────────── */
+:root {
+  --sidebar-width: 14rem;
+}
+
 .aqa-layout {
   display: flex;
   min-height: 100vh;
@@ -18,6 +22,13 @@ html, body {
   padding: 2rem;
   min-height: 100vh;
   box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  :root,
+  [data-theme="dark"] {
+    --sidebar-width: 3.5rem;
+  }
 }
 
 @media (max-width: 768px) {
