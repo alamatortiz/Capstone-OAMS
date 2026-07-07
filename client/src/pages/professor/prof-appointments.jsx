@@ -6,6 +6,7 @@ import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
+import { formatManilaDate } from "../../utils/dateTime";
 import {
   Calendar,
   Clock,
@@ -118,14 +119,7 @@ function AppointmentCard({
 }) {
   const dateStr = (() => {
     try {
-      return new Date(`${appointment.date}T00:00:00`).toLocaleDateString(
-        "en-US",
-        {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        },
-      );
+      return formatManilaDate(appointment.date);
     } catch {
       return appointment.date;
     }

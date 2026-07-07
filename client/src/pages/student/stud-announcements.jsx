@@ -6,6 +6,7 @@ import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import { formatManilaDate } from "../../utils/dateTime";
 
 import "./stud-announcements.css";
 
@@ -319,14 +320,11 @@ export default function AnnouncementsPage() {
                               {announcement.college}
                             </span>
                             <span className="announcement-date">
-                              {new Date(announcement.date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )}
+                              {formatManilaDate(announcement.date, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
                             </span>
                           </div>
                         </div>
@@ -381,14 +379,11 @@ export default function AnnouncementsPage() {
                               {announcement.college}
                             </span>
                             <span className="announcement-date">
-                              {new Date(announcement.date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )}
+                              {formatManilaDate(announcement.date, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
                             </span>
                           </div>
                         </div>

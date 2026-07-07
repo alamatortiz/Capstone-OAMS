@@ -16,6 +16,7 @@ import api from "../../utils/api";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import { formatManilaDate } from "../../utils/dateTime";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 
@@ -40,20 +41,12 @@ const getStatusMeta = (status) => {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatManilaDate(dateStr, { month: "long" });
 };
 
 const formatDateShort = (dateStr) => {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatManilaDate(dateStr);
 };
 
 // ─── Detail View ──────────────────────────────────────────────────────────────

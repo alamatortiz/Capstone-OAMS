@@ -6,6 +6,7 @@ import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { toast } from "sonner";
+import { formatManilaDate } from "../../utils/dateTime";
 import "./prof-dashboard.css";
 import "./prof-documents.css";
 import api from "../../utils/api";
@@ -484,20 +485,14 @@ export default function ProfessorDocumentRequest() {
                           <div className="doc-card-field">
                             <label>Request Date</label>
                             <p className="doc-card-date-value">
-                              {new Date(req.requestDate).toLocaleDateString(
-                                "en-US",
-                                { month: "long", day: "numeric", year: "numeric" },
-                              )}
+                              {formatManilaDate(req.requestDate, { month: "long" })}
                             </p>
                           </div>
                           {req.estimatedCompletion && (
                             <div className="doc-card-field">
                               <label>Est. Completion</label>
                               <p className="doc-card-date-value">
-                                {new Date(req.estimatedCompletion).toLocaleDateString(
-                                  "en-US",
-                                  { month: "long", day: "numeric", year: "numeric" },
-                                )}
+                                {formatManilaDate(req.estimatedCompletion, { month: "long" })}
                               </p>
                             </div>
                           )}
@@ -565,10 +560,7 @@ export default function ProfessorDocumentRequest() {
                             <h3>{req.type}</h3>
                             <p className="doc-card-college">{req.college}</p>
                             <p className="doc-card-tracking">
-                              {new Date(req.requestDate).toLocaleDateString(
-                                "en-US",
-                                { month: "short", day: "numeric", year: "numeric" },
-                              )}{" "}
+                              {formatManilaDate(req.requestDate)}{" "}
                               • {req.trackingNumber}
                             </p>
                           </div>

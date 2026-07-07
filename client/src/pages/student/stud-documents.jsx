@@ -7,6 +7,7 @@ import ChatWidget from "../../components/ChatWidget";
 import { toast } from "sonner";
 import "./stud-documents.css";
 import api from "../../utils/api";
+import { formatManilaDate } from "../../utils/dateTime";
 
 import { ChevronLeft } from "lucide-react";
 
@@ -503,23 +504,18 @@ export default function DocumentsPage() {
                           <div className="doc-card-field">
                             <label>Request Date</label>
                             <p className="doc-card-date-value">
-                              {new Date(doc.requestDate).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "long",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )}
+                              {formatManilaDate(doc.requestDate, {
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
                             </p>
                           </div>
                           {doc.estimatedCompletion && (
                             <div className="doc-card-field">
                               <label>Est. Completion</label>
                               <p className="doc-card-date-value">
-                                {new Date(
-                                  doc.estimatedCompletion,
-                                ).toLocaleDateString("en-US", {
+                                {formatManilaDate(doc.estimatedCompletion, {
                                   month: "long",
                                   day: "numeric",
                                   year: "numeric",
@@ -603,14 +599,11 @@ export default function DocumentsPage() {
                             <h3>{doc.type}</h3>
                             <p className="doc-card-college">{doc.college}</p>
                             <p className="doc-card-tracking">
-                              {new Date(doc.requestDate).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )}{" "}
+                              {formatManilaDate(doc.requestDate, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}{" "}
                               • {doc.trackingNumber}
                             </p>
                           </div>

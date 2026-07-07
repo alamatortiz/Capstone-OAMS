@@ -6,6 +6,7 @@ const {
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
+const { getManilaDateString } = require("../utils/dateTime");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -788,12 +789,12 @@ router.get(
         [deptId],
       );
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = getManilaDateString();
 
       const appointments = rows.map((r) => {
         const dateStr =
           r.appointment_date instanceof Date
-            ? r.appointment_date.toISOString().split("T")[0]
+            ? getManilaDateString(r.appointment_date)
             : String(r.appointment_date).split("T")[0];
 
         return {
@@ -1131,7 +1132,7 @@ router.get(
         documentType: r.request_type,
         purpose: r.purpose,
         requestDate: r.created_at instanceof Date
-          ? r.created_at.toISOString().split("T")[0]
+          ? getManilaDateString(r.created_at)
           : String(r.created_at).split("T")[0],
         status: statusMap[r.status] ?? r.status,
         notes: r.notes || "",
@@ -1197,7 +1198,7 @@ router.get(
         documentType: r.request_type,
         purpose: r.purpose,
         requestDate: r.created_at instanceof Date
-          ? r.created_at.toISOString().split("T")[0]
+          ? getManilaDateString(r.created_at)
           : String(r.created_at).split("T")[0],
         status: statusMap[r.status] ?? r.status,
         notes: r.notes || "",

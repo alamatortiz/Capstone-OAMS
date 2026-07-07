@@ -6,6 +6,7 @@ const {
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept } = require("../sockets");
+const { getManilaDateString } = require("../utils/dateTime");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -1358,7 +1359,7 @@ router.get(
         personRole: row.faculty_role ?? "Faculty",
         date:
           row.appointment_date instanceof Date
-            ? row.appointment_date.toISOString().split("T")[0]
+            ? getManilaDateString(row.appointment_date)
             : String(row.appointment_date).split("T")[0],
         windowStart: row.window_start ? formatTime12h(row.window_start) : null,
         windowEnd: row.window_end ? formatTime12h(row.window_end) : null,
@@ -1366,7 +1367,7 @@ router.get(
         purpose: row.notes ?? "",
         status: row.status,
         createdAt: row.created_at
-          ? new Date(row.created_at).toISOString().split("T")[0]
+          ? getManilaDateString(row.created_at)
           : null,
       }));
 
@@ -1711,20 +1712,20 @@ router.get(
       const bookedMap = {};
       for (const b of bookingCounts) {
         const dStr = b.appointment_date instanceof Date
-          ? b.appointment_date.toISOString().split("T")[0]
+          ? getManilaDateString(b.appointment_date)
           : String(b.appointment_date).split("T")[0];
         bookedMap[`${b.availability_id}_${dStr}`] = b.booked;
       }
 
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
+      const todayStr = getManilaDateString(now);
       const slots = [];
 
       // Project each template onto every matching weekday within the window.
       const datesToCheck = date ? [date] : Array.from({ length: DAYS_AHEAD }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() + i);
-        return d.toISOString().split("T")[0];
+        return getManilaDateString(d);
       });
 
       for (const dateStr of datesToCheck) {
@@ -1793,7 +1794,7 @@ router.post(
         error: "availabilityId, appointmentDate, and purpose are required",
       });
     }
-    if (appointmentDate < new Date().toISOString().split("T")[0]) {
+    if (appointmentDate < getManilaDateString()) {
       return res.status(400).json({ error: "Appointment date cannot be in the past" });
     }
 

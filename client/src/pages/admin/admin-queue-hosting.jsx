@@ -8,6 +8,7 @@ import { connectSocket } from "../../utils/socket";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
+import { formatManilaDateTime } from "../../utils/dateTime";
 
 // ── Icons ──────────────────────────────────────────────────────
 const QueueIconNav = ({ className }) => (
@@ -67,11 +68,6 @@ const SearchIcon = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
   </svg>
 );
-
-const formatDateTime = (date) => {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
 
 // ── College logo resolver ────────────────────────────────────────────────
 // Resolves a college's logo image from /src/assets/{CODE}.png, falling
@@ -490,7 +486,7 @@ export default function AdminQueueHosting() {
                       <div className="aqh-queue-stat">
                         <p className="aqh-queue-stat-label">Opened At</p>
                         <p className="aqh-queue-stat-value aqh-stat-value-sm">
-                          {new Date(queue.createdAt).toLocaleString("en-US", {
+                          {formatManilaDateTime(queue.createdAt, {
                             hour: "2-digit",
                             minute: "2-digit",
                             month: "numeric",

@@ -6,6 +6,7 @@ import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import { COLLEGES } from "../../data/colleges";
+import { formatManilaDate } from "../../utils/dateTime";
 
 // ── Icons (All SVG Components) ──────────────────────────────────────────────
 const CalendarIconNav = () => (
@@ -221,7 +222,7 @@ export default function AdminAppointment() {
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Date</span>
               <span className="admin-appointment-detail-value">
-                {new Date(appointment.date).toLocaleDateString()}
+                {formatManilaDate(appointment.date)}
               </span>
             </div>
             <div className="admin-appointment-detail-item">
@@ -416,7 +417,7 @@ export default function AdminAppointment() {
                 <div className="admin-appointment-modal-field">
                   <span className="admin-appointment-modal-label">Date</span>
                   <span className="admin-appointment-modal-value">
-                    {new Date(selectedAppointment.date).toLocaleDateString()}
+                    {formatManilaDate(selectedAppointment.date)}
                   </span>
                 </div>
                 <div className="admin-appointment-modal-field">

@@ -4,6 +4,7 @@ import "./admin-user-management.css";
 import { toast } from "sonner";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
 
 // ─── Shared Layout Icons ──────────────────────────────────────────────────────
 const ChevronLeftIcon = () => (
@@ -284,8 +285,8 @@ export default function AdminUserManagement() {
                           <span className="aum-college-badge">{u.college}</span>
                           {u.studentId  && <span className="aum-meta-text">ID: {u.studentId}</span>}
                           {u.employeeId && <span className="aum-meta-text">ID: {u.employeeId}</span>}
-                          {u.lastLogin  && <span className="aum-meta-text">Last login: {new Date(u.lastLogin).toLocaleString()}</span>}
-                          <span className="aum-meta-text">Created: {new Date(u.createdDate).toLocaleDateString()}</span>
+                          {u.lastLogin  && <span className="aum-meta-text">Last login: {formatManilaDateTime(u.lastLogin)}</span>}
+                          <span className="aum-meta-text">Created: {formatManilaDate(u.createdDate)}</span>
                         </div>
                       </div>
                       <div className="aum-user-actions">

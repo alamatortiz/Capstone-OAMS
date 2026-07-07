@@ -5,6 +5,7 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
+const { getManilaDateString } = require("../utils/dateTime");
 
 // GET /api/faculty/dashboard-stats
 router.get(
@@ -263,7 +264,7 @@ router.get(
         purpose: r.notes || "No purpose specified",
         date:
           r.appointment_date instanceof Date
-            ? r.appointment_date.toISOString().split("T")[0]
+            ? getManilaDateString(r.appointment_date)
             : String(r.appointment_date).split("T")[0],
         time:
           r.window_start && r.window_end

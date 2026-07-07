@@ -7,6 +7,7 @@ import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
 import "./stud-appointments.css";
 import api from "../../utils/api";
+import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
 import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
@@ -253,10 +254,10 @@ export default function AppointmentsPage() {
     } finally { setCancellingId(null); }
   };
 
-  const formatDate = (dateString) => new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const formatDate = (dateString) => formatManilaDate(`${dateString}T00:00:00+08:00`, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   const formatTime = (time) => { const [hours, minutes] = time.split(":"); const hour = parseInt(hours); return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? "PM" : "AM"}`; };
-  const isToday = (dateString) => new Date().toDateString() === new Date(`${dateString}T00:00:00`).toDateString();
-  const isTomorrow = (dateString) => { const t = new Date(); t.setDate(t.getDate() + 1); return t.toDateString() === new Date(`${dateString}T00:00:00`).toDateString(); };
+  const isToday = (dateString) => dateString === getManilaDateString();
+  const isTomorrow = (dateString) => { const t = new Date(); t.setDate(t.getDate() + 1); return dateString === getManilaDateString(t); };
 
   return (
     <StudentPageShell

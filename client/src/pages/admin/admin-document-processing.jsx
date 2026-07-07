@@ -5,6 +5,7 @@ import api from "../../utils/api";
 import { toast } from "sonner";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import { formatManilaDate } from "../../utils/dateTime";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -280,7 +281,7 @@ export default function AdminDocumentProcessing() {
                             {label}
                           </span>
                           <span className="adp-doc-date">
-                            Requested: {new Date(doc.requestDate).toLocaleDateString()}
+                            Requested: {formatManilaDate(doc.requestDate)}
                           </span>
                           {doc.processedBy && (
                             <span className="adp-doc-date">By: {doc.processedBy}</span>
@@ -356,12 +357,12 @@ export default function AdminDocumentProcessing() {
                 </div>
                 <div className="adp-modal-field">
                   <label className="adp-modal-label">Request Date</label>
-                  <p className="adp-modal-value">{new Date(selectedDocument.requestDate).toLocaleDateString()}</p>
+                  <p className="adp-modal-value">{formatManilaDate(selectedDocument.requestDate)}</p>
                 </div>
                 {selectedDocument.completedDate && (
                   <div className="adp-modal-field">
                     <label className="adp-modal-label">Completed Date</label>
-                    <p className="adp-modal-value">{new Date(selectedDocument.completedDate).toLocaleDateString()}</p>
+                    <p className="adp-modal-value">{formatManilaDate(selectedDocument.completedDate)}</p>
                   </div>
                 )}
               </div>

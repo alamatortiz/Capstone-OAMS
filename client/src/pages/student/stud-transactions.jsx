@@ -8,6 +8,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";
+import { formatManilaDate } from "../../utils/dateTime";
 import { ChevronLeft } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
@@ -396,11 +397,10 @@ export default function TransactionsPage() {
                   <div className="transaction-meta">
                     <div className="transaction-date">
                       <CalendarIcon />
-                      {new Date(transaction.date).toLocaleDateString("en-US", {
+                      {formatManilaDate(transaction.date, {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
-                        timeZone: "Asia/Manila",
                       })}
                     </div>
                     <div className="transaction-time">

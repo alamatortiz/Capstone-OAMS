@@ -6,6 +6,7 @@ import PageHeader from "../../components/PageHeader";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
+import { formatManilaDateTime } from "../../utils/dateTime";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -125,7 +126,7 @@ export default function ProfessorTransactionsPage() {
         ...t,
         action: `${statusLabel(t.status)} ${typeLabel(t.type)}`,
         details: t.description ?? "",
-        timestamp: t.date ? new Date(t.date).toLocaleString() : "",
+        timestamp: t.date ? formatManilaDateTime(t.date) : "",
       })));
     } catch {
       // silently fail — table might be empty

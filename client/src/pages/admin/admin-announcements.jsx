@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import api from "../../utils/api";
+import { formatManilaDate } from "../../utils/dateTime";
 
 // ── Page-only icons ───────────────────────────────────────────────────────────
 const PlusIconSmall = () => (
@@ -107,7 +108,7 @@ const EMPTY_FORM = { title: "", content: "", type: "general", isPinned: false };
 
 const formatDate = (iso) => {
   try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    return formatManilaDate(iso, { month: "long", day: "numeric", year: "numeric" });
   } catch {
     return iso;
   }

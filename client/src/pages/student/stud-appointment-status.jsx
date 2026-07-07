@@ -19,6 +19,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import { formatManilaDate } from "../../utils/dateTime";
 import "./stud-appointment-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -35,13 +36,13 @@ const getStatusMeta = (status) => {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
+  return formatManilaDate(dateStr, {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
 };
 const formatDateShort = (dateStr) => {
   if (!dateStr) return "—";
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
+  return formatManilaDate(dateStr, {
     month: "short", day: "numeric", year: "numeric",
   });
 };

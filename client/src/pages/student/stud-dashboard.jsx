@@ -12,6 +12,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 
 import "./stud-dashboard.css";
 import api from "../../utils/api";
+import { formatManilaDate } from "../../utils/dateTime";
 
 // ─── Dashboard Content Icons ──────────────────────────────────────────────────
 const ClockIcon = () => (
@@ -643,7 +644,7 @@ export default function StudentDashboard() {
                             {ann.college}
                           </span>
                           <span className="pinned-announcement-date">
-                            {new Date(ann.date).toLocaleDateString("en-US", {
+                            {formatManilaDate(ann.date, {
                               month: "short",
                               day: "numeric",
                               year: "numeric",

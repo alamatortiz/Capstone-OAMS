@@ -8,6 +8,7 @@ import { connectSocket } from '../../utils/socket';
 import AdminSidebar from '../../components/AdminSidebar';
 import ChatWidget from '../../components/ChatWidget';
 import QueueReasonModal from '../../components/QueueReasonModal';
+import { formatManilaDateTime } from '../../utils/dateTime';
 
 
 // ─── Icons (all from admin dashboard) ───────────────────────────────────────
@@ -123,7 +124,7 @@ function mapQueueFromApi(q) {
     servedCount: q.servedCount,
     status: q.status === 'open' ? 'active' : q.status,
     createdAt: q.createdAt
-      ? new Date(q.createdAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true })
+      ? formatManilaDateTime(q.createdAt, { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true })
       : '—',
     serviceHours: q.serviceHours,
     location: q.location || 'N/A',
