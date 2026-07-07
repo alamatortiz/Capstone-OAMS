@@ -433,7 +433,7 @@ createRoot(document.getElementById("root")).render(
                 </Suspense>
               }
             />
-<Route path="/admin-dashboard" element={<AdminDashboard />} />
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route
               path="/admin-queue-management"
               element={<AdminQueueManagement />}
