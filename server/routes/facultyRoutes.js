@@ -383,6 +383,79 @@ router.get(
 // repeats every week until edited or removed.
 // ─────────────────────────────────────────────────────────────
 
+// GET /api/faculty/locations
+// Fixed premises the faculty can pick from for their availability slots:
+// their own department's locations plus shared/global ones.
+router.get(
+  "/locations",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId],
+      );
+      const deptId = fac?.department_id ?? null;
+
+      const [rows] = await pool.query(
+        `SELECT location_id, department_id, location_name
+         FROM locations
+         WHERE department_id = ? OR department_id IS NULL
+         ORDER BY department_id IS NULL, location_name ASC`,
+        [deptId],
+      );
+      res.json({ locations: rows.map((r) => ({
+        id: r.location_id,
+        name: r.location_name,
+        isGlobal: r.department_id === null,
+      })) });
+    } catch (err) {
+      console.error("GET /locations error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  },
+);
+
+// POST /api/faculty/locations
+// Body: { name }
+// Lets a faculty member add a one-off premise not yet in the fixed list,
+// scoped to their own department. Idempotent via uq_location_dept_name.
+router.post(
+  "/locations",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const name = (req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ message: "name is required" });
+
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId],
+      );
+      const deptId = fac?.department_id ?? null;
+      if (!deptId) return res.status(403).json({ message: "Faculty has no department assigned" });
+
+      await pool.query(
+        `INSERT INTO locations (department_id, location_name) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE location_name = location_name`,
+        [deptId, name],
+      );
+      const [[loc]] = await pool.query(
+        `SELECT location_id, location_name FROM locations WHERE department_id = ? AND location_name = ?`,
+        [deptId, name],
+      );
+      res.status(201).json({ id: loc.location_id, name: loc.location_name, isGlobal: false });
+    } catch (err) {
+      console.error("POST /locations error:", err);
+      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    }
+  },
+);
+
 // GET /api/faculty/availability
 router.get(
   "/availability",

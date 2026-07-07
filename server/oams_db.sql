@@ -116,15 +116,30 @@ CREATE TABLE login_logs (
 -- ─────────────────────────────────────────────────────────────
 -- 5. SERVICES & REQUIREMENTS (queue only)
 -- ─────────────────────────────────────────────────────────────
+
+-- Fixed set of on-campus premises (rooms/offices/windows) admins and
+-- faculty pick from instead of typing free text. department_id NULL =
+-- shared/global location (visible to every department's dropdown).
+CREATE TABLE locations (
+    location_id     INT          AUTO_INCREMENT PRIMARY KEY,
+    department_id   INT          NULL,
+    location_name   VARCHAR(100) NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_location_dept_name (department_id, location_name)
+);
+
 CREATE TABLE services (
     service_id            INT          AUTO_INCREMENT PRIMARY KEY,
     service_name          VARCHAR(100) NOT NULL,
     description           TEXT,
     department_id         INT          NULL,   -- NULL = available across all departments
+    location_id           INT          NULL,
     status                ENUM('active','inactive') NOT NULL DEFAULT 'active',
     average_service_time  INT          NOT NULL DEFAULT 15,
     auto_close            BOOLEAN      NOT NULL DEFAULT TRUE,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+    FOREIGN KEY (location_id)   REFERENCES locations(location_id)     ON DELETE SET NULL
 );
 
 CREATE TABLE service_requirements (

@@ -78,6 +78,7 @@ export default function ProfessorScheduleManager() {
   // All slots indexed by day name, e.g. "Monday" -> [slot, slot, ...]
   const [slotsByDay, setSlotsByDay] = useState({});
   const [loading, setLoading] = useState(true);
+  const [locations, setLocations] = useState([]);
 
   // ── Selected day / Add-Edit slot form ───────────────────────────────────────
   const [selectedDay, setSelectedDay] = useState(null);
@@ -87,6 +88,7 @@ export default function ProfessorScheduleManager() {
   const [addStart, setAddStart] = useState("");
   const [addEnd, setAddEnd] = useState("");
   const [addLocation, setAddLocation] = useState("");
+  const [showOtherLocation, setShowOtherLocation] = useState(false);
   const [addMaxStudents, setAddMaxStudents] = useState("");
   const [addApptTypes, setAddApptTypes] = useState([]);   // string[]
   const [addApptInput, setAddApptInput] = useState("");   // current tag input value
@@ -112,6 +114,12 @@ export default function ProfessorScheduleManager() {
 
   useEffect(() => { fetchAll(); }, []);
 
+  useEffect(() => {
+    api.get("/faculty/locations")
+      .then(({ data }) => setLocations(data.locations || []))
+      .catch(() => toast.error("Failed to load locations"));
+  }, []);
+
   const handleDayClick = (day) => {
     setSelectedDay(day === selectedDay ? null : day);
   };
@@ -123,6 +131,7 @@ export default function ProfessorScheduleManager() {
     setAddStart("");
     setAddEnd("");
     setAddLocation("");
+    setShowOtherLocation(false);
     setAddMaxStudents("");
     setAddApptTypes([]);
     setAddApptInput("");
@@ -136,6 +145,7 @@ export default function ProfessorScheduleManager() {
     setAddStart(slot.start_time.slice(0, 5));
     setAddEnd(slot.end_time.slice(0, 5));
     setAddLocation(slot.location ?? "");
+    setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
     setAddMaxStudents(slot.max_students != null ? String(slot.max_students) : "");
     setAddApptTypes((slot.appointmentTypes ?? []).map((t) => t.name));
     setAddApptInput("");
@@ -193,6 +203,15 @@ export default function ProfessorScheduleManager() {
 
     setAddSaving(true);
     try {
+      if (showOtherLocation && !locations.some((loc) => loc.name === addLocation.trim())) {
+        try {
+          const { data } = await api.post("/faculty/locations", { name: addLocation.trim() });
+          setLocations((prev) => [...prev, data]);
+        } catch {
+          // Non-fatal: the slot can still be saved with the typed location text.
+        }
+      }
+
       if (editingId) {
         await api.patch(`/faculty/availability/${editingId}`, {
           day_of_week: addDays[0],
@@ -475,13 +494,37 @@ export default function ProfessorScheduleManager() {
               </div>
               <div className="sa-form-group">
                 <label>Location *</label>
-                <input
+                <select
                   className="sa-input"
-                  type="text"
-                  placeholder="e.g. Room 301, Faculty Office"
-                  value={addLocation}
-                  onChange={(e) => setAddLocation(e.target.value)}
-                />
+                  value={showOtherLocation ? "__other__" : addLocation}
+                  onChange={(e) => {
+                    if (e.target.value === "__other__") {
+                      setShowOtherLocation(true);
+                      setAddLocation("");
+                    } else {
+                      setShowOtherLocation(false);
+                      setAddLocation(e.target.value);
+                    }
+                  }}
+                >
+                  <option value="">Select a location</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.name}>
+                      {loc.name}{loc.isGlobal ? " (Shared)" : ""}
+                    </option>
+                  ))}
+                  <option value="__other__">Other (type your own)…</option>
+                </select>
+                {showOtherLocation && (
+                  <input
+                    className="sa-input"
+                    style={{ marginTop: "8px" }}
+                    type="text"
+                    placeholder="Type the location name"
+                    value={addLocation}
+                    onChange={(e) => setAddLocation(e.target.value)}
+                  />
+                )}
               </div>
               <div className="sa-form-group">
                 <label>Max Students *</label>

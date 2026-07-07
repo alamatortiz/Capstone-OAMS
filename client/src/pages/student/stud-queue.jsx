@@ -323,6 +323,12 @@ export default function QueuePage() {
                         <CheckCircle2 className="avail-services-service-hero-icon" />
                         <span>Now Serving: {selectedSlot.currentlyServing}</span>
                       </div>
+                      {selectedSlot.voidTimeoutMinutes != null && (
+                        <div className="avail-services-service-hero-meta">
+                          <AlertCircle className="avail-services-service-hero-icon" />
+                          <span>Void after {selectedSlot.voidTimeoutMinutes} min if you don't show up when called</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -508,6 +514,12 @@ export default function QueuePage() {
                                 servicedTotal={queue.totalInQueue ?? 0}
                                 servicedPercent={queue.servicedPercent ?? 0}
                               />
+                              {queue.voidTimeoutMinutes != null && (
+                                <p style={{ fontSize: '0.75rem', opacity: 0.65, margin: '4px 0 0' }}>
+                                  <AlertCircle style={{ width: '12px', height: '12px', verticalAlign: 'text-bottom', marginRight: '4px' }} />
+                                  If called, arrive within {queue.voidTimeoutMinutes} min or your ticket will be voided
+                                </p>
+                              )}
                               <button
                                 className="queue-leave-btn"
                                 onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName }); }}

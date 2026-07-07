@@ -100,6 +100,8 @@ const emptyServiceForm = () => ({
   autoClose: true,
   status: "active",
   scope: "department",
+  locationId: "",
+  otherLocationName: "",
 });
 
 const emptyReqForm = () => ({ name: "", description: "", isMandatory: true });
@@ -148,6 +150,9 @@ export default function AdminDataManagement() {
   const [svcStepForm, setSvcStepForm] = useState({ title: "", description: "" });
   const [svcReqLoading, setSvcReqLoading] = useState(false);
 
+  // Fixed premises fetched once for the Location dropdown
+  const [locations, setLocations] = useState([]);
+
   // ── Audit Logs ─────────────────────────────────────────────
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -180,6 +185,15 @@ export default function AdminDataManagement() {
     }
   }, []);
 
+  const fetchLocations = useCallback(async () => {
+    try {
+      const { data } = await api.get("/admin/locations");
+      setLocations(data.locations || []);
+    } catch {
+      toast.error("Failed to load locations.");
+    }
+  }, []);
+
   const fetchAuditLogs = useCallback(async (action = "all") => {
     setAuditLoading(true);
     try {
@@ -198,8 +212,11 @@ export default function AdminDataManagement() {
   }, [activeTab, docStatusFilter, fetchDocumentTypes]);
 
   useEffect(() => {
-    if (activeTab === "services") fetchServiceTypes(serviceStatusFilter);
-  }, [activeTab, serviceStatusFilter, fetchServiceTypes]);
+    if (activeTab === "services") {
+      fetchServiceTypes(serviceStatusFilter);
+      fetchLocations();
+    }
+  }, [activeTab, serviceStatusFilter, fetchServiceTypes, fetchLocations]);
 
   useEffect(() => {
     if (activeTab === "audit") fetchAuditLogs(auditActionFilter);
@@ -339,6 +356,7 @@ export default function AdminDataManagement() {
       autoClose: s.autoClose,
       status: s.status,
       scope: s.scope || "department",
+      locationId: s.locationId ? String(s.locationId) : "",
     });
     setServiceRequirements([]);
     setServiceSteps([]);
@@ -399,8 +417,21 @@ export default function AdminDataManagement() {
       toast.error("Service name and average service time are required.");
       return;
     }
+    if (serviceForm.locationId === "__other__" && !serviceForm.otherLocationName.trim()) {
+      toast.error("Please type a location name.");
+      return;
+    }
     setServiceSaving(true);
     try {
+      let locationId = serviceForm.locationId || null;
+      if (locationId === "__other__") {
+        const { data } = await api.post("/admin/locations", {
+          name: serviceForm.otherLocationName.trim(),
+        });
+        locationId = data.id;
+        setLocations((prev) => [...prev, data]);
+      }
+
       const payload = {
         name: serviceForm.name,
         description: serviceForm.description,
@@ -408,6 +439,7 @@ export default function AdminDataManagement() {
         autoClose: serviceForm.autoClose,
         status: serviceForm.status,
         scope: serviceForm.scope,
+        locationId,
       };
 
       let serviceId;
@@ -982,6 +1014,31 @@ export default function AdminDataManagement() {
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
+              </div>
+              <div className="adm-form-group">
+                <label className="adm-form-label">Location</label>
+                <select
+                  className="adm-form-select"
+                  value={serviceForm.locationId}
+                  onChange={(e) => setServiceForm((p) => ({ ...p, locationId: e.target.value }))}
+                >
+                  <option value="">No specific location</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}{loc.isGlobal ? " (Shared)" : ""}
+                    </option>
+                  ))}
+                  <option value="__other__">Other (type your own)…</option>
+                </select>
+                {serviceForm.locationId === "__other__" && (
+                  <input
+                    className="adm-form-input"
+                    style={{ marginTop: "8px" }}
+                    placeholder="Type the location name"
+                    value={serviceForm.otherLocationName}
+                    onChange={(e) => setServiceForm((p) => ({ ...p, otherLocationName: e.target.value }))}
+                  />
+                )}
               </div>
               <div className="adm-form-group">
                 <label className="adm-form-label">Availability</label>

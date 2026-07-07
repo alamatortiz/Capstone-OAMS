@@ -1726,6 +1726,74 @@ router.delete(
 );
 
 // ─────────────────────────────────────────────────────────────
+// LOCATIONS — fixed premises admins pick from via dropdown
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/locations
+// Returns locations scoped to the admin's own department plus shared/global ones.
+router.get(
+  "/locations",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      const [rows] = await pool.query(
+        `SELECT location_id, department_id, location_name
+         FROM locations
+         WHERE department_id = ? OR department_id IS NULL
+         ORDER BY department_id IS NULL, location_name ASC`,
+        [deptId],
+      );
+      res.json({ locations: rows.map((r) => ({
+        id: r.location_id,
+        name: r.location_name,
+        isGlobal: r.department_id === null,
+      })) });
+    } catch (error) {
+      console.error("Locations fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/admin/locations
+// Body: { name }
+// Lets an admin add a one-off premise not yet in the fixed list, scoped to
+// their own department. Idempotent: re-adding the same name returns the
+// existing row instead of erroring (uq_location_dept_name).
+router.post(
+  "/locations",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const name = (req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "name is required" });
+
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+
+      await pool.query(
+        `INSERT INTO locations (department_id, location_name) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE location_name = location_name`,
+        [deptId, name],
+      );
+      const [[loc]] = await pool.query(
+        `SELECT location_id, location_name FROM locations WHERE department_id = ? AND location_name = ?`,
+        [deptId, name],
+      );
+      res.status(201).json({ id: loc.location_id, name: loc.location_name, isGlobal: false });
+    } catch (error) {
+      console.error("Location create error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // DATA MANAGEMENT — Service Types (queue services)
 // ─────────────────────────────────────────────────────────────
 
@@ -1743,10 +1811,12 @@ router.get(
       let sql = `
         SELECT s.service_id AS id, s.service_name AS name, s.description,
                s.status, s.average_service_time AS avgServiceTime, s.auto_close AS autoClose,
-               s.department_id,
-               d.department_abbreviation AS deptAbbrev
+               s.department_id, s.location_id,
+               d.department_abbreviation AS deptAbbrev,
+               l.location_name AS locationName
         FROM services s
         LEFT JOIN departments d ON s.department_id = d.department_id
+        LEFT JOIN locations l ON s.location_id = l.location_id
         WHERE (s.department_id = ? OR s.department_id IS NULL)`;
       const params = [deptId];
 
@@ -1766,6 +1836,8 @@ router.get(
         autoClose: !!r.autoClose,
         deptAbbrev: r.deptAbbrev || "All",
         scope: r.department_id === null ? "all" : "department",
+        locationId: r.location_id,
+        locationName: r.locationName || null,
       })) });
     } catch (error) {
       console.error("Service types fetch error:", error);
@@ -1781,7 +1853,7 @@ router.post(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { name, description, avgServiceTime, autoClose, status, scope } = req.body;
+    const { name, description, avgServiceTime, autoClose, status, scope, locationId } = req.body;
     if (!name || !avgServiceTime) {
       return res.status(400).json({ error: "name and avgServiceTime are required" });
     }
@@ -1792,9 +1864,9 @@ router.post(
       const effectiveDeptId = scope === "all" ? null : deptId;
 
       const [result] = await pool.query(
-        `INSERT INTO services (service_name, description, department_id, status, average_service_time, auto_close)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [name, description || null, effectiveDeptId, status || "active", parseInt(avgServiceTime, 10), autoClose !== false],
+        `INSERT INTO services (service_name, description, department_id, location_id, status, average_service_time, auto_close)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [name, description || null, effectiveDeptId, locationId || null, status || "active", parseInt(avgServiceTime, 10), autoClose !== false],
       );
       const newId = result.insertId;
       await logAudit(req.user.userId, "CREATE", "services", newId, null, { name, status: status || "active", avgServiceTime });
@@ -1813,7 +1885,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, avgServiceTime, autoClose, status, scope } = req.body;
+    const { name, description, avgServiceTime, autoClose, status, scope, locationId } = req.body;
     if (!name || !avgServiceTime) {
       return res.status(400).json({ error: "name and avgServiceTime are required" });
     }
@@ -1831,8 +1903,8 @@ router.put(
 
       await pool.query(
         `UPDATE services SET service_name = ?, description = ?, status = ?, average_service_time = ?, auto_close = ?,
-         department_id = ? WHERE service_id = ?`,
-        [name, description || null, status || "active", parseInt(avgServiceTime, 10), autoClose !== false, effectiveDeptId, serviceId],
+         department_id = ?, location_id = ? WHERE service_id = ?`,
+        [name, description || null, status || "active", parseInt(avgServiceTime, 10), autoClose !== false, effectiveDeptId, locationId || null, serviceId],
       );
 
       await logAudit(req.user.userId, "UPDATE", "services", serviceId,

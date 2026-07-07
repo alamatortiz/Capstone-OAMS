@@ -642,6 +642,7 @@ router.get(
            qs.max_capacity,
            qs.current_count,
            qs.status,
+           qs.no_show_timeout_minutes,
            s.service_name,
            s.department_id AS svc_dept_id,
            -- For dept-scoped services use the service's dept; for global use the admin's dept
@@ -706,6 +707,7 @@ router.get(
             waitingCount === 0
               ? "No wait"
               : `${avgWaitMin}-${avgWaitMin + 5} mins`,
+          voidTimeoutMinutes: slot.no_show_timeout_minutes,
         };
       });
 
@@ -742,9 +744,10 @@ router.get(
            qs.max_capacity,
            qs.status AS slot_status,
            qs.pause_reason,
+           qs.no_show_timeout_minutes,
            s.service_name,
-           d.department_name,
-           d.department_abbreviation,
+           COALESCE(d.department_name, da.department_name) AS department_name,
+           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation,
            -- Position: how many 'waiting' entries in this slot have queue_number <= mine
            (
              SELECT COUNT(*)
@@ -778,7 +781,9 @@ router.get(
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN departments d ON s.department_id = d.department_id
+         JOIN administrators adm ON qs.admin_id = adm.admin_id
+         JOIN departments da ON adm.department_id = da.department_id
          WHERE q.student_id = ?
            AND q.status IN ('waiting', 'serving')
          ORDER BY q.created_at ASC`,
@@ -834,6 +839,7 @@ router.get(
           }),
           startTime: formatTime12h(row.start_time),
           endTime: formatTime12h(row.end_time),
+          voidTimeoutMinutes: row.no_show_timeout_minutes,
         };
       });
 
@@ -1027,8 +1033,11 @@ router.post(
            q.queue_id, q.queue_number, q.slot_id, q.service_id, q.status, q.created_at AS joined_at,
            qs.max_capacity,
            qs.status AS slot_status,
+           qs.no_show_timeout_minutes,
            s.service_name,
-           d.department_id, d.department_name, d.department_abbreviation,
+           COALESCE(d.department_id, da.department_id) AS department_id,
+           COALESCE(d.department_name, da.department_name) AS department_name,
+           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation,
            (
              SELECT COUNT(*) FROM queues q2
              WHERE q2.slot_id = q.slot_id AND q2.status = 'waiting' AND q2.queue_number <= q.queue_number
@@ -1048,7 +1057,9 @@ router.post(
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN departments d ON s.department_id = d.department_id
+         JOIN administrators adm ON qs.admin_id = adm.admin_id
+         JOIN departments da ON adm.department_id = da.department_id
          WHERE q.queue_id = ?`,
         [queueId],
       );
@@ -1113,6 +1124,7 @@ router.post(
             minute: "2-digit",
             timeZone: "Asia/Manila",
           }),
+          voidTimeoutMinutes: newEntry.no_show_timeout_minutes,
         },
       });
     } catch (error) {
@@ -2013,6 +2025,7 @@ router.get(
            qs.max_capacity,
            qs.current_count,
            qs.status,
+           qs.no_show_timeout_minutes,
            (
              SELECT COUNT(*)
              FROM queues q
@@ -2090,12 +2103,24 @@ router.get(
                 ? "No wait"
                 : `${avgWaitMin}–${avgWaitMin + 5} mins`,
             currentlyServingNumber: slot.currently_serving_number ?? null,
+            voidTimeoutMinutes: slot.no_show_timeout_minutes,
           });
         }
       }
 
       // ── Assemble: group services per department ───────────────────────────
+      // Services with a NULL department_id are "global" (open to every
+      // college) — they don't belong to any row in `departments`, so they're
+      // grouped into a synthetic bucket instead of being dropped.
+      const GLOBAL_DEPT_KEY = "__global__";
       const deptMap = new Map();
+      deptMap.set(GLOBAL_DEPT_KEY, {
+        departmentId: null,
+        departmentName: "All Departments",
+        departmentAbbrev: "ALL",
+        officeLocation: "",
+        services: [],
+      });
       for (const dept of departments) {
         deptMap.set(dept.department_id, {
           departmentId: dept.department_id,
@@ -2107,7 +2132,7 @@ router.get(
       }
 
       for (const svc of serviceMap.values()) {
-        const dept = deptMap.get(svc.departmentId);
+        const dept = deptMap.get(svc.departmentId ?? GLOBAL_DEPT_KEY);
         if (!dept) continue;
 
         const todaySlot = slotByService.get(svc.serviceId) ?? null;

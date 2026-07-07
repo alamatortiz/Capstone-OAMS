@@ -42,6 +42,7 @@ TRUNCATE TABLE faculty_availability_services;
 TRUNCATE TABLE faculty_availability;
 TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
+TRUNCATE TABLE locations;
 TRUNCATE TABLE chat_messages;
 TRUNCATE TABLE chat_sessions;
 TRUNCATE TABLE chatbot_knowledge_base;
@@ -102,6 +103,24 @@ INSERT INTO departments (department_id, department_name, department_abbreviation
 (4001, 'College of Engineering',                              'COE',  'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 7:30 AM - 5:00 PM'),
 (5001, 'College of Arts and Sciences',                        'CAS',  'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 8:00 AM - 5:00 PM'),
 (6001, 'College of Health and Allied Sciences',               'CHAS', 'PNC Main Bldg. 2nd Floor', 'Monday - Friday: 8:00 AM - 5:00 PM, Saturday: 8:00 AM - 12:00 PM');
+
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 0b · LOCATIONS
+-- Fixed set of on-campus premises admins/faculty pick from via dropdown
+-- instead of typing free text. department_id NULL = shared/global.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO locations (location_id, department_id, location_name) VALUES
+(1,  1001, 'CCS Office'),
+(2,  1001, 'Room 201'),
+(3,  2001, 'CBAA Office'),
+(4,  3001, 'COED Office'),
+(5,  4001, 'COE Office'),
+(6,  5001, 'CAS Office'),
+(7,  6001, 'CHAS Office'),
+(8,  NULL, 'Registrar Window 1'),
+(9,  NULL, 'Registrar Window 2'),
+(10, NULL, 'Main Building Lobby');
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -364,14 +383,14 @@ INSERT INTO students (student_id, student_number, first_name, last_name, course,
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5 · SERVICES (queue only)
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO services (service_id, service_name, description, department_id, status, average_service_time, auto_close) VALUES
-(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001, 'active', 20, TRUE),
-(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001, 'active', 15, TRUE),
-(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, 'active', 10, TRUE),
-(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, 'active', 15, FALSE),
-(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, 'active', 10, TRUE),
-(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 'active', 30, FALSE),
-(7, 'General Inquiry Counter',   'Walk-in general inquiries available to all departments', NULL, 'active', 10, TRUE);
+INSERT INTO services (service_id, service_name, description, department_id, location_id, status, average_service_time, auto_close) VALUES
+(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001, 1,    'active', 20, TRUE),
+(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001, 2,    'active', 15, TRUE),
+(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, 1,    'active', 10, TRUE),
+(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, 1,    'active', 15, FALSE),
+(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, 3,    'active', 10, TRUE),
+(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 4,    'active', 30, FALSE),
+(7, 'General Inquiry Counter',   'Walk-in general inquiries available to all departments', NULL, 10, 'active', 10, TRUE);
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5a-REQ · SERVICE REQUIREMENTS
