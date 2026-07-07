@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { connectSocket, disconnectSocket } from "../utils/socket";
 import QueueContext from "./QueueContextBase";
 
-// How often we poll the server for queue changes while the student is
-// logged in. This is what makes admin actions (pause/resume/call-next/
-// serve) show up on the student side without a manual refresh.
-const POLL_INTERVAL_MS = 6000;
+// Live updates are pushed over WebSocket; this is only a safety-net poll
+// in case a socket event is missed or the connection drops silently.
+const FALLBACK_POLL_INTERVAL_MS = 45000;
 
 export function QueueProvider({ children }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   const [queues, setQueues] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
@@ -25,6 +25,10 @@ export function QueueProvider({ children }) {
   // status page right now.
   const prevQueuesRef = useRef(new Map());
   const hasLoadedOnceRef = useRef(false);
+  const queuesRef = useRef([]);
+  useEffect(() => {
+    queuesRef.current = queues;
+  }, [queues]);
 
   // ── Fetch queue history ───────────────────────────────────────────────────
   const fetchQueueHistory = useCallback(async () => {
@@ -55,7 +59,9 @@ export function QueueProvider({ children }) {
       }
       if (prev.slotStatus !== "paused" && q.slotStatus === "paused") {
         toast.warning(
-          `The queue for ${q.serviceName} has been paused by the admin. Please wait.`,
+          q.slotPauseReason
+            ? `The queue for ${q.serviceName} has been paused by the admin. Reason: ${q.slotPauseReason}`
+            : `The queue for ${q.serviceName} has been paused by the admin. Please wait.`,
         );
       }
       if (prev.slotStatus === "paused" && q.slotStatus === "open") {
@@ -176,7 +182,7 @@ export function QueueProvider({ children }) {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [user?.userId, fetchActiveQueues, fetchAvailableSlots]);
 
-  // ── Poll for live updates ─────────────────────────────────────────────────
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
     if (!user?.userId || user.role !== "student") return;
     const interval = setInterval(() => {
@@ -184,9 +190,66 @@ export function QueueProvider({ children }) {
         fetchActiveQueues();
         fetchAvailableSlots();
       }
-    }, POLL_INTERVAL_MS);
+    }, FALLBACK_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [user?.userId, fetchActiveQueues, fetchAvailableSlots]);
+
+  // ── WebSocket: live queue updates ─────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.userId || user.role !== "student" || !token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const refetch = () => {
+      fetchActiveQueues();
+      fetchAvailableSlots();
+    };
+
+    const events = [
+      "queue:called",
+      "queue:served",
+      "queue:no-show",
+      "queue:slot-status",
+      "queue:student-joined",
+      "queue:student-left",
+    ];
+    events.forEach((event) => socket.on(event, refetch));
+
+    // The admin stopped a queue that this student was still in — their
+    // entry was force-cancelled server-side. Tell them directly (with the
+    // reason) instead of relying on the generic diff logic, which only
+    // ever notices "serving" entries vanishing, not "waiting" ones.
+    const onQueueStopped = (payload) => {
+      const stoppedQueue = queuesRef.current.find(
+        (q) => q.queueId === payload.queueId,
+      );
+      toast.error(
+        `Your queue${stoppedQueue ? ` for ${stoppedQueue.serviceName}` : ""} was stopped by the admin. Reason: ${payload.reason}`,
+        { duration: 10000 },
+      );
+      refetch();
+    };
+    socket.on("queue:queue-stopped", onQueueStopped);
+
+    // Reconcile any events missed while disconnected.
+    const onReconnect = () => {
+      socket.emit("queue:rejoin-rooms");
+      refetch();
+    };
+    socket.on("connect", onReconnect);
+
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+      socket.off("queue:queue-stopped", onQueueStopped);
+      socket.off("connect", onReconnect);
+    };
+  }, [user?.userId, user?.role, token, fetchActiveQueues, fetchAvailableSlots]);
+
+  // ── Disconnect socket on logout ───────────────────────────────────────────
+  useEffect(() => {
+    if (!token) disconnectSocket();
+  }, [token]);
 
   // ── Join a queue ──────────────────────────────────────────────────────────
   const joinQueue = useCallback(

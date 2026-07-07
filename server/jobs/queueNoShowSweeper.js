@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { emitToSlot, emitToUser, emitToDept } = require("../sockets");
 
 const SWEEP_INTERVAL_MS = 30 * 1000;
 
@@ -10,9 +11,10 @@ const SWEEP_INTERVAL_MS = 30 * 1000;
 async function sweepNoShows() {
   try {
     const [stale] = await pool.query(
-      `SELECT q.queue_id
+      `SELECT q.queue_id, q.slot_id, q.student_id, s.department_id
        FROM queues q
        JOIN queue_slots qs ON q.slot_id = qs.slot_id
+       JOIN services s ON qs.service_id = s.service_id
        WHERE q.status = 'serving'
          AND q.called_at IS NOT NULL
          AND TIMESTAMPDIFF(MINUTE, q.called_at, NOW()) >= qs.no_show_timeout_minutes`,
@@ -20,7 +22,8 @@ async function sweepNoShows() {
 
     if (stale.length === 0) return;
 
-    for (const { queue_id: queueId } of stale) {
+    for (const row of stale) {
+      const { queue_id: queueId, slot_id: slotId, student_id: studentId, department_id: deptId } = row;
       await pool.query(
         `UPDATE queues SET status = 'no_show', completed_at = NOW() WHERE queue_id = ?`,
         [queueId],
@@ -30,6 +33,11 @@ async function sweepNoShows() {
          VALUES (?, 'serving', 'no_show', NULL, 'Auto-voided: no-show timeout exceeded', NOW())`,
         [queueId],
       );
+
+      const noShowPayload = { slotId, queueId, studentId };
+      emitToSlot(slotId, "queue:no-show", noShowPayload);
+      emitToUser(studentId, "queue:no-show", noShowPayload);
+      emitToDept(deptId, "queue:no-show", noShowPayload);
     }
 
     console.log(

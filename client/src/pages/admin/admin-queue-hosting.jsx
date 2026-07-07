@@ -4,8 +4,10 @@ import { Link } from "react-router-dom";
 import "./admin-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
+import { connectSocket } from "../../utils/socket";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import QueueReasonModal from "../../components/QueueReasonModal";
 
 // ── Icons ──────────────────────────────────────────────────────
 const QueueIconNav = ({ className }) => (
@@ -125,6 +127,30 @@ export default function AdminQueueHosting() {
     if (authUser) init();
   }, [authUser, fetchQueues, fetchServices]);
 
+  // ── Live updates: refetch when a socket event affects this dept's queues ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!authUser || !token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = [
+      "queue:slot-opened",
+      "queue:slot-status",
+      "queue:called",
+      "queue:served",
+      "queue:no-show",
+      "queue:student-joined",
+      "queue:student-left",
+    ];
+    events.forEach((event) => socket.on(event, fetchQueues));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchQueues));
+    };
+  }, [authUser, fetchQueues]);
+
   // ── Search & filter state ──────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -210,15 +236,12 @@ export default function AdminQueueHosting() {
   };
 
   // ── Queue lifecycle handlers (server-authoritative) ───────────────────────
-  const handlePauseQueue = async (id) => {
-    try {
-      await api.patch(`/admin/queue-hosting/${id}/pause`);
-      toast.message("Queue paused");
-      await fetchQueues();
-    } catch (error) {
-      toast.error(error?.response?.data?.error ?? "Failed to pause queue");
-    }
-  };
+  // Pause and close both require a reason, collected via QueueReasonModal.
+  const [reasonModal, setReasonModal] = useState(null); // { mode: 'pause'|'close', queueId }
+  const [reasonSubmitting, setReasonSubmitting] = useState(false);
+
+  const handlePauseQueue = (id) => setReasonModal({ mode: "pause", queueId: id });
+  const handleCloseQueue = (id) => setReasonModal({ mode: "close", queueId: id });
 
   const handleResumeQueue = async (id) => {
     try {
@@ -230,19 +253,23 @@ export default function AdminQueueHosting() {
     }
   };
 
-  const handleCloseQueue = async (id) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to close this queue? This action cannot be undone.",
-      )
-    )
-      return;
+  const handleReasonConfirm = async (reason) => {
+    if (!reasonModal) return;
+    const { mode, queueId } = reasonModal;
+    setReasonSubmitting(true);
     try {
-      await api.patch(`/admin/queue-hosting/${id}/close`);
-      toast.success("Queue closed");
+      await api.patch(`/admin/queue-hosting/${queueId}/${mode}`, { reason });
+      toast[mode === "pause" ? "message" : "success"](
+        mode === "pause" ? "Queue paused" : "Queue stopped",
+      );
+      setReasonModal(null);
       await fetchQueues();
     } catch (error) {
-      toast.error(error?.response?.data?.error ?? "Failed to close queue");
+      toast.error(
+        error?.response?.data?.error ?? `Failed to ${mode} queue`,
+      );
+    } finally {
+      setReasonSubmitting(false);
     }
   };
 
@@ -650,6 +677,20 @@ export default function AdminQueueHosting() {
       <ChatWidget
         initialGreeting={`Hello! 👋 I'm your OAMS Assistant. How can I help you host queues for ${user.departmentAbbrev} today?`}
         getBotResponse={generateBotResponse}
+      />
+
+      <QueueReasonModal
+        show={!!reasonModal}
+        title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
+        message={
+          reasonModal?.mode === "pause"
+            ? "Students in this queue will see this reason while it's paused."
+            : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
+        }
+        confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
+        submitting={reasonSubmitting}
+        onConfirm={handleReasonConfirm}
+        onCancel={() => setReasonModal(null)}
       />
 
       {/* Open New Queue Line Modal */}

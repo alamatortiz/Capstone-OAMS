@@ -5,6 +5,7 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
+const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -205,14 +206,7 @@ router.get(
 // QUEUE HOSTING — scoped strictly to the admin's own department
 // ─────────────────────────────────────────────────────────────
 
-// Small helper: resolve admin -> department_id, or null if not found
-async function getAdminDepartmentId(adminId) {
-  const [[row]] = await pool.query(
-    `SELECT department_id FROM administrators WHERE admin_id = ?`,
-    [adminId],
-  );
-  return row?.department_id ?? null;
-}
+const { getAdminDepartmentId } = require("../utils/adminDept");
 
 // GET /api/admin/queue-hosting/services
 // Services dropdown — only services under the admin's own department.
@@ -412,6 +406,15 @@ router.post(
         [serviceId, adminId, startTime, endTime, capacityNum, noShowTimeoutNum],
       );
 
+      emitToDept(deptId, "queue:slot-opened", {
+        slotId: result.insertId,
+        serviceId,
+        queueType: service.service_name,
+        maxCapacity: capacityNum,
+        status: "open",
+        serviceHours: { start: startTime, end: endTime },
+      });
+
       res.status(201).json({
         message: "Queue line opened successfully",
         queue: {
@@ -466,6 +469,10 @@ router.patch(
   authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
+    const reason = (req.body?.reason ?? "").trim();
+    if (!reason) {
+      return res.status(400).json({ error: "A reason is required to pause a queue" });
+    }
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const check = await assertOwnedSlot(deptId, slotId);
@@ -478,10 +485,12 @@ router.patch(
       }
 
       await pool.query(
-        `UPDATE queue_slots SET status = 'paused' WHERE slot_id = ?`,
-        [slotId],
+        `UPDATE queue_slots SET status = 'paused', pause_reason = ? WHERE slot_id = ?`,
+        [reason, slotId],
       );
-      res.json({ message: "Queue paused", slotId, status: "paused" });
+      emitToSlot(slotId, "queue:slot-status", { slotId, status: "paused", reason });
+      emitToDept(deptId, "queue:slot-status", { slotId, status: "paused", reason });
+      res.json({ message: "Queue paused", slotId, status: "paused", reason });
     } catch (error) {
       console.error("Pause queue error:", error);
       res
@@ -510,9 +519,11 @@ router.patch(
       }
 
       await pool.query(
-        `UPDATE queue_slots SET status = 'open' WHERE slot_id = ?`,
+        `UPDATE queue_slots SET status = 'open', pause_reason = NULL WHERE slot_id = ?`,
         [slotId],
       );
+      emitToSlot(slotId, "queue:slot-status", { slotId, status: "open" });
+      emitToDept(deptId, "queue:slot-status", { slotId, status: "open" });
       res.json({ message: "Queue resumed", slotId, status: "open" });
     } catch (error) {
       console.error("Resume queue error:", error);
@@ -530,27 +541,90 @@ router.patch(
   authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
+    const reason = (req.body?.reason ?? "").trim();
+    if (!reason) {
+      return res.status(400).json({ error: "A reason is required to stop a queue" });
+    }
+    const adminId = req.user.userId;
+    const conn = await pool.getConnection();
     try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      const check = await assertOwnedSlot(deptId, slotId);
-      if (check.error)
-        return res.status(check.error).json({ error: check.message });
-      if (!["open", "paused"].includes(check.slot.status)) {
-        return res
-          .status(409)
-          .json({ error: `Queue is already ${check.slot.status}` });
-      }
+      await conn.beginTransaction();
 
-      await pool.query(
-        `UPDATE queue_slots SET status = 'closed' WHERE slot_id = ?`,
+      const deptId = await getAdminDepartmentId(adminId);
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, qs.status, s.department_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? FOR UPDATE`,
         [slotId],
       );
-      res.json({ message: "Queue closed", slotId, status: "closed" });
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue slot not found" });
+      }
+      if (slot.department_id !== deptId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only manage queues for your own department" });
+      }
+      if (!["open", "paused"].includes(slot.status)) {
+        await conn.rollback();
+        return res.status(409).json({ error: `Queue is already ${slot.status}` });
+      }
+
+      // Every student still waiting or being served has their entry force-
+      // cancelled with the admin's reason — otherwise these rows would be
+      // orphaned in the DB forever (see queueNoShowSweeper.js for the
+      // analogous no-show cleanup path).
+      const [affected] = await conn.query(
+        `SELECT queue_id, student_id, status FROM queues
+         WHERE slot_id = ? AND status IN ('waiting', 'serving')`,
+        [slotId],
+      );
+
+      for (const entry of affected) {
+        await conn.query(
+          `UPDATE queues SET status = 'cancelled', cancelled_at = NOW(), admin_reason = ? WHERE queue_id = ?`,
+          [reason, entry.queue_id],
+        );
+        await conn.query(
+          `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+           VALUES (?, ?, 'cancelled', ?, ?, NOW())`,
+          [entry.queue_id, entry.status, adminId, `Queue stopped by admin: ${reason}`],
+        );
+      }
+
+      await conn.query(
+        `UPDATE queue_slots SET status = 'closed', close_reason = ? WHERE slot_id = ?`,
+        [reason, slotId],
+      );
+
+      await conn.commit();
+
+      emitToSlot(slotId, "queue:slot-status", { slotId, status: "closed", reason });
+      emitToDept(deptId, "queue:slot-status", { slotId, status: "closed", reason });
+      for (const entry of affected) {
+        const stoppedPayload = { slotId, queueId: entry.queue_id, studentId: entry.student_id, reason };
+        emitToUser(entry.student_id, "queue:queue-stopped", stoppedPayload);
+        emitToDept(deptId, "queue:queue-stopped", stoppedPayload);
+      }
+
+      res.json({
+        message: "Queue closed",
+        slotId,
+        status: "closed",
+        reason,
+        cancelledCount: affected.length,
+      });
     } catch (error) {
+      await conn.rollback();
       console.error("Close queue error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -582,7 +656,7 @@ router.patch(
       }
 
       const [[next]] = await pool.query(
-        `SELECT queue_id FROM queues
+        `SELECT queue_id, student_id FROM queues
          WHERE slot_id = ? AND status = 'waiting'
          ORDER BY queue_number ASC
          LIMIT 1`,
@@ -598,6 +672,16 @@ router.patch(
         `UPDATE queues SET status = 'serving', called_at = NOW() WHERE queue_id = ?`,
         [next.queue_id],
       );
+
+      const calledPayload = {
+        slotId,
+        queueId: next.queue_id,
+        studentId: next.student_id,
+        calledAt: new Date().toISOString(),
+      };
+      emitToSlot(slotId, "queue:called", calledPayload);
+      emitToUser(next.student_id, "queue:called", calledPayload);
+      emitToDept(deptId, "queue:called", calledPayload);
 
       res.json({ message: "Next student called", queueId: next.queue_id });
     } catch (error) {
@@ -624,7 +708,7 @@ router.patch(
         return res.status(check.error).json({ error: check.message });
 
       const [[serving]] = await pool.query(
-        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
         [slotId],
       );
       if (!serving) {
@@ -637,6 +721,16 @@ router.patch(
         `UPDATE queues SET status = 'completed', completed_at = NOW() WHERE queue_id = ?`,
         [serving.queue_id],
       );
+
+      const servedPayload = {
+        slotId,
+        queueId: serving.queue_id,
+        studentId: serving.student_id,
+        completedAt: new Date().toISOString(),
+      };
+      emitToSlot(slotId, "queue:served", servedPayload);
+      emitToUser(serving.student_id, "queue:served", servedPayload);
+      emitToDept(deptId, "queue:served", servedPayload);
 
       res.json({
         message: "Student marked as served",
@@ -774,10 +868,11 @@ router.get(
             SELECT
               'queue' AS type,
               q.queue_id AS id,
-              CASE q.status
-                WHEN 'completed' THEN 'Completed Queue Service'
-                WHEN 'cancelled' THEN 'Cancelled Queue Request'
-                WHEN 'serving'   THEN 'Currently Serving'
+              CASE
+                WHEN q.status = 'cancelled' AND q.admin_reason IS NOT NULL THEN 'Queue Stopped'
+                WHEN q.status = 'completed' THEN 'Completed Queue Service'
+                WHEN q.status = 'cancelled' THEN 'Cancelled Queue Request'
+                WHEN q.status = 'serving'   THEN 'Currently Serving'
                 ELSE 'Queue Joined'
               END AS action,
               d.department_name AS college,
@@ -785,7 +880,7 @@ router.get(
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
               s.service_name AS processor,
-              s.service_name AS details,
+              COALESCE(q.admin_reason, s.service_name) AS details,
               q.status AS raw_status,
               COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time
             FROM queues q

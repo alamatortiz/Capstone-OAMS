@@ -199,6 +199,8 @@ CREATE TABLE queue_slots (
     current_count   INT          NOT NULL DEFAULT 0,
     no_show_timeout_minutes INT  NOT NULL DEFAULT 15,
     status          ENUM('open','paused','closed','cancelled') DEFAULT 'open',
+    pause_reason    VARCHAR(255) NULL,
+    close_reason    VARCHAR(255) NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (service_id) REFERENCES services(service_id),
@@ -222,6 +224,11 @@ CREATE TABLE queues (
     completed_at    TIMESTAMP    NULL,
     cancelled_at    TIMESTAMP    NULL,
     notes           TEXT,
+    -- Reason an admin gave when force-cancelling this entry by stopping the
+    -- whole queue slot. NULL when the student left voluntarily. Kept separate
+    -- from `notes` (the student's own concern text) so neither overwrites
+    -- the other.
+    admin_reason    VARCHAR(255) NULL,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES services(service_id),
     FOREIGN KEY (slot_id)    REFERENCES queue_slots(slot_id)

@@ -126,6 +126,37 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
         </div>
       )}
 
+      {/* Persistent "queue paused" banner — stays visible the whole time the
+          queue is paused, not just as a one-off toast on the transition. */}
+      {queue.slotStatus === "paused" && (
+        <div
+          style={{
+            background: "rgba(245, 158, 11, 0.12)",
+            border: "1px solid rgba(245, 158, 11, 0.4)",
+            borderRadius: "1rem",
+            padding: "1rem 1.5rem",
+            color: "#f59e0b",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "0.75rem",
+            fontWeight: 600,
+            fontSize: "0.9375rem",
+          }}
+        >
+          <AlertCircle
+            style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }}
+          />
+          <div>
+            <div>This queue is currently paused by the admin.</div>
+            {queue.slotPauseReason && (
+              <div style={{ fontWeight: 400, marginTop: "0.25rem" }}>
+                Reason: {queue.slotPauseReason}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Detail Grid */}
       <div className="queue-detail-grid">
         <div className="queue-detail-main">
@@ -584,6 +615,26 @@ export default function QueueStatusPage() {
                                 </div>
                                 <span className="qsl-number-badge">{queue.queueNumberBadge}</span>
                               </div>
+                              {queue.slotStatus === "paused" && (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    background: "rgba(245, 158, 11, 0.12)",
+                                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                                    color: "#f59e0b",
+                                    borderRadius: "999px",
+                                    padding: "0.2rem 0.65rem",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    margin: "0.5rem 0",
+                                  }}
+                                >
+                                  <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
+                                  Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ""}
+                                </div>
+                              )}
                               <div className="qsl-stats-grid">
                                 <div className="qsl-stat">
                                   <p className="qsl-stat-label">Your Position</p>

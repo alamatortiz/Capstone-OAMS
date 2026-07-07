@@ -5,6 +5,7 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
+const { emitToSlot, emitToDept } = require("../sockets");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -739,6 +740,7 @@ router.get(
            qs.end_time,
            qs.max_capacity,
            qs.status AS slot_status,
+           qs.pause_reason,
            s.service_name,
            d.department_name,
            d.department_abbreviation,
@@ -814,6 +816,7 @@ router.get(
           departmentAbbrev: deptAbbrev,
           status: row.status,
           slotStatus: row.slot_status,
+          slotPauseReason: row.pause_reason ?? null,
           position,
           totalWaiting: row.total_waiting || 0,
           maxCapacity,
@@ -1024,7 +1027,7 @@ router.post(
            qs.max_capacity,
            qs.status AS slot_status,
            s.service_name,
-           d.department_name, d.department_abbreviation,
+           d.department_id, d.department_name, d.department_abbreviation,
            (
              SELECT COUNT(*) FROM queues q2
              WHERE q2.slot_id = q.slot_id AND q2.status = 'waiting' AND q2.queue_number <= q.queue_number
@@ -1066,6 +1069,21 @@ router.post(
         totalInQueue > 0
           ? Math.min(100, Math.round((servicedCount / totalInQueue) * 100))
           : 0;
+
+      emitToSlot(slotId, "queue:student-joined", {
+        slotId,
+        queueId,
+        studentId,
+        queueNumber: newEntry.queue_number,
+        currentCount: totalInQueue,
+      });
+      emitToDept(newEntry.department_id, "queue:student-joined", {
+        slotId,
+        queueId,
+        studentId,
+        queueNumber: newEntry.queue_number,
+        currentCount: totalInQueue,
+      });
 
       res.status(201).json({
         message: "Successfully joined the queue",
@@ -1171,7 +1189,19 @@ router.post(
         [queueId, studentId],
       );
 
+      const [[deptRow]] = await conn.query(
+        `SELECT s.department_id
+         FROM queue_slots qs JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ?`,
+        [entry.slot_id],
+      );
+
       await conn.commit();
+
+      const leftPayload = { slotId: entry.slot_id, queueId, studentId };
+      emitToSlot(entry.slot_id, "queue:student-left", leftPayload);
+      emitToDept(deptRow?.department_id, "queue:student-left", leftPayload);
+
       res.json({ message: "Successfully left the queue", queueId });
     } catch (error) {
       await conn.rollback();
@@ -1237,7 +1267,7 @@ router.patch(
 
     try {
       const [[entry]] = await pool.query(
-        `SELECT queue_id, student_id, status FROM queues WHERE queue_id = ?`,
+        `SELECT queue_id, student_id, slot_id, status FROM queues WHERE queue_id = ?`,
         [queueId],
       );
 
@@ -1254,6 +1284,17 @@ router.patch(
         notes ?? null,
         queueId,
       ]);
+
+      const [[deptRow]] = await pool.query(
+        `SELECT s.department_id
+         FROM queue_slots qs JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ?`,
+        [entry.slot_id],
+      );
+      emitToDept(deptRow?.department_id, "queue:notes-updated", {
+        queueId,
+        notes: notes ?? null,
+      });
 
       res.json({ message: "Updated", queueId, notes: notes ?? null });
     } catch (error) {
@@ -1506,10 +1547,10 @@ router.get(
            SELECT
              'queue' AS type,
              q.queue_id AS id,
-             CONCAT('Queue for ', s.service_name) AS title,
+             IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', s.service_name)) AS title,
              d.department_name AS college,
              q.status AS raw_status,
-             q.notes AS details,
+             COALESCE(q.admin_reason, q.notes) AS details,
              q.created_at AS event_time
            FROM queues q
            JOIN services s ON q.service_id = s.service_id

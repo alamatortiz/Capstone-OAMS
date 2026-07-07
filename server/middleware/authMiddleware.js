@@ -1,6 +1,20 @@
 const jwt = require("jsonwebtoken");
 
 /**
+ * Verifies a raw JWT string and resolves to its decoded payload.
+ * Shared by the REST auth middleware and the socket.io auth handshake
+ * so both paths trust the exact same rules.
+ */
+const verifyAuthToken = (token) => {
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) return reject(err);
+      resolve(decoded); // { userId, schoolId, role }
+    });
+  });
+};
+
+/**
  * Middleware to verify JWT and restrict access to authorized roles.
  * Expects header format: Authorization: Bearer <token>
  */
@@ -40,4 +54,5 @@ const authorizeRoles = (...allowedRoles) => {
 module.exports = {
   authenticateToken,
   authorizeRoles,
+  verifyAuthToken,
 };

@@ -4,8 +4,10 @@ import { toast } from 'sonner';
 import './admin-queue-management.css';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import api from '../../utils/api';
+import { connectSocket } from '../../utils/socket';
 import AdminSidebar from '../../components/AdminSidebar';
 import ChatWidget from '../../components/ChatWidget';
+import QueueReasonModal from '../../components/QueueReasonModal';
 
 
 // ─── Icons (all from admin dashboard) ───────────────────────────────────────
@@ -194,6 +196,36 @@ export default function AdminQueueManagement() {
     fetchEntries();
   }, [fetchEntries]);
 
+  // ── Live updates: refetch when a socket event affects this dept's queues ──
+  useEffect(() => {
+    const token = sessionStorage.getItem('oams_token');
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const refetch = () => {
+      fetchQueues();
+      fetchEntries();
+    };
+
+    const events = [
+      'queue:slot-opened',
+      'queue:slot-status',
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+      'queue:student-joined',
+      'queue:student-left',
+      'queue:notes-updated',
+    ];
+    events.forEach((event) => socket.on(event, refetch));
+
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+    };
+  }, [fetchQueues, fetchEntries]);
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const generateQueueBotResponse = (input) => {
     const i = input.toLowerCase();
@@ -238,15 +270,12 @@ export default function AdminQueueManagement() {
     }
   };
 
-  const handlePause = async () => {
-    try {
-      await api.patch(`/admin/queue-hosting/${selectedQueueId}/pause`);
-      toast.message('Queue paused');
-      await fetchQueues();
-    } catch (err) {
-      toast.error(err?.response?.data?.error ?? 'Failed to pause queue');
-    }
-  };
+  // Pause and stop both require a reason, collected via QueueReasonModal.
+  const [reasonModal, setReasonModal] = useState(null); // { mode: 'pause'|'close' }
+  const [reasonSubmitting, setReasonSubmitting] = useState(false);
+
+  const handlePause = () => setReasonModal({ mode: 'pause' });
+  const handleStop = () => setReasonModal({ mode: 'close' });
 
   const handleResume = async () => {
     try {
@@ -258,15 +287,22 @@ export default function AdminQueueManagement() {
     }
   };
 
-  const handleStop = async () => {
-    if (!window.confirm('Are you sure you want to stop this queue? This cannot be undone.')) return;
+  const handleReasonConfirm = async (reason) => {
+    if (!reasonModal) return;
+    const { mode } = reasonModal;
+    setReasonSubmitting(true);
     try {
-      await api.patch(`/admin/queue-hosting/${selectedQueueId}/close`);
-      toast.success('Queue stopped');
-      setSelectedQueueId(null);
-      await fetchQueues();
+      await api.patch(`/admin/queue-hosting/${selectedQueueId}/${mode}`, { reason });
+      toast[mode === 'pause' ? 'message' : 'success'](
+        mode === 'pause' ? 'Queue paused' : 'Queue stopped',
+      );
+      setReasonModal(null);
+      if (mode === 'close') setSelectedQueueId(null);
+      await Promise.all([fetchQueues(), fetchEntries()]);
     } catch (err) {
-      toast.error(err?.response?.data?.error ?? 'Failed to stop queue');
+      toast.error(err?.response?.data?.error ?? `Failed to ${mode} queue`);
+    } finally {
+      setReasonSubmitting(false);
     }
   };
 
@@ -597,6 +633,20 @@ export default function AdminQueueManagement() {
         <ChatWidget
           initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you manage queues?"
           getBotResponse={generateQueueBotResponse}
+        />
+
+        <QueueReasonModal
+          show={!!reasonModal}
+          title={reasonModal?.mode === 'pause' ? 'Pause Queue' : 'Stop Queue'}
+          message={
+            reasonModal?.mode === 'pause'
+              ? "Students in this queue will see this reason while it's paused."
+              : 'All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.'
+          }
+          confirmText={reasonModal?.mode === 'pause' ? 'Pause' : 'Stop Queue'}
+          submitting={reasonSubmitting}
+          onConfirm={handleReasonConfirm}
+          onCancel={() => setReasonModal(null)}
         />
       </div>
     );
