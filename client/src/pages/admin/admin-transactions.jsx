@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import collegeCCSLogo from "../../assets/CCS.png";
 import collegeCBAALogo from "../../assets/CBAA.png";
 import collegeCOElogo from "../../assets/COE.png";
@@ -12,13 +13,9 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 
 // ── Icons (all unchanged from admin_dashboard) ──────────────────────────────
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
 const SearchIcon = () => (
   <svg
     className="icon"
@@ -275,21 +272,18 @@ export default function AdminTransaction() {
       {/* Main Content */}
       <main className="admin-transaction-main">
         <div className="admin-transaction-container">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Header */}
-          <div className="admin-transaction-header">
-            <div className="admin-transaction-title-section">
-              <div className="admin-transaction-title-icon">
-                <ActivityIcon />
-              </div>
-              <div>
-                <h1 className="admin-transaction-title">Transaction Logs</h1>
-                <p className="admin-transaction-subtitle">
-                  View transaction logs for {user.college} ({user.departmentAbbrev})
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<ActivityIcon />}
+            iconClassName="admin-transaction-title-icon"
+            title="Transaction Logs"
+            subtitle={`View transaction logs for ${user.college} (${user.departmentAbbrev})`}
+            headerClassName="admin-transaction-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="admin-transaction-title-section"
+            titleClassName="admin-transaction-title"
+            subtitleClassName="admin-transaction-subtitle"
+          />
 
           {error && (
             <div className="dash-error-banner" style={{ marginBottom: "1rem" }}>

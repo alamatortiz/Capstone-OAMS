@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -21,11 +22,6 @@ const QueueIconNav = ({ className }) => (
   >
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const CloseIcon = () => (
@@ -298,7 +294,8 @@ export default function AdminQueueHosting() {
       {/* Main Content */}
       <main className="aqh-dashboard-main">
         <div className="aqh-page-container">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
+          <div className="aqh-header-block">
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
           {/* Page Header */}
           <div className="aqh-page-header">
             <div className="aqh-title-section">
@@ -321,6 +318,7 @@ export default function AdminQueueHosting() {
               <PlusIcon />
               Open Queue Line
             </button>
+          </div>
           </div>
 
           {/* Summary Stats */}

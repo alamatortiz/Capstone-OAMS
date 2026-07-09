@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-appointment.css";
 import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 import { COLLEGES } from "../../data/colleges";
 import { formatManilaDate } from "../../utils/dateTime";
 
@@ -15,11 +17,6 @@ const CalendarIconNav = () => (
     <line x1="16" y1="2" x2="16" y2="6"></line>
     <line x1="8" y1="2" x2="8" y2="6"></line>
     <line x1="3" y1="10" x2="21" y2="10"></line>
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const CloseIcon = () => (
@@ -262,23 +259,18 @@ export default function AdminAppointment() {
       {/* Main Content */}
       <main className="admin-appointment-main">
         <div className="admin-appointment-container">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Header */}
-          <div className="admin-appointment-page-header">
-            <div className="admin-appointment-title-section">
-              <div className="admin-appointment-title-icon">
-                <CalendarIconNav />
-              </div>
-              <div>
-                <h1 className="admin-appointment-page-title">
-                  Centralized Appointment Management
-                </h1>
-                <p className="admin-appointment-page-subtitle">
-                  Oversee appointment system across all colleges
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<CalendarIconNav />}
+            iconClassName="admin-appointment-title-icon"
+            title="Centralized Appointment Management"
+            subtitle="Oversee appointment system across all colleges"
+            headerClassName="admin-appointment-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="admin-appointment-title-section"
+            titleClassName="admin-appointment-page-title"
+            subtitleClassName="admin-appointment-page-subtitle"
+          />
 
           {/* Filters */}
           <div className="admin-appointment-filters-card">

@@ -1,17 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-queue-analytics.css";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
 const DownloadIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -255,21 +252,18 @@ export default function AdminQueueAnalytics() {
       {/* Main Content */}
       <main className="aqa-main">
         <div className="aqa-content">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Header */}
-          <div className="aqa-page-header">
-            <div className="aqa-title-section">
-              <div className="aqa-title-icon">
-                <BarChartIcon />
-              </div>
-              <div>
-                <h1 className="aqa-page-title">Queue Analytics</h1>
-                <p className="aqa-page-subtitle">
-                  Real-time queue performance metrics and insights
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<BarChartIcon />}
+            iconClassName="aqa-title-icon"
+            title="Queue Analytics"
+            subtitle="Real-time queue performance metrics and insights"
+            headerClassName="aqa-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="aqa-title-section"
+            titleClassName="aqa-page-title"
+            subtitleClassName="aqa-page-subtitle"
+          />
 
           {/* Filters */}
           <div className="aqa-filters-card">

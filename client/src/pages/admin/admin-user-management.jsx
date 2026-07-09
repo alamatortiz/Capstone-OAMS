@@ -1,17 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-user-management.css";
 import { toast } from "sonner";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
 
 // ─── Shared Layout Icons ──────────────────────────────────────────────────────
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -191,20 +188,22 @@ export default function AdminUserManagement() {
       {/* ── Main Content ───────────────────────────────────────────────────────── */}
       <main className="admin-dashboard-main">
         <div className="aum-content">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-
-          {/* Header */}
-          <div className="aum-page-header">
-            <div className="aum-title-section">
-              <div className="aum-title-icon">
-                <UsersHeaderIcon />
-              </div>
-              <div>
-                <h1 className="aum-page-title">User Account Management</h1>
-                <p className="aum-page-subtitle">Manage all user accounts across the OAMS system</p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={
+              <Link to="/admin/dashboard" className="prof-breadcrumb-link">
+                <ChevronLeft />Home
+              </Link>
+            }
+            icon={<UsersHeaderIcon />}
+            iconClassName="aum-title-icon"
+            title="User Account Management"
+            subtitle="Manage all user accounts across the OAMS system"
+            headerClassName="aum-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="aum-title-section"
+            titleClassName="aum-page-title"
+            subtitleClassName="aum-page-subtitle"
+          />
 
           {/* Filter & Search */}
           <div className="aum-filter-section">

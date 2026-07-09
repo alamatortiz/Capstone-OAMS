@@ -1,17 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-pinnacle-sync.css";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import api from "../../utils/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
 const DatabaseIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -235,7 +231,8 @@ export default function AdminPinnacleSync() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="aps-page">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
+          <div className="aps-header-block">
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
           {/* Header */}
           <div className="aps-page-header">
             <div className="aps-title-section">
@@ -255,6 +252,7 @@ export default function AdminPinnacleSync() {
               <span className="aps-sync-dot"></span>
               {syncEnabled ? "Sync Enabled" : "Sync Disabled"}
             </div>
+          </div>
           </div>
 
           {/* Stat Cards */}

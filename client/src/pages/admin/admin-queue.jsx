@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -8,6 +9,7 @@ import { connectSocket } from "../../utils/socket";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
+import PageHeader from "../../components/PageHeader";
 import { getCollegeLogo } from "../../data/collegeLogo";
 
 
@@ -16,12 +18,6 @@ const QueueIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-);
-
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 
@@ -645,20 +641,18 @@ export default function AdminQueue() {
       {/* Main Content */}
       <main className="admin-queue-main">
         <div className="queue-page-container">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Header */}
-          {/* Page Header */}
-          <div className="aq-page-header">
-            <div className="aq-title-section">
-              <div className="aq-title-icon">
-                <QueueIconNav />
-              </div>
-              <div>
-                <h1 className="aq-title">Centralized Queue Management</h1>
-                <p className="aq-subtitle">Monitor and control queues for {user?.college}</p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<QueueIconNav />}
+            iconClassName="aq-title-icon"
+            title="Centralized Queue Management"
+            subtitle={`Monitor and control queues for ${user?.college}`}
+            headerClassName="aq-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="aq-title-section"
+            titleClassName="aq-title"
+            subtitleClassName="aq-subtitle"
+          />
 
           {/* System Stats */}
           <div className="queue-system-stats">

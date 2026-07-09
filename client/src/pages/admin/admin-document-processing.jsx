@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-document-processing.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 import { formatManilaDate } from "../../utils/dateTime";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -58,12 +60,6 @@ const EyeIcon = () => (
     <circle cx="12" cy="12" r="3"></circle>
   </svg>
 );
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6"></polyline>
-  </svg>
-);
-
 
 const SOURCES = [
   { id: "student", label: "Students", endpoint: "document-processing" },
@@ -177,19 +173,18 @@ export default function AdminDocumentProcessing() {
       {/* ── Main Content ─────────────────────────────────────────────────────── */}
       <main className="adp-main">
         <div className="adp-content">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Page Header */}
-          <div className="adp-page-header">
-            <div className="adp-title-section">
-              <div className="adp-title-icon">
-                <FileTextIcon className="adp-icon-lg" />
-              </div>
-              <div>
-                <h1 className="adp-page-title">Document Processing</h1>
-                <p className="adp-page-subtitle">Process and manage document requests</p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<FileTextIcon className="adp-icon-lg" />}
+            iconClassName="adp-title-icon"
+            title="Document Processing"
+            subtitle="Process and manage document requests"
+            headerClassName="adp-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="adp-title-section"
+            titleClassName="adp-page-title"
+            subtitleClassName="adp-page-subtitle"
+          />
 
           {/* Source toggle */}
           <div className="adp-source-toggle">

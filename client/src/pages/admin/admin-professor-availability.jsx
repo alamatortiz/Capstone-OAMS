@@ -1,16 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-professor-availability.css";
 import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
 const UsersIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -114,21 +111,18 @@ export default function AdminProfessorAvailability() {
       {/* Main Content */}
       <main className="apa-dashboard-main">
         <div className="apa-page-container">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Page Header */}
-          <div className="apa-page-header">
-            <div className="apa-title-section">
-              <div className="apa-title-icon">
-                <UsersIcon className="apa-icon-lg" />
-              </div>
-              <div>
-                <h1 className="apa-page-title">Faculty Availability</h1>
-                <p className="apa-page-subtitle">
-                  Monitor faculty consultation schedules and availability for your department
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<UsersIcon className="apa-icon-lg" />}
+            iconClassName="apa-title-icon"
+            title="Faculty Availability"
+            subtitle="Monitor faculty consultation schedules and availability for your department"
+            headerClassName="apa-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="apa-title-section"
+            titleClassName="apa-page-title"
+            subtitleClassName="apa-page-subtitle"
+          />
 
           {/* Status Tabs */}
           <div className="apa-tabs">

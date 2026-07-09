@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import './admin-queue-management.css';
 import { getCollegeLogo } from '../../data/collegeLogo';
@@ -16,11 +17,6 @@ const QueueIconNav = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-);
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const ChevronRightIcon = () => (
@@ -546,7 +542,7 @@ export default function AdminQueueManagement() {
                         disabled={currentEntriesPage === 0}
                         aria-label="Previous batch"
                       >
-                        <ChevronLeftIcon />
+                        <ChevronLeft />
                       </button>
                       <span className="aqm-entries-page-label">
                         {entriesStartIndex + 1}–{Math.min(queueEntries.length, entriesStartIndex + ENTRIES_PER_PAGE)} of {queueEntries.length}
@@ -661,7 +657,7 @@ export default function AdminQueueManagement() {
       {/* Main Content - List View */}
       <main className="aqm-dashboard-main">
         <div className="aqm-list-container">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
+          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
           <div className="aqm-page-header">
             <div className="aqm-title-section">
               <div className="aqm-title-icon">

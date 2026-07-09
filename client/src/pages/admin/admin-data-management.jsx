@@ -1,19 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-dashboard.css";
 import "./admin-data-management.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
-
-// ── Shared sidebar / chatbot icons ────────────────────────────────────────────
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
+import PageHeader from "../../components/PageHeader";
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -551,21 +546,18 @@ export default function AdminDataManagement() {
       <main className="admin-dashboard-main">
         <div className="admin-dashboard">
 
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Header */}
-          <div className="adm-page-header">
-            <div className="adm-title-section">
-              <div className="adm-title-icon">
-                <DatabaseIcon />
-              </div>
-              <div>
-                <h1 className="adm-page-title">Data Management</h1>
-                <p className="adm-page-subtitle">
-                  {user?.college} ({user?.departmentAbbrev}) — Configure document types and queue services
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<DatabaseIcon />}
+            iconClassName="adm-title-icon"
+            title="Data Management"
+            subtitle={`${user?.college} (${user?.departmentAbbrev}) — Configure document types and queue services`}
+            headerClassName="adm-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="adm-title-section"
+            titleClassName="adm-page-title"
+            subtitleClassName="adm-page-subtitle"
+          />
 
           {/* Tabs Container */}
           <div className="adm-tabs-container">

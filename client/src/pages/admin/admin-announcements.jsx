@@ -5,8 +5,10 @@ import deleteIcon from "../../assets/delete_icon.png";
 import "./admin-dashboard.css";
 import "./admin-announcements.css";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 import { formatManilaDate } from "../../utils/dateTime";
 
@@ -81,12 +83,6 @@ const CheckCircleIcon = (props) => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18">
-    <polyline points="15 18 9 12 15 6"></polyline>
-  </svg>
-);
-
 // ── Static reference data ─────────────────────────────────────────────────────
 const COLLEGES = [
   { name: "College of Computing Studies", shortName: "CCS", color: "#f97316" },
@@ -308,23 +304,18 @@ export default function AdminAnnouncements() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="ann-page">
-          {/* Back button */}
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-
-          {/* Header */}
-          <div className="ann-header-row">
-            <div className="ann-title-section">
-              <div className="ann-title-icon">
-                <MegaphoneIcon />
-              </div>
-              <div>
-                <h1 className="ann-page-title">Announcements Management</h1>
-                <p className="ann-page-subtitle">
-                  Manage announcements for {user?.college || "your department"}
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<MegaphoneIcon />}
+            iconClassName="ann-title-icon"
+            title="Announcements Management"
+            subtitle={`Manage announcements for ${user?.college || "your department"}`}
+            headerClassName="ann-header-row"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="ann-title-section"
+            titleClassName="ann-page-title"
+            subtitleClassName="ann-page-subtitle"
+          />
 
           <button className="ann-btn-new" onClick={() => setIsCreating(true)}>
             <PlusIconSmall />

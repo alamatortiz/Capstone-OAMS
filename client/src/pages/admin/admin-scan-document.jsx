@@ -1,17 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "./admin-scan-document.css";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
+import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-const ChevronLeftIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -166,21 +163,18 @@ export default function AdminScanDocument() {
       {/* Main Content */}
       <main className="admin-dashboard-main">
         <div className="asd-page">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeftIcon />Home</Link></div>
-          {/* Page Header */}
-          <div className="asd-page-header">
-            <div className="asd-title-section">
-              <div className="asd-title-icon">
-                <QRScanIcon />
-              </div>
-              <div>
-                <h1 className="asd-page-title">Document Scanner</h1>
-                <p className="asd-page-subtitle">
-                  Scan QR codes to verify and view document details
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            icon={<QRScanIcon />}
+            iconClassName="asd-title-icon"
+            title="Document Scanner"
+            subtitle="Scan QR codes to verify and view document details"
+            headerClassName="asd-page-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="asd-title-section"
+            titleClassName="asd-page-title"
+            subtitleClassName="asd-page-subtitle"
+          />
 
           <div className="asd-content-grid">
             {/* Left Column */}
