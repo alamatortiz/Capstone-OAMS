@@ -2,6 +2,7 @@
   "expo": {
     "name": "client-mobile",
     "slug": "client-mobile",
+    "owner": "alamatyuortz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,10 +21,19 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.alamatyuortz.clientmobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "48def5ce-8755-4257-91ff-2187f8940f79"
+      }
     }
   }
 }
