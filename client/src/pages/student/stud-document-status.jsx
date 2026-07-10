@@ -501,7 +501,7 @@ export default function DocumentStatusPage() {
                         <button
                           onClick={() => navigate("/student/documents")}
                           style={{
-                            marginTop: "1rem",
+                            marginTop: "0.5rem",
                             background: "linear-gradient(135deg, #f97316, #ea580c)",
                             color: "white",
                             border: "none",

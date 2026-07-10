@@ -406,7 +406,7 @@ export default function AppointmentStatusPage() {
                         <button
                           onClick={() => navigate("/student/appointments")}
                           style={{
-                            marginTop: "1rem",
+                            marginTop: "0.5rem",
                             background: "linear-gradient(135deg, #a855f7, #9333ea)",
                             color: "white",
                             border: "none",

@@ -903,10 +903,10 @@ body {
 }
 
 .queue-empty-icon {
-  width: 3rem;
-  height: 3rem;
-  color: var(--text-tertiary);
-  margin: 0 auto 1rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  color: var(--text-primary);
+  margin: 0 auto 0.5rem;
   stroke: currentColor;
   transition: color 0.3s ease;
 }
@@ -915,14 +915,14 @@ body {
   font-weight: 700;
   font-size: 1rem;
   color: var(--text-primary);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   transition: color 0.3s ease;
 }
 
 .queue-empty-text {
   font-size: 0.875rem;
   color: var(--text-tertiary);
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
   transition: color 0.3s ease;
 }
 

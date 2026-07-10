@@ -678,7 +678,7 @@ export default function QueueStatusPage() {
                     <button
                       onClick={() => navigate("/student/queue")}
                       style={{
-                        marginTop: "1rem",
+                        marginTop: "0.5rem",
                         background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
                         color: "white",
                         border: "none",

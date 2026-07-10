@@ -1,6 +1,41 @@
 /* ===== Appointment Status Page — Purple-themed Overrides ===== */
 /* Fully self-contained — no longer depends on other pages' CSS. */
 
+/* ===== DARK MODE (DEFAULT) ===== */
+:root,
+[data-theme="dark"] {
+  --background: #0a0f0a;
+  --card: #111612;
+  --foreground: #f0fdf4;
+  --muted-foreground: #94a3b8;
+  --border: #1e3a23;
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground);
+  --text-tertiary: var(--muted-foreground);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+}
+
+/* ===== LIGHT MODE ===== */
+[data-theme="light"] {
+  --background: #f8fafc;
+  --card: #ffffff;
+  --foreground: #1e293b;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --text-primary: var(--foreground);
+  --text-secondary: #334155;
+  --text-tertiary: var(--muted-foreground);
+  --card-bg: var(--card);
+  --card-border: var(--border);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 /* ─── Page Shell ─────────────────────────────────────────────────────────── */
 .apst-with-sidebar {
   display: flex;
@@ -776,10 +811,10 @@
 }
 
 .apst-empty-icon {
-  width: 3rem;
-  height: 3rem;
-  color: var(--text-tertiary);
-  margin: 0 auto 1rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  color: var(--text-primary);
+  margin: 0 auto 0.5rem;
   stroke: currentColor;
   transition: color 0.3s ease;
 }
@@ -788,14 +823,14 @@
   font-weight: 700;
   font-size: 1rem;
   color: var(--text-primary);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   transition: color 0.3s ease;
 }
 
 .apst-empty-text {
   font-size: 0.875rem;
   color: var(--text-tertiary);
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
   transition: color 0.3s ease;
 }
 
