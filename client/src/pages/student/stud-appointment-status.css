@@ -764,11 +764,15 @@
 /* ─── Empty state (self-contained copy) ──────────────────────────────────── */
 .apst-empty-state {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(168, 85, 247, 0.2);
   border-radius: 1.125rem;
   padding: 3rem 1.5rem;
   text-align: center;
   transition: all 0.3s ease;
+}
+
+[data-theme="light"] .apst-empty-state {
+  border-color: rgba(147, 51, 234, 0.18);
 }
 
 .apst-empty-icon {

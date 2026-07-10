@@ -658,7 +658,7 @@
 /* ─── Empty state (self-contained copy) ──────────────────────────────────── */
 .dss-empty-state {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1.125rem;
   padding: 3rem 1.5rem;
   text-align: center;
