@@ -640,12 +640,12 @@ body {
   gap: 1rem;
 }
 
-.queue-empty-state {
+.admin-queue-with-sidebar .queue-empty-state {
   text-align: center;
   padding: 3rem 2rem;
 }
 
-.queue-empty-state svg {
+.admin-queue-with-sidebar .queue-empty-state svg {
   width: 2rem;
   height: 2rem;
   color: var(--text-tertiary);
@@ -654,7 +654,7 @@ body {
   stroke: currentColor;
 }
 
-.queue-empty-state p {
+.admin-queue-with-sidebar .queue-empty-state p {
   color: var(--text-tertiary);
   margin: 0;
   font-size: 0.95rem;
