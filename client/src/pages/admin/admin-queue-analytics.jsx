@@ -3,7 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-queue-analytics.css";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
@@ -246,11 +246,16 @@ export default function AdminQueueAnalytics() {
   };
 
   return (
-    <div className="aqa-layout">
-      <AdminSidebar />
-
-      {/* Main Content */}
-      <main className="aqa-main">
+    <AdminPageShell
+      outerClassName="aqa-layout"
+      mainClassName="aqa-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue analytics today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="aqa-content">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -676,12 +681,6 @@ export default function AdminQueueAnalytics() {
             </div>
           )}
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue analytics today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

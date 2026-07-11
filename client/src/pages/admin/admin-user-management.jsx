@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-user-management.css";
 import { toast } from "sonner";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
 
 // ─── Shared Layout Icons ──────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ export default function AdminUserManagement() {
   const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [activeTab, setActiveTab]   = useState("all");
+  const [confirmAction, setConfirmAction] = useState(null); // { type: "delete" | "reset" | "suspend", user }
 
   // ── Handlers: chat ───────────────────────────────────────────────────────────
   const generateBotResponse = (input) => {
@@ -152,19 +154,25 @@ export default function AdminUserManagement() {
   };
 
   const handleDelete = (id) => {
-    if (!window.confirm("Delete this user? This action cannot be undone.")) return;
     setUsers((p) => p.filter((u) => u.id !== id));
     toast.success("User deleted successfully");
   };
   const handleResetPassword = (u) => {
-    if (!window.confirm(`Reset password for ${u.name}? A temporary password will be sent to ${u.email}`)) return;
     toast.success(`Password reset email sent to ${u.email}`);
   };
   const handleToggleSuspend = (u) => {
     const suspending = u.status !== "suspended";
-    if (!window.confirm(`${suspending ? "Suspend" : "Reactivate"} ${u.name}'s account?`)) return;
     setUsers((p) => p.map((x) => x.id === u.id ? { ...x, status: suspending ? "suspended" : "active" } : x));
     toast.success(`Account ${suspending ? "suspended" : "reactivated"}`);
+  };
+
+  const runConfirmAction = () => {
+    if (!confirmAction) return;
+    const { type, user } = confirmAction;
+    if (type === "delete") handleDelete(user.id);
+    else if (type === "reset") handleResetPassword(user);
+    else if (type === "suspend") handleToggleSuspend(user);
+    setConfirmAction(null);
   };
 
   // ── Filtered / grouped users ─────────────────────────────────────────────────
@@ -180,13 +188,124 @@ export default function AdminUserManagement() {
   const displayUsers = activeTab === "students" ? students : activeTab === "professors" ? professors : activeTab === "admins" ? admins : filtered;
   const tabMeta = { all: { title: "All Users", desc: "Complete list of all user accounts" }, students: { title: "Student Accounts", desc: "Manage student user accounts" }, professors: { title: "Professor Accounts", desc: "Manage professor/faculty user accounts" }, admins: { title: "Admin Accounts", desc: "Manage administrator user accounts" } };
 
+  // ── Confirm-modal copy, derived from the pending action ──────────────────────
+  const confirmSuspending = confirmAction?.user.status !== "suspended";
+  const confirmMeta = confirmAction && {
+    delete: {
+      title: "Delete User?",
+      message: <>Delete <strong>{confirmAction.user.name}</strong>? This action cannot be undone.</>,
+      confirmText: "Delete",
+      icon: <TrashIconSvg />,
+    },
+    reset: {
+      title: "Reset Password?",
+      message: <>Reset password for <strong>{confirmAction.user.name}</strong>? A temporary password will be sent to {confirmAction.user.email}.</>,
+      confirmText: "Reset Password",
+      icon: <KeyIconSvg />,
+    },
+    suspend: {
+      title: confirmSuspending ? "Suspend Account?" : "Reactivate Account?",
+      message: <>{confirmSuspending ? "Suspend" : "Reactivate"} <strong>{confirmAction.user.name}</strong>'s account?</>,
+      confirmText: confirmSuspending ? "Suspend" : "Reactivate",
+      icon: confirmSuspending ? <BanIconSvg /> : <CheckCircleIconSvg />,
+    },
+  }[confirmAction.type];
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="admin-dashboard-with-sidebar">
-      <AdminSidebar />
+    <AdminPageShell
+      outerClassName="admin-dashboard-with-sidebar"
+      mainClassName="admin-dashboard-main"
+      overlay={
+        <>
+          {/* ── Add / Edit Modal ───────────────────────────────────────────────── */}
+          {showModal && (
+            <div className="aum-modal-overlay">
+              <div className="aum-modal">
+                <div className="aum-modal-header">
+                  <div>
+                    <h2 className="aum-modal-title">Edit User Account</h2>
+                    <p className="aum-modal-desc">Update user account information</p>
+                  </div>
+                  <button className="aum-modal-close" onClick={closeModal} aria-label="Close modal"><CloseIcon /></button>
+                </div>
+                <div className="aum-modal-body">
+                  <div className="aum-form-grid">
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Full Name *</label>
+                      <input type="text" className="aum-form-input" placeholder="e.g., Juan Dela Cruz" value={form.name} onChange={setField("name")} />
+                    </div>
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Email Address *</label>
+                      <input type="email" className="aum-form-input" placeholder="user@pnc.edu.ph" value={form.email} onChange={setField("email")} />
+                    </div>
+                  </div>
+                  <div className="aum-form-grid">
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Role *</label>
+                      <select className="aum-form-select" value={form.role} onChange={setField("role")}>
+                        <option value="student">Student</option>
+                        <option value="professor">Professor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">College *</label>
+                      <select className="aum-form-select" value={form.college} onChange={setField("college")}>
+                        <option value="">Select college</option>
+                        {COLLEGES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="aum-form-grid">
+                    <div className="aum-form-group">
+                      {form.role === "student" ? (
+                        <>
+                          <label className="aum-form-label">Student ID *</label>
+                          <input type="text" className="aum-form-input" placeholder="e.g., 2312345" value={form.studentId} onChange={setField("studentId")} />
+                        </>
+                      ) : (
+                        <>
+                          <label className="aum-form-label">Employee ID *</label>
+                          <input type="text" className="aum-form-input" placeholder="e.g., EMP-2020-045" value={form.employeeId} onChange={setField("employeeId")} />
+                        </>
+                      )}
+                    </div>
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Status *</label>
+                      <select className="aum-form-select" value={form.status} onChange={setField("status")}>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="suspended">Suspended</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="aum-modal-footer">
+                  <button className="aum-btn-cancel" onClick={closeModal}>Cancel</button>
+                  <button className="aum-btn-submit" onClick={handleSave}>Update User</button>
+                </div>
+              </div>
+            </div>
+          )}
 
-      {/* ── Main Content ───────────────────────────────────────────────────────── */}
-      <main className="admin-dashboard-main">
+          <ActionConfirmModal
+            show={!!confirmAction}
+            onCancel={() => setConfirmAction(null)}
+            onConfirm={runConfirmAction}
+            title={confirmMeta?.title}
+            message={confirmMeta?.message}
+            icon={confirmMeta?.icon}
+            confirmText={confirmMeta?.confirmText}
+          />
+
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+            getBotResponse={generateBotResponse}
+          />
+        </>
+      }
+    >
         <div className="aum-content">
           <PageHeader
             breadcrumb={
@@ -292,13 +411,13 @@ export default function AdminUserManagement() {
                         <button className="aum-icon-btn aum-icon-btn-edit"   onClick={() => openEditModal(u)}      title="Edit user"><EditIconSvg /></button>
                         <button
                           className={`aum-icon-btn ${u.status === "suspended" ? "aum-icon-btn-reactivate" : "aum-icon-btn-suspend"}`}
-                          onClick={() => handleToggleSuspend(u)}
+                          onClick={() => setConfirmAction({ type: "suspend", user: u })}
                           title={u.status === "suspended" ? "Reactivate account" : "Suspend account"}
                         >
                           {u.status === "suspended" ? <CheckCircleIconSvg /> : <BanIconSvg />}
                         </button>
-                        <button className="aum-icon-btn aum-icon-btn-key"    onClick={() => handleResetPassword(u)} title="Reset password"><KeyIconSvg /></button>
-                        <button className="aum-icon-btn aum-icon-btn-delete" onClick={() => handleDelete(u.id)}    title="Delete user"><TrashIconSvg /></button>
+                        <button className="aum-icon-btn aum-icon-btn-key"    onClick={() => setConfirmAction({ type: "reset", user: u })} title="Reset password"><KeyIconSvg /></button>
+                        <button className="aum-icon-btn aum-icon-btn-delete" onClick={() => setConfirmAction({ type: "delete", user: u })} title="Delete user"><TrashIconSvg /></button>
                       </div>
                     </div>
                   ))
@@ -308,83 +427,6 @@ export default function AdminUserManagement() {
           </div>
 
         </div>
-      </main>
-
-      {/* ── Add / Edit Modal ───────────────────────────────────────────────────── */}
-      {showModal && (
-        <div className="aum-modal-overlay">
-          <div className="aum-modal">
-            <div className="aum-modal-header">
-              <div>
-                <h2 className="aum-modal-title">Edit User Account</h2>
-                <p className="aum-modal-desc">Update user account information</p>
-              </div>
-              <button className="aum-modal-close" onClick={closeModal} aria-label="Close modal"><CloseIcon /></button>
-            </div>
-            <div className="aum-modal-body">
-              <div className="aum-form-grid">
-                <div className="aum-form-group">
-                  <label className="aum-form-label">Full Name *</label>
-                  <input type="text" className="aum-form-input" placeholder="e.g., Juan Dela Cruz" value={form.name} onChange={setField("name")} />
-                </div>
-                <div className="aum-form-group">
-                  <label className="aum-form-label">Email Address *</label>
-                  <input type="email" className="aum-form-input" placeholder="user@pnc.edu.ph" value={form.email} onChange={setField("email")} />
-                </div>
-              </div>
-              <div className="aum-form-grid">
-                <div className="aum-form-group">
-                  <label className="aum-form-label">Role *</label>
-                  <select className="aum-form-select" value={form.role} onChange={setField("role")}>
-                    <option value="student">Student</option>
-                    <option value="professor">Professor</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div className="aum-form-group">
-                  <label className="aum-form-label">College *</label>
-                  <select className="aum-form-select" value={form.college} onChange={setField("college")}>
-                    <option value="">Select college</option>
-                    {COLLEGES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="aum-form-grid">
-                <div className="aum-form-group">
-                  {form.role === "student" ? (
-                    <>
-                      <label className="aum-form-label">Student ID *</label>
-                      <input type="text" className="aum-form-input" placeholder="e.g., 2312345" value={form.studentId} onChange={setField("studentId")} />
-                    </>
-                  ) : (
-                    <>
-                      <label className="aum-form-label">Employee ID *</label>
-                      <input type="text" className="aum-form-input" placeholder="e.g., EMP-2020-045" value={form.employeeId} onChange={setField("employeeId")} />
-                    </>
-                  )}
-                </div>
-                <div className="aum-form-group">
-                  <label className="aum-form-label">Status *</label>
-                  <select className="aum-form-select" value={form.status} onChange={setField("status")}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="aum-modal-footer">
-              <button className="aum-btn-cancel" onClick={closeModal}>Cancel</button>
-              <button className="aum-btn-submit" onClick={handleSave}>Update User</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

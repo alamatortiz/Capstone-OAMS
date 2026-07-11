@@ -6,7 +6,7 @@ import "./admin-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import { formatManilaDateTime } from "../../utils/dateTime";
@@ -288,11 +288,155 @@ export default function AdminQueueHosting() {
   const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "all" || typeFilter !== "all";
 
   return (
-    <div className="aqh-dashboard-with-sidebar">
-      <AdminSidebar />
+    <AdminPageShell
+      outerClassName="aqh-dashboard-with-sidebar"
+      mainClassName="aqh-dashboard-main"
+      overlay={
+        <>
+          <ChatWidget
+            initialGreeting={`Hello! 👋 I'm your OAMS Assistant. How can I help you host queues for ${user.departmentAbbrev} today?`}
+            getBotResponse={generateBotResponse}
+          />
 
-      {/* Main Content */}
-      <main className="aqh-dashboard-main">
+          <QueueReasonModal
+            show={!!reasonModal}
+            title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
+            message={
+              reasonModal?.mode === "pause"
+                ? "Students in this queue will see this reason while it's paused."
+                : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
+            }
+            confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
+            submitting={reasonSubmitting}
+            onConfirm={handleReasonConfirm}
+            onCancel={() => setReasonModal(null)}
+          />
+
+          {/* Open New Queue Line Modal */}
+          {showModal && (
+            <div className="aqh-modal-overlay">
+              <div className="aqh-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <div>
+                    <h2 className="aqh-modal-title">Open New Queue Line</h2>
+                    <p className="aqh-modal-subtitle">
+                      For {user.college} ({user.departmentAbbrev}) only
+                    </p>
+                  </div>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={closeModal}
+                    aria-label="Close"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="aqh-modal-body">
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">Service *</label>
+                    <div className="aqh-form-select-wrap">
+                      <select
+                        className="aqh-form-select"
+                        value={serviceId}
+                        onChange={(e) => setServiceId(e.target.value)}
+                      >
+                        <option value="">Select a service</option>
+                        {services.map((s) => (
+                          <option key={s.service_id} value={s.service_id}>
+                            {s.service_name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="aqh-select-chevron">
+                        <ChevronDownIcon />
+                      </span>
+                    </div>
+                    {services.length === 0 && (
+                      <p className="aqh-modal-subtitle">
+                        No services configured for your department yet.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      Maximum Queue Capacity *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 100"
+                      value={maxCapacity}
+                      onChange={(e) => setMaxCapacity(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      No-Show Timeout (minutes) *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 15"
+                      value={noShowTimeout}
+                      onChange={(e) => setNoShowTimeout(e.target.value)}
+                    />
+                    <p className="aqh-modal-subtitle">
+                      A called student who doesn't show up within this many
+                      minutes is automatically voided so you can call the next one.
+                    </p>
+                  </div>
+
+                  <div className="aqh-form-row">
+                    <div className="aqh-form-group">
+                      <label className="aqh-form-label">Service Start Time *</label>
+                      <div className="aqh-time-input-wrap">
+                        <input
+                          type="time"
+                          className="aqh-form-input"
+                          value={serviceStart}
+                          onChange={(e) => setServiceStart(e.target.value)}
+                        />
+                        <ClockIcon />
+                      </div>
+                    </div>
+                    <div className="aqh-form-group">
+                      <label className="aqh-form-label">Service End Time *</label>
+                      <div className="aqh-time-input-wrap">
+                        <input
+                          type="time"
+                          className="aqh-form-input"
+                          value={serviceEnd}
+                          onChange={(e) => setServiceEnd(e.target.value)}
+                        />
+                        <ClockIcon />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={closeModal}>
+                    Cancel
+                  </button>
+                  <button
+                    className="aqh-btn-submit"
+                    onClick={handleOpenQueueSubmit}
+                    disabled={submitting}
+                  >
+                    {submitting ? "Opening..." : "Open Queue Line"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      }
+    >
         <div className="aqh-page-container">
           <div className="aqh-header-block">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
@@ -666,149 +810,6 @@ export default function AdminQueueHosting() {
             </div>
           )}
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting={`Hello! 👋 I'm your OAMS Assistant. How can I help you host queues for ${user.departmentAbbrev} today?`}
-        getBotResponse={generateBotResponse}
-      />
-
-      <QueueReasonModal
-        show={!!reasonModal}
-        title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
-        message={
-          reasonModal?.mode === "pause"
-            ? "Students in this queue will see this reason while it's paused."
-            : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
-        }
-        confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
-        submitting={reasonSubmitting}
-        onConfirm={handleReasonConfirm}
-        onCancel={() => setReasonModal(null)}
-      />
-
-      {/* Open New Queue Line Modal */}
-      {showModal && (
-        <div className="aqh-modal-overlay">
-          <div className="aqh-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="aqh-modal-header">
-              <div>
-                <h2 className="aqh-modal-title">Open New Queue Line</h2>
-                <p className="aqh-modal-subtitle">
-                  For {user.college} ({user.departmentAbbrev}) only
-                </p>
-              </div>
-              <button
-                className="aqh-modal-close-btn"
-                onClick={closeModal}
-                aria-label="Close"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
-            <div className="aqh-modal-body">
-              <div className="aqh-form-group">
-                <label className="aqh-form-label">Service *</label>
-                <div className="aqh-form-select-wrap">
-                  <select
-                    className="aqh-form-select"
-                    value={serviceId}
-                    onChange={(e) => setServiceId(e.target.value)}
-                  >
-                    <option value="">Select a service</option>
-                    {services.map((s) => (
-                      <option key={s.service_id} value={s.service_id}>
-                        {s.service_name}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="aqh-select-chevron">
-                    <ChevronDownIcon />
-                  </span>
-                </div>
-                {services.length === 0 && (
-                  <p className="aqh-modal-subtitle">
-                    No services configured for your department yet.
-                  </p>
-                )}
-              </div>
-
-              <div className="aqh-form-group">
-                <label className="aqh-form-label">
-                  Maximum Queue Capacity *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  className="aqh-form-input"
-                  placeholder="e.g., 100"
-                  value={maxCapacity}
-                  onChange={(e) => setMaxCapacity(e.target.value)}
-                />
-              </div>
-
-              <div className="aqh-form-group">
-                <label className="aqh-form-label">
-                  No-Show Timeout (minutes) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  className="aqh-form-input"
-                  placeholder="e.g., 15"
-                  value={noShowTimeout}
-                  onChange={(e) => setNoShowTimeout(e.target.value)}
-                />
-                <p className="aqh-modal-subtitle">
-                  A called student who doesn't show up within this many
-                  minutes is automatically voided so you can call the next one.
-                </p>
-              </div>
-
-              <div className="aqh-form-row">
-                <div className="aqh-form-group">
-                  <label className="aqh-form-label">Service Start Time *</label>
-                  <div className="aqh-time-input-wrap">
-                    <input
-                      type="time"
-                      className="aqh-form-input"
-                      value={serviceStart}
-                      onChange={(e) => setServiceStart(e.target.value)}
-                    />
-                    <ClockIcon />
-                  </div>
-                </div>
-                <div className="aqh-form-group">
-                  <label className="aqh-form-label">Service End Time *</label>
-                  <div className="aqh-time-input-wrap">
-                    <input
-                      type="time"
-                      className="aqh-form-input"
-                      value={serviceEnd}
-                      onChange={(e) => setServiceEnd(e.target.value)}
-                    />
-                    <ClockIcon />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="aqh-modal-footer">
-              <button className="aqh-btn-cancel" onClick={closeModal}>
-                Cancel
-              </button>
-              <button
-                className="aqh-btn-submit"
-                onClick={handleOpenQueueSubmit}
-                disabled={submitting}
-              >
-                {submitting ? "Opening..." : "Open Queue Line"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </AdminPageShell>
   );
 }

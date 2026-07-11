@@ -6,9 +6,10 @@ import "./admin-dashboard.css";
 import "./admin-announcements.css";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
 import { formatManilaDate } from "../../utils/dateTime";
 
@@ -139,6 +140,7 @@ export default function AdminAnnouncements() {
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
+  const [deleteId, setDeleteId] = useState(null);
 
   const [toasts, setToasts] = useState([]);
   const showToast = (message, kind = "success") => {
@@ -223,13 +225,14 @@ export default function AdminAnnouncements() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this announcement permanently? This can't be undone.")) return;
     try {
       await api.delete(`/admin/announcements/${id}`);
       setAnnouncements((prev) => prev.filter((a) => a.id !== id));
       showToast("Announcement deleted permanently");
     } catch {
       showToast("Failed to delete announcement", "error");
+    } finally {
+      setDeleteId(null);
     }
   };
 
@@ -289,20 +292,184 @@ export default function AdminAnnouncements() {
   const list = getFiltered(activeTab);
 
   return (
-    <div className="admin-dashboard-with-sidebar">
-      <AdminSidebar />
-
-      {/* Toasts */}
-      <div className="ann-toast-stack">
-        {toasts.map((t) => (
-          <div key={t.id} className={`ann-toast ${t.kind === "error" ? "ann-toast-error" : ""}`}>
-            {t.message}
+    <AdminPageShell
+      outerClassName="admin-dashboard-with-sidebar"
+      mainClassName="admin-dashboard-main"
+      overlay={
+        <>
+          {/* Toasts */}
+          <div className="ann-toast-stack">
+            {toasts.map((t) => (
+              <div key={t.id} className={`ann-toast ${t.kind === "error" ? "ann-toast-error" : ""}`}>
+                {t.message}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Main Content */}
-      <main className="admin-dashboard-main">
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. Ask me about announcements, pinning, or filters."
+            getBotResponse={generateBotResponse}
+          />
+
+          {/* View Modal */}
+          {viewingAnnouncement && (
+            <div className="ann-modal-overlay">
+              <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="ann-modal-header">
+                  <div>
+                    <h3 className="ann-modal-title"><EyeIcon /> Announcement Details</h3>
+                    <p className="ann-modal-desc">View complete information about this announcement</p>
+                  </div>
+                  <button className="ann-modal-close" onClick={() => setViewingAnnouncement(null)} aria-label="Close">
+                    <XIcon />
+                  </button>
+                </div>
+
+                <div className="ann-view-banner">
+                  <div>
+                    <h2>{viewingAnnouncement.title}</h2>
+                    <div className="ann-view-banner-date"><CalendarIcon />{formatDate(viewingAnnouncement.date)}</div>
+                  </div>
+                  <div className="ann-view-banner-badges">
+                    <span className={`ann-badge ${TYPE_META[viewingAnnouncement.type].badgeClass}`}>
+                      {TYPE_META[viewingAnnouncement.type].label}
+                    </span>
+                    {viewingAnnouncement.isPinned && (
+                      <span className="ann-pinned-pill"><PinIcon /> Pinned</span>
+                    )}
+                  </div>
+                </div>
+
+                <p className="ann-view-label">Content</p>
+                <div className="ann-view-block"><p>{viewingAnnouncement.content}</p></div>
+
+                <div className="ann-view-grid">
+                  <div>
+                    <p className="ann-view-label">Created By</p>
+                    <p className="ann-view-value">{viewingAnnouncement.createdBy || "Admin Office"}</p>
+                  </div>
+                  <div>
+                    <p className="ann-view-label">Status</p>
+                    <p className="ann-view-value">
+                      <span className={`ann-status-pill ${viewingAnnouncement.status === "active" ? "ann-status-active" : "ann-status-archived"}`}>
+                        {viewingAnnouncement.status}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="ann-view-label">Published Date</p>
+                    <p className="ann-view-value">{formatDate(viewingAnnouncement.date)}</p>
+                  </div>
+                </div>
+
+                <div className="ann-modal-footer">
+                  <button className="ann-btn-secondary" onClick={() => { const a = viewingAnnouncement; setViewingAnnouncement(null); openEdit(a); }}>
+                    Edit Announcement
+                  </button>
+                  <button className="ann-btn-primary" onClick={() => setViewingAnnouncement(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Modal */}
+          {editingAnnouncement && (
+            <div className="ann-modal-overlay">
+              <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="ann-modal-header">
+                  <div>
+                    <h3 className="ann-modal-title">Edit Announcement</h3>
+                    <p className="ann-modal-desc">Make changes and save when you're done.</p>
+                  </div>
+                  <button className="ann-modal-close" onClick={closeEdit} aria-label="Close"><XIcon /></button>
+                </div>
+
+                <div className="ann-field">
+                  <label htmlFor="edit-title">Title *</label>
+                  <input id="edit-title" className="ann-input" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+                </div>
+                <div className="ann-field">
+                  <label htmlFor="edit-content">Content *</label>
+                  <textarea id="edit-content" className="ann-textarea" value={editForm.content} onChange={(e) => setEditForm({ ...editForm, content: e.target.value })} />
+                </div>
+                <div className="ann-field-row">
+                  <div className="ann-field">
+                    <label htmlFor="edit-type">Type *</label>
+                    <select id="edit-type" className="ann-select" value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>
+                      <option value="general">General</option>
+                      <option value="important">Important</option>
+                      <option value="event">Event</option>
+                      <option value="reminder">Reminder</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="ann-modal-footer">
+                  <button className="ann-btn-secondary" onClick={closeEdit}>Cancel</button>
+                  <button className="ann-btn-primary" onClick={saveEdit}><CheckCircleIcon /> Save Changes</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Create Modal */}
+          {isCreating && (
+            <div className="ann-modal-overlay">
+              <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="ann-modal-header">
+                  <div>
+                    <h3 className="ann-modal-title"><PlusIconSmall /> New Announcement</h3>
+                    <p className="ann-modal-desc">Create a new announcement for your department.</p>
+                  </div>
+                  <button className="ann-modal-close" onClick={closeCreate} aria-label="Close"><XIcon /></button>
+                </div>
+
+                <div className="ann-field">
+                  <label htmlFor="create-title">Title *</label>
+                  <input id="create-title" className="ann-input" placeholder="Enter announcement title" value={createForm.title} onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })} />
+                </div>
+                <div className="ann-field">
+                  <label htmlFor="create-content">Content *</label>
+                  <textarea id="create-content" className="ann-textarea" placeholder="Enter announcement content" value={createForm.content} onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })} />
+                </div>
+                <div className="ann-field-row">
+                  <div className="ann-field">
+                    <label htmlFor="create-type">Type *</label>
+                    <select id="create-type" className="ann-select" value={createForm.type} onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}>
+                      <option value="general">General</option>
+                      <option value="important">Important</option>
+                      <option value="event">Event</option>
+                      <option value="reminder">Reminder</option>
+                    </select>
+                  </div>
+                  <div className="ann-field">
+                    <label htmlFor="create-pinned">Pin Announcement</label>
+                    <select id="create-pinned" className="ann-select" value={createForm.isPinned ? "true" : "false"} onChange={(e) => setCreateForm({ ...createForm, isPinned: e.target.value === "true" })}>
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="ann-modal-footer">
+                  <button className="ann-btn-secondary" onClick={closeCreate}>Cancel</button>
+                  <button className="ann-btn-primary" onClick={saveCreate}><CheckCircleIcon /> Save Announcement</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <ActionConfirmModal
+            show={deleteId !== null}
+            onCancel={() => setDeleteId(null)}
+            onConfirm={() => handleDelete(deleteId)}
+            title="Delete Announcement?"
+            message="Delete this announcement permanently? This can't be undone."
+            confirmText="Delete"
+          />
+        </>
+      }
+    >
         <div className="ann-page">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -443,7 +610,7 @@ export default function AdminAnnouncements() {
                                 <button className="ann-action-btn ann-action-restore" onClick={() => handleRestore(a.id)}>
                                   Restore
                                 </button>
-                                <button className="ann-action-btn ann-action-delete" onClick={() => handleDelete(a.id)}>
+                                <button className="ann-action-btn ann-action-delete" onClick={() => setDeleteId(a.id)}>
                                   <img src={deleteIcon} alt="" /> Delete
                                 </button>
                               </>
@@ -458,160 +625,6 @@ export default function AdminAnnouncements() {
             )}
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. Ask me about announcements, pinning, or filters."
-        getBotResponse={generateBotResponse}
-      />
-
-      {/* View Modal */}
-      {viewingAnnouncement && (
-        <div className="ann-modal-overlay">
-          <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ann-modal-header">
-              <div>
-                <h3 className="ann-modal-title"><EyeIcon /> Announcement Details</h3>
-                <p className="ann-modal-desc">View complete information about this announcement</p>
-              </div>
-              <button className="ann-modal-close" onClick={() => setViewingAnnouncement(null)} aria-label="Close">
-                <XIcon />
-              </button>
-            </div>
-
-            <div className="ann-view-banner">
-              <div>
-                <h2>{viewingAnnouncement.title}</h2>
-                <div className="ann-view-banner-date"><CalendarIcon />{formatDate(viewingAnnouncement.date)}</div>
-              </div>
-              <div className="ann-view-banner-badges">
-                <span className={`ann-badge ${TYPE_META[viewingAnnouncement.type].badgeClass}`}>
-                  {TYPE_META[viewingAnnouncement.type].label}
-                </span>
-                {viewingAnnouncement.isPinned && (
-                  <span className="ann-pinned-pill"><PinIcon /> Pinned</span>
-                )}
-              </div>
-            </div>
-
-            <p className="ann-view-label">Content</p>
-            <div className="ann-view-block"><p>{viewingAnnouncement.content}</p></div>
-
-            <div className="ann-view-grid">
-              <div>
-                <p className="ann-view-label">Created By</p>
-                <p className="ann-view-value">{viewingAnnouncement.createdBy || "Admin Office"}</p>
-              </div>
-              <div>
-                <p className="ann-view-label">Status</p>
-                <p className="ann-view-value">
-                  <span className={`ann-status-pill ${viewingAnnouncement.status === "active" ? "ann-status-active" : "ann-status-archived"}`}>
-                    {viewingAnnouncement.status}
-                  </span>
-                </p>
-              </div>
-              <div>
-                <p className="ann-view-label">Published Date</p>
-                <p className="ann-view-value">{formatDate(viewingAnnouncement.date)}</p>
-              </div>
-            </div>
-
-            <div className="ann-modal-footer">
-              <button className="ann-btn-secondary" onClick={() => { const a = viewingAnnouncement; setViewingAnnouncement(null); openEdit(a); }}>
-                Edit Announcement
-              </button>
-              <button className="ann-btn-primary" onClick={() => setViewingAnnouncement(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editingAnnouncement && (
-        <div className="ann-modal-overlay">
-          <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ann-modal-header">
-              <div>
-                <h3 className="ann-modal-title">Edit Announcement</h3>
-                <p className="ann-modal-desc">Make changes and save when you're done.</p>
-              </div>
-              <button className="ann-modal-close" onClick={closeEdit} aria-label="Close"><XIcon /></button>
-            </div>
-
-            <div className="ann-field">
-              <label htmlFor="edit-title">Title *</label>
-              <input id="edit-title" className="ann-input" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-            </div>
-            <div className="ann-field">
-              <label htmlFor="edit-content">Content *</label>
-              <textarea id="edit-content" className="ann-textarea" value={editForm.content} onChange={(e) => setEditForm({ ...editForm, content: e.target.value })} />
-            </div>
-            <div className="ann-field-row">
-              <div className="ann-field">
-                <label htmlFor="edit-type">Type *</label>
-                <select id="edit-type" className="ann-select" value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>
-                  <option value="general">General</option>
-                  <option value="important">Important</option>
-                  <option value="event">Event</option>
-                  <option value="reminder">Reminder</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="ann-modal-footer">
-              <button className="ann-btn-secondary" onClick={closeEdit}>Cancel</button>
-              <button className="ann-btn-primary" onClick={saveEdit}><CheckCircleIcon /> Save Changes</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Modal */}
-      {isCreating && (
-        <div className="ann-modal-overlay">
-          <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ann-modal-header">
-              <div>
-                <h3 className="ann-modal-title"><PlusIconSmall /> New Announcement</h3>
-                <p className="ann-modal-desc">Create a new announcement for your department.</p>
-              </div>
-              <button className="ann-modal-close" onClick={closeCreate} aria-label="Close"><XIcon /></button>
-            </div>
-
-            <div className="ann-field">
-              <label htmlFor="create-title">Title *</label>
-              <input id="create-title" className="ann-input" placeholder="Enter announcement title" value={createForm.title} onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })} />
-            </div>
-            <div className="ann-field">
-              <label htmlFor="create-content">Content *</label>
-              <textarea id="create-content" className="ann-textarea" placeholder="Enter announcement content" value={createForm.content} onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })} />
-            </div>
-            <div className="ann-field-row">
-              <div className="ann-field">
-                <label htmlFor="create-type">Type *</label>
-                <select id="create-type" className="ann-select" value={createForm.type} onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}>
-                  <option value="general">General</option>
-                  <option value="important">Important</option>
-                  <option value="event">Event</option>
-                  <option value="reminder">Reminder</option>
-                </select>
-              </div>
-              <div className="ann-field">
-                <label htmlFor="create-pinned">Pin Announcement</label>
-                <select id="create-pinned" className="ann-select" value={createForm.isPinned ? "true" : "false"} onChange={(e) => setCreateForm({ ...createForm, isPinned: e.target.value === "true" })}>
-                  <option value="false">No</option>
-                  <option value="true">Yes</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="ann-modal-footer">
-              <button className="ann-btn-secondary" onClick={closeCreate}>Cancel</button>
-              <button className="ann-btn-primary" onClick={saveCreate}><CheckCircleIcon /> Save Announcement</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </AdminPageShell>
   );
 }

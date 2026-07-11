@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import "./admin-document-processing.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
@@ -208,11 +208,125 @@ export default function AdminDocumentProcessing() {
   const TABS = ["all", "pending", "processing", "ready", "completed", "rejected"];
 
   return (
-    <div className="adp-layout">
-      <AdminSidebar />
+    <AdminPageShell
+      outerClassName="adp-layout"
+      mainClassName="adp-main"
+      overlay={
+        <>
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+            getBotResponse={generateBotResponse}
+          />
 
-      {/* ── Main Content ─────────────────────────────────────────────────────── */}
-      <main className="adp-main">
+          {/* ── Details Modal ────────────────────────────────────────────────────── */}
+          {showDetailsModal && selectedDocument && (
+            <div className="adp-modal-backdrop" onClick={handleCloseModal}>
+              <div className="adp-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="adp-modal-header">
+                  <div>
+                    <h2 className="adp-modal-title">Document Request Details</h2>
+                    <p className="adp-modal-subtitle">Review and process document request</p>
+                  </div>
+                  <button className="adp-modal-close-btn" onClick={handleCloseModal} aria-label="Close modal">
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="adp-modal-body">
+                  <div className="adp-modal-grid">
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">Tracking Number</label>
+                      <p className="adp-modal-value">{selectedDocument.trackingNumber}</p>
+                    </div>
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">Status</label>
+                      <div className="adp-modal-value">
+                        <span className={`adp-status-badge ${getStatusMeta(selectedDocument.status).cls}`}>
+                          {getStatusMeta(selectedDocument.status).label}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">Name</label>
+                      <p className="adp-modal-value">{selectedDocument.requesterName}</p>
+                    </div>
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">{selectedDocument.requesterIdLabel}</label>
+                      <p className="adp-modal-value">{selectedDocument.requesterIdValue}</p>
+                    </div>
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">College</label>
+                      <p className="adp-modal-value">{selectedDocument.college}</p>
+                    </div>
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">Document Type</label>
+                      <p className="adp-modal-value">{selectedDocument.documentType}</p>
+                    </div>
+                    {selectedDocument.neededBy && (
+                      <div className="adp-modal-field">
+                        <label className="adp-modal-label">Needed By</label>
+                        <p className="adp-modal-value">{formatManilaDate(selectedDocument.neededBy)}</p>
+                      </div>
+                    )}
+                    <div className="adp-modal-field adp-modal-field--full">
+                      <label className="adp-modal-label">Purpose</label>
+                      <p className="adp-modal-value">{selectedDocument.purpose}</p>
+                    </div>
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">Request Date</label>
+                      <p className="adp-modal-value">{formatManilaDate(selectedDocument.requestDate)}</p>
+                    </div>
+                    {selectedDocument.completedDate && (
+                      <div className="adp-modal-field">
+                        <label className="adp-modal-label">Completed Date</label>
+                        <p className="adp-modal-value">{formatManilaDate(selectedDocument.completedDate)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="adp-modal-notes-wrap">
+                    <label className="adp-modal-label" htmlFor="adp-notes">Processing Notes</label>
+                    <textarea
+                      id="adp-notes"
+                      className="adp-modal-textarea"
+                      placeholder="Add notes about the processing status..."
+                      rows={4}
+                      value={processingNotes}
+                      onChange={(e) => setProcessingNotes(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="adp-modal-actions">
+                    {selectedDocument.status === "pending" && (
+                      <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => handleUpdateStatus("processing")}>
+                        Start Processing
+                      </button>
+                    )}
+                    {selectedDocument.status === "processing" && (
+                      <button className="adp-modal-btn adp-modal-btn--success" onClick={() => handleUpdateStatus("ready")}>
+                        Mark as Ready
+                      </button>
+                    )}
+                    {selectedDocument.status === "ready" && (
+                      <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => handleUpdateStatus("completed")}>
+                        Mark as Completed
+                      </button>
+                    )}
+                    {(selectedDocument.status === "pending" || selectedDocument.status === "processing") && (
+                      <button className="adp-modal-btn adp-modal-btn--danger" onClick={() => handleUpdateStatus("rejected")}>
+                        Reject Request
+                      </button>
+                    )}
+                    <button className="adp-modal-btn adp-modal-btn--outline" onClick={handleCloseModal}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      }
+    >
         <div className="adp-content">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -356,119 +470,6 @@ export default function AdminDocumentProcessing() {
             )}
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-        getBotResponse={generateBotResponse}
-      />
-
-      {/* ── Details Modal ────────────────────────────────────────────────────── */}
-      {showDetailsModal && selectedDocument && (
-        <div className="adp-modal-backdrop" onClick={handleCloseModal}>
-          <div className="adp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="adp-modal-header">
-              <div>
-                <h2 className="adp-modal-title">Document Request Details</h2>
-                <p className="adp-modal-subtitle">Review and process document request</p>
-              </div>
-              <button className="adp-modal-close-btn" onClick={handleCloseModal} aria-label="Close modal">
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="adp-modal-body">
-              <div className="adp-modal-grid">
-                <div className="adp-modal-field">
-                  <label className="adp-modal-label">Tracking Number</label>
-                  <p className="adp-modal-value">{selectedDocument.trackingNumber}</p>
-                </div>
-                <div className="adp-modal-field">
-                  <label className="adp-modal-label">Status</label>
-                  <div className="adp-modal-value">
-                    <span className={`adp-status-badge ${getStatusMeta(selectedDocument.status).cls}`}>
-                      {getStatusMeta(selectedDocument.status).label}
-                    </span>
-                  </div>
-                </div>
-                <div className="adp-modal-field">
-                  <label className="adp-modal-label">Name</label>
-                  <p className="adp-modal-value">{selectedDocument.requesterName}</p>
-                </div>
-                <div className="adp-modal-field">
-                  <label className="adp-modal-label">{selectedDocument.requesterIdLabel}</label>
-                  <p className="adp-modal-value">{selectedDocument.requesterIdValue}</p>
-                </div>
-                <div className="adp-modal-field">
-                  <label className="adp-modal-label">College</label>
-                  <p className="adp-modal-value">{selectedDocument.college}</p>
-                </div>
-                <div className="adp-modal-field">
-                  <label className="adp-modal-label">Document Type</label>
-                  <p className="adp-modal-value">{selectedDocument.documentType}</p>
-                </div>
-                {selectedDocument.neededBy && (
-                  <div className="adp-modal-field">
-                    <label className="adp-modal-label">Needed By</label>
-                    <p className="adp-modal-value">{formatManilaDate(selectedDocument.neededBy)}</p>
-                  </div>
-                )}
-                <div className="adp-modal-field adp-modal-field--full">
-                  <label className="adp-modal-label">Purpose</label>
-                  <p className="adp-modal-value">{selectedDocument.purpose}</p>
-                </div>
-                <div className="adp-modal-field">
-                  <label className="adp-modal-label">Request Date</label>
-                  <p className="adp-modal-value">{formatManilaDate(selectedDocument.requestDate)}</p>
-                </div>
-                {selectedDocument.completedDate && (
-                  <div className="adp-modal-field">
-                    <label className="adp-modal-label">Completed Date</label>
-                    <p className="adp-modal-value">{formatManilaDate(selectedDocument.completedDate)}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="adp-modal-notes-wrap">
-                <label className="adp-modal-label" htmlFor="adp-notes">Processing Notes</label>
-                <textarea
-                  id="adp-notes"
-                  className="adp-modal-textarea"
-                  placeholder="Add notes about the processing status..."
-                  rows={4}
-                  value={processingNotes}
-                  onChange={(e) => setProcessingNotes(e.target.value)}
-                />
-              </div>
-
-              <div className="adp-modal-actions">
-                {selectedDocument.status === "pending" && (
-                  <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => handleUpdateStatus("processing")}>
-                    Start Processing
-                  </button>
-                )}
-                {selectedDocument.status === "processing" && (
-                  <button className="adp-modal-btn adp-modal-btn--success" onClick={() => handleUpdateStatus("ready")}>
-                    Mark as Ready
-                  </button>
-                )}
-                {selectedDocument.status === "ready" && (
-                  <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => handleUpdateStatus("completed")}>
-                    Mark as Completed
-                  </button>
-                )}
-                {(selectedDocument.status === "pending" || selectedDocument.status === "processing") && (
-                  <button className="adp-modal-btn adp-modal-btn--danger" onClick={() => handleUpdateStatus("rejected")}>
-                    Reject Request
-                  </button>
-                )}
-                <button className="adp-modal-btn adp-modal-btn--outline" onClick={handleCloseModal}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </AdminPageShell>
   );
 }

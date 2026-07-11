@@ -6,7 +6,7 @@ import './admin-queue-management.css';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import api from '../../utils/api';
 import { connectSocket } from '../../utils/socket';
-import AdminSidebar from '../../components/AdminSidebar';
+import AdminPageShell from '../../components/AdminPageShell';
 import ChatWidget from '../../components/ChatWidget';
 import QueueReasonModal from '../../components/QueueReasonModal';
 import { formatManilaDateTime } from '../../utils/dateTime';
@@ -342,11 +342,32 @@ export default function AdminQueueManagement() {
     const capacityUsed = (selectedQueue.currentCount / selectedQueue.maxCapacity) * 100;
 
     return (
-      <div className="aqm-dashboard-with-sidebar">
-        <AdminSidebar />
+      <AdminPageShell
+        outerClassName="aqm-dashboard-with-sidebar"
+        mainClassName="aqm-dashboard-main"
+        overlay={
+          <>
+            <ChatWidget
+              initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you manage queues?"
+              getBotResponse={generateQueueBotResponse}
+            />
 
-        {/* Main Content - Details View */}
-        <main className="aqm-dashboard-main">
+            <QueueReasonModal
+              show={!!reasonModal}
+              title={reasonModal?.mode === 'pause' ? 'Pause Queue' : 'Stop Queue'}
+              message={
+                reasonModal?.mode === 'pause'
+                  ? "Students in this queue will see this reason while it's paused."
+                  : 'All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.'
+              }
+              confirmText={reasonModal?.mode === 'pause' ? 'Pause' : 'Stop Queue'}
+              submitting={reasonSubmitting}
+              onConfirm={handleReasonConfirm}
+              onCancel={() => setReasonModal(null)}
+            />
+          </>
+        }
+      >
           <div className="aqm-details-container">
             {/* Back Button */}
             <div className="aqm-details-header">
@@ -625,37 +646,22 @@ export default function AdminQueueManagement() {
               </aside>
             </div>
           </div>
-        </main>
-
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you manage queues?"
-          getBotResponse={generateQueueBotResponse}
-        />
-
-        <QueueReasonModal
-          show={!!reasonModal}
-          title={reasonModal?.mode === 'pause' ? 'Pause Queue' : 'Stop Queue'}
-          message={
-            reasonModal?.mode === 'pause'
-              ? "Students in this queue will see this reason while it's paused."
-              : 'All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.'
-          }
-          confirmText={reasonModal?.mode === 'pause' ? 'Pause' : 'Stop Queue'}
-          submitting={reasonSubmitting}
-          onConfirm={handleReasonConfirm}
-          onCancel={() => setReasonModal(null)}
-        />
-      </div>
+      </AdminPageShell>
     );
   }
 
   // ─── List View ─────────────────────────────────────────────────────────────
   return (
-    <div className="aqm-dashboard-with-sidebar">
-      <AdminSidebar />
-
-      {/* Main Content - List View */}
-      <main className="aqm-dashboard-main">
+    <AdminPageShell
+      outerClassName="aqm-dashboard-with-sidebar"
+      mainClassName="aqm-dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you manage queues?"
+          getBotResponse={generateQueueBotResponse}
+        />
+      }
+    >
         <div className="aqm-list-container">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
           <div className="aqm-page-header">
@@ -797,12 +803,6 @@ export default function AdminQueueManagement() {
             )}
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you manage queues?"
-        getBotResponse={generateQueueBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

@@ -419,13 +419,20 @@
   }
 }
 
-.admin-transaction-select-wrapper {
+.admin-transaction-filter-selects .filter-group,
+.admin-transaction-actions-row .filter-group {
+  display: block;
+}
+
+.admin-transaction-filter-selects .filter-select-wrapper,
+.admin-transaction-actions-row .filter-select-wrapper {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.admin-transaction-select {
+.admin-transaction-filter-selects .filter-select,
+.admin-transaction-actions-row .filter-select {
   width: 100%;
   padding: 0.75rem 2.5rem 0.75rem 1rem;
   background-color: var(--input-background);
@@ -439,18 +446,21 @@
   transition: all 0.2s ease;
 }
 
-.admin-transaction-select:hover {
+.admin-transaction-filter-selects .filter-select:hover,
+.admin-transaction-actions-row .filter-select:hover {
   border-color: var(--primary-color);
 }
 
-.admin-transaction-select:focus {
+.admin-transaction-filter-selects .filter-select:focus,
+.admin-transaction-actions-row .filter-select:focus {
   outline: none;
   border-color: var(--primary-color);
   background-color: var(--card-bg);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
 }
 
-.admin-transaction-select-wrapper svg {
+.admin-transaction-filter-selects .filter-select-wrapper svg,
+.admin-transaction-actions-row .filter-select-wrapper svg {
   position: absolute;
   right: 0.75rem;
   width: 1rem;
@@ -776,7 +786,8 @@
     font-size: 0.8rem;
   }
 
-  .admin-transaction-select {
+  .admin-transaction-filter-selects .filter-select,
+  .admin-transaction-actions-row .filter-select {
     padding: 0.65rem 2.25rem 0.65rem 1rem;
     font-size: 0.8rem;
   }
@@ -837,7 +848,8 @@
     flex-direction: column;
   }
 
-  .admin-transaction-select-wrapper {
+  .admin-transaction-filter-selects .filter-group,
+  .admin-transaction-actions-row .filter-group {
     width: 100%;
   }
 

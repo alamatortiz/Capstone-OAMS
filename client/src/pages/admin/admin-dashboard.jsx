@@ -5,7 +5,7 @@ import "./admin-dashboard.css";
 import editIcon from "../../assets/edit_icon.png";
 import deleteIcon from "../../assets/delete_icon.png";
 import api from "../../utils/api";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 
 // ── Icons (all unchanged from original) ──────────────────────────────────────
@@ -352,11 +352,16 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="admin-dashboard-with-sidebar">
-      <AdminSidebar />
-
-      {/* Main Content */}
-      <main className="admin-dashboard-main">
+    <AdminPageShell
+      outerClassName="admin-dashboard-with-sidebar"
+      mainClassName="admin-dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="admin-dashboard">
           {dashError && <div className="dash-error-banner">{dashError}</div>}
 
@@ -694,12 +699,6 @@ export default function AdminDashboard() {
             </div>
           </section>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

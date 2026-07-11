@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-appointment.css";
 import api from "../../utils/api";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import { COLLEGES } from "../../data/colleges";
@@ -253,11 +253,137 @@ export default function AdminAppointment() {
   };
 
   return (
-    <div className="admin-appointment-with-sidebar">
-      <AdminSidebar />
+    <AdminPageShell
+      outerClassName="admin-appointment-with-sidebar"
+      mainClassName="admin-appointment-main"
+      overlay={
+        <>
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+            getBotResponse={generateBotResponse}
+          />
 
-      {/* Main Content */}
-      <main className="admin-appointment-main">
+          {selectedAppointment && (
+            <div className="admin-appointment-modal-overlay">
+              <div
+                className="admin-appointment-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="admin-appointment-modal-header">
+                  <div>
+                    <h2 className="admin-appointment-modal-title">
+                      Appointment Details
+                    </h2>
+                    <p className="admin-appointment-modal-subtitle">
+                      Read-only — monitoring view
+                    </p>
+                  </div>
+                  <button
+                    className="admin-appointment-modal-close-btn"
+                    onClick={handleCloseDetails}
+                    aria-label="Close"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="admin-appointment-modal-body">
+                  <div className="admin-appointment-modal-status-row">
+                    {getStatusBadge(selectedAppointment.status)}
+                    <span className="admin-appointment-modal-tracking">
+                      #{selectedAppointment.id}
+                    </span>
+                  </div>
+
+                  <div className="admin-appointment-modal-grid">
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">Student</span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.studentName} (
+                        {selectedAppointment.studentId})
+                      </span>
+                    </div>
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">Course</span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.studentCourse ?? "—"}
+                      </span>
+                    </div>
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">Faculty</span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.professor}
+                      </span>
+                    </div>
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">College</span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.college}
+                      </span>
+                    </div>
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">Date</span>
+                      <span className="admin-appointment-modal-value">
+                        {formatManilaDate(selectedAppointment.date)}
+                      </span>
+                    </div>
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">Time</span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.time}
+                      </span>
+                    </div>
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">
+                        Location
+                      </span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.location}
+                      </span>
+                    </div>
+                    {selectedAppointment.serviceName && (
+                      <div className="admin-appointment-modal-field">
+                        <span className="admin-appointment-modal-label">
+                          Service
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {selectedAppointment.serviceName}
+                        </span>
+                      </div>
+                    )}
+                    <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                      <span className="admin-appointment-modal-label">
+                        Purpose / Notes
+                      </span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.purpose}
+                      </span>
+                    </div>
+                    <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                      <span className="admin-appointment-modal-label">
+                        Requested At
+                      </span>
+                      <span className="admin-appointment-modal-value">
+                        {selectedAppointment.requestedAt}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-appointment-modal-footer">
+                  <button
+                    className="admin-appointment-modal-close-action"
+                    onClick={handleCloseDetails}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      }
+    >
         <div className="admin-appointment-container">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -341,131 +467,6 @@ export default function AdminAppointment() {
             </div>
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-        getBotResponse={generateBotResponse}
-      />
-
-      {selectedAppointment && (
-        <div className="admin-appointment-modal-overlay">
-          <div
-            className="admin-appointment-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="admin-appointment-modal-header">
-              <div>
-                <h2 className="admin-appointment-modal-title">
-                  Appointment Details
-                </h2>
-                <p className="admin-appointment-modal-subtitle">
-                  Read-only — monitoring view
-                </p>
-              </div>
-              <button
-                className="admin-appointment-modal-close-btn"
-                onClick={handleCloseDetails}
-                aria-label="Close"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
-            <div className="admin-appointment-modal-body">
-              <div className="admin-appointment-modal-status-row">
-                {getStatusBadge(selectedAppointment.status)}
-                <span className="admin-appointment-modal-tracking">
-                  #{selectedAppointment.id}
-                </span>
-              </div>
-
-              <div className="admin-appointment-modal-grid">
-                <div className="admin-appointment-modal-field">
-                  <span className="admin-appointment-modal-label">Student</span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.studentName} (
-                    {selectedAppointment.studentId})
-                  </span>
-                </div>
-                <div className="admin-appointment-modal-field">
-                  <span className="admin-appointment-modal-label">Course</span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.studentCourse ?? "—"}
-                  </span>
-                </div>
-                <div className="admin-appointment-modal-field">
-                  <span className="admin-appointment-modal-label">Faculty</span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.professor}
-                  </span>
-                </div>
-                <div className="admin-appointment-modal-field">
-                  <span className="admin-appointment-modal-label">College</span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.college}
-                  </span>
-                </div>
-                <div className="admin-appointment-modal-field">
-                  <span className="admin-appointment-modal-label">Date</span>
-                  <span className="admin-appointment-modal-value">
-                    {formatManilaDate(selectedAppointment.date)}
-                  </span>
-                </div>
-                <div className="admin-appointment-modal-field">
-                  <span className="admin-appointment-modal-label">Time</span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.time}
-                  </span>
-                </div>
-                <div className="admin-appointment-modal-field">
-                  <span className="admin-appointment-modal-label">
-                    Location
-                  </span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.location}
-                  </span>
-                </div>
-                {selectedAppointment.serviceName && (
-                  <div className="admin-appointment-modal-field">
-                    <span className="admin-appointment-modal-label">
-                      Service
-                    </span>
-                    <span className="admin-appointment-modal-value">
-                      {selectedAppointment.serviceName}
-                    </span>
-                  </div>
-                )}
-                <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
-                  <span className="admin-appointment-modal-label">
-                    Purpose / Notes
-                  </span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.purpose}
-                  </span>
-                </div>
-                <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
-                  <span className="admin-appointment-modal-label">
-                    Requested At
-                  </span>
-                  <span className="admin-appointment-modal-value">
-                    {selectedAppointment.requestedAt}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="admin-appointment-modal-footer">
-              <button
-                className="admin-appointment-modal-close-action"
-                onClick={handleCloseDetails}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </AdminPageShell>
   );
 }

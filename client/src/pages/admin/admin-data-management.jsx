@@ -6,9 +6,10 @@ import "./admin-dashboard.css";
 import "./admin-data-management.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -152,6 +153,10 @@ export default function AdminDataManagement() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditActionFilter, setAuditActionFilter] = useState("all");
+
+  // ── Delete confirmations ────────────────────────────────────
+  const [deleteDocTarget, setDeleteDocTarget] = useState(null);
+  const [deleteServiceTarget, setDeleteServiceTarget] = useState(null);
 
   // ── Effects ────────────────────────────────────────────────
   const fetchDocumentTypes = useCallback(async (status = "all") => {
@@ -321,13 +326,14 @@ export default function AdminDataManagement() {
   };
 
   const handleDeleteDoc = async (doc) => {
-    if (!window.confirm(`Delete "${doc.name}"?`)) return;
     try {
       await api.delete(`/admin/data-management/document-types/${doc.id}`);
       toast.success("Document type deleted.");
       fetchDocumentTypes(docStatusFilter);
     } catch (err) {
       toast.error(err?.response?.data?.error || "Failed to delete document type.");
+    } finally {
+      setDeleteDocTarget(null);
     }
   };
 
@@ -475,13 +481,14 @@ export default function AdminDataManagement() {
   };
 
   const handleDeleteService = async (s) => {
-    if (!window.confirm(`Delete "${s.name}"?`)) return;
     try {
       await api.delete(`/admin/data-management/service-types/${s.id}`);
       toast.success("Service deleted.");
       fetchServiceTypes(serviceStatusFilter);
     } catch (err) {
       toast.error(err?.response?.data?.error || "Failed to delete service.");
+    } finally {
+      setDeleteServiceTarget(null);
     }
   };
 
@@ -539,11 +546,442 @@ export default function AdminDataManagement() {
 
   // ── Render ─────────────────────────────────────────────────
   return (
-    <div className="admin-dashboard-with-sidebar">
-      <AdminSidebar />
+    <AdminPageShell
+      outerClassName="admin-dashboard-with-sidebar"
+      mainClassName="admin-dashboard-main"
+      overlay={
+        <>
+          <ChatWidget
+            initialGreeting="Hello! I'm your OAMS Assistant. Need help with Data Management?"
+            getBotResponse={generateBotResponse}
+          />
 
-      {/* ── Main Content ── */}
-      <main className="admin-dashboard-main">
+          {/* ── Document Type Modal ── */}
+          {showDocModal && (
+            <div className="adm-modal-overlay">
+              <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
+                <div className="adm-modal-header">
+                  <div>
+                    <h3 className="adm-modal-title">{editingDoc ? "Edit Document Type" : "Add Document Type"}</h3>
+                    <p className="adm-modal-subtitle">
+                      {editingDoc ? "Update document type details and requirements" : "Create a new document type for your department"}
+                    </p>
+                  </div>
+                  <button className="adm-modal-close-btn" onClick={closeDocModal} aria-label="Close">
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="adm-modal-body">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Document Name *</label>
+                    <input
+                      className="adm-form-input"
+                      placeholder="e.g., Certificate of Grades"
+                      value={docForm.name}
+                      onChange={(e) => setDocForm((p) => ({ ...p, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Description *</label>
+                    <textarea
+                      className="adm-form-textarea"
+                      placeholder="Brief description of the document"
+                      rows={3}
+                      value={docForm.description}
+                      onChange={(e) => setDocForm((p) => ({ ...p, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-grid-2">
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Processing Time *</label>
+                      <input
+                        className="adm-form-input"
+                        placeholder="e.g., 3-5 business days"
+                        value={docForm.processingTime}
+                        onChange={(e) => setDocForm((p) => ({ ...p, processingTime: e.target.value }))}
+                      />
+                    </div>
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Fee (PHP) *</label>
+                      <input
+                        className="adm-form-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g., 100"
+                        value={docForm.fee}
+                        onChange={(e) => setDocForm((p) => ({ ...p, fee: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Status *</label>
+                    <select
+                      className="adm-form-select"
+                      value={docForm.status}
+                      onChange={(e) => setDocForm((p) => ({ ...p, status: e.target.value }))}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  <div className="adm-form-grid-2">
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Availability</label>
+                      <div className="adm-scope-toggle">
+                        <label className={`adm-scope-option ${docForm.scope === "department" ? "adm-scope-selected" : ""}`}>
+                          <input type="radio" name="docScope" value="department" checked={docForm.scope === "department"}
+                            onChange={() => setDocForm((p) => ({ ...p, scope: "department" }))} />
+                          My Department
+                        </label>
+                        <label className={`adm-scope-option ${docForm.scope === "all" ? "adm-scope-selected" : ""}`}>
+                          <input type="radio" name="docScope" value="all" checked={docForm.scope === "all"}
+                            onChange={() => setDocForm((p) => ({ ...p, scope: "all" }))} />
+                          All Departments
+                        </label>
+                      </div>
+                    </div>
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Available To</label>
+                      <select
+                        className="adm-form-select"
+                        value={docForm.recipientType}
+                        onChange={(e) => setDocForm((p) => ({ ...p, recipientType: e.target.value }))}
+                      >
+                        <option value="students">Students</option>
+                        <option value="faculty">Faculty</option>
+                        <option value="both">Both</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ── Document Requirements ── */}
+                  <div className="adm-req-section">
+                    <div className="adm-req-header">
+                      <h4 className="adm-req-title">Document Requirements</h4>
+                      <p className="adm-req-subtitle">List what students need to submit for this document type</p>
+                    </div>
+
+                    {reqLoading && <div className="adm-loading adm-loading-sm">Loading requirements...</div>}
+
+                    {!reqLoading && requirements.length > 0 && (
+                      <div className="adm-req-list">
+                        {requirements.map((req, idx) => (
+                          <div key={req.id || req._tempId || idx} className="adm-req-item">
+                            <div className="adm-req-item-main">
+                              <div className="adm-req-item-top">
+                                <span className="adm-req-item-name">{req.name}</span>
+                                {(req.isMandatory !== false) && (
+                                  <span className="adm-badge adm-badge-mandatory">Required</span>
+                                )}
+                                {req.isMandatory === false && (
+                                  <span className="adm-badge adm-badge-optional">Optional</span>
+                                )}
+                              </div>
+                              {req.description && <p className="adm-req-item-desc">{req.description}</p>}
+                            </div>
+                            <button className="adm-btn-icon adm-btn-delete" onClick={() => removeRequirement(idx)} title="Remove">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add requirement inline form */}
+                    <div className="adm-req-add-form">
+                      <div className="adm-req-add-fields">
+                        <input
+                          className="adm-form-input"
+                          placeholder="Requirement name *"
+                          value={reqForm.name}
+                          onChange={(e) => setReqForm((p) => ({ ...p, name: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } }}
+                        />
+                        <input
+                          className="adm-form-input"
+                          placeholder="Description (optional)"
+                          value={reqForm.description}
+                          onChange={(e) => setReqForm((p) => ({ ...p, description: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } }}
+                        />
+                        <label className="adm-checkbox-wrapper">
+                          <input
+                            type="checkbox"
+                            checked={reqForm.isMandatory}
+                            onChange={(e) => setReqForm((p) => ({ ...p, isMandatory: e.target.checked }))}
+                          />
+                          <span className="adm-checkbox-label">Mandatory</span>
+                        </label>
+                      </div>
+                      <button className="adm-btn-add-req" onClick={addRequirement} type="button">
+                        <PlusIcon /> Add Requirement
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="adm-modal-footer">
+                  <button className="adm-btn-outline" onClick={closeDocModal}>Cancel</button>
+                  <button className="adm-btn-primary" onClick={handleDocSubmit} disabled={docSaving}>
+                    {docSaving ? "Saving..." : (editingDoc ? "Update" : "Create")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Service Setting Modal ── */}
+          {showServiceModal && (
+            <div className="adm-modal-overlay">
+              <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
+                <div className="adm-modal-header">
+                  <div>
+                    <h3 className="adm-modal-title">{editingService ? "Edit Service" : "Add Service"}</h3>
+                    <p className="adm-modal-subtitle">
+                      {editingService ? "Update queue service configuration" : "Create a new queue service for your department"}
+                    </p>
+                  </div>
+                  <button className="adm-modal-close-btn" onClick={closeServiceModal} aria-label="Close">
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="adm-modal-body">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Service Name *</label>
+                    <input
+                      className="adm-form-input"
+                      placeholder="e.g., Enrollment Assistance"
+                      value={serviceForm.name}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Description</label>
+                    <textarea
+                      className="adm-form-textarea"
+                      placeholder="Brief description of this service"
+                      rows={3}
+                      value={serviceForm.description}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="adm-form-grid-2">
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Avg. Service Time (min) *</label>
+                      <input
+                        className="adm-form-input"
+                        type="number"
+                        min="1"
+                        placeholder="e.g., 15"
+                        value={serviceForm.avgServiceTime}
+                        onChange={(e) => setServiceForm((p) => ({ ...p, avgServiceTime: e.target.value }))}
+                      />
+                    </div>
+                    <div className="adm-form-group">
+                      <label className="adm-form-label">Status *</label>
+                      <select
+                        className="adm-form-select"
+                        value={serviceForm.status}
+                        onChange={(e) => setServiceForm((p) => ({ ...p, status: e.target.value }))}
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Location</label>
+                    <select
+                      className="adm-form-select"
+                      value={serviceForm.locationId}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, locationId: e.target.value }))}
+                    >
+                      <option value="">No specific location</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name}{loc.isGlobal ? " (Shared)" : ""}
+                        </option>
+                      ))}
+                      <option value="__other__">Other (type your own)…</option>
+                    </select>
+                    {serviceForm.locationId === "__other__" && (
+                      <input
+                        className="adm-form-input"
+                        style={{ marginTop: "8px" }}
+                        placeholder="Type the location name"
+                        value={serviceForm.otherLocationName}
+                        onChange={(e) => setServiceForm((p) => ({ ...p, otherLocationName: e.target.value }))}
+                      />
+                    )}
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Availability</label>
+                    <div className="adm-scope-toggle">
+                      <label className={`adm-scope-option ${serviceForm.scope === "department" ? "adm-scope-selected" : ""}`}>
+                        <input type="radio" name="svcScope" value="department" checked={serviceForm.scope === "department"}
+                          onChange={() => setServiceForm((p) => ({ ...p, scope: "department" }))} />
+                        My Department
+                      </label>
+                      <label className={`adm-scope-option ${serviceForm.scope === "all" ? "adm-scope-selected" : ""}`}>
+                        <input type="radio" name="svcScope" value="all" checked={serviceForm.scope === "all"}
+                          onChange={() => setServiceForm((p) => ({ ...p, scope: "all" }))} />
+                        All Departments
+                      </label>
+                    </div>
+                  </div>
+
+                  <label className="adm-checkbox-wrapper">
+                    <input
+                      type="checkbox"
+                      checked={serviceForm.autoClose}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, autoClose: e.target.checked }))}
+                    />
+                    <span className="adm-checkbox-label">Auto-close when capacity is reached</span>
+                  </label>
+
+                  {/* ── Service Requirements ── */}
+                  <div className="adm-req-section">
+                    <div className="adm-req-header">
+                      <h4 className="adm-req-title">Service Requirements</h4>
+                      <p className="adm-req-subtitle">List what students need to bring or prepare</p>
+                    </div>
+
+                    {svcReqLoading && <div className="adm-loading adm-loading-sm">Loading...</div>}
+
+                    {!svcReqLoading && serviceRequirements.length > 0 && (
+                      <div className="adm-req-list">
+                        {serviceRequirements.map((req, idx) => (
+                          <div key={req.id || req._tempId || idx} className="adm-req-item">
+                            <div className="adm-req-item-main">
+                              <div className="adm-req-item-top">
+                                <span className="adm-req-item-name">{req.name}</span>
+                                {(req.isMandatory !== false) && (
+                                  <span className="adm-badge adm-badge-mandatory">Required</span>
+                                )}
+                                {req.isMandatory === false && (
+                                  <span className="adm-badge adm-badge-optional">Optional</span>
+                                )}
+                              </div>
+                              {req.description && <p className="adm-req-item-desc">{req.description}</p>}
+                            </div>
+                            <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceRequirement(idx)} title="Remove">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="adm-req-add-form">
+                      <div className="adm-req-add-fields">
+                        <input
+                          className="adm-form-input"
+                          placeholder="Requirement name *"
+                          value={svcReqForm.name}
+                          onChange={(e) => setSvcReqForm((p) => ({ ...p, name: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
+                        />
+                        <input
+                          className="adm-form-input"
+                          placeholder="Description (optional)"
+                          value={svcReqForm.description}
+                          onChange={(e) => setSvcReqForm((p) => ({ ...p, description: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
+                        />
+                        <label className="adm-checkbox-wrapper">
+                          <input
+                            type="checkbox"
+                            checked={svcReqForm.isMandatory}
+                            onChange={(e) => setSvcReqForm((p) => ({ ...p, isMandatory: e.target.checked }))}
+                          />
+                          <span className="adm-checkbox-label">Mandatory</span>
+                        </label>
+                      </div>
+                      <button className="adm-btn-add-req" onClick={addServiceRequirement} type="button">
+                        <PlusIcon /> Add Requirement
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Procedure Steps ── */}
+                  <div className="adm-req-section">
+                    <div className="adm-req-header">
+                      <h4 className="adm-req-title">Procedure Steps</h4>
+                      <p className="adm-req-subtitle">Step-by-step process students will follow</p>
+                    </div>
+
+                    {!svcReqLoading && serviceSteps.length > 0 && (
+                      <div className="adm-req-list">
+                        {serviceSteps.map((step, idx) => (
+                          <div key={step.id || step._tempId || idx} className="adm-req-item">
+                            <div className="adm-req-item-main">
+                              <div className="adm-req-item-top">
+                                <span className="adm-badge adm-badge-mandatory">Step {step.stepNumber}</span>
+                                <span className="adm-req-item-name">{step.title}</span>
+                              </div>
+                              {step.description && <p className="adm-req-item-desc">{step.description}</p>}
+                            </div>
+                            <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceStep(idx)} title="Remove">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="adm-req-add-form">
+                      <div className="adm-req-add-fields">
+                        <input
+                          className="adm-form-input"
+                          placeholder="Step title *"
+                          value={svcStepForm.title}
+                          onChange={(e) => setSvcStepForm((p) => ({ ...p, title: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
+                        />
+                        <input
+                          className="adm-form-input"
+                          placeholder="Description (optional)"
+                          value={svcStepForm.description}
+                          onChange={(e) => setSvcStepForm((p) => ({ ...p, description: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
+                        />
+                      </div>
+                      <button className="adm-btn-add-req" onClick={addServiceStep} type="button">
+                        <PlusIcon /> Add Step
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="adm-modal-footer">
+                  <button className="adm-btn-outline" onClick={closeServiceModal}>Cancel</button>
+                  <button className="adm-btn-primary" onClick={handleServiceSubmit} disabled={serviceSaving}>
+                    {serviceSaving ? "Saving..." : (editingService ? "Update" : "Add Service")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <ActionConfirmModal
+            show={!!deleteDocTarget}
+            onCancel={() => setDeleteDocTarget(null)}
+            onConfirm={() => handleDeleteDoc(deleteDocTarget)}
+            title="Delete Document Type?"
+            message={deleteDocTarget && <>Delete <strong>{deleteDocTarget.name}</strong>?</>}
+            confirmText="Delete"
+          />
+          <ActionConfirmModal
+            show={!!deleteServiceTarget}
+            onCancel={() => setDeleteServiceTarget(null)}
+            onConfirm={() => handleDeleteService(deleteServiceTarget)}
+            title="Delete Service?"
+            message={deleteServiceTarget && <>Delete <strong>{deleteServiceTarget.name}</strong>?</>}
+            confirmText="Delete"
+          />
+        </>
+      }
+    >
         <div className="admin-dashboard">
 
           <PageHeader
@@ -642,7 +1080,7 @@ export default function AdminDataManagement() {
                         <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditDocModal(doc)} title="Edit">
                           <EditSvgIcon />
                         </button>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => handleDeleteDoc(doc)} title="Delete">
+                        <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteDocTarget(doc)} title="Delete">
                           <TrashIcon />
                         </button>
                       </div>
@@ -706,7 +1144,7 @@ export default function AdminDataManagement() {
                         <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditServiceModal(s)} title="Edit">
                           <EditSvgIcon />
                         </button>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => handleDeleteService(s)} title="Delete">
+                        <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteServiceTarget(s)} title="Delete">
                           <TrashIcon />
                         </button>
                       </div>
@@ -766,419 +1204,6 @@ export default function AdminDataManagement() {
             )}
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! I'm your OAMS Assistant. Need help with Data Management?"
-        getBotResponse={generateBotResponse}
-      />
-
-      {/* ── Document Type Modal ── */}
-      {showDocModal && (
-        <div className="adm-modal-overlay">
-          <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="adm-modal-header">
-              <div>
-                <h3 className="adm-modal-title">{editingDoc ? "Edit Document Type" : "Add Document Type"}</h3>
-                <p className="adm-modal-subtitle">
-                  {editingDoc ? "Update document type details and requirements" : "Create a new document type for your department"}
-                </p>
-              </div>
-              <button className="adm-modal-close-btn" onClick={closeDocModal} aria-label="Close">
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="adm-modal-body">
-              <div className="adm-form-group">
-                <label className="adm-form-label">Document Name *</label>
-                <input
-                  className="adm-form-input"
-                  placeholder="e.g., Certificate of Grades"
-                  value={docForm.name}
-                  onChange={(e) => setDocForm((p) => ({ ...p, name: e.target.value }))}
-                />
-              </div>
-              <div className="adm-form-group">
-                <label className="adm-form-label">Description *</label>
-                <textarea
-                  className="adm-form-textarea"
-                  placeholder="Brief description of the document"
-                  rows={3}
-                  value={docForm.description}
-                  onChange={(e) => setDocForm((p) => ({ ...p, description: e.target.value }))}
-                />
-              </div>
-              <div className="adm-form-grid-2">
-                <div className="adm-form-group">
-                  <label className="adm-form-label">Processing Time *</label>
-                  <input
-                    className="adm-form-input"
-                    placeholder="e.g., 3-5 business days"
-                    value={docForm.processingTime}
-                    onChange={(e) => setDocForm((p) => ({ ...p, processingTime: e.target.value }))}
-                  />
-                </div>
-                <div className="adm-form-group">
-                  <label className="adm-form-label">Fee (PHP) *</label>
-                  <input
-                    className="adm-form-input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="e.g., 100"
-                    value={docForm.fee}
-                    onChange={(e) => setDocForm((p) => ({ ...p, fee: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="adm-form-group">
-                <label className="adm-form-label">Status *</label>
-                <select
-                  className="adm-form-select"
-                  value={docForm.status}
-                  onChange={(e) => setDocForm((p) => ({ ...p, status: e.target.value }))}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-
-              <div className="adm-form-grid-2">
-                <div className="adm-form-group">
-                  <label className="adm-form-label">Availability</label>
-                  <div className="adm-scope-toggle">
-                    <label className={`adm-scope-option ${docForm.scope === "department" ? "adm-scope-selected" : ""}`}>
-                      <input type="radio" name="docScope" value="department" checked={docForm.scope === "department"}
-                        onChange={() => setDocForm((p) => ({ ...p, scope: "department" }))} />
-                      My Department
-                    </label>
-                    <label className={`adm-scope-option ${docForm.scope === "all" ? "adm-scope-selected" : ""}`}>
-                      <input type="radio" name="docScope" value="all" checked={docForm.scope === "all"}
-                        onChange={() => setDocForm((p) => ({ ...p, scope: "all" }))} />
-                      All Departments
-                    </label>
-                  </div>
-                </div>
-                <div className="adm-form-group">
-                  <label className="adm-form-label">Available To</label>
-                  <select
-                    className="adm-form-select"
-                    value={docForm.recipientType}
-                    onChange={(e) => setDocForm((p) => ({ ...p, recipientType: e.target.value }))}
-                  >
-                    <option value="students">Students</option>
-                    <option value="faculty">Faculty</option>
-                    <option value="both">Both</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* ── Document Requirements ── */}
-              <div className="adm-req-section">
-                <div className="adm-req-header">
-                  <h4 className="adm-req-title">Document Requirements</h4>
-                  <p className="adm-req-subtitle">List what students need to submit for this document type</p>
-                </div>
-
-                {reqLoading && <div className="adm-loading adm-loading-sm">Loading requirements...</div>}
-
-                {!reqLoading && requirements.length > 0 && (
-                  <div className="adm-req-list">
-                    {requirements.map((req, idx) => (
-                      <div key={req.id || req._tempId || idx} className="adm-req-item">
-                        <div className="adm-req-item-main">
-                          <div className="adm-req-item-top">
-                            <span className="adm-req-item-name">{req.name}</span>
-                            {(req.isMandatory !== false) && (
-                              <span className="adm-badge adm-badge-mandatory">Required</span>
-                            )}
-                            {req.isMandatory === false && (
-                              <span className="adm-badge adm-badge-optional">Optional</span>
-                            )}
-                          </div>
-                          {req.description && <p className="adm-req-item-desc">{req.description}</p>}
-                        </div>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => removeRequirement(idx)} title="Remove">
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add requirement inline form */}
-                <div className="adm-req-add-form">
-                  <div className="adm-req-add-fields">
-                    <input
-                      className="adm-form-input"
-                      placeholder="Requirement name *"
-                      value={reqForm.name}
-                      onChange={(e) => setReqForm((p) => ({ ...p, name: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } }}
-                    />
-                    <input
-                      className="adm-form-input"
-                      placeholder="Description (optional)"
-                      value={reqForm.description}
-                      onChange={(e) => setReqForm((p) => ({ ...p, description: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRequirement(); } }}
-                    />
-                    <label className="adm-checkbox-wrapper">
-                      <input
-                        type="checkbox"
-                        checked={reqForm.isMandatory}
-                        onChange={(e) => setReqForm((p) => ({ ...p, isMandatory: e.target.checked }))}
-                      />
-                      <span className="adm-checkbox-label">Mandatory</span>
-                    </label>
-                  </div>
-                  <button className="adm-btn-add-req" onClick={addRequirement} type="button">
-                    <PlusIcon /> Add Requirement
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="adm-modal-footer">
-              <button className="adm-btn-outline" onClick={closeDocModal}>Cancel</button>
-              <button className="adm-btn-primary" onClick={handleDocSubmit} disabled={docSaving}>
-                {docSaving ? "Saving..." : (editingDoc ? "Update" : "Create")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Service Setting Modal ── */}
-      {showServiceModal && (
-        <div className="adm-modal-overlay">
-          <div className="adm-modal adm-modal-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="adm-modal-header">
-              <div>
-                <h3 className="adm-modal-title">{editingService ? "Edit Service" : "Add Service"}</h3>
-                <p className="adm-modal-subtitle">
-                  {editingService ? "Update queue service configuration" : "Create a new queue service for your department"}
-                </p>
-              </div>
-              <button className="adm-modal-close-btn" onClick={closeServiceModal} aria-label="Close">
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="adm-modal-body">
-              <div className="adm-form-group">
-                <label className="adm-form-label">Service Name *</label>
-                <input
-                  className="adm-form-input"
-                  placeholder="e.g., Enrollment Assistance"
-                  value={serviceForm.name}
-                  onChange={(e) => setServiceForm((p) => ({ ...p, name: e.target.value }))}
-                />
-              </div>
-              <div className="adm-form-group">
-                <label className="adm-form-label">Description</label>
-                <textarea
-                  className="adm-form-textarea"
-                  placeholder="Brief description of this service"
-                  rows={3}
-                  value={serviceForm.description}
-                  onChange={(e) => setServiceForm((p) => ({ ...p, description: e.target.value }))}
-                />
-              </div>
-              <div className="adm-form-grid-2">
-                <div className="adm-form-group">
-                  <label className="adm-form-label">Avg. Service Time (min) *</label>
-                  <input
-                    className="adm-form-input"
-                    type="number"
-                    min="1"
-                    placeholder="e.g., 15"
-                    value={serviceForm.avgServiceTime}
-                    onChange={(e) => setServiceForm((p) => ({ ...p, avgServiceTime: e.target.value }))}
-                  />
-                </div>
-                <div className="adm-form-group">
-                  <label className="adm-form-label">Status *</label>
-                  <select
-                    className="adm-form-select"
-                    value={serviceForm.status}
-                    onChange={(e) => setServiceForm((p) => ({ ...p, status: e.target.value }))}
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-              <div className="adm-form-group">
-                <label className="adm-form-label">Location</label>
-                <select
-                  className="adm-form-select"
-                  value={serviceForm.locationId}
-                  onChange={(e) => setServiceForm((p) => ({ ...p, locationId: e.target.value }))}
-                >
-                  <option value="">No specific location</option>
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}{loc.isGlobal ? " (Shared)" : ""}
-                    </option>
-                  ))}
-                  <option value="__other__">Other (type your own)…</option>
-                </select>
-                {serviceForm.locationId === "__other__" && (
-                  <input
-                    className="adm-form-input"
-                    style={{ marginTop: "8px" }}
-                    placeholder="Type the location name"
-                    value={serviceForm.otherLocationName}
-                    onChange={(e) => setServiceForm((p) => ({ ...p, otherLocationName: e.target.value }))}
-                  />
-                )}
-              </div>
-              <div className="adm-form-group">
-                <label className="adm-form-label">Availability</label>
-                <div className="adm-scope-toggle">
-                  <label className={`adm-scope-option ${serviceForm.scope === "department" ? "adm-scope-selected" : ""}`}>
-                    <input type="radio" name="svcScope" value="department" checked={serviceForm.scope === "department"}
-                      onChange={() => setServiceForm((p) => ({ ...p, scope: "department" }))} />
-                    My Department
-                  </label>
-                  <label className={`adm-scope-option ${serviceForm.scope === "all" ? "adm-scope-selected" : ""}`}>
-                    <input type="radio" name="svcScope" value="all" checked={serviceForm.scope === "all"}
-                      onChange={() => setServiceForm((p) => ({ ...p, scope: "all" }))} />
-                    All Departments
-                  </label>
-                </div>
-              </div>
-
-              <label className="adm-checkbox-wrapper">
-                <input
-                  type="checkbox"
-                  checked={serviceForm.autoClose}
-                  onChange={(e) => setServiceForm((p) => ({ ...p, autoClose: e.target.checked }))}
-                />
-                <span className="adm-checkbox-label">Auto-close when capacity is reached</span>
-              </label>
-
-              {/* ── Service Requirements ── */}
-              <div className="adm-req-section">
-                <div className="adm-req-header">
-                  <h4 className="adm-req-title">Service Requirements</h4>
-                  <p className="adm-req-subtitle">List what students need to bring or prepare</p>
-                </div>
-
-                {svcReqLoading && <div className="adm-loading adm-loading-sm">Loading...</div>}
-
-                {!svcReqLoading && serviceRequirements.length > 0 && (
-                  <div className="adm-req-list">
-                    {serviceRequirements.map((req, idx) => (
-                      <div key={req.id || req._tempId || idx} className="adm-req-item">
-                        <div className="adm-req-item-main">
-                          <div className="adm-req-item-top">
-                            <span className="adm-req-item-name">{req.name}</span>
-                            {(req.isMandatory !== false) && (
-                              <span className="adm-badge adm-badge-mandatory">Required</span>
-                            )}
-                            {req.isMandatory === false && (
-                              <span className="adm-badge adm-badge-optional">Optional</span>
-                            )}
-                          </div>
-                          {req.description && <p className="adm-req-item-desc">{req.description}</p>}
-                        </div>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceRequirement(idx)} title="Remove">
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="adm-req-add-form">
-                  <div className="adm-req-add-fields">
-                    <input
-                      className="adm-form-input"
-                      placeholder="Requirement name *"
-                      value={svcReqForm.name}
-                      onChange={(e) => setSvcReqForm((p) => ({ ...p, name: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
-                    />
-                    <input
-                      className="adm-form-input"
-                      placeholder="Description (optional)"
-                      value={svcReqForm.description}
-                      onChange={(e) => setSvcReqForm((p) => ({ ...p, description: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceRequirement(); } }}
-                    />
-                    <label className="adm-checkbox-wrapper">
-                      <input
-                        type="checkbox"
-                        checked={svcReqForm.isMandatory}
-                        onChange={(e) => setSvcReqForm((p) => ({ ...p, isMandatory: e.target.checked }))}
-                      />
-                      <span className="adm-checkbox-label">Mandatory</span>
-                    </label>
-                  </div>
-                  <button className="adm-btn-add-req" onClick={addServiceRequirement} type="button">
-                    <PlusIcon /> Add Requirement
-                  </button>
-                </div>
-              </div>
-
-              {/* ── Procedure Steps ── */}
-              <div className="adm-req-section">
-                <div className="adm-req-header">
-                  <h4 className="adm-req-title">Procedure Steps</h4>
-                  <p className="adm-req-subtitle">Step-by-step process students will follow</p>
-                </div>
-
-                {!svcReqLoading && serviceSteps.length > 0 && (
-                  <div className="adm-req-list">
-                    {serviceSteps.map((step, idx) => (
-                      <div key={step.id || step._tempId || idx} className="adm-req-item">
-                        <div className="adm-req-item-main">
-                          <div className="adm-req-item-top">
-                            <span className="adm-badge adm-badge-mandatory">Step {step.stepNumber}</span>
-                            <span className="adm-req-item-name">{step.title}</span>
-                          </div>
-                          {step.description && <p className="adm-req-item-desc">{step.description}</p>}
-                        </div>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => removeServiceStep(idx)} title="Remove">
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="adm-req-add-form">
-                  <div className="adm-req-add-fields">
-                    <input
-                      className="adm-form-input"
-                      placeholder="Step title *"
-                      value={svcStepForm.title}
-                      onChange={(e) => setSvcStepForm((p) => ({ ...p, title: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
-                    />
-                    <input
-                      className="adm-form-input"
-                      placeholder="Description (optional)"
-                      value={svcStepForm.description}
-                      onChange={(e) => setSvcStepForm((p) => ({ ...p, description: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addServiceStep(); } }}
-                    />
-                  </div>
-                  <button className="adm-btn-add-req" onClick={addServiceStep} type="button">
-                    <PlusIcon /> Add Step
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="adm-modal-footer">
-              <button className="adm-btn-outline" onClick={closeServiceModal}>Cancel</button>
-              <button className="adm-btn-primary" onClick={handleServiceSubmit} disabled={serviceSaving}>
-                {serviceSaving ? "Saving..." : (editingService ? "Update" : "Add Service")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </AdminPageShell>
   );
 }

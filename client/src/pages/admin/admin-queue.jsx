@@ -6,7 +6,7 @@ import "./admin-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import PageHeader from "../../components/PageHeader";
@@ -329,11 +329,32 @@ export default function AdminQueue() {
         : null;
 
     return (
-      <div className="admin-queue-with-sidebar">
-        <AdminSidebar />
+      <AdminPageShell
+        outerClassName="admin-queue-with-sidebar"
+        mainClassName="admin-queue-main"
+        overlay={
+          <>
+            <ChatWidget
+              initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue management today?"
+              getBotResponse={generateBotResponse}
+            />
 
-        {/* Main Content - Queue Monitoring Detail */}
-        <main className="admin-queue-main">
+            <QueueReasonModal
+              show={!!reasonModal}
+              title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
+              message={
+                reasonModal?.mode === "pause"
+                  ? "Students in this queue will see this reason while it's paused."
+                  : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
+              }
+              confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
+              submitting={reasonSubmitting}
+              onConfirm={handleReasonConfirm}
+              onCancel={() => setReasonModal(null)}
+            />
+          </>
+        }
+      >
           <div className="queue-monitoring-container">
             <div className="queue-monitoring-topbar">
               <button
@@ -609,37 +630,22 @@ export default function AdminQueue() {
               </div>
             </div>
           </div>
-        </main>
-
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue management today?"
-          getBotResponse={generateBotResponse}
-        />
-
-        <QueueReasonModal
-          show={!!reasonModal}
-          title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
-          message={
-            reasonModal?.mode === "pause"
-              ? "Students in this queue will see this reason while it's paused."
-              : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
-          }
-          confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
-          submitting={reasonSubmitting}
-          onConfirm={handleReasonConfirm}
-          onCancel={() => setReasonModal(null)}
-        />
-      </div>
+      </AdminPageShell>
     );
   }
 
   // Render main queue list view
   return (
-    <div className="admin-queue-with-sidebar">
-      <AdminSidebar />
-
-      {/* Main Content */}
-      <main className="admin-queue-main">
+    <AdminPageShell
+      outerClassName="admin-queue-with-sidebar"
+      mainClassName="admin-queue-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue management today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="queue-page-container">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -796,12 +802,6 @@ export default function AdminQueue() {
             </div>
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue management today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

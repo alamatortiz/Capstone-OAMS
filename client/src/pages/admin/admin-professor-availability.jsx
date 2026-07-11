@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-professor-availability.css";
 import api from "../../utils/api";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 
@@ -105,11 +105,16 @@ export default function AdminProfessorAvailability() {
       .slice(0, 3);
 
   return (
-    <div className="apa-dashboard-with-sidebar">
-      <AdminSidebar />
-
-      {/* Main Content */}
-      <main className="apa-dashboard-main">
+    <AdminPageShell
+      outerClassName="apa-dashboard-with-sidebar"
+      mainClassName="apa-dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! I'm your OAMS Assistant. How can I help you check faculty availability today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="apa-page-container">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -232,12 +237,6 @@ export default function AdminProfessorAvailability() {
             )}
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! I'm your OAMS Assistant. How can I help you check faculty availability today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

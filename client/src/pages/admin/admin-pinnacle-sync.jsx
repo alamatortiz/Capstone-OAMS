@@ -3,7 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-pinnacle-sync.css";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import api from "../../utils/api";
 
@@ -225,11 +225,16 @@ export default function AdminPinnacleSync() {
   };
 
   return (
-    <div className="admin-dashboard-with-sidebar">
-      <AdminSidebar />
-
-      {/* Main Content */}
-      <main className="admin-dashboard-main">
+    <AdminPageShell
+      outerClassName="admin-dashboard-with-sidebar"
+      mainClassName="admin-dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="aps-page">
           <div className="aps-header-block">
           <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
@@ -506,12 +511,6 @@ export default function AdminPinnacleSync() {
             </div>
           )}
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

@@ -3,7 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-scan-document.css";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
@@ -157,11 +157,179 @@ export default function AdminScanDocument() {
   };
 
   return (
-    <div className="admin-dashboard-with-sidebar">
-      <AdminSidebar />
+    <AdminPageShell
+      outerClassName="admin-dashboard-with-sidebar"
+      mainClassName="admin-dashboard-main"
+      overlay={
+        <>
+          {/* Document Verification Modal */}
+          {modalOpen && verifiedDoc && (
+            <div className="asd-modal-overlay">
+              <div className="asd-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="asd-modal-header">
+                  <div>
+                    <h2 className="asd-modal-title">Document Verification</h2>
+                    <p className="asd-modal-subtitle">
+                      Scanned document details and softcopy content
+                    </p>
+                  </div>
+                  <button
+                    className="asd-modal-close"
+                    onClick={() => setModalOpen(false)}
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
 
-      {/* Main Content */}
-      <main className="admin-dashboard-main">
+                <div className="asd-modal-body">
+                  {/* Verified Banner */}
+                  <div
+                    className={`asd-verified-banner ${verifiedDoc.status === "VALID" ? "asd-verified-banner--valid" : "asd-verified-banner--expired"}`}
+                  >
+                    {verifiedDoc.status === "VALID" ? (
+                      <>
+                        <CheckCircleIcon />
+                        <div>
+                          <p className="asd-verified-title">Document Verified ✓</p>
+                          <p className="asd-verified-desc">
+                            This document has been authenticated against university
+                            records
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          style={{ width: "1.3rem", height: "1.3rem" }}
+                        >
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="12" y1="8" x2="12" y2="12"></line>
+                          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <div>
+                          <p className="asd-verified-title">Document Expired</p>
+                          <p className="asd-verified-desc">
+                            This document has passed its validity date
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Doc Meta Grid */}
+                  <div className="asd-meta-grid">
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">Tracking Number</span>
+                      <span className="asd-meta-value">
+                        {verifiedDoc.trackingNumber}
+                      </span>
+                    </div>
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">Document Type</span>
+                      <span className="asd-meta-value">
+                        {verifiedDoc.documentType}
+                      </span>
+                    </div>
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">Student Name</span>
+                      <span className="asd-meta-value">
+                        {verifiedDoc.studentName}
+                      </span>
+                    </div>
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">Student ID</span>
+                      <span className="asd-meta-value">
+                        {verifiedDoc.studentId}
+                      </span>
+                    </div>
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">College</span>
+                      <span className="asd-meta-value">{verifiedDoc.college}</span>
+                    </div>
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">Status</span>
+                      <span
+                        className={`asd-status-badge asd-status-${verifiedDoc.status.toLowerCase()}`}
+                      >
+                        {verifiedDoc.status}
+                      </span>
+                    </div>
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">Issue Date</span>
+                      <span className="asd-meta-value">
+                        {verifiedDoc.issueDate}
+                      </span>
+                    </div>
+                    <div className="asd-meta-item">
+                      <span className="asd-meta-label">Valid Until</span>
+                      <span className="asd-meta-value">
+                        {verifiedDoc.validUntil}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Document Content */}
+                  {verifiedDoc.content && (
+                    <div className="asd-doc-content-section">
+                      <h3 className="asd-doc-content-title">Document Content</h3>
+                      <pre className="asd-doc-content-pre">{verifiedDoc.content}</pre>
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="asd-modal-footer-info">
+                    {verifiedDoc.issuedBy && (
+                      <p>
+                        <strong>Issued by:</strong> {verifiedDoc.issuedBy}
+                      </p>
+                    )}
+                    {verifiedDoc.authorizedSignatory && (
+                      <p>
+                        <strong>Authorized Signatory:</strong>{" "}
+                        {verifiedDoc.authorizedSignatory}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Modal Actions */}
+                <div className="asd-modal-actions">
+                  <button className="asd-btn-print" onClick={() => window.print()}>
+                    <PrintIcon /> Print
+                  </button>
+                  <button className="asd-btn-download">
+                    <DownloadIcon /> Download
+                  </button>
+                  <button
+                    className="asd-btn-close-modal"
+                    onClick={() => setModalOpen(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Toast Notification */}
+          {scanToast && (
+            <div className="asd-toast">
+              <CheckCircleIcon />
+              <span>QR Code scanned successfully!</span>
+            </div>
+          )}
+
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+            getBotResponse={generateBotResponse}
+          />
+        </>
+      }
+    >
         <div className="asd-page">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -425,173 +593,6 @@ export default function AdminScanDocument() {
             </div>
           </div>
         </div>
-      </main>
-
-      {/* Document Verification Modal */}
-      {modalOpen && verifiedDoc && (
-        <div className="asd-modal-overlay">
-          <div className="asd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="asd-modal-header">
-              <div>
-                <h2 className="asd-modal-title">Document Verification</h2>
-                <p className="asd-modal-subtitle">
-                  Scanned document details and softcopy content
-                </p>
-              </div>
-              <button
-                className="asd-modal-close"
-                onClick={() => setModalOpen(false)}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
-            <div className="asd-modal-body">
-              {/* Verified Banner */}
-              <div
-                className={`asd-verified-banner ${verifiedDoc.status === "VALID" ? "asd-verified-banner--valid" : "asd-verified-banner--expired"}`}
-              >
-                {verifiedDoc.status === "VALID" ? (
-                  <>
-                    <CheckCircleIcon />
-                    <div>
-                      <p className="asd-verified-title">Document Verified ✓</p>
-                      <p className="asd-verified-desc">
-                        This document has been authenticated against university
-                        records
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      style={{ width: "1.3rem", height: "1.3rem" }}
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="8" x2="12" y2="12"></line>
-                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    <div>
-                      <p className="asd-verified-title">Document Expired</p>
-                      <p className="asd-verified-desc">
-                        This document has passed its validity date
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Doc Meta Grid */}
-              <div className="asd-meta-grid">
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">Tracking Number</span>
-                  <span className="asd-meta-value">
-                    {verifiedDoc.trackingNumber}
-                  </span>
-                </div>
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">Document Type</span>
-                  <span className="asd-meta-value">
-                    {verifiedDoc.documentType}
-                  </span>
-                </div>
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">Student Name</span>
-                  <span className="asd-meta-value">
-                    {verifiedDoc.studentName}
-                  </span>
-                </div>
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">Student ID</span>
-                  <span className="asd-meta-value">
-                    {verifiedDoc.studentId}
-                  </span>
-                </div>
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">College</span>
-                  <span className="asd-meta-value">{verifiedDoc.college}</span>
-                </div>
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">Status</span>
-                  <span
-                    className={`asd-status-badge asd-status-${verifiedDoc.status.toLowerCase()}`}
-                  >
-                    {verifiedDoc.status}
-                  </span>
-                </div>
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">Issue Date</span>
-                  <span className="asd-meta-value">
-                    {verifiedDoc.issueDate}
-                  </span>
-                </div>
-                <div className="asd-meta-item">
-                  <span className="asd-meta-label">Valid Until</span>
-                  <span className="asd-meta-value">
-                    {verifiedDoc.validUntil}
-                  </span>
-                </div>
-              </div>
-
-              {/* Document Content */}
-              {verifiedDoc.content && (
-                <div className="asd-doc-content-section">
-                  <h3 className="asd-doc-content-title">Document Content</h3>
-                  <pre className="asd-doc-content-pre">{verifiedDoc.content}</pre>
-                </div>
-              )}
-
-              {/* Footer */}
-              <div className="asd-modal-footer-info">
-                {verifiedDoc.issuedBy && (
-                  <p>
-                    <strong>Issued by:</strong> {verifiedDoc.issuedBy}
-                  </p>
-                )}
-                {verifiedDoc.authorizedSignatory && (
-                  <p>
-                    <strong>Authorized Signatory:</strong>{" "}
-                    {verifiedDoc.authorizedSignatory}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="asd-modal-actions">
-              <button className="asd-btn-print" onClick={() => window.print()}>
-                <PrintIcon /> Print
-              </button>
-              <button className="asd-btn-download">
-                <DownloadIcon /> Download
-              </button>
-              <button
-                className="asd-btn-close-modal"
-                onClick={() => setModalOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast Notification */}
-      {scanToast && (
-        <div className="asd-toast">
-          <CheckCircleIcon />
-          <span>QR Code scanned successfully!</span>
-        </div>
-      )}
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }

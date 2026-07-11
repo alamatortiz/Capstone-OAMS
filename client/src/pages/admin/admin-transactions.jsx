@@ -11,9 +11,10 @@ import collegeCHASlogo from "../../assets/CHAS.png";
 import "./admin-transactions.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
+import FilterSelect from "../../components/FilterSelect";
 
 // ── Icons (all unchanged from admin_dashboard) ──────────────────────────────
 const SearchIcon = () => (
@@ -129,6 +130,26 @@ const ChevronDownIcon = () => (
 
 // Transactions now come live from GET /api/admin/transactions, scoped
 // server-side to the logged-in admin's own department. No static data.
+
+const TYPE_OPTIONS = [
+  { value: "all", label: "All Types" },
+  { value: "queue", label: "Queue" },
+  { value: "appointment", label: "Appointment" },
+  { value: "document", label: "Document" },
+];
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "completed", label: "Completed" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "cancelled", label: "Cancelled" },
+];
+const DATE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "all", label: "All Time" },
+];
 
 export default function AdminTransaction() {
   const { user: authUser } = useAuth();
@@ -266,11 +287,16 @@ export default function AdminTransaction() {
   };
 
   return (
-    <div className="admin-transaction-with-sidebar">
-      <AdminSidebar />
-
-      {/* Main Content */}
-      <main className="admin-transaction-main">
+    <AdminPageShell
+      outerClassName="admin-transaction-with-sidebar"
+      mainClassName="admin-transaction-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with transactions today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="admin-transaction-container">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
@@ -360,51 +386,41 @@ export default function AdminTransaction() {
                 </div>
 
                 <div className="admin-transaction-filter-selects">
-                  <div className="admin-transaction-select-wrapper">
-                    <select
-                      value={filterType}
-                      onChange={(e) => setFilterType(e.target.value)}
-                      className="admin-transaction-select"
-                    >
-                      <option value="all">All Types</option>
-                      <option value="queue">Queue</option>
-                      <option value="appointment">Appointment</option>
-                      <option value="document">Document</option>
-                    </select>
-                    <ChevronDownIcon />
-                  </div>
+                  <FilterSelect
+                    id="tx-filter-type"
+                    label=""
+                    labelClassName={undefined}
+                    ariaLabel="Filter by type"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    options={TYPE_OPTIONS}
+                    chevronIcon={<ChevronDownIcon />}
+                  />
 
-                  <div className="admin-transaction-select-wrapper">
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="admin-transaction-select"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="completed">Completed</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                    <ChevronDownIcon />
-                  </div>
+                  <FilterSelect
+                    id="tx-filter-status"
+                    label=""
+                    labelClassName={undefined}
+                    ariaLabel="Filter by status"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    options={STATUS_OPTIONS}
+                    chevronIcon={<ChevronDownIcon />}
+                  />
                 </div>
               </div>
 
               <div className="admin-transaction-actions-row">
-                <div className="admin-transaction-select-wrapper">
-                  <select
-                    value={dateRange}
-                    onChange={(e) => setDateRange(e.target.value)}
-                    className="admin-transaction-select"
-                  >
-                    <option value="today">Today</option>
-                    <option value="week">This Week</option>
-                    <option value="month">This Month</option>
-                    <option value="all">All Time</option>
-                  </select>
-                  <ChevronDownIcon />
-                </div>
+                <FilterSelect
+                  id="tx-filter-date-range"
+                  label=""
+                  labelClassName={undefined}
+                  ariaLabel="Filter by date range"
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  options={DATE_OPTIONS}
+                  chevronIcon={<ChevronDownIcon />}
+                />
                 <button className="admin-transaction-export-btn">
                   <DownloadIcon />
                   Export Report
@@ -479,12 +495,6 @@ export default function AdminTransaction() {
             </div>
           </div>
         </div>
-      </main>
-
-      <ChatWidget
-        initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with transactions today?"
-        getBotResponse={generateBotResponse}
-      />
-    </div>
+    </AdminPageShell>
   );
 }
