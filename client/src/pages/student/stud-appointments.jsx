@@ -10,6 +10,7 @@ import api from "../../utils/api";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
+import { useAuth } from "../../context/AuthContext";
 import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ const StatusBadge = ({ status }) => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentsPage() {
+  const { user } = useAuth();
   const [slots, setSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
   const [slotsError, setSlotsError] = useState(null);
@@ -118,7 +120,7 @@ export default function AppointmentsPage() {
   const [selectedApptType, setSelectedApptType] = useState("");
 
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedCollege, setSelectedCollege] = useState("");
+  const [selectedCollege, setSelectedCollege] = useState(() => user?.departmentAbbrev || "");
   const [selectedProfessorId, setSelectedProfessorId] = useState("");
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -158,9 +160,44 @@ export default function AppointmentsPage() {
     return matchesDate && matchesCollege && matchesProfessor;
   }), [slots, selectedDate, selectedCollege, selectedProfessorId]);
 
-  const slotsByDate = useMemo(() => availableSlots.reduce((acc, slot) => {
+  // The Available Slots tab only ever shows this week and next week (Monday–Saturday,
+  // matching the days a faculty_availability row can recur on), computed once per mount.
+  const twoWeekDates = useMemo(() => {
+    const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const [y, m, d] = getManilaDateString().split("-").map(Number);
+    const today = new Date(y, m - 1, d);
+    const dow = today.getDay(); // 0=Sun..6=Sat
+    const monday = new Date(today);
+    monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow));
+    const buildWeek = (weekOffset) => Array.from({ length: 6 }, (_, i) => {
+      const dt = new Date(monday);
+      dt.setDate(dt.getDate() + weekOffset * 7 + i);
+      return toDateStr(dt);
+    });
+    return { thisWeek: buildWeek(0), nextWeek: buildWeek(1) };
+  }, []);
+
+  const twoWeekDateSet = useMemo(
+    () => new Set([...twoWeekDates.thisWeek, ...twoWeekDates.nextWeek]),
+    [twoWeekDates],
+  );
+
+  const isPastDate = (dateString) => dateString < getManilaDateString();
+
+  const weekInfo = (dateString) => (twoWeekDates.thisWeek.includes(dateString)
+    ? { key: "this-week", label: "This Week" }
+    : { key: "next-week", label: "Next Week" });
+
+  // When a specific date is picked via the calendar filter, show only that date;
+  // otherwise cap the listing to the this-week/next-week window.
+  const visibleSlots = useMemo(
+    () => (selectedDate ? availableSlots : availableSlots.filter((s) => twoWeekDateSet.has(s.date))),
+    [availableSlots, selectedDate, twoWeekDateSet],
+  );
+
+  const slotsByDate = useMemo(() => visibleSlots.reduce((acc, slot) => {
     (acc[slot.date] ||= []).push(slot); return acc;
-  }, {}), [availableSlots]);
+  }, {}), [visibleSlots]);
 
   const activeBookings = myBookings.filter((b) => b.status === "pending" || b.status === "approved");
 
@@ -193,16 +230,16 @@ export default function AppointmentsPage() {
     if (!selectedProfessorId) return [];
     const { year, month } = calendarMonth;
     const daysInMonth = new Date(year, month, 0).getDate();
-    const profSlots = slots.filter((s) => String(s.professorId) === selectedProfessorId);
+    const profSlots = slots.filter((s) => String(s.professorId) === selectedProfessorId && twoWeekDateSet.has(s.date));
     const slotDates = new Set(profSlots.map((s) => s.date));
-    const today = new Date().toISOString().split("T")[0];
+    const today = getManilaDateString();
     const result = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       result.push({ date: dateStr, status: dateStr >= today && slotDates.has(dateStr) ? "available" : "unavailable" });
     }
     return result;
-  }, [slots, selectedProfessorId, calendarMonth]);
+  }, [slots, selectedProfessorId, calendarMonth, twoWeekDateSet]);
 
   const colleges = [
     { value: "CCS", label: "CCS" }, { value: "CBAA", label: "CBAA" }, { value: "COED", label: "COED" },
@@ -211,9 +248,9 @@ export default function AppointmentsPage() {
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
-    if (lowerInput.includes("slot") || lowerInput.includes("available")) return `We have ${availableSlots.length} available slots. Filter by professor, college, or date to find the perfect time!`;
+    if (lowerInput.includes("slot") || lowerInput.includes("available")) return `We have ${visibleSlots.length} available slots this week and next week. Filter by professor, college, or date to find the perfect time!`;
     if (lowerInput.includes("book") || lowerInput.includes("appointment")) return "Select a slot from the available slots section and provide your consultation purpose.";
-    if (lowerInput.includes("professor")) return `There are ${new Set(availableSlots.map((s) => s.professorId)).size} professors with available consultation slots.`;
+    if (lowerInput.includes("professor")) return `There are ${new Set(visibleSlots.map((s) => s.professorId)).size} professors with available consultation slots.`;
     if (lowerInput.includes("cancel")) return "Go to your bookings and click the cancel button on the appointment you want to remove.";
     return "I can help you with booking appointments, finding slots, or managing your consultations. What would you like to know?";
   };
@@ -256,8 +293,56 @@ export default function AppointmentsPage() {
 
   const formatDate = (dateString) => formatManilaDate(`${dateString}T00:00:00+08:00`, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   const formatTime = (time) => { const [hours, minutes] = time.split(":"); const hour = parseInt(hours); return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? "PM" : "AM"}`; };
-  const isToday = (dateString) => dateString === getManilaDateString();
-  const isTomorrow = (dateString) => { const t = new Date(); t.setDate(t.getDate() + 1); return dateString === getManilaDateString(t); };
+
+  const renderDateGroup = (date) => {
+    const daySlots = slotsByDate[date] ?? [];
+    if (daySlots.length === 0) {
+      return (
+        <div key={date} className="slots-date-group slots-date-group--disabled">
+          <div className="date-header">
+            <Calendar style={{ width: "1.5rem", height: "1.5rem", color: "var(--text-tertiary)" }} />
+            <h3>{formatDate(date)}</h3>
+          </div>
+          <p className="date-count date-count--disabled">{isPastDate(date) ? "This day has already passed" : "No slots available"}</p>
+        </div>
+      );
+    }
+    return (
+      <div key={date} className="slots-date-group">
+        <div className="date-header">
+          <Calendar style={{ width: "1.5rem", height: "1.5rem", color: "#a855f7" }} />
+          <h3>{formatDate(date)}</h3>
+        </div>
+        <p className="date-count">{daySlots.length} slots available</p>
+        <div className="slots-grid">
+          {daySlots.map((slot) => {
+            const isUnavailable = slot.professorAvailabilityStatus === "unavailable";
+            const isAlreadyBooked = bookedSlotKeys.has(`${slot.availabilityId}_${slot.date}`);
+            return (
+              <div key={slot.availabilityId} className={`slot-card${isUnavailable ? " slot-card--unavailable" : ""}`}>
+                <div className="slot-header">
+                  <h4>{slot.professorName}</h4>
+                  <span className="college-badge">{slot.college}</span>
+                </div>
+                <div className="slot-details">
+                  <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</span></div>
+                  <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
+                  <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "spot" : "spots"} left` : "Unlimited"} {slot.maxStudents != null ? `(max ${slot.maxStudents})` : ""}</span></div>
+                </div>
+                {isUnavailable ? (
+                  <button className="book-btn book-btn--disabled" disabled>Currently Unavailable</button>
+                ) : isAlreadyBooked ? (
+                  <button className="book-btn book-btn--disabled" disabled>Already Booked</button>
+                ) : (
+                  <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book this Slot</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <StudentPageShell
@@ -372,7 +457,7 @@ export default function AppointmentsPage() {
                 labelClassName={undefined}
                 value={selectedCollege}
                 onChange={(e) => { setSelectedCollege(e.target.value); setSelectedProfessorId(""); setSelectedDate(""); }}
-                options={[{ value: "", label: "All Colleges" }, ...colleges.map((c) => ({ value: c.value, label: c.label }))]}
+                options={colleges.map((c) => ({ value: c.value, label: c.label }))}
                 chevronIcon={<ChevronDown className="filter-chevron" />}
               />
               <FilterSelect
@@ -381,9 +466,9 @@ export default function AppointmentsPage() {
                 labelClassName={undefined}
                 value={selectedProfessorId}
                 onChange={(e) => { setSelectedProfessorId(e.target.value); setSelectedDate(""); }}
-                disabled={!selectedCollege || slotsLoading || availableProfessors.length === 0}
+                disabled={slotsLoading || availableProfessors.length === 0}
                 options={[
-                  { value: "", label: !selectedCollege ? "Select a college first" : slotsLoading ? "Loading…" : availableProfessors.length === 0 ? "No professors available" : "All Professors" },
+                  { value: "", label: slotsLoading ? "Loading…" : availableProfessors.length === 0 ? "No professors available" : "All Professors" },
                   ...availableProfessors.map((p) => ({ value: p.id, label: p.name })),
                 ]}
                 chevronIcon={<ChevronDown className="filter-chevron" />}
@@ -409,7 +494,7 @@ export default function AppointmentsPage() {
             <div className="ab-tabs-list">
               <button type="button" className={`ab-tab ${activeTab === "slots" ? "active" : ""}`} onClick={() => setActiveTab("slots")}>
                 <CalendarDays className="ab-tab-icon" /> Available Slots
-                <span className="ab-tab-count">{slotsLoading ? "—" : availableSlots.length}</span>
+                <span className="ab-tab-count">{slotsLoading ? "—" : visibleSlots.length}</span>
               </button>
               <button type="button" className={`ab-tab ${activeTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
                 <ClipboardList className="ab-tab-icon" /> My Bookings
@@ -425,47 +510,31 @@ export default function AppointmentsPage() {
                 <div className="appt-empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading available slots…</h3></div>
               ) : slotsError ? (
                 <div className="appt-empty-state"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
-              ) : Object.keys(slotsByDate).length === 0 ? (
-                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedCollege || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published consultation hours yet"}</p></div>
+              ) : availableSlots.length === 0 ? (
+                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published consultation hours yet"}</p></div>
+              ) : selectedDate ? (
+                <div className="slots-list">
+                  <div className="week-section">
+                    <div className="week-section-header">
+                      <span className={`appointment-booking-badge ${weekInfo(selectedDate).key}`}>{weekInfo(selectedDate).label}</span>
+                    </div>
+                    {renderDateGroup(selectedDate)}
+                  </div>
+                </div>
               ) : (
                 <div className="slots-list">
-                  {Object.keys(slotsByDate).sort().map((date) => (
-                    <div key={date} className="slots-date-group">
-                      <div className="date-header">
-                        <Calendar style={{ width: "1.5rem", height: "1.5rem", color: "#a855f7" }} />
-                        <h3>{formatDate(date)}</h3>
-                        {isToday(date) && <span className="appointment-booking-badge today">Today</span>}
-                        {isTomorrow(date) && <span className="appointment-booking-badge tomorrow">Tomorrow</span>}
-                      </div>
-                      <p className="date-count">{slotsByDate[date].length} slots available</p>
-                      <div className="slots-grid">
-                        {slotsByDate[date].map((slot) => {
-                          const isUnavailable = slot.professorAvailabilityStatus === "unavailable";
-                          const isAlreadyBooked = bookedSlotKeys.has(`${slot.availabilityId}_${slot.date}`);
-                          return (
-                            <div key={slot.availabilityId} className={`slot-card${isUnavailable ? " slot-card--unavailable" : ""}`}>
-                              <div className="slot-header">
-                                <h4>{slot.professorName}</h4>
-                                <span className="college-badge">{slot.college}</span>
-                              </div>
-                              <div className="slot-details">
-                                <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</span></div>
-                                <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
-                                <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "spot" : "spots"} left` : "Unlimited"} {slot.maxStudents != null ? `(max ${slot.maxStudents})` : ""}</span></div>
-                              </div>
-                              {isUnavailable ? (
-                                <button className="book-btn book-btn--disabled" disabled>Currently Unavailable</button>
-                              ) : isAlreadyBooked ? (
-                                <button className="book-btn book-btn--disabled" disabled>Already Booked</button>
-                              ) : (
-                                <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book this Slot</button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                  <div className="week-section">
+                    <div className="week-section-header">
+                      <span className="appointment-booking-badge this-week">This Week</span>
                     </div>
-                  ))}
+                    {twoWeekDates.thisWeek.map(renderDateGroup)}
+                  </div>
+                  <div className="week-section">
+                    <div className="week-section-header">
+                      <span className="appointment-booking-badge next-week">Next Week</span>
+                    </div>
+                    {twoWeekDates.nextWeek.map(renderDateGroup)}
+                  </div>
                 </div>
               )}
             </div>

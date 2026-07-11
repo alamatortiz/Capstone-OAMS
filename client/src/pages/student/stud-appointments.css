@@ -490,20 +490,32 @@ body {
 .date-header h3 { font-size: 1.125rem; font-weight: 700; color: var(--text-primary); margin: 0; transition: color 0.3s ease; }
 
 .appointment-booking-badge {
-  display: inline-block;
-  padding: 0.375rem 0.875rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: block;
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.875rem;
+  font-size: 1rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-left: auto;
+  letter-spacing: 1.5px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
-.appointment-booking-badge.today { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
-.appointment-booking-badge.tomorrow { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+.appointment-booking-badge.this-week { background: rgba(16,185,129,0.15); color: var(--success); border: 1.5px solid rgba(16,185,129,0.4); }
+.appointment-booking-badge.next-week { background: rgba(59,130,246,0.15); color: var(--blue); border: 1.5px solid rgba(59,130,246,0.4); }
 
 .date-count { font-size: 0.875rem; color: var(--text-tertiary); margin: 0 0 1rem; transition: color 0.3s ease; }
+.date-count--disabled { font-style: italic; }
+
+/* ===== Week Sections (This Week / Next Week) ===== */
+.week-section { display: flex; flex-direction: column; gap: 1.5rem; }
+.week-section + .week-section { margin-top: 0.5rem; padding-top: 1.5rem; border-top: 1px solid var(--card-border); }
+
+.week-section-header { width: 100%; }
+
+.slots-date-group--disabled { opacity: 0.55; }
+.slots-date-group--disabled .date-header h3 { color: var(--text-tertiary); }
 
 .slots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
 @media (max-width: 1024px) { .slots-grid { grid-template-columns: 1fr; gap: 1rem; } }
