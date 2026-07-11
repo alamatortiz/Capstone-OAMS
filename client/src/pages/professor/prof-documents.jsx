@@ -95,6 +95,10 @@ function getStatusIcon(status) {
   }
 }
 
+const MIN_NEEDED_BY_DATE = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  .toISOString()
+  .split("T")[0];
+
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function ProfessorDocumentRequest() {
   const navigate = useNavigate();
@@ -115,6 +119,7 @@ export default function ProfessorDocumentRequest() {
     type: "",
     purpose: "",
     notes: "",
+    neededBy: "",
   });
 
   // ── Effects ─────────────────────────────────────────────────────────────
@@ -156,6 +161,7 @@ export default function ProfessorDocumentRequest() {
           trackingNumber: r.tracking_number,
           notes: r.notes || undefined,
           estimatedCompletion: r.estimated_completion || undefined,
+          neededBy: r.needed_by || undefined,
         })),
       );
       setRequestsError(null);
@@ -186,10 +192,11 @@ export default function ProfessorDocumentRequest() {
         request_type: formData.type,
         purpose: formData.purpose,
         notes: formData.notes,
+        needed_by: formData.neededBy || null,
       });
       await fetchRequests();
       setDialogOpen(false);
-      setFormData({ type: "", purpose: "", notes: "" });
+      setFormData({ type: "", purpose: "", notes: "", neededBy: "" });
       toast.success("Document request submitted successfully!");
     } catch (err) {
       console.error("Failed to submit document request:", err);
@@ -330,6 +337,20 @@ export default function ProfessorDocumentRequest() {
                       }
                       className="doc-form-textarea"
                       rows={3}
+                    />
+                  </div>
+
+                  <div className="doc-form-group">
+                    <label htmlFor="neededBy">Needed By (optional)</label>
+                    <input
+                      id="neededBy"
+                      type="date"
+                      min={MIN_NEEDED_BY_DATE}
+                      value={formData.neededBy}
+                      onChange={(e) =>
+                        setFormData({ ...formData, neededBy: e.target.value })
+                      }
+                      className="doc-form-input"
                     />
                   </div>
 
@@ -493,6 +514,14 @@ export default function ProfessorDocumentRequest() {
                               <label>Est. Completion</label>
                               <p className="doc-card-date-value">
                                 {formatManilaDate(req.estimatedCompletion, { month: "long" })}
+                              </p>
+                            </div>
+                          )}
+                          {req.neededBy && (
+                            <div className="doc-card-field">
+                              <label>Needed By</label>
+                              <p className="doc-card-date-value">
+                                {formatManilaDate(req.neededBy, { month: "long" })}
                               </p>
                             </div>
                           )}

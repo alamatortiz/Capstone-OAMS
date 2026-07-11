@@ -866,13 +866,13 @@ router.post(
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { service_id, request_type, purpose, notes } = req.body;
+    const { service_id, request_type, purpose, notes, needed_by } = req.body;
     if (!service_id || !purpose) return res.status(400).json({ message: "service_id and purpose are required" });
     try {
       const [result] = await pool.query(
-        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, notes)
-         VALUES (?,?,?,?,?)`,
-        [facultyId, service_id, request_type ?? "General", purpose, notes ?? null]
+        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, notes, needed_by)
+         VALUES (?,?,?,?,?,?)`,
+        [facultyId, service_id, request_type ?? "General", purpose, notes ?? null, needed_by || null]
       );
       const [[newRequest]] = await pool.query(
         `SELECT request_id, tracking_number FROM faculty_document_requests WHERE request_id = ?`,

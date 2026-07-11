@@ -23,6 +23,7 @@ import { ChevronLeft } from "lucide-react";
  * @property {string} trackingNumber
  * @property {string} [notes]
  * @property {string} [estimatedCompletion]
+ * @property {string} [neededBy]
  */
 
 // ─── Icons ────────────────────────────────────────────────────────────────
@@ -87,6 +88,10 @@ const AlertCircleIcon = () => (
   </svg>
 );
 
+const MIN_NEEDED_BY_DATE = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  .toISOString()
+  .split("T")[0];
+
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function DocumentsPage() {
   const navigate = useNavigate();
@@ -109,6 +114,7 @@ export default function DocumentsPage() {
     college: "",
     purpose: "",
     copies: "1",
+    neededBy: "",
   });
 
   // ── Effects ─────────────────────────────────────────────────────────────
@@ -158,7 +164,7 @@ export default function DocumentsPage() {
       const res = await api.post("/student/documents", formData);
       setDocuments((prev) => [res.data.document, ...prev]);
       setDialogOpen(false);
-      setFormData({ type: "", college: "", purpose: "", copies: "1" });
+      setFormData({ type: "", college: "", purpose: "", copies: "1", neededBy: "" });
       toast.success("Document request submitted successfully!");
     } catch (err) {
       console.error("Failed to submit document request:", err);
@@ -353,6 +359,20 @@ export default function DocumentsPage() {
                   </div>
 
                   <div className="doc-form-group">
+                    <label htmlFor="neededBy">Needed By (optional)</label>
+                    <input
+                      id="neededBy"
+                      type="date"
+                      min={MIN_NEEDED_BY_DATE}
+                      value={formData.neededBy}
+                      onChange={(e) =>
+                        setFormData({ ...formData, neededBy: e.target.value })
+                      }
+                      className="doc-form-input"
+                    />
+                  </div>
+
+                  <div className="doc-form-group">
                     <label htmlFor="purpose">Purpose</label>
                     <textarea
                       id="purpose"
@@ -516,6 +536,18 @@ export default function DocumentsPage() {
                               <label>Est. Completion</label>
                               <p className="doc-card-date-value">
                                 {formatManilaDate(doc.estimatedCompletion, {
+                                  month: "long",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </p>
+                            </div>
+                          )}
+                          {doc.neededBy && (
+                            <div className="doc-card-field">
+                              <label>Needed By</label>
+                              <p className="doc-card-date-value">
+                                {formatManilaDate(doc.neededBy, {
                                   month: "long",
                                   day: "numeric",
                                   year: "numeric",

@@ -1100,6 +1100,7 @@ router.get(
            dr.status,
            dr.notes,
            dr.created_at,
+           dr.needed_by,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number AS student_id,
            d.department_abbreviation AS college
@@ -1136,6 +1137,7 @@ router.get(
           : String(r.created_at).split("T")[0],
         status: statusMap[r.status] ?? r.status,
         notes: r.notes || "",
+        neededBy: r.needed_by || null,
       }));
 
       res.json({ documents });
@@ -1168,6 +1170,7 @@ router.get(
            fdr.status,
            fdr.notes,
            fdr.created_at,
+           fdr.needed_by,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.employee_id AS faculty_employee_id,
            COALESCE(d.department_abbreviation, 'ALL') AS college
@@ -1202,6 +1205,7 @@ router.get(
           : String(r.created_at).split("T")[0],
         status: statusMap[r.status] ?? r.status,
         notes: r.notes || "",
+        neededBy: r.needed_by || null,
       }));
 
       res.json({ documents });

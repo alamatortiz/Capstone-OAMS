@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-document-processing.css";
@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import AdminSidebar from "../../components/AdminSidebar";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -73,6 +73,9 @@ export default function AdminDocumentProcessing() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  // Default to "all" since This Week/Next Week/This Month all hide requests
+  // with no deadline set — admins can narrow down once deadlines are in use.
+  const [weekFilter, setWeekFilter] = useState("all");
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [processingNotes, setProcessingNotes] = useState("");
@@ -96,15 +99,53 @@ export default function AdminDocumentProcessing() {
     fetchDocuments();
   }, [fetchDocuments]);
 
+  // ── Deadline buckets ──────────────────────────────────────────────────────
+  // Monday-anchored this-week/next-week windows (same pattern as
+  // stud-appointments.jsx) plus a full-current-month window, applied to the
+  // requester-set "Needed By" deadline rather than the request date.
+  const weekDates = useMemo(() => {
+    const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const [y, m, d] = getManilaDateString().split("-").map(Number);
+    const today = new Date(y, m - 1, d);
+    const dow = today.getDay(); // 0=Sun..6=Sat
+    const monday = new Date(today);
+    monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow));
+    const buildWeek = (weekOffset) => Array.from({ length: 7 }, (_, i) => {
+      const dt = new Date(monday);
+      dt.setDate(dt.getDate() + weekOffset * 7 + i);
+      return toDateStr(dt);
+    });
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const thisMonth = Array.from({ length: daysInMonth }, (_, i) => toDateStr(new Date(y, m - 1, i + 1)));
+    return { thisWeekStart: toDateStr(monday), thisWeek: buildWeek(0), nextWeek: buildWeek(1), thisMonth };
+  }, []);
+
+  const deadlineLabel = (dateString) => {
+    if (!dateString) return null;
+    if (weekDates.thisWeek.includes(dateString)) return "This Week";
+    if (weekDates.nextWeek.includes(dateString)) return "Next Week";
+    if (weekDates.thisMonth.includes(dateString)) return "This Month";
+    return null;
+  };
+
   // ── Derived values ────────────────────────────────────────────────────────
   // Search applied first so tab counts reflect the current search context.
-  const baseFiltered = documents.filter((doc) => {
+  const searchFiltered = documents.filter((doc) => {
     const q = searchQuery.toLowerCase();
     return (
       doc.trackingNumber.toLowerCase().includes(q) ||
       doc.requesterName.toLowerCase().includes(q) ||
       doc.requesterIdValue.toLowerCase().includes(q)
     );
+  });
+
+  const baseFiltered = searchFiltered.filter((doc) => {
+    if (weekFilter === "all") return true;
+    if (!doc.neededBy) return false;
+    if (weekFilter === "this-week") return weekDates.thisWeek.includes(doc.neededBy);
+    if (weekFilter === "next-week") return weekDates.nextWeek.includes(doc.neededBy);
+    if (weekFilter === "this-month") return weekDates.thisMonth.includes(doc.neededBy);
+    return true;
   });
 
   const filteredDocuments =
@@ -203,7 +244,7 @@ export default function AdminDocumentProcessing() {
             ))}
           </div>
 
-          {/* Search */}
+          {/* Search + Week Filter */}
           <div className="adp-filter-bar">
             <div className="adp-search-wrap">
               <span className="adp-search-icon"><SearchIcon /></span>
@@ -215,6 +256,17 @@ export default function AdminDocumentProcessing() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <select
+              className="adp-search-input adp-week-select"
+              value={weekFilter}
+              onChange={(e) => setWeekFilter(e.target.value)}
+              aria-label="Filter by needed-by deadline"
+            >
+              <option value="this-week">This Week</option>
+              <option value="next-week">Next Week</option>
+              <option value="this-month">This Month</option>
+              <option value="all">All</option>
+            </select>
           </div>
 
           {/* Category Tabs */}
@@ -252,6 +304,8 @@ export default function AdminDocumentProcessing() {
             ) : (
               filteredDocuments.map((doc) => {
                 const { label, cls, Icon } = getStatusMeta(doc.status);
+                const doneStatuses = ["completed", "rejected"];
+                const isOverdue = doc.neededBy && !doneStatuses.includes(doc.status) && doc.neededBy < getManilaDateString();
                 return (
                   <div key={doc.id} className="adp-doc-card">
                     <div className="adp-doc-card-inner">
@@ -278,6 +332,12 @@ export default function AdminDocumentProcessing() {
                           <span className="adp-doc-date">
                             Requested: {formatManilaDate(doc.requestDate)}
                           </span>
+                          {doc.neededBy && (
+                            <span className={`adp-status-badge ${isOverdue ? "adp-badge-rejected" : "adp-badge-pending"}`}>
+                              {isOverdue ? "Overdue — " : "Needed By: "}{formatManilaDate(doc.neededBy)}
+                              {deadlineLabel(doc.neededBy) && ` (${deadlineLabel(doc.neededBy)})`}
+                            </span>
+                          )}
                           {doc.processedBy && (
                             <span className="adp-doc-date">By: {doc.processedBy}</span>
                           )}
@@ -346,6 +406,12 @@ export default function AdminDocumentProcessing() {
                   <label className="adp-modal-label">Document Type</label>
                   <p className="adp-modal-value">{selectedDocument.documentType}</p>
                 </div>
+                {selectedDocument.neededBy && (
+                  <div className="adp-modal-field">
+                    <label className="adp-modal-label">Needed By</label>
+                    <p className="adp-modal-value">{formatManilaDate(selectedDocument.neededBy)}</p>
+                  </div>
+                )}
                 <div className="adp-modal-field adp-modal-field--full">
                   <label className="adp-modal-label">Purpose</label>
                   <p className="adp-modal-value">{selectedDocument.purpose}</p>

@@ -338,6 +338,7 @@ router.get(
            dr.purpose,
            dr.status,
            dr.estimated_completion,
+           dr.needed_by,
            dr.released_at,
            dr.notes,
            dr.created_at,
@@ -369,6 +370,7 @@ router.get(
         trackingNumber: d.tracking_number,
         notes: d.notes || undefined,
         estimatedCompletion: d.estimated_completion || undefined,
+        neededBy: d.needed_by || undefined,
         claimedDate: d.released_at || undefined,
       }));
 
@@ -390,7 +392,7 @@ router.post(
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { type, college, purpose, copies } = req.body;
+    const { type, college, purpose, copies, neededBy } = req.body;
 
     if (!type || !college || !purpose) {
       return res
@@ -459,15 +461,15 @@ router.post(
 
       const [result] = await pool.query(
         `INSERT INTO document_requests
-           (student_id, service_id, request_type, purpose, status, estimated_completion, notes, created_at)
-         VALUES (?, ?, ?, ?, 'pending', ?, ?, NOW())`,
-        [studentId, serviceId, type, purpose, estimatedCompletion, notes],
+           (student_id, service_id, request_type, purpose, status, estimated_completion, needed_by, notes, created_at)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
+        [studentId, serviceId, type, purpose, estimatedCompletion, neededBy || null, notes],
       );
 
       const [[newDoc]] = await pool.query(
         `SELECT
            dr.request_id, dr.tracking_number, dr.request_type, dr.purpose,
-           dr.status, dr.estimated_completion, dr.notes, dr.created_at,
+           dr.status, dr.estimated_completion, dr.needed_by, dr.notes, dr.created_at,
            d.department_name AS college
          FROM document_requests dr
          JOIN document_services s ON dr.service_id = s.service_id
@@ -488,6 +490,7 @@ router.post(
           trackingNumber: newDoc.tracking_number,
           notes: newDoc.notes || undefined,
           estimatedCompletion: newDoc.estimated_completion || undefined,
+          neededBy: newDoc.needed_by || undefined,
         },
       });
     } catch (error) {
