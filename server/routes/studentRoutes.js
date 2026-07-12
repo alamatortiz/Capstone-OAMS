@@ -664,7 +664,15 @@ router.get(
              SELECT COUNT(*)
              FROM queues q2
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'waiting'
-           ) AS waiting_count
+           ) AS waiting_count,
+           (
+             -- Total daily cap usage: everyone who has claimed a spot today
+             -- (waiting + serving + completed) — this is what max_capacity
+             -- gates against, not just who's currently waiting.
+             SELECT COUNT(*)
+             FROM queues q6
+             WHERE q6.slot_id = qs.slot_id AND q6.status IN ('waiting', 'serving', 'completed')
+           ) AS claimed_count
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
          LEFT JOIN departments d  ON s.department_id   = d.department_id
@@ -679,6 +687,7 @@ router.get(
 
       const formatted = slots.map((slot) => {
         const waitingCount = slot.waiting_count || 0;
+        const claimedCount = slot.claimed_count || 0;
         const avgWaitMin = waitingCount * 5;
         const deptAbbrev = slot.department_abbreviation;
         const serviceCode = slot.service_name
@@ -701,9 +710,9 @@ router.get(
           startTime: slot.start_time,
           endTime: slot.end_time,
           maxCapacity: slot.max_capacity,
-          currentCount: slot.current_count,
+          currentCount: claimedCount,
           hasCapacity:
-            slot.status === "open" && waitingCount < slot.max_capacity,
+            slot.status === "open" && claimedCount < slot.max_capacity,
           status: slot.status,
           waitingCount,
           currentlyServing,
@@ -973,14 +982,17 @@ router.post(
           .json({ error: "This queue is not currently open" });
       }
 
-      // 1b. Live capacity check — avoids relying on drifted current_count
+      // 1b. Live capacity check — max_capacity is a total daily cap, not a
+      // concurrent-waiting-room limit, so it counts everyone who has already
+      // claimed a spot today (waiting + serving + completed), not just those
+      // still waiting. Avoids relying on drifted current_count.
       const [[countRow]] = await conn.query(
-        `SELECT COUNT(*) AS actual_waiting
+        `SELECT COUNT(*) AS claimed
          FROM queues
-         WHERE slot_id = ? AND status = 'waiting'`,
+         WHERE slot_id = ? AND status IN ('waiting', 'serving', 'completed')`,
         [slotId],
       );
-      if (countRow.actual_waiting >= slot.max_capacity) {
+      if (countRow.claimed >= slot.max_capacity) {
         await conn.rollback();
         return res
           .status(409)
@@ -1021,6 +1033,18 @@ router.post(
         `UPDATE queue_slots SET current_count = current_count + 1 WHERE slot_id = ?`,
         [slotId],
       );
+
+      // 5b. This join may have used up the last spot for the day — close the
+      // slot to new joins. Already-queued students keep being served normally;
+      // only /queues/join and /queues/available check this status.
+      let slotAutoClosed = false;
+      if (countRow.claimed + 1 >= slot.max_capacity) {
+        await conn.query(
+          `UPDATE queue_slots SET status = 'closed', close_reason = 'Capacity reached — queue full for today' WHERE slot_id = ?`,
+          [slotId],
+        );
+        slotAutoClosed = true;
+      }
 
       // 6. Write audit log
       await conn.query(
@@ -1100,6 +1124,15 @@ router.post(
         queueNumber: newEntry.queue_number,
         currentCount: totalInQueue,
       });
+      if (slotAutoClosed) {
+        const closedPayload = {
+          slotId,
+          status: "closed",
+          reason: "Capacity reached — queue full for today",
+        };
+        emitToSlot(slotId, "queue:slot-status", closedPayload);
+        emitToDept(newEntry.department_id, "queue:slot-status", closedPayload);
+      }
 
       res.status(201).json({
         message: "Successfully joined the queue",
@@ -1199,6 +1232,30 @@ router.post(
         [entry.slot_id],
       );
 
+      // 3b. Cancelling frees a spot under the daily cap. If this slot was
+      // auto-closed by /queues/join for hitting max_capacity, reopen it now
+      // that there's room again. A manual admin close (different
+      // close_reason) is left alone.
+      let slotReopened = false;
+      const [[slotRow]] = await conn.query(
+        `SELECT qs.status, qs.close_reason, qs.max_capacity,
+           (SELECT COUNT(*) FROM queues q WHERE q.slot_id = qs.slot_id AND q.status IN ('waiting', 'serving', 'completed')) AS claimed
+         FROM queue_slots qs WHERE qs.slot_id = ? FOR UPDATE`,
+        [entry.slot_id],
+      );
+      if (
+        slotRow &&
+        slotRow.status === "closed" &&
+        slotRow.close_reason === "Capacity reached — queue full for today" &&
+        slotRow.claimed < slotRow.max_capacity
+      ) {
+        await conn.query(
+          `UPDATE queue_slots SET status = 'open', close_reason = NULL WHERE slot_id = ?`,
+          [entry.slot_id],
+        );
+        slotReopened = true;
+      }
+
       // 4. Write audit log
       await conn.query(
         `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
@@ -1218,6 +1275,11 @@ router.post(
       const leftPayload = { slotId: entry.slot_id, queueId, studentId };
       emitToSlot(entry.slot_id, "queue:student-left", leftPayload);
       emitToDept(deptRow?.department_id, "queue:student-left", leftPayload);
+      if (slotReopened) {
+        const reopenedPayload = { slotId: entry.slot_id, status: "open" };
+        emitToSlot(entry.slot_id, "queue:slot-status", reopenedPayload);
+        emitToDept(deptRow?.department_id, "queue:slot-status", reopenedPayload);
+      }
 
       res.json({ message: "Successfully left the queue", queueId });
     } catch (error) {
@@ -2041,7 +2103,15 @@ router.get(
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'serving'
              ORDER BY q2.called_at DESC
              LIMIT 1
-           ) AS currently_serving_number
+           ) AS currently_serving_number,
+           (
+             -- Total daily cap usage: everyone who has claimed a spot today
+             -- (waiting + serving + completed) — this is what max_capacity
+             -- gates against, not just who's currently waiting.
+             SELECT COUNT(*)
+             FROM queues q3
+             WHERE q3.slot_id = qs.slot_id AND q3.status IN ('waiting', 'serving', 'completed')
+           ) AS claimed_count
          FROM queue_slots qs
          WHERE qs.slot_date = ?
            AND qs.status IN ('open', 'paused')
@@ -2092,16 +2162,17 @@ router.get(
       for (const slot of slots) {
         if (!slotByService.has(slot.service_id)) {
           const waitingCount = Number(slot.waiting_count) || 0;
+          const claimedCount = Number(slot.claimed_count) || 0;
           const avgWaitMin = waitingCount * 5;
           slotByService.set(slot.service_id, {
             slotId: slot.slot_id,
             startTime: formatTime12h(slot.start_time),
             endTime: formatTime12h(slot.end_time),
             maxCapacity: slot.max_capacity,
-            currentCount: slot.current_count,
+            currentCount: claimedCount,
             waitingCount,
             hasCapacity:
-              slot.status === "open" && waitingCount < slot.max_capacity,
+              slot.status === "open" && claimedCount < slot.max_capacity,
             status: slot.status,
             avgWaitTime:
               waitingCount === 0

@@ -1,7 +1,7 @@
 import "./QueueProgressBars.css";
 
 /**
- * Consolidates the "People in Queue / Serviced" dual progress bar previously duplicated
+ * Consolidates the "Occupied Slots / Serviced People" dual progress bar previously duplicated
  * (with a genuine cross-file border/margin/fill-color inconsistency) across the dashboard,
  * queue, queue-status, and queue-tracking pages. The occupancy fill is intentionally blue
  * everywhere now — previously only the dashboard's own instance had this via a scoped
@@ -21,7 +21,7 @@ export default function QueueProgressBars({
       <div className="queue-progress-group">
         <div className="queue-progress-wrapper">
           <div className="qs-progress-label-row">
-            <p className="qs-progress-label">People in Queue</p>
+            <p className="qs-progress-label">Occupied Slots</p>
             <p className="qs-progress-value">
               {occupancyCurrent}/{occupancyTotal}
               <span className="qs-progress-percent">&nbsp;({occupancyPercent}%)</span>
@@ -33,7 +33,7 @@ export default function QueueProgressBars({
         </div>
         <div className="queue-progress-wrapper">
           <div className="qs-progress-label-row">
-            <p className="qs-progress-label">Serviced</p>
+            <p className="qs-progress-label">Serviced People</p>
             <p className="qs-progress-value">
               {servicedCurrent}/{servicedTotal}
               <span className="qs-progress-percent">&nbsp;({servicedPercent}%)</span>

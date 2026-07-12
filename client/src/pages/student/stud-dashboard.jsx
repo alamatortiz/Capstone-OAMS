@@ -275,8 +275,8 @@ export default function StudentDashboard() {
     dashStats?.stats?.activeQueueCount ?? contextQueues.length;
 
   // Two distinct progress measures, mirroring the Queue Management page:
-  // 1) how full the queue is (people in queue vs. max capacity)
-  // 2) how far along the queue has been serviced (serviced vs. total in queue)
+  // 1) how full the queue is (occupied slots vs. max capacity)
+  // 2) how far along the queue has been serviced (serviced people vs. total occupied slots)
   const queueOccupancyPercent = mostRecentQueue
     ? mostRecentQueue.queueOccupancyPercent ?? 0
     : 0;
