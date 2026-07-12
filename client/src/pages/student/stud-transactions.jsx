@@ -4,7 +4,6 @@ import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
-import { getCollegeLogo } from "../../data/collegeLogo";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";

@@ -358,7 +358,6 @@ export default function StudentDashboard() {
       icon: CalendarIcon,
       link: "/student/appointments",
       gradient: "from-indigo-500 to-purple-600",
-      badge: "New Slots",
     },
     {
       title: "Queue Tracking",
@@ -367,7 +366,6 @@ export default function StudentDashboard() {
       icon: ActivityIcon,
       link: "/student/queue-tracking",
       gradient: "from-cyan-500 to-blue-600",
-      badge: "Analytics",
     },
     {
       title: "Professor Schedules",
@@ -375,7 +373,7 @@ export default function StudentDashboard() {
       icon: GraduationCapIcon,
       link: "/student/professor-schedules",
       gradient: "from-sky-500 to-blue-600",
-      badge: "13 Faculty",
+      badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`,
     },
   ];
 
@@ -445,7 +443,6 @@ export default function StudentDashboard() {
               </div>
               <div className="banner-badges">
                 <span className="dash-badge">Student Portal</span>
-                <span className="dash-badge">AY 2025–2026</span>
                 <span className="dash-badge">
                   {user?.studentNumber ?? "Student Number"}
                 </span>
@@ -501,9 +498,11 @@ export default function StudentDashboard() {
                         <action.icon />
                       </div>
                       <div className="action-body">
-                        <span className="action-badge action-badge-right">
-                          {action.badge}
-                        </span>
+                        {action.badge && (
+                          <span className="action-badge action-badge-right">
+                            {action.badge}
+                          </span>
+                        )}
                         <h3 className="action-title">{action.title}</h3>
                         <p className="action-description">
                           {action.description}

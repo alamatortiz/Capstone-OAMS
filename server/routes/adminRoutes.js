@@ -2399,21 +2399,40 @@ router.get(
       const deptId = await getAdminDepartmentId(req.user.userId);
       const { period = "Today", service = "All Services" } = req.query;
 
-      // Compute date threshold
-      const now = new Date();
+      // Compute date threshold, anchored to Manila midnight (a real UTC
+      // instant) rather than the server process's own local time -- mirrors
+      // the /transactions endpoint above (~line 865). Do not use raw local
+      // `Date` getters (getFullYear/getMonth/getDate) here; they depend on
+      // the server process's own timezone, not Manila's.
+      const manilaMidnightUTC = new Date(`${getManilaDateString()}T00:00:00+08:00`);
+      const [manilaYear, manilaMonth, manilaDay] = getManilaDateString()
+        .split("-")
+        .map(Number);
       let dateThreshold;
       if (period === "Today") {
-        dateThreshold = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        dateThreshold = manilaMidnightUTC;
       } else if (period === "This Week") {
-        const day = now.getDay();
-        dateThreshold = new Date(now);
-        dateThreshold.setDate(now.getDate() - day);
-        dateThreshold.setHours(0, 0, 0, 0);
+        // Weekday of Manila's "today", derived from a local-Date seed built
+        // from the Manila Y/M/D so it never depends on server process TZ.
+        const dayOfWeek = new Date(manilaYear, manilaMonth - 1, manilaDay).getDay();
+        dateThreshold = new Date(
+          manilaMidnightUTC.getTime() - dayOfWeek * 24 * 60 * 60 * 1000,
+        );
       } else if (period === "This Month") {
-        dateThreshold = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateThreshold = new Date(
+          `${manilaYear}-${String(manilaMonth).padStart(2, "0")}-01T00:00:00+08:00`,
+        );
       } else {
-        // This Semester: 6 months back
-        dateThreshold = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        // This Semester: 6 months back from the 1st of the current Manila month
+        let semYear = manilaYear;
+        let semMonth = manilaMonth - 6;
+        if (semMonth <= 0) {
+          semMonth += 12;
+          semYear -= 1;
+        }
+        dateThreshold = new Date(
+          `${semYear}-${String(semMonth).padStart(2, "0")}-01T00:00:00+08:00`,
+        );
       }
 
       // Service type filter
@@ -2439,7 +2458,9 @@ router.get(
       const peakMap = {};
       for (const row of rows) {
         const [peakRows] = await pool.query(
-          `SELECT HOUR(q.created_at) AS hr, COUNT(*) AS cnt
+          // q.created_at is stored/returned as a UTC instant; HOUR() alone
+          // would bucket by UTC hour, not Manila hour, so shift it first.
+          `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr, COUNT(*) AS cnt
            FROM queues q
            WHERE q.service_id = ? AND q.created_at >= ?
            GROUP BY hr

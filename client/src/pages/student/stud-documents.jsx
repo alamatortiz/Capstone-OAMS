@@ -7,7 +7,8 @@ import ChatWidget from "../../components/ChatWidget";
 import { toast } from "sonner";
 import "./stud-documents.css";
 import api from "../../utils/api";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, getManilaTomorrowDateString } from "../../utils/dateTime";
+import { formatCollegeLabel } from "../../utils/formatCollege";
 
 import { ChevronLeft } from "lucide-react";
 
@@ -88,9 +89,7 @@ const AlertCircleIcon = () => (
   </svg>
 );
 
-const MIN_NEEDED_BY_DATE = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  .toISOString()
-  .split("T")[0];
+const MIN_NEEDED_BY_DATE = getManilaTomorrowDateString();
 
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function DocumentsPage() {
@@ -311,7 +310,7 @@ export default function DocumentsPage() {
                       </option>
                       {collegesFromDB.map((college) => (
                         <option key={college.id} value={college.name}>
-                          {college.name}
+                          {formatCollegeLabel(college.abbrev, college.name)}
                         </option>
                       ))}
                     </select>

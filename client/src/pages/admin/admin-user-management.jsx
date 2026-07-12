@@ -8,6 +8,8 @@ import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
+import { COLLEGES } from "../../data/colleges";
+import { formatCollegeLabel } from "../../utils/formatCollege";
 
 // ─── Shared Layout Icons ──────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -89,14 +91,10 @@ const CheckCircleIconSvg = () => (
 );
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const COLLEGES = [
-  { value: "CCS",  label: "College of Computing Studies (CCS)" },
-  { value: "CBAA", label: "College of Business, Accountancy and Administration (CBAA)" },
-  { value: "COED", label: "College of Education (COED)" },
-  { value: "COE",  label: "College of Engineering (COE)" },
-  { value: "CAS",  label: "College of Arts and Sciences (CAS)" },
-  { value: "CHAS", label: "College of Health and Allied Sciences (CHAS)" },
-];
+const COLLEGE_OPTIONS = COLLEGES.map((c) => ({
+  value: c.abbreviation,
+  label: formatCollegeLabel(c.abbreviation, c.name),
+}));
 
 const INITIAL_USERS = [
   { id: "1", name: "Juan Dela Cruz",    email: "juan.delacruz@pnc.edu.ph",  role: "student",   college: "CCS",  studentId: "2100123",       status: "active",    lastLogin: "2026-05-20T08:30:00", createdDate: "2021-08-15" },
@@ -253,7 +251,7 @@ export default function AdminUserManagement() {
                       <label className="aum-form-label">College *</label>
                       <select className="aum-form-select" value={form.college} onChange={setField("college")}>
                         <option value="">Select college</option>
-                        {COLLEGES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        {COLLEGE_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                       </select>
                     </div>
                   </div>

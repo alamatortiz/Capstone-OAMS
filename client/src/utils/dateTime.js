@@ -28,6 +28,20 @@ export function getManilaTodayAsLocalDate() {
   return new Date(year, month - 1, day);
 }
 
+// Returns tomorrow's Manila calendar date as "YYYY-MM-DD" -- the safe way to
+// compute a "must be at least 1 day ahead" minimum date. Do NOT use
+// `new Date(Date.now() + 86400000).toISOString()` for this: `.toISOString()`
+// returns the UTC calendar date, which still lags Manila's by one day during
+// Manila-local 12:00 AM-7:59 AM, silently allowing same-day selections.
+export function getManilaTomorrowDateString() {
+  const tomorrow = getManilaTodayAsLocalDate();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const year = tomorrow.getFullYear();
+  const month = String(tomorrow.getMonth() + 1).padStart(2, "0");
+  const day = String(tomorrow.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function formatManilaDate(value, opts = {}) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("en-US", {

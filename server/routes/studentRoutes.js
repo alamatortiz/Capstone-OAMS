@@ -83,20 +83,24 @@ router.get(
       );
 
       const [[completedRow]] = await pool.query(
-        `SELECT 
+        `SELECT
            (
-             SELECT COUNT(*) FROM queues 
+             SELECT COUNT(*) FROM queues
              WHERE student_id = ? AND status = 'completed'
            ) +
            (
-             SELECT COUNT(*) FROM appointments 
+             SELECT COUNT(*) FROM appointments
              WHERE student_id = ? AND status = 'completed'
            ) +
            (
-             SELECT COUNT(*) FROM document_requests 
+             SELECT COUNT(*) FROM document_requests
              WHERE student_id = ? AND status = 'released'
            ) AS total_completed`,
         [studentId, studentId, studentId],
+      );
+
+      const [[facultyRow]] = await pool.query(
+        `SELECT COUNT(*) AS total_faculty FROM faculty`,
       );
 
       const [recentActivity] = await pool.query(
@@ -184,6 +188,7 @@ router.get(
             pending: docRow.pending_count || 0,
           },
           completed: completedRow.total_completed || 0,
+          totalFacultyCount: facultyRow.total_faculty || 0,
         },
         activeQueue: closestQueue
           ? {

@@ -11,6 +11,8 @@ import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
 import { useAuth } from "../../context/AuthContext";
+import { COLLEGES } from "../../data/colleges";
+import { formatCollegeLabel } from "../../utils/formatCollege";
 import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
@@ -241,10 +243,10 @@ export default function AppointmentsPage() {
     return result;
   }, [slots, selectedProfessorId, calendarMonth, twoWeekDateSet]);
 
-  const colleges = [
-    { value: "CCS", label: "CCS" }, { value: "CBAA", label: "CBAA" }, { value: "COED", label: "COED" },
-    { value: "COE", label: "COE" }, { value: "CAS", label: "CAS" }, { value: "CHAS", label: "CHAS" },
-  ];
+  const colleges = COLLEGES.map((c) => ({
+    value: c.abbreviation,
+    label: formatCollegeLabel(c.abbreviation, c.name),
+  }));
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();

@@ -27,6 +27,7 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - TZ=Asia/Manila
       - DB_HOST=db
       - DB_USER=root
       - DB_PASSWORD=Akosimatt123

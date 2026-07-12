@@ -8,10 +8,17 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  // The DB container runs with TZ=Asia/Manila (see docker-compose.yml), so
-  // MySQL's CURRENT_TIMESTAMP/NOW() store Manila wall-clock time. Tell the
-  // driver the stored values are +08:00 so it doesn't mislabel them as UTC.
-  timezone: "+08:00",
+  // The DB container has no TZ override (see docker-compose.yml) and MySQL
+  // defaults to SYSTEM/UTC, so CURRENT_TIMESTAMP/NOW() store UTC instants.
+  // "Z" tells the driver the connection is UTC so it does NOT re-shift those
+  // values -- all Manila conversion happens app-side via getManilaDateString
+  // / formatManilaDate* (client) and getManilaDateString / getManilaTimeString
+  // (server). DO NOT change this to "+08:00" unless the db container is also
+  // given TZ: Asia/Manila in docker-compose.yml -- doing one without the
+  // other silently shifts every TIMESTAMP column by ~8 hours (this has
+  // happened before; if you're about to "fix" this, check docker-compose.yml
+  // first, not just this comment).
+  timezone: "Z",
 });
 
 module.exports = pool;

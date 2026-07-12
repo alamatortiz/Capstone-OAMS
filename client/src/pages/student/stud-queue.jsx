@@ -12,6 +12,7 @@ import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { useQueue } from '../../contexts/QueueContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
+import { formatCollegeLabel } from '../../utils/formatCollege';
 import api from '../../utils/api';
 
 import './stud-queue.css';
@@ -635,7 +636,15 @@ export default function QueuePage() {
                         value={selectedCollege}
                         onChange={(e) => setSelectedCollege(e.target.value)}
                         ariaLabel="Filter by college"
-                        options={[{ value: "all", label: "All Colleges" }, ...collegeOptions.map((college) => ({ value: college.name, label: `${college.abbrev} — ${college.name}` }))]}
+                        options={[{ value: "all", label: "All Colleges" }, ...collegeOptions.map((college) => ({
+                          value: college.name,
+                          // "ALL" is the synthetic cross-college services bucket, not a real
+                          // college -- give it a distinct label so it doesn't read like a
+                          // second "show everything" option next to "All Colleges" above.
+                          label: college.abbrev === "ALL"
+                            ? "ALL - Cross-College Services"
+                            : formatCollegeLabel(college.abbrev, college.name),
+                        }))]}
                         chevronIcon={<ChevronDown className="filter-chevron" />}
                       />
                       <FilterSelect

@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { Megaphone as LucideMegaphone } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getCollegeLogo } from "../../data/collegeLogo";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
+import { formatCollegeLabel } from "../../utils/formatCollege";
 
 import "./stud-announcements.css";
 
@@ -271,7 +271,7 @@ export default function AnnouncementsPage() {
                 <option value="all">All Colleges</option>
                 {collegeOptions.map((opt) => (
                   <option key={opt.abbrev} value={opt.abbrev}>
-                    {opt.name} ({opt.abbrev})
+                    {formatCollegeLabel(opt.abbrev, opt.name)}
                   </option>
                 ))}
               </select>

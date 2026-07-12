@@ -6,7 +6,7 @@ import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { toast } from "sonner";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, getManilaTomorrowDateString } from "../../utils/dateTime";
 import "./prof-dashboard.css";
 import "./prof-documents.css";
 import api from "../../utils/api";
@@ -95,9 +95,7 @@ function getStatusIcon(status) {
   }
 }
 
-const MIN_NEEDED_BY_DATE = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  .toISOString()
-  .split("T")[0];
+const MIN_NEEDED_BY_DATE = getManilaTomorrowDateString();
 
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function ProfessorDocumentRequest() {
