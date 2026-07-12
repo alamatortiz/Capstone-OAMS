@@ -512,7 +512,7 @@ export default function QueueStatusPage() {
           <QueueDetail
             queue={selectedQueue}
             backLabel={fromTracking ? 'Queue Tracking' : fromQueue ? 'Queues' : 'My Queues'}
-            onBack={() => fromTracking ? navigate('/student/queue-tracking') : fromQueue ? navigate('/student/queue') : setSelectedQueueId(null)}
+            onBack={() => fromTracking ? navigate('/student/queue-tracking') : fromQueue ? navigate('/student/queue', { state: { activeTab: 'active' } }) : setSelectedQueueId(null)}
             onCancel={handleCancel}
             onSaveNotes={updateQueueNotes}
             cancelling={cancelling}
@@ -528,7 +528,7 @@ export default function QueueStatusPage() {
                     Queue Tracking
                   </button>
                 ) : fromQueue ? (
-                  <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue')}>
+                  <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue', { state: { activeTab: 'active' } })}>
                     <ChevronLeft className="breadcrumb-icon" />
                     Queue Management
                   </button>

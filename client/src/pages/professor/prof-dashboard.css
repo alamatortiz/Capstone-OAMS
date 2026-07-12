@@ -321,7 +321,7 @@ body {
 }
 
 /* ===== Stats Grid ===== */
-.stats-grid {
+.professor-dashboard .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1.25rem;
@@ -329,7 +329,7 @@ body {
 }
 
 @media (min-width: 1024px) {
-  .stats-grid {
+  .professor-dashboard .stats-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
@@ -449,6 +449,15 @@ body {
   font-weight: 800;
   color: var(--text-primary);
   transition: color 0.3s ease;
+}
+
+.professor-dashboard .stat-value.stat-loading {
+  animation: statPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes statPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
 }
 
 .professor-dashboard .stat-title {
@@ -1160,7 +1169,7 @@ body {
     font-size: 1.5rem;
   }
 
-  .stats-grid {
+  .professor-dashboard .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -1182,7 +1191,7 @@ body {
     font-size: 1.25rem;
   }
 
-  .stats-grid {
+  .professor-dashboard .stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }

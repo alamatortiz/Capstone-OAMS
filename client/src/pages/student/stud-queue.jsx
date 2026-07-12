@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 
 import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity } from 'lucide-react';
 import { toast } from 'sonner';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
@@ -28,10 +28,16 @@ export default function QueuePage() {
   } = useQueue();
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Track which slot/queue buttons are in-flight to prevent double-clicks
   const [joiningSlotId, setJoiningSlotId] = useState(null);
   const [leavingQueueId, setLeavingQueueId] = useState(null);
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState(
+    location.state?.activeTab === 'active' ? 'active' : 'available',
+  );
 
   // Detail view state
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -104,17 +110,33 @@ export default function QueuePage() {
   );
 
   // ── Fetch services data for requirements lookup ───────────────────────────
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const { data } = await api.get('/student/services/by-department');
-        setServicesData(data.departments ?? []);
-      } catch {
-        // silent — requirements fall back to generic defaults
-      }
-    };
-    fetchServices();
+  // Refetched every time a queue's detail view is opened (not just on mount)
+  // so newly created services/requirements show up immediately instead of
+  // relying on a stale mount-time snapshot.
+  const [servicesLoading, setServicesLoading] = useState(true);
+
+  const fetchServices = useCallback(async () => {
+    setServicesLoading(true);
+    try {
+      const { data } = await api.get('/student/services/by-department');
+      setServicesData(data.departments ?? []);
+    } catch {
+      // silent — requirements fall back to generic defaults
+    } finally {
+      setServicesLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  const isServiceKnown = (serviceName) =>
+    servicesData.some((dept) =>
+      dept.services?.some(
+        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
+      ),
+    );
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleJoinQueue = useCallback(
@@ -372,13 +394,26 @@ export default function QueuePage() {
                   <div className="avail-services-details-card-content">
                     {(() => {
                       const reqs = getServiceRequirements(selectedSlot.serviceName);
+                      if (reqs.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceName)) {
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                            <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
+                            Loading requirements…
+                          </div>
+                        );
+                      }
                       return reqs.length > 0 ? (
                         <ul className="avail-services-requirements-list">
                           {reqs.map((req) => (
                             <li key={req.id} className="avail-services-requirement-item">
                               <CheckCircle2 className="avail-services-requirement-icon" />
                               <div>
-                                <span>{req.name}</span>
+                                <div className="avail-services-requirement-name-row">
+                                  <span>{req.name}</span>
+                                  <span className={`avail-services-requirement-badge ${req.isMandatory ? 'is-mandatory' : 'is-optional'}`}>
+                                    {req.isMandatory ? 'Required' : 'Optional'}
+                                  </span>
+                                </div>
                                 {req.description && (
                                   <p style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: '2px' }}>
                                     {req.description}
@@ -389,16 +424,9 @@ export default function QueuePage() {
                           ))}
                         </ul>
                       ) : (
-                        <ul className="avail-services-requirements-list">
-                          <li className="avail-services-requirement-item">
-                            <CheckCircle2 className="avail-services-requirement-icon" />
-                            <span>Valid Student ID</span>
-                          </li>
-                          <li className="avail-services-requirement-item">
-                            <CheckCircle2 className="avail-services-requirement-icon" />
-                            <span>Any relevant supporting documents</span>
-                          </li>
-                        </ul>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                          No specific requirements have been defined for this service yet. Contact the office for details.
+                        </p>
                       );
                     })()}
                   </div>
@@ -417,12 +445,27 @@ export default function QueuePage() {
                   <div className="avail-services-details-card-content">
                     {(() => {
                       const steps = getProcedureSteps(selectedSlot.serviceName);
+                      if (steps.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceName)) {
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                            <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
+                            Loading procedure…
+                          </div>
+                        );
+                      }
                       return steps.length > 0 ? (
                         <ol className="avail-services-procedure-list">
                           {steps.map((step) => (
                             <li key={step.id} className="avail-services-procedure-item">
                               <span className="avail-services-procedure-number">{step.stepNumber}</span>
-                              <span>{step.title}</span>
+                              <div>
+                                <span className="avail-services-procedure-title">{step.title}</span>
+                                {step.description && (
+                                  <p style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: '2px' }}>
+                                    {step.description}
+                                  </p>
+                                )}
+                              </div>
                             </li>
                           ))}
                         </ol>
@@ -457,16 +500,36 @@ export default function QueuePage() {
                 </div>
               )}
 
-              {/* My Active Queues */}
-              {!isLoading && queues.length > 0 && (
-                <section className="my-queues-section">
-                  <div className="qp-section-title-wrapper">
-                    <Clock className="section-icon" />
-                    <h2 className="qp-section-title">My Active Queues</h2>
-                    <span className="queue-badge">{queues.length}</span>
+              {/* Tabs */}
+              {!isLoading && !error && (
+                <div className="qp-tabs-navigation">
+                  <div className="qp-tabs-list">
+                    <button
+                      type="button"
+                      className={`qp-tab ${activeTab === 'available' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('available')}
+                    >
+                      <Users className="qp-tab-icon" /> Available Queues
+                      <span className="qp-tab-count">{filteredSlots.length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`qp-tab ${activeTab === 'active' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('active')}
+                    >
+                      <Clock className="qp-tab-icon" /> My Active Queues
+                      <span className="qp-tab-count">{queues.length}</span>
+                    </button>
                   </div>
-                  <div className="queues-list">
-                    {queues.map((queue) => (
+                </div>
+              )}
+
+              {/* My Active Queues */}
+              {!isLoading && !error && activeTab === 'active' && (
+                <>
+                  {queues.length > 0 ? (
+                    <div className="queues-list">
+                      {queues.map((queue) => (
                       <div
                         key={queue.queueId}
                         className="queue-card active-queue-card"
@@ -514,12 +577,6 @@ export default function QueuePage() {
                                 servicedTotal={queue.totalInQueue ?? 0}
                                 servicedPercent={queue.servicedPercent ?? 0}
                               />
-                              {queue.voidTimeoutMinutes != null && (
-                                <p style={{ fontSize: '0.75rem', opacity: 0.65, margin: '4px 0 0' }}>
-                                  <AlertCircle style={{ width: '12px', height: '12px', verticalAlign: 'text-bottom', marginRight: '4px' }} />
-                                  If called, arrive within {queue.voidTimeoutMinutes} min or your ticket will be voided
-                                </p>
-                              )}
                               <button
                                 className="queue-leave-btn"
                                 onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName }); }}
@@ -537,17 +594,32 @@ export default function QueuePage() {
                                   {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
                                 </span>
                               </button>
+                              {queue.voidTimeoutMinutes != null && (
+                                <div className="qp-void-warning">
+                                  <AlertCircle className="qp-void-warning-icon" />
+                                  <span>If called, arrive within {queue.voidTimeoutMinutes} min or your ticket will be voided</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
                       </div>
                     ))}
-                  </div>
-                </section>
+                    </div>
+                  ) : (
+                    <div className="no-queues-card">
+                      <AlertCircle className="no-queues-icon" />
+                      <h3 className="no-queues-title">No Active Queues</h3>
+                      <p className="no-queues-description">
+                        You're not currently in any queues. Browse available queues to join one.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Filters + Available Queues */}
-              {!isLoading && (
+              {!isLoading && !error && activeTab === 'available' && (
                 <>
                   <div className="filters-card">
                     <div className="filters-header">
@@ -588,7 +660,7 @@ export default function QueuePage() {
                           <div
                             key={slot.slotId}
                             className="queue-card available-queue-card"
-                            onClick={() => setSelectedSlot(slot)}
+                            onClick={() => { setSelectedSlot(slot); fetchServices(); }}
                             style={{ cursor: 'pointer' }}
                           >
                             <div className="qp-card-content">

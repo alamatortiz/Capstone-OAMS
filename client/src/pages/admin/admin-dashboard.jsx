@@ -308,7 +308,7 @@ export default function AdminDashboard() {
       value: loading ? "—" : String(s?.announcements ?? 0),
       description: "Published",
       icon: BellIcon,
-      bgColor: "bg-blue-stat",
+      bgColor: "bg-purple-50",
       isClickable: true,
       ctaAriaLabel: "View announcement management",
     },
