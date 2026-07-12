@@ -8,11 +8,10 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  // MySQL (SYSTEM/UTC in this container) stores and returns TIMESTAMP values
-  // in UTC; tell the driver they're UTC so it doesn't re-shift them. Display
-  // conversion to Philippine time happens explicitly via the Asia/Manila
-  // formatters in server/utils/dateTime.js and client/src/utils/dateTime.js.
-  timezone: "Z",
+  // The DB container runs with TZ=Asia/Manila (see docker-compose.yml), so
+  // MySQL's CURRENT_TIMESTAMP/NOW() store Manila wall-clock time. Tell the
+  // driver the stored values are +08:00 so it doesn't mislabel them as UTC.
+  timezone: "+08:00",
 });
 
 module.exports = pool;

@@ -335,7 +335,7 @@ export default function AdminDashboard() {
   // ── Handler for clicking stat cards ────────────────────────────────────────
   const handleStatCardClick = (statTitle) => {
     if (statTitle === "Active Queues") {
-      navigate("/admin/queue-management");
+      navigate("/admin/queue");
       return;
     }
     if (statTitle === "Pending Documents") {
@@ -628,11 +628,11 @@ export default function AdminDashboard() {
               <div className="card-header-admin">
                 <h3>Current Hosted Queues</h3>
                 <a
-                  href="/admin/queue-management"
+                  href="/admin/queue"
                   className="view-all-link"
                   onClick={(e) => {
                     e.preventDefault();
-                    navigate("/admin/queue-management");
+                    navigate("/admin/queue");
                   }}
                 >
                   Manage <ChevronRightIcon />

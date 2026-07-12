@@ -119,6 +119,26 @@ const AlertCircleIcon = ({ className }) => (
   </svg>
 );
 
+const PlusCircleIcon = ({ className }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="16" />
+    <line x1="8" y1="12" x2="16" y2="12" />
+  </svg>
+);
+
+const ChevronDownIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+
 export default function AdminQueue() {
   const { user: authUser } = useAuth();
   const user = authUser
@@ -140,6 +160,7 @@ export default function AdminQueue() {
   const [queueDetails, setQueueDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [monitoringQueueId, setMonitoringQueueId] = useState(null);
+  const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
 
   const fetchQueueDetails = useCallback(async () => {
     try {
@@ -160,6 +181,39 @@ export default function AdminQueue() {
     if (authUser) init();
   }, [authUser, fetchQueueDetails]);
 
+  // ── Queue entries (individual students waiting) for the monitored queue ──
+  const [queueEntries, setQueueEntries] = useState([]);
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const [entriesPage, setEntriesPage] = useState(0);
+  const ENTRIES_PER_PAGE = 5;
+
+  const fetchQueueEntries = useCallback(async () => {
+    if (!monitoringQueueId) {
+      setQueueEntries([]);
+      return;
+    }
+    setLoadingEntries(true);
+    try {
+      const res = await api.get(`/admin/queue-hosting/${monitoringQueueId}/entries`);
+      setQueueEntries(res.data.entries ?? []);
+    } catch {
+      setQueueEntries([]);
+    } finally {
+      setLoadingEntries(false);
+    }
+  }, [monitoringQueueId]);
+
+  useEffect(() => {
+    fetchQueueEntries();
+  }, [fetchQueueEntries]);
+
+  const totalEntryPages = Math.max(1, Math.ceil(queueEntries.length / ENTRIES_PER_PAGE));
+  const currentEntriesPage = Math.min(entriesPage, totalEntryPages - 1);
+  const entriesStartIndex = currentEntriesPage * ENTRIES_PER_PAGE;
+  const paginatedEntries = queueEntries.slice(entriesStartIndex, entriesStartIndex + ENTRIES_PER_PAGE);
+
+  const getEntryStatusLabel = (status) => (status === "no_show" ? "No-Show" : status);
+
   // ── Live updates: refetch when a socket event affects this dept's queues ──
   useEffect(() => {
     const token = sessionStorage.getItem("oams_token");
@@ -167,6 +221,11 @@ export default function AdminQueue() {
 
     const socket = connectSocket(token);
     if (!socket) return;
+
+    const refetch = () => {
+      fetchQueueDetails();
+      fetchQueueEntries();
+    };
 
     const events = [
       "queue:slot-opened",
@@ -177,12 +236,12 @@ export default function AdminQueue() {
       "queue:student-joined",
       "queue:student-left",
     ];
-    events.forEach((event) => socket.on(event, fetchQueueDetails));
+    events.forEach((event) => socket.on(event, refetch));
 
     return () => {
-      events.forEach((event) => socket.off(event, fetchQueueDetails));
+      events.forEach((event) => socket.off(event, refetch));
     };
-  }, [authUser, fetchQueueDetails]);
+  }, [authUser, fetchQueueDetails, fetchQueueEntries]);
 
   // Re-derive the monitored queue from live data on every refresh, so the
   // monitor view always reflects the latest call-next/serve/pause actions
@@ -211,6 +270,12 @@ export default function AdminQueue() {
   const activeQueueDetails = queueDetails.filter(
     (q) => q.status === "open" || q.status === "paused",
   );
+
+  const serviceTypes = [...new Set(activeQueueDetails.map((q) => q.queueType))].sort();
+  const filteredQueueDetails =
+    serviceTypeFilter === "all"
+      ? activeQueueDetails
+      : activeQueueDetails.filter((q) => q.queueType === serviceTypeFilter);
 
   const systemStats = {
     totalQueues: activeQueueDetails.length,
@@ -546,6 +611,78 @@ export default function AdminQueue() {
                     </button>
                   </div>
                 </div>
+
+                {/* Queue Entries */}
+                <div className="queue-detail-card">
+                  <div className="queue-detail-header">
+                    <h3>
+                      <UsersIcon />
+                      Queue Entries ({queueEntries.length})
+                    </h3>
+                  </div>
+                  <div className="queue-entries-list">
+                    {loadingEntries ? (
+                      <p className="queue-entries-empty">Loading entries…</p>
+                    ) : queueEntries.length === 0 ? (
+                      <p className="queue-entries-empty">No students in queue.</p>
+                    ) : (
+                      paginatedEntries.map((entry, index) => (
+                        <div
+                          key={entry.queueNumber}
+                          className={`queue-entry-item ${entry.status === "serving" ? "is-serving" : ""}`}
+                        >
+                          <div className="queue-entry-top">
+                            <div className="queue-entry-number">{entriesStartIndex + index + 1}</div>
+                            <div className="queue-entry-info">
+                              <h4 className="queue-entry-name">{entry.studentName}</h4>
+                              <p className="queue-entry-id">ID: {entry.studentId}</p>
+                            </div>
+                            <div className="queue-entry-badges">
+                              <span className={`queue-entry-status queue-entry-status--${entry.status}`}>
+                                {getEntryStatusLabel(entry.status)}
+                              </span>
+                              <span className="queue-entry-queue-number">{entry.queueNumber}</span>
+                            </div>
+                          </div>
+                          <div className="queue-entry-details">
+                            <p className="queue-entry-concern">
+                              <strong>Concern:</strong> {entry.concern}
+                            </p>
+                            <p className="queue-entry-time">
+                              <ClockIcon />
+                              Joined at {entry.joinedAt}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {!loadingEntries && queueEntries.length > ENTRIES_PER_PAGE && (
+                    <div className="queue-entries-pagination">
+                      <button
+                        className="queue-entries-page-btn"
+                        onClick={() => setEntriesPage((p) => Math.max(0, p - 1))}
+                        disabled={currentEntriesPage === 0}
+                        aria-label="Previous batch"
+                      >
+                        <ChevronLeft />
+                      </button>
+                      <span className="queue-entries-page-label">
+                        {entriesStartIndex + 1}–{Math.min(queueEntries.length, entriesStartIndex + ENTRIES_PER_PAGE)} of {queueEntries.length}
+                      </span>
+                      <button
+                        className="queue-entries-page-btn"
+                        onClick={() => setEntriesPage((p) => Math.min(totalEntryPages - 1, p + 1))}
+                        disabled={currentEntriesPage >= totalEntryPages - 1}
+                        aria-label="Next batch"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right Column */}
@@ -660,6 +797,19 @@ export default function AdminQueue() {
             subtitleClassName="aq-subtitle"
           />
 
+          <Link to="/admin/queue-hosting" className="aq-host-link-btn">
+            <div className="aq-host-link-btn-icon-box">
+              <PlusCircleIcon />
+            </div>
+            <div className="aq-host-link-btn-text">
+              <span className="aq-host-link-btn-title">Host Queue</span>
+              <span className="aq-host-link-btn-subtitle">Open a new queue line and manage service slots</span>
+            </div>
+            <svg className="aq-host-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </Link>
+
           {/* System Stats */}
           <div className="queue-system-stats">
             <div className="queue-stat-box">
@@ -715,6 +865,26 @@ export default function AdminQueue() {
                 <h2>Active Queue Details</h2>
                 <p>Queue information for {user?.college}</p>
               </div>
+              {serviceTypes.length > 0 && (
+                <div className="queue-section-controls">
+                  <div className="queue-filter-wrapper">
+                    <select
+                      className="queue-filter-select"
+                      value={serviceTypeFilter}
+                      onChange={(e) => setServiceTypeFilter(e.target.value)}
+                      aria-label="Filter by service type"
+                    >
+                      <option value="all">All Service Types</option>
+                      {serviceTypes.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                    <span className="queue-filter-icon">
+                      <ChevronDownIcon />
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="queue-details-list">
               {loading ? (
@@ -727,8 +897,13 @@ export default function AdminQueue() {
                   <ActivityIcon />
                   <p>No active queues found</p>
                 </div>
+              ) : filteredQueueDetails.length === 0 ? (
+                <div className="queue-empty-state">
+                  <ActivityIcon />
+                  <p>No queues match this service type</p>
+                </div>
               ) : (
-                activeQueueDetails.map((detail) => (
+                filteredQueueDetails.map((detail) => (
                   <div key={detail.id} className="queue-detail-row">
                     <div className="queue-detail-info">
                     <div className="queue-detail-header-row">
@@ -791,7 +966,7 @@ export default function AdminQueue() {
                     </div>
                     <button
                       className="btn-monitor"
-                      onClick={() => setMonitoringQueueId(detail.id)}
+                      onClick={() => { setMonitoringQueueId(detail.id); setEntriesPage(0); }}
                     >
                       <AlertCircleIcon />
                       Monitor
