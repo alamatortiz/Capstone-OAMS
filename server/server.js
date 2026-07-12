@@ -15,6 +15,7 @@ const studentRoutes = require("./routes/studentRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { startNoShowSweeper } = require("./jobs/queueNoShowSweeper");
+const { startExpirySweeper } = require("./jobs/queueExpirySweeper");
 const { initSocketServer } = require("./sockets");
 
 app.use("/api/auth", authRoutes);
@@ -28,6 +29,7 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 startNoShowSweeper();
+startExpirySweeper();
 
 const pool = require("./db"); // your mysql2 pool connection
 

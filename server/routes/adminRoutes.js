@@ -7,6 +7,7 @@ const {
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
+const { voidQueueEntry } = require("../jobs/queueNoShowSweeper");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -231,7 +232,7 @@ router.get(
       const [services] = await pool.query(
         `SELECT service_id, service_name, description
          FROM services
-         WHERE department_id = ?
+         WHERE department_id = ? OR department_id IS NULL
          ORDER BY service_name ASC`,
         [deptId],
       );
@@ -372,6 +373,12 @@ router.post(
         .status(400)
         .json({ error: "Start time must be before end time" });
     }
+    if (endTime <= getManilaTimeString()) {
+      return res.status(400).json({
+        error:
+          "End time has already passed — choose a window that ends later than the current time",
+      });
+    }
     const noShowTimeoutNum = noShowTimeoutMinutes != null
       ? parseInt(noShowTimeoutMinutes, 10)
       : 15;
@@ -402,6 +409,19 @@ router.post(
         return res
           .status(403)
           .json({ error: "You can only host queues for your own department" });
+      }
+
+      const [[overlap]] = await pool.query(
+        `SELECT slot_id FROM queue_slots
+         WHERE service_id = ? AND slot_date = ? AND status IN ('open', 'paused')
+           AND start_time < ? AND end_time > ?
+         LIMIT 1`,
+        [serviceId, getManilaDateString(), endTime, startTime],
+      );
+      if (overlap) {
+        return res.status(409).json({
+          error: "This time window overlaps with an existing queue for this service",
+        });
       }
 
       const [result] = await pool.query(
@@ -458,7 +478,7 @@ async function assertOwnedSlot(deptId, slotId) {
     [slotId],
   );
   if (!slot) return { error: 404, message: "Queue slot not found" };
-  if (slot.department_id !== deptId) {
+  if (slot.department_id !== null && slot.department_id !== deptId) {
     return {
       error: 403,
       message: "You can only manage queues for your own department",
@@ -567,7 +587,7 @@ router.patch(
         await conn.rollback();
         return res.status(404).json({ error: "Queue slot not found" });
       }
-      if (slot.department_id !== deptId) {
+      if (slot.department_id !== null && slot.department_id !== deptId) {
         await conn.rollback();
         return res
           .status(403)
@@ -743,6 +763,54 @@ router.patch(
       });
     } catch (error) {
       console.error("Mark as served error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/skip
+// Manually voids the currently-serving student as a no-show, instead of
+// waiting for the automatic no-show timeout (queueNoShowSweeper.js).
+router.patch(
+  "/queue-hosting/:slotId/skip",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    const adminId = req.user.userId;
+    try {
+      const deptId = await getAdminDepartmentId(adminId);
+      const check = await assertOwnedSlot(deptId, slotId);
+      if (check.error)
+        return res.status(check.error).json({ error: check.message });
+
+      const [[serving]] = await pool.query(
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+        [slotId],
+      );
+      if (!serving) {
+        return res
+          .status(404)
+          .json({ error: "No student is currently being served" });
+      }
+
+      await voidQueueEntry({
+        queueId: serving.queue_id,
+        slotId,
+        studentId: serving.student_id,
+        deptId,
+        changedBy: adminId,
+        note: "Manually voided by admin (skipped)",
+      });
+
+      res.json({
+        message: "Student skipped and marked as no-show",
+        queueId: serving.queue_id,
+      });
+    } catch (error) {
+      console.error("Skip student error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
@@ -1052,7 +1120,7 @@ router.get(
       const [[slot]] = await pool.query(
         `SELECT qs.slot_id FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? AND s.department_id = ?`,
+         WHERE qs.slot_id = ? AND (s.department_id = ? OR s.department_id IS NULL)`,
         [slotId, deptId],
       );
       if (!slot) {
@@ -1067,11 +1135,14 @@ router.get(
            q.created_at,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number,
-           d.department_abbreviation
+           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation
          FROM queues q
          JOIN students st ON q.student_id = st.student_id
          JOIN services s ON q.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN departments d ON s.department_id = d.department_id
+         JOIN queue_slots qs ON q.slot_id = qs.slot_id
+         JOIN administrators adm ON qs.admin_id = adm.admin_id
+         JOIN departments da ON adm.department_id = da.department_id
          WHERE q.slot_id = ?
          ORDER BY q.queue_number ASC`,
         [slotId],
@@ -1830,7 +1901,7 @@ router.get(
       const { status } = req.query;
       let sql = `
         SELECT s.service_id AS id, s.service_name AS name, s.description,
-               s.status, s.average_service_time AS avgServiceTime, s.auto_close AS autoClose,
+               s.status, s.average_service_time AS avgServiceTime,
                s.department_id, s.location_id,
                d.department_abbreviation AS deptAbbrev,
                l.location_name AS locationName
@@ -1853,7 +1924,6 @@ router.get(
         description: r.description,
         status: r.status,
         avgServiceTime: r.avgServiceTime,
-        autoClose: !!r.autoClose,
         deptAbbrev: r.deptAbbrev || "All",
         scope: r.department_id === null ? "all" : "department",
         locationId: r.location_id,
@@ -1867,13 +1937,13 @@ router.get(
 );
 
 // POST /api/admin/data-management/service-types
-// Body: { name, description, avgServiceTime, autoClose, status, scope }
+// Body: { name, description, avgServiceTime, status, scope }
 router.post(
   "/data-management/service-types",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { name, description, avgServiceTime, autoClose, status, scope, locationId } = req.body;
+    const { name, description, avgServiceTime, status, scope, locationId } = req.body;
     if (!name || !avgServiceTime) {
       return res.status(400).json({ error: "name and avgServiceTime are required" });
     }
@@ -1884,9 +1954,9 @@ router.post(
       const effectiveDeptId = scope === "all" ? null : deptId;
 
       const [result] = await pool.query(
-        `INSERT INTO services (service_name, description, department_id, location_id, status, average_service_time, auto_close)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [name, description || null, effectiveDeptId, locationId || null, status || "active", parseInt(avgServiceTime, 10), autoClose !== false],
+        `INSERT INTO services (service_name, description, department_id, location_id, status, average_service_time)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [name, description || null, effectiveDeptId, locationId || null, status || "active", parseInt(avgServiceTime, 10)],
       );
       const newId = result.insertId;
       await logAudit(req.user.userId, "CREATE", "services", newId, null, { name, status: status || "active", avgServiceTime });
@@ -1905,7 +1975,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, avgServiceTime, autoClose, status, scope, locationId } = req.body;
+    const { name, description, avgServiceTime, status, scope, locationId } = req.body;
     if (!name || !avgServiceTime) {
       return res.status(400).json({ error: "name and avgServiceTime are required" });
     }
@@ -1922,9 +1992,9 @@ router.put(
       const effectiveDeptId = scope === "all" ? null : deptId;
 
       await pool.query(
-        `UPDATE services SET service_name = ?, description = ?, status = ?, average_service_time = ?, auto_close = ?,
+        `UPDATE services SET service_name = ?, description = ?, status = ?, average_service_time = ?,
          department_id = ?, location_id = ? WHERE service_id = ?`,
-        [name, description || null, status || "active", parseInt(avgServiceTime, 10), autoClose !== false, effectiveDeptId, locationId || null, serviceId],
+        [name, description || null, status || "active", parseInt(avgServiceTime, 10), effectiveDeptId, locationId || null, serviceId],
       );
 
       await logAudit(req.user.userId, "UPDATE", "services", serviceId,
@@ -2440,14 +2510,14 @@ router.get(
 
       // Main performance query: per-service stats for completed queues
       const [rows] = await pool.query(
-        `SELECT s.service_id, s.service_name, d.department_abbreviation AS college,
+        `SELECT s.service_id, s.service_name, COALESCE(d.department_abbreviation, 'ALL') AS college,
            COUNT(q.queue_id) AS students_served,
            AVG(TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at)) AS avg_wait_minutes
          FROM queues q
          JOIN services s ON q.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN departments d ON s.department_id = d.department_id
          WHERE q.status = 'completed'
-           AND s.department_id = ?
+           AND (s.department_id = ? OR s.department_id IS NULL)
            AND q.created_at >= ?
            ${serviceFilter ? "AND s.service_name = ?" : ""}
          GROUP BY s.service_id, s.service_name, d.department_abbreviation`,
@@ -2519,7 +2589,7 @@ router.get(
 
       // Service type list for dropdown
       const [serviceRows] = await pool.query(
-        `SELECT service_name FROM services WHERE department_id = ? ORDER BY service_name`,
+        `SELECT service_name FROM services WHERE department_id = ? OR department_id IS NULL ORDER BY service_name`,
         [deptId],
       );
       const serviceTypes = ["All Services", ...serviceRows.map((s) => s.service_name)];

@@ -16,6 +16,34 @@ export function getManilaDateString(date = new Date()) {
   return MANILA_DATE_FORMATTER.format(date);
 }
 
+const MANILA_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Manila",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+// Returns the current Manila wall-clock time as "HH:MM" (24h) -- directly
+// comparable to a native <input type="time"> value. Mirrors
+// server/utils/dateTime.js's getManilaTimeString (which includes seconds
+// for TIME-column comparisons); this one deliberately omits seconds to
+// match the time input's value format.
+export function getManilaTimeString(date = new Date()) {
+  return MANILA_TIME_FORMATTER.format(date);
+}
+
+// Adds `minutesToAdd` to a "HH:MM" time string, clamping at "23:59" instead
+// of rolling into the next day -- queue windows are always same-day
+// (slot_date is fixed to "today" server-side), so wrapping would silently
+// misrepresent the window instead of extending it.
+export function addMinutesClampedToDay(timeStr, minutesToAdd) {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const totalMinutes = Math.min(hours * 60 + minutes + minutesToAdd, 23 * 60 + 59);
+  const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const mm = String(totalMinutes % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 // Returns today's Manila calendar date as a local-midnight `Date` object
 // (year, 0-indexed month, day) — a safe seed for calendar math (week/month
 // range boundaries, weekday lookups) that stays internally consistent

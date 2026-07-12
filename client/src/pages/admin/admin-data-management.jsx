@@ -93,7 +93,6 @@ const emptyServiceForm = () => ({
   name: "",
   description: "",
   avgServiceTime: "",
-  autoClose: true,
   status: "active",
   scope: "department",
   locationId: "",
@@ -227,7 +226,7 @@ export default function AdminDataManagement() {
     if (i.includes("document") || i.includes("certificate"))
       return "Manage document types and their requirements in the Document Settings tab.";
     if (i.includes("service") || i.includes("queue"))
-      return "Configure queue services — name, average service time, and auto-close — in Service Settings.";
+      return "Configure queue services — name and average service time — in Service Settings.";
     if (i.includes("audit") || i.includes("log"))
       return "The Audit Logs tab shows all CREATE, UPDATE, DELETE, and other admin actions. Filter by action type.";
     return "I can help with document settings, service configuration, and audit logs. What do you need?";
@@ -354,7 +353,6 @@ export default function AdminDataManagement() {
       name: s.name,
       description: s.description || "",
       avgServiceTime: String(s.avgServiceTime),
-      autoClose: s.autoClose,
       status: s.status,
       scope: s.scope || "department",
       locationId: s.locationId ? String(s.locationId) : "",
@@ -437,7 +435,6 @@ export default function AdminDataManagement() {
         name: serviceForm.name,
         description: serviceForm.description,
         avgServiceTime: parseInt(serviceForm.avgServiceTime, 10),
-        autoClose: serviceForm.autoClose,
         status: serviceForm.status,
         scope: serviceForm.scope,
         locationId,
@@ -831,15 +828,6 @@ export default function AdminDataManagement() {
                     </div>
                   </div>
 
-                  <label className="adm-checkbox-wrapper">
-                    <input
-                      type="checkbox"
-                      checked={serviceForm.autoClose}
-                      onChange={(e) => setServiceForm((p) => ({ ...p, autoClose: e.target.checked }))}
-                    />
-                    <span className="adm-checkbox-label">Auto-close when capacity is reached</span>
-                  </label>
-
                   {/* ── Service Requirements ── */}
                   <div className="adm-req-section">
                     <div className="adm-req-header">
@@ -1137,7 +1125,6 @@ export default function AdminDataManagement() {
                         {s.description && <p className="adm-item-desc">{s.description}</p>}
                         <div className="adm-item-meta">
                           <span>Avg. Service Time: {s.avgServiceTime} min</span>
-                          <span>{s.autoClose ? "Auto-close enabled" : "Manual close"}</span>
                         </div>
                       </div>
                       <div className="adm-item-actions">

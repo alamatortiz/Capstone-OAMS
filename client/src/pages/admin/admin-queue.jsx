@@ -339,6 +339,18 @@ export default function AdminQueue() {
     }
   };
 
+  const handleSkipStudent = async (slotId) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${slotId}/skip`);
+      toast.message("Student skipped and marked as no-show");
+      await fetchQueueDetails();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.error ?? "Failed to skip student",
+      );
+    }
+  };
+
   // Pause and stop both require a reason, collected via QueueReasonModal.
   const [reasonModal, setReasonModal] = useState(null); // { mode: 'pause'|'close', slotId }
   const [reasonSubmitting, setReasonSubmitting] = useState(false);
@@ -608,6 +620,15 @@ export default function AdminQueue() {
                     >
                       <AlertCircleIcon />
                       Mark as Served
+                    </button>
+                    <button
+                      className="queue-action-btn queue-action-btn--danger"
+                      style={{ width: "100%", marginTop: "0.5rem" }}
+                      onClick={() => handleSkipStudent(monitoringQueue.id)}
+                      disabled={!monitoringQueue.currentlyServingStudentNumber}
+                    >
+                      <CloseIcon />
+                      Skip / No-Show
                     </button>
                   </div>
                 </div>

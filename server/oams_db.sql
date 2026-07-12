@@ -137,7 +137,6 @@ CREATE TABLE services (
     location_id           INT          NULL,
     status                ENUM('active','inactive') NOT NULL DEFAULT 'active',
     average_service_time  INT          NOT NULL DEFAULT 15,
-    auto_close            BOOLEAN      NOT NULL DEFAULT TRUE,
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
     FOREIGN KEY (location_id)   REFERENCES locations(location_id)     ON DELETE SET NULL
 );

@@ -207,9 +207,16 @@ export default function QueuePage() {
     }
   };
 
+  // A slot is only actually joinable while it's 'open', has a free spot,
+  // and the current time falls within its posted hours -- checked in this
+  // order so the label names the real blocker instead of defaulting to
+  // "Queue Full" for a merely paused queue (hasCapacity is false for any
+  // non-open status, not just a full one).
   const detailJoinBtnLabel = () => {
     if (!selectedSlot) return 'Join Queue';
     if (isAlreadyInQueue(selectedSlot.slotId)) return 'Already in Queue';
+    if (selectedSlot.status === 'paused') return 'Queue Paused';
+    if (!selectedSlot.isWithinHours) return 'Currently Closed';
     if (!selectedSlot.hasCapacity) return 'Queue Full';
     if (joiningSlotId === selectedSlot.slotId) return 'Joining…';
     return 'Join Queue';
@@ -218,6 +225,8 @@ export default function QueuePage() {
   const detailJoinBtnDisabled = () => {
     if (!selectedSlot) return true;
     if (isAlreadyInQueue(selectedSlot.slotId)) return true;
+    if (selectedSlot.status === 'paused') return true;
+    if (!selectedSlot.isWithinHours) return true;
     if (!selectedSlot.hasCapacity) return true;
     if (joiningSlotId === selectedSlot.slotId) return true;
     return false;
@@ -663,7 +672,9 @@ export default function QueuePage() {
                     <div className="available-queues-list">
                       {filteredSlots.map((slot) => {
                         const isJoining = joiningSlotId === slot.slotId;
+                        const isPaused = slot.status === 'paused';
                         const atCapacity = !slot.hasCapacity;
+                        const outsideHours = !slot.isWithinHours;
 
                         return (
                           <div
@@ -688,7 +699,7 @@ export default function QueuePage() {
                                       <p className="qp-college-name">{slot.departmentName}</p>
                                     </div>
                                     <span className="queue-status-badge">
-                                      {atCapacity ? 'Full' : 'Open'}
+                                      {isPaused ? 'Paused' : outsideHours ? 'Closed' : atCapacity ? 'Full' : 'Open'}
                                     </span>
                                   </div>
                                   <div className="queue-details-grid">
@@ -723,12 +734,16 @@ export default function QueuePage() {
                                 </div>
                               </div>
                               <button
-                                className={`queue-join-btn ${(isJoining || atCapacity) ? 'disabled' : ''}`}
+                                className={`queue-join-btn ${(isJoining || isPaused || outsideHours || atCapacity) ? 'disabled' : ''}`}
                                 onClick={(e) => { e.stopPropagation(); handleJoinQueue(slot.slotId); }}
-                                disabled={isJoining || atCapacity}
+                                disabled={isJoining || isPaused || outsideHours || atCapacity}
                                 type="button"
                                 aria-label={
-                                  atCapacity
+                                  isPaused
+                                    ? `Queue for ${slot.serviceName} is paused`
+                                    : outsideHours
+                                    ? `Queue for ${slot.serviceName} is closed for today`
+                                    : atCapacity
                                     ? `Queue for ${slot.serviceName} is full`
                                     : `Join queue for ${slot.serviceName}`
                                 }
@@ -746,6 +761,10 @@ export default function QueuePage() {
                                     />
                                     Joining…
                                   </>
+                                ) : isPaused ? (
+                                  'Queue Paused'
+                                ) : outsideHours ? (
+                                  'Currently Closed'
                                 ) : atCapacity ? (
                                   'Queue Full'
                                 ) : (

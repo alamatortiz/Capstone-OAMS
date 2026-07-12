@@ -6,7 +6,7 @@ const {
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept } = require("../sockets");
-const { getManilaDateString } = require("../utils/dateTime");
+const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -690,6 +690,7 @@ router.get(
         [manilaToday, studentDeptId],
       );
 
+      const manilaNow = getManilaTimeString();
       const formatted = slots.map((slot) => {
         const waitingCount = slot.waiting_count || 0;
         const claimedCount = slot.claimed_count || 0;
@@ -718,6 +719,8 @@ router.get(
           currentCount: claimedCount,
           hasCapacity:
             slot.status === "open" && claimedCount < slot.max_capacity,
+          isWithinHours:
+            manilaNow >= slot.start_time && manilaNow <= slot.end_time,
           status: slot.status,
           waitingCount,
           currentlyServing,
@@ -967,7 +970,8 @@ router.post(
 
       // 1. Lock and fetch the slot
       const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, qs.service_id, qs.status, qs.current_count, qs.max_capacity
+        `SELECT qs.slot_id, qs.service_id, qs.status, qs.current_count, qs.max_capacity,
+                qs.start_time, qs.end_time
          FROM queue_slots qs
          WHERE qs.slot_id = ? AND qs.slot_date = ?
          FOR UPDATE`,
@@ -985,6 +989,20 @@ router.post(
         return res
           .status(409)
           .json({ error: "This queue is not currently open" });
+      }
+
+      const manilaNow = getManilaTimeString();
+      if (manilaNow < slot.start_time) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `This queue hasn't opened yet — it opens at ${slot.start_time}`,
+        });
+      }
+      if (manilaNow > slot.end_time) {
+        await conn.rollback();
+        return res
+          .status(409)
+          .json({ error: "This queue's hours have ended for today" });
       }
 
       // 1b. Live capacity check — max_capacity is a total daily cap, not a

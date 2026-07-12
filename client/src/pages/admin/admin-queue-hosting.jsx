@@ -9,7 +9,7 @@ import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
-import { formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDateTime, getManilaTimeString, addMinutesClampedToDay } from "../../utils/dateTime";
 
 // ── Icons ──────────────────────────────────────────────────────
 const QueueIconNav = ({ className }) => (
@@ -175,8 +175,9 @@ export default function AdminQueueHosting() {
   const resetForm = () => {
     setServiceId("");
     setMaxCapacity("100");
-    setServiceStart("08:00");
-    setServiceEnd("17:00");
+    const now = getManilaTimeString();
+    setServiceStart(now);
+    setServiceEnd(addMinutesClampedToDay(now, 240));
     setNoShowTimeout("15");
   };
   const openModal = () => {
@@ -200,6 +201,10 @@ export default function AdminQueueHosting() {
     }
     if (serviceStart >= serviceEnd) {
       toast.error("Start time must be before end time");
+      return;
+    }
+    if (serviceEnd <= getManilaTimeString()) {
+      toast.error("End time has already passed — choose a window that ends later than the current time");
       return;
     }
     const noShowTimeoutNum = parseInt(noShowTimeout, 10);

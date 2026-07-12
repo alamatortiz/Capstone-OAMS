@@ -555,7 +555,7 @@ body {
 }
 
 .queue-wait-time-value {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--blue);
   margin-bottom: 0.75rem;
@@ -563,7 +563,7 @@ body {
 }
 
 .queue-wait-time-joined {
-  font-size: 1.4rem;
+  font-size: 1rem;
   color: var(--text-tertiary);
   transition: color 0.3s ease;
 }
