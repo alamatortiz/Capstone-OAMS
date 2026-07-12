@@ -16,6 +16,18 @@ export function getManilaDateString(date = new Date()) {
   return MANILA_DATE_FORMATTER.format(date);
 }
 
+// Returns today's Manila calendar date as a local-midnight `Date` object
+// (year, 0-indexed month, day) — a safe seed for calendar math (week/month
+// range boundaries, weekday lookups) that stays internally consistent
+// because everything downstream is built from local-Date arithmetic too.
+// Use this instead of `new Date()` wherever "today" drives calendar
+// boundaries — the viewer's device timezone must never be the source of
+// truth for what day it is.
+export function getManilaTodayAsLocalDate() {
+  const [year, month, day] = getManilaDateString().split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export function formatManilaDate(value, opts = {}) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("en-US", {

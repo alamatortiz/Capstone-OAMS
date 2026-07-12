@@ -63,14 +63,14 @@ router.get(
       );
 
       const [[apptRow]] = await pool.query(
-        `SELECT 
+        `SELECT
            COUNT(*) AS upcoming_count,
            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count
          FROM appointments
-         WHERE student_id = ? 
+         WHERE student_id = ?
            AND status IN ('pending', 'approved')
-           AND appointment_date >= CURDATE()`,
-        [studentId],
+           AND appointment_date >= ?`,
+        [studentId, getManilaDateString()],
       );
 
       const [[docRow]] = await pool.query(
@@ -452,9 +452,9 @@ router.post(
         });
       }
 
-      const estimatedCompletion = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0];
+      const estimatedCompletion = getManilaDateString(
+        new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      );
 
       const copyCount = parseInt(copies, 10) || 1;
       const notes = copyCount > 1 ? `Copies requested: ${copyCount}` : null;
@@ -634,6 +634,7 @@ router.get(
         [studentId],
       );
       const studentDeptId = stu?.department_id ?? null;
+      const manilaToday = getManilaDateString();
 
       const [slots] = await pool.query(
         `SELECT
@@ -669,11 +670,11 @@ router.get(
          LEFT JOIN departments d  ON s.department_id   = d.department_id
          JOIN administrators adm  ON qs.admin_id       = adm.admin_id
          JOIN departments    da   ON adm.department_id = da.department_id
-         WHERE qs.slot_date = CURDATE()
+         WHERE qs.slot_date = ?
            AND qs.status IN ('open', 'paused')
            AND (s.department_id = ? OR s.department_id IS NULL)
          ORDER BY department_abbreviation, s.service_name`,
-        [studentDeptId],
+        [manilaToday, studentDeptId],
       );
 
       const formatted = slots.map((slot) => {
@@ -954,9 +955,9 @@ router.post(
       const [[slot]] = await conn.query(
         `SELECT qs.slot_id, qs.service_id, qs.status, qs.current_count, qs.max_capacity
          FROM queue_slots qs
-         WHERE qs.slot_id = ? AND qs.slot_date = CURDATE()
+         WHERE qs.slot_id = ? AND qs.slot_date = ?
          FOR UPDATE`,
-        [slotId],
+        [slotId, getManilaDateString()],
       );
 
       if (!slot) {
@@ -1714,15 +1715,17 @@ router.get(
 
       // Count confirmed bookings per (template, specific date) pair across the
       // whole projection window in one query, to avoid one query per day.
+      const now = new Date();
+      const todayStr = getManilaDateString(now);
       const [bookingCounts] = await pool.query(
         `SELECT availability_id, appointment_date, COUNT(*) AS booked
          FROM appointments
          WHERE availability_id IN (?)
-           AND appointment_date >= CURDATE()
-           AND appointment_date < CURDATE() + INTERVAL ? DAY
+           AND appointment_date >= ?
+           AND appointment_date < ? + INTERVAL ? DAY
            AND status NOT IN ('cancelled', 'rejected')
          GROUP BY availability_id, appointment_date`,
-        [availabilityIds, DAYS_AHEAD],
+        [availabilityIds, todayStr, todayStr, DAYS_AHEAD],
       );
       const bookedMap = {};
       for (const b of bookingCounts) {
@@ -1732,8 +1735,6 @@ router.get(
         bookedMap[`${b.availability_id}_${dStr}`] = b.booked;
       }
 
-      const now = new Date();
-      const todayStr = getManilaDateString(now);
       const slots = [];
 
       // Project each template onto every matching weekday within the window.
@@ -2042,9 +2043,10 @@ router.get(
              LIMIT 1
            ) AS currently_serving_number
          FROM queue_slots qs
-         WHERE qs.slot_date = CURDATE()
+         WHERE qs.slot_date = ?
            AND qs.status IN ('open', 'paused')
          ORDER BY qs.start_time ASC`,
+        [getManilaDateString()],
       );
 
       // ── Assemble: group requirements per service ──────────────────────────

@@ -127,8 +127,8 @@ export default function AppointmentsPage() {
   const [purpose, setPurpose] = useState("");
   const [activeTab, setActiveTab] = useState("slots");
   const [calendarMonth, setCalendarMonth] = useState(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    const [year, month] = getManilaDateString().split("-").map(Number);
+    return { year, month };
   });
 
   const fetchSlots = async () => {

@@ -8,7 +8,11 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  timezone: "+08:00",
+  // MySQL (SYSTEM/UTC in this container) stores and returns TIMESTAMP values
+  // in UTC; tell the driver they're UTC so it doesn't re-shift them. Display
+  // conversion to Philippine time happens explicitly via the Asia/Manila
+  // formatters in server/utils/dateTime.js and client/src/utils/dateTime.js.
+  timezone: "Z",
 });
 
 module.exports = pool;

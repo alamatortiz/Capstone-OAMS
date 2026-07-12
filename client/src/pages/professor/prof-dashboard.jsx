@@ -1,17 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import ProfessorSidebar from "../../components/ProfessorSidebar";
+import ProfessorPageShell from "../../components/ProfessorPageShell";
+import ChatWidget from "../../components/ChatWidget";
 import "./prof-dashboard.css";
 import api from "../../utils/api";
 
 // ── Icons (unchanged from original) ──────────────────────────────────────────
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
 const CalendarIcon = () => (
   <svg
     className="icon"
@@ -98,29 +93,6 @@ const ActivityIcon = () => (
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
   </svg>
 );
-const ChatIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
-const SendIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
 const FileEditIcon = () => (
   <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -156,18 +128,6 @@ export default function ProfessorDashboard() {
         employeeId: "",
         departmentAbbrev: "CCS",
       };
-
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
 
   // ── Dashboard data state ──────────────────────────────────────────────────
   const [dashStats, setDashStats] = useState(null);
@@ -244,32 +204,6 @@ export default function ProfessorDashboard() {
   ];
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = {
-      id: messages.length + 1,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
-    };
-    setMessages([...messages, userMsg]);
-    setInputValue("");
-    setTimeout(() => {
-      const bot = {
-        id: messages.length + 2,
-        type: "bot",
-        text: generateBotResponse(inputValue),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
-  };
-
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
     if (i.includes("appointment"))
@@ -284,11 +218,16 @@ export default function ProfessorDashboard() {
   };
 
   return (
-    <div className="dashboard-with-sidebar">
-      <ProfessorSidebar />
-
-      {/* Main Content */}
-      <main className="dashboard-main">
+    <ProfessorPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="professor-dashboard">
           {dashError && <div className="dash-error-banner">{dashError}</div>}
 
@@ -482,56 +421,6 @@ export default function ProfessorDashboard() {
             </div>
           </div>
         </div>
-      </main>
-
-      {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="chat-send-btn"
-                aria-label="Send message"
-              >
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+    </ProfessorPageShell>
   );
 }

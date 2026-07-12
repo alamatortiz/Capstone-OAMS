@@ -8,7 +8,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { ChevronLeft } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ export default function TransactionsPage() {
       filterStatus === "all" || transaction.status === filterStatus;
     return matchesSearch && matchesType && matchesStatus;
   });
-  const now = new Date();
+  const currentManilaMonth = getManilaDateString().slice(0, 7); // "YYYY-MM"
 
   const stats = [
     {
@@ -137,13 +137,8 @@ export default function TransactionsPage() {
     },
     {
       label: "This Month",
-      value: transactions.filter((t) => {
-        const d = new Date(t.date);
-        return (
-          d.getMonth() === now.getMonth() &&
-          d.getFullYear() === now.getFullYear()
-        );
-      }).length,
+      value: transactions.filter((t) => t.date?.slice(0, 7) === currentManilaMonth)
+        .length,
       color: "text-purple-600",
       bgColor: "tx-bg-purple-50",
       icon: "calendar",
@@ -252,7 +247,6 @@ export default function TransactionsPage() {
         <ChatWidget
           initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your transactions?"
           getBotResponse={generateBotResponse}
-          showUnreadDot
         />
       }
     >

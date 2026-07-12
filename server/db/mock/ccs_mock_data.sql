@@ -56,7 +56,7 @@ TRUNCATE TABLE users;
 TRUNCATE TABLE departments;
 SET FOREIGN_KEY_CHECKS = 1;
 
--- DYNAMIC GENERATOR TRIGGER FOR TRACKING NUMBER
+-- Auto-generates tracking_number on insert (REQ-00001, REQ-00002, ...)
 DROP TRIGGER IF EXISTS ts_auto_tracking_number;
 DELIMITER //
 
@@ -65,17 +65,13 @@ BEFORE INSERT ON document_requests
 FOR EACH ROW
 BEGIN
     DECLARE next_id INT;
-    
-    -- Dynamically look up the next primary increment token sequence
     SELECT COALESCE(MAX(request_id), 0) + 1 INTO next_id FROM document_requests;
-    
-    -- Combines text with padded zero increment (e.g., REQ-00001, REQ-00002)
     SET NEW.tracking_number = CONCAT('REQ-', LPAD(next_id, 5, '0'));
 END//
 
 DELIMITER ;
 
--- Mirrors ts_auto_tracking_number above, but for faculty's own document requests.
+-- Mirrors ts_auto_tracking_number above, but for faculty's own document requests (FDR-00001, ...)
 DROP TRIGGER IF EXISTS ts_auto_tracking_number_faculty;
 DELIMITER //
 
@@ -84,9 +80,7 @@ BEFORE INSERT ON faculty_document_requests
 FOR EACH ROW
 BEGIN
     DECLARE next_id INT;
-
     SELECT COALESCE(MAX(request_id), 0) + 1 INTO next_id FROM faculty_document_requests;
-
     SET NEW.tracking_number = CONCAT('FDR-', LPAD(next_id, 5, '0'));
 END//
 
@@ -132,7 +126,7 @@ INSERT INTO locations (location_id, department_id, location_name) VALUES
 INSERT INTO users (user_id, password, role, status) VALUES
 (103, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'admin', 'active');
 
--- 1b. Faculty (5): 3 named + 2 generated
+-- 1b. Faculty (5): all named
 INSERT INTO users (user_id, password, role, status) VALUES
 (102, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active'),
 (106, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active'),
@@ -255,7 +249,7 @@ INSERT INTO administrators (admin_id, employee_id, first_name, last_name, positi
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 3 · FACULTY (child profiles)
--- 3 named + 2 generated | all in CCS (department_id 1001)
+-- All 5 named, all in CCS (department_id 1001)
 -- Employee ID format: EMP-2026-XXX
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO faculty (faculty_id, employee_id, first_name, last_name, specialization, email, department_id) VALUES
@@ -659,12 +653,12 @@ INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id,
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
 -- Student 101: 1 processing, 1 released
-(1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', '2026-06-14', NULL,                        'Document Test 1', NOW() - INTERVAL 3 DAY),
-(2,  101, 2, 'Transcript of Records',     'Local Doc Req 2', 'released',   '2026-06-14', NOW() - INTERVAL 7 DAY,  'Document Test 2', NOW() - INTERVAL 14 DAY),
+(1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', CURDATE() + INTERVAL 2 DAY, NULL,                        'Document Test 1', NOW() - INTERVAL 3 DAY),
+(2,  101, 2, 'Transcript of Records',     'Local Doc Req 2', 'released',   CURDATE() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY,  'Document Test 2', NOW() - INTERVAL 14 DAY),
 -- Student 104: 2 pending, 1 released
-(3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    '2026-06-14', NULL,                        'Document Test 3', NOW() - INTERVAL 1 DAY),
-(4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    '2026-06-14', NULL,                        'Document Test 4', NOW() - INTERVAL 2 DAY),
-(5,  104, 1, 'Good Moral Certificate',    'Local Doc Req 5', 'released',   '2026-06-14', NOW() - INTERVAL 5 DAY,  'Document Test 5', NOW() - INTERVAL 10 DAY);
+(3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    CURDATE() + INTERVAL 3 DAY, NULL,                        'Document Test 3', NOW() - INTERVAL 1 DAY),
+(4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    CURDATE() + INTERVAL 6 DAY, NULL,                        'Document Test 4', NOW() - INTERVAL 2 DAY),
+(5,  104, 1, 'Good Moral Certificate',    'Local Doc Req 5', 'released',   CURDATE() - INTERVAL 5 DAY, NOW() - INTERVAL 5 DAY,  'Document Test 5', NOW() - INTERVAL 10 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -697,9 +691,9 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 -- All reference the faculty-only "Certificate of Employment" service (service_id 5).
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO faculty_document_requests (request_id, tracking_number, faculty_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
-(1, 'FDR-00001', 102, 5, 'Certificate of Employment', 'Bank loan requirement', 'released',   '2026-06-10', NOW() - INTERVAL 4 DAY, 'Faculty Doc Req 1', NOW() - INTERVAL 9 DAY),
-(2, 'FDR-00002', 106, 5, 'Certificate of Employment', 'Visa application',      'processing', '2026-06-16', NULL,                    'Faculty Doc Req 2', NOW() - INTERVAL 2 DAY),
-(3, 'FDR-00003', 110, 5, 'Certificate of Employment', 'HR records update',     'pending',    '2026-06-18', NULL,                    'Faculty Doc Req 3', NOW() - INTERVAL 1 DAY);
+(1, 'FDR-00001', 102, 5, 'Certificate of Employment', 'Bank loan requirement', 'released',   CURDATE() - INTERVAL 4 DAY, NOW() - INTERVAL 4 DAY, 'Faculty Doc Req 1', NOW() - INTERVAL 9 DAY),
+(2, 'FDR-00002', 106, 5, 'Certificate of Employment', 'Visa application',      'processing', CURDATE() + INTERVAL 2 DAY, NULL,                    'Faculty Doc Req 2', NOW() - INTERVAL 2 DAY),
+(3, 'FDR-00003', 110, 5, 'Certificate of Employment', 'HR records update',     'pending',    CURDATE() + INTERVAL 3 DAY, NULL,                    'Faculty Doc Req 3', NOW() - INTERVAL 1 DAY);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -724,10 +718,10 @@ INSERT INTO faqs (faq_id, question, answer, type, status, created_by, is_pinned,
    'The CCS office is open Monday to Friday, 8:00 AM to 5:00 PM. Queue slots are available from 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM.',
    'general', 'active', 'CCS Admin Office', FALSE, 1001),
 (6, 'Enrollment period for AY 2026 - 2027 is now open.',
-   'All students must complete online enrollment via the OAMS portal by June 30, 2026. Walk-in enrollment will not be accommodated after the deadline.',
+   CONCAT('All students must complete online enrollment via the OAMS portal by ', DATE_FORMAT(CURDATE() + INTERVAL 30 DAY, '%M %d, %Y'), '. Walk-in enrollment will not be accommodated after the deadline.'),
    'important', 'active', 'Admin Office', TRUE, NULL),
-(7, 'System maintenance scheduled for June 15, 2026.',
-   'OAMS will be unavailable from 12:00 AM to 4:00 AM on June 15, 2026 for scheduled maintenance. Please plan your transactions accordingly.',
+(7, CONCAT('System maintenance scheduled for ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), '.'),
+   CONCAT('OAMS will be unavailable from 12:00 AM to 4:00 AM on ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), ' for scheduled maintenance. Please plan your transactions accordingly.'),
    'important', 'active', 'Admin Office', TRUE, NULL);
 
 
@@ -777,13 +771,15 @@ INSERT INTO chatbot_knowledge_base (kb_id, intent, keywords, response_text, cate
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO notifications (user_id, message, is_read, created_at) VALUES
 -- Student 101 (Alvin Matthew Ortiz · 2300544)
-(101, CONCAT('Your appointment with Prof. Ogalesco on ', DATE_FORMAT(CURDATE() + INTERVAL 2 DAY, '%M %d'), ' (9:00 AM - 12:00 PM) has been approved.'), FALSE, NOW() - INTERVAL 1 DAY),
-(101, 'Your appointment request with Prof. Tan on July 08 (10:00 AM - 12:00 PM) is pending approval.',                                   FALSE, NOW() - INTERVAL 2 HOUR),
+-- Dates below match appointment_id 1 and 2 (Section 8) exactly, computed the same way.
+(101, CONCAT('Your appointment with Prof. Ogalesco on ', DATE_FORMAT(CURDATE() + INTERVAL ((2 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '%M %d'), ' (9:00 AM - 12:00 PM) has been approved.'), FALSE, NOW() - INTERVAL 1 DAY),
+(101, CONCAT('Your appointment request with Prof. Tan on ', DATE_FORMAT(CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '%M %d'), ' (10:00 AM - 12:00 PM) is pending approval.'), FALSE, NOW() - INTERVAL 2 HOUR),
 (101, 'Your Good Moral Certificate request is now being processed.',                                                                      FALSE, NOW() - INTERVAL 3 DAY),
 (101, 'Your Transcript of Records is ready for pickup at the CCS office.',                                                                TRUE,  NOW() - INTERVAL 14 DAY),
 -- Student 104 (Luiz Gabriel Rosales · 2302494)
-(104, 'Your appointment request with Prof. Ogalesco on July 08 (9:00 AM - 12:00 PM) is pending approval.',                               FALSE, NOW() - INTERVAL 3 HOUR),
-(104, 'Your appointment request with Prof. Dela Cruz on June 30 (8:00 AM - 12:00 PM) is pending approval.',                              FALSE, NOW() - INTERVAL 1 HOUR),
+-- Dates below match appointment_id 4 and 5 (Section 8) exactly, computed the same way.
+(104, CONCAT('Your appointment request with Prof. Ogalesco on ', DATE_FORMAT(CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '%M %d'), ' (9:00 AM - 12:00 PM) is pending approval.'), FALSE, NOW() - INTERVAL 3 HOUR),
+(104, CONCAT('Your appointment request with Prof. Dela Cruz on ', DATE_FORMAT(CURDATE() + INTERVAL ((1 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '%M %d'), ' (8:00 AM - 12:00 PM) is pending approval.'), FALSE, NOW() - INTERVAL 1 HOUR),
 (104, 'Your Good Moral Certificate request has been received and is pending review.',                                                     FALSE, NOW() - INTERVAL 1 DAY),
 -- Admin 103
 (103, 'New document request submitted by Alvin Matthew Ortiz (Good Moral Certificate).',                                                 TRUE,  NOW() - INTERVAL 3 DAY),

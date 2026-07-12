@@ -265,21 +265,19 @@ body {
 .dash-stats-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.125rem;
+  gap: 1.25rem;
   width: 100%;
 }
 
 @media (min-width: 640px) {
   .dash-stats-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem;
   }
 }
 
 @media (min-width: 1024px) {
   .dash-stats-grid {
     grid-template-columns: repeat(4, 1fr);
-    gap: 1.75rem;
   }
 }
 
@@ -1585,7 +1583,6 @@ body {
 
   .dash-stats-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
   }
 
   .quick-actions-grid {

@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
 import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import "./prof-dashboard.css";
 import "./prof-schedule-manager.css";
 import api from "../../utils/api";
@@ -12,21 +13,6 @@ import { toast } from "sonner";
 const CalendarIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-);
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
 const PlusIcon = () => (
@@ -68,11 +54,6 @@ export default function ProfessorScheduleManager() {
   const location = useLocation();
   const cameFrom = location.state?.from ?? "/professor/dashboard";
   const cameFromLabel = location.state?.fromLabel ?? "Home";
-
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([{ id: 1, type: "bot", text: "Hello! I'm your OAMS Assistant. How can I help with your schedule?", timestamp: new Date() }]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
 
   // ── Data ────────────────────────────────────────────────────────────────────
   // All slots indexed by day name, e.g. "Monday" -> [slot, slot, ...]
@@ -273,20 +254,8 @@ export default function ProfessorScheduleManager() {
   // ── Weekly schedule summary (days with slots, in week order) ────────────────
   const scheduledDays = DAYS.filter((d) => (slotsByDay[d] ?? []).length > 0);
 
-  // ── Effects ─────────────────────────────────────────────────────────────────
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = { id: messages.length + 1, type: "user", text: inputValue, timestamp: new Date() };
-    setMessages([...messages, userMsg]);
-    setInputValue("");
-    setTimeout(() => {
-      const bot = { id: messages.length + 2, type: "bot", text: "Click any day in the weekly overview to add time slots for that day. This schedule repeats every week until you change it.", timestamp: new Date() };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
-  };
+  const generateBotResponse = () =>
+    "Click any day in the weekly overview to add time slots for that day. This schedule repeats every week until you change it.";
 
   const selectedSlots = selectedDay ? (slotsByDay[selectedDay] ?? []) : [];
 
@@ -576,27 +545,10 @@ export default function ProfessorScheduleManager() {
       )}
 
       {/* AI Chatbot */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button className="chat-close-btn" onClick={() => setChatOpen(false)} aria-label="Close chat"><CloseIcon /></button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}><div className="message-content">{m.text}</div></div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input type="text" className="chat-input" placeholder="Ask me anything…" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-              <button type="submit" className="chat-send-btn" aria-label="Send message"><SendIcon /></button>
-            </form>
-          </div>
-        )}
-        <button className={`chat-fab ${chatOpen ? "hidden" : ""}`} onClick={() => setChatOpen(true)} aria-label="Open chat"><ChatIcon /></button>
-      </div>
+      <ChatWidget
+        initialGreeting="Hello! I'm your OAMS Assistant. How can I help with your schedule?"
+        getBotResponse={generateBotResponse}
+      />
     </div>
   );
 }

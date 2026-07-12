@@ -1,4 +1,5 @@
 import "./CalendarGrid.css";
+import { getManilaDateString, getManilaTodayAsLocalDate } from "../utils/dateTime";
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -36,8 +37,8 @@ export default function CalendarGrid({
   disablePast = true,
   loading = false,
 }) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = getManilaTodayAsLocalDate();
+  const todayStr = getManilaDateString();
 
   const firstDayOfMonth = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -95,7 +96,7 @@ export default function CalendarGrid({
               if (!cell) return <div key={i} className="cg-cell cg-cell--empty" />;
 
               const isSelected = cell.date === selectedDate;
-              const isToday = cell.date === today.toISOString().split("T")[0];
+              const isToday = cell.date === todayStr;
               let mod = "";
               if (cell.isPast) mod = "cg-cell--past";
               else if (cell.status === "available") mod = "cg-cell--available";

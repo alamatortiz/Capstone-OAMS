@@ -1,35 +1,19 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import ProfessorSidebar from "../../components/ProfessorSidebar";
+import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
+import ChatWidget from "../../components/ChatWidget";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDateTime } from "../../utils/dateTime";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
-const CloseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-const ChatIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-const SendIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
 const ActivityIcon = () => (
@@ -68,18 +52,6 @@ const FileTextIconSm = () => (
 // ── Transactions data ─────────────────────────────────────────────────────────
 
 export default function ProfessorTransactionsPage() {
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      text: "Hello! 👋 I'm your OAMS Assistant. How can I help you today?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const messagesEndRef = useRef(null);
-
   // ── Filter state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -137,31 +109,8 @@ export default function ProfessorTransactionsPage() {
 
   useEffect(() => { fetchTransactions(); }, [searchQuery, filterType, filterStatus]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-    const userMsg = {
-      id: messages.length + 1,
-      type: "user",
-      text: inputValue,
-      timestamp: new Date(),
-    };
-    setMessages([...messages, userMsg]);
-    setInputValue("");
-    setTimeout(() => {
-      const bot = {
-        id: messages.length + 2,
-        type: "bot",
-        text: "I can help you with appointment management, student requests, and document reviews. What do you need?",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, bot]);
-    }, 600);
-  };
+  const generateBotResponse = () =>
+    "I can help you with appointment management, student requests, and document reviews. What do you need?";
 
   // ── Derived stats ─────────────────────────────────────────────────────────
   const stats = {
@@ -175,11 +124,16 @@ export default function ProfessorTransactionsPage() {
   const filtered = transactions;
 
   return (
-    <div className="dashboard-with-sidebar">
-      <ProfessorSidebar />
-
-      {/* ── Main content ─────────────────────────────────────────────────── */}
-      <main className="dashboard-main">
+    <ProfessorPageShell
+      outerClassName="dashboard-with-sidebar"
+      mainClassName="dashboard-main"
+      overlay={
+        <ChatWidget
+          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+          getBotResponse={generateBotResponse}
+        />
+      }
+    >
         <div className="transactions-page">
 
           {/* Page header */}
@@ -337,52 +291,6 @@ export default function ProfessorTransactionsPage() {
             )}
           </div>
         </div>
-      </main>
-
-      {/* ── AI Chatbot ───────────────────────────────────────────────────── */}
-      <div className={`chat-widget ${chatOpen ? "open" : ""}`}>
-        {chatOpen && (
-          <div className="chat-container">
-            <div className="chat-header">
-              <h3>OAMS Assistant</h3>
-              <button
-                className="chat-close-btn"
-                onClick={() => setChatOpen(false)}
-                aria-label="Close chat"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="chat-messages">
-              {messages.map((m) => (
-                <div key={m.id} className={`message message-${m.type}`}>
-                  <div className="message-content">{m.text}</div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ask me anything..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-              <button type="submit" className="chat-send-btn" aria-label="Send message">
-                <SendIcon />
-              </button>
-            </form>
-          </div>
-        )}
-        <button
-          className={`chat-fab ${chatOpen ? "hidden" : ""}`}
-          onClick={() => setChatOpen(true)}
-          aria-label="Open chat"
-        >
-          <ChatIcon />
-        </button>
-      </div>
-    </div>
+    </ProfessorPageShell>
   );
 }

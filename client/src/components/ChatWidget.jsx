@@ -22,7 +22,7 @@ const CloseIcon = () => (
 );
 
 /**
- * Visual variant props (accent/customScrollbar/shrinkIconOnMobile/showUnreadDot) exist because
+ * Visual variant props (accent/customScrollbar/shrinkIconOnMobile) exist because
  * the 9 page-local implementations this was consolidated from had genuinely diverged in these
  * specific ways — they reproduce each page's exact prior appearance, not stylistic options for new use.
  */
@@ -33,7 +33,6 @@ export default function ChatWidget({
   accent = "light",
   customScrollbar = true,
   shrinkIconOnMobile = true,
-  showUnreadDot = false,
 }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -78,7 +77,6 @@ export default function ChatWidget({
       data-accent={accent}
       data-scrollbar={customScrollbar ? "thin" : undefined}
       data-icon-shrink={shrinkIconOnMobile ? "true" : undefined}
-      data-unread={showUnreadDot ? "true" : undefined}
     >
       {chatOpen && (
         <div className="chat-container">

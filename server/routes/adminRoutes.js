@@ -6,7 +6,7 @@ const {
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
-const { getManilaDateString } = require("../utils/dateTime");
+const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -16,6 +16,8 @@ router.get(
   authorizeRoles("admin"),
   async (req, res) => {
     const adminId = req.user.userId;
+    const manilaToday = getManilaDateString();
+    const manilaNow = getManilaTimeString();
 
     try {
       // Get admin's department
@@ -30,10 +32,10 @@ router.get(
         `SELECT COUNT(*) AS active_queue_count
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_date = CURDATE()
+         WHERE qs.slot_date = ?
            AND qs.status = 'open'
            AND (? IS NULL OR s.department_id = ?)`,
-        [deptId, deptId],
+        [manilaToday, deptId, deptId],
       );
 
       // 2. Pending documents (in this department's services)
@@ -95,12 +97,12 @@ router.get(
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
          LEFT JOIN departments d ON s.department_id = d.department_id
-         WHERE qs.slot_date = CURDATE()
+         WHERE qs.slot_date = ?
            AND qs.status IN ('open', 'paused')
            AND (s.department_id = ? OR s.department_id IS NULL)
          ORDER BY waiting_count DESC
          LIMIT 5`,
-        [deptId],
+        [manilaToday, deptId],
       );
 
       // 7. Faculty list for the availability card
@@ -114,10 +116,10 @@ router.get(
              WHEN EXISTS (
                SELECT 1 FROM appointments a
                WHERE a.faculty_id = f.faculty_id
-                 AND a.appointment_date = CURDATE()
+                 AND a.appointment_date = ?
                  AND a.status = 'approved'
                  AND a.appointment_time BETWEEN
-                   SUBTIME(CURTIME(), '01:00:00') AND ADDTIME(CURTIME(), '00:30:00')
+                   SUBTIME(?, '01:00:00') AND ADDTIME(?, '00:30:00')
              ) THEN 'Busy'
              ELSE 'Available'
            END AS status,
@@ -125,15 +127,15 @@ router.get(
              SELECT MIN(a2.appointment_time)
              FROM appointments a2
              WHERE a2.faculty_id = f.faculty_id
-               AND a2.appointment_date = CURDATE()
-               AND a2.appointment_time > CURTIME()
+               AND a2.appointment_date = ?
+               AND a2.appointment_time > ?
                AND a2.status IN ('pending','approved')
            ) AS next_appointment
          FROM faculty f
          JOIN departments d ON f.department_id = d.department_id
          WHERE (? IS NULL OR f.department_id = ?)
          LIMIT 8`,
-        [deptId, deptId],
+        [manilaToday, manilaNow, manilaNow, manilaToday, manilaNow, deptId, deptId],
       );
 
       // 8. Announcements list (faqs table)
@@ -159,6 +161,7 @@ router.get(
           document: d.request_type,
           college: d.college,
           date: new Date(d.created_at).toLocaleDateString("en-US", {
+            timeZone: "Asia/Manila",
             month: "numeric",
             day: "numeric",
             year: "numeric",
@@ -188,6 +191,7 @@ router.get(
           tag: a.type || "general",
           isPinned: a.is_pinned === 1,
           date: new Date(a.created_at).toLocaleDateString("en-US", {
+            timeZone: "Asia/Manila",
             month: "numeric",
             day: "numeric",
             year: "numeric",
@@ -300,9 +304,9 @@ router.get(
          JOIN services s ON qs.service_id = s.service_id
          LEFT JOIN departments d ON s.department_id = d.department_id
          WHERE (s.department_id = ? OR s.department_id IS NULL)
-           AND qs.slot_date = CURDATE()
+           AND qs.slot_date = ?
          ORDER BY qs.created_at DESC`,
-        [deptId],
+        [deptId, getManilaDateString()],
       );
 
       const formatted = slots.map((q) => ({
@@ -403,8 +407,8 @@ router.post(
       const [result] = await pool.query(
         `INSERT INTO queue_slots
            (service_id, admin_id, slot_date, start_time, end_time, max_capacity, no_show_timeout_minutes, current_count, status)
-         VALUES (?, ?, CURDATE(), ?, ?, ?, ?, 0, 'open')`,
-        [serviceId, adminId, startTime, endTime, capacityNum, noShowTimeoutNum],
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'open')`,
+        [serviceId, adminId, getManilaDateString(), startTime, endTime, capacityNum, noShowTimeoutNum],
       );
 
       emitToDept(deptId, "queue:slot-opened", {
@@ -811,7 +815,7 @@ router.get(
           date: dateStr,
           time: formatTime(r.appointment_time),
           status: r.status,
-          requestedAt: new Date(r.created_at).toLocaleString("en-US"),
+          requestedAt: new Date(r.created_at).toLocaleString("en-US", { timeZone: "Asia/Manila" }),
           isToday: dateStr === todayStr,
         };
       });
@@ -855,13 +859,22 @@ router.get(
 
       const { type = "all", status = "all", range = "all" } = req.query;
 
-      // Date-range boundary applied identically to all three branches below
+      // Date-range boundary applied identically to all three branches below.
+      // event_time is a real UTC instant, so "today"/"week"/"month" must be
+      // anchored to Manila midnight, not the DB server's (UTC) CURDATE().
+      const manilaMidnightUTC = new Date(`${getManilaDateString()}T00:00:00+08:00`);
       let dateClause = "";
-      if (range === "today") dateClause = "AND event_time >= CURDATE()";
-      else if (range === "week")
-        dateClause = "AND event_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
-      else if (range === "month")
-        dateClause = "AND event_time >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+      let dateParam = null;
+      if (range === "today") {
+        dateClause = "AND event_time >= ?";
+        dateParam = manilaMidnightUTC;
+      } else if (range === "week") {
+        dateClause = "AND event_time >= ?";
+        dateParam = new Date(manilaMidnightUTC.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (range === "month") {
+        dateClause = "AND event_time >= ?";
+        dateParam = new Date(manilaMidnightUTC.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
 
       const unionSql = `
         SELECT * FROM (
@@ -947,7 +960,9 @@ router.get(
         LIMIT 200
       `;
 
-      const [rows] = await pool.query(unionSql, [deptId, deptId, deptId]);
+      const unionParams = [deptId, deptId, deptId];
+      if (dateParam) unionParams.push(dateParam);
+      const [rows] = await pool.query(unionSql, unionParams);
 
       // Map raw per-table statuses -> the badge vocabulary the UI uses
       const statusMap = {
@@ -975,6 +990,7 @@ router.get(
         details: r.details || "No additional details provided.",
         status: statusMap[r.raw_status] ?? r.raw_status,
         timestamp: new Date(r.event_time).toLocaleString("en-US", {
+          timeZone: "Asia/Manila",
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
@@ -1066,7 +1082,7 @@ router.get(
         studentName: r.student_name,
         studentId: r.student_number,
         concern: r.notes || "No concern specified",
-        joinedAt: formatTime(new Date(r.created_at).toTimeString().slice(0, 8)),
+        joinedAt: formatTime(getManilaTimeString(r.created_at)),
         status: r.status,
       }));
 
@@ -1365,13 +1381,14 @@ router.get(
       }
 
       const facultyIds = facultyList.map((f) => f.faculty_id);
+      const manilaToday = getManilaDateString();
 
       const [availabilityRows] = await pool.query(
         `SELECT faculty_id, start_time, end_time, location
          FROM faculty_availability
-         WHERE faculty_id IN (?) AND day_of_week = DAYNAME(CURDATE())
+         WHERE faculty_id IN (?) AND day_of_week = DAYNAME(?)
          ORDER BY faculty_id, start_time`,
-        [facultyIds],
+        [facultyIds, manilaToday],
       );
 
       const [appointmentRows] = await pool.query(
@@ -1381,10 +1398,10 @@ router.get(
            a.status
          FROM appointments a
          WHERE a.faculty_id IN (?)
-           AND a.appointment_date = CURDATE()
+           AND a.appointment_date = ?
            AND a.status IN ('pending', 'approved')
          ORDER BY a.faculty_id, a.appointment_time`,
-        [facultyIds],
+        [facultyIds, manilaToday],
       );
 
       const availMap = {};
@@ -1399,8 +1416,7 @@ router.get(
         apptMap[row.faculty_id].push(row);
       });
 
-      const nowDate = new Date();
-      const currentTimeStr = nowDate.toTimeString().slice(0, 8);
+      const currentTimeStr = getManilaTimeString();
 
       const toTimeStr = (val) => {
         if (!val) return "00:00:00";
@@ -1967,7 +1983,7 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_id FROM services WHERE service_id = ? AND department_id = ?`,
+        `SELECT service_id FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2000,7 +2016,7 @@ router.put(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
+        `SELECT service_name FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2041,7 +2057,7 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_id FROM services WHERE service_id = ? AND department_id = ?`,
+        `SELECT service_id FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2074,7 +2090,7 @@ router.put(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
+        `SELECT service_name FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2142,7 +2158,7 @@ router.get(
         newValues: r.new_values,
         adminName: r.admin_name,
         adminEmail: r.admin_email,
-        timestamp: new Date(r.created_at).toLocaleString("en-US"),
+        timestamp: new Date(r.created_at).toLocaleString("en-US", { timeZone: "Asia/Manila" }),
       })) });
     } catch (error) {
       console.error("Audit logs fetch error:", error);
@@ -2684,7 +2700,7 @@ router.get(
       const docStatus = validStatuses.includes(docRow.status) ? "VALID" : "EXPIRED";
 
       const fmtDate = (d) =>
-        d ? new Date(d).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" }) : "N/A";
+        d ? new Date(d).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "numeric", day: "numeric", year: "numeric" }) : "N/A";
 
       res.json({
         found: true,

@@ -14,6 +14,7 @@ router.get(
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
+    const manilaToday = getManilaDateString();
 
     try {
       // 0. Current availability status (global Available/Unavailable toggle)
@@ -26,12 +27,12 @@ router.get(
       const [[apptRow]] = await pool.query(
         `SELECT
            COUNT(*) AS pending_count,
-           SUM(CASE WHEN appointment_date = CURDATE() AND status IN ('pending','approved') THEN 1 ELSE 0 END) AS today_count
+           SUM(CASE WHEN appointment_date = ? AND status IN ('pending','approved') THEN 1 ELSE 0 END) AS today_count
          FROM appointments
          WHERE faculty_id = ?
            AND status IN ('pending', 'approved')
-           AND appointment_date >= CURDATE()`,
-        [facultyId],
+           AND appointment_date >= ?`,
+        [manilaToday, facultyId, manilaToday],
       );
 
       // 2. Distinct students with pending requests
@@ -56,9 +57,9 @@ router.get(
          FROM appointments
          WHERE faculty_id = ?
            AND status = 'completed'
-           AND MONTH(appointment_date) = MONTH(CURDATE())
-           AND YEAR(appointment_date) = YEAR(CURDATE())`,
-        [facultyId],
+           AND MONTH(appointment_date) = MONTH(?)
+           AND YEAR(appointment_date) = YEAR(?)`,
+        [facultyId, manilaToday, manilaToday],
       );
 
       // 5. Today's appointments list
@@ -75,10 +76,10 @@ router.get(
          FROM appointments a
          JOIN students s ON a.student_id = s.student_id
          WHERE a.faculty_id = ?
-           AND a.appointment_date = CURDATE()
+           AND a.appointment_date = ?
            AND a.status IN ('pending', 'approved')
          ORDER BY a.appointment_time ASC`,
-        [facultyId],
+        [facultyId, manilaToday],
       );
 
       // 6. Recent activity (last 5)
