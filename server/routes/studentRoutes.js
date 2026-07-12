@@ -1650,13 +1650,15 @@ router.get(
              'queue' AS type,
              q.queue_id AS id,
              IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', s.service_name)) AS title,
-             d.department_name AS college,
+             COALESCE(d.department_name, 'All Colleges') AS college,
              q.status AS raw_status,
              COALESCE(q.admin_reason, q.notes) AS details,
              q.created_at AS event_time
            FROM queues q
            JOIN services s ON q.service_id = s.service_id
-           JOIN departments d ON s.department_id = d.department_id
+           LEFT JOIN queue_slots qs ON q.slot_id = qs.slot_id
+           LEFT JOIN administrators adm ON qs.admin_id = adm.admin_id
+           LEFT JOIN departments d ON adm.department_id = d.department_id
            WHERE q.student_id = ?
          )
          UNION ALL
@@ -1680,13 +1682,13 @@ router.get(
              'document' AS type,
              dr.request_id AS id,
              CONCAT(dr.request_type, ' Request') AS title,
-             d.department_name AS college,
+             COALESCE(d.department_name, 'All Colleges') AS college,
              dr.status AS raw_status,
              dr.purpose AS details,
              dr.created_at AS event_time
            FROM document_requests dr
            JOIN document_services s ON dr.service_id = s.service_id
-           JOIN departments d ON s.department_id = d.department_id
+           LEFT JOIN departments d ON s.department_id = d.department_id
            WHERE dr.student_id = ?
          )
          ORDER BY event_time DESC`,

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
@@ -61,6 +62,35 @@ const ALL_RANGE_LABELS = {
   week: "This Week",
   month: "This Month",
   all: "All Time",
+};
+
+// ── Confirmation modal copy, keyed by action type ──────────────────────────────
+const CONFIRM_META = {
+  approve: (apt) => ({
+    title: "Approve Appointment?",
+    message: <>Approve the appointment request from <strong>{apt.studentName}</strong>?</>,
+    confirmText: "Approve",
+    icon: <CheckCircle2 style={{ width: 22, height: 22 }} />,
+  }),
+  reject: (apt) => ({
+    title: "Reject Appointment?",
+    message: <>Reject the appointment request from <strong>{apt.studentName}</strong>? This action cannot be undone.</>,
+    confirmText: "Reject",
+    icon: <XCircle style={{ width: 22, height: 22 }} />,
+  }),
+  complete: (apt) => ({
+    title: "Mark as Completed?",
+    message: <>Mark the appointment with <strong>{apt.studentName}</strong> as completed?</>,
+    confirmText: "Mark Complete",
+    icon: <CheckCircle2 style={{ width: 22, height: 22 }} />,
+  }),
+  cancel: (apt) => ({
+    title: "Cancel Appointment?",
+    message: <>Cancel the appointment with <strong>{apt.studentName}</strong>? This action cannot be undone.</>,
+    confirmText: "Cancel Appointment",
+    cancelText: "Keep Appointment",
+    icon: <XCircle style={{ width: 22, height: 22 }} />,
+  }),
 };
 
 // Week starts on Sunday, matching the appointment booking calendar elsewhere in the app.
@@ -193,6 +223,10 @@ export default function ProfessorAppointmentsPage() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ── Action confirmation (approve / reject / complete / cancel) ─────────────
+  const [confirmAction, setConfirmAction] = useState(null); // { type, apt } or null
+  const [confirmSaving, setConfirmSaving] = useState(false);
+
   const fetchAppointments = async () => {
     try {
       const res = await api.get("/faculty/appointments");
@@ -234,14 +268,34 @@ export default function ProfessorAppointmentsPage() {
     }
   };
 
-  const handleApprove = (id) =>
-    updateStatus(id, "approved", "Approved appointment with {name}");
-  const handleReject = (id) =>
-    updateStatus(id, "rejected", null, "Rejected appointment");
-  const handleComplete = (id) =>
-    updateStatus(id, "completed", "Appointment marked as completed");
-  const handleCancel = (id) =>
-    updateStatus(id, "cancelled", "Appointment cancelled");
+  const requestAction = (type, id) => {
+    const apt = appointments.find((a) => a.id === id);
+    if (apt) setConfirmAction({ type, apt });
+  };
+
+  const handleApprove = (id) => requestAction("approve", id);
+  const handleReject = (id) => requestAction("reject", id);
+  const handleComplete = (id) => requestAction("complete", id);
+  const handleCancel = (id) => requestAction("cancel", id);
+
+  const STATUS_BY_ACTION = {
+    approve: ["approved", "Approved appointment with {name}"],
+    reject: ["rejected", null],
+    complete: ["completed", "Appointment marked as completed"],
+    cancel: ["cancelled", "Appointment cancelled"],
+  };
+
+  const runConfirmAction = async () => {
+    if (!confirmAction) return;
+    const { type, apt } = confirmAction;
+    const [status, successMsg] = STATUS_BY_ACTION[type];
+    setConfirmSaving(true);
+    await updateStatus(apt.id, status, successMsg);
+    setConfirmSaving(false);
+    setConfirmAction(null);
+  };
+
+  const confirmMeta = confirmAction ? CONFIRM_META[confirmAction.type](confirmAction.apt) : null;
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
@@ -269,10 +323,23 @@ export default function ProfessorAppointmentsPage() {
       outerClassName="dashboard-with-sidebar"
       mainClassName="dashboard-main"
       overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-          getBotResponse={generateBotResponse}
-        />
+        <>
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
+            getBotResponse={generateBotResponse}
+          />
+          <ActionConfirmModal
+            show={!!confirmAction}
+            onCancel={() => setConfirmAction(null)}
+            onConfirm={runConfirmAction}
+            title={confirmMeta?.title}
+            message={confirmMeta?.message}
+            icon={confirmMeta?.icon}
+            confirmText={confirmSaving ? "Please wait…" : confirmMeta?.confirmText}
+            cancelText={confirmMeta?.cancelText}
+            confirmDisabled={confirmSaving}
+          />
+        </>
       }
     >
         <div className="appt-page-content">

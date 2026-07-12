@@ -957,8 +957,8 @@ router.get(
                 WHEN q.status = 'serving'   THEN 'Currently Serving'
                 ELSE 'Queue Joined'
               END AS action,
-              d.department_name AS college,
-              d.department_abbreviation AS college_abbrev,
+              COALESCE(d.department_name, 'All Colleges') AS college,
+              COALESCE(d.department_abbreviation, 'ALL') AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
               s.service_name AS processor,
@@ -967,9 +967,11 @@ router.get(
               COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time
             FROM queues q
             JOIN services s ON q.service_id = s.service_id
-            JOIN departments d ON s.department_id = d.department_id
+            LEFT JOIN queue_slots qs ON q.slot_id = qs.slot_id
+            LEFT JOIN administrators adm ON qs.admin_id = adm.admin_id
+            LEFT JOIN departments d ON adm.department_id = d.department_id
             JOIN students st ON q.student_id = st.student_id
-            WHERE s.department_id = ?
+            WHERE (d.department_id = ? OR d.department_id IS NULL)
           )
           UNION ALL
           (
@@ -1008,8 +1010,8 @@ router.get(
                 WHEN 'processing' THEN 'Processing Document Request'
                 ELSE 'Pending Document Request'
               END AS action,
-              d.department_name AS college,
-              d.department_abbreviation AS college_abbrev,
+              COALESCE(d.department_name, 'All Colleges') AS college,
+              COALESCE(d.department_abbreviation, 'ALL') AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
               dr.request_type AS processor,
@@ -1018,9 +1020,9 @@ router.get(
               dr.created_at AS event_time
             FROM document_requests dr
             JOIN document_services s ON dr.service_id = s.service_id
-            JOIN departments d ON s.department_id = d.department_id
+            LEFT JOIN departments d ON s.department_id = d.department_id
             JOIN students st ON dr.student_id = st.student_id
-            WHERE s.department_id = ?
+            WHERE (s.department_id = ? OR s.department_id IS NULL)
           )
         ) AS combined
         WHERE 1=1 ${dateClause}
@@ -1190,12 +1192,12 @@ router.get(
            dr.needed_by,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number AS student_id,
-           d.department_abbreviation AS college
+           COALESCE(d.department_abbreviation, 'ALL') AS college
          FROM document_requests dr
          JOIN students st ON dr.student_id = st.student_id
          JOIN document_services s ON dr.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
-         WHERE s.department_id = ?
+         LEFT JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ? OR s.department_id IS NULL
          ORDER BY dr.created_at DESC`,
         [deptId],
       );
@@ -1401,7 +1403,7 @@ router.patch(
       if (!request) {
         return res.status(404).json({ error: "Document request not found" });
       }
-      if (request.department_id !== deptId) {
+      if (request.department_id !== null && request.department_id !== deptId) {
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
 

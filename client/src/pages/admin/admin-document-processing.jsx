@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -79,6 +80,10 @@ export default function AdminDocumentProcessing() {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [processingNotes, setProcessingNotes] = useState("");
+
+  // ── Status-change confirmation ───────────────────────────────────────────
+  const [confirmStatus, setConfirmStatus] = useState(null); // target status or null
+  const [confirmSaving, setConfirmSaving] = useState(false);
 
   const sourceEndpoint = SOURCES.find((s) => s.id === source).endpoint;
 
@@ -194,6 +199,35 @@ export default function AdminDocumentProcessing() {
     setProcessingNotes("");
   };
 
+  const runConfirmStatusChange = async () => {
+    if (!confirmStatus) return;
+    setConfirmSaving(true);
+    await handleUpdateStatus(confirmStatus);
+    setConfirmSaving(false);
+    setConfirmStatus(null);
+  };
+
+  const DOC_CONFIRM_META = selectedDocument && {
+    processing: {
+      title: "Start Processing?",
+      message: <>Start processing the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong>?</>,
+      confirmText: "Start Processing",
+      icon: <ClockIcon />,
+    },
+    ready: {
+      title: "Mark as Ready?",
+      message: <>Mark the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong> as ready for pickup?</>,
+      confirmText: "Mark as Ready",
+      icon: <CheckCircleIcon />,
+    },
+    rejected: {
+      title: "Reject Request?",
+      message: <>Reject the <strong>{selectedDocument.documentType}</strong> request from <strong>{selectedDocument.requesterName}</strong>? This action cannot be undone.</>,
+      confirmText: "Reject Request",
+      icon: <XCircleIcon />,
+    },
+  }[confirmStatus];
+
   const getStatusMeta = (status) => {
     switch (status) {
       case "pending":     return { label: "Pending",    cls: "adp-badge-pending",    Icon: AlertCircleIcon };
@@ -297,12 +331,12 @@ export default function AdminDocumentProcessing() {
 
                   <div className="adp-modal-actions">
                     {selectedDocument.status === "pending" && (
-                      <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => handleUpdateStatus("processing")}>
+                      <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => setConfirmStatus("processing")}>
                         Start Processing
                       </button>
                     )}
                     {selectedDocument.status === "processing" && (
-                      <button className="adp-modal-btn adp-modal-btn--success" onClick={() => handleUpdateStatus("ready")}>
+                      <button className="adp-modal-btn adp-modal-btn--success" onClick={() => setConfirmStatus("ready")}>
                         Mark as Ready
                       </button>
                     )}
@@ -312,7 +346,7 @@ export default function AdminDocumentProcessing() {
                       </button>
                     )}
                     {(selectedDocument.status === "pending" || selectedDocument.status === "processing") && (
-                      <button className="adp-modal-btn adp-modal-btn--danger" onClick={() => handleUpdateStatus("rejected")}>
+                      <button className="adp-modal-btn adp-modal-btn--danger" onClick={() => setConfirmStatus("rejected")}>
                         Reject Request
                       </button>
                     )}
@@ -324,6 +358,18 @@ export default function AdminDocumentProcessing() {
               </div>
             </div>
           )}
+
+          {/* ── Status-change confirmation ─────────────────────────────────────── */}
+          <ActionConfirmModal
+            show={!!confirmStatus}
+            onCancel={() => setConfirmStatus(null)}
+            onConfirm={runConfirmStatusChange}
+            title={DOC_CONFIRM_META?.title}
+            message={DOC_CONFIRM_META?.message}
+            icon={DOC_CONFIRM_META?.icon}
+            confirmText={confirmSaving ? "Please wait…" : DOC_CONFIRM_META?.confirmText}
+            confirmDisabled={confirmSaving}
+          />
         </>
       }
     >

@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import ActionConfirmModal from "../../components/ActionConfirmModal";
 import "./prof-dashboard.css";
 import "./prof-schedule-manager.css";
 import api from "../../utils/api";
@@ -74,6 +75,10 @@ export default function ProfessorScheduleManager() {
   const [addApptTypes, setAddApptTypes] = useState([]);   // string[]
   const [addApptInput, setAddApptInput] = useState("");   // current tag input value
   const [addSaving, setAddSaving] = useState(false);
+
+  // ── Delete-slot confirmation ─────────────────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, day, slot } or null
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   // ── Fetch weekly availability ───────────────────────────────────────────────
   const fetchAll = async () => {
@@ -239,8 +244,12 @@ export default function ProfessorScheduleManager() {
   };
 
   // ── Delete slot ─────────────────────────────────────────────────────────────
-  const handleDeleteSlot = async (id, day) => {
-    if (!confirm("Remove this time slot?")) return;
+  const requestDeleteSlot = (slot, day) => setDeleteTarget({ id: slot.availability_id, day, slot });
+
+  const handleDeleteSlot = async () => {
+    if (!deleteTarget) return;
+    const { id, day } = deleteTarget;
+    setDeleteSaving(true);
     try {
       await api.delete(`/faculty/availability/${id}`);
       toast.success("Time slot removed");
@@ -248,7 +257,9 @@ export default function ProfessorScheduleManager() {
       // If this was the last slot for the selected day, deselect it
       const remaining = (slotsByDay[day] ?? []).filter((s) => s.availability_id !== id);
       if (remaining.length === 0 && selectedDay === day) setSelectedDay(null);
+      setDeleteTarget(null);
     } catch { toast.error("Failed to remove time slot"); }
+    finally { setDeleteSaving(false); }
   };
 
   // ── Weekly schedule summary (days with slots, in week order) ────────────────
@@ -341,7 +352,7 @@ export default function ProfessorScheduleManager() {
                               <button className="sa-edit-btn" onClick={() => openEditSlot(s, selectedDay)} title="Edit slot">
                                 <PencilIcon />
                               </button>
-                              <button className="sa-delete-btn" onClick={() => handleDeleteSlot(s.availability_id, selectedDay)} title="Remove slot">
+                              <button className="sa-delete-btn" onClick={() => requestDeleteSlot(s, selectedDay)} title="Remove slot">
                                 <TrashIcon />
                               </button>
                             </div>
@@ -543,6 +554,25 @@ export default function ProfessorScheduleManager() {
           </div>
         </div>
       )}
+
+      {/* ── Delete Time Slot Confirmation ── */}
+      <ActionConfirmModal
+        show={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteSlot}
+        title="Remove Time Slot?"
+        message={
+          deleteTarget && (
+            <>
+              Remove the <strong>{fmt12(deleteTarget.slot.start_time)} – {fmt12(deleteTarget.slot.end_time)}</strong> slot on{" "}
+              <strong>{deleteTarget.day}</strong>? This action cannot be undone.
+            </>
+          )
+        }
+        icon={<TrashIcon />}
+        confirmText={deleteSaving ? "Removing…" : "Remove"}
+        confirmDisabled={deleteSaving}
+      />
 
       {/* AI Chatbot */}
       <ChatWidget
