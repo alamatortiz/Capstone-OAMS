@@ -377,14 +377,15 @@ INSERT INTO students (student_id, student_number, first_name, last_name, course,
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5 · SERVICES (queue only)
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO services (service_id, service_name, description, department_id, location_id, status, average_service_time, auto_close) VALUES
-(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001, 1,    'active', 20, TRUE),
-(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001, 2,    'active', 15, TRUE),
-(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, 1,    'active', 10, TRUE),
-(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, 1,    'active', 15, FALSE),
-(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, 3,    'active', 10, TRUE),
-(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, 4,    'active', 30, FALSE),
-(7, 'General Inquiry Counter',   'Walk-in general inquiries available to all departments', NULL, 10, 'active', 10, TRUE);
+INSERT INTO services (service_id, service_name, description, department_id, is_cross_college, location_id, average_service_time) VALUES
+(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001, FALSE, 1,    20),
+(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001, FALSE, 2,    15),
+(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, FALSE, 1,    10),
+(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, FALSE, 1,    15),
+(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, FALSE, 3,    10),
+(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, FALSE, 4,    30),
+-- Hosted by CCS, but every other department's students can also join it.
+(7, 'General Inquiry Counter',   'Walk-in general inquiries available to all departments', 1001, TRUE, 10, 10);
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5a-REQ · SERVICE REQUIREMENTS
@@ -462,7 +463,9 @@ INSERT INTO service_procedure_steps (service_id, step_number, step_title, descri
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5b · APPOINTMENT SERVICES (created by faculty)
 -- Each row is a service type a faculty member offers for appointments.
+-- Commented out for a clean local test baseline — uncomment to seed.
 -- ─────────────────────────────────────────────────────────────
+/*
 INSERT INTO appointment_services (service_id, service_name, description, faculty_id) VALUES
 (1, 'Web Development Consultation',  'Frontend/backend web development guidance',    102),
 (2, 'Mobile App Consultation',       'Mobile application development advice',        102),
@@ -470,18 +473,19 @@ INSERT INTO appointment_services (service_id, service_name, description, faculty
 (4, 'Backend Architecture Review',   'Server-side architecture guidance',            107),
 (5, 'Software Engineering Consult',  'SDLC and software design principles',          110),
 (6, 'Network Security Consultation', 'Cybersecurity and network security guidance',  111);
+*/
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5c · DOCUMENT SERVICES
 -- ─────────────────────────────────────────────────────────────
 -- recipient_type: 'students' | 'faculty' | 'both'
--- department_id NULL = available across all departments
-INSERT INTO document_services (service_id, service_name, description, department_id, recipient_type, status, fee, processing_time) VALUES
-(1, 'Good Moral Certificate',       'Request for Good Moral Certificate',              1001, 'students', 'active',  75.00, '2-3 business days'),
-(2, 'Transcript of Records',        'Request for official Transcript of Records',      1001, 'students', 'active', 150.00, '5-7 business days'),
-(3, 'Certificate of Enrollment',    'Request for Certificate of Enrollment',           2001, 'students', 'active',  50.00, '1-2 business days'),
-(4, 'Clearance Processing',         'Process student clearance for graduation/leave',  3001, 'students', 'active',   0.00, '3-5 business days'),
-(5, 'Certificate of Employment',    'Official certificate of employment for faculty',  NULL, 'faculty',  'active',   0.00, '2-3 business days');
+-- Hosted by one department, is_cross_college marks which ones every other department can also request.
+INSERT INTO document_services (service_id, service_name, description, department_id, is_cross_college, recipient_type, status, fee, processing_time) VALUES
+(1, 'Good Moral Certificate',       'Request for Good Moral Certificate',              1001, FALSE, 'students', 'active',  75.00, '2-3 business days'),
+(2, 'Transcript of Records',        'Request for official Transcript of Records',      1001, FALSE, 'students', 'active', 150.00, '5-7 business days'),
+(3, 'Certificate of Enrollment',    'Request for Certificate of Enrollment',           2001, FALSE, 'students', 'active',  50.00, '1-2 business days'),
+(4, 'Clearance Processing',         'Process student clearance for graduation/leave',  3001, FALSE, 'students', 'active',   0.00, '3-5 business days'),
+(5, 'Certificate of Employment',    'Official certificate of employment for faculty',  1001, TRUE,  'faculty',  'active',   0.00, '2-3 business days');
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5c-REQ · DOCUMENT REQUIREMENTS
@@ -503,7 +507,10 @@ INSERT INTO document_requirements (service_id, requirement_name, description, is
 --   Slot 3: queue_number 3 (completed, not active)  → current_count  0
 --   Slot 4: queue_number 11 (completed, not active) → current_count  0
 --   Slot 5: no-show sweeper demo, 5-minute custom timeout (see Section 7)
+-- Sections 6, 7, 14, 14D, and 8 below are commented out together for a
+-- clean local test baseline — uncomment to seed queues/appointments.
 -- ─────────────────────────────────────────────────────────────
+/*
 INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, no_show_timeout_minutes, status) VALUES
 (1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 15, 'open'),
 (2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 15, 'open'),
@@ -646,11 +653,14 @@ INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id,
 (9,  109, 107, 1001, 4,  9,  CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '10:00:00', 'approved', 'Capstone backend review',      NOW() - INTERVAL 5 HOUR),
 -- Template 13 (110 · Monday PM · max 5): 1 of 5 spots taken
 (10, 105, 110, 1001, 5,  13, CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '13:00:00', 'pending',  'SDLC consultation for thesis', NOW() - INTERVAL 3 HOUR);
+*/
 
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 9 · DOCUMENT REQUESTS
+-- Commented out for a clean local test baseline — uncomment to seed.
 -- ─────────────────────────────────────────────────────────────
+/*
 INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
 -- Student 101: 1 processing, 1 released
 (1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', CURDATE() + INTERVAL 2 DAY, NULL,                        'Document Test 1', NOW() - INTERVAL 3 DAY),
@@ -674,6 +684,7 @@ INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time) VAL
 (1, 103, 'CCS Office', NOW() - INTERVAL 2 MINUTE),
 (2, 103, 'CCS Office', NOW() - INTERVAL 1 HOUR),
 (1, 103, 'CCS Office', NOW() - INTERVAL 1 DAY);
+*/
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -689,40 +700,46 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 9d · FACULTY DOCUMENT REQUESTS (faculty requesting their own documents)
 -- All reference the faculty-only "Certificate of Employment" service (service_id 5).
+-- Commented out for a clean local test baseline — uncomment to seed.
 -- ─────────────────────────────────────────────────────────────
+/*
 INSERT INTO faculty_document_requests (request_id, tracking_number, faculty_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
 (1, 'FDR-00001', 102, 5, 'Certificate of Employment', 'Bank loan requirement', 'released',   CURDATE() - INTERVAL 4 DAY, NOW() - INTERVAL 4 DAY, 'Faculty Doc Req 1', NOW() - INTERVAL 9 DAY),
 (2, 'FDR-00002', 106, 5, 'Certificate of Employment', 'Visa application',      'processing', CURDATE() + INTERVAL 2 DAY, NULL,                    'Faculty Doc Req 2', NOW() - INTERVAL 2 DAY),
 (3, 'FDR-00003', 110, 5, 'Certificate of Employment', 'HR records update',     'pending',    CURDATE() + INTERVAL 3 DAY, NULL,                    'Faculty Doc Req 3', NOW() - INTERVAL 1 DAY);
+*/
 
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 10 · FAQS / ANNOUNCEMENTS
 -- Used by the admin dashboard announcements card.
 -- department_id NULL = global/cross-department announcement.
+-- Sections 10, 11, 12, and 13 below are commented out together for a
+-- clean local test baseline — uncomment to seed. Runs to end of file.
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO faqs (faq_id, question, answer, type, status, created_by, is_pinned, department_id) VALUES
+/*
+INSERT INTO faqs (faq_id, question, answer, type, status, created_by, is_pinned, department_id, is_cross_college) VALUES
 (1, 'How do I request a Good Moral Certificate?',
    'Submit a document request through the OAMS portal under Document Requests. Processing takes 3 - 5 business days. Claim your document at the CCS office upon notification.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
 (2, 'How do I book a consultation with my professor?',
    'Go to Appointments in your student dashboard, select your professor, choose an available time slot, and submit your request. You will be notified once the professor approves.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
 (3, 'How does the online queue work?',
    'Join a queue from the Queue section of your dashboard. You will receive a queue number and can monitor your position in real time. Proceed to the office when you are called.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
 (4, 'What documents are required for enrollment assistance?',
    'Bring your registration form, previous grades, and any outstanding clearance slips. Visit the CCS office or join the Enrollment Assistance queue online.',
-   'reminder', 'active', 'CCS Admin Office', FALSE, 1001),
+   'reminder', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
 (5, 'What are the CCS office hours?',
    'The CCS office is open Monday to Friday, 8:00 AM to 5:00 PM. Queue slots are available from 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001),
+   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
 (6, 'Enrollment period for AY 2026 - 2027 is now open.',
    CONCAT('All students must complete online enrollment via the OAMS portal by ', DATE_FORMAT(CURDATE() + INTERVAL 30 DAY, '%M %d, %Y'), '. Walk-in enrollment will not be accommodated after the deadline.'),
-   'important', 'active', 'Admin Office', TRUE, NULL),
+   'important', 'active', 'CCS Admin Office', TRUE, 1001, TRUE),
 (7, CONCAT('System maintenance scheduled for ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), '.'),
    CONCAT('OAMS will be unavailable from 12:00 AM to 4:00 AM on ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), ' for scheduled maintenance. Please plan your transactions accordingly.'),
-   'important', 'active', 'Admin Office', TRUE, NULL);
+   'important', 'active', 'CCS Admin Office', TRUE, 1001, TRUE);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -793,3 +810,4 @@ UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 106;
 UPDATE faculty SET position = 'Program Coordinator'  WHERE faculty_id = 107;
 UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 110;
 UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 111;
+*/

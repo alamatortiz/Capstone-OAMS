@@ -64,6 +64,11 @@ const SearchIcon = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
   </svg>
 );
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+);
 
 // ── College logo resolver ────────────────────────────────────────────────
 // Resolves a college's logo image from /src/assets/{CODE}.png, falling
@@ -289,6 +294,14 @@ export default function AdminQueueHosting() {
 
   const activeQueues = filteredQueues.filter((q) => q.status === "open");
   const pausedQueues = filteredQueues.filter((q) => q.status === "paused");
+  // 'full' (capacity reached) and 'expired' (hours ended) both mean "closed
+  // to new joins, but still has unserved students" -- grouped together so
+  // they don't silently vanish from this page once they leave open/paused.
+  const stillServingQueues = filteredQueues.filter(
+    (q) => q.status === "full" || q.status === "expired",
+  );
+  const completedQueues = filteredQueues.filter((q) => q.status === "completed");
+  // 'closed' now means exclusively "an admin manually stopped this queue".
   const closedQueues = filteredQueues.filter((q) => q.status === "closed");
   const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "all" || typeFilter !== "all";
 
@@ -308,7 +321,9 @@ export default function AdminQueueHosting() {
             title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
             message={
               reasonModal?.mode === "pause"
-                ? "Students in this queue will see this reason while it's paused."
+                ? queues.find((q) => q.id === reasonModal.queueId)?.currentlyServingStudentNumber
+                  ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
+                  : "Students in this queue will see this reason while it's paused."
                 : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
             }
             confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
@@ -494,9 +509,31 @@ export default function AdminQueueHosting() {
                 <PauseIcon />
               </div>
             </div>
+            <div className="aqh-summary-card aqh-summary-still-serving">
+              <div className="aqh-summary-content">
+                <p className="aqh-summary-label">Still Serving</p>
+                <p className="aqh-summary-value aqh-value-still-serving">
+                  {loading ? "—" : stillServingQueues.length}
+                </p>
+              </div>
+              <div className="aqh-summary-icon aqh-icon-still-serving">
+                <ClockIcon />
+              </div>
+            </div>
+            <div className="aqh-summary-card aqh-summary-completed">
+              <div className="aqh-summary-content">
+                <p className="aqh-summary-label">Completed Queues</p>
+                <p className="aqh-summary-value aqh-value-completed">
+                  {loading ? "—" : completedQueues.length}
+                </p>
+              </div>
+              <div className="aqh-summary-icon aqh-icon-completed">
+                <CheckIcon />
+              </div>
+            </div>
             <div className="aqh-summary-card aqh-summary-closed">
               <div className="aqh-summary-content">
-                <p className="aqh-summary-label">Closed Queues</p>
+                <p className="aqh-summary-label">Manually Closed</p>
                 <p className="aqh-summary-value aqh-value-closed">
                   {loading ? "—" : closedQueues.length}
                 </p>
@@ -530,6 +567,9 @@ export default function AdminQueueHosting() {
                   <option value="all">All Statuses</option>
                   <option value="open">Active</option>
                   <option value="paused">Paused</option>
+                  <option value="full">Full</option>
+                  <option value="expired">Hours Ended</option>
+                  <option value="completed">Completed</option>
                   <option value="closed">Closed</option>
                 </select>
                 <span className="aqh-select-chevron">
@@ -741,10 +781,131 @@ export default function AdminQueueHosting() {
             </section>
           )}
 
-          {/* Closed Queue Lines */}
+          {/* Still Serving Queue Lines (full or hours ended, students remain) */}
+          {!loading && stillServingQueues.length > 0 && (
+            <section className="aqh-section">
+              <h2 className="aqh-section-title">Still Serving (Closed to New Joins)</h2>
+              <div className="aqh-queue-list">
+                {stillServingQueues.map((queue) => (
+                  <div
+                    key={queue.id}
+                    className="aqh-queue-card aqh-card-still-serving"
+                  >
+                    <div className="aqh-queue-card-top">
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                          onError={(e) => {
+                            if (e.currentTarget.src !== ccsLogoFallback) {
+                              e.currentTarget.src = ccsLogoFallback;
+                            }
+                          }}
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-still-serving">
+                          {queue.status === "full" ? "full" : "hours ended"}
+                        </span>
+                        <div className="aqh-queue-card-actions">
+                          <button
+                            className="aqh-action-btn aqh-action-close"
+                            onClick={() => handleCloseQueue(queue.id)}
+                          >
+                            <CloseIcon />
+                            <span>Stop Queue</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="aqh-queue-stats-row aqh-stats-row-3">
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Waiting / Max</p>
+                        <p className="aqh-queue-stat-value">
+                          {queue.currentCount} / {queue.maxCapacity}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Service Hours</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          {queue.serviceHours.start} - {queue.serviceHours.end}
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Served Today</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          {queue.servedCount}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Completed Queue Lines */}
+          {!loading && completedQueues.length > 0 && (
+            <section className="aqh-section">
+              <h2 className="aqh-section-title">Completed Queue Lines (Today)</h2>
+              <div className="aqh-queue-list">
+                {completedQueues.map((queue) => (
+                  <div
+                    key={queue.id}
+                    className="aqh-queue-card aqh-card-completed"
+                  >
+                    <div className="aqh-queue-card-top">
+                      <div className="aqh-queue-card-title-row">
+                        <img
+                          src={getCollegeLogo(
+                            queue.department || user.departmentAbbrev,
+                          )}
+                          alt={`${queue.department || user.departmentAbbrev} logo`}
+                          className="aqh-queue-card-logo"
+                          onError={(e) => {
+                            if (e.currentTarget.src !== ccsLogoFallback) {
+                              e.currentTarget.src = ccsLogoFallback;
+                            }
+                          }}
+                        />
+                        <div className="aqh-queue-card-title-block">
+                          <h3 className="aqh-queue-card-title">
+                            {queue.queueType}
+                          </h3>
+                          <p className="aqh-queue-card-dept">
+                            {queue.department}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="aqh-status-badge aqh-status-completed">
+                        completed
+                      </span>
+                    </div>
+                    <p className="aqh-closed-meta">
+                      Served {queue.servedCount} student(s), capacity{" "}
+                      {queue.maxCapacity}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Manually Closed Queue Lines */}
           {!loading && closedQueues.length > 0 && (
             <section className="aqh-section">
-              <h2 className="aqh-section-title">Closed Queue Lines (Today)</h2>
+              <h2 className="aqh-section-title">Manually Closed Queue Lines (Today)</h2>
               <div className="aqh-queue-list">
                 {closedQueues.map((queue) => (
                   <div

@@ -85,7 +85,7 @@ const emptyDocForm = () => ({
   processingTime: "",
   fee: "",
   status: "active",
-  scope: "department",
+  isCrossCollege: false,
   recipientType: "students",
 });
 
@@ -93,8 +93,7 @@ const emptyServiceForm = () => ({
   name: "",
   description: "",
   avgServiceTime: "",
-  status: "active",
-  scope: "department",
+  isCrossCollege: false,
   locationId: "",
   otherLocationName: "",
 });
@@ -132,7 +131,6 @@ export default function AdminDataManagement() {
   // ── Service Settings ───────────────────────────────────────
   const [serviceSettings, setServiceSettings] = useState([]);
   const [serviceLoading, setServiceLoading] = useState(false);
-  const [serviceStatusFilter, setServiceStatusFilter] = useState("all");
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [serviceForm, setServiceForm] = useState(emptyServiceForm());
@@ -171,11 +169,10 @@ export default function AdminDataManagement() {
     }
   }, []);
 
-  const fetchServiceTypes = useCallback(async (status = "all") => {
+  const fetchServiceTypes = useCallback(async () => {
     setServiceLoading(true);
     try {
-      const params = status !== "all" ? { status } : {};
-      const { data } = await api.get("/admin/data-management/service-types", { params });
+      const { data } = await api.get("/admin/data-management/service-types");
       setServiceSettings(data.serviceTypes || []);
     } catch {
       toast.error("Failed to load service types.");
@@ -212,10 +209,10 @@ export default function AdminDataManagement() {
 
   useEffect(() => {
     if (activeTab === "services") {
-      fetchServiceTypes(serviceStatusFilter);
+      fetchServiceTypes();
       fetchLocations();
     }
-  }, [activeTab, serviceStatusFilter, fetchServiceTypes, fetchLocations]);
+  }, [activeTab, fetchServiceTypes, fetchLocations]);
 
   useEffect(() => {
     if (activeTab === "audit") fetchAuditLogs(auditActionFilter);
@@ -249,7 +246,7 @@ export default function AdminDataManagement() {
       processingTime: doc.processingTime,
       fee: String(doc.fee),
       status: doc.status,
-      scope: doc.scope || "department",
+      isCrossCollege: !!doc.isCrossCollege,
       recipientType: doc.recipientType || "students",
     });
     setRequirements([]);
@@ -299,7 +296,7 @@ export default function AdminDataManagement() {
         processingTime,
         fee: parseFloat(fee),
         status: docForm.status,
-        scope: docForm.scope,
+        isCrossCollege: docForm.isCrossCollege,
         recipientType: docForm.recipientType,
         requirements: requirements.map((r) => ({
           name: r.name,
@@ -353,8 +350,7 @@ export default function AdminDataManagement() {
       name: s.name,
       description: s.description || "",
       avgServiceTime: String(s.avgServiceTime),
-      status: s.status,
-      scope: s.scope || "department",
+      isCrossCollege: !!s.isCrossCollege,
       locationId: s.locationId ? String(s.locationId) : "",
     });
     setServiceRequirements([]);
@@ -435,8 +431,7 @@ export default function AdminDataManagement() {
         name: serviceForm.name,
         description: serviceForm.description,
         avgServiceTime: parseInt(serviceForm.avgServiceTime, 10),
-        status: serviceForm.status,
-        scope: serviceForm.scope,
+        isCrossCollege: serviceForm.isCrossCollege,
         locationId,
       };
 
@@ -469,7 +464,7 @@ export default function AdminDataManagement() {
       ]);
 
       closeServiceModal();
-      fetchServiceTypes(serviceStatusFilter);
+      fetchServiceTypes();
     } catch (err) {
       toast.error(err?.response?.data?.error || "Failed to save service.");
     } finally {
@@ -481,7 +476,7 @@ export default function AdminDataManagement() {
     try {
       await api.delete(`/admin/data-management/service-types/${s.id}`);
       toast.success("Service deleted.");
-      fetchServiceTypes(serviceStatusFilter);
+      fetchServiceTypes();
     } catch (err) {
       toast.error(err?.response?.data?.error || "Failed to delete service.");
     } finally {
@@ -626,18 +621,14 @@ export default function AdminDataManagement() {
                   <div className="adm-form-grid-2">
                     <div className="adm-form-group">
                       <label className="adm-form-label">Availability</label>
-                      <div className="adm-scope-toggle">
-                        <label className={`adm-scope-option ${docForm.scope === "department" ? "adm-scope-selected" : ""}`}>
-                          <input type="radio" name="docScope" value="department" checked={docForm.scope === "department"}
-                            onChange={() => setDocForm((p) => ({ ...p, scope: "department" }))} />
-                          My Department
-                        </label>
-                        <label className={`adm-scope-option ${docForm.scope === "all" ? "adm-scope-selected" : ""}`}>
-                          <input type="radio" name="docScope" value="all" checked={docForm.scope === "all"}
-                            onChange={() => setDocForm((p) => ({ ...p, scope: "all" }))} />
-                          All Departments
-                        </label>
-                      </div>
+                      <label className="adm-checkbox-wrapper">
+                        <input
+                          type="checkbox"
+                          checked={docForm.isCrossCollege}
+                          onChange={(e) => setDocForm((p) => ({ ...p, isCrossCollege: e.target.checked }))}
+                        />
+                        <span className="adm-checkbox-label">Share with all colleges</span>
+                      </label>
                     </div>
                     <div className="adm-form-group">
                       <label className="adm-form-label">Available To</label>
@@ -763,29 +754,16 @@ export default function AdminDataManagement() {
                       onChange={(e) => setServiceForm((p) => ({ ...p, description: e.target.value }))}
                     />
                   </div>
-                  <div className="adm-form-grid-2">
-                    <div className="adm-form-group">
-                      <label className="adm-form-label">Avg. Service Time (min) *</label>
-                      <input
-                        className="adm-form-input"
-                        type="number"
-                        min="1"
-                        placeholder="e.g., 15"
-                        value={serviceForm.avgServiceTime}
-                        onChange={(e) => setServiceForm((p) => ({ ...p, avgServiceTime: e.target.value }))}
-                      />
-                    </div>
-                    <div className="adm-form-group">
-                      <label className="adm-form-label">Status *</label>
-                      <select
-                        className="adm-form-select"
-                        value={serviceForm.status}
-                        onChange={(e) => setServiceForm((p) => ({ ...p, status: e.target.value }))}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Avg. Service Time (min) *</label>
+                    <input
+                      className="adm-form-input"
+                      type="number"
+                      min="1"
+                      placeholder="e.g., 15"
+                      value={serviceForm.avgServiceTime}
+                      onChange={(e) => setServiceForm((p) => ({ ...p, avgServiceTime: e.target.value }))}
+                    />
                   </div>
                   <div className="adm-form-group">
                     <label className="adm-form-label">Location</label>
@@ -814,18 +792,14 @@ export default function AdminDataManagement() {
                   </div>
                   <div className="adm-form-group">
                     <label className="adm-form-label">Availability</label>
-                    <div className="adm-scope-toggle">
-                      <label className={`adm-scope-option ${serviceForm.scope === "department" ? "adm-scope-selected" : ""}`}>
-                        <input type="radio" name="svcScope" value="department" checked={serviceForm.scope === "department"}
-                          onChange={() => setServiceForm((p) => ({ ...p, scope: "department" }))} />
-                        My Department
-                      </label>
-                      <label className={`adm-scope-option ${serviceForm.scope === "all" ? "adm-scope-selected" : ""}`}>
-                        <input type="radio" name="svcScope" value="all" checked={serviceForm.scope === "all"}
-                          onChange={() => setServiceForm((p) => ({ ...p, scope: "all" }))} />
-                        All Departments
-                      </label>
-                    </div>
+                    <label className="adm-checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        checked={serviceForm.isCrossCollege}
+                        onChange={(e) => setServiceForm((p) => ({ ...p, isCrossCollege: e.target.checked }))}
+                      />
+                      <span className="adm-checkbox-label">Share with all colleges</span>
+                    </label>
                   </div>
 
                   {/* ── Service Requirements ── */}
@@ -1050,9 +1024,8 @@ export default function AdminDataManagement() {
                         <div className="adm-item-top-row">
                           <p className="adm-item-name">{doc.name}</p>
                           <div className="adm-item-badges">
-                            {doc.scope === "all"
-                              ? <span className="adm-badge adm-badge-global">All Depts</span>
-                              : <span className="adm-badge adm-badge-dept">{doc.deptAbbrev}</span>}
+                            <span className="adm-badge adm-badge-dept">{doc.deptAbbrev}</span>
+                            {doc.isCrossCollege && <span className="adm-badge adm-badge-global">Cross-College</span>}
                             <span className="adm-badge adm-badge-recipient">{doc.recipientType || "students"}</span>
                             <span className={`adm-badge adm-badge-status-${doc.status}`}>{doc.status}</span>
                           </div>
@@ -1092,19 +1065,6 @@ export default function AdminDataManagement() {
                   </button>
                 </div>
 
-                {/* Status filter pills */}
-                <div className="adm-filter-bar">
-                  {STATUS_FILTERS.map((f) => (
-                    <button
-                      key={f.value}
-                      className={`adm-filter-pill ${serviceStatusFilter === f.value ? "adm-filter-pill-active" : ""}`}
-                      onClick={() => setServiceStatusFilter(f.value)}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-
                 <div className="adm-items-list">
                   {serviceLoading && <div className="adm-loading">Loading services...</div>}
                   {!serviceLoading && serviceSettings.length === 0 && (
@@ -1116,10 +1076,8 @@ export default function AdminDataManagement() {
                         <div className="adm-item-top-row">
                           <p className="adm-item-name">{s.name}</p>
                           <div className="adm-item-badges">
-                            {s.scope === "all"
-                              ? <span className="adm-badge adm-badge-global">All Depts</span>
-                              : <span className="adm-badge adm-badge-dept">{s.deptAbbrev}</span>}
-                            <span className={`adm-badge adm-badge-status-${s.status}`}>{s.status}</span>
+                            <span className="adm-badge adm-badge-dept">{s.deptAbbrev}</span>
+                            {s.isCrossCollege && <span className="adm-badge adm-badge-global">Cross-College</span>}
                           </div>
                         </div>
                         {s.description && <p className="adm-item-desc">{s.description}</p>}

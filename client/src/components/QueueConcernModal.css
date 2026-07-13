@@ -1,0 +1,125 @@
+.qcm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: qcm-fade-in 0.15s ease;
+}
+
+@keyframes qcm-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.qcm-modal {
+  background: var(--card-bg, #111612);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 16px;
+  padding: 2rem 2rem 1.5rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  animation: qcm-slide-up 0.2s ease;
+}
+
+@keyframes qcm-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.qcm-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0fdf4);
+  margin: 0 0 0.5rem;
+}
+
+.qcm-message {
+  font-size: 0.875rem;
+  color: var(--muted-foreground, #94a3b8);
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+}
+
+.qcm-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 4.5rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: var(--input-bg, rgba(255, 255, 255, 0.03));
+  color: var(--text-primary, #f0fdf4);
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.qcm-textarea:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.qcm-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.qcm-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.qcm-cancel {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: transparent;
+  color: var(--text-primary, #f0fdf4);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.qcm-cancel:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.qcm-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qcm-confirm {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: filter 0.15s;
+}
+
+.qcm-confirm:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.qcm-confirm:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

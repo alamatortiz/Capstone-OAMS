@@ -1,10 +1,11 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity, MapPin, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import QueueConcernModal from "../../components/QueueConcernModal";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import FilterSelect from "../../components/FilterSelect";
@@ -43,13 +44,18 @@ export default function QueuePage() {
   // Detail view state
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [servicesData, setServicesData] = useState([]);
+  const [concernModal, setConcernModal] = useState(null); // { slotId, serviceName }
 
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
 
-  // Derive unique college names from all departments in the database
+  // Derive unique college names from all departments in the database.
+  // Cross-college services (e.g. General Inquiry Counter) still belong to
+  // one real owning department, so they're a selectable filter like any
+  // other -- they also always appear regardless of the selected filter,
+  // handled via slot.isCrossCollege in filteredSlots above.
   const collegeOptions = useMemo(() => {
     const seen = new Map();
     for (const dept of servicesData) {
@@ -64,13 +70,18 @@ export default function QueuePage() {
 
   // Derive service names scoped to the selected college (or all if none selected)
   const serviceOptions = useMemo(() => {
-    const departments =
-      selectedCollege === 'all'
-        ? servicesData
-        : servicesData.filter((dept) => dept.departmentName === selectedCollege);
     const names = [
       ...new Set(
-        departments.flatMap((dept) => dept.services?.map((s) => s.serviceName) ?? [])
+        servicesData.flatMap((dept) =>
+          (dept.services ?? [])
+            .filter(
+              (s) =>
+                selectedCollege === 'all' ||
+                dept.departmentName === selectedCollege ||
+                s.isCrossCollege,
+            )
+            .map((s) => s.serviceName),
+        ),
       ),
     ].sort();
     return names;
@@ -101,7 +112,8 @@ export default function QueuePage() {
       availableSlots.filter((slot) => {
         const collegeMatch =
           selectedCollege === 'all' ||
-          slot.departmentName === selectedCollege;
+          slot.departmentName === selectedCollege ||
+          slot.isCrossCollege;
         const serviceMatch =
           selectedService === 'all' || slot.serviceName === selectedService;
         const notAlreadyJoined = !isAlreadyInQueue(slot.slotId);
@@ -140,15 +152,19 @@ export default function QueuePage() {
     );
 
   // ── Actions ───────────────────────────────────────────────────────────────
-  const handleJoinQueue = useCallback(
-    async (slotId) => {
+  // Shared by both join entry points (quick card button + detail panel CTA) --
+  // both open the concern popup first; this runs once the student confirms.
+  const performJoin = useCallback(
+    async (slotId, notes) => {
       if (joiningSlotId === slotId) return;
       setJoiningSlotId(slotId);
       try {
-        await joinQueue(slotId);
+        await joinQueue(slotId, notes);
         toast.success('Successfully joined the queue!');
+        setSelectedSlot(null);
+        setConcernModal(null);
       } catch (err) {
-        toast.error(err.message);
+        toast.error(err.message ?? 'Failed to join the queue. Please try again.');
       } finally {
         setJoiningSlotId(null);
       }
@@ -193,19 +209,6 @@ export default function QueuePage() {
     return [];
   };
 
-  const handleJoinFromDetail = async () => {
-    if (!selectedSlot || joiningSlotId) return;
-    setJoiningSlotId(selectedSlot.slotId);
-    try {
-      await joinQueue(selectedSlot.slotId);
-      toast.success(`Successfully joined the queue for ${selectedSlot.serviceName}!`);
-      setSelectedSlot(null);
-    } catch (err) {
-      toast.error(err.message ?? 'Failed to join the queue. Please try again.');
-    } finally {
-      setJoiningSlotId(null);
-    }
-  };
 
   // A slot is only actually joinable while it's 'open', has a free spot,
   // and the current time falls within its posted hours -- checked in this
@@ -237,9 +240,9 @@ export default function QueuePage() {
   const generateBotResponse = (userInput) => {
     const lower = userInput.toLowerCase();
     if (lower.includes('queue') || lower.includes('position')) {
-      return queues.length > 0
-        ? `You have ${queues.length} active queue${queues.length > 1 ? 's' : ''}. Your first queue position is ${queues[0].position}. Est. wait: ${queues[0].estimatedWait}`
-        : "You don't have any active queues. Would you like to join one?";
+      if (queues.length === 0) return "You don't have any active queues. Would you like to join one?";
+      const positionText = queues[0].status === 'serving' ? 'You are currently being served' : `Your first queue position is ${queues[0].position}`;
+      return `You have ${queues.length} active queue${queues.length > 1 ? 's' : ''}. ${positionText}. Est. wait: ${queues[0].estimatedWait}`;
     }
     if (lower.includes('wait') || lower.includes('time')) {
       return queues.length > 0
@@ -270,16 +273,36 @@ export default function QueuePage() {
             onConfirm={async () => { await handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
             title="Leave Queue?"
             message={
-              <>
-                You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
-                Leaving will permanently remove your spot — you will need to rejoin
-                and wait from the back of the line if you change your mind.
-              </>
+              leaveConfirmQueue?.status === "serving" ? (
+                <>
+                  You are currently being served for <strong>{leaveConfirmQueue?.serviceName}</strong>.
+                  Leaving now ends your turn immediately — the staff will move on to the next student.
+                </>
+              ) : (
+                <>
+                  You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
+                  Leaving will permanently remove your spot — you will need to rejoin
+                  and wait from the back of the line if you change your mind.
+                </>
+              )
             }
             icon={<XCircle width={22} height={22} />}
             cancelText="Stay in Queue"
             confirmText={leavingQueueId === leaveConfirmQueue?.queueId ? "Leaving…" : "Leave Queue"}
             confirmDisabled={leavingQueueId === leaveConfirmQueue?.queueId}
+          />
+          <QueueConcernModal
+            show={concernModal !== null}
+            onCancel={() => setConcernModal(null)}
+            onConfirm={(notes) => performJoin(concernModal.slotId, notes)}
+            title="What's your concern?"
+            message={
+              <>
+                Joining the queue for <strong>{concernModal?.serviceName}</strong>. Let the staff know why you're here — this step is optional.
+              </>
+            }
+            confirmText={joiningSlotId === concernModal?.slotId ? "Joining…" : "Join Queue"}
+            submitting={joiningSlotId === concernModal?.slotId}
           />
         </>
       }
@@ -351,10 +374,12 @@ export default function QueuePage() {
                         <Users className="avail-services-service-hero-icon" />
                         <span>{selectedSlot.waitingCount} currently waiting</span>
                       </div>
-                      <div className="avail-services-service-hero-meta">
-                        <CheckCircle2 className="avail-services-service-hero-icon" />
-                        <span>Now Serving: {selectedSlot.currentlyServing}</span>
-                      </div>
+                      {selectedSlot.location && (
+                        <div className="avail-services-service-hero-meta">
+                          <MapPin className="avail-services-service-hero-icon" />
+                          <span>{selectedSlot.location}</span>
+                        </div>
+                      )}
                       {selectedSlot.voidTimeoutMinutes != null && (
                         <div className="avail-services-service-hero-meta">
                           <AlertCircle className="avail-services-service-hero-icon" />
@@ -374,7 +399,7 @@ export default function QueuePage() {
                 </div>
                 <button
                   className="avail-services-queue-btn"
-                  onClick={handleJoinFromDetail}
+                  onClick={() => setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName })}
                   disabled={detailJoinBtnDisabled()}
                 >
                   {joiningSlotId === selectedSlot.slotId ? (
@@ -388,6 +413,22 @@ export default function QueuePage() {
                   {detailJoinBtnLabel()}
                 </button>
               </div>
+
+              {/* About this Service */}
+              {selectedSlot.description && (
+                <div className="avail-services-details-card">
+                  <div className="avail-services-details-card-header">
+                    <h3 className="avail-services-details-card-title">
+                      <FileText className="avail-services-details-card-icon" /> About this Service
+                    </h3>
+                  </div>
+                  <div className="avail-services-details-card-content">
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.6 }}>
+                      {selectedSlot.description}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Requirements + Procedure */}
               <div className="avail-services-details-grid">
@@ -561,10 +602,32 @@ export default function QueuePage() {
                                 </div>
                                 <span className="qp-number-badge">{queue.queueNumberBadge}</span>
                               </div>
+                              {queue.slotStatus === "paused" && (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    background: "rgba(245, 158, 11, 0.12)",
+                                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                                    color: "#f59e0b",
+                                    borderRadius: "999px",
+                                    padding: "0.2rem 0.65rem",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    margin: "0.5rem 0",
+                                  }}
+                                >
+                                  <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
+                                  Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ""}
+                                </div>
+                              )}
                               <div className="qp-stats-grid">
                                 <div className="qp-stat">
                                   <p className="qp-stat-label">Your Position</p>
-                                  <p className="qp-stat-value">{queue.position}</p>
+                                  <p className="qp-stat-value">
+                                    {queue.status === 'serving' ? 'Being Served' : queue.position}
+                                  </p>
                                 </div>
                                 <div className="qp-stat">
                                   <p className="qp-stat-label">Total Waiting</p>
@@ -589,7 +652,7 @@ export default function QueuePage() {
                               />
                               <button
                                 className="queue-leave-btn"
-                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName }); }}
+                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status }); }}
                                 disabled={leavingQueueId === queue.queueId}
                                 title="Leave this queue"
                                 type="button"
@@ -647,12 +710,7 @@ export default function QueuePage() {
                         ariaLabel="Filter by college"
                         options={[{ value: "all", label: "All Colleges" }, ...collegeOptions.map((college) => ({
                           value: college.name,
-                          // "ALL" is the synthetic cross-college services bucket, not a real
-                          // college -- give it a distinct label so it doesn't read like a
-                          // second "show everything" option next to "All Colleges" above.
-                          label: college.abbrev === "ALL"
-                            ? "ALL - Cross-College Services"
-                            : formatCollegeLabel(college.abbrev, college.name),
+                          label: formatCollegeLabel(college.abbrev, college.name),
                         }))]}
                         chevronIcon={<ChevronDown className="filter-chevron" />}
                       />
@@ -698,7 +756,7 @@ export default function QueuePage() {
                                       <h3 className="qp-service-name">{slot.serviceName}</h3>
                                       <p className="qp-college-name">{slot.departmentName}</p>
                                     </div>
-                                    <span className="queue-status-badge">
+                                    <span className={`queue-status-badge ${isPaused ? 'queue-status-badge--paused' : ''}`}>
                                       {isPaused ? 'Paused' : outsideHours ? 'Closed' : atCapacity ? 'Full' : 'Open'}
                                     </span>
                                   </div>
@@ -735,7 +793,7 @@ export default function QueuePage() {
                               </div>
                               <button
                                 className={`queue-join-btn ${(isJoining || isPaused || outsideHours || atCapacity) ? 'disabled' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); handleJoinQueue(slot.slotId); }}
+                                onClick={(e) => { e.stopPropagation(); setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName }); }}
                                 disabled={isJoining || isPaused || outsideHours || atCapacity}
                                 type="button"
                                 aria-label={

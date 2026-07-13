@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Hash,
   Activity,
+  MapPin,
+  FileText,
 } from "lucide-react";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
@@ -99,6 +101,14 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
               </div>
               <div className="queue-hero-badge">{queue.queueNumberBadge}</div>
             </div>
+            {queue.location && (
+              <div className="queue-hero-meta-row">
+                <div className="queue-hero-meta">
+                  <MapPin className="queue-hero-meta-icon" />
+                  <span>{queue.location}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -122,7 +132,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
           <CheckCircle2
             style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }}
           />
-          Please proceed to the service window — it's your turn!
+          Please proceed to the designated location — it's your turn!
         </div>
       )}
 
@@ -131,11 +141,44 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
       {queue.slotStatus === "paused" && (
         <div
           style={{
-            background: "rgba(245, 158, 11, 0.12)",
+            background: "rgba(245, 158, 11, 0.15)",
             border: "1px solid rgba(245, 158, 11, 0.4)",
             borderRadius: "1rem",
             padding: "1rem 1.5rem",
             color: "#f59e0b",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            fontWeight: 700,
+            fontSize: "1rem",
+            boxShadow: "0 8px 24px rgba(245,158,11,0.15)",
+          }}
+        >
+          <AlertCircle
+            style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }}
+          />
+          <div style={{ textAlign: "left" }}>
+            <div>This queue is currently paused by the admin.</div>
+            {queue.slotPauseReason && (
+              <div style={{ fontWeight: 400, fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                Reason: {queue.slotPauseReason}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Informational banner for a queue that's closed to new joins (full
+          capacity or hours ended) but still working through existing
+          students — reassures the student they haven't been dropped. */}
+      {(queue.slotStatus === "full" || queue.slotStatus === "expired") && (
+        <div
+          style={{
+            background: "rgba(59, 130, 246, 0.1)",
+            border: "1px solid rgba(59, 130, 246, 0.35)",
+            borderRadius: "1rem",
+            padding: "1rem 1.5rem",
+            color: "#3b82f6",
             display: "flex",
             alignItems: "flex-start",
             gap: "0.75rem",
@@ -147,12 +190,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }}
           />
           <div>
-            <div>This queue is currently paused by the admin.</div>
-            {queue.slotPauseReason && (
-              <div style={{ fontWeight: 400, marginTop: "0.25rem" }}>
-                Reason: {queue.slotPauseReason}
-              </div>
-            )}
+            This queue is no longer accepting new students, but you're still
+            in line and will be served.
           </div>
         </div>
       )}
@@ -174,14 +213,18 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             <div className="qss-card-content">
               <div className="queue-placement-center">
                 <div className="queue-position-display">
-                  <div className="queue-position-label">Number in Line</div>
+                  <div className="queue-position-label">
+                    {queue.status === "serving" ? "Status" : "Number in Line"}
+                  </div>
                   <div>
                     <div className="queue-position-number">
-                      {queue.position}
+                      {queue.status === "serving" ? "Serving" : queue.position}
                     </div>
-                    <div className="queue-position-total">
-                      of {queue.totalWaiting} waiting
-                    </div>
+                    {queue.status !== "serving" && (
+                      <div className="queue-position-total">
+                        of {queue.totalWaiting} waiting
+                      </div>
+                    )}
                   </div>
                   <div
                     className="queue-position-message"
@@ -214,7 +257,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             <div className="qss-card-header">
               <h3 className="qss-card-title">
                 <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
-                Estimated Wait
+                {queue.status === "serving" ? "Next Steps" : "Estimated Wait"}
               </h3>
             </div>
             <div className="qss-card-content">
@@ -233,6 +276,21 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
               </div>
             </div>
           </div>
+
+          {/* About this service card */}
+          {queue.description && (
+            <div className="qss-card">
+              <div className="qss-card-header">
+                <h3 className="qss-card-title">
+                  <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
+                  About this Service
+                </h3>
+              </div>
+              <div className="qss-card-content">
+                <p className="queue-concern-text">{queue.description}</p>
+              </div>
+            </div>
+          )}
 
           {/* Notes / concern card */}
           <div className="qss-card">
@@ -317,8 +375,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             </div>
           </div>
 
-          {/* Cancel (only while waiting) */}
-          {queue.status === "waiting" && (
+          {/* Cancel (while waiting or being served) */}
+          {(queue.status === "waiting" || queue.status === "serving") && (
             <div className="qss-card queue-cancel-card">
               <div className="qss-card-header">
                 <h3 className="qss-card-title queue-cancel-title">
@@ -422,12 +480,19 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
         onConfirm={() => onCancel(queue.queueId)}
         title="Leave Queue?"
         message={
-          <>
-            You are currently at position <strong>{queue.position}</strong> in
-            the <strong>{queue.serviceName}</strong> queue. Leaving will
-            permanently remove your spot — you will need to rejoin and wait
-            from the back of the line if you change your mind.
-          </>
+          queue.status === "serving" ? (
+            <>
+              You are currently being served for <strong>{queue.serviceName}</strong>.
+              Leaving now ends your turn immediately — the staff will move on to the next student.
+            </>
+          ) : (
+            <>
+              You are currently at position <strong>{queue.position}</strong> in
+              the <strong>{queue.serviceName}</strong> queue. Leaving will
+              permanently remove your spot — you will need to rejoin and wait
+              from the back of the line if you change your mind.
+            </>
+          )
         }
         icon={<XCircle width={22} height={22} />}
         cancelText="Stay in Queue"
@@ -479,9 +544,9 @@ export default function QueueStatusPage() {
     const i = input.toLowerCase();
     const q = selectedQueue ?? queues[0];
     if (i.includes("position") || i.includes("queue")) {
-      return q
-        ? `You're at position ${q.position} of ${q.totalWaiting} in the ${q.serviceName} queue. Estimated wait: ${q.estimatedWait}.`
-        : "You have no active queues right now.";
+      if (!q) return "You have no active queues right now.";
+      const positionText = q.status === "serving" ? "You're currently being served" : `You're at position ${q.position} of ${q.totalWaiting}`;
+      return `${positionText} in the ${q.serviceName} queue. Estimated wait: ${q.estimatedWait}.`;
     }
     if (i.includes("wait") || i.includes("time")) {
       return q
@@ -635,10 +700,32 @@ export default function QueueStatusPage() {
                                   Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ""}
                                 </div>
                               )}
+                              {(queue.slotStatus === "full" || queue.slotStatus === "expired") && (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    background: "rgba(59, 130, 246, 0.1)",
+                                    border: "1px solid rgba(59, 130, 246, 0.35)",
+                                    color: "#3b82f6",
+                                    borderRadius: "999px",
+                                    padding: "0.2rem 0.65rem",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    margin: "0.5rem 0",
+                                  }}
+                                >
+                                  <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
+                                  {queue.slotStatus === "full" ? "Full — still serving" : "Hours ended — still serving"}
+                                </div>
+                              )}
                               <div className="qsl-stats-grid">
                                 <div className="qsl-stat">
                                   <p className="qsl-stat-label">Your Position</p>
-                                  <p className="qsl-stat-value">{queue.position}</p>
+                                  <p className="qsl-stat-value">
+                                    {queue.status === "serving" ? "Serving" : queue.position}
+                                  </p>
                                 </div>
                                 <div className="qsl-stat">
                                   <p className="qsl-stat-label">Total Waiting</p>

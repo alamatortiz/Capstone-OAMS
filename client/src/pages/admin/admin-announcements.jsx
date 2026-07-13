@@ -101,7 +101,7 @@ const TYPE_META = {
   general:   { label: "General",   icon: InfoIcon,        iconClass: "ann-icon-general",   badgeClass: "ann-badge-general"   },
 };
 
-const EMPTY_FORM = { title: "", content: "", type: "general", isPinned: false };
+const EMPTY_FORM = { title: "", content: "", type: "general", isPinned: false, isCrossCollege: false };
 
 const formatDate = (iso) => {
   try {
@@ -238,7 +238,13 @@ export default function AdminAnnouncements() {
 
   const openEdit = (announcement) => {
     setEditingAnnouncement(announcement);
-    setEditForm({ title: announcement.title, content: announcement.content, type: announcement.type, isPinned: announcement.isPinned });
+    setEditForm({
+      title: announcement.title,
+      content: announcement.content,
+      type: announcement.type,
+      isPinned: announcement.isPinned,
+      isCrossCollege: !!announcement.isCrossCollege,
+    });
   };
   const closeEdit = () => { setEditingAnnouncement(null); setEditForm(EMPTY_FORM); };
 
@@ -252,11 +258,12 @@ export default function AdminAnnouncements() {
         title: editForm.title,
         content: editForm.content,
         type: editForm.type,
+        isCrossCollege: editForm.isCrossCollege,
       });
       setAnnouncements((prev) =>
         prev.map((a) =>
           a.id === editingAnnouncement.id
-            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type }
+            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, isCrossCollege: editForm.isCrossCollege }
             : a,
         ),
       );
@@ -280,6 +287,7 @@ export default function AdminAnnouncements() {
         content:  createForm.content,
         type:     createForm.type,
         isPinned: createForm.isPinned,
+        isCrossCollege: createForm.isCrossCollege,
       });
       setAnnouncements((prev) => [data.announcement, ...prev]);
       showToast("Announcement created successfully");
@@ -336,6 +344,9 @@ export default function AdminAnnouncements() {
                     </span>
                     {viewingAnnouncement.isPinned && (
                       <span className="ann-pinned-pill"><PinIcon /> Pinned</span>
+                    )}
+                    {viewingAnnouncement.isCrossCollege && (
+                      <span className="ann-badge ann-badge-cross-college">Cross-College</span>
                     )}
                   </div>
                 </div>
@@ -402,6 +413,13 @@ export default function AdminAnnouncements() {
                       <option value="reminder">Reminder</option>
                     </select>
                   </div>
+                  <div className="ann-field">
+                    <label htmlFor="edit-cross-college">Share with all colleges</label>
+                    <select id="edit-cross-college" className="ann-select" value={editForm.isCrossCollege ? "true" : "false"} onChange={(e) => setEditForm({ ...editForm, isCrossCollege: e.target.value === "true" })}>
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="ann-modal-footer">
@@ -445,6 +463,13 @@ export default function AdminAnnouncements() {
                   <div className="ann-field">
                     <label htmlFor="create-pinned">Pin Announcement</label>
                     <select id="create-pinned" className="ann-select" value={createForm.isPinned ? "true" : "false"} onChange={(e) => setCreateForm({ ...createForm, isPinned: e.target.value === "true" })}>
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                  <div className="ann-field">
+                    <label htmlFor="create-cross-college">Share with all colleges</label>
+                    <select id="create-cross-college" className="ann-select" value={createForm.isCrossCollege ? "true" : "false"} onChange={(e) => setCreateForm({ ...createForm, isCrossCollege: e.target.value === "true" })}>
                       <option value="false">No</option>
                       <option value="true">Yes</option>
                     </select>
@@ -579,6 +604,7 @@ export default function AdminAnnouncements() {
                               {a.isPinned && <PinIcon className="ann-pin-flag" />}
                             </div>
                             <span className={`ann-badge ${meta.badgeClass}`}>{meta.label}</span>
+                            {a.isCrossCollege && <span className="ann-badge ann-badge-cross-college">Cross-College</span>}
                           </div>
                           <p className="ann-item-desc">{a.content}</p>
                           <div className="ann-item-meta">

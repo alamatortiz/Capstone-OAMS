@@ -8,6 +8,7 @@ const {
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 const { voidQueueEntry } = require("../jobs/queueNoShowSweeper");
+const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -57,11 +58,11 @@ router.get(
         [deptId, deptId],
       );
 
-      // 4. Announcements (faqs table, scoped to department or global)
+      // 4. Announcements (faqs table, scoped to department)
       const [[annRow]] = await pool.query(
         `SELECT COUNT(*) AS announcement_count
          FROM faqs
-         WHERE department_id = ? OR department_id IS NULL`,
+         WHERE department_id = ?`,
         [deptId],
       );
 
@@ -90,17 +91,17 @@ router.get(
         `SELECT
            qs.slot_id,
            s.service_name,
-           COALESCE(d.department_abbreviation, 'ALL') AS college,
+           d.department_abbreviation AS college,
            qs.status,
            qs.current_count,
            qs.max_capacity,
            (SELECT COUNT(*) FROM queues q WHERE q.slot_id = qs.slot_id AND q.status = 'waiting') AS waiting_count
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
+         JOIN departments d ON s.department_id = d.department_id
          WHERE qs.slot_date = ?
            AND qs.status IN ('open', 'paused')
-           AND (s.department_id = ? OR s.department_id IS NULL)
+           AND s.department_id = ?
          ORDER BY waiting_count DESC
          LIMIT 5`,
         [manilaToday, deptId],
@@ -143,7 +144,7 @@ router.get(
       const [announcements] = await pool.query(
         `SELECT faq_id, question AS title, answer AS description, type, is_pinned, created_at
          FROM faqs
-         WHERE department_id = ? OR department_id IS NULL
+         WHERE department_id = ?
          ORDER BY is_pinned DESC, created_at DESC
          LIMIT 5`,
         [deptId],
@@ -232,7 +233,7 @@ router.get(
       const [services] = await pool.query(
         `SELECT service_id, service_name, description
          FROM services
-         WHERE department_id = ? OR department_id IS NULL
+         WHERE department_id = ?
          ORDER BY service_name ASC`,
         [deptId],
       );
@@ -286,6 +287,10 @@ router.get(
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'completed'
            ) AS served_count,
            (
+             SELECT COUNT(*) FROM queues q6
+             WHERE q6.slot_id = qs.slot_id AND q6.status IN ('waiting', 'serving', 'completed')
+           ) AS total_in_queue,
+           (
              SELECT st.student_number
              FROM queues q3
              JOIN students st ON q3.student_id = st.student_id
@@ -303,36 +308,53 @@ router.get(
            ) AS avg_service_minutes
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
-         WHERE (s.department_id = ? OR s.department_id IS NULL)
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ?
            AND qs.slot_date = ?
          ORDER BY qs.created_at DESC`,
         [deptId, getManilaDateString()],
       );
 
-      const formatted = slots.map((q) => ({
-        id: q.slot_id,
-        queueType: q.service_name,
-        department: q.department_name
-          ? `${q.department_name} (${q.department_abbreviation})`
-          : "All Departments",
-        college: q.department_abbreviation || "ALL",
-        maxCapacity: q.max_capacity,
-        noShowTimeoutMinutes: q.no_show_timeout_minutes,
-        currentCount: q.waiting_count || 0,
-        servedCount: q.served_count || 0,
-        status: q.status, // 'open' | 'paused' | 'closed' | 'cancelled'
-        createdAt: q.created_at,
-        location: q.office_location || null,
-        currentlyServingStudentNumber:
-          q.currently_serving_student_number || null,
-        avgServiceMinutes:
-          q.avg_service_minutes != null ? Number(q.avg_service_minutes) : null,
-        serviceHours: {
-          start: String(q.start_time).slice(0, 5),
-          end: String(q.end_time).slice(0, 5),
-        },
-      }));
+      const formatted = slots.map((q) => {
+        const maxCapacity = q.max_capacity || 0;
+        const totalInQueue = q.total_in_queue || 0;
+        const servedCount = q.served_count || 0;
+        const queueOccupancyPercent =
+          maxCapacity > 0
+            ? Math.min(100, Math.round((totalInQueue / maxCapacity) * 100))
+            : 0;
+        const servicedPercent =
+          totalInQueue > 0
+            ? Math.min(100, Math.round((servedCount / totalInQueue) * 100))
+            : 0;
+
+        return {
+          id: q.slot_id,
+          queueType: q.service_name,
+          department: q.department_name
+            ? `${q.department_name} (${q.department_abbreviation})`
+            : "All Departments",
+          college: q.department_abbreviation || "ALL",
+          maxCapacity,
+          noShowTimeoutMinutes: q.no_show_timeout_minutes,
+          currentCount: q.waiting_count || 0,
+          servedCount,
+          totalInQueue,
+          queueOccupancyPercent,
+          servicedPercent,
+          status: q.status, // 'open' | 'paused' | 'full' | 'expired' | 'completed' | 'closed' | 'cancelled'
+          createdAt: q.created_at,
+          location: q.office_location || null,
+          currentlyServingStudentNumber:
+            q.currently_serving_student_number || null,
+          avgServiceMinutes:
+            q.avg_service_minutes != null ? Number(q.avg_service_minutes) : null,
+          serviceHours: {
+            start: String(q.start_time).slice(0, 5),
+            end: String(q.end_time).slice(0, 5),
+          },
+        };
+      });
 
       res.json({ queues: formatted });
     } catch (error) {
@@ -396,7 +418,8 @@ router.post(
           .json({ error: "Admin has no department assigned" });
       }
 
-      // The chosen service must belong to the admin's department OR be global (NULL dept).
+      // Hosting is restricted to the service's own owning department, even if
+      // it's cross-college (is_cross_college only controls who can JOIN it).
       const [[service]] = await pool.query(
         `SELECT service_id, department_id, service_name
          FROM services WHERE service_id = ?`,
@@ -405,7 +428,7 @@ router.post(
       if (!service) {
         return res.status(404).json({ error: "Service not found" });
       }
-      if (service.department_id !== null && service.department_id !== deptId) {
+      if (service.department_id !== deptId) {
         return res
           .status(403)
           .json({ error: "You can only host queues for your own department" });
@@ -413,7 +436,7 @@ router.post(
 
       const [[overlap]] = await pool.query(
         `SELECT slot_id FROM queue_slots
-         WHERE service_id = ? AND slot_date = ? AND status IN ('open', 'paused')
+         WHERE service_id = ? AND slot_date = ? AND status IN ('open', 'paused', 'full', 'expired')
            AND start_time < ? AND end_time > ?
          LIMIT 1`,
         [serviceId, getManilaDateString(), endTime, startTime],
@@ -478,7 +501,7 @@ async function assertOwnedSlot(deptId, slotId) {
     [slotId],
   );
   if (!slot) return { error: 404, message: "Queue slot not found" };
-  if (slot.department_id !== null && slot.department_id !== deptId) {
+  if (slot.department_id !== deptId) {
     return {
       error: 403,
       message: "You can only manage queues for your own department",
@@ -488,6 +511,10 @@ async function assertOwnedSlot(deptId, slotId) {
 }
 
 // PATCH /api/admin/queue-hosting/:slotId/pause
+// If a student is currently 'serving' when the queue pauses, their call is
+// reverted (back to 'waiting', called_at cleared) rather than left dangling
+// -- since queue_number never changes, they naturally land back at position
+// 1 (the position subquery counts 'waiting' rows with queue_number <= own).
 router.patch(
   "/queue-hosting/:slotId/pause",
   authenticateToken,
@@ -498,29 +525,82 @@ router.patch(
     if (!reason) {
       return res.status(400).json({ error: "A reason is required to pause a queue" });
     }
+    const adminId = req.user.userId;
+    const conn = await pool.getConnection();
     try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      const check = await assertOwnedSlot(deptId, slotId);
-      if (check.error)
-        return res.status(check.error).json({ error: check.message });
-      if (check.slot.status !== "open") {
+      await conn.beginTransaction();
+
+      const deptId = await getAdminDepartmentId(adminId);
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, qs.status, s.department_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? FOR UPDATE`,
+        [slotId],
+      );
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue slot not found" });
+      }
+      if (slot.department_id !== deptId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only manage queues for your own department" });
+      }
+      if (slot.status !== "open") {
+        await conn.rollback();
         return res
           .status(409)
           .json({ error: "Only an open queue can be paused" });
       }
 
-      await pool.query(
+      const [[serving]] = await conn.query(
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
+        [slotId],
+      );
+      if (serving) {
+        await conn.query(
+          `UPDATE queues SET status = 'waiting', called_at = NULL WHERE queue_id = ?`,
+          [serving.queue_id],
+        );
+        await conn.query(
+          `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+           VALUES (?, 'serving', 'waiting', ?, 'Call reverted: queue paused before student was served', NOW())`,
+          [serving.queue_id, adminId],
+        );
+      }
+
+      await conn.query(
         `UPDATE queue_slots SET status = 'paused', pause_reason = ? WHERE slot_id = ?`,
         [reason, slotId],
       );
+
+      await conn.commit();
+
       emitToSlot(slotId, "queue:slot-status", { slotId, status: "paused", reason });
       emitToDept(deptId, "queue:slot-status", { slotId, status: "paused", reason });
-      res.json({ message: "Queue paused", slotId, status: "paused", reason });
+      if (serving) {
+        const uncalledPayload = { slotId, queueId: serving.queue_id, studentId: serving.student_id };
+        emitToSlot(slotId, "queue:uncalled", uncalledPayload);
+        emitToUser(serving.student_id, "queue:uncalled", uncalledPayload);
+        emitToDept(deptId, "queue:uncalled", uncalledPayload);
+      }
+      res.json({
+        message: "Queue paused",
+        slotId,
+        status: "paused",
+        reason,
+        revertedServingStudent: !!serving,
+      });
     } catch (error) {
+      await conn.rollback();
       console.error("Pause queue error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -587,13 +667,13 @@ router.patch(
         await conn.rollback();
         return res.status(404).json({ error: "Queue slot not found" });
       }
-      if (slot.department_id !== null && slot.department_id !== deptId) {
+      if (slot.department_id !== deptId) {
         await conn.rollback();
         return res
           .status(403)
           .json({ error: "You can only manage queues for your own department" });
       }
-      if (!["open", "paused"].includes(slot.status)) {
+      if (slot.status === "cancelled") {
         await conn.rollback();
         return res.status(409).json({ error: `Queue is already ${slot.status}` });
       }
@@ -668,6 +748,11 @@ router.patch(
       const check = await assertOwnedSlot(deptId, slotId);
       if (check.error)
         return res.status(check.error).json({ error: check.message });
+      if (check.slot.status === "paused") {
+        return res.status(409).json({
+          error: "Queue is paused — resume it before calling students.",
+        });
+      }
 
       const [[alreadyServing]] = await pool.query(
         `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
@@ -756,6 +841,15 @@ router.patch(
       emitToSlot(slotId, "queue:served", servedPayload);
       emitToUser(serving.student_id, "queue:served", servedPayload);
       emitToDept(deptId, "queue:served", servedPayload);
+
+      // Marking someone served never frees a capacity seat, but it can be
+      // the last unserved entry in a 'full'/'expired' slot -- settle it.
+      const settleResult = await settleSlotAfterEntryChange(pool, slotId);
+      if (settleResult) {
+        const settledPayload = { slotId, status: settleResult.newStatus };
+        emitToSlot(slotId, "queue:slot-status", settledPayload);
+        emitToDept(deptId, "queue:slot-status", settledPayload);
+      }
 
       res.json({
         message: "Student marked as served",
@@ -1010,8 +1104,8 @@ router.get(
                 WHEN 'processing' THEN 'Processing Document Request'
                 ELSE 'Pending Document Request'
               END AS action,
-              COALESCE(d.department_name, 'All Colleges') AS college,
-              COALESCE(d.department_abbreviation, 'ALL') AS college_abbrev,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
               dr.request_type AS processor,
@@ -1020,9 +1114,9 @@ router.get(
               dr.created_at AS event_time
             FROM document_requests dr
             JOIN document_services s ON dr.service_id = s.service_id
-            LEFT JOIN departments d ON s.department_id = d.department_id
+            JOIN departments d ON s.department_id = d.department_id
             JOIN students st ON dr.student_id = st.student_id
-            WHERE (s.department_id = ? OR s.department_id IS NULL)
+            WHERE s.department_id = ?
           )
         ) AS combined
         WHERE 1=1 ${dateClause}
@@ -1122,7 +1216,7 @@ router.get(
       const [[slot]] = await pool.query(
         `SELECT qs.slot_id FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? AND (s.department_id = ? OR s.department_id IS NULL)`,
+         WHERE qs.slot_id = ? AND s.department_id = ?`,
         [slotId, deptId],
       );
       if (!slot) {
@@ -1137,14 +1231,11 @@ router.get(
            q.created_at,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number,
-           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation
+           d.department_abbreviation
          FROM queues q
          JOIN students st ON q.student_id = st.student_id
          JOIN services s ON q.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
-         JOIN queue_slots qs ON q.slot_id = qs.slot_id
-         JOIN administrators adm ON qs.admin_id = adm.admin_id
-         JOIN departments da ON adm.department_id = da.department_id
+         JOIN departments d ON s.department_id = d.department_id
          WHERE q.slot_id = ?
          ORDER BY q.queue_number ASC`,
         [slotId],
@@ -1192,12 +1283,12 @@ router.get(
            dr.needed_by,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number AS student_id,
-           COALESCE(d.department_abbreviation, 'ALL') AS college
+           d.department_abbreviation AS college
          FROM document_requests dr
          JOIN students st ON dr.student_id = st.student_id
          JOIN document_services s ON dr.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
-         WHERE s.department_id = ? OR s.department_id IS NULL
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ?
          ORDER BY dr.created_at DESC`,
         [deptId],
       );
@@ -1262,12 +1353,12 @@ router.get(
            fdr.needed_by,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.employee_id AS faculty_employee_id,
-           COALESCE(d.department_abbreviation, 'ALL') AS college
+           d.department_abbreviation AS college
          FROM faculty_document_requests fdr
          JOIN faculty f ON fdr.faculty_id = f.faculty_id
          JOIN document_services s ON fdr.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
-         WHERE s.department_id = ? OR s.department_id IS NULL
+         JOIN departments d ON s.department_id = d.department_id
+         WHERE s.department_id = ?
          ORDER BY fdr.created_at DESC`,
         [deptId],
       );
@@ -1345,7 +1436,7 @@ router.patch(
       if (!request) {
         return res.status(404).json({ error: "Document request not found" });
       }
-      if (request.department_id !== null && request.department_id !== deptId) {
+      if (request.department_id !== deptId) {
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
 
@@ -1403,7 +1494,7 @@ router.patch(
       if (!request) {
         return res.status(404).json({ error: "Document request not found" });
       }
-      if (request.department_id !== null && request.department_id !== deptId) {
+      if (request.department_id !== deptId) {
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
 
@@ -1630,13 +1721,13 @@ router.get(
       const { status } = req.query;
       let sql = `
         SELECT ds.service_id AS id, ds.service_name AS name, ds.description,
-               ds.status, ds.fee, ds.processing_time, ds.department_id,
+               ds.status, ds.fee, ds.processing_time, ds.department_id, ds.is_cross_college,
                ds.recipient_type,
                d.department_abbreviation AS dept_abbrev,
                (SELECT COUNT(*) FROM document_requirements dr WHERE dr.service_id = ds.service_id) AS req_count
         FROM document_services ds
-        LEFT JOIN departments d ON ds.department_id = d.department_id
-        WHERE (ds.department_id = ? OR ds.department_id IS NULL)`;
+        JOIN departments d ON ds.department_id = d.department_id
+        WHERE ds.department_id = ?`;
       const params = [deptId];
 
       if (status && status !== "all") {
@@ -1653,9 +1744,9 @@ router.get(
         status: r.status,
         fee: parseFloat(r.fee) || 0,
         processingTime: r.processing_time || "",
-        deptAbbrev: r.dept_abbrev || "All",
+        deptAbbrev: r.dept_abbrev,
         requirementCount: r.req_count,
-        scope: r.department_id === null ? "all" : "department",
+        isCrossCollege: !!r.is_cross_college,
         recipientType: r.recipient_type || "students",
       })) });
     } catch (error) {
@@ -1677,7 +1768,7 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_id FROM document_services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_id FROM document_services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Document type not found in your department" });
@@ -1696,13 +1787,13 @@ router.get(
 );
 
 // POST /api/admin/data-management/document-types
-// Body: { name, description, processingTime, fee, status, scope, recipientType, requirements[] }
+// Body: { name, description, processingTime, fee, status, isCrossCollege, recipientType, requirements[] }
 router.post(
   "/data-management/document-types",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { name, description, processingTime, fee, status, scope, recipientType, requirements = [] } = req.body;
+    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requirements = [] } = req.body;
     if (!name || !description || !processingTime || fee === undefined) {
       return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
     }
@@ -1710,13 +1801,12 @@ router.post(
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
-      const effectiveDeptId = scope === "all" ? null : deptId;
       const effectiveRecipient = recipientType || "students";
 
       const [result] = await pool.query(
-        `INSERT INTO document_services (service_name, description, department_id, status, fee, processing_time, recipient_type)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, effectiveDeptId, status || "active", parseFloat(fee), processingTime, effectiveRecipient],
+        `INSERT INTO document_services (service_name, description, department_id, is_cross_college, status, fee, processing_time, recipient_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description, deptId, !!isCrossCollege, status || "active", parseFloat(fee), processingTime, effectiveRecipient],
       );
       const newId = result.insertId;
 
@@ -1745,7 +1835,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, processingTime, fee, status, scope, recipientType, requirements = [] } = req.body;
+    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requirements = [] } = req.body;
     if (!name || !description || !processingTime || fee === undefined) {
       return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
     }
@@ -1755,18 +1845,17 @@ router.put(
 
       const [[old]] = await pool.query(
         `SELECT service_name, status, fee, processing_time FROM document_services
-         WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+         WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!old) return res.status(404).json({ error: "Document type not found" });
 
-      const effectiveDeptId = scope === "all" ? null : deptId;
       const effectiveRecipient = recipientType || "students";
 
       await pool.query(
         `UPDATE document_services SET service_name = ?, description = ?, status = ?, fee = ?, processing_time = ?,
-         department_id = ?, recipient_type = ? WHERE service_id = ?`,
-        [name, description, status || "active", parseFloat(fee), processingTime, effectiveDeptId, effectiveRecipient, serviceId],
+         is_cross_college = ?, recipient_type = ? WHERE service_id = ?`,
+        [name, description, status || "active", parseFloat(fee), processingTime, !!isCrossCollege, effectiveRecipient, serviceId],
       );
 
       // Replace requirements: delete all then re-insert
@@ -1803,7 +1892,7 @@ router.delete(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_name FROM document_services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_name FROM document_services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Document type not found" });
@@ -1890,7 +1979,7 @@ router.post(
 // DATA MANAGEMENT — Service Types (queue services)
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/admin/data-management/service-types?status=active|inactive
+// GET /api/admin/data-management/service-types
 router.get(
   "/data-management/service-types",
   authenticateToken,
@@ -1900,34 +1989,26 @@ router.get(
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
-      const { status } = req.query;
-      let sql = `
-        SELECT s.service_id AS id, s.service_name AS name, s.description,
-               s.status, s.average_service_time AS avgServiceTime,
-               s.department_id, s.location_id,
-               d.department_abbreviation AS deptAbbrev,
-               l.location_name AS locationName
-        FROM services s
-        LEFT JOIN departments d ON s.department_id = d.department_id
-        LEFT JOIN locations l ON s.location_id = l.location_id
-        WHERE (s.department_id = ? OR s.department_id IS NULL)`;
-      const params = [deptId];
-
-      if (status && status !== "all") {
-        sql += " AND s.status = ?";
-        params.push(status);
-      }
-      sql += " ORDER BY s.service_name ASC";
-
-      const [rows] = await pool.query(sql, params);
+      const [rows] = await pool.query(
+        `SELECT s.service_id AS id, s.service_name AS name, s.description,
+                s.average_service_time AS avgServiceTime,
+                s.department_id, s.is_cross_college, s.location_id,
+                d.department_abbreviation AS deptAbbrev,
+                l.location_name AS locationName
+         FROM services s
+         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
+         WHERE s.department_id = ?
+         ORDER BY s.service_name ASC`,
+        [deptId],
+      );
       res.json({ serviceTypes: rows.map((r) => ({
         id: r.id,
         name: r.name,
         description: r.description,
-        status: r.status,
         avgServiceTime: r.avgServiceTime,
-        deptAbbrev: r.deptAbbrev || "All",
-        scope: r.department_id === null ? "all" : "department",
+        deptAbbrev: r.deptAbbrev,
+        isCrossCollege: !!r.is_cross_college,
         locationId: r.location_id,
         locationName: r.locationName || null,
       })) });
@@ -1939,13 +2020,13 @@ router.get(
 );
 
 // POST /api/admin/data-management/service-types
-// Body: { name, description, avgServiceTime, status, scope }
+// Body: { name, description, avgServiceTime, isCrossCollege }
 router.post(
   "/data-management/service-types",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { name, description, avgServiceTime, status, scope, locationId } = req.body;
+    const { name, description, avgServiceTime, isCrossCollege, locationId } = req.body;
     if (!name || !avgServiceTime) {
       return res.status(400).json({ error: "name and avgServiceTime are required" });
     }
@@ -1953,15 +2034,13 @@ router.post(
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
-      const effectiveDeptId = scope === "all" ? null : deptId;
-
       const [result] = await pool.query(
-        `INSERT INTO services (service_name, description, department_id, location_id, status, average_service_time)
+        `INSERT INTO services (service_name, description, department_id, is_cross_college, location_id, average_service_time)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [name, description || null, effectiveDeptId, locationId || null, status || "active", parseInt(avgServiceTime, 10)],
+        [name, description || null, deptId, !!isCrossCollege, locationId || null, parseInt(avgServiceTime, 10)],
       );
       const newId = result.insertId;
-      await logAudit(req.user.userId, "CREATE", "services", newId, null, { name, status: status || "active", avgServiceTime });
+      await logAudit(req.user.userId, "CREATE", "services", newId, null, { name, avgServiceTime });
       res.status(201).json({ message: "Service type created", id: newId });
     } catch (error) {
       console.error("Service type create error:", error);
@@ -1977,7 +2056,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, avgServiceTime, status, scope, locationId } = req.body;
+    const { name, description, avgServiceTime, isCrossCollege, locationId } = req.body;
     if (!name || !avgServiceTime) {
       return res.status(400).json({ error: "name and avgServiceTime are required" });
     }
@@ -1986,22 +2065,20 @@ router.put(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[old]] = await pool.query(
-        `SELECT service_name, status FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!old) return res.status(404).json({ error: "Service type not found" });
 
-      const effectiveDeptId = scope === "all" ? null : deptId;
-
       await pool.query(
-        `UPDATE services SET service_name = ?, description = ?, status = ?, average_service_time = ?,
-         department_id = ?, location_id = ? WHERE service_id = ?`,
-        [name, description || null, status || "active", parseInt(avgServiceTime, 10), effectiveDeptId, locationId || null, serviceId],
+        `UPDATE services SET service_name = ?, description = ?, average_service_time = ?,
+         is_cross_college = ?, location_id = ? WHERE service_id = ?`,
+        [name, description || null, parseInt(avgServiceTime, 10), !!isCrossCollege, locationId || null, serviceId],
       );
 
       await logAudit(req.user.userId, "UPDATE", "services", serviceId,
-        { name: old.service_name, status: old.status },
-        { name, status },
+        { name: old.service_name },
+        { name },
       );
       res.json({ message: "Service type updated" });
     } catch (error) {
@@ -2023,7 +2100,7 @@ router.delete(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_name FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found" });
@@ -2055,7 +2132,7 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_id FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_id FROM services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2088,7 +2165,7 @@ router.put(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_name FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2129,7 +2206,7 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_id FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_id FROM services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2162,7 +2239,7 @@ router.put(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[svc]] = await pool.query(
-        `SELECT service_name FROM services WHERE service_id = ? AND (department_id = ? OR department_id IS NULL)`,
+        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
@@ -2255,12 +2332,14 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [rows] = await pool.query(
-        `SELECT faq_id, question AS title, answer AS content,
-                is_pinned AS isPinned, type, status, created_by AS createdBy,
-                department_id, created_at
-         FROM faqs
-         WHERE department_id = ? OR department_id IS NULL
-         ORDER BY is_pinned DESC, created_at DESC`,
+        `SELECT f.faq_id, f.question AS title, f.answer AS content,
+                f.is_pinned AS isPinned, f.type, f.status, f.created_by AS createdBy,
+                f.department_id, f.is_cross_college, f.created_at,
+                d.department_abbreviation
+         FROM faqs f
+         JOIN departments d ON f.department_id = d.department_id
+         WHERE f.department_id = ?
+         ORDER BY f.is_pinned DESC, f.created_at DESC`,
         [deptId],
       );
 
@@ -2274,7 +2353,8 @@ router.get(
           status: r.status || "active",
           createdBy: r.createdBy || "Admin Office",
           date: r.created_at,
-          college: r.department_id === deptId ? "Own Department" : "All Departments",
+          college: r.department_abbreviation,
+          isCrossCollege: !!r.is_cross_college,
         })),
       });
     } catch (error) {
@@ -2290,7 +2370,7 @@ router.post(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { title, content, type = "general", isPinned = false, isGlobal = false } = req.body;
+    const { title, content, type = "general", isPinned = false, isCrossCollege = false } = req.body;
     if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({ error: "title and content are required" });
     }
@@ -2307,9 +2387,9 @@ router.post(
       const createdBy = adminRow?.full_name || "Admin Office";
 
       const [result] = await pool.query(
-        `INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id)
-         VALUES (?, ?, ?, 'active', ?, ?, ?)`,
-        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, isGlobal ? null : deptId],
+        `INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id, is_cross_college)
+         VALUES (?, ?, ?, 'active', ?, ?, ?, ?)`,
+        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId, isCrossCollege ? 1 : 0],
       );
 
       res.status(201).json({
@@ -2320,6 +2400,7 @@ router.post(
           type,
           status: "active",
           isPinned: !!isPinned,
+          isCrossCollege: !!isCrossCollege,
           createdBy,
           date: new Date().toISOString(),
         },
@@ -2338,7 +2419,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const faqId = parseInt(req.params.id, 10);
-    const { title, content, type } = req.body;
+    const { title, content, type, isCrossCollege = false } = req.body;
     if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({ error: "title and content are required" });
     }
@@ -2348,13 +2429,13 @@ router.put(
         `SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
-      if (row.department_id !== null && row.department_id !== deptId) {
+      if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot edit announcements from another department" });
       }
 
       await pool.query(
-        `UPDATE faqs SET question = ?, answer = ?, type = ? WHERE faq_id = ?`,
-        [title.trim(), content.trim(), type || "general", faqId],
+        `UPDATE faqs SET question = ?, answer = ?, type = ?, is_cross_college = ? WHERE faq_id = ?`,
+        [title.trim(), content.trim(), type || "general", isCrossCollege ? 1 : 0, faqId],
       );
       res.json({ message: "Announcement updated" });
     } catch (error) {
@@ -2375,7 +2456,7 @@ router.patch(
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(`SELECT is_pinned, department_id FROM faqs WHERE faq_id = ?`, [faqId]);
       if (!row) return res.status(404).json({ error: "Announcement not found" });
-      if (row.department_id !== null && row.department_id !== deptId) {
+      if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
       const newPinned = row.is_pinned ? 0 : 1;
@@ -2399,7 +2480,7 @@ router.patch(
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
       if (!row) return res.status(404).json({ error: "Announcement not found" });
-      if (row.department_id !== null && row.department_id !== deptId) {
+      if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
       await pool.query(`UPDATE faqs SET status = 'archived' WHERE faq_id = ?`, [faqId]);
@@ -2422,7 +2503,7 @@ router.patch(
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
       if (!row) return res.status(404).json({ error: "Announcement not found" });
-      if (row.department_id !== null && row.department_id !== deptId) {
+      if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
       await pool.query(`UPDATE faqs SET status = 'active' WHERE faq_id = ?`, [faqId]);
@@ -2445,7 +2526,7 @@ router.delete(
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
       if (!row) return res.status(404).json({ error: "Announcement not found" });
-      if (row.department_id !== null && row.department_id !== deptId) {
+      if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot delete announcements from another department" });
       }
       await pool.query(`DELETE FROM faqs WHERE faq_id = ?`, [faqId]);
@@ -2512,14 +2593,14 @@ router.get(
 
       // Main performance query: per-service stats for completed queues
       const [rows] = await pool.query(
-        `SELECT s.service_id, s.service_name, COALESCE(d.department_abbreviation, 'ALL') AS college,
+        `SELECT s.service_id, s.service_name, d.department_abbreviation AS college,
            COUNT(q.queue_id) AS students_served,
            AVG(TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at)) AS avg_wait_minutes
          FROM queues q
          JOIN services s ON q.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
+         JOIN departments d ON s.department_id = d.department_id
          WHERE q.status = 'completed'
-           AND (s.department_id = ? OR s.department_id IS NULL)
+           AND s.department_id = ?
            AND q.created_at >= ?
            ${serviceFilter ? "AND s.service_name = ?" : ""}
          GROUP BY s.service_id, s.service_name, d.department_abbreviation`,
@@ -2591,7 +2672,7 @@ router.get(
 
       // Service type list for dropdown
       const [serviceRows] = await pool.query(
-        `SELECT service_name FROM services WHERE department_id = ? OR department_id IS NULL ORDER BY service_name`,
+        `SELECT service_name FROM services WHERE department_id = ? ORDER BY service_name`,
         [deptId],
       );
       const serviceTypes = ["All Services", ...serviceRows.map((s) => s.service_name)];

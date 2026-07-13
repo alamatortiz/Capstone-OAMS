@@ -7,6 +7,8 @@ const {
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
+const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
+const { getQueueDisplayInfo } = require("../utils/queueDisplay");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -57,7 +59,7 @@ router.get(
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
-         WHERE q.student_id = ? AND q.status = 'waiting'
+         WHERE q.student_id = ? AND q.status IN ('waiting', 'serving')
          ORDER BY position ASC`,
         [studentId],
       );
@@ -174,6 +176,10 @@ router.get(
           })()
         : null;
 
+      const closestQueueDisplay = closestQueue
+        ? getQueueDisplayInfo(closestQueue.status, closestQueue.position)
+        : null;
+
       res.json({
         stats: {
           queuePosition: closestQueue ? closestQueue.position : 0,
@@ -198,17 +204,15 @@ router.get(
               service: closestQueue.service_name,
               college: closestQueue.department_name,
               collegeAbbrev: closestQueue.department_abbreviation,
-              position: closestQueue.position,
+              status: closestQueue.status,
+              position: closestQueueDisplay.position,
               totalWaiting: closestQueue.total_waiting,
               maxCapacity,
               totalInQueue,
               servicedCount,
               queueOccupancyPercent,
               servicedPercent,
-              estimatedWaitTime:
-                closestQueue.position > 1
-                  ? `~${(closestQueue.position - 1) * 5} min`
-                  : "You're next!",
+              estimatedWaitTime: closestQueueDisplay.estimatedWait,
             }
           : null,
         recentActivity: recentActivity.map((row, i) => ({
@@ -271,10 +275,9 @@ function classifyAnnouncement(question = "", answer = "") {
 }
 
 // GET /api/student/announcements
-// Returns every announcement, each tagged with the department it
-// belongs to (department_id IS NULL = "All Departments" / global).
-// Students filter by department on the frontend using
-// departmentAbbrev (e.g. "CCS", "CBAA") or the "all" sentinel.
+// Returns every announcement, each tagged with its owning department.
+// Students filter by department on the frontend using departmentAbbrev,
+// with cross-college announcements always shown regardless of filter.
 router.get(
   "/announcements",
   authenticateToken,
@@ -287,12 +290,13 @@ router.get(
            f.question,
            f.answer,
            f.is_pinned,
+           f.is_cross_college,
            f.created_at,
            d.department_id,
            d.department_name,
            d.department_abbreviation
          FROM faqs f
-         LEFT JOIN departments d ON f.department_id = d.department_id
+         JOIN departments d ON f.department_id = d.department_id
          ORDER BY f.is_pinned DESC, f.created_at DESC`,
       );
 
@@ -303,13 +307,11 @@ router.get(
         category: classifyAnnouncement(row.question, row.answer),
         isPinned: !!row.is_pinned,
         date: row.created_at,
-        // department_id NULL -> global notice, visible regardless of filter
         departmentId: row.department_id,
-        departmentName: row.department_name ?? "All Departments",
-        departmentAbbrev: row.department_abbreviation ?? "ALL",
-        college: row.department_id
-          ? `${row.department_name} (${row.department_abbreviation})`
-          : "All Departments",
+        departmentName: row.department_name,
+        departmentAbbrev: row.department_abbreviation,
+        isCrossCollege: !!row.is_cross_college,
+        college: `${row.department_name} (${row.department_abbreviation})`,
       }));
 
       res.json({ announcements });
@@ -524,29 +526,28 @@ router.get(
       const studentDeptId = stu?.department_id ?? null;
 
       const [rows] = await pool.query(
-        `SELECT ds.service_id, ds.service_name, ds.department_id,
-                d.department_id AS dept_id, d.department_name, d.department_abbreviation
+        `SELECT ds.service_id, ds.service_name, ds.department_id, ds.is_cross_college,
+                d.department_name, d.department_abbreviation
          FROM document_services ds
-         LEFT JOIN departments d ON ds.department_id = d.department_id
-         WHERE (ds.department_id = ? OR ds.department_id IS NULL)
+         JOIN departments d ON ds.department_id = d.department_id
+         WHERE (ds.department_id = ? OR ds.is_cross_college = TRUE)
            AND ds.recipient_type IN ('students', 'both')
            AND ds.status = 'active'
-         ORDER BY ds.department_id IS NULL ASC, ds.service_name ASC`,
+         ORDER BY ds.service_name ASC`,
         [studentDeptId],
       );
 
-      // Group by department. Global services (NULL dept) go under a synthetic "All Departments" group.
-      const GLOBAL_KEY = 0;
+      // Group by the service's real owning department.
       const departmentMap = new Map();
       const servicesByDepartmentId = {};
 
       for (const row of rows) {
-        const key = row.department_id ?? GLOBAL_KEY;
+        const key = row.department_id;
         if (!departmentMap.has(key)) {
           departmentMap.set(key, {
             id: key,
-            name: row.department_id ? row.department_name : "All Departments",
-            abbrev: row.department_id ? row.department_abbreviation : "ALL",
+            name: row.department_name,
+            abbrev: row.department_abbreviation,
           });
           servicesByDepartmentId[key] = [];
         }
@@ -624,9 +625,13 @@ router.delete(
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/student/queues/available
-// Returns open queue slots for today that the student can join:
+// Returns today's queue slots students should know about, including ones
+// currently 'full' (visible but not joinable, so a student can see it exists
+// and check back if a seat frees up) -- 'expired'/'completed'/'closed' slots
+// are done for the day and stay hidden. Scope:
 //   - Service belongs to the student's own department, OR
-//   - Service is global (department_id IS NULL) — hosted by any admin, shown to all students.
+//   - Service is cross-college (is_cross_college = TRUE) — owned by another
+//     department but shared with every other department's students.
 router.get(
   "/queues/available",
   authenticateToken,
@@ -653,11 +658,12 @@ router.get(
            qs.status,
            qs.no_show_timeout_minutes,
            s.service_name,
-           s.department_id AS svc_dept_id,
-           -- For dept-scoped services use the service's dept; for global use the admin's dept
-           COALESCE(d.department_id,   da.department_id)   AS department_id,
-           COALESCE(d.department_name, da.department_name) AS department_name,
-           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation,
+           s.is_cross_college,
+           s.description AS service_description,
+           l.location_name AS service_location,
+           d.department_id,
+           d.department_name,
+           d.department_abbreviation,
            (
              SELECT q.queue_number
              FROM queues q
@@ -680,12 +686,11 @@ router.get(
            ) AS claimed_count
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
-         LEFT JOIN departments d  ON s.department_id   = d.department_id
-         JOIN administrators adm  ON qs.admin_id       = adm.admin_id
-         JOIN departments    da   ON adm.department_id = da.department_id
+         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
          WHERE qs.slot_date = ?
-           AND qs.status IN ('open', 'paused')
-           AND (s.department_id = ? OR s.department_id IS NULL)
+           AND qs.status IN ('open', 'paused', 'full')
+           AND (s.department_id = ? OR s.is_cross_college = TRUE)
          ORDER BY department_abbreviation, s.service_name`,
         [manilaToday, studentDeptId],
       );
@@ -711,7 +716,9 @@ router.get(
           departmentId: slot.department_id,
           departmentName: slot.department_name,
           departmentAbbrev: deptAbbrev,
-          isGlobal: slot.svc_dept_id === null,
+          isCrossCollege: !!slot.is_cross_college,
+          description: slot.service_description || null,
+          location: slot.service_location || null,
           slotDate: slot.slot_date,
           startTime: slot.start_time,
           endTime: slot.end_time,
@@ -759,6 +766,7 @@ router.get(
            q.slot_id,
            q.service_id,
            q.status,
+           q.notes,
            q.created_at AS joined_at,
            qs.start_time,
            qs.end_time,
@@ -767,8 +775,10 @@ router.get(
            qs.pause_reason,
            qs.no_show_timeout_minutes,
            s.service_name,
-           COALESCE(d.department_name, da.department_name) AS department_name,
-           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation,
+           s.description AS service_description,
+           l.location_name AS service_location,
+           d.department_name,
+           d.department_abbreviation,
            -- Position: how many 'waiting' entries in this slot have queue_number <= mine
            (
              SELECT COUNT(*)
@@ -802,9 +812,8 @@ router.get(
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
-         JOIN administrators adm ON qs.admin_id = adm.admin_id
-         JOIN departments da ON adm.department_id = da.department_id
+         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
          WHERE q.student_id = ?
            AND q.status IN ('waiting', 'serving')
          ORDER BY q.created_at ASC`,
@@ -812,7 +821,7 @@ router.get(
       );
 
       const formatted = rows.map((row) => {
-        const position = row.position || 1;
+        const { position, estimatedWait } = getQueueDisplayInfo(row.status, row.position);
         const deptAbbrev = row.department_abbreviation;
         const serviceCode = row.service_name
           .split(" ")[0]
@@ -842,6 +851,9 @@ router.get(
           departmentName: row.department_name,
           departmentAbbrev: deptAbbrev,
           status: row.status,
+          notes: row.notes ?? null,
+          description: row.service_description || null,
+          location: row.service_location || null,
           slotStatus: row.slot_status,
           slotPauseReason: row.pause_reason ?? null,
           position,
@@ -851,8 +863,7 @@ router.get(
           servicedCount,
           queueOccupancyPercent,
           servicedPercent,
-          estimatedWait:
-            position > 1 ? `~${(position - 1) * 5} min` : "You're next!",
+          estimatedWait,
           joinedAt: new Date(row.joined_at).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
@@ -951,14 +962,15 @@ router.get(
 );
 
 // POST /api/student/queues/join
-// Body: { slotId }
+// Body: { slotId, notes? }
 router.post(
   "/queues/join",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { slotId } = req.body;
+    const { slotId, notes } = req.body;
+    const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
 
     if (!slotId) {
       return res.status(400).json({ error: "slotId is required" });
@@ -1045,9 +1057,9 @@ router.post(
 
       // 4. Insert queue entry
       const [insertResult] = await conn.query(
-        `INSERT INTO queues (student_id, service_id, slot_id, queue_number, status, created_at)
-         VALUES (?, ?, ?, ?, 'waiting', NOW())`,
-        [studentId, slot.service_id, slotId, queueNumber],
+        `INSERT INTO queues (student_id, service_id, slot_id, queue_number, status, notes, created_at)
+         VALUES (?, ?, ?, ?, 'waiting', ?, NOW())`,
+        [studentId, slot.service_id, slotId, queueNumber, trimmedNotes || null],
       );
       const queueId = insertResult.insertId;
 
@@ -1057,13 +1069,15 @@ router.post(
         [slotId],
       );
 
-      // 5b. This join may have used up the last spot for the day — close the
-      // slot to new joins. Already-queued students keep being served normally;
-      // only /queues/join and /queues/available check this status.
+      // 5b. This join may have used up the last spot for the day — mark the
+      // slot 'full' to block new joins. Already-queued students keep being
+      // served normally; only /queues/join and /queues/available check this
+      // status. Reopens automatically (see settleSlotAfterEntryChange) if a
+      // seat frees up before the slot's posted hours end.
       let slotAutoClosed = false;
       if (countRow.claimed + 1 >= slot.max_capacity) {
         await conn.query(
-          `UPDATE queue_slots SET status = 'closed', close_reason = 'Capacity reached — queue full for today' WHERE slot_id = ?`,
+          `UPDATE queue_slots SET status = 'full', close_reason = 'Capacity reached — queue full for today' WHERE slot_id = ?`,
           [slotId],
         );
         slotAutoClosed = true;
@@ -1086,9 +1100,9 @@ router.post(
            qs.status AS slot_status,
            qs.no_show_timeout_minutes,
            s.service_name,
-           COALESCE(d.department_id, da.department_id) AS department_id,
-           COALESCE(d.department_name, da.department_name) AS department_name,
-           COALESCE(d.department_abbreviation, da.department_abbreviation) AS department_abbreviation,
+           d.department_id,
+           d.department_name,
+           d.department_abbreviation,
            (
              SELECT COUNT(*) FROM queues q2
              WHERE q2.slot_id = q.slot_id AND q2.status = 'waiting' AND q2.queue_number <= q.queue_number
@@ -1108,9 +1122,7 @@ router.post(
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
-         LEFT JOIN departments d ON s.department_id = d.department_id
-         JOIN administrators adm ON qs.admin_id = adm.admin_id
-         JOIN departments da ON adm.department_id = da.department_id
+         JOIN departments d ON s.department_id = d.department_id
          WHERE q.queue_id = ?`,
         [queueId],
       );
@@ -1120,7 +1132,7 @@ router.post(
         .split(" ")[0]
         .substring(0, 3)
         .toUpperCase();
-      const position = newEntry.position || 1;
+      const { position, estimatedWait } = getQueueDisplayInfo(newEntry.status, newEntry.position);
       const maxCapacity = newEntry.max_capacity || 0;
       const totalInQueue = newEntry.total_in_queue || 0;
       const servicedCount = newEntry.serviced_count || 0;
@@ -1150,7 +1162,7 @@ router.post(
       if (slotAutoClosed) {
         const closedPayload = {
           slotId,
-          status: "closed",
+          status: "full",
           reason: "Capacity reached — queue full for today",
         };
         emitToSlot(slotId, "queue:slot-status", closedPayload);
@@ -1177,8 +1189,7 @@ router.post(
           servicedCount,
           queueOccupancyPercent,
           servicedPercent,
-          estimatedWait:
-            position > 1 ? `~${(position - 1) * 5} min` : "You're next!",
+          estimatedWait,
           joinedAt: new Date(newEntry.joined_at).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
@@ -1233,13 +1244,10 @@ router.post(
           .status(403)
           .json({ error: "You can only leave your own queue" });
       }
-      if (entry.status !== "waiting") {
+      if (entry.status !== "waiting" && entry.status !== "serving") {
         await conn.rollback();
         return res.status(409).json({
-          error:
-            entry.status === "serving"
-              ? "You cannot leave a queue while being served"
-              : `Queue is already ${entry.status}`,
+          error: `Queue is already ${entry.status}`,
         });
       }
 
@@ -1255,40 +1263,23 @@ router.post(
         [entry.slot_id],
       );
 
-      // 3b. Cancelling frees a spot under the daily cap. If this slot was
-      // auto-closed by /queues/join for hitting max_capacity, reopen it now
-      // that there's room again. A manual admin close (different
-      // close_reason) is left alone.
-      let slotReopened = false;
-      const [[slotRow]] = await conn.query(
-        `SELECT qs.status, qs.close_reason, qs.max_capacity,
-           (SELECT COUNT(*) FROM queues q WHERE q.slot_id = qs.slot_id AND q.status IN ('waiting', 'serving', 'completed')) AS claimed
-         FROM queue_slots qs WHERE qs.slot_id = ? FOR UPDATE`,
-        [entry.slot_id],
-      );
-      if (
-        slotRow &&
-        slotRow.status === "closed" &&
-        slotRow.close_reason === "Capacity reached — queue full for today" &&
-        slotRow.claimed < slotRow.max_capacity
-      ) {
-        await conn.query(
-          `UPDATE queue_slots SET status = 'open', close_reason = NULL WHERE slot_id = ?`,
-          [entry.slot_id],
-        );
-        slotReopened = true;
-      }
+      // 3b. Cancelling frees a spot under the daily cap and removes this
+      // entry from the unserved count -- settle the slot: reopen it if it
+      // was 'full' and there's room again (and hours haven't ended), or
+      // mark it 'completed' if nobody's left waiting/serving.
+      const settleResult = await settleSlotAfterEntryChange(conn, entry.slot_id);
 
       // 4. Write audit log
       await conn.query(
         `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
-         VALUES (?, 'waiting', 'cancelled', ?, 'Student left queue', NOW())`,
-        [queueId, studentId],
+         VALUES (?, ?, 'cancelled', ?, 'Student left queue', NOW())`,
+        [queueId, entry.status, studentId],
       );
 
       const [[deptRow]] = await conn.query(
         `SELECT s.department_id
-         FROM queue_slots qs JOIN services s ON qs.service_id = s.service_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
          WHERE qs.slot_id = ?`,
         [entry.slot_id],
       );
@@ -1298,10 +1289,10 @@ router.post(
       const leftPayload = { slotId: entry.slot_id, queueId, studentId };
       emitToSlot(entry.slot_id, "queue:student-left", leftPayload);
       emitToDept(deptRow?.department_id, "queue:student-left", leftPayload);
-      if (slotReopened) {
-        const reopenedPayload = { slotId: entry.slot_id, status: "open" };
-        emitToSlot(entry.slot_id, "queue:slot-status", reopenedPayload);
-        emitToDept(deptRow?.department_id, "queue:slot-status", reopenedPayload);
+      if (settleResult) {
+        const settledPayload = { slotId: entry.slot_id, status: settleResult.newStatus };
+        emitToSlot(entry.slot_id, "queue:slot-status", settledPayload);
+        emitToDept(deptRow?.department_id, "queue:slot-status", settledPayload);
       }
 
       res.json({ message: "Successfully left the queue", queueId });
@@ -1650,15 +1641,13 @@ router.get(
              'queue' AS type,
              q.queue_id AS id,
              IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', s.service_name)) AS title,
-             COALESCE(d.department_name, 'All Colleges') AS college,
+             d.department_name AS college,
              q.status AS raw_status,
              COALESCE(q.admin_reason, q.notes) AS details,
              q.created_at AS event_time
            FROM queues q
            JOIN services s ON q.service_id = s.service_id
-           LEFT JOIN queue_slots qs ON q.slot_id = qs.slot_id
-           LEFT JOIN administrators adm ON qs.admin_id = adm.admin_id
-           LEFT JOIN departments d ON adm.department_id = d.department_id
+           JOIN departments d ON s.department_id = d.department_id
            WHERE q.student_id = ?
          )
          UNION ALL
@@ -1682,13 +1671,13 @@ router.get(
              'document' AS type,
              dr.request_id AS id,
              CONCAT(dr.request_type, ' Request') AS title,
-             COALESCE(d.department_name, 'All Colleges') AS college,
+             d.department_name AS college,
              dr.status AS raw_status,
              dr.purpose AS details,
              dr.created_at AS event_time
            FROM document_requests dr
            JOIN document_services s ON dr.service_id = s.service_id
-           LEFT JOIN departments d ON s.department_id = d.department_id
+           JOIN departments d ON s.department_id = d.department_id
            WHERE dr.student_id = ?
          )
          ORDER BY event_time DESC`,
@@ -1892,9 +1881,9 @@ router.post(
     const studentId = req.user.userId;
     const { availabilityId, appointmentDate, purpose, appointmentType } = req.body;
 
-    if (!availabilityId || !appointmentDate || !purpose?.trim()) {
+    if (!availabilityId || !appointmentDate) {
       return res.status(400).json({
-        error: "availabilityId, appointmentDate, and purpose are required",
+        error: "availabilityId and appointmentDate are required",
       });
     }
     if (appointmentDate < getManilaDateString()) {
@@ -2006,7 +1995,7 @@ router.post(
           availabilityId,
           appointmentDate,
           appointmentTime,
-          purpose.trim(),
+          purpose?.trim() || null,
         ],
       );
 
@@ -2090,6 +2079,7 @@ router.get(
            s.service_name,
            s.description,
            s.department_id,
+           s.is_cross_college,
            sr.requirement_id,
            sr.requirement_name,
            sr.description  AS req_description,
@@ -2154,6 +2144,7 @@ router.get(
             serviceName: row.service_name,
             description: row.description ?? "",
             departmentId: row.department_id,
+            isCrossCollege: !!row.is_cross_college,
             requirements: [],
             procedureSteps: [],
           });
@@ -2209,19 +2200,11 @@ router.get(
         }
       }
 
-      // ── Assemble: group services per department ───────────────────────────
-      // Services with a NULL department_id are "global" (open to every
-      // college) — they don't belong to any row in `departments`, so they're
-      // grouped into a synthetic bucket instead of being dropped.
-      const GLOBAL_DEPT_KEY = "__global__";
+      // ── Assemble: group services under their real owning department ───────
+      // Cross-college services still belong to one department; the UI uses
+      // each service's isCrossCollege flag to also surface it under other
+      // colleges' filters instead of relying on a synthetic bucket.
       const deptMap = new Map();
-      deptMap.set(GLOBAL_DEPT_KEY, {
-        departmentId: null,
-        departmentName: "All Departments",
-        departmentAbbrev: "ALL",
-        officeLocation: "",
-        services: [],
-      });
       for (const dept of departments) {
         deptMap.set(dept.department_id, {
           departmentId: dept.department_id,
@@ -2233,7 +2216,7 @@ router.get(
       }
 
       for (const svc of serviceMap.values()) {
-        const dept = deptMap.get(svc.departmentId ?? GLOBAL_DEPT_KEY);
+        const dept = deptMap.get(svc.departmentId);
         if (!dept) continue;
 
         const todaySlot = slotByService.get(svc.serviceId) ?? null;
@@ -2242,6 +2225,7 @@ router.get(
           serviceId: svc.serviceId,
           serviceName: svc.serviceName,
           description: svc.description,
+          isCrossCollege: svc.isCrossCollege,
           requirements: svc.requirements,
           procedureSteps: svc.procedureSteps,
           todaySlot,

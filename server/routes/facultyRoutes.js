@@ -809,7 +809,7 @@ router.get(
         [facultyId]
       );
       const [rows] = await pool.query(
-        "SELECT * FROM document_services WHERE (department_id = ? OR department_id IS NULL) AND recipient_type IN ('faculty', 'both') AND status = 'active' ORDER BY service_name",
+        "SELECT * FROM document_services WHERE (department_id = ? OR is_cross_college = TRUE) AND recipient_type IN ('faculty', 'both') AND status = 'active' ORDER BY service_name",
         [fac.department_id]
       );
 
@@ -844,10 +844,10 @@ router.get(
     try {
       const [rows] = await pool.query(
         `SELECT fdr.*, ds.service_name, ds.processing_time,
-                COALESCE(d.department_name, 'All Departments') AS college
+                d.department_name AS college
          FROM faculty_document_requests fdr
          JOIN document_services ds ON fdr.service_id = ds.service_id
-         LEFT JOIN departments d ON ds.department_id = d.department_id
+         JOIN departments d ON ds.department_id = d.department_id
          WHERE fdr.faculty_id = ?
          ORDER BY fdr.created_at DESC`,
         [facultyId]

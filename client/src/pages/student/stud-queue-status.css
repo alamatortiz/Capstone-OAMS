@@ -394,6 +394,29 @@ body {
   white-space: nowrap;
 }
 
+.queue-hero-meta-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.queue-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  text-align: left;
+}
+
+.queue-hero-meta-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
 /* ===== Detail Grid ===== */
 .queue-detail-grid {
   display: grid;
@@ -638,7 +661,7 @@ body {
 
 .queue-status-waiting {
   background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  color: var(--blue);
   border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
@@ -869,6 +892,7 @@ body {
   font-size: 0.95rem;
   color: var(--text-primary);
   margin: 0;
+  text-align: left;
   transition: color 0.3s ease;
 }
 
@@ -876,6 +900,7 @@ body {
   font-size: 0.8rem;
   color: var(--text-tertiary);
   margin: 0.15rem 0 0 0;
+  text-align: left;
   transition: color 0.3s ease;
 }
 

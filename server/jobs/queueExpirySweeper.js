@@ -4,23 +4,21 @@ const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime"
 
 const SWEEP_INTERVAL_MS = 30 * 1000;
 
-// Flips 'open'/'paused' slots to 'closed' once their posted end_time has
+// Flips 'open'/'paused' slots to 'expired' once their posted end_time has
 // passed, so the admin dashboard doesn't keep showing a queue as "Open"
 // indefinitely after hours (previously required a manual Close click).
-// Only stops new joins -- students already waiting/serving are left alone,
+// Only stops new joins -- students already waiting/serving are left alone
+// and settle into 'completed' once served (see queueSlotSettlement.js),
 // mirroring the existing capacity-driven auto-close in POST /queues/join.
 async function sweepExpiredSlots() {
   try {
     const manilaToday = getManilaDateString();
     const manilaNow = getManilaTimeString();
 
-    // department_id follows the same COALESCE(service dept, hosting admin's
-    // dept) fallback used elsewhere for global (department_id IS NULL) services.
     const [expired] = await pool.query(
-      `SELECT qs.slot_id, COALESCE(s.department_id, adm.department_id) AS department_id
+      `SELECT qs.slot_id, s.department_id
        FROM queue_slots qs
        JOIN services s ON qs.service_id = s.service_id
-       JOIN administrators adm ON qs.admin_id = adm.admin_id
        WHERE qs.status IN ('open', 'paused')
          AND qs.slot_date = ?
          AND qs.end_time <= ?`,
@@ -32,17 +30,17 @@ async function sweepExpiredSlots() {
     for (const row of expired) {
       const { slot_id: slotId, department_id: deptId } = row;
       await pool.query(
-        `UPDATE queue_slots SET status = 'closed', close_reason = 'Queue hours ended' WHERE slot_id = ?`,
+        `UPDATE queue_slots SET status = 'expired', close_reason = 'Queue hours ended' WHERE slot_id = ?`,
         [slotId],
       );
 
-      const payload = { slotId, status: "closed", reason: "Queue hours ended" };
+      const payload = { slotId, status: "expired", reason: "Queue hours ended" };
       emitToSlot(slotId, "queue:slot-status", payload);
       emitToDept(deptId, "queue:slot-status", payload);
     }
 
     console.log(
-      `[queueExpirySweeper] Closed ${expired.length} expired queue${expired.length === 1 ? "" : "s"}: ${expired.map((r) => r.slot_id).join(", ")}`,
+      `[queueExpirySweeper] Expired ${expired.length} queue${expired.length === 1 ? "" : "s"}: ${expired.map((r) => r.slot_id).join(", ")}`,
     );
   } catch (error) {
     console.error("[queueExpirySweeper] Sweep failed:", error);

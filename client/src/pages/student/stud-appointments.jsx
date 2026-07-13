@@ -262,7 +262,6 @@ export default function AppointmentsPage() {
     if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
       toast.error("Please select an appointment type"); return;
     }
-    if (!purpose.trim()) { toast.error("Please provide a purpose for consultation"); return; }
     setSubmitting(true);
     try {
       await api.post("/student/appointments/book-slot", {
@@ -388,7 +387,7 @@ export default function AppointmentsPage() {
                     </div>
                   )}
                   <div className="form-group">
-                    <label htmlFor="purpose">Purpose of Consultation *</label>
+                    <label htmlFor="purpose">Purpose of Consultation (optional)</label>
                     <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
                   </div>
                   <div className="dialog-actions">

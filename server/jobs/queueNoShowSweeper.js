@@ -1,13 +1,14 @@
 const pool = require("../db");
 const { emitToSlot, emitToUser, emitToDept } = require("../sockets");
+const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 
 const SWEEP_INTERVAL_MS = 30 * 1000;
 
 // Voids a single 'serving' queue entry as a no-show: marks it, logs the
-// transition, notifies sockets, and reopens the slot if it had been
-// auto-closed for hitting max_capacity. Shared by the timeout sweep below
-// and the admin-triggered "Skip" action (PATCH /queue-hosting/:slotId/skip)
-// so both paths stay in sync.
+// transition, notifies sockets, and settles the slot (reopens it if it was
+// 'full' with room again, or marks it 'completed' if nobody's left).
+// Shared by the timeout sweep below and the admin-triggered "Skip" action
+// (PATCH /queue-hosting/:slotId/skip) so both paths stay in sync.
 async function voidQueueEntry({ queueId, slotId, studentId, deptId, changedBy = null, note }) {
   await pool.query(
     `UPDATE queues SET status = 'no_show', completed_at = NOW() WHERE queue_id = ?`,
@@ -24,27 +25,15 @@ async function voidQueueEntry({ queueId, slotId, studentId, deptId, changedBy = 
   emitToUser(studentId, "queue:no-show", noShowPayload);
   emitToDept(deptId, "queue:no-show", noShowPayload);
 
-  // Voiding frees a spot under the daily cap same as a cancellation --
-  // reopen the slot if /queues/join auto-closed it for hitting max_capacity.
-  const [[slotRow]] = await pool.query(
-    `SELECT qs.status, qs.close_reason, qs.max_capacity,
-       (SELECT COUNT(*) FROM queues q WHERE q.slot_id = qs.slot_id AND q.status IN ('waiting', 'serving', 'completed')) AS claimed
-     FROM queue_slots qs WHERE qs.slot_id = ?`,
-    [slotId],
-  );
-  if (
-    slotRow &&
-    slotRow.status === "closed" &&
-    slotRow.close_reason === "Capacity reached — queue full for today" &&
-    slotRow.claimed < slotRow.max_capacity
-  ) {
-    await pool.query(
-      `UPDATE queue_slots SET status = 'open', close_reason = NULL WHERE slot_id = ?`,
-      [slotId],
-    );
-    const reopenedPayload = { slotId, status: "open" };
-    emitToSlot(slotId, "queue:slot-status", reopenedPayload);
-    emitToDept(deptId, "queue:slot-status", reopenedPayload);
+  // Voiding frees a spot under the daily cap same as a cancellation, and
+  // removes this entry from the unserved count -- settle the slot: reopen
+  // it if it was 'full' and there's room again (and hours haven't ended),
+  // or mark it 'completed' if nobody's left waiting/serving.
+  const settleResult = await settleSlotAfterEntryChange(pool, slotId);
+  if (settleResult) {
+    const settledPayload = { slotId, status: settleResult.newStatus };
+    emitToSlot(slotId, "queue:slot-status", settledPayload);
+    emitToDept(deptId, "queue:slot-status", settledPayload);
   }
 }
 

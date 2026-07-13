@@ -494,6 +494,12 @@
   color: var(--text-tertiary);
   border: 0.5px solid rgba(148, 163, 184, 0.35);
 }
+.ann-badge-cross-college {
+  background: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+  text-transform: none;
+}
 
 .ann-item-desc {
   font-size: 0.85rem;

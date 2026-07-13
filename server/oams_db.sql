@@ -133,11 +133,11 @@ CREATE TABLE services (
     service_id            INT          AUTO_INCREMENT PRIMARY KEY,
     service_name          VARCHAR(100) NOT NULL,
     description           TEXT,
-    department_id         INT          NULL,   -- NULL = available across all departments
+    department_id         INT          NOT NULL,   -- the owning/creating department, always real
+    is_cross_college       BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = other departments' students can also use it
     location_id           INT          NULL,
-    status                ENUM('active','inactive') NOT NULL DEFAULT 'active',
     average_service_time  INT          NOT NULL DEFAULT 15,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
     FOREIGN KEY (location_id)   REFERENCES locations(location_id)     ON DELETE SET NULL
 );
 
@@ -180,12 +180,13 @@ CREATE TABLE document_services (
     service_id       INT          AUTO_INCREMENT PRIMARY KEY,
     service_name     VARCHAR(100) NOT NULL,
     description      TEXT,
-    department_id    INT          NULL,   -- NULL = available across all departments
+    department_id    INT          NOT NULL,   -- the owning/creating department, always real
+    is_cross_college BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = other departments' students/faculty can also use it
     recipient_type   ENUM('students','faculty','both') NOT NULL DEFAULT 'students',
     status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
     fee              DECIMAL(10,2) NOT NULL DEFAULT 0,
     processing_time  VARCHAR(100) NULL,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE document_requirements (
@@ -212,7 +213,7 @@ CREATE TABLE queue_slots (
     max_capacity    INT          NOT NULL DEFAULT 20,
     current_count   INT          NOT NULL DEFAULT 0,
     no_show_timeout_minutes INT  NOT NULL DEFAULT 15,
-    status          ENUM('open','paused','closed','cancelled') DEFAULT 'open',
+    status          ENUM('open','paused','full','expired','completed','closed','cancelled') DEFAULT 'open',
     pause_reason    VARCHAR(255) NULL,
     close_reason    VARCHAR(255) NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -402,9 +403,10 @@ CREATE TABLE faqs (
     status          ENUM('active','archived')                      NOT NULL DEFAULT 'active',
     created_by      VARCHAR(255) NULL,
     is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
-    department_id   INT          NULL,   -- NULL = global announcement
+    department_id   INT          NOT NULL,   -- the posting department, always real
+    is_cross_college BOOLEAN     NOT NULL DEFAULT FALSE, -- TRUE = visible to every department, not just the poster's
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
     INDEX idx_faqs_pinned_created (is_pinned, created_at)
 );
 

@@ -53,8 +53,13 @@ export function QueueProvider({ children }) {
 
       if (prev.status === "waiting" && q.status === "serving") {
         toast.success(
-          `It's your turn for ${q.serviceName}! Please proceed to the window.`,
+          `It's your turn for ${q.serviceName}! Please proceed to the designated location.`,
           { duration: 8000 },
+        );
+      }
+      if (prev.status === "serving" && q.status === "waiting") {
+        toast.warning(
+          `Your call for ${q.serviceName} was reverted because the queue was paused. You're still in line.`,
         );
       }
       if (prev.slotStatus !== "paused" && q.slotStatus === "paused") {
@@ -66,6 +71,16 @@ export function QueueProvider({ children }) {
       }
       if (prev.slotStatus === "paused" && q.slotStatus === "open") {
         toast.success(`The queue for ${q.serviceName} has resumed.`);
+      }
+      if (prev.slotStatus !== "full" && q.slotStatus === "full") {
+        toast.message(
+          `The queue for ${q.serviceName} is now full. New students can no longer join, but you'll still be served.`,
+        );
+      }
+      if (prev.slotStatus !== "expired" && q.slotStatus === "expired") {
+        toast.message(
+          `The queue for ${q.serviceName} is closed for new joins (hours ended), but you'll still be served.`,
+        );
       }
     }
 
@@ -253,9 +268,9 @@ export function QueueProvider({ children }) {
 
   // ── Join a queue ──────────────────────────────────────────────────────────
   const joinQueue = useCallback(
-    async (slotId) => {
+    async (slotId, notes) => {
       try {
-        const { data } = await api.post("/student/queues/join", { slotId });
+        const { data } = await api.post("/student/queues/join", { slotId, notes });
         setQueues((prev) => [...prev, data.queue]);
         await fetchAvailableSlots();
         await fetchActiveQueues();

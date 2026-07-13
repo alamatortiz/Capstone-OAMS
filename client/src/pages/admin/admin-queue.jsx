@@ -9,6 +9,7 @@ import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
+import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
 import { getCollegeLogo } from "../../data/collegeLogo";
 
@@ -266,9 +267,11 @@ export default function AdminQueue() {
     return "I can help you with queue monitoring, wait time analysis, and department statistics. What would you like to know?";
   };
 
-  // Only today's currently open/paused queue lines count as "active"
-  const activeQueueDetails = queueDetails.filter(
-    (q) => q.status === "open" || q.status === "paused",
+  // Today's open/paused queue lines, plus 'full'/'expired' lines — those are
+  // closed to new joins but still have unserved students by construction
+  // (they settle into 'completed' once the last one is served/left/voided).
+  const activeQueueDetails = queueDetails.filter((q) =>
+    ["open", "paused", "full", "expired"].includes(q.status),
   );
 
   const serviceTypes = [...new Set(activeQueueDetails.map((q) => q.queueType))].sort();
@@ -305,6 +308,12 @@ export default function AdminQueue() {
         return "Active";
       case "paused":
         return "Paused";
+      case "full":
+        return "Full";
+      case "expired":
+        return "Hours Ended";
+      case "completed":
+        return "Completed";
       case "closed":
         return "Closed";
       case "cancelled":
@@ -389,17 +398,6 @@ export default function AdminQueue() {
 
   // Render monitoring detail view
   if (monitoringQueue) {
-    const queueProgress = monitoringQueue.maxCapacity
-      ? Math.min(
-          100,
-          Math.max(
-            0,
-            ((monitoringQueue.maxCapacity - monitoringQueue.currentCount) /
-              monitoringQueue.maxCapacity) *
-              100,
-          ),
-        )
-      : 0;
     const estimatedWaitMinutes =
       monitoringQueue.avgServiceMinutes != null
         ? monitoringQueue.avgServiceMinutes * monitoringQueue.currentCount
@@ -421,7 +419,9 @@ export default function AdminQueue() {
               title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
               message={
                 reasonModal?.mode === "pause"
-                  ? "Students in this queue will see this reason while it's paused."
+                  ? monitoringQueue?.currentlyServingStudentNumber
+                    ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
+                    : "Students in this queue will see this reason while it's paused."
                   : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
               }
               confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
@@ -473,6 +473,13 @@ export default function AdminQueue() {
                   </p>
                 </div>
               </div>
+              {(monitoringQueue.status === "full" || monitoringQueue.status === "expired") && (
+                <p className="queue-monitoring-status-note">
+                  {monitoringQueue.status === "full"
+                    ? "This queue is full — closed to new joins, but you can still call and serve everyone already in line."
+                    : "This queue's hours have ended — closed to new joins, but you can still call and serve everyone already in line."}
+                </p>
+              )}
             </div>
 
             {/* Stats Cards */}
@@ -513,18 +520,14 @@ export default function AdminQueue() {
                     <h3>Queue Progress</h3>
                   </div>
                   <div className="queue-detail-content">
-                    <div className="progress-section">
-                      <div className="progress-label">
-                        <span>Processing Rate</span>
-                        <span>{Math.round(queueProgress)}% Complete</span>
-                      </div>
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${queueProgress}%` }}
-                        ></div>
-                      </div>
-                    </div>
+                    <QueueProgressBars
+                      occupancyCurrent={monitoringQueue.totalInQueue ?? 0}
+                      occupancyTotal={monitoringQueue.maxCapacity ?? 0}
+                      occupancyPercent={monitoringQueue.queueOccupancyPercent ?? 0}
+                      servicedCurrent={monitoringQueue.servedCount ?? 0}
+                      servicedTotal={monitoringQueue.totalInQueue ?? 0}
+                      servicedPercent={monitoringQueue.servicedPercent ?? 0}
+                    />
                     <div className="progress-stats">
                       <div className="progress-stat">
                         <span className="progress-stat-label">
@@ -577,6 +580,12 @@ export default function AdminQueue() {
                       <button
                         className="queue-action-btn queue-action-btn--warning"
                         onClick={() => handlePauseQueue(monitoringQueue.id)}
+                        disabled={monitoringQueue.status !== "open"}
+                        title={
+                          monitoringQueue.status !== "open"
+                            ? "Only an open queue can be paused"
+                            : undefined
+                        }
                       >
                         <AlertCircleIcon />
                         Pause Queue
@@ -780,7 +789,7 @@ export default function AdminQueue() {
                     </h3>
                   </div>
                   <div className="queue-detail-content">
-                    <div className="status-badge">
+                    <div className={`status-badge status-badge--${monitoringQueue.status}`}>
                       {getQueueStatusLabel(monitoringQueue.status)}
                     </div>
                   </div>

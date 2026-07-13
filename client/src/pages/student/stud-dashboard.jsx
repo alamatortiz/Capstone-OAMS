@@ -76,7 +76,7 @@ const ChevronRightIcon = () => (
     <polyline points="9 18 15 12 9 6"></polyline>
   </svg>
 );
-const AlertCircleIcon = () => (
+const AlertCircleIcon = (props) => (
   <svg
     className="icon"
     viewBox="0 0 24 24"
@@ -85,6 +85,7 @@ const AlertCircleIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    {...props}
   >
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="12" y1="8" x2="12" y2="12"></line>
@@ -263,14 +264,41 @@ export default function StudentDashboard() {
   };
 
   // ── Derived values from API response ─────────────────────────────────────
-  const apiQueue = dashStats?.activeQueue ?? null;
+  // dashboard-stats' activeQueue and QueueContext's active-queue entries use
+  // different field names for the same data (service/college/estimatedWaitTime
+  // vs. serviceName/departmentName/estimatedWait) -- normalize both to one
+  // shape so the preview card below doesn't render blank when it falls back
+  // between the two sources.
+  const apiQueue = dashStats?.activeQueue
+    ? {
+        ...dashStats.activeQueue,
+        service: dashStats.activeQueue.service,
+        college: dashStats.activeQueue.college,
+        estimatedWaitTime: dashStats.activeQueue.estimatedWaitTime,
+        slotStatus: dashStats.activeQueue.status,
+      }
+    : null;
   // Fallback to QueueContext (for locally-joined queues before page refresh)
   const contextQueues = getActiveQueues();
-  // Sort by position ascending so index [0] is always the closest to being served
+  // Sort so index [0] is always the closest to being served -- a 'serving'
+  // entry always wins (its position is null, not a sortable number), then
+  // fall back to position ascending among the rest.
   const closestContextQueue = contextQueues.length > 0
-    ? [...contextQueues].sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity))[0]
+    ? [...contextQueues].sort((a, b) => {
+        if (a.status === "serving" && b.status !== "serving") return -1;
+        if (b.status === "serving" && a.status !== "serving") return 1;
+        return (a.position ?? Infinity) - (b.position ?? Infinity);
+      })[0]
     : null;
-  const mostRecentQueue = apiQueue ?? closestContextQueue ?? null;
+  const normalizedContextQueue = closestContextQueue
+    ? {
+        ...closestContextQueue,
+        service: closestContextQueue.serviceName,
+        college: closestContextQueue.departmentName,
+        estimatedWaitTime: closestContextQueue.estimatedWait,
+      }
+    : null;
+  const mostRecentQueue = apiQueue ?? normalizedContextQueue ?? null;
   const activeQueueCount =
     dashStats?.stats?.activeQueueCount ?? contextQueues.length;
 
@@ -384,9 +412,9 @@ export default function StudentDashboard() {
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
     if (lowerInput.includes("queue") || lowerInput.includes("position")) {
-      return mostRecentQueue
-        ? `You're currently at position ${mostRecentQueue.position} in the ${mostRecentQueue.service} queue. Estimated wait: ${mostRecentQueue.estimatedWaitTime}.`
-        : "You don't have any active queues. Would you like to join one?";
+      if (!mostRecentQueue) return "You don't have any active queues. Would you like to join one?";
+      const positionText = mostRecentQueue.status === "serving" ? "currently being served" : `at position ${mostRecentQueue.position}`;
+      return `You're ${positionText} in the ${mostRecentQueue.service} queue. Estimated wait: ${mostRecentQueue.estimatedWaitTime}.`;
     } else if (lowerInput.includes("appointment")) {
       const count = dashStats?.stats?.appointments?.upcoming ?? 0;
       return `You have ${count} upcoming appointment${count !== 1 ? "s" : ""} this week. Visit the Appointments section for details.`;
@@ -548,15 +576,34 @@ export default function StudentDashboard() {
                           </p>
                           <p className="college-name">{mostRecentQueue.college}</p>
                         </div>
-                        <span className="queue-number">
-                          {mostRecentQueue.queueNumber}
-                        </span>
                       </div>
                     </div>
                   </div>
+                  {mostRecentQueue.slotStatus === "paused" && (
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        background: "rgba(245, 158, 11, 0.12)",
+                        border: "1px solid rgba(245, 158, 11, 0.4)",
+                        color: "#f59e0b",
+                        borderRadius: "999px",
+                        padding: "0.2rem 0.65rem",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        margin: "0.5rem 0",
+                      }}
+                    >
+                      <AlertCircleIcon style={{ width: "0.9rem", height: "0.9rem" }} />
+                      Paused{mostRecentQueue.slotPauseReason ? `: ${mostRecentQueue.slotPauseReason}` : ""}
+                    </div>
+                  )}
                   <div className="queue-stats">
                     <div className="dash-queue-stat">
-                      <p className="stat-num">{mostRecentQueue.position}</p>
+                      <p className="stat-num">
+                        {mostRecentQueue.status === "serving" ? "Serving" : mostRecentQueue.position}
+                      </p>
                       <p className="dash-stat-label">Position</p>
                     </div>
                     <div className="dash-queue-stat">

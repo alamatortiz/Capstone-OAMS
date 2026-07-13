@@ -254,7 +254,7 @@
 /* ===== Summary Stat Cards ===== */
 .aqh-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
 }
 
@@ -284,11 +284,27 @@
 }
 
 .aqh-summary-closed {
-  border-color: var(--card-border);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 .aqh-summary-closed:hover {
-  border-color: #475569;
-  box-shadow: 0 8px 16px rgba(100, 116, 139, 0.1);
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 8px 16px rgba(239, 68, 68, 0.12);
+}
+
+.aqh-summary-still-serving {
+  border-color: rgba(249, 115, 22, 0.35);
+}
+.aqh-summary-still-serving:hover {
+  border-color: rgba(249, 115, 22, 0.55);
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.12);
+}
+
+.aqh-summary-completed {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+.aqh-summary-completed:hover {
+  border-color: rgba(16, 185, 129, 0.55);
+  box-shadow: 0 8px 16px rgba(16, 185, 129, 0.12);
 }
 
 .aqh-summary-content {
@@ -316,8 +332,14 @@
 .aqh-value-paused {
   color: var(--warning);
 }
+.aqh-value-still-serving {
+  color: #f97316;
+}
+.aqh-value-completed {
+  color: #10b981;
+}
 .aqh-value-closed {
-  color: var(--text-tertiary);
+  color: #ef4444;
 }
 
 .aqh-summary-icon {
@@ -342,8 +364,14 @@
 .aqh-icon-paused {
   background: var(--warning);
 }
+.aqh-icon-still-serving {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+.aqh-icon-completed {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
 .aqh-icon-closed {
-  background: #64748b;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
 /* ===== Search & Filter Bar ===== */
@@ -471,6 +499,27 @@
   box-shadow: none;
 }
 
+.aqh-card-still-serving {
+  background: rgba(249, 115, 22, 0.06);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+.aqh-card-still-serving:hover {
+  background: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.5);
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.1);
+}
+
+.aqh-card-completed {
+  background: var(--card-bg);
+  border-color: rgba(16, 185, 129, 0.3);
+  opacity: 0.9;
+}
+.aqh-card-completed:hover {
+  background: var(--card-bg);
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: none;
+}
+
 .aqh-queue-card-top {
   display: flex;
   align-items: flex-start;
@@ -547,9 +596,21 @@
 }
 
 .aqh-status-closed {
-  background: rgba(100, 116, 139, 0.2);
-  color: var(--text-tertiary);
-  border: 0.5px solid rgba(100, 116, 139, 0.4);
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
+}
+
+.aqh-status-still-serving {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 0.5px solid rgba(249, 115, 22, 0.4);
+}
+
+.aqh-status-completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 0.5px solid rgba(16, 185, 129, 0.4);
 }
 
 .aqh-queue-card-actions {

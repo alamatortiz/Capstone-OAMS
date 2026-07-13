@@ -511,6 +511,7 @@ body {
   font-size: 0.95rem;
   color: var(--text-primary);
   margin: 0;
+  text-align: left;
   transition: color 0.3s ease;
 }
 
@@ -518,6 +519,7 @@ body {
   font-size: 0.8rem;
   color: var(--text-tertiary);
   margin: 0.15rem 0 0 0;
+  text-align: left;
   transition: color 0.3s ease;
 }
 
@@ -551,6 +553,12 @@ body {
   background: rgba(16, 185, 129, 0.15);
   color: var(--success);
   border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.queue-status-badge--paused {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 /* ===== Queue Stats Grid ===== */
@@ -1448,6 +1456,7 @@ body {
   transition: color 0.3s ease;
   font-weight: 500;
 }
+
 
 .avail-services-queue-btn {
   display: flex;

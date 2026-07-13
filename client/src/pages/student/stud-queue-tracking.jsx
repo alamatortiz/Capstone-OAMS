@@ -19,6 +19,7 @@ import {
   Target,
   Loader2,
   ChevronLeft,
+  AlertCircle,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -138,11 +139,18 @@ export default function QueueTrackingPage() {
             onConfirm={async () => { await handleLeaveQueue(leaveConfirmQueue.queueId); setLeaveConfirmQueue(null); }}
             title="Leave Queue?"
             message={
-              <>
-                You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
-                Leaving will permanently remove your spot — you will need to rejoin
-                and wait from the back of the line if you change your mind.
-              </>
+              leaveConfirmQueue?.status === "serving" ? (
+                <>
+                  You are currently being served for <strong>{leaveConfirmQueue?.serviceName}</strong>.
+                  Leaving now ends your turn immediately — the staff will move on to the next student.
+                </>
+              ) : (
+                <>
+                  You are about to leave the <strong>{leaveConfirmQueue?.serviceName}</strong> queue.
+                  Leaving will permanently remove your spot — you will need to rejoin
+                  and wait from the back of the line if you change your mind.
+                </>
+              )
             }
             icon={<XCircle width={22} height={22} />}
             cancelText="Stay in Queue"
@@ -329,6 +337,27 @@ export default function QueueTrackingPage() {
                             </div>
                           </div>
 
+                          {queue.slotStatus === "paused" && (
+                            <div
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.35rem",
+                                background: "rgba(245, 158, 11, 0.12)",
+                                border: "1px solid rgba(245, 158, 11, 0.4)",
+                                color: "#f59e0b",
+                                borderRadius: "999px",
+                                padding: "0.2rem 0.65rem",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                margin: "0.5rem 0",
+                              }}
+                            >
+                              <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
+                              Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ""}
+                            </div>
+                          )}
+
                           {/* Position */}
                           <div className="qt-queue-position">
                             <div className="qt-position-header">
@@ -337,11 +366,13 @@ export default function QueueTrackingPage() {
                               </div>
                               <div className="qt-position-display">
                                 <p className="qt-position-number">
-                                  {queue.position}
+                                  {queue.status === "serving" ? "Serving" : queue.position}
                                 </p>
-                                <p className="qt-position-total">
-                                  of {queue.totalWaiting}
-                                </p>
+                                {queue.status !== "serving" && (
+                                  <p className="qt-position-total">
+                                    of {queue.totalWaiting}
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <QueueProgressBars
@@ -375,10 +406,10 @@ export default function QueueTrackingPage() {
                           </div>
 
                           {/* Actions */}
-                          {queue.status === "waiting" && (
+                          {(queue.status === "waiting" || queue.status === "serving") && (
                             <div className="qt-queue-actions">
                               <button
-                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName }); }}
+                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status }); }}
                                 className="qt-btn-cancel"
                                 disabled={isLeaving}
                               >

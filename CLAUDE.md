@@ -46,3 +46,6 @@ Always look for ways to reduce redundancy. If two files do the same thing, flag 
 - `client-mobile/` is out of scope until web parity is reached — do not generate mobile code unless explicitly asked
 - AI/chatbot layer does not exist yet — do not fabricate integration code for it
 - Mock data is CCS-scoped (`ccs_mock_data.sql`) — do not assume all 6 colleges are wired up
+
+## Rule 6: Plan summaries
+Whenever a plan is presented (plan mode), give the in-depth rundown first, then follow it with a short, plain-language summary in simple terms — no jargon, no file paths, just what's changing and why.

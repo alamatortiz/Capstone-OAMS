@@ -124,13 +124,14 @@ export default function AnnouncementsPage() {
 
   // ── College options derived from live data: each department that actually
   //    has at least one announcement, keyed by abbreviation (e.g. "CCS").
-  //    Global notices (departmentAbbrev "ALL") are excluded from the option
-  //    list itself but always remain visible regardless of which college is
-  //    selected, since they apply to every department by definition. ───────
+  //    Cross-college announcements still belong to one real department, so
+  //    they're a selectable filter like any other -- they also always
+  //    remain visible regardless of which college is selected (see
+  //    isCrossCollege check below), since they apply to every department. ──
   const collegeOptions = useMemo(() => {
     const seen = new Map();
     announcements.forEach((a) => {
-      if (a.departmentAbbrev !== "ALL" && !seen.has(a.departmentAbbrev)) {
+      if (!seen.has(a.departmentAbbrev)) {
         seen.set(a.departmentAbbrev, a.departmentName);
       }
     });
@@ -141,14 +142,14 @@ export default function AnnouncementsPage() {
 
   // ── Filtered announcements (category tab + department dropdown both apply).
   //    Selecting a college (e.g. "CCS") shows that college's announcements
-  //    PLUS global ("All Departments") ones -- never hides global notices. ──
+  //    PLUS cross-college ones -- never hides cross-college notices. ───────
   const pinnedAnnouncements = announcements
     .filter((a) => a.isPinned)
     .filter(
       (a) =>
         selectedCollege === "all" ||
         a.departmentAbbrev === selectedCollege ||
-        a.departmentAbbrev === "ALL",
+        a.isCrossCollege,
     );
   const filteredAnnouncements = announcements
     .filter((a) => selectedFilter === "all" || a.category === selectedFilter)
@@ -156,7 +157,7 @@ export default function AnnouncementsPage() {
       (a) =>
         selectedCollege === "all" ||
         a.departmentAbbrev === selectedCollege ||
-        a.departmentAbbrev === "ALL",
+        a.isCrossCollege,
     )
     .filter((a) => !a.isPinned);
 
