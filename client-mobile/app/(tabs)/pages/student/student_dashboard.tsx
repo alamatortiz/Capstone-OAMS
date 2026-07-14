@@ -198,6 +198,7 @@ const officeHours = {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
   { key: 'queue', label: 'Queue', icon: 'time-outline' },
   { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
   { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
@@ -223,6 +224,10 @@ export default function StudentDashboardScreen() {
     if (key === 'dashboard') return;
     if (key === 'queue') {
       router.push('/pages/student/student_queue');
+      return;
+    }
+    if (key === 'announcements') {
+      router.push('/pages/student/student_announcement');
       return;
     }
     comingSoon();
@@ -317,8 +322,12 @@ export default function StudentDashboardScreen() {
           <View style={styles.actionsGrid}>
             {quickActions.map((action) => {
               const badgeTint = BADGE_TINTS[action.badgeTint];
+              const onPress =
+                action.key === 'announcements'
+                  ? () => router.push('/pages/student/student_announcement')
+                  : comingSoon;
               return (
-                <Pressable key={action.key} style={styles.actionCard} onPress={comingSoon}>
+                <Pressable key={action.key} style={styles.actionCard} onPress={onPress}>
                   <View style={styles.actionMain}>
                     <LinearGradient colors={action.gradient} style={styles.actionIcon}>
                       <Ionicons name={action.icon} size={24} color="#ffffff" />
@@ -372,7 +381,10 @@ export default function StudentDashboardScreen() {
                 <Ionicons name="megaphone-outline" size={18} color={theme.primary} />
                 <Text style={styles.cardTitleText}>Pinned Announcements</Text>
               </View>
-              <Pressable onPress={comingSoon} hitSlop={8}>
+              <Pressable
+                onPress={() => router.push('/pages/student/student_announcement')}
+                hitSlop={8}
+              >
                 <Text style={styles.viewAllText}>View All</Text>
               </Pressable>
             </View>
@@ -380,7 +392,11 @@ export default function StudentDashboardScreen() {
               {pinnedAnnouncements.map((ann) => {
                 const meta = ANNOUNCEMENT_META[ann.category];
                 return (
-                  <Pressable key={ann.id} style={styles.announcementCard} onPress={comingSoon}>
+                  <Pressable
+                    key={ann.id}
+                    style={styles.announcementCard}
+                    onPress={() => router.push('/pages/student/student_announcement')}
+                  >
                     <LinearGradient colors={meta.iconBg} style={styles.announcementIcon}>
                       <Ionicons name={meta.icon} size={18} color="#ffffff" />
                     </LinearGradient>
