@@ -116,6 +116,10 @@ export default function LoginScreen() {
         router.replace('/pages/student/student_dashboard');
         return;
       }
+      if (role === 'professor') {
+        router.replace('/pages/professor/professor_dashboard');
+        return;
+      }
       Alert.alert('Signed in', 'Login functionality is not wired up yet on mobile.');
     } finally {
       setIsLoading(false);
