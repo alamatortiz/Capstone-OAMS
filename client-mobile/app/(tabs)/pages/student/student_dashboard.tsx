@@ -221,6 +221,10 @@ export default function StudentDashboardScreen() {
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
     if (key === 'dashboard') return;
+    if (key === 'queue') {
+      router.push('/pages/student/student_queue');
+      return;
+    }
     comingSoon();
   };
 
@@ -637,10 +641,10 @@ function createStyles(theme: ThemePalette) {
     headerBrand: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 0,
     },
-    headerPncLogo: { width: 30, height: 30 },
-    headerOamsLogo: { height: 26, width: 76 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',

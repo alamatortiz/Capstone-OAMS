@@ -685,10 +685,10 @@ function createStyles(theme: ThemePalette) {
     headerBrand: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 0,
     },
-    headerPncLogo: { width: 30, height: 30 },
-    headerOamsLogo: { height: 26, width: 76 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',
