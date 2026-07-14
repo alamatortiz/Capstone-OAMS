@@ -9,6 +9,7 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -174,6 +175,8 @@ const navItems: NavItem[] = [
 export default function ProfessorDashboardScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(true);
   const router = useRouter();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
@@ -192,6 +195,11 @@ export default function ProfessorDashboardScreen() {
 
   const handleLogout = () => {
     setMenuOpen(false);
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutModalVisible(false);
     router.replace('/login');
   };
 
@@ -407,6 +415,16 @@ export default function ProfessorDashboardScreen() {
               <Text style={styles.drawerCollege}>{demoProfessor.departmentName}</Text>
             </View>
 
+            <View style={styles.availabilityRow}>
+              <Text style={styles.availabilityLabel}>Available</Text>
+              <Switch
+                value={isAvailable}
+                onValueChange={setIsAvailable}
+                trackColor={{ false: '#3f3f46', true: '#22c55e' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+
             <View style={styles.drawerNav}>
               {navItems.map((item) => {
                 const active = item.key === 'dashboard';
@@ -431,6 +449,38 @@ export default function ProfessorDashboardScreen() {
             </Pressable>
           </SafeAreaView>
           <Pressable style={styles.drawerBackdrop} onPress={() => setMenuOpen(false)} />
+        </View>
+      </Modal>
+
+      {/* Confirm Logout Modal */}
+      <Modal
+        visible={logoutModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutIconCircle}>
+              <Ionicons name="log-out-outline" size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Confirm Logout</Text>
+            <Text style={styles.logoutModalDescription}>
+              Are you sure you want to log out? Any unsaved changes will be lost.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable
+                style={styles.logoutCancelBtn}
+                onPress={() => setLogoutModalVisible(false)}
+              >
+                <Text style={styles.logoutCancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.logoutConfirmBtn} onPress={confirmLogout}>
+                <Ionicons name="log-out-outline" size={16} color="#ffffff" />
+                <Text style={styles.logoutConfirmBtnText}>Log Out</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>
@@ -922,9 +972,26 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '500',
       color: theme.subtext,
     },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    availabilityLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.text,
+    },
     drawerNav: {
       flex: 1,
-      marginTop: 28,
+      marginTop: 16,
       gap: 4,
     },
     drawerNavItem: {
@@ -961,6 +1028,81 @@ function createStyles(theme: ThemePalette) {
       fontSize: 14,
       fontWeight: '700',
       color: '#ef4444',
+    },
+
+    // Confirm logout modal
+    logoutOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    logoutModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    logoutIconCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+      marginBottom: 16,
+    },
+    logoutModalTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.text,
+      marginBottom: 8,
+    },
+    logoutModalDescription: {
+      fontSize: 13,
+      color: theme.subtext,
+      textAlign: 'center',
+      lineHeight: 19,
+      marginBottom: 20,
+    },
+    logoutModalActions: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+    },
+    logoutCancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    logoutCancelBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    logoutConfirmBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#ef4444',
+    },
+    logoutConfirmBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#ffffff',
     },
   });
 }

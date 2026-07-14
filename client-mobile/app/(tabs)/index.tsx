@@ -119,24 +119,26 @@ export default function WelcomeScreen() {
         stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Navbar */}
-        <View style={styles.navbar}>
-          <View style={styles.navbarBrand}>
-            <Image source={pncLogo} style={styles.navPncImg} resizeMode="contain" />
-            <OamsLogo style={styles.navLogoImg} outline={isDarkMode} />
-          </View>
-          <View style={styles.navbarActions}>
-            <Pressable style={styles.iconBtn} onPress={toggleTheme}>
-              <Image
-                source={isDarkMode ? sunIcon : darkModeIcon}
-                style={styles.iconBtnImg}
-                resizeMode="contain"
-              />
-            </Pressable>
-            <Pressable style={styles.btnSignin} onPress={goToLogin}>
-              <Text style={styles.btnSigninText}>Sign In</Text>
-              <Image source={nextIcon} style={styles.btnIconImg} resizeMode="contain" />
-            </Pressable>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerBrand}>
+            <View style={styles.headerBrandLogos}>
+              <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
+              <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+            </View>
+            <View style={styles.headerActionsGroup}>
+              <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
+                <Image
+                  source={isDarkMode ? sunIcon : darkModeIcon}
+                  style={styles.iconBtnImg}
+                  resizeMode="contain"
+                />
+              </Pressable>
+              <Pressable style={styles.btnSignin} onPress={goToLogin}>
+                <Text style={styles.btnSigninText}>Sign In</Text>
+                <Image source={nextIcon} style={styles.btnIconImg} resizeMode="contain" />
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -240,6 +242,8 @@ const lightPalette = {
   subtext: '#6b7280',
   cardBorder: 'rgba(34, 197, 94, 0.15)',
   iconBtn: '#666666',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
 };
 
 const darkPalette = {
@@ -251,6 +255,8 @@ const darkPalette = {
   subtext: '#94a3b8',
   cardBorder: 'rgba(34, 197, 94, 0.18)',
   iconBtn: '#94a3b8',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
 };
 
 function createStyles(theme: typeof lightPalette) {
@@ -263,40 +269,43 @@ function createStyles(theme: typeof lightPalette) {
       flexGrow: 1,
     },
 
-    // Navbar
-    navbar: {
+    // Header
+    header: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      height: 78,
       paddingHorizontal: 16,
+      paddingVertical: 8,
       backgroundColor: theme.navBg,
       borderBottomWidth: 1,
       borderBottomColor: theme.navBorder,
     },
-    navbarBrand: {
+    headerBrand: {
+      flex: 1,
       flexDirection: 'row',
+      flexWrap: 'nowrap',
       alignItems: 'center',
-      alignSelf: 'flex-start',
-      gap: 3,
-      flexShrink: 1,
-      marginRight: 'auto',
-      marginTop: 36,
+      justifyContent: 'space-between',
     },
-    navPncImg: { height: 36, width: 36 },
-    navLogoImg: { height: 36, width: 108 },
-    navbarActions: {
+    headerBrandLogos: {
       flexDirection: 'row',
       alignItems: 'center',
-      alignSelf: 'flex-end',
-      gap: 10,
+      flexShrink: 1,
+      gap: 0,
+    },
+    headerPncLogo: { width: 46, height: 46 },
+    headerOamsLogo: { height: 40, width: 112 },
+    headerActionsGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
       flexShrink: 0,
-      marginLeft: 'auto',
-      marginBottom: 22,
+      gap: 8,
     },
     iconBtn: {
-      padding: 5,
-      borderRadius: 8,
+      padding: 8,
+      borderRadius: 10,
+      backgroundColor: theme.iconBtnBg,
+      borderWidth: 1,
+      borderColor: theme.iconBtnBorder,
     },
     iconBtnImg: { width: 18, height: 18 },
     btnSignin: {
@@ -325,11 +334,11 @@ function createStyles(theme: typeof lightPalette) {
     heroLogosRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 0,
       marginBottom: 20,
     },
-    heroPncLogoImg: { height: 56, width: 56 },
-    heroLogoImg: { height: 44, width: 140 },
+    heroPncLogoImg: { height: 64, width: 64 },
+    heroLogoImg: { height: 50, width: 160, marginLeft: -14 },
     heroTitle: {
       fontSize: 28,
       fontWeight: '800',
@@ -509,10 +518,10 @@ function createStyles(theme: typeof lightPalette) {
     footerLogosLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 0,
     },
-    footerPncLogoImg: { height: 46, width: 46 },
-    footerLogoImg: { height: 38, width: 114 },
+    footerPncLogoImg: { height: 54, width: 54 },
+    footerLogoImg: { height: 44, width: 132 },
     footerRight: {
       alignItems: 'center',
       gap: 4,
