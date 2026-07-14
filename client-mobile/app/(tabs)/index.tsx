@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -104,8 +105,10 @@ export default function WelcomeScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+  const router = useRouter();
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
+  const goToLogin = () => router.push('./login');
 
   return (
     <SafeAreaView style={styles.root}>
@@ -130,7 +133,7 @@ export default function WelcomeScreen() {
                 resizeMode="contain"
               />
             </Pressable>
-            <Pressable style={styles.btnSignin}>
+            <Pressable style={styles.btnSignin} onPress={goToLogin}>
               <Text style={styles.btnSigninText}>Sign In</Text>
               <Image source={nextIcon} style={styles.btnIconImg} resizeMode="contain" />
             </Pressable>
@@ -148,7 +151,7 @@ export default function WelcomeScreen() {
             A centralized platform for students, professors, and administrators to
             streamline university services and enhance productivity.
           </Text>
-          <Pressable style={styles.btnHero}>
+          <Pressable style={styles.btnHero} onPress={goToLogin}>
             <Text style={styles.btnHeroText}>Sign In to Get Started</Text>
             <Image source={nextIcon} style={styles.btnIconImg} resizeMode="contain" />
           </Pressable>
@@ -198,7 +201,7 @@ export default function WelcomeScreen() {
             Join thousands of students, professors, and staff using OAMS to
             streamline their university experience.
           </Text>
-          <Pressable style={styles.btnCta}>
+          <Pressable style={styles.btnCta} onPress={goToLogin}>
             <Text style={styles.btnCtaText}>Sign In Now</Text>
             <Image source={nextIcon} style={styles.btnIconImg} resizeMode="contain" />
           </Pressable>
