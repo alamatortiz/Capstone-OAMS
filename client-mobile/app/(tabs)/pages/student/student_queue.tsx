@@ -157,6 +157,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
   { key: 'queue', label: 'Queue', icon: 'time-outline' },
   { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
   { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
@@ -191,6 +192,10 @@ export default function StudentQueueScreen() {
     if (key === 'queue') return;
     if (key === 'dashboard') {
       goToDashboard();
+      return;
+    }
+    if (key === 'announcements') {
+      router.push('/pages/student/student_announcement');
       return;
     }
     if (key === 'appointments') {
@@ -745,10 +750,10 @@ function createStyles(theme: ThemePalette) {
     headerBrand: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 0,
     },
-    headerPncLogo: { width: 30, height: 30 },
-    headerOamsLogo: { height: 26, width: 76 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',

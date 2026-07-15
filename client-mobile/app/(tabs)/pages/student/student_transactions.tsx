@@ -523,9 +523,9 @@ function createStyles(theme: ThemePalette) {
       borderBottomWidth: 1,
       borderBottomColor: theme.headerBorder,
     },
-    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    headerPncLogo: { width: 30, height: 30 },
-    headerOamsLogo: { height: 26, width: 76 },
+    headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+    headerPncLogo: { width: 40, height: 40 },
+    headerOamsLogo: { height: 34, width: 96 },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     iconBtn: {
       padding: 8,
