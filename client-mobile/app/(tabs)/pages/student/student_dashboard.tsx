@@ -316,7 +316,7 @@ export default function StudentDashboardScreen() {
                   key={stat.key}
                   style={styles.statCard}
                   onPress={stat.key === 'appointments'
-                    ? () => router.push('/pages/student/student_appointments')
+                    ? () => router.push('/pages/student/student_appointment_status')
                     : stat.key === 'documents'
                     ? () => router.push('/pages/student/student_documents')
                     : comingSoon}

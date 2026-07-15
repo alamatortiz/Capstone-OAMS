@@ -684,7 +684,7 @@ export default function StudentAppointmentsScreen() {
                   <Text style={styles.bookingsHeaderTitle}>My Appointments</Text>
                   <Text style={styles.bookingsHeaderSubtitle}>Your scheduled consultations</Text>
                 </View>
-                <Pressable style={styles.statusLink} onPress={comingSoon}>
+                <Pressable style={styles.statusLink} onPress={() => router.push('/pages/student/student_appointment_status')}>
                   <Text style={styles.statusLinkText}>View All Status</Text>
                   <Ionicons name="chevron-forward" size={13} color={theme.purple} />
                 </Pressable>
