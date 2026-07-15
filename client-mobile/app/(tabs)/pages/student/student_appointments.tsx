@@ -321,6 +321,7 @@ export default function StudentAppointmentsScreen() {
     if (key === 'queue') { router.push('/pages/student/student_queue'); return; }
     if (key === 'announcements') { router.push('/pages/student/student_announcement'); return; }
     if (key === 'documents') { router.push('/pages/student/student_documents'); return; }
+    if (key === 'transactions') { router.push('/pages/student/student_transactions'); return; }
     comingSoon();
   };
 

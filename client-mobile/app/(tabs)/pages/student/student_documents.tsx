@@ -187,6 +187,7 @@ export default function StudentDocumentsScreen() {
     if (key === 'queue') { router.push('/pages/student/student_queue'); return; }
     if (key === 'announcements') { router.push('/pages/student/student_announcement'); return; }
     if (key === 'appointments') { router.push('/pages/student/student_appointments'); return; }
+    if (key === 'transactions') { router.push('/pages/student/student_transactions'); return; }
     comingSoon();
   };
 

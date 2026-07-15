@@ -238,6 +238,10 @@ export default function StudentDashboardScreen() {
       router.push('/pages/student/student_documents');
       return;
     }
+    if (key === 'transactions') {
+      router.push('/pages/student/student_transactions');
+      return;
+    }
     comingSoon();
   };
 
