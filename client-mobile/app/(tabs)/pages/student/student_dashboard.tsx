@@ -230,6 +230,14 @@ export default function StudentDashboardScreen() {
       router.push('/pages/student/student_announcement');
       return;
     }
+    if (key === 'appointments') {
+      router.push('/pages/student/student_appointments');
+      return;
+    }
+    if (key === 'documents') {
+      router.push('/pages/student/student_documents');
+      return;
+    }
     comingSoon();
   };
 
@@ -300,7 +308,15 @@ export default function StudentDashboardScreen() {
             {stats.map((stat) => {
               const tint = STAT_TINTS[stat.tint];
               return (
-                <Pressable key={stat.key} style={styles.statCard} onPress={comingSoon}>
+                <Pressable
+                  key={stat.key}
+                  style={styles.statCard}
+                  onPress={stat.key === 'appointments'
+                    ? () => router.push('/pages/student/student_appointments')
+                    : stat.key === 'documents'
+                    ? () => router.push('/pages/student/student_documents')
+                    : comingSoon}
+                >
                   <View style={[styles.statIcon, { backgroundColor: tint.bg, borderColor: tint.border }]}>
                     <Ionicons name={stat.icon} size={20} color={tint.color} />
                   </View>
@@ -325,6 +341,8 @@ export default function StudentDashboardScreen() {
               const onPress =
                 action.key === 'announcements'
                   ? () => router.push('/pages/student/student_announcement')
+                  : action.key === 'appointment-booking'
+                  ? () => router.push('/pages/student/student_appointments')
                   : comingSoon;
               return (
                 <Pressable key={action.key} style={styles.actionCard} onPress={onPress}>

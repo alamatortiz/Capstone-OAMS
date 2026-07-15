@@ -171,6 +171,14 @@ export default function StudentAnnouncementScreen() {
       router.push('/pages/student/student_queue');
       return;
     }
+    if (key === 'appointments') {
+      router.push('/pages/student/student_appointments');
+      return;
+    }
+    if (key === 'documents') {
+      router.push('/pages/student/student_documents');
+      return;
+    }
     comingSoon();
   };
 
@@ -269,7 +277,7 @@ export default function StudentAnnouncementScreen() {
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
             <Ionicons name="chevron-back" size={18} color={theme.subtext} />
-            <Text style={styles.breadcrumbText}>Dashboard</Text>
+            <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
