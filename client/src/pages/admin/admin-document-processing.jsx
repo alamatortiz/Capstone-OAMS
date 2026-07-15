@@ -8,6 +8,8 @@ import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import { connectSocket } from "../../utils/socket";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -79,6 +81,7 @@ export default function AdminDocumentProcessing() {
   const [weekFilter, setWeekFilter] = useState("all");
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  useLockBodyScroll(showDetailsModal);
   const [processingNotes, setProcessingNotes] = useState("");
 
   // ── Status-change confirmation ───────────────────────────────────────────
@@ -102,6 +105,22 @@ export default function AdminDocumentProcessing() {
 
   useEffect(() => {
     fetchDocuments();
+  }, [fetchDocuments]);
+
+  // ── Live updates: refetch when a student submits/cancels a document request ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["document:new-request", "document:cancelled"];
+    events.forEach((event) => socket.on(event, fetchDocuments));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchDocuments));
+    };
   }, [fetchDocuments]);
 
   // ── Deadline buckets ──────────────────────────────────────────────────────
@@ -165,9 +184,10 @@ export default function AdminDocumentProcessing() {
     if (i.includes("pending")) return `There are ${count("pending")} pending documents awaiting processing.`;
     if (i.includes("processing")) return `${count("processing")} document(s) are currently being processed.`;
     if (i.includes("ready")) return `${count("ready")} document(s) are ready for student pickup.`;
-    if (i.includes("completed")) return `${count("completed")} document request(s) have been completed.`;
+    if (i.includes("released")) return `${count("released")} document(s) have been released, awaiting pickup confirmation.`;
+    if (i.includes("claimed")) return `${count("claimed")} document request(s) have been claimed.`;
     if (i.includes("search") || i.includes("find")) return "Use the search bar to look up by tracking number, student name, or student ID.";
-    return "I can help you with document processing. Ask about pending, processing, ready, or completed documents!";
+    return "I can help you with document processing. Ask about pending, processing, ready, released, or claimed documents!";
   };
 
   const handleViewDetails = (doc) => {
@@ -226,6 +246,12 @@ export default function AdminDocumentProcessing() {
       confirmText: "Reject Request",
       icon: <XCircleIcon />,
     },
+    claimed: {
+      title: "Mark as Claimed?",
+      message: <>Confirm that the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong> has been handed to the correct recipient, per office procedure?</>,
+      confirmText: "Mark as Claimed",
+      icon: <CheckCircleIcon />,
+    },
   }[confirmStatus];
 
   const getStatusMeta = (status) => {
@@ -233,13 +259,14 @@ export default function AdminDocumentProcessing() {
       case "pending":     return { label: "Pending",    cls: "adp-badge-pending",    Icon: AlertCircleIcon };
       case "processing":  return { label: "Processing", cls: "adp-badge-processing", Icon: ClockIcon };
       case "ready":       return { label: "Ready",      cls: "adp-badge-ready",      Icon: CheckCircleIcon };
-      case "completed":   return { label: "Completed",  cls: "adp-badge-completed",  Icon: CheckCircleIcon };
+      case "released":    return { label: "Released",   cls: "adp-badge-released",  Icon: CheckCircleIcon };
+      case "claimed":     return { label: "Claimed",    cls: "adp-badge-claimed",   Icon: CheckCircleIcon };
       case "rejected":    return { label: "Rejected",   cls: "adp-badge-rejected",   Icon: XCircleIcon };
       default:            return { label: status,       cls: "",                     Icon: ClockIcon };
     }
   };
 
-  const TABS = ["all", "pending", "processing", "ready", "completed", "rejected"];
+  const TABS = ["all", "pending", "processing", "ready", "released", "claimed", "rejected"];
 
   return (
     <AdminPageShell
@@ -295,6 +322,10 @@ export default function AdminDocumentProcessing() {
                       <label className="adp-modal-label">Document Type</label>
                       <p className="adp-modal-value">{selectedDocument.documentType}</p>
                     </div>
+                    <div className="adp-modal-field">
+                      <label className="adp-modal-label">Number of Copies</label>
+                      <p className="adp-modal-value">{selectedDocument.copies ?? 1}</p>
+                    </div>
                     {selectedDocument.neededBy && (
                       <div className="adp-modal-field">
                         <label className="adp-modal-label">Needed By</label>
@@ -309,10 +340,16 @@ export default function AdminDocumentProcessing() {
                       <label className="adp-modal-label">Request Date</label>
                       <p className="adp-modal-value">{formatManilaDate(selectedDocument.requestDate)}</p>
                     </div>
-                    {selectedDocument.completedDate && (
+                    {selectedDocument.releasedDate && (
                       <div className="adp-modal-field">
-                        <label className="adp-modal-label">Completed Date</label>
-                        <p className="adp-modal-value">{formatManilaDate(selectedDocument.completedDate)}</p>
+                        <label className="adp-modal-label">Released Date</label>
+                        <p className="adp-modal-value">{formatManilaDate(selectedDocument.releasedDate)}</p>
+                      </div>
+                    )}
+                    {selectedDocument.claimedDate && (
+                      <div className="adp-modal-field">
+                        <label className="adp-modal-label">Claimed Date</label>
+                        <p className="adp-modal-value">{formatManilaDate(selectedDocument.claimedDate)}</p>
                       </div>
                     )}
                   </div>
@@ -341,8 +378,13 @@ export default function AdminDocumentProcessing() {
                       </button>
                     )}
                     {selectedDocument.status === "ready" && (
-                      <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => handleUpdateStatus("completed")}>
-                        Mark as Completed
+                      <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => handleUpdateStatus("released")}>
+                        Mark as Released
+                      </button>
+                    )}
+                    {selectedDocument.status === "released" && (
+                      <button className="adp-modal-btn adp-modal-btn--primary" onClick={() => setConfirmStatus("claimed")}>
+                        Mark as Claimed
                       </button>
                     )}
                     {(selectedDocument.status === "pending" || selectedDocument.status === "processing") && (
@@ -464,7 +506,7 @@ export default function AdminDocumentProcessing() {
             ) : (
               filteredDocuments.map((doc) => {
                 const { label, cls, Icon } = getStatusMeta(doc.status);
-                const doneStatuses = ["completed", "rejected"];
+                const doneStatuses = ["claimed", "rejected"];
                 const isOverdue = doc.neededBy && !doneStatuses.includes(doc.status) && doc.neededBy < getManilaDateString();
                 return (
                   <div key={doc.id} className="adp-doc-card">

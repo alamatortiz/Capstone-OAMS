@@ -25,11 +25,6 @@ import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const getProgress = (position, totalWaiting) => {
-  if (!totalWaiting || totalWaiting === 0) return 100;
-  return Math.round(((totalWaiting - position) / totalWaiting) * 100);
-};
-
 const getStatusMeta = (status) => {
   switch (status) {
     case "serving":
@@ -52,7 +47,6 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
   const [notesText, setNotesText] = useState(queue.notes ?? "");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  const progress = getProgress(queue.position, queue.totalWaiting);
   const statusMeta = getStatusMeta(queue.status);
   const peopleAhead = Math.max(queue.position - 1, 0);
 
@@ -413,7 +407,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
           style={{
             position: "fixed",
             inset: 0,
-            zIndex: 50,
+            zIndex: 9999,
             background: "rgba(0,0,0,0.6)",
             display: "flex",
             alignItems: "center",

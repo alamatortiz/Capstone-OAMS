@@ -106,8 +106,7 @@
   font-size: 1rem;
   font-weight: 700;
   flex-shrink: 0;
-  font-family: "Courier New", monospace;
-  letter-spacing: 0.04em;
+  font-family: "Inter", sans-serif;
   white-space: nowrap;
 }
 
@@ -158,10 +157,16 @@
   border: 1px solid rgba(34, 197, 94, 0.35);
 }
 
-.dss-badge-claimed {
+.dss-badge-released {
   background: rgba(156, 163, 175, 0.15);
   color: #e5e7eb;
   border: 1px solid rgba(156, 163, 175, 0.35);
+}
+
+.dss-badge-claimed {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
 .dss-badge-rejected {
@@ -185,10 +190,15 @@
   color: #065f46;
   border-color: rgba(5, 150, 105, 0.25);
 }
-[data-theme="light"] .dss-badge-claimed {
+[data-theme="light"] .dss-badge-released {
   background: rgba(75, 85, 99, 0.1);
   color: #1f2937;
   border-color: rgba(75, 85, 99, 0.25);
+}
+[data-theme="light"] .dss-badge-claimed {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
 }
 [data-theme="light"] .dss-badge-rejected {
   background: rgba(220, 38, 38, 0.08);

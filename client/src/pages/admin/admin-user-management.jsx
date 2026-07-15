@@ -7,6 +7,7 @@ import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
@@ -112,6 +113,7 @@ export default function AdminUserManagement() {
   // ── User-management state ────────────────────────────────────────────────────
   const [users, setUsers]           = useState(INITIAL_USERS);
   const [showModal, setShowModal]   = useState(false);
+  useLockBodyScroll(showModal);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm]             = useState(BLANK_FORM);
   const [searchTerm, setSearchTerm] = useState("");

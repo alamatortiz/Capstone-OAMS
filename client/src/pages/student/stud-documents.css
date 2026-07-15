@@ -567,10 +567,16 @@ body {
   border-color: rgba(16, 185, 129, 0.3);
 }
 
-.doc-badge-claimed {
+.doc-badge-released {
   background-color: rgba(107, 114, 128, 0.15);
   color: #d1d5db;
   border-color: rgba(107, 114, 128, 0.3);
+}
+
+.doc-badge-claimed {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .doc-badge-rejected {
@@ -598,10 +604,16 @@ body {
   border-color: rgba(5, 150, 105, 0.25);
 }
 
-[data-theme="light"] .doc-badge-claimed {
+[data-theme="light"] .doc-badge-released {
   background-color: rgba(75, 85, 99, 0.1);
   color: #1f2937;
   border-color: rgba(75, 85, 99, 0.25);
+}
+
+[data-theme="light"] .doc-badge-claimed {
+  background-color: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
 }
 
 [data-theme="light"] .doc-badge-rejected {

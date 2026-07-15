@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 
 import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity, MapPin, FileText } from 'lucide-react';
 import { toast } from 'sonner';
@@ -102,8 +102,15 @@ export default function QueuePage() {
       return;
     }
     const fresh = availableSlots.find((s) => s.slotId === selectedSlot.slotId);
-    if (fresh) setSelectedSlot(fresh);
-    else setSelectedSlot(null);
+    if (fresh) {
+      setSelectedSlot(fresh);
+    } else {
+      // The slot dropped out of the available list entirely (e.g. its hours
+      // just ended) while the student was reading its details -- tell them
+      // why instead of silently snapping back to the list.
+      toast.message('This queue is no longer available.');
+      setSelectedSlot(null);
+    }
   }, [availableSlots, selectedSlot, isAlreadyInQueue]);
 
   // Filter available slots client-side
@@ -133,8 +140,9 @@ export default function QueuePage() {
     try {
       const { data } = await api.get('/student/services/by-department');
       setServicesData(data.departments ?? []);
-    } catch {
-      // silent — requirements fall back to generic defaults
+    } catch (err) {
+      // requirements fall back to generic defaults, but still log for debuggability
+      console.error('Fetch services error:', err);
     } finally {
       setServicesLoading(false);
     }
@@ -152,11 +160,26 @@ export default function QueuePage() {
     );
 
   // ── Actions ───────────────────────────────────────────────────────────────
+  // Refs (not just the mirroring state below) so a fast double-click can't
+  // slip past the guard before React re-renders with the disabled button --
+  // state reads inside a callback can be one render stale, refs can't.
+  const joiningSlotIdRef = useRef(null);
+  const leavingQueueIdRef = useRef(null);
+
   // Shared by both join entry points (quick card button + detail panel CTA) --
   // both open the concern popup first; this runs once the student confirms.
   const performJoin = useCallback(
     async (slotId, notes) => {
-      if (joiningSlotId === slotId) return;
+      if (joiningSlotIdRef.current === slotId) return;
+      // Guards the narrow window where a cross-tab/other-device join for
+      // this same slot completed while the concern modal was still open.
+      if (isAlreadyInQueue(slotId)) {
+        toast.info('You are already in this queue.');
+        setConcernModal(null);
+        setSelectedSlot(null);
+        return;
+      }
+      joiningSlotIdRef.current = slotId;
       setJoiningSlotId(slotId);
       try {
         await joinQueue(slotId, notes);
@@ -166,15 +189,17 @@ export default function QueuePage() {
       } catch (err) {
         toast.error(err.message ?? 'Failed to join the queue. Please try again.');
       } finally {
+        joiningSlotIdRef.current = null;
         setJoiningSlotId(null);
       }
     },
-    [joinQueue, joiningSlotId],
+    [joinQueue, isAlreadyInQueue],
   );
 
   const handleLeaveQueue = useCallback(
     async (queueId) => {
-      if (leavingQueueId) return;
+      if (leavingQueueIdRef.current === queueId) return;
+      leavingQueueIdRef.current = queueId;
       setLeavingQueueId(queueId);
       try {
         await leaveQueue(queueId);
@@ -182,10 +207,11 @@ export default function QueuePage() {
       } catch (err) {
         toast.error(err.message);
       } finally {
+        leavingQueueIdRef.current = null;
         setLeavingQueueId(null);
       }
     },
-    [leaveQueue, leavingQueueId],
+    [leaveQueue],
   );
 
   // ── Service detail helpers ────────────────────────────────────────────────

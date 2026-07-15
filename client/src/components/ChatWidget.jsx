@@ -41,10 +41,19 @@ export default function ChatWidget({
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
   const messageIdRef = useRef(1);
+  const botReplyTimeoutRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // If the student navigates away within the reply delay, this timeout would
+  // otherwise still fire and call setState on an unmounted component.
+  useEffect(() => {
+    return () => {
+      if (botReplyTimeoutRef.current) clearTimeout(botReplyTimeoutRef.current);
+    };
+  }, []);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -60,7 +69,8 @@ export default function ChatWidget({
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
 
-    setTimeout(() => {
+    if (botReplyTimeoutRef.current) clearTimeout(botReplyTimeoutRef.current);
+    botReplyTimeoutRef.current = setTimeout(() => {
       const botResponse = {
         id: ++messageIdRef.current,
         type: "bot",

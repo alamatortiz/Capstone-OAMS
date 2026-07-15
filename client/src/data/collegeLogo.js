@@ -7,6 +7,10 @@ import COE from "../assets/COE.png";
 import COED from "../assets/COED.png";
 import CAS from "../assets/CAS.png";
 import CHAS from "../assets/CHAS.png";
+// Neutral institution logo -- used when a college name doesn't match any
+// known entry, so a newly-added college shows an honest "unknown" logo
+// instead of silently being mislabeled as CCS.
+import PNC from "../assets/Pnc-Logo.png";
 
 const COLLEGE_LOGOS = {
   "College of Computing Studies (CCS)": CCS,
@@ -28,7 +32,7 @@ const COLLEGE_LOGOS = {
 };
 
 export function getCollegeLogo(collegeName) {
-  if (!collegeName) return CCS;
+  if (!collegeName) return PNC;
 
   // Exact match first
   if (COLLEGE_LOGOS[collegeName]) {
@@ -45,5 +49,5 @@ export function getCollegeLogo(collegeName) {
   if (name.includes("CHAS")) return CHAS;
   if (name.includes("CAS")) return CAS;
 
-  return CCS;
+  return PNC;
 }

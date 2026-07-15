@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -9,6 +9,7 @@ import "./prof-appointments.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { formatManilaDate, getManilaDateString, getManilaTodayAsLocalDate } from "../../utils/dateTime";
+import { connectSocket } from "../../utils/socket";
 import {
   Calendar,
   Clock,
@@ -227,7 +228,7 @@ export default function ProfessorAppointmentsPage() {
   const [confirmAction, setConfirmAction] = useState(null); // { type, apt } or null
   const [confirmSaving, setConfirmSaving] = useState(false);
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     try {
       const res = await api.get("/faculty/appointments");
       setAppointments(res.data);
@@ -236,11 +237,27 @@ export default function ProfessorAppointmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAppointments();
-  }, []);
+  }, [fetchAppointments]);
+
+  // ── Live updates: refetch when a student books or cancels an appointment ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["appointment:slot-updated", "appointment:status-updated"];
+    events.forEach((event) => socket.on(event, fetchAppointments));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchAppointments));
+    };
+  }, [fetchAppointments]);
 
   const TABS = ["all", "pending", "approved", "completed", "rejected"];
 

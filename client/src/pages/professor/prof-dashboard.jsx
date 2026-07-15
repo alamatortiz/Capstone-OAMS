@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import "./prof-dashboard.css";
 import api from "../../utils/api";
+import { connectSocket } from "../../utils/socket";
 
 // ── Icons (unchanged from original) ──────────────────────────────────────────
 const CalendarIcon = () => (
@@ -134,21 +135,38 @@ export default function ProfessorDashboard() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
 
+  const fetchStats = useCallback(async () => {
+    try {
+      setDashLoading(true);
+      const res = await api.get("/faculty/dashboard-stats");
+      setDashStats(res.data);
+    } catch (err) {
+      console.error("Failed to fetch faculty dashboard stats:", err);
+      setDashError("Could not load dashboard data.");
+    } finally {
+      setDashLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setDashLoading(true);
-        const res = await api.get("/faculty/dashboard-stats");
-        setDashStats(res.data);
-      } catch (err) {
-        console.error("Failed to fetch faculty dashboard stats:", err);
-        setDashError("Could not load dashboard data.");
-      } finally {
-        setDashLoading(false);
-      }
-    };
     if (authUser) fetchStats();
-  }, [authUser]);
+  }, [authUser, fetchStats]);
+
+  // ── Live updates: refetch when an appointment or document status changes ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!authUser || !token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["appointment:slot-updated", "appointment:status-updated", "document:status-updated"];
+    events.forEach((event) => socket.on(event, fetchStats));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchStats));
+    };
+  }, [authUser, fetchStats]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;

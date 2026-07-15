@@ -7,6 +7,14 @@ import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import { toast } from "sonner";
+
+const DOCUMENT_STATUS_LABELS = {
+  generated: "Ready for Pickup",
+  released: "Released — awaiting claim",
+  claimed: "Claimed",
+};
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -92,9 +100,11 @@ export default function AdminScanDocument() {
   const [scanning, setScanning] = useState(false);
   const [verifiedDoc, setVerifiedDoc] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  useLockBodyScroll(modalOpen);
   const [scanToast, setScanToast] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [recentScans, setRecentScans] = useState([]);
+  const [claiming, setClaiming] = useState(false);
 
   // Load recent scans on mount
   useEffect(() => {
@@ -149,6 +159,22 @@ export default function AdminScanDocument() {
   const handleVerify = () => {
     if (!manualCode.trim()) return;
     processCode(manualCode);
+  };
+
+  const handleMarkClaimed = async () => {
+    if (!verifiedDoc?.requestId) return;
+    setClaiming(true);
+    try {
+      await api.patch(`/admin/document-processing/${verifiedDoc.requestId}/status`, {
+        status: "claimed",
+      });
+      toast.success("Document marked as claimed.");
+      setVerifiedDoc((prev) => prev && { ...prev, documentStatus: "claimed" });
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to mark document as claimed");
+    } finally {
+      setClaiming(false);
+    }
   };
 
   const handleQuickCode = (code) => {
@@ -258,6 +284,14 @@ export default function AdminScanDocument() {
                         {verifiedDoc.status}
                       </span>
                     </div>
+                    {verifiedDoc.documentStatus && (
+                      <div className="asd-meta-item">
+                        <span className="asd-meta-label">Document Status</span>
+                        <span className="asd-meta-value">
+                          {DOCUMENT_STATUS_LABELS[verifiedDoc.documentStatus] ?? verifiedDoc.documentStatus}
+                        </span>
+                      </div>
+                    )}
                     <div className="asd-meta-item">
                       <span className="asd-meta-label">Issue Date</span>
                       <span className="asd-meta-value">
@@ -298,6 +332,15 @@ export default function AdminScanDocument() {
 
                 {/* Modal Actions */}
                 <div className="asd-modal-actions">
+                  {verifiedDoc.documentStatus === "released" && (
+                    <button
+                      className="asd-btn-claim"
+                      onClick={handleMarkClaimed}
+                      disabled={claiming}
+                    >
+                      <CheckCircleIcon /> {claiming ? "Marking…" : "Mark as Claimed"}
+                    </button>
+                  )}
                   <button className="asd-btn-print" onClick={() => window.print()}>
                     <PrintIcon /> Print
                   </button>

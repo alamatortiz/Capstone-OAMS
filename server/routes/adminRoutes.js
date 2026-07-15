@@ -5,10 +5,16 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
-const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
+const { emitToSlot, emitToDept, emitToUser, emitToAll } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 const { voidQueueEntry } = require("../jobs/queueNoShowSweeper");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
+const {
+  DB_STATUS_MAP,
+  STATUS_LABEL_MAP,
+  VALID_SCAN_STATUSES,
+  REQUIRED_PRIOR_STATUS,
+} = require("../utils/documentStatus");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -1099,6 +1105,7 @@ router.get(
               'document' AS type,
               dr.request_id AS id,
               CASE dr.status
+                WHEN 'claimed'    THEN 'Claimed Document Request'
                 WHEN 'released'   THEN 'Released Document Request'
                 WHEN 'generated'  THEN 'Generated Document'
                 WHEN 'processing' THEN 'Processing Document Request'
@@ -1139,7 +1146,8 @@ router.get(
         rejected: "rejected",
         processing: "approved",
         generated: "approved",
-        released: "completed",
+        released: "approved",
+        claimed: "completed",
       };
 
       let transactions = rows.map((r) => ({
@@ -1277,10 +1285,13 @@ router.get(
            dr.tracking_number,
            dr.request_type,
            dr.purpose,
+           dr.copies,
            dr.status,
            dr.notes,
            dr.created_at,
            dr.needed_by,
+           dr.released_at,
+           dr.claimed_at,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number AS student_id,
            d.department_abbreviation AS college
@@ -1293,14 +1304,6 @@ router.get(
         [deptId],
       );
 
-      const statusMap = {
-        pending: "pending",
-        processing: "processing",
-        generated: "ready",
-        released: "completed",
-        rejected: "rejected",
-      };
-
       const documents = rows.map((r) => ({
         id: String(r.request_id),
         trackingNumber: r.tracking_number,
@@ -1312,12 +1315,15 @@ router.get(
         college: r.college,
         documentType: r.request_type,
         purpose: r.purpose,
+        copies: r.copies,
         requestDate: r.created_at instanceof Date
           ? getManilaDateString(r.created_at)
           : String(r.created_at).split("T")[0],
-        status: statusMap[r.status] ?? r.status,
+        status: STATUS_LABEL_MAP[r.status] ?? r.status,
         notes: r.notes || "",
         neededBy: r.needed_by || null,
+        releasedDate: r.released_at || null,
+        claimedDate: r.claimed_at || null,
       }));
 
       res.json({ documents });
@@ -1351,6 +1357,8 @@ router.get(
            fdr.notes,
            fdr.created_at,
            fdr.needed_by,
+           fdr.released_at,
+           fdr.claimed_at,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.employee_id AS faculty_employee_id,
            d.department_abbreviation AS college
@@ -1362,14 +1370,6 @@ router.get(
          ORDER BY fdr.created_at DESC`,
         [deptId],
       );
-
-      const statusMap = {
-        pending: "pending",
-        processing: "processing",
-        generated: "ready",
-        released: "completed",
-        rejected: "rejected",
-      };
 
       const documents = rows.map((r) => ({
         id: String(r.request_id),
@@ -1383,9 +1383,11 @@ router.get(
         requestDate: r.created_at instanceof Date
           ? getManilaDateString(r.created_at)
           : String(r.created_at).split("T")[0],
-        status: statusMap[r.status] ?? r.status,
+        status: STATUS_LABEL_MAP[r.status] ?? r.status,
         notes: r.notes || "",
         neededBy: r.needed_by || null,
+        releasedDate: r.released_at || null,
+        claimedDate: r.claimed_at || null,
       }));
 
       res.json({ documents });
@@ -1406,27 +1408,21 @@ router.patch(
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
     const { status, notes } = req.body;
+    const adminId = req.user.userId;
 
-    const dbStatusMap = {
-      pending: "pending",
-      processing: "processing",
-      ready: "generated",
-      completed: "released",
-      rejected: "rejected",
-    };
-
-    if (!dbStatusMap[status]) {
+    if (!DB_STATUS_MAP[status]) {
       return res.status(400).json({ error: "Invalid status" });
     }
+    const dbStatus = DB_STATUS_MAP[status];
 
     try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
+      const deptId = await getAdminDepartmentId(adminId);
       if (!deptId) {
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
 
       const [[request]] = await pool.query(
-        `SELECT fdr.request_id, s.department_id
+        `SELECT fdr.request_id, fdr.status, fdr.faculty_id, s.department_id
          FROM faculty_document_requests fdr
          JOIN document_services s ON fdr.service_id = s.service_id
          WHERE fdr.request_id = ?`,
@@ -1440,10 +1436,25 @@ router.patch(
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
 
+      const requiredPrior = REQUIRED_PRIOR_STATUS[dbStatus];
+      if (requiredPrior && request.status !== requiredPrior) {
+        return res.status(409).json({
+          error: `Document must be ${requiredPrior} before it can be marked ${dbStatus}`,
+        });
+      }
+
+      const timestampClause =
+        dbStatus === "released" ? ", released_at = NOW()" :
+        dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+
       await pool.query(
-        `UPDATE faculty_document_requests SET status = ?, notes = ? WHERE request_id = ?`,
-        [dbStatusMap[status], notes !== undefined ? notes : null, requestId],
+        `UPDATE faculty_document_requests SET status = ?, notes = ?${timestampClause} WHERE request_id = ?`,
+        [dbStatus, notes !== undefined ? notes : null, requestId],
       );
+
+      await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: dbStatus });
+
+      emitToUser(request.faculty_id, "document:status-updated", { requestId, status });
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -1463,28 +1474,21 @@ router.patch(
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
     const { status, notes } = req.body;
+    const adminId = req.user.userId;
 
-    // Map frontend status vocabulary -> DB ENUM values
-    const dbStatusMap = {
-      pending: "pending",
-      processing: "processing",
-      ready: "generated",
-      completed: "released",
-      rejected: "rejected",
-    };
-
-    if (!dbStatusMap[status]) {
+    if (!DB_STATUS_MAP[status]) {
       return res.status(400).json({ error: "Invalid status" });
     }
+    const dbStatus = DB_STATUS_MAP[status];
 
     try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
+      const deptId = await getAdminDepartmentId(adminId);
       if (!deptId) {
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
 
       const [[request]] = await pool.query(
-        `SELECT dr.request_id, s.department_id
+        `SELECT dr.request_id, dr.student_id, dr.status, s.department_id
          FROM document_requests dr
          JOIN document_services s ON dr.service_id = s.service_id
          WHERE dr.request_id = ?`,
@@ -1498,10 +1502,25 @@ router.patch(
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
 
+      const requiredPrior = REQUIRED_PRIOR_STATUS[dbStatus];
+      if (requiredPrior && request.status !== requiredPrior) {
+        return res.status(409).json({
+          error: `Document must be ${requiredPrior} before it can be marked ${dbStatus}`,
+        });
+      }
+
+      const timestampClause =
+        dbStatus === "released" ? ", released_at = NOW()" :
+        dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+
       await pool.query(
-        `UPDATE document_requests SET status = ?, notes = ? WHERE request_id = ?`,
-        [dbStatusMap[status], notes !== undefined ? notes : null, requestId],
+        `UPDATE document_requests SET status = ?, notes = ?${timestampClause} WHERE request_id = ?`,
+        [dbStatus, notes !== undefined ? notes : null, requestId],
       );
+
+      await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: dbStatus });
+
+      emitToUser(request.student_id, "document:status-updated", { requestId, status });
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -2392,6 +2411,12 @@ router.post(
         [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId, isCrossCollege ? 1 : 0],
       );
 
+      if (isCrossCollege) {
+        emitToAll("announcement:changed", { faqId: result.insertId });
+      } else {
+        emitToDept(deptId, "announcement:changed", { faqId: result.insertId });
+      }
+
       res.status(201).json({
         announcement: {
           id: String(result.insertId),
@@ -2437,6 +2462,11 @@ router.put(
         `UPDATE faqs SET question = ?, answer = ?, type = ?, is_cross_college = ? WHERE faq_id = ?`,
         [title.trim(), content.trim(), type || "general", isCrossCollege ? 1 : 0, faqId],
       );
+      if (isCrossCollege) {
+        emitToAll("announcement:changed", { faqId });
+      } else {
+        emitToDept(deptId, "announcement:changed", { faqId });
+      }
       res.json({ message: "Announcement updated" });
     } catch (error) {
       console.error("Announcement update error:", error);
@@ -2454,13 +2484,21 @@ router.patch(
     const faqId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[row]] = await pool.query(`SELECT is_pinned, department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      const [[row]] = await pool.query(
+        `SELECT is_pinned, department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
+        [faqId],
+      );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
       const newPinned = row.is_pinned ? 0 : 1;
       await pool.query(`UPDATE faqs SET is_pinned = ? WHERE faq_id = ?`, [newPinned, faqId]);
+      if (row.is_cross_college) {
+        emitToAll("announcement:changed", { faqId });
+      } else {
+        emitToDept(deptId, "announcement:changed", { faqId });
+      }
       res.json({ isPinned: !!newPinned });
     } catch (error) {
       console.error("Announcement pin toggle error:", error);
@@ -2478,12 +2516,20 @@ router.patch(
     const faqId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      const [[row]] = await pool.query(
+        `SELECT department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
+        [faqId],
+      );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
       await pool.query(`UPDATE faqs SET status = 'archived' WHERE faq_id = ?`, [faqId]);
+      if (row.is_cross_college) {
+        emitToAll("announcement:changed", { faqId });
+      } else {
+        emitToDept(deptId, "announcement:changed", { faqId });
+      }
       res.json({ message: "Announcement archived" });
     } catch (error) {
       console.error("Announcement archive error:", error);
@@ -2501,12 +2547,20 @@ router.patch(
     const faqId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      const [[row]] = await pool.query(
+        `SELECT department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
+        [faqId],
+      );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
       await pool.query(`UPDATE faqs SET status = 'active' WHERE faq_id = ?`, [faqId]);
+      if (row.is_cross_college) {
+        emitToAll("announcement:changed", { faqId });
+      } else {
+        emitToDept(deptId, "announcement:changed", { faqId });
+      }
       res.json({ message: "Announcement restored" });
     } catch (error) {
       console.error("Announcement restore error:", error);
@@ -2524,12 +2578,20 @@ router.delete(
     const faqId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[row]] = await pool.query(`SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId]);
+      const [[row]] = await pool.query(
+        `SELECT department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
+        [faqId],
+      );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot delete announcements from another department" });
       }
       await pool.query(`DELETE FROM faqs WHERE faq_id = ?`, [faqId]);
+      if (row.is_cross_college) {
+        emitToAll("announcement:changed", { faqId });
+      } else {
+        emitToDept(deptId, "announcement:changed", { faqId });
+      }
       res.json({ message: "Announcement deleted" });
     } catch (error) {
       console.error("Announcement delete error:", error);
@@ -2835,7 +2897,7 @@ router.get(
 
       const [[docRow]] = await pool.query(
         `SELECT gf.file_id, gf.qr_code,
-           dr.tracking_number, ds.service_name AS document_type,
+           dr.request_id, dr.tracking_number, ds.service_name AS document_type,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number AS student_id,
            d.department_name AS college,
@@ -2870,8 +2932,7 @@ router.get(
         await logAudit(adminUserId, "READ", "generated_files", docRow.file_id, null, { qrCode, trackingNumber: docRow.tracking_number });
       }
 
-      const validStatuses = ["released", "generated"];
-      const docStatus = validStatuses.includes(docRow.status) ? "VALID" : "EXPIRED";
+      const docStatus = VALID_SCAN_STATUSES.includes(docRow.status) ? "VALID" : "EXPIRED";
 
       const fmtDate = (d) =>
         d ? new Date(d).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "numeric", day: "numeric", year: "numeric" }) : "N/A";
@@ -2879,12 +2940,14 @@ router.get(
       res.json({
         found: true,
         doc: {
+          requestId: docRow.request_id,
           trackingNumber: docRow.tracking_number,
           documentType: docRow.document_type,
           studentName: docRow.student_name,
           studentId: docRow.student_id,
           college: docRow.college,
           status: docStatus,
+          documentStatus: docRow.status,
           issueDate: fmtDate(docRow.issue_date),
           validUntil: fmtDate(docRow.valid_until),
           issuedBy: `${docRow.college} — ${docRow.dept_abbrev} Office`,
@@ -2935,7 +2998,6 @@ router.get(
         return `${days} day${days > 1 ? "s" : ""} ago`;
       };
 
-      const validStatuses = ["released", "generated"];
       res.json({
         scans: rows.map((r) => ({
           id: r.log_id,
@@ -2943,7 +3005,7 @@ router.get(
           docType: r.doc_type,
           tracking: r.tracking_number,
           time: formatRelative(r.scan_time),
-          status: validStatuses.includes(r.status) ? "valid" : "expired",
+          status: VALID_SCAN_STATUSES.includes(r.status) ? "valid" : "expired",
         })),
       });
     } catch (error) {

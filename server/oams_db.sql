@@ -325,10 +325,12 @@ CREATE TABLE document_requests (
     service_id              INT          NOT NULL,
     request_type            VARCHAR(100) NOT NULL,
     purpose                 VARCHAR(255) NOT NULL,
-    status                  ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
+    copies                  INT          NOT NULL DEFAULT 1,
+    status                  ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
     estimated_completion    DATE         NULL,
     needed_by               DATE         NULL,
     released_at             TIMESTAMP    NULL,
+    claimed_at              TIMESTAMP    NULL,
     notes                   TEXT         NULL,
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
@@ -480,10 +482,11 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     service_id           INT          NOT NULL,
     request_type         VARCHAR(100) NOT NULL DEFAULT 'General',
     purpose              VARCHAR(255) NOT NULL,
-    status               ENUM('pending','processing','generated','released','rejected') DEFAULT 'pending',
+    status               ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
     estimated_completion DATE         NULL,
     needed_by            DATE         NULL,
     released_at          TIMESTAMP    NULL,
+    claimed_at           TIMESTAMP    NULL,
     notes                TEXT         NULL,
     created_at           TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
@@ -502,3 +505,23 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
 -- MIGRATION: Run against existing databases (do not re-run on fresh installs)
 -- ─────────────────────────────────────────────────────────────
 -- ALTER TABLE faculty_date_availability DROP COLUMN slot_duration_minutes;
+
+-- Adds a real, distinct "claimed" status for document requests, separate from "released".
+-- "released" = document is at the pickup counter, not yet confirmed handed to the recipient.
+-- "claimed"   = confirmed handed to the correct recipient (identity verified by existing
+--               office procedures, not tracked by OAMS itself).
+-- ALTER TABLE document_requests
+--     MODIFY status ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
+--     ADD COLUMN claimed_at TIMESTAMP NULL AFTER released_at;
+-- ALTER TABLE faculty_document_requests
+--     MODIFY status ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
+--     ADD COLUMN claimed_at TIMESTAMP NULL AFTER released_at;
+-- -- Backfill: pre-existing "released" documents have no reliable record of whether they were
+-- -- actually picked up, so treat them all as claimed to avoid a false "awaiting pickup" backlog.
+-- UPDATE document_requests SET status = 'claimed' WHERE status = 'released';
+-- UPDATE faculty_document_requests SET status = 'claimed' WHERE status = 'released';
+
+-- Adds a dedicated `copies` column to document_requests. Previously the requested copy
+-- count was stowed inside the free-text `notes` field, which got silently wiped out the
+-- moment an admin's own note overwrote `notes` via any status update.
+-- ALTER TABLE document_requests ADD COLUMN copies INT NOT NULL DEFAULT 1 AFTER purpose;

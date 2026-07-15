@@ -751,9 +751,9 @@ body {
 }
 
 .admin-appointment-badge-completed {
-  background: rgba(59, 130, 246, 0.2);
-  color: var(--blue);
-  border: 0.5px solid rgba(59, 130, 246, 0.4);
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+  border: 0.5px solid rgba(16, 185, 129, 0.4);
 }
 
 .admin-appointment-badge-cancelled {

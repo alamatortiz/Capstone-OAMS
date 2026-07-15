@@ -634,6 +634,7 @@
 
 .asd-btn-print,
 .asd-btn-download,
+.asd-btn-claim,
 .asd-btn-close-modal {
   display: flex;
   align-items: center;
@@ -646,6 +647,21 @@
   transition:
     background 0.2s,
     color 0.2s;
+}
+
+.asd-btn-claim {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.asd-btn-claim:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.asd-btn-claim:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .asd-btn-print {

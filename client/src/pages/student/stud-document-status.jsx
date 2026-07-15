@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -18,6 +18,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
+import { connectSocket } from "../../utils/socket";
 import "./stud-document-status.css";
 
 const CheckCircleIcon = () => (
@@ -33,6 +34,7 @@ const getStatusMeta = (status) => {
     case "pending":    return { label: "Pending",          cls: "dss-badge-pending" };
     case "processing": return { label: "Processing",       cls: "dss-badge-processing" };
     case "ready":      return { label: "Ready for Pickup", cls: "dss-badge-ready" };
+    case "released":   return { label: "Released",         cls: "dss-badge-released" };
     case "claimed":    return { label: "Claimed",          cls: "dss-badge-claimed" };
     case "rejected":   return { label: "Rejected",         cls: "dss-badge-rejected" };
     default:           return { label: status,             cls: "dss-badge-pending" };
@@ -118,6 +120,27 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
         </div>
       )}
 
+      {/* Released alert */}
+      {doc.status === "released" && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+            borderRadius: "1rem",
+            padding: "1rem 1.5rem",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            fontWeight: 700,
+            fontSize: "1rem",
+            boxShadow: "0 8px 24px rgba(107,114,128,0.3)",
+          }}
+        >
+          <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
+          Your document has been released to the registrar's office — visit to complete pickup.
+        </div>
+      )}
+
       {/* Detail Grid */}
       <div className="dss-detail-grid">
         {/* Main column */}
@@ -143,12 +166,21 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
                   <span className="dss-detail-label">Date Acquired</span>
                   <span className="dss-detail-value">{formatDate(doc.claimedDate)}</span>
                 </div>
+              ) : doc.status === "released" && doc.releasedDate ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Date Released</span>
+                  <span className="dss-detail-value">{formatDate(doc.releasedDate)}</span>
+                </div>
               ) : doc.estimatedCompletion ? (
                 <div className="dss-detail-row">
                   <span className="dss-detail-label">Estimated Completion</span>
                   <span className="dss-detail-value">{formatDate(doc.estimatedCompletion)}</span>
                 </div>
               ) : null}
+              <div className="dss-detail-row">
+                <span className="dss-detail-label">Number of Copies</span>
+                <span className="dss-detail-value">{doc.copies ?? 1}</span>
+              </div>
               <div className="dss-detail-row" style={{ borderBottom: "none" }}>
                 <span className="dss-detail-label">Purpose</span>
                 <span className="dss-detail-value">{doc.purpose}</span>
@@ -295,22 +327,38 @@ export default function DocumentStatusPage() {
     if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
   }, [loading, selectedDocId, selectedDoc]);
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get("/student/documents");
-        setDocuments(res.data.documents ?? []);
-        setError(null);
-      } catch (err) {
-        console.error("Failed to fetch documents:", err);
-        setError("Could not load your documents.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDocuments();
+  const fetchDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/student/documents");
+      setDocuments(res.data.documents ?? []);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to fetch documents:", err);
+      setError("Could not load your documents.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  // ── Live updates: refetch when a document's status changes ────────────────
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on("document:status-updated", fetchDocuments);
+
+    return () => {
+      socket.off("document:status-updated", fetchDocuments);
+    };
+  }, [fetchDocuments]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleCancel = async (docId) => {

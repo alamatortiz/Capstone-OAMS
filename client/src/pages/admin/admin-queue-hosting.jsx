@@ -9,6 +9,7 @@ import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { formatManilaDateTime, getManilaTimeString, addMinutesClampedToDay } from "../../utils/dateTime";
 
 // ── Icons ──────────────────────────────────────────────────────
@@ -155,6 +156,7 @@ export default function AdminQueueHosting() {
 
   // ── "Open New Queue Line" modal state ─────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
+  useLockBodyScroll(showModal);
   const [serviceId, setServiceId] = useState("");
   const [maxCapacity, setMaxCapacity] = useState("100");
   const [serviceStart, setServiceStart] = useState("08:00");

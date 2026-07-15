@@ -23,6 +23,14 @@ async function joinStudentSlotRooms(socket, studentId) {
   rows.forEach((row) => socket.join(slotRoom(row.slot_id)));
 }
 
+async function joinStudentDeptRoom(socket, studentId) {
+  const [[row]] = await pool.query(
+    `SELECT department_id FROM students WHERE student_id = ?`,
+    [studentId],
+  );
+  if (row?.department_id) socket.join(deptRoom(row.department_id));
+}
+
 function initSocketServer(server, options = {}) {
   io = new Server(server, {
     cors: options.cors || { origin: "*" },
@@ -50,6 +58,7 @@ function initSocketServer(server, options = {}) {
         if (deptId) socket.join(deptRoom(deptId));
       } else if (role === "student") {
         await joinStudentSlotRooms(socket, userId);
+        await joinStudentDeptRoom(socket, userId);
       }
     } catch (err) {
       console.error("Socket room join error:", err.message);
@@ -88,10 +97,16 @@ function emitToUser(userId, event, payload) {
   io.to(userRoom(userId)).emit(event, payload);
 }
 
+function emitToAll(event, payload) {
+  if (!io) return;
+  io.emit(event, payload);
+}
+
 module.exports = {
   initSocketServer,
   getIo,
   emitToSlot,
   emitToDept,
   emitToUser,
+  emitToAll,
 };

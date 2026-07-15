@@ -26,6 +26,15 @@ export default function Login() {
     setIsDarkMode(getSavedTheme() === "dark");
   }, []);
 
+  // Set by the api.js response interceptor when a request comes back with a
+  // dead session (missing/expired JWT), right before it redirects here.
+  useEffect(() => {
+    if (sessionStorage.getItem("oams_session_expired")) {
+      sessionStorage.removeItem("oams_session_expired");
+      toast.error("Your session has expired. Please log in again.");
+    }
+  }, []);
+
   const toggleTheme = () => {
     const newDarkMode = !isDarkMode;
     setIsDarkMode(newDarkMode);

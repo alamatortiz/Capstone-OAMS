@@ -80,6 +80,7 @@ export default function ProfessorTransactionsPage() {
       processing: "txn-badge txn-badge-processing",
       generated: "txn-badge txn-badge-generated",
       released: "txn-badge txn-badge-released",
+      claimed: "txn-badge txn-badge-claimed",
     }[status] ?? "txn-badge");
 
   const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -226,6 +227,7 @@ export default function ProfessorTransactionsPage() {
                   <option value="processing">Processing</option>
                   <option value="generated">Ready for Pickup</option>
                   <option value="released">Released</option>
+                  <option value="claimed">Claimed</option>
                   <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
                   <option value="cancelled">Cancelled</option>

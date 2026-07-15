@@ -10,6 +10,7 @@ import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -119,6 +120,7 @@ export default function AdminDataManagement() {
   const [docLoading, setDocLoading] = useState(false);
   const [docStatusFilter, setDocStatusFilter] = useState("all");
   const [showDocModal, setShowDocModal] = useState(false);
+  useLockBodyScroll(showDocModal);
   const [editingDoc, setEditingDoc] = useState(null);
   const [docForm, setDocForm] = useState(emptyDocForm());
   const [docSaving, setDocSaving] = useState(false);
@@ -132,6 +134,7 @@ export default function AdminDataManagement() {
   const [serviceSettings, setServiceSettings] = useState([]);
   const [serviceLoading, setServiceLoading] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
+  useLockBodyScroll(showServiceModal);
   const [editingService, setEditingService] = useState(null);
   const [serviceForm, setServiceForm] = useState(emptyServiceForm());
   const [serviceSaving, setServiceSaving] = useState(false);

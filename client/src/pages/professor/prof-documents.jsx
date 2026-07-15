@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
@@ -10,6 +10,7 @@ import { formatManilaDate, getManilaTomorrowDateString } from "../../utils/dateT
 import "./prof-dashboard.css";
 import "./prof-documents.css";
 import api from "../../utils/api";
+import { connectSocket } from "../../utils/socket";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -70,7 +71,8 @@ const STATUS_META = {
   pending:    { cls: "doc-badge-pending",    label: "Pending" },
   processing: { cls: "doc-badge-processing", label: "Processing" },
   generated:  { cls: "doc-badge-ready",      label: "Ready for Pickup" },
-  released:   { cls: "doc-badge-claimed",    label: "Released" },
+  released:   { cls: "doc-badge-released",   label: "Released" },
+  claimed:    { cls: "doc-badge-claimed",    label: "Claimed" },
   rejected:   { cls: "doc-badge-rejected",   label: "Rejected" },
 };
 
@@ -87,6 +89,8 @@ function getStatusIcon(status) {
     case "generated":
       return <CheckCircleIcon />;
     case "released":
+      return <CheckCircleIcon />;
+    case "claimed":
       return <CheckCircleIcon />;
     case "rejected":
       return <XCircleIcon />;
@@ -144,7 +148,7 @@ export default function ProfessorDocumentRequest() {
     fetchDocumentTypes();
   }, []);
 
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     try {
       setRequestsLoading(true);
       const res = await api.get("/faculty/my-document-requests");
@@ -169,11 +173,26 @@ export default function ProfessorDocumentRequest() {
     } finally {
       setRequestsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [fetchRequests]);
+
+  // ── Live updates: refetch when admin changes a request's status ───────────
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on("document:status-updated", fetchRequests);
+
+    return () => {
+      socket.off("document:status-updated", fetchRequests);
+    };
+  }, [fetchRequests]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSubmitRequest = async () => {
@@ -222,7 +241,7 @@ export default function ProfessorDocumentRequest() {
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
     const activeCount = requests.filter(
-      (r) => r.status !== "released" && r.status !== "rejected",
+      (r) => r.status !== "claimed" && r.status !== "rejected",
     ).length;
     const readyCount = requests.filter((r) => r.status === "generated").length;
     const pendingCount = requests.filter((r) => r.status === "pending").length;
@@ -257,10 +276,10 @@ export default function ProfessorDocumentRequest() {
   };
 
   const activeRequests = requests.filter(
-    (r) => r.status !== "released" && r.status !== "rejected",
+    (r) => r.status !== "claimed" && r.status !== "rejected",
   );
   const completedRequests = requests.filter(
-    (r) => r.status === "released" || r.status === "rejected",
+    (r) => r.status === "claimed" || r.status === "rejected",
   );
 
   const selectedType = documentTypes.find((d) => d.name === formData.type);

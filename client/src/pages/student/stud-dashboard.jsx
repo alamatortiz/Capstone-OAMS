@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FileText, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
@@ -13,6 +13,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import "./stud-dashboard.css";
 import api from "../../utils/api";
 import { formatManilaDate } from "../../utils/dateTime";
+import { connectSocket } from "../../utils/socket";
 
 // ─── Dashboard Content Icons ──────────────────────────────────────────────────
 const ClockIcon = () => (
@@ -183,61 +184,110 @@ export default function StudentDashboard() {
   // ── Office hours state ────────────────────────────────────────────────────
   const [officeHours, setOfficeHours] = useState(null);
   const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
+  const [officeHoursError, setOfficeHoursError] = useState(null);
 
   // ── Fetch dashboard stats from backend ───────────────────────────────────
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setDashLoading(true);
-        const res = await api.get("/student/dashboard-stats");
-        setDashStats(res.data);
-      } catch (err) {
-        console.error("Failed to fetch dashboard stats:", err);
-        setDashError("Could not load dashboard data.");
-      } finally {
-        setDashLoading(false);
-      }
-    };
+  const fetchStats = useCallback(async () => {
+    try {
+      setDashLoading(true);
+      const res = await api.get("/student/dashboard-stats");
+      setDashStats(res.data);
+    } catch (err) {
+      console.error("Failed to fetch dashboard stats:", err);
+      setDashError("Could not load dashboard data.");
+    } finally {
+      setDashLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     if (authUser) fetchStats();
-  }, [authUser]);
+  }, [authUser, fetchStats]);
 
   // ── Fetch announcements from backend ──────────────────────────────────────
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        setAnnouncementsLoading(true);
-        const res = await api.get("/student/announcements");
-        setAnnouncements(res.data?.announcements ?? []);
-      } catch (err) {
-        console.error("Failed to fetch announcements:", err);
-        setAnnouncementsError("Could not load announcements.");
-      } finally {
-        setAnnouncementsLoading(false);
-      }
-    };
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      setAnnouncementsLoading(true);
+      const res = await api.get("/student/announcements");
+      setAnnouncements(res.data?.announcements ?? []);
+    } catch (err) {
+      console.error("Failed to fetch announcements:", err);
+      setAnnouncementsError("Could not load announcements.");
+    } finally {
+      setAnnouncementsLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     if (authUser) fetchAnnouncements();
-  }, [authUser]);
+  }, [authUser, fetchAnnouncements]);
+
+  // ── Live updates: refetch dashboard data when relevant socket events fire ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!authUser || !token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const statsEvents = [
+      "document:status-updated",
+      "appointment:status-updated",
+      "queue:called",
+      "queue:served",
+      "queue:no-show",
+    ];
+    statsEvents.forEach((event) => socket.on(event, fetchStats));
+    socket.on("announcement:changed", fetchAnnouncements);
+
+    return () => {
+      statsEvents.forEach((event) => socket.off(event, fetchStats));
+      socket.off("announcement:changed", fetchAnnouncements);
+    };
+  }, [authUser, fetchStats, fetchAnnouncements]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  // Unlike QueueProvider, this page had no such safety net: if the socket
+  // never connects (e.g. a network that blocks WebSocket upgrades), stats
+  // and announcements would never update again without a manual reload.
+  useEffect(() => {
+    if (!authUser) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchStats();
+        fetchAnnouncements();
+      }
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [authUser, fetchStats, fetchAnnouncements]);
 
   // ── Fetch office hours from backend ───────────────────────────────────────
-  useEffect(() => {
-    const fetchOfficeHours = async () => {
-      try {
-        const res = await api.get("/student/office-hours");
-        setOfficeHours(res.data);
-      } catch (err) {
-        console.error("Failed to fetch office hours:", err);
-      } finally {
-        setOfficeHoursLoading(false);
-      }
-    };
-    if (authUser) fetchOfficeHours();
-  }, [authUser]);
+  const fetchOfficeHours = useCallback(async () => {
+    try {
+      setOfficeHoursLoading(true);
+      const res = await api.get("/student/office-hours");
+      setOfficeHours(res.data);
+      setOfficeHoursError(null);
+    } catch (err) {
+      console.error("Failed to fetch office hours:", err);
+      setOfficeHoursError("Could not load office hours.");
+    } finally {
+      setOfficeHoursLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
+    if (authUser) fetchOfficeHours();
+  }, [authUser, fetchOfficeHours]);
+
+  // Splits only on a comma followed by a weekday name (the actual entry
+  // delimiter, e.g. "Monday - Friday: 8 AM - 5 PM, Saturday: 8 AM - 12 PM")
+  // rather than any capital letter -- a naive "any capital letter" split
+  // would mis-split free text like "Monday: 9-11, By Appointment" on "By".
   const parseSchedule = (hoursStr) => {
     if (!hoursStr) return [];
-    return hoursStr.split(/,\s*(?=[A-Z])/).map((entry) => {
+    const weekdayNames = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday";
+    return hoursStr.split(new RegExp(`,\\s*(?=(?:${weekdayNames})\\b)`)).map((entry) => {
       const colonIdx = entry.indexOf(": ");
       if (colonIdx === -1) return { day: entry.trim(), time: "" };
       return {
@@ -316,7 +366,11 @@ export default function StudentDashboard() {
   const stats = [
     {
       title: "Queue Position",
-      value: dashLoading ? "—" : String(dashStats?.stats?.queuePosition ?? 0),
+      value: dashLoading
+        ? "—"
+        : dashStats?.activeQueue?.status === "serving"
+          ? "Serving"
+          : String(dashStats?.stats?.queuePosition ?? 0),
       badge: dashLoading ? null : (dashStats?.stats?.queueNumberBadge ?? null),
       description: dashLoading
         ? "Loading..."
@@ -351,7 +405,7 @@ export default function StudentDashboard() {
       description: dashLoading
         ? "Loading..."
         : dashStats?.stats?.documents?.pending > 0
-          ? `${dashStats.stats.documents.pending} pending approval`
+          ? `${dashStats.stats.documents.pending} need your attention`
           : "No pending documents",
       icon: FileText,
       color: "text-orange-600",
@@ -421,7 +475,7 @@ export default function StudentDashboard() {
     } else if (lowerInput.includes("document")) {
       const total = dashStats?.stats?.documents?.total ?? 0;
       const pending = dashStats?.stats?.documents?.pending ?? 0;
-      return `You have ${total} document${total !== 1 ? "s" : ""} on file${pending > 0 ? `, with ${pending} pending approval` : ""}.`;
+      return `You have ${total} document${total !== 1 ? "s" : ""} on file${pending > 0 ? `, with ${pending} needing your attention` : ""}.`;
     } else if (lowerInput.includes("service") || lowerInput.includes("help")) {
       return "I can help you with queue information, appointments, documents, announcements, and more. What would you like to know?";
     } else {
@@ -779,6 +833,17 @@ export default function StudentDashboard() {
             <div className="stud-hours-body">
               {officeHoursLoading ? (
                 <p className="stud-hours-loading">Loading office hours...</p>
+              ) : officeHoursError ? (
+                <p className="stud-hours-empty">
+                  {officeHoursError}{" "}
+                  <button
+                    className="breadcrumb-link"
+                    style={{ display: "inline", padding: 0 }}
+                    onClick={fetchOfficeHours}
+                  >
+                    Retry
+                  </button>
+                </p>
               ) : !officeHours ? (
                 <p className="stud-hours-empty">No office hours available.</p>
               ) : (

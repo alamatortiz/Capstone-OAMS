@@ -1,4 +1,5 @@
 import "./LogoutConfirmModal.css";
+import useLockBodyScroll from "../hooks/useLockBodyScroll";
 
 const LogOutIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
@@ -9,6 +10,8 @@ const LogOutIcon = () => (
 );
 
 export default function LogoutConfirmModal({ show, onConfirm, onCancel }) {
+  useLockBodyScroll(show);
+
   if (!show) return null;
 
   return (

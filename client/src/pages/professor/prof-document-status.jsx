@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -17,6 +17,7 @@ import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
+import { connectSocket } from "../../utils/socket";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 
@@ -33,7 +34,8 @@ const getStatusMeta = (status) => {
     case "pending":    return { label: "Pending",          cls: "dss-badge-pending" };
     case "processing": return { label: "Processing",       cls: "dss-badge-processing" };
     case "generated":  return { label: "Ready for Pickup", cls: "dss-badge-ready" };
-    case "released":   return { label: "Released",         cls: "dss-badge-claimed" };
+    case "released":   return { label: "Released",         cls: "dss-badge-released" };
+    case "claimed":    return { label: "Claimed",          cls: "dss-badge-claimed" };
     case "rejected":   return { label: "Rejected",         cls: "dss-badge-rejected" };
     default:           return { label: status,             cls: "dss-badge-pending" };
   }
@@ -130,7 +132,12 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Re
                 <span className="dss-detail-label">Request Date</span>
                 <span className="dss-detail-value">{formatDate(doc.requestDate)}</span>
               </div>
-              {doc.status === "released" && doc.releasedDate ? (
+              {doc.status === "claimed" && doc.claimedDate ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Date Claimed</span>
+                  <span className="dss-detail-value">{formatDate(doc.claimedDate)}</span>
+                </div>
+              ) : doc.status === "released" && doc.releasedDate ? (
                 <div className="dss-detail-row">
                   <span className="dss-detail-label">Date Released</span>
                   <span className="dss-detail-value">{formatDate(doc.releasedDate)}</span>
@@ -287,35 +294,52 @@ export default function ProfessorDocumentsPage() {
     if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
   }, [loading, selectedDocId, selectedDoc]);
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get("/faculty/my-document-requests");
-        setDocuments(
-          res.data.map((r) => ({
-            id: String(r.request_id),
-            type: r.service_name,
-            college: r.college,
-            purpose: r.purpose,
-            requestDate: r.created_at,
-            status: r.status,
-            trackingNumber: r.tracking_number,
-            notes: r.notes || undefined,
-            estimatedCompletion: r.estimated_completion || undefined,
-            releasedDate: r.released_at || undefined,
-          })),
-        );
-        setError(null);
-      } catch (err) {
-        console.error("Failed to fetch document requests:", err);
-        setError("Could not load your document requests.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDocuments();
+  const fetchDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/faculty/my-document-requests");
+      setDocuments(
+        res.data.map((r) => ({
+          id: String(r.request_id),
+          type: r.service_name,
+          college: r.college,
+          purpose: r.purpose,
+          requestDate: r.created_at,
+          status: r.status,
+          trackingNumber: r.tracking_number,
+          notes: r.notes || undefined,
+          estimatedCompletion: r.estimated_completion || undefined,
+          releasedDate: r.released_at || undefined,
+          claimedDate: r.claimed_at || undefined,
+        })),
+      );
+      setError(null);
+    } catch (err) {
+      console.error("Failed to fetch document requests:", err);
+      setError("Could not load your document requests.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  // ── Live updates: refetch when admin changes a request's status ───────────
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on("document:status-updated", fetchDocuments);
+
+    return () => {
+      socket.off("document:status-updated", fetchDocuments);
+    };
+  }, [fetchDocuments]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleCancel = async (requestId) => {
@@ -355,10 +379,10 @@ export default function ProfessorDocumentsPage() {
   };
 
   const activeDocuments = documents.filter(
-    (d) => d.status !== "released" && d.status !== "rejected",
+    (d) => d.status !== "claimed" && d.status !== "rejected",
   );
   const completedDocuments = documents.filter(
-    (d) => d.status === "released" || d.status === "rejected",
+    (d) => d.status === "claimed" || d.status === "rejected",
   );
 
   // ── Render ─────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
@@ -13,6 +13,7 @@ import CalendarGrid from "../../components/CalendarGrid";
 import { useAuth } from "../../context/AuthContext";
 import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
+import { connectSocket } from "../../utils/socket";
 import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
@@ -122,7 +123,8 @@ export default function AppointmentsPage() {
   const [selectedApptType, setSelectedApptType] = useState("");
 
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedCollege, setSelectedCollege] = useState(() => user?.departmentAbbrev || "");
+  const [selectedCollege, setSelectedCollege] = useState("");
+  const [hasUserSetCollege, setHasUserSetCollege] = useState(false);
   const [selectedProfessorId, setSelectedProfessorId] = useState("");
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -133,7 +135,17 @@ export default function AppointmentsPage() {
     return { year, month };
   });
 
-  const fetchSlots = async () => {
+  // Default the college filter to the student's own college once auth
+  // finishes loading -- a useState initializer would race ahead of user
+  // being available and get stuck on "All Colleges" forever. Only applies
+  // until the student picks a filter themselves.
+  useEffect(() => {
+    if (!hasUserSetCollege && user?.departmentAbbrev) {
+      setSelectedCollege(user.departmentAbbrev);
+    }
+  }, [user?.departmentAbbrev, hasUserSetCollege]);
+
+  const fetchSlots = useCallback(async () => {
     setSlotsLoading(true); setSlotsError(null);
     try {
       const { data } = await api.get("/student/appointments/available-slots");
@@ -141,9 +153,9 @@ export default function AppointmentsPage() {
     } catch (err) {
       setSlotsError("Could not load available slots. Please try again.");
     } finally { setSlotsLoading(false); }
-  };
+  }, []);
 
-  const fetchMyBookings = async () => {
+  const fetchMyBookings = useCallback(async () => {
     setBookingsLoading(true); setBookingsError(null);
     try {
       const { data } = await api.get("/student/appointments");
@@ -151,9 +163,36 @@ export default function AppointmentsPage() {
     } catch (err) {
       setBookingsError("Could not load your bookings. Please try again.");
     } finally { setBookingsLoading(false); }
-  };
+  }, []);
 
-  useEffect(() => { fetchSlots(); fetchMyBookings(); }, []);
+  useEffect(() => { fetchSlots(); fetchMyBookings(); }, [fetchSlots, fetchMyBookings]);
+
+  // ── Live updates: refetch slots when capacity changes elsewhere ───────────
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["appointment:slot-updated", "appointment:slot-removed"];
+    events.forEach((event) => socket.on(event, fetchSlots));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchSlots));
+    };
+  }, [fetchSlots]);
+
+  // Fallback poll: a student browsing a professor from another college is
+  // in their own department's socket room, not the professor's, so
+  // appointment:slot-updated/removed events for that professor never reach
+  // them -- this keeps spotsLeft/removed slots from drifting stale.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchSlots();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchSlots]);
 
   const availableSlots = useMemo(() => slots.filter((slot) => {
     const matchesDate = !selectedDate || slot.date === selectedDate;
@@ -222,9 +261,8 @@ export default function AppointmentsPage() {
   }, [activeBookings]);
 
   const availableProfessors = useMemo(() => {
-    if (!selectedCollege) return [];
     const seen = new Set();
-    return slots.filter((s) => s.college === selectedCollege).filter((s) => { const id = String(s.professorId); if (seen.has(id)) return false; seen.add(id); return true; })
+    return slots.filter((s) => !selectedCollege || s.college === selectedCollege).filter((s) => { const id = String(s.professorId); if (seen.has(id)) return false; seen.add(id); return true; })
       .map((s) => ({ id: String(s.professorId), name: s.professorName })).sort((a, b) => a.name.localeCompare(b.name));
   }, [slots, selectedCollege]);
 
@@ -258,7 +296,7 @@ export default function AppointmentsPage() {
   };
 
   const handleBookSlot = async () => {
-    if (!selectedSlot) return;
+    if (!selectedSlot || submitting) return;
     if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
       toast.error("Please select an appointment type"); return;
     }
@@ -280,8 +318,12 @@ export default function AppointmentsPage() {
 
   const doCancel = async () => {
     const appointmentId = cancelConfirmId;
+    if (!appointmentId) return;
+    if (cancellingId) {
+      toast.info("Please wait for the current cancellation to finish.");
+      return;
+    }
     setCancelConfirmId(null);
-    if (!appointmentId || cancellingId) return;
     setCancellingId(appointmentId);
     try {
       await api.delete(`/student/appointments/${appointmentId}`);
@@ -457,8 +499,16 @@ export default function AppointmentsPage() {
                 label="College"
                 labelClassName={undefined}
                 value={selectedCollege}
-                onChange={(e) => { setSelectedCollege(e.target.value); setSelectedProfessorId(""); setSelectedDate(""); }}
-                options={colleges.map((c) => ({ value: c.value, label: c.label }))}
+                onChange={(e) => {
+                  setSelectedCollege(e.target.value);
+                  setHasUserSetCollege(true);
+                  setSelectedProfessorId("");
+                  setSelectedDate("");
+                }}
+                options={[
+                  { value: "", label: "All Colleges" },
+                  ...colleges.map((c) => ({ value: c.value, label: c.label })),
+                ]}
                 chevronIcon={<ChevronDown className="filter-chevron" />}
               />
               <FilterSelect

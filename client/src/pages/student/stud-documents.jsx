@@ -20,7 +20,7 @@ import { ChevronLeft } from "lucide-react";
  * @property {string} college
  * @property {string} requestDate
  * @property {string} purpose
- * @property {'pending' | 'processing' | 'ready' | 'claimed' | 'rejected'} status
+ * @property {'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected'} status
  * @property {string} trackingNumber
  * @property {string} [notes]
  * @property {string} [estimatedCompletion]
@@ -89,8 +89,6 @@ const AlertCircleIcon = () => (
   </svg>
 );
 
-const MIN_NEEDED_BY_DATE = getManilaTomorrowDateString();
-
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function DocumentsPage() {
   const navigate = useNavigate();
@@ -153,6 +151,7 @@ export default function DocumentsPage() {
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSubmitRequest = async () => {
+    if (submitting) return;
     if (!formData.type || !formData.college || !formData.purpose) {
       toast.error("Please fill in all required fields");
       return;
@@ -161,6 +160,9 @@ export default function DocumentsPage() {
     setSubmitting(true);
     try {
       const res = await api.post("/student/documents", formData);
+      if (!res.data?.document) {
+        throw new Error("Unexpected response from server");
+      }
       setDocuments((prev) => [res.data.document, ...prev]);
       setDialogOpen(false);
       setFormData({ type: "", college: "", purpose: "", copies: "1", neededBy: "" });
@@ -237,6 +239,8 @@ export default function DocumentsPage() {
         return "doc-badge-processing";
       case "ready":
         return "doc-badge-ready";
+      case "released":
+        return "doc-badge-released";
       case "claimed":
         return "doc-badge-claimed";
       case "rejected":
@@ -253,6 +257,8 @@ export default function DocumentsPage() {
       case "processing":
         return <AlertCircleIcon />;
       case "ready":
+        return <CheckCircleIcon />;
+      case "released":
         return <CheckCircleIcon />;
       case "claimed":
         return <CheckCircleIcon />;
@@ -293,7 +299,13 @@ export default function DocumentsPage() {
                     <CloseIcon />
                   </button>
                 </div>
-                <div className="doc-dialog-content">
+                <form
+                  className="doc-dialog-content"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmitRequest();
+                  }}
+                >
                   <div className="doc-form-group">
                     <label htmlFor="college">College</label>
                     <select
@@ -304,6 +316,7 @@ export default function DocumentsPage() {
                       }
                       className="doc-form-select"
                       disabled={formOptionsLoading}
+                      required
                     >
                       <option value="">
                         {formOptionsLoading ? "Loading colleges…" : "Select college"}
@@ -326,6 +339,7 @@ export default function DocumentsPage() {
                       }
                       className="doc-form-select"
                       disabled={formOptionsLoading || !formData.college}
+                      required
                     >
                       <option value="">
                         {!formData.college
@@ -348,12 +362,14 @@ export default function DocumentsPage() {
                       id="copies"
                       type="number"
                       min="1"
-                      max="10"
+                      max="20"
+                      step="1"
                       value={formData.copies}
                       onChange={(e) =>
                         setFormData({ ...formData, copies: e.target.value })
                       }
                       className="doc-form-input"
+                      required
                     />
                   </div>
 
@@ -362,7 +378,7 @@ export default function DocumentsPage() {
                     <input
                       id="neededBy"
                       type="date"
-                      min={MIN_NEEDED_BY_DATE}
+                      min={getManilaTomorrowDateString()}
                       value={formData.neededBy}
                       onChange={(e) =>
                         setFormData({ ...formData, neededBy: e.target.value })
@@ -382,11 +398,14 @@ export default function DocumentsPage() {
                       }
                       className="doc-form-textarea"
                       rows={3}
+                      maxLength={255}
+                      required
                     />
                   </div>
 
                   <div className="doc-dialog-actions">
                     <button
+                      type="button"
                       className="doc-btn-secondary"
                       onClick={() => setDialogOpen(false)}
                       disabled={submitting}
@@ -394,14 +413,14 @@ export default function DocumentsPage() {
                       Cancel
                     </button>
                     <button
-                      onClick={handleSubmitRequest}
+                      type="submit"
                       className="doc-form-submit"
                       disabled={submitting}
                     >
                       {submitting ? "Submitting..." : "Submit Request"}
                     </button>
                   </div>
-                </div>
+                </form>
               </div>
             </div>
           )}
@@ -554,6 +573,10 @@ export default function DocumentsPage() {
                               </p>
                             </div>
                           )}
+                          <div className="doc-card-field">
+                            <label>Number of Copies</label>
+                            <p className="doc-card-date-value">{doc.copies ?? 1}</p>
+                          </div>
                           <div className="doc-card-field-full">
                             <label>Purpose</label>
                             <p>{doc.purpose}</p>
@@ -567,7 +590,7 @@ export default function DocumentsPage() {
                           </div>
                         )}
 
-                        {doc.status === "ready" && (
+                        {(doc.status === "ready" || doc.status === "released") && (
                           <button
                             className="doc-card-claim-btn"
                             onClick={(e) => {
@@ -577,7 +600,7 @@ export default function DocumentsPage() {
                               });
                             }}
                           >
-                            <DownloadIcon /> Claim Document
+                            <DownloadIcon /> View Pickup Details
                           </button>
                         )}
 
@@ -609,7 +632,12 @@ export default function DocumentsPage() {
             {/* Completed Tab */}
             {activeTab === "completed" && (
               <div className="doc-tab-content">
-                {completedDocuments.length > 0 ? (
+                {docsLoading ? (
+                  <div className="doc-empty-state">
+                    <FileTextIcon />
+                    <h3>Loading documents...</h3>
+                  </div>
+                ) : completedDocuments.length > 0 ? (
                   <div className="doc-cards-grid">
                     {completedDocuments.map((doc) => (
                       <div

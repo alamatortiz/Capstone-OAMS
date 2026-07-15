@@ -6,6 +6,7 @@ const {
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { getManilaDateString } = require("../utils/dateTime");
+const { emitToUser, emitToDept } = require("../sockets");
 
 // GET /api/faculty/dashboard-stats
 router.get(
@@ -203,9 +204,9 @@ function buildActivityTitle(row) {
 function statusToDot(status) {
   return (
     {
-      pending: "dot-green",
-      approved: "dot-blue",
-      completed: "dot-purple",
+      pending: "dot-amber",
+      approved: "dot-green",
+      completed: "dot-green",
       rejected: "dot-red",
       cancelled: "dot-gray",
     }[status] ?? "dot-gray"
@@ -296,11 +297,20 @@ router.patch(
       return res.status(400).json({ message: "Invalid status value" });
     }
     try {
-      const [result] = await pool.query(
+      const [[appt]] = await pool.query(
+        "SELECT student_id, department_id FROM appointments WHERE appointment_id = ? AND faculty_id = ?",
+        [id, facultyId]
+      );
+      if (!appt) return res.status(404).json({ message: "Appointment not found" });
+
+      await pool.query(
         "UPDATE appointments SET status = ? WHERE appointment_id = ? AND faculty_id = ?",
         [status, id, facultyId]
       );
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Appointment not found" });
+
+      emitToUser(appt.student_id, "appointment:status-updated", { appointmentId: Number(id), status });
+      emitToDept(appt.department_id, "appointment:status-updated", { appointmentId: Number(id), status });
+
       res.json({ message: "Status updated" });
     } catch (err) {
       console.error("PATCH /appointments/:id/status error:", err);
@@ -567,6 +577,13 @@ router.post(
         );
         linkedServices.push({ id: svc.service_id, name: svc.service_name });
       }
+
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      emitToDept(fac?.department_id, "appointment:slot-updated", { availabilityId: newId });
+
       res.status(201).json({
         availability_id: newId,
         message: "Availability added",
@@ -668,6 +685,13 @@ router.patch(
           );
         }
       }
+
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      emitToDept(fac?.department_id, "appointment:slot-updated", { availabilityId: Number(id) });
+
       res.json({ message: "Availability updated" });
     } catch (err) {
       console.error("PATCH /availability/:id error:", err);
@@ -690,6 +714,13 @@ router.delete(
         [id, facultyId]
       );
       if (result.affectedRows === 0) return res.status(404).json({ message: "Availability not found" });
+
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId]
+      );
+      emitToDept(fac?.department_id, "appointment:slot-removed", { availabilityId: Number(id) });
+
       res.json({ message: "Availability deleted" });
     } catch (err) {
       console.error("DELETE /availability/:id error:", err);
@@ -879,6 +910,13 @@ router.post(
         `SELECT request_id, tracking_number FROM faculty_document_requests WHERE request_id = ?`,
         [result.insertId]
       );
+
+      const [[svc]] = await pool.query(
+        `SELECT department_id FROM document_services WHERE service_id = ?`,
+        [service_id]
+      );
+      emitToDept(svc?.department_id, "document:new-request", { requestId: newRequest.request_id });
+
       res.status(201).json({
         request_id: newRequest.request_id,
         tracking_number: newRequest.tracking_number,
@@ -907,8 +945,10 @@ router.delete(
 
     try {
       const [[request]] = await pool.query(
-        `SELECT request_id, faculty_id, status
-         FROM faculty_document_requests WHERE request_id = ?`,
+        `SELECT fdr.request_id, fdr.faculty_id, fdr.status, s.department_id
+         FROM faculty_document_requests fdr
+         JOIN document_services s ON fdr.service_id = s.service_id
+         WHERE fdr.request_id = ?`,
         [requestId]
       );
 
@@ -930,6 +970,8 @@ router.delete(
         `DELETE FROM faculty_document_requests WHERE request_id = ?`,
         [requestId]
       );
+
+      emitToDept(request.department_id, "document:cancelled", { requestId });
 
       res.json({
         message: "Document request cancelled successfully",

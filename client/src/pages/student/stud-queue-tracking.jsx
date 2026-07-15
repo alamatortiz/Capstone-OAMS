@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { useQueue } from "../../contexts/QueueContext";
 import { getCollegeLogo } from "../../data/collegeLogo";
@@ -33,6 +34,8 @@ const getStatusColor = (status) => {
       return "status-completed";
     case "cancelled":
       return "status-cancelled";
+    case "no_show":
+      return "status-cancelled";
     default:
       return "status-default";
   }
@@ -48,6 +51,8 @@ const getStatusLabel = (status) => {
       return "Completed";
     case "cancelled":
       return "Cancelled";
+    case "no_show":
+      return "Marked as No-Show";
     default:
       return status;
   }
@@ -60,6 +65,8 @@ export default function QueueTrackingPage() {
     queueHistory = [],
     metrics,
     isLoading,
+    historyError,
+    metricsError,
     leaveQueue,
     fetchQueueHistory,
     fetchMetrics,
@@ -101,8 +108,8 @@ export default function QueueTrackingPage() {
       await fetchQueueHistory();
       await fetchMetrics();
     } catch (err) {
-      // toast handled by caller context; just log
       console.error("Leave queue error:", err);
+      toast.error(err.message ?? "Failed to leave the queue. Please try again.");
     } finally {
       setLeavingId(null);
     }
@@ -323,15 +330,7 @@ export default function QueueTrackingPage() {
                               >
                                 {getStatusLabel(queue.status)}
                               </span>
-                              <span
-                                style={{
-                                  fontSize: "0.75rem",
-                                  fontWeight: 700,
-                                  fontFamily: "monospace",
-                                  color: "var(--primary-color)",
-                                  letterSpacing: "0.05em",
-                                }}
-                              >
+                              <span className="qt-number-badge">
                                 {queue.queueNumberBadge}
                               </span>
                             </div>
@@ -443,7 +442,16 @@ export default function QueueTrackingPage() {
             {/* ── HISTORY TAB ── */}
             {activeTab === "history" && (
               <div className="qt-tab-content">
-                {queueHistory.length === 0 ? (
+                {historyError ? (
+                  <div className="qt-empty-state">
+                    <AlertCircle className="qt-empty-icon" />
+                    <h3 className="qt-empty-title">Couldn't Load History</h3>
+                    <p className="qt-empty-description">{historyError}</p>
+                    <button className="breadcrumb-link" onClick={fetchQueueHistory}>
+                      Retry
+                    </button>
+                  </div>
+                ) : queueHistory.length === 0 ? (
                   <div className="qt-empty-state">
                     <History className="qt-empty-icon" />
                     <h3 className="qt-empty-title">No Queue History Yet</h3>
@@ -503,6 +511,16 @@ export default function QueueTrackingPage() {
             {/* ── ANALYTICS TAB ── */}
             {activeTab === "analytics" && (
               <div className="qt-tab-content">
+                {metricsError && (
+                  <div className="qt-empty-state">
+                    <AlertCircle className="qt-empty-icon" />
+                    <h3 className="qt-empty-title">Couldn't Load Analytics</h3>
+                    <p className="qt-empty-description">{metricsError}</p>
+                    <button className="breadcrumb-link" onClick={fetchMetrics}>
+                      Retry
+                    </button>
+                  </div>
+                )}
                 <div className="qt-analytics-grid">
                   {/* Queue Statistics */}
                   <div className="qt-analytics-card">

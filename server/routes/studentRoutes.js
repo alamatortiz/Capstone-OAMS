@@ -5,10 +5,11 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
-const { emitToSlot, emitToDept } = require("../sockets");
+const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
+const { STATUS_LABEL_MAP } = require("../utils/documentStatus");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -60,7 +61,7 @@ router.get(
          JOIN services s ON q.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE q.student_id = ? AND q.status IN ('waiting', 'serving')
-         ORDER BY position ASC`,
+         ORDER BY (q.status = 'serving') DESC, position ASC, q.queue_id ASC`,
         [studentId],
       );
 
@@ -78,7 +79,7 @@ router.get(
       const [[docRow]] = await pool.query(
         `SELECT
            COUNT(*) AS total_count,
-           SUM(CASE WHEN status IN ('pending','processing') THEN 1 ELSE 0 END) AS pending_count
+           SUM(CASE WHEN status IN ('pending','processing','generated','released') THEN 1 ELSE 0 END) AS pending_count
          FROM document_requests
          WHERE student_id = ?`,
         [studentId],
@@ -96,7 +97,7 @@ router.get(
            ) +
            (
              SELECT COUNT(*) FROM document_requests
-             WHERE student_id = ? AND status = 'released'
+             WHERE student_id = ? AND status = 'claimed'
            ) AS total_completed`,
         [studentId, studentId, studentId],
       );
@@ -182,7 +183,7 @@ router.get(
 
       res.json({
         stats: {
-          queuePosition: closestQueue ? closestQueue.position : 0,
+          queuePosition: closestQueueDisplay ? closestQueueDisplay.position : 0,
           queueNumberBadge: closestQueueNumberBadge,
           activeQueueCount: activeQueues.length,
           appointments: {
@@ -343,10 +344,12 @@ router.get(
            dr.tracking_number,
            dr.request_type,
            dr.purpose,
+           dr.copies,
            dr.status,
            dr.estimated_completion,
            dr.needed_by,
            dr.released_at,
+           dr.claimed_at,
            dr.notes,
            dr.created_at,
            d.department_name AS college
@@ -358,27 +361,20 @@ router.get(
         [studentId],
       );
 
-      // Map DB status enum -> frontend status vocabulary
-      const statusMap = {
-        pending: "pending",
-        processing: "processing",
-        generated: "ready",
-        released: "claimed",
-        rejected: "rejected",
-      };
-
       const documents = rows.map((d) => ({
         id: String(d.request_id),
         type: d.request_type,
         college: d.college,
         requestDate: d.created_at,
         purpose: d.purpose,
-        status: statusMap[d.status] ?? d.status,
+        copies: d.copies,
+        status: STATUS_LABEL_MAP[d.status] ?? d.status,
         trackingNumber: d.tracking_number,
         notes: d.notes || undefined,
         estimatedCompletion: d.estimated_completion || undefined,
         neededBy: d.needed_by || undefined,
-        claimedDate: d.released_at || undefined,
+        releasedDate: d.released_at || undefined,
+        claimedDate: d.claimed_at || undefined,
       }));
 
       res.json({ documents });
@@ -405,6 +401,25 @@ router.post(
       return res
         .status(400)
         .json({ error: "type, college, and purpose are required" });
+    }
+    if (purpose.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Purpose must be 255 characters or fewer" });
+    }
+
+    const copyCount = copies === undefined ? 1 : parseInt(copies, 10);
+    if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 20) {
+      return res
+        .status(400)
+        .json({ error: "Number of copies must be a whole number between 1 and 20" });
+    }
+
+    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    if (neededBy && neededBy < tomorrow) {
+      return res
+        .status(400)
+        .json({ error: "Needed-by date must be at least tomorrow" });
     }
 
     // Strip an "(ABBR)" suffix, e.g. "College of Computing Studies (CCS)"
@@ -459,31 +474,45 @@ router.post(
         });
       }
 
+      // Guard against a double-click/double-tap firing this twice before the
+      // client's own disabled-button state catches up to the first request.
+      const [[recentDup]] = await pool.query(
+        `SELECT request_id FROM document_requests
+         WHERE student_id = ? AND service_id = ? AND purpose = ?
+           AND created_at >= NOW() - INTERVAL 10 SECOND
+         LIMIT 1`,
+        [studentId, serviceId, purpose],
+      );
+      if (recentDup) {
+        return res.status(409).json({
+          error: "This request was already submitted a moment ago",
+        });
+      }
+
       const estimatedCompletion = getManilaDateString(
         new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       );
 
-      const copyCount = parseInt(copies, 10) || 1;
-      const notes = copyCount > 1 ? `Copies requested: ${copyCount}` : null;
-
       const [result] = await pool.query(
         `INSERT INTO document_requests
-           (student_id, service_id, request_type, purpose, status, estimated_completion, needed_by, notes, created_at)
-         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
-        [studentId, serviceId, type, purpose, estimatedCompletion, neededBy || null, notes],
+           (student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, created_at)
+         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, NOW())`,
+        [studentId, serviceId, type, purpose, copyCount, estimatedCompletion, neededBy || null],
       );
 
       const [[newDoc]] = await pool.query(
         `SELECT
-           dr.request_id, dr.tracking_number, dr.request_type, dr.purpose,
+           dr.request_id, dr.tracking_number, dr.request_type, dr.purpose, dr.copies,
            dr.status, dr.estimated_completion, dr.needed_by, dr.notes, dr.created_at,
-           d.department_name AS college
+           d.department_name AS college, s.department_id
          FROM document_requests dr
          JOIN document_services s ON dr.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          WHERE dr.request_id = ?`,
         [result.insertId],
       );
+
+      emitToDept(newDoc.department_id, "document:new-request", { requestId: newDoc.request_id });
 
       res.status(201).json({
         message: "Document request submitted successfully",
@@ -493,6 +522,7 @@ router.post(
           college: newDoc.college,
           requestDate: newDoc.created_at,
           purpose: newDoc.purpose,
+          copies: newDoc.copies,
           status: newDoc.status,
           trackingNumber: newDoc.tracking_number,
           notes: newDoc.notes || undefined,
@@ -581,41 +611,60 @@ router.delete(
       return res.status(400).json({ error: "Invalid requestId" });
     }
 
+    const conn = await pool.getConnection();
     try {
-      const [[request]] = await pool.query(
-        `SELECT request_id, student_id, status
-         FROM document_requests WHERE request_id = ?`,
+      await conn.beginTransaction();
+
+      // Lock the row so an admin's status-changing UPDATE (e.g. to
+      // "generated") can't land in the narrow window between this SELECT
+      // and the DELETE below.
+      const [[request]] = await conn.query(
+        `SELECT dr.request_id, dr.student_id, dr.status, s.department_id
+         FROM document_requests dr
+         JOIN document_services s ON dr.service_id = s.service_id
+         WHERE dr.request_id = ?
+         FOR UPDATE`,
         [requestId],
       );
 
       if (!request) {
+        await conn.rollback();
         return res.status(404).json({ error: "Document request not found" });
       }
       if (request.student_id !== studentId) {
+        await conn.rollback();
         return res
           .status(403)
           .json({ error: "You can only cancel your own document requests" });
       }
       if (!["pending", "processing"].includes(request.status)) {
+        await conn.rollback();
         return res.status(409).json({
           error: `Cannot cancel a request that is already ${request.status}`,
         });
       }
 
-      await pool.query(
+      await conn.query(
         `DELETE FROM document_requests WHERE request_id = ?`,
         [requestId],
       );
+
+      await conn.commit();
+
+      emitToDept(request.department_id, "document:cancelled", { requestId });
 
       res.json({
         message: "Document request cancelled successfully",
         requestId,
       });
     } catch (error) {
+      await conn.rollback();
       console.error("Cancel document request error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -1489,7 +1538,7 @@ router.delete(
 
     try {
       const [[appt]] = await pool.query(
-        `SELECT appointment_id, student_id, status
+        `SELECT appointment_id, student_id, status, faculty_id, department_id
          FROM appointments WHERE appointment_id = ?`,
         [appointmentId],
       );
@@ -1512,6 +1561,15 @@ router.delete(
         `UPDATE appointments SET status = 'cancelled' WHERE appointment_id = ?`,
         [appointmentId],
       );
+
+      emitToDept(appt.department_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
+      emitToUser(appt.faculty_id, "appointment:status-updated", {
+        appointmentId,
+        status: "cancelled",
+      });
 
       res.json({
         message: "Appointment cancelled successfully",
@@ -1695,8 +1753,9 @@ router.get(
         approved: "ongoing",
         rejected: "cancelled",
         processing: "ongoing",
-        generated: "completed",
-        released: "completed",
+        generated: "ongoing",
+        released: "ongoing",
+        claimed: "completed",
       };
 
       const transactions = rows.map((row) => {
@@ -1917,6 +1976,18 @@ router.post(
         return res.status(400).json({ error: `${appointmentDate} is not a ${slot.day_of_week}` });
       }
 
+      // Reject a same-day booking whose window has already ended — mirrors
+      // the identical check in GET /appointments/available-slots, which the
+      // client's cached list can drift out of sync with if left open past
+      // the window's end without a refresh.
+      if (appointmentDate === getManilaDateString()) {
+        const windowEnd = new Date(`${appointmentDate}T${slot.end_time}`);
+        if (windowEnd <= new Date()) {
+          await conn.rollback();
+          return res.status(409).json({ error: "This availability window has already ended for today" });
+        }
+      }
+
       // Guard against the professor toggling themselves unavailable between
       // the student loading the slot list and submitting this booking.
       const [[facultyStatus]] = await conn.query(
@@ -1982,24 +2053,64 @@ router.post(
       // Store the window's start_time as appointment_time for reference
       const appointmentTime = String(slot.start_time).slice(0, 8);
 
-      const [result] = await conn.query(
-        `INSERT INTO appointments
-           (student_id, faculty_id, department_id, service_id, availability_id,
-            appointment_date, appointment_time, status, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
-        [
-          studentId,
-          slot.faculty_id,
-          facultyRow.department_id,
-          chosenServiceId,
-          availabilityId,
-          appointmentDate,
-          appointmentTime,
-          purpose?.trim() || null,
-        ],
+      // A prior cancelled/rejected booking for this exact
+      // (student, faculty, date, time) combination collides with the DB's
+      // uq_appointment_slot unique key on a fresh INSERT, even though it's
+      // an entirely ordinary workflow to cancel then rebook the same slot.
+      // Reactivate that row instead of inserting a new one -- the unique
+      // constraint itself stays untouched, so real double-booking is still
+      // prevented.
+      const [[staleRow]] = await conn.query(
+        `SELECT appointment_id FROM appointments
+         WHERE student_id = ? AND faculty_id = ? AND appointment_date = ? AND appointment_time = ?
+           AND status IN ('cancelled', 'rejected')
+         LIMIT 1`,
+        [studentId, slot.faculty_id, appointmentDate, appointmentTime],
       );
 
+      let appointmentId;
+      if (staleRow) {
+        await conn.query(
+          `UPDATE appointments
+             SET department_id = ?, service_id = ?, availability_id = ?,
+                 status = 'pending', notes = ?, created_at = NOW()
+           WHERE appointment_id = ?`,
+          [facultyRow.department_id, chosenServiceId, availabilityId, purpose?.trim() || null, staleRow.appointment_id],
+        );
+        appointmentId = staleRow.appointment_id;
+      } else {
+        const [result] = await conn.query(
+          `INSERT INTO appointments
+             (student_id, faculty_id, department_id, service_id, availability_id,
+              appointment_date, appointment_time, status, notes, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
+          [
+            studentId,
+            slot.faculty_id,
+            facultyRow.department_id,
+            chosenServiceId,
+            availabilityId,
+            appointmentDate,
+            appointmentTime,
+            purpose?.trim() || null,
+          ],
+        );
+        appointmentId = result.insertId;
+      }
+
       await conn.commit();
+
+      const newSpotsLeft = slot.max_students != null ? slot.max_students - (total + 1) : null;
+      emitToDept(facultyRow.department_id, "appointment:slot-updated", {
+        availabilityId,
+        date: appointmentDate,
+        spotsLeft: newSpotsLeft,
+      });
+      emitToUser(slot.faculty_id, "appointment:slot-updated", {
+        availabilityId,
+        date: appointmentDate,
+        spotsLeft: newSpotsLeft,
+      });
 
       const [[newRow]] = await pool.query(
         `SELECT
@@ -2014,7 +2125,7 @@ router.post(
          JOIN departments d ON f.department_id = d.department_id
          JOIN faculty_availability fa ON a.availability_id = fa.availability_id
          WHERE a.appointment_id = ?`,
-        [result.insertId],
+        [appointmentId],
       );
 
       res.status(201).json({

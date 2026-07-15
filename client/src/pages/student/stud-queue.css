@@ -525,8 +525,6 @@ body {
 
 .qp-number-badge,
 .queue-status-badge {
-  background: var(--primary-color);
-  color: white;
   padding: 0.375rem 0.875rem;
   border-radius: 0.5rem;
   font-size: 0.75rem;
@@ -547,6 +545,12 @@ body {
   align-self: flex-start; /* ← prevents flex stretch */
   width: fit-content; /* ← fallback */
   white-space: nowrap; /* ← keeps text on one line */
+}
+
+.qp-number-badge {
+  background: var(--blue);
+  color: white;
+  font-family: "Inter", sans-serif;
 }
 
 .queue-status-badge {

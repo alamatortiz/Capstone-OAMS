@@ -97,6 +97,7 @@ import AdminAppointment from "./pages/admin/admin-appointment.jsx";
 import AdminTransaction from "./pages/admin/admin-transactions.jsx";
 import AdminQueue from "./pages/admin/admin-queue.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
+import { FacultyProvider } from "./contexts/FacultyProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { Toaster } from "sonner";
 
@@ -107,6 +108,7 @@ createRoot(document.getElementById("root")).render(
     <AuthProvider>
       <Toaster richColors position="top-right" />
       <QueueProvider>
+      <FacultyProvider>
         <BrowserRouter>
           <ScrollToTop />
           <Routes>
@@ -320,179 +322,9 @@ createRoot(document.getElementById("root")).render(
                 }
               />
             </Route>
-
-            {/* ─── Backward-compatible TEMP UI-testing routes ──────────────── */}
-            <Route path="/dashboard" element={<StudentDashboard />} />
-            <Route path="/student-dashboard" element={<StudentDashboard />} />
-            <Route path="/student-queue" element={<QueuePage />} />
-            <Route
-              path="/student-queue-status"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <QueueStatusPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/student-queue-tracking"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <QueueTrackingPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/student-announcements"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AnnouncementsPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/student-professor-schedules"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfessorSchedulePage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/student-appointment-status"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AppointmentStatusPage />
-                </Suspense>
-              }
-            />
-            <Route path="/student-documents" element={<DocumentsPage />} />
-            <Route
-              path="/student-document-status"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <DocumentStatusPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/student-transactions"
-              element={<TransactionsPage />}
-            />
-            <Route
-              path="/professor-dashboard"
-              element={<ProfessorDashboard />}
-            />
-            <Route
-              path="/professor-queue"
-              element={<Navigate to="/professor/appointments" replace />}
-            />
-            {/* ★ Backward-compatible temp route for professor appointments */}
-            <Route
-              path="/professor-appointments"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfessorAppointmentsPage />
-                </Suspense>
-              }
-            />
-            {/* ★ Backward-compatible temp route for professor documents */}
-            <Route
-              path="/professor-documents"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfessorDocumentsPage />
-                </Suspense>
-              }
-            />
-            {/* ★ Backward-compatible temp route for professor transactions */}
-            <Route
-              path="/professor-transactions"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfessorTransactionsPage />
-                </Suspense>
-              }
-            />
-            {/* ★ Backward-compatible temp route for professor schedule manager */}
-            <Route
-              path="/professor-schedule-manager"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfessorScheduleManagerPage />
-                </Suspense>
-              }
-            />
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/admin-appointments" element={<AdminAppointment />} />
-            <Route
-              path="/admin-document-processing"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminDocumentProcessing />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/admin-professor-availability"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminProfessorAvailability />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/admin-announcements"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminAnnouncements />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/admin-user-management"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminUserManagement />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/admin-data-management"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminDataManagement />
-                </Suspense>
-              }
-            />
-            {/* Backward-compatible temp route for scan document */}
-            <Route
-              path="/admin-scan-document"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminScanDocument />
-                </Suspense>
-              }
-            />
-            {/* Backward-compatible temp route for queue analytics */}
-            <Route
-              path="/admin-queue-analytics"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminQueueAnalytics />
-                </Suspense>
-              }
-            />
-            {/* Backward-compatible temp route for pinnacle sync */}
-            <Route
-              path="/admin-pinnacle-sync"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminPinnacleSync />
-                </Suspense>
-              }
-            />
           </Routes>
         </BrowserRouter>
+      </FacultyProvider>
       </QueueProvider>
     </AuthProvider>
   </StrictMode>,

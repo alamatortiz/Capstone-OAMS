@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -20,6 +20,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
+import { connectSocket } from "../../utils/socket";
 import "./stud-appointment-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -196,7 +197,7 @@ export default function AppointmentStatusPage() {
   const [cancelling, setCancelling] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -207,9 +208,24 @@ export default function AppointmentStatusPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchAppointments(); }, []);
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+
+  // ── Live updates: refetch when an appointment's status changes ────────────
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on("appointment:status-updated", fetchAppointments);
+
+    return () => {
+      socket.off("appointment:status-updated", fetchAppointments);
+    };
+  }, [fetchAppointments]);
 
   const handleCancel = async (id) => {
     setCancelling(id);

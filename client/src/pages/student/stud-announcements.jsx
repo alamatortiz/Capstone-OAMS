@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Megaphone as LucideMegaphone } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../../utils/api";
@@ -7,6 +7,7 @@ import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
 import { formatCollegeLabel } from "../../utils/formatCollege";
+import { connectSocket } from "../../utils/socket";
 
 import "./stud-announcements.css";
 
@@ -94,7 +95,7 @@ export default function AnnouncementsPage() {
   const [annLoading, setAnnLoading] = useState(true);
   const [annError, setAnnError] = useState(null);
 
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = useCallback(async () => {
     setAnnLoading(true);
     setAnnError(null);
     try {
@@ -106,11 +107,34 @@ export default function AnnouncementsPage() {
     } finally {
       setAnnLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAnnouncements();
-  }, []);
+  }, [fetchAnnouncements]);
+
+  // ── Live updates: refetch when an admin posts/edits/removes an announcement ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on("announcement:changed", fetchAnnouncements);
+
+    return () => {
+      socket.off("announcement:changed", fetchAnnouncements);
+    };
+  }, [fetchAnnouncements]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchAnnouncements();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchAnnouncements]);
 
   // ── Filter tabs ────────────────────────────────────────────────────────────
   const filterTabs = [
@@ -151,6 +175,10 @@ export default function AnnouncementsPage() {
         a.departmentAbbrev === selectedCollege ||
         a.isCrossCollege,
     );
+  // Pinned announcements are NOT excluded here -- they have their own
+  // dedicated "Pinned" tab, but a pinned item matching the selected
+  // category (or "All") should still appear in that tab too, rather than
+  // only ever being visible under "Pinned".
   const filteredAnnouncements = announcements
     .filter((a) => selectedFilter === "all" || a.category === selectedFilter)
     .filter(
@@ -158,8 +186,7 @@ export default function AnnouncementsPage() {
         selectedCollege === "all" ||
         a.departmentAbbrev === selectedCollege ||
         a.isCrossCollege,
-    )
-    .filter((a) => !a.isPinned);
+    );
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();

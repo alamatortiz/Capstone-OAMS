@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
@@ -9,6 +9,8 @@ import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import { COLLEGES } from "../../data/colleges";
 import { formatManilaDate } from "../../utils/dateTime";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import { connectSocket } from "../../utils/socket";
 
 // ── Icons (All SVG Components) ──────────────────────────────────────────────
 const CalendarIconNav = () => (
@@ -77,6 +79,7 @@ export default function AdminAppointment() {
   const [selectedCollege, setSelectedCollege] = useState("all");
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  useLockBodyScroll(Boolean(selectedAppointment));
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -91,21 +94,38 @@ export default function AdminAppointment() {
     pending: appointments.filter((a) => a.status === "pending").length,
   };
 
+  const fetchAppointments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/admin/appointments");
+      setAppointments(res.data.appointments ?? []);
+    } catch (err) {
+      console.error("Failed to fetch appointments:", err);
+      setError("Could not load appointments.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get("/admin/appointments");
-        setAppointments(res.data.appointments ?? []);
-      } catch (err) {
-        console.error("Failed to fetch appointments:", err);
-        setError("Could not load appointments.");
-      } finally {
-        setLoading(false);
-      }
-    };
     if (authUser) fetchAppointments();
-  }, [authUser]);
+  }, [authUser, fetchAppointments]);
+
+  // ── Live updates: refetch when a booking or status change affects this dept ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!authUser || !token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["appointment:slot-updated", "appointment:status-updated"];
+    events.forEach((event) => socket.on(event, fetchAppointments));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchAppointments));
+    };
+  }, [authUser, fetchAppointments]);
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();

@@ -236,6 +236,7 @@ export default function AdminQueue() {
       "queue:no-show",
       "queue:student-joined",
       "queue:student-left",
+      "queue:notes-updated",
     ];
     events.forEach((event) => socket.on(event, refetch));
 

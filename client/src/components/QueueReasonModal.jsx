@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "./ActionConfirmModal.css";
 import "./QueueReasonModal.css";
+import useLockBodyScroll from "../hooks/useLockBodyScroll";
 
 // Prompts the admin for a required reason before pausing or stopping a
 // queue. Students see this reason (paused banner / "queue stopped" toast +
@@ -16,6 +17,8 @@ export default function QueueReasonModal({
   submitting = false,
 }) {
   const [reason, setReason] = useState("");
+
+  useLockBodyScroll(show);
 
   if (!show) return null;
 

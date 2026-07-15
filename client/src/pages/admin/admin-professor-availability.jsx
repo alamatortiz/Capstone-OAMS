@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-professor-availability.css";
@@ -6,6 +6,7 @@ import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
+import { connectSocket } from "../../utils/socket";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const UsersIcon = ({ className }) => (
@@ -59,22 +60,39 @@ export default function AdminProfessorAvailability() {
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
 
-  useEffect(() => {
-    const fetchFaculty = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await api.get("/admin/faculty-availability");
-        setFaculty(res.data.faculty || []);
-      } catch (err) {
-        console.error("Failed to fetch faculty availability:", err);
-        setError("Failed to load faculty data. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFaculty();
+  const fetchFaculty = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await api.get("/admin/faculty-availability");
+      setFaculty(res.data.faculty || []);
+    } catch (err) {
+      console.error("Failed to fetch faculty availability:", err);
+      setError("Failed to load faculty data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchFaculty();
+  }, [fetchFaculty]);
+
+  // ── Live updates: refetch when a faculty member's schedule changes ────────
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["appointment:slot-updated", "appointment:slot-removed"];
+    events.forEach((event) => socket.on(event, fetchFaculty));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchFaculty));
+    };
+  }, [fetchFaculty]);
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();

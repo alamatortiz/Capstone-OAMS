@@ -646,13 +646,13 @@ body {
   white-space: nowrap;
 }
 
-.appointment-badge.status-confirmed {
+.appointment-badge.status-approved {
   background: rgba(34, 197, 94, 0.2);
   color: var(--primary-color);
   border: 0.5px solid rgba(34, 197, 94, 0.4);
 }
 
-[data-theme="light"] .appointment-badge.status-confirmed {
+[data-theme="light"] .appointment-badge.status-approved {
   background: rgba(34, 197, 94, 0.15);
   color: var(--primary-dark);
   border: 0.5px solid rgba(34, 197, 94, 0.3);
@@ -1071,12 +1071,16 @@ body {
   background: #10b981;
 }
 
-.activity-dot.dot-blue {
-  background: #3b82f6;
+.activity-dot.dot-amber {
+  background: #f59e0b;
 }
 
-.activity-dot.dot-purple {
-  background: #a855f7;
+.activity-dot.dot-red {
+  background: #ef4444;
+}
+
+.activity-dot.dot-gray {
+  background: #6b7280;
 }
 
 .activity-text {

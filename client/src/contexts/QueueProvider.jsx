@@ -9,6 +9,12 @@ import QueueContext from "./QueueContextBase";
 // in case a socket event is missed or the connection drops silently.
 const FALLBACK_POLL_INTERVAL_MS = 45000;
 
+// Available slots get their own, shorter poll: a student merely *browsing*
+// a cross-college service (not yet joined) isn't in that service's owning
+// department's socket room, so they'd otherwise only see capacity/pause
+// changes via the slower 45s fallback above.
+const AVAILABLE_SLOTS_POLL_INTERVAL_MS = 15000;
+
 export function QueueProvider({ children }) {
   const { user, token } = useAuth();
 
@@ -18,6 +24,11 @@ export function QueueProvider({ children }) {
   const [metrics, setMetrics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Separate from `error` (which gates the Active/Available tabs) so a
+  // history/metrics fetch failure doesn't incorrectly hide unrelated,
+  // successfully-loaded queue data.
+  const [historyError, setHistoryError] = useState(null);
+  const [metricsError, setMetricsError] = useState(null);
 
   // Snapshot of queues from the previous poll, keyed by queueId. Used to
   // detect transitions (waiting -> serving, slot paused/resumed, etc.) so
@@ -36,9 +47,11 @@ export function QueueProvider({ children }) {
       const { data } = await api.get("/student/queues/history");
       const history = data.history ?? [];
       setQueueHistory(history);
+      setHistoryError(null);
       return history;
     } catch (err) {
       console.error("fetchQueueHistory error:", err);
+      setHistoryError("Failed to load your queue history.");
       return [];
     }
   }, []);
@@ -100,6 +113,10 @@ export function QueueProvider({ children }) {
           toast.warning(
             `You were marked as a no-show for ${prev.serviceName} and your line was voided.`,
           );
+        } else if (resolved?.status === "cancelled") {
+          // The student left voluntarily -- leaveQueue() already shows its
+          // own "You have left the queue" toast, so stay silent here rather
+          // than contradicting it with a false "you've been served."
         } else {
           toast.success(`You've been served for ${prev.serviceName}. Thank you!`);
         }
@@ -146,8 +163,10 @@ export function QueueProvider({ children }) {
     try {
       const { data } = await api.get("/student/queues/metrics");
       setMetrics(data);
+      setMetricsError(null);
     } catch (err) {
       console.error("fetchMetrics error:", err);
+      setMetricsError("Failed to load your queue analytics.");
     }
   }, []);
 
@@ -160,6 +179,8 @@ export function QueueProvider({ children }) {
       setQueueHistory([]);
       setMetrics(null);
       setError(null);
+      setHistoryError(null);
+      setMetricsError(null);
       prevQueuesRef.current = new Map();
       hasLoadedOnceRef.current = false;
 
@@ -203,11 +224,21 @@ export function QueueProvider({ children }) {
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         fetchActiveQueues();
-        fetchAvailableSlots();
       }
     }, FALLBACK_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [user?.userId, fetchActiveQueues, fetchAvailableSlots]);
+  }, [user?.userId, fetchActiveQueues]);
+
+  // ── Available-slots poll (shorter interval — see constant comment above) ──
+  useEffect(() => {
+    if (!user?.userId || user.role !== "student") return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchAvailableSlots();
+      }
+    }, AVAILABLE_SLOTS_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user?.userId, fetchAvailableSlots]);
 
   // ── WebSocket: live queue updates ─────────────────────────────────────────
   useEffect(() => {
@@ -332,6 +363,8 @@ export function QueueProvider({ children }) {
       metrics,
       isLoading,
       error,
+      historyError,
+      metricsError,
       fetchActiveQueues,
       fetchAvailableSlots,
       fetchQueueHistory,
@@ -349,6 +382,8 @@ export function QueueProvider({ children }) {
       metrics,
       isLoading,
       error,
+      historyError,
+      metricsError,
       fetchActiveQueues,
       fetchAvailableSlots,
       fetchQueueHistory,

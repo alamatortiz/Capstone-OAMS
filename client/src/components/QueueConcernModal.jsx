@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./QueueConcernModal.css";
+import useLockBodyScroll from "../hooks/useLockBodyScroll";
 
 // Prompts the student for an optional concern before joining a queue. Unlike
 // QueueReasonModal (admin pause/stop reasons, required text), this concern
@@ -15,6 +16,8 @@ export default function QueueConcernModal({
   submitting = false,
 }) {
   const [concern, setConcern] = useState("");
+
+  useLockBodyScroll(show);
 
   if (!show) return null;
 

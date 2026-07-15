@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import "./stud-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { connectSocket } from "../../utils/socket";
 import { ChevronLeft } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
@@ -145,22 +146,47 @@ export default function TransactionsPage() {
   ];
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        setTxLoading(true);
-        const res = await api.get("/student/transactions");
-        setTransactions(res.data.transactions ?? []);
-        setTxError(null);
-      } catch (err) {
-        console.error("Failed to fetch transactions:", err);
-        setTxError("Could not load your transaction history.");
-      } finally {
-        setTxLoading(false);
-      }
-    };
-    fetchTransactions();
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setTxLoading(true);
+      const res = await api.get("/student/transactions");
+      setTransactions(res.data.transactions ?? []);
+      setTxError(null);
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+      setTxError("Could not load your transaction history.");
+    } finally {
+      setTxLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  // ── Live updates: refetch when a document or appointment status changes ───
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["document:status-updated", "appointment:status-updated"];
+    events.forEach((event) => socket.on(event, fetchTransactions));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchTransactions));
+    };
+  }, [fetchTransactions]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchTransactions();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchTransactions]);
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();

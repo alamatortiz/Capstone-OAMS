@@ -531,13 +531,13 @@ body {
 }
 
 .qt-status-badge.status-completed {
-  background: rgba(59, 130, 246, 0.2);
-  color: #93c5fd;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 [data-theme="light"] .qt-status-badge.status-completed {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(16, 185, 129, 0.15);
 }
 
 .qt-status-badge.status-cancelled {
@@ -548,6 +548,18 @@ body {
 
 [data-theme="light"] .qt-status-badge.status-cancelled {
   background: rgba(239, 68, 68, 0.15);
+}
+
+.qt-number-badge {
+  background: var(--blue);
+  color: white;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-family: "Inter", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.3s ease;
 }
 
 

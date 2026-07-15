@@ -1,4 +1,5 @@
 import "./ActionConfirmModal.css";
+import useLockBodyScroll from "../hooks/useLockBodyScroll";
 
 export default function ActionConfirmModal({
   show,
@@ -11,6 +12,8 @@ export default function ActionConfirmModal({
   cancelText = "Cancel",
   confirmDisabled = false,
 }) {
+  useLockBodyScroll(show);
+
   if (!show) return null;
 
   return (

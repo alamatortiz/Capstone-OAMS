@@ -11,7 +11,7 @@ let socket = null;
 export function connectSocket(token) {
   if (!token) return null;
 
-  if (socket && socket.auth?.token === token && socket.connected) {
+  if (socket && socket.auth?.token === token) {
     return socket;
   }
 

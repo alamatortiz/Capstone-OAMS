@@ -64,7 +64,7 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(
     () => getSavedTheme() === "dark",
   );
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     applyTheme(isDarkMode ? "dark" : "light");
@@ -77,7 +77,14 @@ function App() {
   };
 
   const goToLogin = () => navigate("/login");
-  const goToDashboard = () => navigate("/dashboard");
+  const goToDashboard = () => {
+    const roleRoutes = {
+      student: "/student/dashboard",
+      faculty: "/professor/dashboard",
+      admin: "/admin/dashboard",
+    };
+    navigate(roleRoutes[user?.role] ?? "/login");
+  };
 
   return (
     <div className="oams-root">

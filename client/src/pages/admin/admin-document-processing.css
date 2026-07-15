@@ -372,8 +372,7 @@ html, body {
   background: rgba(249, 115, 22, 0.15);
   color: #f97316;
   border: 1px solid rgba(249, 115, 22, 0.3);
-  letter-spacing: 0.02em;
-  font-family: monospace;
+  font-family: "Inter", sans-serif;
 }
 [data-theme="light"] .adp-tracking-badge { color: #ea580c; }
 .adp-status-badge {
@@ -395,7 +394,8 @@ html, body {
 .adp-badge-pending    { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 0.5px solid rgba(245, 158, 11, 0.4); }
 .adp-badge-processing { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 0.5px solid rgba(59, 130, 246, 0.4); }
 .adp-badge-ready      { background: rgba(34, 197, 94, 0.15);  color: #22c55e; border: 0.5px solid rgba(34, 197, 94, 0.4); }
-.adp-badge-completed  { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 0.5px solid rgba(100, 116, 139, 0.4); }
+.adp-badge-released   { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 0.5px solid rgba(100, 116, 139, 0.4); }
+.adp-badge-claimed    { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 0.5px solid rgba(16, 185, 129, 0.4); }
 .adp-badge-rejected   { background: rgba(239, 68, 68, 0.15);  color: #ef4444; border: 0.5px solid rgba(239, 68, 68, 0.4); }
 
 .adp-doc-date {

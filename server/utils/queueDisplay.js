@@ -7,7 +7,7 @@ function getQueueDisplayInfo(status, rawPosition) {
   if (status === "serving") {
     return { position: null, estimatedWait: "Please proceed to the designated location" };
   }
-  const position = rawPosition || 1;
+  const position = rawPosition ?? 1;
   return {
     position,
     estimatedWait: position > 1 ? `~${(position - 1) * 5} min` : "You're next!",
