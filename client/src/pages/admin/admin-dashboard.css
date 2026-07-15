@@ -1300,10 +1300,6 @@ body {
 
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
-  :root,
-  [data-theme="dark"] {
-    --sidebar-width: 3.5rem;
-  }
 
   .admin-dashboard-main {
     padding-left: 0;
@@ -1374,7 +1370,7 @@ body {
   }
 
   .admin-dashboard .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: 0.75rem;
   }
 

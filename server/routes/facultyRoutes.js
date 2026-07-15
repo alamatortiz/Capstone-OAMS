@@ -943,33 +943,45 @@ router.delete(
       return res.status(400).json({ message: "Invalid requestId" });
     }
 
+    const conn = await pool.getConnection();
     try {
-      const [[request]] = await pool.query(
+      await conn.beginTransaction();
+
+      // Lock the row so an admin's status-changing UPDATE (e.g. to
+      // "generated") can't land in the narrow window between this SELECT
+      // and the DELETE below.
+      const [[request]] = await conn.query(
         `SELECT fdr.request_id, fdr.faculty_id, fdr.status, s.department_id
          FROM faculty_document_requests fdr
          JOIN document_services s ON fdr.service_id = s.service_id
-         WHERE fdr.request_id = ?`,
+         WHERE fdr.request_id = ?
+         FOR UPDATE`,
         [requestId]
       );
 
       if (!request) {
+        await conn.rollback();
         return res.status(404).json({ message: "Document request not found" });
       }
       if (request.faculty_id !== facultyId) {
+        await conn.rollback();
         return res
           .status(403)
           .json({ message: "You can only cancel your own document requests" });
       }
       if (!["pending", "processing"].includes(request.status)) {
+        await conn.rollback();
         return res.status(409).json({
           message: `Cannot cancel a request that is already ${request.status}`,
         });
       }
 
-      await pool.query(
+      await conn.query(
         `DELETE FROM faculty_document_requests WHERE request_id = ?`,
         [requestId]
       );
+
+      await conn.commit();
 
       emitToDept(request.department_id, "document:cancelled", { requestId });
 
@@ -978,8 +990,11 @@ router.delete(
         requestId,
       });
     } catch (err) {
+      await conn.rollback();
       console.error("DELETE /my-document-requests/:requestId error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    } finally {
+      conn.release();
     }
   }
 );

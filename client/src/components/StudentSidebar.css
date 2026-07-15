@@ -24,6 +24,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .mobile-logo .logo-img {
@@ -145,6 +147,8 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .logo-img {
@@ -382,6 +386,17 @@
 
   .dashboard-sidebar.open {
     transform: translateX(0);
+  }
+
+  /* Redundant with the mobile header's own logo + theme toggle. */
+  .sidebar-logo {
+    display: none;
+  }
+
+  /* The mobile header is fixed at the same top:0 as the drawer, so push the
+     drawer's content below it instead of letting it sit clipped underneath. */
+  .sidebar-inner {
+    padding-top: 4rem;
   }
 }
 

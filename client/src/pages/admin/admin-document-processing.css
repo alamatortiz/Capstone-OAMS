@@ -29,7 +29,6 @@ html, body {
 @media (max-width: 1024px) {
   .adp-main { margin-left: 0; margin-top: 4rem; }
   .adp-content { padding: 1rem; }
-  :root, [data-theme="dark"] { --sidebar-width: 3.5rem; }
 }
 @media (max-width: 768px) {
   .adp-content { padding: 0.75rem; gap: 1rem; }

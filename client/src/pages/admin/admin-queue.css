@@ -1521,10 +1521,6 @@ body {
 
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
-  :root,
-  [data-theme="dark"] {
-    --sidebar-width: 3.5rem;
-  }
 
   .queue-system-stats {
     grid-template-columns: repeat(2, 1fr);

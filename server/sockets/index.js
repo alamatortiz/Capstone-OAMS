@@ -31,6 +31,14 @@ async function joinStudentDeptRoom(socket, studentId) {
   if (row?.department_id) socket.join(deptRoom(row.department_id));
 }
 
+async function joinFacultyDeptRoom(socket, facultyId) {
+  const [[row]] = await pool.query(
+    `SELECT department_id FROM faculty WHERE faculty_id = ?`,
+    [facultyId],
+  );
+  if (row?.department_id) socket.join(deptRoom(row.department_id));
+}
+
 function initSocketServer(server, options = {}) {
   io = new Server(server, {
     cors: options.cors || { origin: "*" },
@@ -59,6 +67,8 @@ function initSocketServer(server, options = {}) {
       } else if (role === "student") {
         await joinStudentSlotRooms(socket, userId);
         await joinStudentDeptRoom(socket, userId);
+      } else if (role === "faculty") {
+        await joinFacultyDeptRoom(socket, userId);
       }
     } catch (err) {
       console.error("Socket room join error:", err.message);

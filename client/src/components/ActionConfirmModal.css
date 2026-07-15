@@ -7,6 +7,8 @@
   justify-content: center;
   z-index: 9999;
   animation: acm-fade-in 0.15s ease;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 
 @keyframes acm-fade-in {

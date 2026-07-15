@@ -501,10 +501,6 @@
 
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
-  :root,
-  [data-theme="dark"] {
-    --sidebar-width: 3.5rem;
-  }
 
   .apa-dashboard-main {
     padding-left: 0;

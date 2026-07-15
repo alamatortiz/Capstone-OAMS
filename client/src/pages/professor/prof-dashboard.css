@@ -1148,10 +1148,6 @@ body {
 
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
-  :root,
-  [data-theme="dark"] {
-    --sidebar-width: 3.5rem;
-  }
 
   .dashboard-main {
     padding-left: 0;
@@ -1196,7 +1192,7 @@ body {
   }
 
   .professor-dashboard .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: 0.75rem;
   }
 }

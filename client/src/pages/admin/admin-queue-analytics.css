@@ -25,10 +25,6 @@ html, body {
 }
 
 @media (max-width: 1024px) {
-  :root,
-  [data-theme="dark"] {
-    --sidebar-width: 3.5rem;
-  }
 }
 
 @media (max-width: 768px) {

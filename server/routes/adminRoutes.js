@@ -1446,10 +1446,11 @@ router.patch(
       const timestampClause =
         dbStatus === "released" ? ", released_at = NOW()" :
         dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const notesClause = notes !== undefined ? ", notes = ?" : "";
 
       await pool.query(
-        `UPDATE faculty_document_requests SET status = ?, notes = ?${timestampClause} WHERE request_id = ?`,
-        [dbStatus, notes !== undefined ? notes : null, requestId],
+        `UPDATE faculty_document_requests SET status = ?${notesClause}${timestampClause} WHERE request_id = ?`,
+        notes !== undefined ? [dbStatus, notes, requestId] : [dbStatus, requestId],
       );
 
       await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: dbStatus });
@@ -1512,10 +1513,11 @@ router.patch(
       const timestampClause =
         dbStatus === "released" ? ", released_at = NOW()" :
         dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const notesClause = notes !== undefined ? ", notes = ?" : "";
 
       await pool.query(
-        `UPDATE document_requests SET status = ?, notes = ?${timestampClause} WHERE request_id = ?`,
-        [dbStatus, notes !== undefined ? notes : null, requestId],
+        `UPDATE document_requests SET status = ?${notesClause}${timestampClause} WHERE request_id = ?`,
+        notes !== undefined ? [dbStatus, notes, requestId] : [dbStatus, requestId],
       );
 
       await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: dbStatus });

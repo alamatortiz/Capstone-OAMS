@@ -178,14 +178,18 @@ export default function ProfessorSidebar() {
       <aside className={`dashboard-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-inner">
           <div className="sidebar-logo">
-            <div className="logo-container">
+            <Link
+              to="/professor/dashboard"
+              className="logo-container"
+              onClick={() => setSidebarOpen(false)}
+            >
               <img src={ucLogo} alt="UC Logo" className="logo-img" />
               <img
                 src={oamsLogo}
                 alt="OAMS Logo"
                 className="logo-img oams-logo-img"
               />
-            </div>
+            </Link>
             <button
               className="theme-toggle-btn"
               onClick={toggleDarkMode}
@@ -259,14 +263,14 @@ export default function ProfessorSidebar() {
       {/* Mobile Header */}
       <header className="mobile-header">
         <div className="mobile-header-content">
-          <div className="mobile-logo">
+          <Link to="/professor/dashboard" className="mobile-logo">
             <img src={ucLogo} alt="UC Logo" className="logo-img" />
             <img
               src={oamsLogo}
               alt="OAMS Logo"
               className="logo-img oams-logo-img"
             />
-          </div>
+          </Link>
           <div className="mobile-header-actions">
             <button
               className="theme-toggle-btn"
