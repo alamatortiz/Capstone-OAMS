@@ -260,6 +260,10 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_queue');
       return;
     }
+    if (key === 'appointments') {
+      router.push('/pages/admin/admin_appointment');
+      return;
+    }
     comingSoon();
   };
 

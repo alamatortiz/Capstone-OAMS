@@ -292,6 +292,10 @@ export default function AdminQueueScreen() {
       goToDashboard();
       return;
     }
+    if (key === 'appointments') {
+      router.push('/pages/admin/admin_appointment');
+      return;
+    }
     comingSoon();
   };
 
