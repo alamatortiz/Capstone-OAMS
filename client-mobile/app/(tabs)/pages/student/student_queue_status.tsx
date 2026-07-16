@@ -320,7 +320,15 @@ export default function StudentQueueStatusScreen() {
               </View>
 
               {/* Queue Tracking link */}
-              <Pressable style={styles.trackingBtn} onPress={comingSoon}>
+              <Pressable
+                style={styles.trackingBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: '/pages/student/student_queue_tracking',
+                    params: { from: 'queue-status' },
+                  })
+                }
+              >
                 <LinearGradient colors={['#3b82f6', '#6366f1']} style={styles.trackingIconBox}>
                   <Ionicons name="pulse-outline" size={20} color="#ffffff" />
                 </LinearGradient>

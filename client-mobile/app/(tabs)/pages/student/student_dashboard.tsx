@@ -349,6 +349,8 @@ export default function StudentDashboardScreen() {
                   ? () => router.push('/pages/student/student_announcement')
                   : action.key === 'appointment-booking'
                   ? () => router.push('/pages/student/student_appointments')
+                  : action.key === 'queue-tracking'
+                  ? () => router.push('/pages/student/student_queue_tracking')
                   : comingSoon;
               return (
                 <Pressable key={action.key} style={styles.actionCard} onPress={onPress}>
