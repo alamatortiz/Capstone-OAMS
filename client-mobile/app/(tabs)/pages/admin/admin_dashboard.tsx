@@ -256,6 +256,10 @@ export default function AdminDashboardScreen() {
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
     if (key === 'dashboard') return;
+    if (key === 'queue') {
+      router.push('/pages/admin/admin_queue');
+      return;
+    }
     comingSoon();
   };
 
