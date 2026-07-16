@@ -296,6 +296,10 @@ export default function AdminQueueScreen() {
       router.push('/pages/admin/admin_appointment');
       return;
     }
+    if (key === 'documents') {
+      router.push('/pages/admin/admin_document_processing');
+      return;
+    }
     comingSoon();
   };
 
