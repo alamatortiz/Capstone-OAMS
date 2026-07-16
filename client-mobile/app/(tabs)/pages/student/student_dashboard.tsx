@@ -458,7 +458,7 @@ export default function StudentDashboardScreen() {
           {/* Recent Activity */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <Pressable onPress={comingSoon} hitSlop={8}>
+            <Pressable onPress={() => router.push('/pages/student/student_transactions')} hitSlop={8}>
               <Text style={styles.viewAllText}>See All</Text>
             </Pressable>
           </View>
