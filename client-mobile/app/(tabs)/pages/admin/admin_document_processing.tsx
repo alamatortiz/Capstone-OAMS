@@ -384,6 +384,10 @@ export default function AdminDocumentProcessingScreen() {
       router.push('/pages/admin/admin_appointment');
       return;
     }
+    if (key === 'transactions') {
+      router.push('/pages/admin/admin_transactions');
+      return;
+    }
     comingSoon();
   };
 

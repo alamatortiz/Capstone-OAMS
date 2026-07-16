@@ -268,6 +268,10 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_document_processing');
       return;
     }
+    if (key === 'transactions') {
+      router.push('/pages/admin/admin_transactions');
+      return;
+    }
     comingSoon();
   };
 
