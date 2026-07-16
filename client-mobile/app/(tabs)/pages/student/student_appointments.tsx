@@ -554,7 +554,15 @@ export default function StudentAppointmentsScreen() {
           </View>
 
           {/* Professor Schedules quick link */}
-          <Pressable style={styles.profSchedCard} onPress={comingSoon}>
+          <Pressable
+            style={styles.profSchedCard}
+            onPress={() =>
+              router.push({
+                pathname: '/pages/student/student_professor_schedules',
+                params: { from: 'appointments' },
+              })
+            }
+          >
             <LinearGradient colors={['#7c3aed', '#a855f7']} style={styles.profSchedIcon}>
               <Ionicons name="school-outline" size={22} color="#ffffff" />
             </LinearGradient>
