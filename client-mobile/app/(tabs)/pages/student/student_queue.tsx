@@ -341,7 +341,11 @@ export default function StudentQueueScreen() {
                   Math.min(100, Math.round((1 - queue.position / queue.totalWaiting) * 100)),
                 );
                 return (
-                  <View key={queue.id} style={styles.activeQueueCard}>
+                  <Pressable
+                    key={queue.id}
+                    style={styles.activeQueueCard}
+                    onPress={() => router.push('/pages/student/student_queue_status')}
+                  >
                     <View style={styles.activeQueueHeaderRow}>
                       <Image
                         source={collegeLogoFor(queue.college)}
@@ -388,11 +392,17 @@ export default function StudentQueueScreen() {
                       </View>
                     </View>
 
-                    <Pressable style={styles.leaveBtn} onPress={() => setLeaveTarget(queue)}>
+                    <Pressable
+                      style={styles.leaveBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setLeaveTarget(queue);
+                      }}
+                    >
                       <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
                       <Text style={styles.leaveBtnText}>Leave Queue</Text>
                     </Pressable>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
