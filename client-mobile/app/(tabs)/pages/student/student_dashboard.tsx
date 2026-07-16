@@ -320,7 +320,9 @@ export default function StudentDashboardScreen() {
                     : stat.key === 'appointments'
                     ? () => router.push('/pages/student/student_appointment_status')
                     : stat.key === 'documents'
-                    ? () => router.push('/pages/student/student_documents')
+                    ? () => router.push('/pages/student/student_document_status')
+                    : stat.key === 'completed'
+                    ? () => router.push('/pages/student/student_transactions')
                     : comingSoon}
                 >
                   <View style={[styles.statIcon, { backgroundColor: tint.bg, borderColor: tint.border }]}>

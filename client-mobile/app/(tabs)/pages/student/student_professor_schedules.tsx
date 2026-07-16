@@ -388,7 +388,9 @@ export default function StudentProfessorSchedulesScreen() {
       ? { label: 'Back to Departments', onPress: handleBack }
       : from === 'appointments'
         ? { label: 'Appointments', onPress: () => router.push('/pages/student/student_appointments') }
-        : { label: 'Home', onPress: goToDashboard };
+        : from === 'appointment-status'
+          ? { label: 'My Appointments', onPress: () => router.push('/pages/student/student_appointment_status') }
+          : { label: 'Home', onPress: goToDashboard };
 
   return (
     <View style={styles.root}>
