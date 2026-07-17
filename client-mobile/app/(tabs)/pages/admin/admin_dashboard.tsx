@@ -258,6 +258,10 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_announcement');
       return;
     }
+    if (key === 'faculty') {
+      router.push('/pages/admin/admin_professor_availability');
+      return;
+    }
     comingSoon();
   };
 
@@ -528,7 +532,7 @@ export default function AdminDashboardScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitleText}>Faculty Availability Today</Text>
-              <Pressable onPress={comingSoon} hitSlop={8}>
+              <Pressable onPress={() => router.push('/pages/admin/admin_professor_availability')} hitSlop={8}>
                 <Text style={styles.viewAllText}>View All</Text>
               </Pressable>
             </View>
