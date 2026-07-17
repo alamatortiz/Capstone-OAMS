@@ -103,7 +103,9 @@ interface DocumentRequest {
   claimedDate: string | null;
 }
 
-const initialDocuments: DocumentRequest[] = [
+// Exported so admin_dashboard.tsx's "Pending Documents" stat card can reflect
+// the same demo dataset instead of a disconnected hardcoded number.
+export const initialDocuments: DocumentRequest[] = [
   {
     id: '1',
     source: 'student',
@@ -313,13 +315,6 @@ const WEEK_FILTER_OPTIONS: { value: WeekFilter; label: string }[] = [
   { value: 'all', label: 'All' },
 ];
 
-const STAT_TINTS = {
-  total: { bg: 'rgba(249, 115, 22, 0.16)', border: 'rgba(249, 115, 22, 0.25)', color: '#f97316' },
-  pending: { bg: 'rgba(245, 158, 11, 0.16)', border: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b' },
-  processing: { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.25)', color: '#3b82f6' },
-  ready: { bg: 'rgba(34, 197, 94, 0.16)', border: 'rgba(34, 197, 94, 0.25)', color: '#22c55e' },
-} as const;
-
 const STATUS_TINTS: Record<DocumentStatus, { bg: string; border: string; color: string; icon: IoniconName }> = {
   pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: 'alert-circle-outline' },
   processing: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6', icon: 'time-outline' },
@@ -469,13 +464,6 @@ export default function AdminDocumentProcessingScreen() {
 
   const visibleDocuments = activeTab === 'all' ? baseFiltered : baseFiltered.filter((d) => d.status === activeTab);
 
-  const stats = {
-    total: sourceDocuments.length,
-    pending: sourceDocuments.filter((d) => d.status === 'pending').length,
-    processing: sourceDocuments.filter((d) => d.status === 'processing').length,
-    ready: sourceDocuments.filter((d) => d.status === 'ready').length,
-  };
-
   const handleViewDetails = (doc: DocumentRequest) => {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes);
@@ -597,29 +585,6 @@ export default function AdminDocumentProcessingScreen() {
                 >
                   <Text style={[styles.sourceBtnText, active && styles.sourceBtnTextActive]}>{s.label}</Text>
                 </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Stats */}
-          <View style={styles.statsGrid}>
-            {(
-              [
-                { key: 'total', label: 'Total Requests', value: String(stats.total), icon: 'document-text-outline' as IoniconName },
-                { key: 'pending', label: 'Pending', value: String(stats.pending), icon: 'alert-circle-outline' as IoniconName },
-                { key: 'processing', label: 'Processing', value: String(stats.processing), icon: 'time-outline' as IoniconName },
-                { key: 'ready', label: 'Ready', value: String(stats.ready), icon: 'checkmark-circle-outline' as IoniconName },
-              ] as const
-            ).map((stat) => {
-              const tint = STAT_TINTS[stat.key];
-              return (
-                <View key={stat.key} style={[styles.statCard, { borderColor: tint.border }]}>
-                  <View style={styles.statCardTop}>
-                    <Text style={styles.statCardLabel}>{stat.label}</Text>
-                    <Ionicons name={stat.icon} size={18} color={tint.color} />
-                  </View>
-                  <Text style={[styles.statCardValue, { color: tint.color }]}>{stat.value}</Text>
-                </View>
               );
             })}
           </View>
@@ -1147,20 +1112,6 @@ function createStyles(theme: ThemePalette) {
     sourceBtnActive: { backgroundColor: '#f97316' },
     sourceBtnText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
     sourceBtnTextActive: { color: '#ffffff' },
-
-    // Stats
-    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    statCard: {
-      width: '47.5%',
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderRadius: 16,
-      padding: 14,
-      gap: 8,
-    },
-    statCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    statCardLabel: { fontSize: 11, fontWeight: '600', color: theme.subtext, flex: 1 },
-    statCardValue: { fontSize: 22, fontWeight: '800' },
 
     // Generic card
     card: {

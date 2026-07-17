@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { initialDocuments } from './admin_document_processing';
+import { initialQueueDetails, ACTIVE_STATUSES } from './admin_queue';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -106,9 +108,16 @@ interface StatItem {
   tint: keyof typeof STAT_TINTS;
 }
 
+// Mirrors the same demo dataset admin_document_processing.tsx renders, so this count doesn't drift from what the Documents screen actually shows.
+const pendingDocumentsCount = initialDocuments.filter((d) => d.status === 'pending').length;
+
+// Mirrors the same demo dataset admin_queue.tsx renders (GET /admin/queue-hosting is scoped
+// to the admin's own department server-side, so this is never a cross-college count).
+const activeQueuesCount = initialQueueDetails.filter((q) => ACTIVE_STATUSES.includes(q.status)).length;
+
 const stats: StatItem[] = [
-  { key: 'queues', title: 'Active Queues', value: '12', description: 'Across all colleges', icon: 'time-outline', tint: 'blue' },
-  { key: 'documents', title: 'Pending Documents', value: '28', description: 'Awaiting processing', icon: 'document-text-outline', tint: 'orange' },
+  { key: 'queues', title: 'Active Queues', value: String(activeQueuesCount), description: `In ${demoAdmin.departmentName}`, icon: 'time-outline', tint: 'blue' },
+  { key: 'documents', title: 'Pending Documents', value: String(pendingDocumentsCount), description: 'Awaiting processing', icon: 'document-text-outline', tint: 'orange' },
   { key: 'faculty', title: 'Faculty Available', value: '45', description: 'Today', icon: 'people-outline', tint: 'emerald' },
   { key: 'announcements', title: 'Announcements', value: '2', description: 'Published', icon: 'notifications-outline', tint: 'purple' },
 ];
@@ -254,12 +263,28 @@ export default function AdminDashboardScreen() {
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
 
   const handleStatPress = (key: string) => {
+    if (key === 'queues') {
+      router.push('/pages/admin/admin_queue');
+      return;
+    }
     if (key === 'announcements') {
       router.push('/pages/admin/admin_announcement');
       return;
     }
     if (key === 'faculty') {
       router.push('/pages/admin/admin_professor_availability');
+      return;
+    }
+    if (key === 'documents') {
+      router.push('/pages/admin/admin_document_processing');
+      return;
+    }
+    comingSoon();
+  };
+
+  const handleToolPress = (key: string) => {
+    if (key === 'user-management') {
+      router.push('/pages/admin/admin_user_management');
       return;
     }
     comingSoon();
@@ -374,7 +399,7 @@ export default function AdminDashboardScreen() {
             </View>
             <View style={styles.toolsGrid}>
               {adminTools.map((tool) => (
-                <Pressable key={tool.key} style={styles.adminToolCard} onPress={comingSoon}>
+                <Pressable key={tool.key} style={styles.adminToolCard} onPress={() => handleToolPress(tool.key)}>
                   <LinearGradient colors={tool.gradient} style={styles.toolIcon}>
                     <Ionicons name={tool.icon} size={24} color="#ffffff" />
                   </LinearGradient>

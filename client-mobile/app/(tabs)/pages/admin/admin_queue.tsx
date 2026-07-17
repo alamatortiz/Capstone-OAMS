@@ -137,7 +137,7 @@ interface QueueDetail {
 
 // Only the admin's own department (CCS) has queues wired up here — matches
 // admin-queue.jsx, which only ever renders queues for req.user's department.
-const initialQueueDetails: QueueDetail[] = [
+export const initialQueueDetails: QueueDetail[] = [
   {
     id: 'q1',
     queueType: 'Academic Consultation',
@@ -199,7 +199,7 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
 ];
 
-const ACTIVE_STATUSES: QueueSlotStatus[] = ['open', 'paused', 'full', 'expired'];
+export const ACTIVE_STATUSES: QueueSlotStatus[] = ['open', 'paused', 'full', 'expired'];
 const ENTRIES_PER_PAGE = 5;
 
 const STAT_TINTS = {
