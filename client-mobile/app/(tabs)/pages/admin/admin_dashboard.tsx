@@ -287,6 +287,10 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_user_management');
       return;
     }
+    if (key === 'data-management') {
+      router.push('/pages/admin/admin_data_management');
+      return;
+    }
     comingSoon();
   };
 
