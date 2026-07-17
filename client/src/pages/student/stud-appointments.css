@@ -911,7 +911,7 @@ body {
 }
 
 @media (max-width: 640px) {
-  .appointment-content { padding: 0.5rem; gap: 1rem; }
+  .appointment-content { padding: 1rem; gap: 1rem; }
   .appt-empty-state { padding: 2rem 1rem; }
 }
 

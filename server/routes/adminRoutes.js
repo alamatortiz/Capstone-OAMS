@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const pool = require("../db");
 const {
   authenticateToken,
@@ -15,6 +17,7 @@ const {
   VALID_SCAN_STATUSES,
   REQUIRED_PRIOR_STATUS,
 } = require("../utils/documentStatus");
+const { createNotification } = require("../utils/notifications");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -591,6 +594,7 @@ router.patch(
         emitToSlot(slotId, "queue:uncalled", uncalledPayload);
         emitToUser(serving.student_id, "queue:uncalled", uncalledPayload);
         emitToDept(deptId, "queue:uncalled", uncalledPayload);
+        createNotification(serving.student_id, "The queue was paused while you were being served. You've been moved back to waiting.");
       }
       res.json({
         message: "Queue paused",
@@ -719,6 +723,7 @@ router.patch(
         const stoppedPayload = { slotId, queueId: entry.queue_id, studentId: entry.student_id, reason };
         emitToUser(entry.student_id, "queue:queue-stopped", stoppedPayload);
         emitToDept(deptId, "queue:queue-stopped", stoppedPayload);
+        createNotification(entry.student_id, `The queue you were in was stopped: ${reason}`);
       }
 
       res.json({
@@ -798,6 +803,7 @@ router.patch(
       emitToSlot(slotId, "queue:called", calledPayload);
       emitToUser(next.student_id, "queue:called", calledPayload);
       emitToDept(deptId, "queue:called", calledPayload);
+      createNotification(next.student_id, "You've been called! Please proceed to the counter.");
 
       res.json({ message: "Next student called", queueId: next.queue_id });
     } catch (error) {
@@ -847,6 +853,7 @@ router.patch(
       emitToSlot(slotId, "queue:served", servedPayload);
       emitToUser(serving.student_id, "queue:served", servedPayload);
       emitToDept(deptId, "queue:served", servedPayload);
+      createNotification(serving.student_id, "Your queue service has been completed.");
 
       // Marking someone served never frees a capacity seat, but it can be
       // the last unserved entry in a 'full'/'expired' slot -- settle it.
@@ -1456,6 +1463,7 @@ router.patch(
       await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: dbStatus });
 
       emitToUser(request.faculty_id, "document:status-updated", { requestId, status });
+      createNotification(request.faculty_id, `Your document request is now ${status}.`);
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -1523,6 +1531,7 @@ router.patch(
       await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: dbStatus });
 
       emitToUser(request.student_id, "document:status-updated", { requestId, status });
+      createNotification(request.student_id, `Your document request is now ${status}.`);
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -3012,6 +3021,221 @@ router.get(
       });
     } catch (error) {
       console.error("Recent scans error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// USER ACCOUNT MANAGEMENT
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/users?role=&status=&search=
+router.get(
+  "/users",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const [studentRows] = await pool.query(
+        `SELECT u.user_id AS id, 'student' AS role, u.status, u.last_login_at, u.created_at,
+                s.first_name, s.last_name, s.email, s.student_number AS studentId, NULL AS employeeId,
+                d.department_abbreviation AS college
+         FROM students s
+         JOIN users u ON u.user_id = s.student_id
+         LEFT JOIN departments d ON s.department_id = d.department_id`,
+      );
+      const [facultyRows] = await pool.query(
+        `SELECT u.user_id AS id, 'professor' AS role, u.status, u.last_login_at, u.created_at,
+                f.first_name, f.last_name, f.email, NULL AS studentId, f.employee_id AS employeeId,
+                d.department_abbreviation AS college
+         FROM faculty f
+         JOIN users u ON u.user_id = f.faculty_id
+         LEFT JOIN departments d ON f.department_id = d.department_id`,
+      );
+      const [adminRows] = await pool.query(
+        `SELECT u.user_id AS id, 'admin' AS role, u.status, u.last_login_at, u.created_at,
+                a.first_name, a.last_name, a.email, NULL AS studentId, a.employee_id AS employeeId,
+                d.department_abbreviation AS college
+         FROM administrators a
+         JOIN users u ON u.user_id = a.admin_id
+         LEFT JOIN departments d ON a.department_id = d.department_id`,
+      );
+
+      let users = [...studentRows, ...facultyRows, ...adminRows].map((u) => ({
+        id: String(u.id),
+        name: `${u.first_name} ${u.last_name}`,
+        email: u.email,
+        role: u.role,
+        college: u.college,
+        studentId: u.studentId,
+        employeeId: u.employeeId,
+        status: u.status,
+        lastLogin: u.last_login_at,
+        createdDate: u.created_at,
+      }));
+
+      const { role, status, search } = req.query;
+      if (role && role !== "all") users = users.filter((u) => u.role === role);
+      if (status && status !== "all") users = users.filter((u) => u.status === status);
+      if (search) {
+        const q = search.toLowerCase();
+        users = users.filter(
+          (u) =>
+            u.name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q) ||
+            (u.studentId || "").toLowerCase().includes(q) ||
+            (u.employeeId || "").toLowerCase().includes(q),
+        );
+      }
+
+      res.json({ users });
+    } catch (error) {
+      console.error("GET /users error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PUT /api/admin/users/:id
+// Body: { name, email, college, studentId, employeeId, status } -- role is read-only.
+router.put(
+  "/users/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    const { name, email, college, studentId, employeeId, status } = req.body;
+    const adminId = req.user.userId;
+
+    try {
+      const [[userRow]] = await pool.query(`SELECT role, status FROM users WHERE user_id = ?`, [userId]);
+      if (!userRow) return res.status(404).json({ error: "User not found" });
+
+      let deptId = null;
+      if (college) {
+        const [[deptRow]] = await pool.query(
+          `SELECT department_id FROM departments WHERE department_abbreviation = ?`,
+          [college],
+        );
+        deptId = deptRow?.department_id ?? null;
+      }
+
+      const [firstName, ...rest] = (name || "").trim().split(" ");
+      const lastName = rest.join(" ") || firstName;
+
+      if (userRow.role === "student") {
+        await pool.query(
+          `UPDATE students SET first_name = ?, last_name = ?, email = ?, department_id = COALESCE(?, department_id), student_number = COALESCE(?, student_number) WHERE student_id = ?`,
+          [firstName, lastName, email, deptId, studentId, userId],
+        );
+      } else if (userRow.role === "faculty") {
+        await pool.query(
+          `UPDATE faculty SET first_name = ?, last_name = ?, email = ?, department_id = COALESCE(?, department_id), employee_id = COALESCE(?, employee_id) WHERE faculty_id = ?`,
+          [firstName, lastName, email, deptId, employeeId, userId],
+        );
+      } else if (userRow.role === "admin") {
+        await pool.query(
+          `UPDATE administrators SET first_name = ?, last_name = ?, email = ?, department_id = COALESCE(?, department_id), employee_id = COALESCE(?, employee_id) WHERE admin_id = ?`,
+          [firstName, lastName, email, deptId, employeeId, userId],
+        );
+      }
+
+      if (status) {
+        await pool.query(`UPDATE users SET status = ? WHERE user_id = ?`, [status, userId]);
+      }
+
+      await logAudit(adminId, "UPDATE", "users", userId, { status: userRow.status }, { status });
+
+      res.json({ message: "User updated" });
+    } catch (error) {
+      console.error("PUT /users/:id error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/users/:id/status
+// Body: { status: 'active' | 'suspended' }
+router.patch(
+  "/users/:id/status",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    const { status } = req.body;
+    const adminId = req.user.userId;
+
+    if (!["active", "inactive", "suspended"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    try {
+      const [[userRow]] = await pool.query(`SELECT status FROM users WHERE user_id = ?`, [userId]);
+      if (!userRow) return res.status(404).json({ error: "User not found" });
+
+      await pool.query(`UPDATE users SET status = ? WHERE user_id = ?`, [status, userId]);
+      await logAudit(adminId, "UPDATE", "users", userId, { status: userRow.status }, { status });
+
+      res.json({ message: "Status updated", status });
+    } catch (error) {
+      console.error("PATCH /users/:id/status error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// DELETE /api/admin/users/:id
+router.delete(
+  "/users/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    const adminId = req.user.userId;
+
+    try {
+      const [[userRow]] = await pool.query(`SELECT role FROM users WHERE user_id = ?`, [userId]);
+      if (!userRow) return res.status(404).json({ error: "User not found" });
+
+      await pool.query(`DELETE FROM users WHERE user_id = ?`, [userId]);
+      await logAudit(adminId, "DELETE", "users", userId, { role: userRow.role }, null);
+
+      res.json({ message: "User deleted" });
+    } catch (error) {
+      console.error("DELETE /users/:id error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// POST /api/admin/users/:id/reset-password
+// No email infrastructure exists in this codebase -- returns the generated
+// temp password in the response for the admin to relay manually.
+router.post(
+  "/users/:id/reset-password",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    const adminId = req.user.userId;
+
+    try {
+      const [[userRow]] = await pool.query(`SELECT user_id FROM users WHERE user_id = ?`, [userId]);
+      if (!userRow) return res.status(404).json({ error: "User not found" });
+
+      const tempPassword = crypto.randomBytes(9).toString("base64url");
+      const hashed = await bcrypt.hash(tempPassword, 10);
+
+      await pool.query(
+        `UPDATE users SET password = ?, failed_login_attempts = 0, locked_until = NULL WHERE user_id = ?`,
+        [hashed, userId],
+      );
+      await logAudit(adminId, "UPDATE", "users", userId, null, { action: "password_reset" });
+
+      res.json({ message: "Temporary password generated", tempPassword });
+    } catch (error) {
+      console.error("POST /users/:id/reset-password error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
     }
   },

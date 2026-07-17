@@ -568,7 +568,7 @@ html, body {
 }
 
 @media (max-width: 640px) {
-  .transactions-page { padding: 0.5rem; gap: 1rem; }
+  .transactions-page { padding: 1rem; gap: 1rem; }
 }
 
 @media (max-width: 500px) {

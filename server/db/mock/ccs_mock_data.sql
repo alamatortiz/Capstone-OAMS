@@ -43,9 +43,6 @@ TRUNCATE TABLE faculty_availability;
 TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
 TRUNCATE TABLE locations;
-TRUNCATE TABLE chat_messages;
-TRUNCATE TABLE chat_sessions;
-TRUNCATE TABLE chatbot_knowledge_base;
 TRUNCATE TABLE faqs;
 TRUNCATE TABLE login_logs;
 TRUNCATE TABLE user_sessions;
@@ -740,46 +737,6 @@ INSERT INTO faqs (faq_id, question, answer, type, status, created_by, is_pinned,
 (7, CONCAT('System maintenance scheduled for ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), '.'),
    CONCAT('OAMS will be unavailable from 12:00 AM to 4:00 AM on ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), ' for scheduled maintenance. Please plan your transactions accordingly.'),
    'important', 'active', 'CCS Admin Office', TRUE, 1001, TRUE);
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 11 · CHATBOT KNOWLEDGE BASE
--- Seed entries for the AI chat intent classifier.
--- department_id NULL = available across all departments.
--- ─────────────────────────────────────────────────────────────
-INSERT INTO chatbot_knowledge_base (kb_id, intent, keywords, response_text, category, department_id, is_active) VALUES
-(1, 'request_good_moral',
-   'good moral, good moral certificate, character certificate',
-   'To request a Good Moral Certificate, go to Document Requests in your dashboard and select Good Moral Certificate. Processing takes 3 - 5 business days. You will be notified when it is ready for pickup at the CCS office.',
-   'documents', 1001, TRUE),
-(2, 'request_transcript',
-   'transcript, TOR, transcript of records, official transcript',
-   'To request a Transcript of Records, go to Document Requests and select Transcript of Records. Please allow 5 - 7 business days for processing. You will receive a notification when your TOR is ready.',
-   'documents', 1001, TRUE),
-(3, 'book_appointment',
-   'appointment, consult, consultation, meet professor, schedule meeting',
-   'To book an appointment, go to Appointments in your dashboard, select a professor, and choose an available time slot. Your request will be sent to the professor for approval.',
-   'appointments', 1001, TRUE),
-(4, 'check_queue',
-   'queue, queue number, waiting, position, how long, queue status',
-   'You can check your current queue position from the Queue section of your dashboard. Your real-time position and estimated wait time are displayed there.',
-   'queue', 1001, TRUE),
-(5, 'enrollment_assistance',
-   'enrollment, enroll, subject loading, load subjects, registration',
-   'For enrollment assistance, join the Enrollment Assistance queue from your dashboard or visit the CCS office during office hours (Monday - Friday, 8 AM - 5 PM).',
-   'enrollment', 1001, TRUE),
-(6, 'office_hours',
-   'office hours, open, schedule, when, available',
-   'The CCS office is open Monday to Friday from 8:00 AM to 5:00 PM. Queue slots open at 8:00 AM and 1:00 PM daily.',
-   'general', 1001, TRUE),
-(7, 'grade_inquiry',
-   'grade, grades, grade inquiry, grade correction, check grade',
-   'For grade inquiries or corrections, submit a Grade Inquiry request from the Document Requests section or book an appointment with your professor directly.',
-   'documents', 1001, TRUE),
-(8, 'contact_support',
-   'help, support, contact, problem, issue, not working',
-   'If you are experiencing an issue with OAMS, please describe your problem and a staff member will be notified to assist you. You can also visit the CCS office directly.',
-   'support', NULL, TRUE);
 
 
 -- ─────────────────────────────────────────────────────────────

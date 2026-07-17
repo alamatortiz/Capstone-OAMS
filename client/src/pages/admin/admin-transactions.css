@@ -800,7 +800,7 @@
 
 @media (max-width: 640px) {
   .admin-transaction-container {
-    padding: 0.5rem;
+    padding: 1rem;
   }
 
   .admin-transaction-title {

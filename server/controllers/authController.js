@@ -1,6 +1,17 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const pool = require("../db");
+
+// Per the capstone paper's User Login Activity Diagram: "a three-tries limit
+// before a temporary lockout of the account." The paper doesn't specify an
+// exact lockout duration (just "temporary"), so 15 minutes is used as a
+// reasonable default -- adjust if the paper is later revised with a number.
+const MAX_FAILED_ATTEMPTS = 3;
+const LOCKOUT_MINUTES = 15;
+
+const hashToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
 const fetchUserProfile = async (userId, role) => {
   let query = "";
@@ -55,12 +66,12 @@ const login = async (req, res) => {
 
   try {
     const userQuery = `
-      SELECT u.user_id, u.password, u.role, u.status
+      SELECT u.user_id, u.password, u.role, u.status, u.failed_login_attempts, u.locked_until
       FROM users u
       LEFT JOIN students s ON u.user_id = s.student_id
       LEFT JOIN faculty f ON u.user_id = f.faculty_id
       LEFT JOIN administrators a ON u.user_id = a.admin_id
-      WHERE s.student_number = ? OR f.employee_id = ? OR a.employee_id = ? OR s.email = ? OR f.email = ? OR a.email = ? 
+      WHERE s.student_number = ? OR f.employee_id = ? OR a.employee_id = ? OR s.email = ? OR f.email = ? OR a.email = ?
       LIMIT 1
     `;
 
@@ -75,7 +86,7 @@ const login = async (req, res) => {
 
     if (users.length === 0) {
       await pool.query(
-        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
          VALUES (NULL, ?, ?, ?, 'failed', 'User not found')`,
         [emailOrSchoolId, ipAddress, userAgent],
       );
@@ -86,7 +97,7 @@ const login = async (req, res) => {
 
     if (user.status !== "active") {
       await pool.query(
-        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
          VALUES (?, ?, ?, ?, 'failed', ?)`,
         [
           user.user_id,
@@ -101,13 +112,47 @@ const login = async (req, res) => {
       });
     }
 
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      await pool.query(
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
+         VALUES (?, ?, ?, ?, 'failed', 'account_locked')`,
+        [user.user_id, emailOrSchoolId, ipAddress, userAgent],
+      );
+      const unlockTime = new Date(user.locked_until).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return res.status(423).json({
+        error: `Too many failed login attempts. Try again after ${unlockTime}.`,
+      });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      const nextAttempts = user.failed_login_attempts + 1;
+      const lockingNow = nextAttempts >= MAX_FAILED_ATTEMPTS;
+
       await pool.query(
-        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+        `UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE user_id = ?`,
+        [
+          lockingNow ? 0 : nextAttempts,
+          lockingNow
+            ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
+            : null,
+          user.user_id,
+        ],
+      );
+      await pool.query(
+        `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
          VALUES (?, ?, ?, ?, 'failed', 'Incorrect password')`,
         [user.user_id, emailOrSchoolId, ipAddress, userAgent],
       );
+
+      if (lockingNow) {
+        return res.status(423).json({
+          error: `Too many failed login attempts. Your account has been locked for ${LOCKOUT_MINUTES} minutes.`,
+        });
+      }
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -120,13 +165,20 @@ const login = async (req, res) => {
     });
 
     await pool.query(
-      "UPDATE users SET last_login_at = NOW() WHERE user_id = ?",
+      "UPDATE users SET last_login_at = NOW(), failed_login_attempts = 0, locked_until = NULL WHERE user_id = ?",
       [user.user_id],
     );
     await pool.query(
-      `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason) 
+      `INSERT INTO login_logs (user_id, user_id_attempted, ip_address, user_agent, login_status, failure_reason)
        VALUES (?, ?, ?, ?, 'success', NULL)`,
       [user.user_id, emailOrSchoolId, ipAddress, userAgent],
+    );
+
+    const decoded = jwt.decode(token);
+    await pool.query(
+      `INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at)
+       VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))`,
+      [user.user_id, hashToken(token), ipAddress, userAgent, decoded.exp],
     );
 
     const profile = await fetchUserProfile(user.user_id, user.role);
@@ -153,6 +205,18 @@ const getCurrentUser = async (req, res) => {
 };
 
 const logout = async (req, res) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (token) {
+      await pool.query(
+        `UPDATE user_sessions SET logout_at = NOW() WHERE session_token = ? AND logout_at IS NULL`,
+        [hashToken(token)],
+      );
+    }
+  } catch (error) {
+    console.error("Logout session update error:", error.message);
+  }
   res.json({ message: "Logout successful" });
 };
 

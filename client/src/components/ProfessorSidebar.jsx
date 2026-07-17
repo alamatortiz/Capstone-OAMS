@@ -6,6 +6,9 @@ import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import api from "../utils/api";
+import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
+// NotificationBell temporarily disabled in the UI -- backend/DB stay wired
+// up for a later re-enable. See client/src/components/NotificationBell.jsx.
 
 import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
@@ -117,6 +120,8 @@ export default function ProfessorSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
 
   // ── Availability status (quick Available/Unavailable toggle) ──────────────
   const [profStatus, setProfStatus] = useState("available");

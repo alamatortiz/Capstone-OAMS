@@ -10,6 +10,7 @@ const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime"
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
 const { STATUS_LABEL_MAP } = require("../utils/documentStatus");
+const { createNotification } = require("../utils/notifications");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -1570,6 +1571,7 @@ router.delete(
         appointmentId,
         status: "cancelled",
       });
+      createNotification(appt.faculty_id, "A student cancelled their appointment with you.");
 
       res.json({
         message: "Appointment cancelled successfully",
@@ -2111,6 +2113,7 @@ router.post(
         date: appointmentDate,
         spotsLeft: newSpotsLeft,
       });
+      createNotification(slot.faculty_id, "A student booked an appointment with you.");
 
       const [[newRow]] = await pool.query(
         `SELECT
@@ -2417,5 +2420,65 @@ function formatRelativeTime(date) {
   const diffDay = Math.floor(diffHr / 24);
   return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
 }
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/notifications
+router.get(
+  "/notifications",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [rows] = await pool.query(
+        `SELECT notification_id, message, is_read, created_at
+         FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
+        [req.user.userId],
+      );
+      res.json({ notifications: rows });
+    } catch (error) {
+      console.error("GET /notifications error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/student/notifications/:id/read
+router.patch(
+  "/notifications/:id/read",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      await pool.query(
+        `UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND user_id = ?`,
+        [req.params.id, req.user.userId],
+      );
+      res.json({ message: "Marked as read" });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/student/notifications/read-all
+router.patch(
+  "/notifications/read-all",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      await pool.query(
+        `UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE`,
+        [req.user.userId],
+      );
+      res.json({ message: "All marked as read" });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
 
 module.exports = router;

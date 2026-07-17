@@ -887,7 +887,7 @@ body {
 
 @media (max-width: 640px) {
   .queue-tracking-page {
-    padding: 0.5rem;
+    padding: 1rem;
     gap: 1rem;
   }
 

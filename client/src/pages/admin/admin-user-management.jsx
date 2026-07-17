@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./admin-user-management.css";
@@ -11,6 +11,7 @@ import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
+import api from "../../utils/api";
 
 // ─── Shared Layout Icons ──────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -97,21 +98,13 @@ const COLLEGE_OPTIONS = COLLEGES.map((c) => ({
   label: formatCollegeLabel(c.abbreviation, c.name),
 }));
 
-const INITIAL_USERS = [
-  { id: "1", name: "Juan Dela Cruz",    email: "juan.delacruz@pnc.edu.ph",  role: "student",   college: "CCS",  studentId: "2100123",       status: "active",    lastLogin: "2026-05-20T08:30:00", createdDate: "2021-08-15" },
-  { id: "2", name: "Maria Santos",      email: "maria.santos@pnc.edu.ph",   role: "student",   college: "CBAA", studentId: "2100456",       status: "active",    lastLogin: "2026-05-19T14:20:00", createdDate: "2021-08-15" },
-  { id: "3", name: "Dr. Roberto Cruz",  email: "roberto.cruz@pnc.edu.ph",   role: "professor", college: "CCS",  employeeId: "EMP-2020-045", status: "active",    lastLogin: "2026-05-20T09:15:00", createdDate: "2020-06-01" },
-  { id: "4", name: "Prof. Carmen Ramos",email: "carmen.ramos@pnc.edu.ph",   role: "professor", college: "CBAA", employeeId: "EMP-2019-023", status: "active",    lastLogin: "2026-05-20T07:45:00", createdDate: "2019-08-20" },
-  { id: "5", name: "Admin Office CCS",  email: "admin.ccs@pnc.edu.ph",      role: "admin",     college: "CCS",  employeeId: "ADM-2021-001", status: "active",    lastLogin: "2026-05-20T10:00:00", createdDate: "2021-01-10" },
-  { id: "6", name: "Pedro Garcia",      email: "pedro.garcia@pnc.edu.ph",   role: "student",   college: "COE",  studentId: "2200789",       status: "suspended", lastLogin: "2026-05-10T16:30:00", createdDate: "2022-08-20" },
-];
-
 const BLANK_FORM = { name: "", email: "", role: "student", college: "", employeeId: "", studentId: "", status: "active" };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AdminUserManagement() {
   // ── User-management state ────────────────────────────────────────────────────
-  const [users, setUsers]           = useState(INITIAL_USERS);
+  const [users, setUsers]           = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [showModal, setShowModal]   = useState(false);
   useLockBodyScroll(showModal);
   const [editingUser, setEditingUser] = useState(null);
@@ -133,6 +126,25 @@ export default function AdminUserManagement() {
   };
 
   // ── Handlers: CRUD ───────────────────────────────────────────────────────────
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/admin/users");
+      setUsers(res.data.users);
+    } catch {
+      toast.error("Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchUsers();
+    };
+    init();
+  }, [fetchUsers]);
+
   const setField = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
   const openEditModal = (u) => {
@@ -142,28 +154,48 @@ export default function AdminUserManagement() {
   };
   const closeModal = () => { setShowModal(false); setEditingUser(null); setForm(BLANK_FORM); };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.email || !form.college) return toast.error("Please fill in all required fields");
     if (!form.email.endsWith("@pnc.edu.ph"))        return toast.error("Email must use @pnc.edu.ph domain");
     if (form.role === "student" && !form.studentId)  return toast.error("Student ID is required for students");
     if (form.role !== "student" && !form.employeeId) return toast.error("Employee ID is required for professors and admins");
 
-    setUsers((p) => p.map((u) => u.id === editingUser.id ? { ...u, ...form } : u));
-    toast.success("User updated successfully");
-    closeModal();
+    try {
+      await api.put(`/admin/users/${editingUser.id}`, form);
+      toast.success("User updated successfully");
+      closeModal();
+      fetchUsers();
+    } catch {
+      toast.error("Failed to update user");
+    }
   };
 
-  const handleDelete = (id) => {
-    setUsers((p) => p.filter((u) => u.id !== id));
-    toast.success("User deleted successfully");
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/admin/users/${id}`);
+      toast.success("User deleted successfully");
+      fetchUsers();
+    } catch {
+      toast.error("Failed to delete user");
+    }
   };
-  const handleResetPassword = (u) => {
-    toast.success(`Password reset email sent to ${u.email}`);
+  const handleResetPassword = async (u) => {
+    try {
+      const res = await api.post(`/admin/users/${u.id}/reset-password`);
+      toast.success(`Temporary password generated: ${res.data.tempPassword}`, { duration: 10000 });
+    } catch {
+      toast.error("Failed to reset password");
+    }
   };
-  const handleToggleSuspend = (u) => {
+  const handleToggleSuspend = async (u) => {
     const suspending = u.status !== "suspended";
-    setUsers((p) => p.map((x) => x.id === u.id ? { ...x, status: suspending ? "suspended" : "active" } : x));
-    toast.success(`Account ${suspending ? "suspended" : "reactivated"}`);
+    try {
+      await api.patch(`/admin/users/${u.id}/status`, { status: suspending ? "suspended" : "active" });
+      toast.success(`Account ${suspending ? "suspended" : "reactivated"}`);
+      fetchUsers();
+    } catch {
+      toast.error("Failed to update account status");
+    }
   };
 
   const runConfirmAction = () => {
@@ -199,7 +231,7 @@ export default function AdminUserManagement() {
     },
     reset: {
       title: "Reset Password?",
-      message: <>Reset password for <strong>{confirmAction.user.name}</strong>? A temporary password will be sent to {confirmAction.user.email}.</>,
+      message: <>Reset password for <strong>{confirmAction.user.name}</strong>? A temporary password will be generated for you to relay to them manually.</>,
       confirmText: "Reset Password",
       icon: <KeyIconSvg />,
     },
@@ -242,8 +274,8 @@ export default function AdminUserManagement() {
                   </div>
                   <div className="aum-form-grid">
                     <div className="aum-form-group">
-                      <label className="aum-form-label">Role *</label>
-                      <select className="aum-form-select" value={form.role} onChange={setField("role")}>
+                      <label className="aum-form-label">Role</label>
+                      <select className="aum-form-select" value={form.role} disabled title="Role changes aren't supported — delete and recreate the account under a different role instead.">
                         <option value="student">Student</option>
                         <option value="professor">Professor</option>
                         <option value="admin">Admin</option>
@@ -337,7 +369,7 @@ export default function AdminUserManagement() {
               <div className="aum-filter-actions">
                 <button className="aum-sm-btn" onClick={() => toast.success("Export started")}><DownloadIcon /> Export</button>
                 <button className="aum-sm-btn" onClick={() => toast.info("Import feature coming soon")}><UploadIcon /> Import</button>
-                <button className="aum-sm-btn" onClick={() => toast.success("Data refreshed")}><RefreshIcon /> Refresh</button>
+                <button className="aum-sm-btn" onClick={() => { fetchUsers(); toast.success("Data refreshed"); }}><RefreshIcon /> Refresh</button>
               </div>
             </div>
             <div className="aum-filter-inputs">
@@ -387,7 +419,9 @@ export default function AdminUserManagement() {
                 <p className="aum-users-subtitle">{tabMeta[activeTab].desc}</p>
               </div>
               <div className="aum-users-list">
-                {displayUsers.length === 0 ? (
+                {loading ? (
+                  <div className="aum-empty">Loading users…</div>
+                ) : displayUsers.length === 0 ? (
                   <div className="aum-empty">No users found matching your filters.</div>
                 ) : (
                   displayUsers.map((u) => (

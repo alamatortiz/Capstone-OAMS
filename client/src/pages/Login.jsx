@@ -79,6 +79,8 @@ export default function Login() {
 
       if (status === 401) {
         toast.error(message ?? "Invalid credentials. Please check your ID or email and password.");
+      } else if (status === 423) {
+        toast.error(message ?? "Too many failed login attempts. Please try again later.");
       } else if (status === 403) {
         toast.error(message ?? "Your account is not active. Please contact the administrator.");
       } else if (status === 400) {

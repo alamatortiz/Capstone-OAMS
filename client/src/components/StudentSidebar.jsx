@@ -5,6 +5,9 @@ import { Megaphone as LucideMegaphone } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../utils/theme";
+import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
+// NotificationBell temporarily disabled in the UI -- backend/DB stay wired
+// up for a later re-enable. See client/src/components/NotificationBell.jsx.
 
 import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
@@ -129,6 +132,8 @@ export default function StudentSidebar() {
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
+
+  useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
 
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => {

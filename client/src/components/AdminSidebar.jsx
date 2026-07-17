@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../utils/theme";
+import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
 
 import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
@@ -119,6 +120,8 @@ export default function AdminSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
 
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");

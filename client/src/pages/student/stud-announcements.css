@@ -587,7 +587,7 @@ body {
 
 @media (max-width: 640px) {
   .announcements-page {
-    padding: 0.5rem;
+    padding: 1rem;
     gap: 1rem;
   }
 

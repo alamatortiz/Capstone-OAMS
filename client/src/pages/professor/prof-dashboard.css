@@ -1184,7 +1184,7 @@ body {
 
 @media (max-width: 640px) {
   .professor-dashboard {
-    padding: 0.5rem;
+    padding: 1rem;
   }
 
   .banner-title {

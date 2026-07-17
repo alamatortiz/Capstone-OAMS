@@ -795,7 +795,7 @@ select.sa-input {
 }
 
 @media (max-width: 640px) {
-  .sa-page { padding: 0.5rem; gap: 1rem; }
+  .sa-page { padding: 1rem; gap: 1rem; }
   .sa-upcoming-item { flex-direction: column; gap: 0.5rem; }
   .sa-upcoming-date-col { min-width: unset; }
   .sa-form-row { grid-template-columns: 1fr; }

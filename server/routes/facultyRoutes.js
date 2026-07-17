@@ -6,6 +6,7 @@ const {
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { getManilaDateString } = require("../utils/dateTime");
+const { createNotification } = require("../utils/notifications");
 const { emitToUser, emitToDept } = require("../sockets");
 
 // GET /api/faculty/dashboard-stats
@@ -310,6 +311,7 @@ router.patch(
 
       emitToUser(appt.student_id, "appointment:status-updated", { appointmentId: Number(id), status });
       emitToDept(appt.department_id, "appointment:status-updated", { appointmentId: Number(id), status });
+      createNotification(appt.student_id, `Your appointment has been ${status}.`);
 
       res.json({ message: "Status updated" });
     } catch (err) {
@@ -997,6 +999,66 @@ router.delete(
       conn.release();
     }
   }
+);
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/notifications
+router.get(
+  "/notifications",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    try {
+      const [rows] = await pool.query(
+        `SELECT notification_id, message, is_read, created_at
+         FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
+        [req.user.userId],
+      );
+      res.json({ notifications: rows });
+    } catch (error) {
+      console.error("GET /notifications error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/faculty/notifications/:id/read
+router.patch(
+  "/notifications/:id/read",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    try {
+      await pool.query(
+        `UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND user_id = ?`,
+        [req.params.id, req.user.userId],
+      );
+      res.json({ message: "Marked as read" });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/faculty/notifications/read-all
+router.patch(
+  "/notifications/read-all",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    try {
+      await pool.query(
+        `UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE`,
+        [req.user.userId],
+      );
+      res.json({ message: "All marked as read" });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
 );
 
 module.exports = router;

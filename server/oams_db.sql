@@ -35,6 +35,8 @@ CREATE TABLE users (
     last_login_at       TIMESTAMP    NULL,
     external_auth_id    VARCHAR(100) NULL,
     external_auth_source VARCHAR(50) DEFAULT 'local',
+    failed_login_attempts INT        NOT NULL DEFAULT 0,
+    locked_until        TIMESTAMP    NULL DEFAULT NULL,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_users_role (role)   -- added: role is queried on every authenticated request
 );
@@ -356,42 +358,6 @@ CREATE TABLE qr_tracking_logs (
     scan_time       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (file_id)    REFERENCES generated_files(file_id),
     FOREIGN KEY (scanned_by) REFERENCES users(user_id)
-);
-
--- ─────────────────────────────────────────────────────────────
--- 10. AI-POWERED CHAT SYSTEM
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE chat_sessions (
-    session_id      INT          AUTO_INCREMENT PRIMARY KEY,
-    user_id         INT          NULL,   -- NULL = unauthenticated/guest session
-    status          ENUM('active','closed','expired') DEFAULT 'active',
-    started_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    ended_at        TIMESTAMP    NULL,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
-);
-
-CREATE TABLE chat_messages (
-    message_id       INT          AUTO_INCREMENT PRIMARY KEY,
-    session_id       INT          NOT NULL,
-    sender_type      ENUM('user','ai','admin') NOT NULL,
-    message_content  TEXT         NOT NULL,
-    intent_detected  VARCHAR(100),
-    confidence_score DECIMAL(5,4),
-    created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE
-);
-
--- Local knowledge base for AI FAQ responses, scoped per department
-CREATE TABLE chatbot_knowledge_base (
-    kb_id           INT          AUTO_INCREMENT PRIMARY KEY,
-    intent          VARCHAR(100) NOT NULL,
-    keywords        TEXT,
-    response_text   TEXT         NOT NULL,
-    category        VARCHAR(100),
-    department_id   INT          NULL,   -- NULL = global/cross-department entry
-    is_active       BOOLEAN      DEFAULT TRUE,
-    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
 );
 
 -- ─────────────────────────────────────────────────────────────

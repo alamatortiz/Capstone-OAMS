@@ -1098,7 +1098,7 @@ body {
 
 @media (max-width: 640px) {
   .queue-status-container {
-    padding: 0.5rem;
+    padding: 1rem;
     gap: 1rem;
   }
 
