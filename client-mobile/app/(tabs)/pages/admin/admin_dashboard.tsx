@@ -253,6 +253,14 @@ export default function AdminDashboardScreen() {
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
 
+  const handleStatPress = (key: string) => {
+    if (key === 'announcements') {
+      router.push('/pages/admin/admin_announcement');
+      return;
+    }
+    comingSoon();
+  };
+
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
     if (key === 'dashboard') return;
@@ -339,7 +347,7 @@ export default function AdminDashboardScreen() {
             {stats.map((stat) => {
               const tint = STAT_TINTS[stat.tint];
               return (
-                <Pressable key={stat.key} style={styles.statCard} onPress={comingSoon}>
+                <Pressable key={stat.key} style={styles.statCard} onPress={() => handleStatPress(stat.key)}>
                   <View style={[styles.statIcon, { backgroundColor: tint.bg, borderColor: tint.border }]}>
                     <Ionicons name={stat.icon} size={20} color={tint.color} />
                   </View>
