@@ -291,6 +291,10 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_data_management');
       return;
     }
+    if (key === 'queue-analytics') {
+      router.push('/pages/admin/admin_queue_analytics');
+      return;
+    }
     comingSoon();
   };
 
