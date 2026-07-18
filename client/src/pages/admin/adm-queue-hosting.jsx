@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import "./admin-queue-hosting.css";
+import "./adm-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
@@ -92,7 +92,7 @@ export default function AdminQueueHosting() {
     : { name: "Admin", role: "admin", college: "", departmentAbbrev: "CCS" };
 
   // ── Real queue data, its live-update wiring, and pause/resume/close, all
-  // shared with admin-queue.jsx via useAdminQueueHosting so the two pages'
+  // shared with adm-queue.jsx via useAdminQueueHosting so the two pages'
   // event lists and business logic can't drift out of sync again. ─────────
   const {
     queues,

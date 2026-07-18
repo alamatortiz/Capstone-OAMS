@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import "./admin-queue.css";
+import "./adm-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
@@ -189,7 +189,7 @@ export default function AdminQueue() {
 
   // Queue state (live data, scoped server-side to the admin's own
   // department) plus its socket-driven live-refetch, shared with
-  // admin-queue-hosting.jsx via useAdminQueueHosting so the two pages can't
+  // adm-queue-hosting.jsx via useAdminQueueHosting so the two pages can't
   // drift out of sync again. Entries for the currently-monitored queue also
   // need refreshing on every relevant socket event, not just the queue list.
   const {

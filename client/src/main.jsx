@@ -44,31 +44,31 @@ const ProfessorSchedulePage = React.lazy(
 );
 
 const AdminQueueHosting = React.lazy(
-  () => import("./pages/admin/admin-queue-hosting.jsx"),
+  () => import("./pages/admin/adm-queue-hosting.jsx"),
 );
 const AdminDocumentProcessing = React.lazy(
-  () => import("./pages/admin/admin-document-processing.jsx"),
+  () => import("./pages/admin/adm-document-processing.jsx"),
 );
 const AdminProfessorAvailability = React.lazy(
-  () => import("./pages/admin/admin-professor-availability.jsx"),
+  () => import("./pages/admin/adm-professor-availability.jsx"),
 );
 const AdminScanDocument = React.lazy(
-  () => import("./pages/admin/admin-scan-document.jsx"),
+  () => import("./pages/admin/adm-scan-document.jsx"),
 );
 const AdminQueueAnalytics = React.lazy(
-  () => import("./pages/admin/admin-queue-analytics.jsx"),
+  () => import("./pages/admin/adm-queue-analytics.jsx"),
 );
 const AdminPinnacleSync = React.lazy(
-  () => import("./pages/admin/admin-pinnacle-sync.jsx"),
+  () => import("./pages/admin/adm-pinnacle-sync.jsx"),
 );
 const AdminAnnouncements = React.lazy(
-  () => import("./pages/admin/admin-announcements.jsx"),
+  () => import("./pages/admin/adm-announcements.jsx"),
 );
 const AdminUserManagement = React.lazy(
-  () => import("./pages/admin/admin-user-management.jsx"),
+  () => import("./pages/admin/adm-user-management.jsx"),
 );
 const AdminDataManagement = React.lazy(
-  () => import("./pages/admin/admin-data-management.jsx"),
+  () => import("./pages/admin/adm-data-management.jsx"),
 );
 
 import AppointmentsPage from "./pages/student/stud-appointments.jsx";
@@ -92,10 +92,10 @@ const ProfessorScheduleManagerPage = React.lazy(
   () => import("./pages/professor/prof-schedule-manager.jsx"),
 );
 
-import AdminDashboard from "./pages/admin/admin-dashboard.jsx";
-import AdminAppointment from "./pages/admin/admin-appointment.jsx";
-import AdminTransaction from "./pages/admin/admin-transactions.jsx";
-import AdminQueue from "./pages/admin/admin-queue.jsx";
+import AdminDashboard from "./pages/admin/adm-dashboard.jsx";
+import AdminAppointment from "./pages/admin/adm-appointment.jsx";
+import AdminTransaction from "./pages/admin/adm-transactions.jsx";
+import AdminQueue from "./pages/admin/adm-queue.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
 import { FacultyProvider } from "./contexts/FacultyProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";

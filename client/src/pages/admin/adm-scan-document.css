@@ -1,6 +1,6 @@
-/* admin-scan-document.css
+/* adm-scan-document.css
    All page-specific classes are prefixed with "asd-" to prevent
-   collisions with other pages that share admin-dashboard.css sidebar styles. */
+   collisions with other pages that share adm-dashboard.css sidebar styles. */
 
 /* ── Page layout ─────────────────────────────────────────────────────────── */
 .asd-page {

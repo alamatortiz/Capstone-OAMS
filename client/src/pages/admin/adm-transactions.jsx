@@ -8,7 +8,7 @@ import collegeCOElogo from "../../assets/COE.png";
 import collegeCOEDlogo from "../../assets/COED.png";
 import collegeCASlogo from "../../assets/CAS.png";
 import collegeCHASlogo from "../../assets/CHAS.png";
-import "./admin-transactions.css";
+import "./adm-transactions.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";

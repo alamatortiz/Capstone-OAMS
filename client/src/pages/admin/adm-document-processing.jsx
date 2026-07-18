@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import "./admin-document-processing.css";
+import "./adm-document-processing.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import AdminPageShell from "../../components/AdminPageShell";

@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
 import { connectSocket } from "../utils/socket";
 
-// Shared by admin-queue.jsx (queue monitoring) and admin-queue-hosting.jsx
+// Shared by adm-queue.jsx (queue monitoring) and adm-queue-hosting.jsx
 // (queue lifecycle management) -- both fetch the same GET /admin/queue-hosting
 // data and drive the same pause/resume/close actions against it. Centralizing
 // the fetch, live-update socket wiring, and pause/resume/close flow here
