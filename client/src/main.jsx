@@ -79,9 +79,6 @@ import ProfessorDashboard from "./pages/professor/prof-dashboard.jsx";
 const ProfessorAppointmentsPage = React.lazy(
   () => import("./pages/professor/prof-appointments.jsx"),
 );
-const ProfessorDocumentsPage = React.lazy(
-  () => import("./pages/professor/prof-document-status.jsx"),
-);
 const ProfessorTransactionsPage = React.lazy(
   () => import("./pages/professor/prof-transactions.jsx"),
 );
@@ -199,16 +196,7 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              {/* ★ Documents status list */}
-              <Route
-                path="/professor/documents"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <ProfessorDocumentsPage />
-                  </Suspense>
-                }
-              />
-              {/* ★ Document request submission form */}
+              {/* ★ Document request submission form (also shows request status + detail view) */}
               <Route
                 path="/professor/document-request"
                 element={

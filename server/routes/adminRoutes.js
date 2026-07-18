@@ -18,6 +18,7 @@ const {
   REQUIRED_PRIOR_STATUS,
 } = require("../utils/documentStatus");
 const { createNotification } = require("../utils/notifications");
+const { getFacultyAvailabilityToday, formatTime } = require("../utils/facultyAvailability");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -59,13 +60,13 @@ router.get(
         [deptId, deptId],
       );
 
-      // 3. Faculty available today (with appointments in this department)
-      const [[facultyRow]] = await pool.query(
-        `SELECT COUNT(DISTINCT f.faculty_id) AS faculty_count
-         FROM faculty f
-         WHERE (? IS NULL OR f.department_id = ?)`,
-        [deptId, deptId],
-      );
+      // 3. Faculty available today -- shares the exact same schedule/toggle
+      // computation as GET /faculty-availability so the two pages can never
+      // disagree about who's actually available.
+      const facultyAvailabilityToday = await getFacultyAvailabilityToday(deptId);
+      const facultyAvailableCount = facultyAvailabilityToday.filter(
+        (f) => f.status !== "unavailable",
+      ).length;
 
       // 4. Announcements (faqs table, scoped to department)
       const [[annRow]] = await pool.query(
@@ -116,39 +117,6 @@ router.get(
         [manilaToday, deptId],
       );
 
-      // 7. Faculty list for the availability card
-      const [facultyList] = await pool.query(
-        `SELECT
-           f.faculty_id,
-           CONCAT(f.first_name, ' ', f.last_name) AS name,
-           d.department_abbreviation AS college,
-           -- "busy" if they have an appointment right now (within 1 hour window)
-           CASE
-             WHEN EXISTS (
-               SELECT 1 FROM appointments a
-               WHERE a.faculty_id = f.faculty_id
-                 AND a.appointment_date = ?
-                 AND a.status = 'approved'
-                 AND a.appointment_time BETWEEN
-                   SUBTIME(?, '01:00:00') AND ADDTIME(?, '00:30:00')
-             ) THEN 'Busy'
-             ELSE 'Available'
-           END AS status,
-           (
-             SELECT MIN(a2.appointment_time)
-             FROM appointments a2
-             WHERE a2.faculty_id = f.faculty_id
-               AND a2.appointment_date = ?
-               AND a2.appointment_time > ?
-               AND a2.status IN ('pending','approved')
-           ) AS next_appointment
-         FROM faculty f
-         JOIN departments d ON f.department_id = d.department_id
-         WHERE (? IS NULL OR f.department_id = ?)
-         LIMIT 8`,
-        [manilaToday, manilaNow, manilaNow, manilaToday, manilaNow, deptId, deptId],
-      );
-
       // 8. Announcements list (faqs table)
       const [announcements] = await pool.query(
         `SELECT faq_id, question AS title, answer AS description, type, is_pinned, created_at
@@ -163,7 +131,7 @@ router.get(
         stats: {
           activeQueues: queueRow.active_queue_count || 0,
           pendingDocuments: docRow.pending_doc_count || 0,
-          facultyAvailable: facultyRow.faculty_count || 0,
+          facultyAvailable: facultyAvailableCount,
           announcements: annRow.announcement_count || 0,
         },
         pendingDocuments: pendingDocuments.map((d) => ({
@@ -186,14 +154,12 @@ router.get(
           status: q.status === "open" ? "Active" : "Paused",
           count: `${q.waiting_count} waiting`,
         })),
-        facultyAvailability: facultyList.map((f) => ({
-          id: f.faculty_id,
+        facultyAvailability: facultyAvailabilityToday.slice(0, 8).map((f) => ({
+          id: f.id,
           name: f.name,
           college: f.college,
           status: f.status,
-          time: f.next_appointment
-            ? `Next: ${formatTime(f.next_appointment)}`
-            : "No upcoming appointments",
+          time: f.currentActivity ?? f.nextAvailableSlot,
         })),
         announcements: announcements.map((a) => ({
           id: a.faq_id,
@@ -1264,7 +1230,7 @@ router.get(
               COALESCE(d.department_abbreviation, 'ALL') AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
-              s.service_name AS processor,
+              COALESCE(CONCAT(adm.first_name, ' ', adm.last_name), s.service_name) AS processor,
               COALESCE(q.admin_reason, s.service_name) AS details,
               q.status AS raw_status,
               COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time
@@ -1318,7 +1284,14 @@ router.get(
               d.department_abbreviation AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
-              dr.request_type AS processor,
+              COALESCE(
+                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                 FROM audit_logs al
+                 JOIN administrators adm2 ON al.admin_id = adm2.admin_id
+                 WHERE al.target_table = 'document_requests' AND al.target_record_id = dr.request_id
+                 ORDER BY al.created_at DESC LIMIT 1),
+                dr.request_type
+              ) AS processor,
               dr.purpose AS details,
               dr.status AS raw_status,
               dr.created_at AS event_time
@@ -1757,148 +1730,7 @@ router.get(
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
 
-      const [facultyList] = await pool.query(
-        `SELECT
-           f.faculty_id,
-           CONCAT(f.first_name, ' ', f.last_name) AS name,
-           f.position,
-           f.email,
-           f.availability_status,
-           d.department_name,
-           d.department_abbreviation
-         FROM faculty f
-         JOIN departments d ON f.department_id = d.department_id
-         WHERE f.department_id = ?
-         ORDER BY f.last_name, f.first_name`,
-        [deptId],
-      );
-
-      if (facultyList.length === 0) {
-        return res.json({ faculty: [] });
-      }
-
-      const facultyIds = facultyList.map((f) => f.faculty_id);
-      const manilaToday = getManilaDateString();
-
-      const [availabilityRows] = await pool.query(
-        `SELECT faculty_id, start_time, end_time, location
-         FROM faculty_availability
-         WHERE faculty_id IN (?) AND day_of_week = DAYNAME(?)
-         ORDER BY faculty_id, start_time`,
-        [facultyIds, manilaToday],
-      );
-
-      const [appointmentRows] = await pool.query(
-        `SELECT
-           a.faculty_id,
-           a.appointment_time,
-           a.status
-         FROM appointments a
-         WHERE a.faculty_id IN (?)
-           AND a.appointment_date = ?
-           AND a.status IN ('pending', 'approved')
-         ORDER BY a.faculty_id, a.appointment_time`,
-        [facultyIds, manilaToday],
-      );
-
-      const availMap = {};
-      availabilityRows.forEach((row) => {
-        if (!availMap[row.faculty_id]) availMap[row.faculty_id] = [];
-        availMap[row.faculty_id].push(row);
-      });
-
-      const apptMap = {};
-      appointmentRows.forEach((row) => {
-        if (!apptMap[row.faculty_id]) apptMap[row.faculty_id] = [];
-        apptMap[row.faculty_id].push(row);
-      });
-
-      const currentTimeStr = getManilaTimeString();
-
-      const toTimeStr = (val) => {
-        if (!val) return "00:00:00";
-        const s = String(val);
-        return s.length === 8 ? s : s.slice(0, 8).padEnd(8, "0");
-      };
-
-      const addOneHour = (timeStr) => {
-        const [h, m, s] = timeStr.split(":").map(Number);
-        return `${String(Math.min(h + 1, 23)).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-      };
-
-      const faculty = facultyList.map((f) => {
-        const avails = availMap[f.faculty_id] || [];
-        const appts = apptMap[f.faculty_id] || [];
-
-        const isBusy = appts.some((a) => {
-          if (a.status !== "approved") return false;
-          const start = toTimeStr(a.appointment_time);
-          const end = addOneHour(start);
-          return currentTimeStr >= start && currentTimeStr < end;
-        });
-
-        const schedule = avails.map((slot) => {
-          const slotStart = toTimeStr(slot.start_time);
-          const slotEnd = toTimeStr(slot.end_time);
-          const hasAppt = appts.some((a) => {
-            const apptTime = toTimeStr(a.appointment_time);
-            return apptTime >= slotStart && apptTime < slotEnd;
-          });
-          return {
-            time: `${formatTime(slotStart)} - ${formatTime(slotEnd)}`,
-            activity: hasAppt ? "Consultation" : "Available",
-            location: slot.location || f.department_name,
-            status: hasAppt ? "booked" : "free",
-          };
-        });
-
-        let nextAvailableSlot = null;
-        for (const slot of avails) {
-          const slotStart = toTimeStr(slot.start_time);
-          const slotEnd = toTimeStr(slot.end_time);
-          const hasAppt = appts.some((a) => {
-            const apptTime = toTimeStr(a.appointment_time);
-            return apptTime >= slotStart && apptTime < slotEnd;
-          });
-          if (!hasAppt && slotStart > currentTimeStr) {
-            nextAvailableSlot = `${formatTime(slotStart)} - ${formatTime(slotEnd)}`;
-            break;
-          }
-        }
-
-        // The professor's own toggle (faculty.availability_status) takes
-        // precedence over whatever the schedule/appointments would otherwise
-        // compute — if they've marked themselves unavailable, admin sees that.
-        const isToggledUnavailable = f.availability_status === "unavailable";
-
-        const status = isToggledUnavailable
-          ? "unavailable"
-          : isBusy
-          ? "busy"
-          : avails.length === 0
-          ? "unavailable"
-          : "available";
-
-        return {
-          id: f.faculty_id,
-          name: f.name,
-          position: f.position,
-          college: `${f.department_name} (${f.department_abbreviation})`,
-          status,
-          currentActivity: isToggledUnavailable
-            ? "Marked unavailable by professor"
-            : isBusy
-            ? "In consultation with student"
-            : null,
-          nextAvailableSlot: isToggledUnavailable
-            ? "Unavailable"
-            : nextAvailableSlot ||
-              (avails.length === 0 ? "No schedule today" : "No more slots today"),
-          email: f.email,
-          todaySchedule: schedule,
-        };
-      });
-
+      const faculty = await getFacultyAvailabilityToday(deptId);
       res.json({ faculty });
     } catch (error) {
       console.error("Faculty availability fetch error:", error);
@@ -1906,13 +1738,6 @@ router.get(
     }
   },
 );
-
-function formatTime(timeStr) {
-  if (!timeStr) return "";
-  const [h, m] = timeStr.split(":");
-  const hour = parseInt(h, 10);
-  return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
-}
 
 // ─────────────────────────────────────────────────────────────
 // AUDIT LOG HELPER

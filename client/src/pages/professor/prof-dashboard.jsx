@@ -189,7 +189,7 @@ export default function ProfessorDashboard() {
       description: "Pending requests",
       icon: FileTextIcon,
       bgColor: "bg-orange-50",
-      link: "/professor/documents",
+      link: "/professor/document-request",
     },
     {
       title: "Completed",

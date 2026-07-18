@@ -16,6 +16,7 @@ import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
+import Pagination from "../../components/Pagination";
 
 // ── Icons (all unchanged from admin_dashboard) ──────────────────────────────
 const SearchIcon = () => (
@@ -179,6 +180,8 @@ export default function AdminTransaction() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [dateRange, setDateRange] = useState("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // ── Live transaction data (scoped server-side to admin's department) ─────
   const [transactions, setTransactions] = useState([]);
@@ -278,6 +281,10 @@ export default function AdminTransaction() {
       t.details?.toLowerCase().includes(q)
     );
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedTransactions = filteredTransactions.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // ── Badge Helpers ─────────────────────────────────────────────────────────
   const getTypeBadge = (type) => {
@@ -418,7 +425,7 @@ export default function AdminTransaction() {
                     className="admin-transaction-search-input"
                     placeholder="Search by student, processor, or details..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                   />
                 </div>
 
@@ -429,7 +436,7 @@ export default function AdminTransaction() {
                     labelClassName={undefined}
                     ariaLabel="Filter by type"
                     value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
+                    onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
                     options={TYPE_OPTIONS}
                     chevronIcon={<ChevronDownIcon />}
                   />
@@ -440,7 +447,7 @@ export default function AdminTransaction() {
                     labelClassName={undefined}
                     ariaLabel="Filter by status"
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                     options={STATUS_OPTIONS}
                     chevronIcon={<ChevronDownIcon />}
                   />
@@ -454,7 +461,7 @@ export default function AdminTransaction() {
                   labelClassName={undefined}
                   ariaLabel="Filter by date range"
                   value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
+                  onChange={(e) => { setDateRange(e.target.value); setPage(1); }}
                   options={DATE_OPTIONS}
                   chevronIcon={<ChevronDownIcon />}
                 />
@@ -478,7 +485,7 @@ export default function AdminTransaction() {
                   <p>No transactions found</p>
                 </div>
               ) : (
-                filteredTransactions.map((transaction) => {
+                pagedTransactions.map((transaction) => {
                   return (
                     <div
                       key={transaction.id}
@@ -530,6 +537,7 @@ export default function AdminTransaction() {
                 })
               )}
             </div>
+            <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
           </div>
         </div>
     </AdminPageShell>

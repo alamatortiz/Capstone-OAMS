@@ -189,11 +189,6 @@ export default function ProfessorTransactionsPage() {
               <p className="txn-stat-value txn-val-blue">{stats.total}</p>
             </div>
             <div className="txn-stat-card">
-              <div className="txn-stat-icon-box txn-icon-box-cyan"><UserIcon /></div>
-              <p className="txn-stat-label">Queue Services</p>
-              <p className="txn-stat-value txn-val-cyan">{stats.queue}</p>
-            </div>
-            <div className="txn-stat-card">
               <div className="txn-stat-icon-box txn-icon-box-green"><CalendarSmIcon /></div>
               <p className="txn-stat-label">Appointments</p>
               <p className="txn-stat-value txn-val-green">{stats.appointments}</p>
@@ -239,7 +234,6 @@ export default function ProfessorTransactionsPage() {
                   onChange={(e) => setFilterType(e.target.value)}
                 >
                   <option value="all">All Types</option>
-                  <option value="queue">Queue</option>
                   <option value="appointment">Appointment</option>
                   <option value="document">Document</option>
                 </select>

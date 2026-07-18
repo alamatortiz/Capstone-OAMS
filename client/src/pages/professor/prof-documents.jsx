@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronLeft, FileText, XCircle, CheckCircle2, Hash, MessageSquare } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { formatManilaDate, getManilaTomorrowDateString } from "../../utils/dateTime";
 import "./prof-dashboard.css";
 import "./prof-documents.css";
+import "./prof-document-status.css";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
 
@@ -101,10 +102,207 @@ function getStatusIcon(status) {
 
 const MIN_NEEDED_BY_DATE = getManilaTomorrowDateString();
 
+// ─── Document Detail View ──────────────────────────────────────────────────
+// Shown in place of the list when a card is clicked. Uses its own status/date
+// formatting (dss-* classes) rather than the list's doc-* ones, ported as-is
+// from the page this was merged from.
+function getDetailStatusMeta(status) {
+  switch (status) {
+    case "pending":    return { label: "Pending",          cls: "dss-badge-pending" };
+    case "processing": return { label: "Processing",       cls: "dss-badge-processing" };
+    case "generated":  return { label: "Ready for Pickup", cls: "dss-badge-ready" };
+    case "released":   return { label: "Released",         cls: "dss-badge-released" };
+    case "claimed":    return { label: "Claimed",          cls: "dss-badge-claimed" };
+    case "rejected":   return { label: "Rejected",         cls: "dss-badge-rejected" };
+    default:           return { label: status,             cls: "dss-badge-pending" };
+  }
+}
+
+function formatDetailDate(dateStr) {
+  if (!dateStr) return "—";
+  return formatManilaDate(dateStr, { month: "long" });
+}
+
+function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "Document Requests" }) {
+  const statusMeta = getDetailStatusMeta(doc.status);
+  const canCancel = doc.status === "pending" || doc.status === "processing";
+
+  return (
+    <div className="dss-status-container">
+      <PageHeader
+        breadcrumb={
+          <button type="button" className="breadcrumb-link" onClick={onBack}>
+            <ChevronLeft className="breadcrumb-icon" />
+            {backLabel}
+          </button>
+        }
+        icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
+        iconClassName="dss-title-icon"
+        title="Document Details"
+        subtitle="Track your document request status"
+      />
+
+      <div className="dss-hero-card">
+        <div className="dss-hero-content">
+          <div className="dss-hero-logo">
+            <FileText style={{ width: "2.25rem", height: "2.25rem", color: "white" }} />
+          </div>
+          <div className="dss-hero-text">
+            <div className="dss-hero-header">
+              <div className="dss-hero-title">
+                <p className="dss-hero-doc-name">{doc.type}</p>
+                <p>{doc.college}</p>
+              </div>
+              <div className="dss-hero-badge">{doc.trackingNumber}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {doc.status === "generated" && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+            borderRadius: "1rem",
+            padding: "1rem 1.5rem",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            fontWeight: 700,
+            fontSize: "1rem",
+            boxShadow: "0 8px 24px rgba(34,197,94,0.3)",
+          }}
+        >
+          <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
+          Your document is ready for pickup — please visit the HR/Records office!
+        </div>
+      )}
+
+      <div className="dss-detail-grid">
+        <div className="dss-detail-main">
+          <div className="dss-card">
+            <div className="dss-card-header">
+              <h3 className="dss-card-title">
+                <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
+                Request Details
+              </h3>
+              <span className={`dss-badge ${statusMeta.cls}`}>
+                {statusMeta.label}
+              </span>
+            </div>
+            <div className="dss-card-content">
+              <div className="dss-detail-row">
+                <span className="dss-detail-label">Request Date</span>
+                <span className="dss-detail-value">{formatDetailDate(doc.requestDate)}</span>
+              </div>
+              {doc.status === "claimed" && doc.claimedDate ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Date Claimed</span>
+                  <span className="dss-detail-value">{formatDetailDate(doc.claimedDate)}</span>
+                </div>
+              ) : doc.status === "released" && doc.releasedDate ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Date Released</span>
+                  <span className="dss-detail-value">{formatDetailDate(doc.releasedDate)}</span>
+                </div>
+              ) : doc.estimatedCompletion ? (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Estimated Completion</span>
+                  <span className="dss-detail-value">{formatDetailDate(doc.estimatedCompletion)}</span>
+                </div>
+              ) : null}
+              <div className="dss-detail-row" style={{ borderBottom: "none" }}>
+                <span className="dss-detail-label">Purpose</span>
+                <span className="dss-detail-value">{doc.purpose}</span>
+              </div>
+            </div>
+          </div>
+
+          {doc.notes && (
+            <div className="dss-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title">
+                  <MessageSquare style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Notes
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                <p className="dss-concern-text">{doc.notes}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="dss-detail-sidebar">
+          <div className="dss-card">
+            <div className="dss-card-header">
+              <h3 className="dss-card-title">
+                <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
+                Tracking Number
+              </h3>
+            </div>
+            <div className="dss-card-content" style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 800,
+                  color: "var(--primary-color)",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {doc.trackingNumber}
+              </div>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--text-tertiary)",
+                  marginTop: "0.25rem",
+                }}
+              >
+                {doc.college}
+              </div>
+            </div>
+          </div>
+
+          {canCancel && (
+            <div className="dss-card dss-cancel-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title dss-cancel-title">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Cancel Request
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                <p
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "var(--text-tertiary)",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  Cancelling will permanently remove this request. You'll need
+                  to resubmit if you change your mind.
+                </p>
+                <button
+                  className="dss-cancel-btn"
+                  onClick={() => onCancel(doc.id)}
+                  disabled={cancelling}
+                >
+                  Cancel Request
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function ProfessorDocumentRequest() {
-  const navigate = useNavigate();
-
   // ── State ───────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("active");
   const [requests, setRequests] = useState([]);
@@ -113,6 +311,7 @@ export default function ProfessorDocumentRequest() {
   const [submitting, setSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
+  const [selectedDocId, setSelectedDocId] = useState(null);
   const [documentTypes, setDocumentTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(false);
 
@@ -164,6 +363,8 @@ export default function ProfessorDocumentRequest() {
           notes: r.notes || undefined,
           estimatedCompletion: r.estimated_completion || undefined,
           neededBy: r.needed_by || undefined,
+          releasedDate: r.released_at || undefined,
+          claimedDate: r.claimed_at || undefined,
         })),
       );
       setRequestsError(null);
@@ -283,6 +484,9 @@ export default function ProfessorDocumentRequest() {
   );
 
   const selectedType = documentTypes.find((d) => d.name === formData.type);
+  const selectedDoc = selectedDocId
+    ? requests.find((r) => r.id === selectedDocId) ?? null
+    : null;
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -440,6 +644,14 @@ export default function ProfessorDocumentRequest() {
         </>
       }
     >
+      {selectedDoc ? (
+        <DocumentDetail
+          doc={selectedDoc}
+          onBack={() => setSelectedDocId(null)}
+          onCancel={(id) => setCancelTarget(requests.find((r) => r.id === id) ?? null)}
+          cancelling={cancellingId === selectedDoc.id}
+        />
+      ) : (
       <div className="doc-content">
         {requestsError && <div className="doc-error-banner">{requestsError}</div>}
         {/* Header */}
@@ -496,11 +708,7 @@ export default function ProfessorDocumentRequest() {
                         key={req.id}
                         className="doc-card"
                         style={{ cursor: "pointer" }}
-                        onClick={() =>
-                          navigate("/professor/documents", {
-                            state: { docId: req.id, from: "document-request" },
-                          })
-                        }
+                        onClick={() => setSelectedDocId(req.id)}
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
@@ -592,11 +800,7 @@ export default function ProfessorDocumentRequest() {
                         key={req.id}
                         className="doc-card doc-card-completed"
                         style={{ cursor: "pointer" }}
-                        onClick={() =>
-                          navigate("/professor/documents", {
-                            state: { docId: req.id, from: "document-request" },
-                          })
-                        }
+                        onClick={() => setSelectedDocId(req.id)}
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
@@ -629,6 +833,7 @@ export default function ProfessorDocumentRequest() {
           )}
         </div>
       </div>
+      )}
     </ProfessorPageShell>
   );
 }

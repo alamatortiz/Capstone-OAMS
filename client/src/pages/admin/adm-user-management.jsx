@@ -12,6 +12,7 @@ import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import api from "../../utils/api";
+import Pagination from "../../components/Pagination";
 
 // ─── Shared Layout Icons ──────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -114,6 +115,8 @@ export default function AdminUserManagement() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [activeTab, setActiveTab]   = useState("all");
   const [confirmAction, setConfirmAction] = useState(null); // { type: "delete" | "reset" | "suspend", user }
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // ── Handlers: chat ───────────────────────────────────────────────────────────
   const generateBotResponse = (input) => {
@@ -217,8 +220,12 @@ export default function AdminUserManagement() {
   const professors = filtered.filter((u) => u.role === "professor");
   const admins     = filtered.filter((u) => u.role === "admin");
 
-  const displayUsers = activeTab === "students" ? students : activeTab === "professors" ? professors : activeTab === "admins" ? admins : filtered;
+  const displayUsersAll = activeTab === "students" ? students : activeTab === "professors" ? professors : activeTab === "admins" ? admins : filtered;
   const tabMeta = { all: { title: "All Users", desc: "Complete list of all user accounts" }, students: { title: "Student Accounts", desc: "Manage student user accounts" }, professors: { title: "Professor Accounts", desc: "Manage professor/faculty user accounts" }, admins: { title: "Admin Accounts", desc: "Manage administrator user accounts" } };
+
+  const totalPages = Math.max(1, Math.ceil(displayUsersAll.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const displayUsers = displayUsersAll.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // ── Confirm-modal copy, derived from the pending action ──────────────────────
   const confirmSuspending = confirmAction?.user.status !== "suspended";
@@ -380,16 +387,16 @@ export default function AdminUserManagement() {
                   className="aum-search-input"
                   placeholder="Search by name, email, or ID..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                 />
               </div>
-              <select className="aum-select" value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+              <select className="aum-select" value={filterRole} onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}>
                 <option value="all">All Roles</option>
                 <option value="student">Students</option>
                 <option value="professor">Professors</option>
                 <option value="admin">Admins</option>
               </select>
-              <select className="aum-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <select className="aum-select" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}>
                 <option value="all">All Statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -407,7 +414,7 @@ export default function AdminUserManagement() {
                 { key: "professors", label: "Professors" },
                 { key: "admins",     label: "Admins" },
               ].map((t) => (
-                <button key={t.key} className={`aum-tab-btn ${activeTab === t.key ? "aum-tab-active" : ""}`} onClick={() => setActiveTab(t.key)}>
+                <button key={t.key} className={`aum-tab-btn ${activeTab === t.key ? "aum-tab-active" : ""}`} onClick={() => { setActiveTab(t.key); setPage(1); }}>
                   {t.label}
                 </button>
               ))}
@@ -457,6 +464,7 @@ export default function AdminUserManagement() {
                   ))
                 )}
               </div>
+              <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
             </div>
           </div>
 

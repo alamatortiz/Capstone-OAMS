@@ -251,7 +251,7 @@ export default function AdminAppointment() {
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Type</span>
               <span className="admin-appointment-detail-value capitalize">
-                {appointment.type}
+                {appointment.serviceName ?? "General consultation"}
               </span>
             </div>
           </div>
