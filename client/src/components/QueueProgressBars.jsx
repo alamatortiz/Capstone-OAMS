@@ -9,12 +9,12 @@ import "./QueueProgressBars.css";
  * blue independently. Unifying on blue was a deliberate choice, not a preserved default.
  */
 export default function QueueProgressBars({
-  occupancyCurrent,
-  occupancyTotal,
-  occupancyPercent,
-  servicedCurrent,
-  servicedTotal,
-  servicedPercent,
+  occupancyCurrent = 0,
+  occupancyTotal = 0,
+  occupancyPercent = 0,
+  servicedCurrent = 0,
+  servicedTotal = 0,
+  servicedPercent = 0,
 }) {
   return (
     <div className="qs-progress-card">

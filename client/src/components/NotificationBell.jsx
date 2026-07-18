@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { connectSocket } from "../utils/socket";
 import api from "../utils/api";
+import { formatManilaDateTime } from "../utils/dateTime";
 import "./NotificationBell.css";
 
 const BellIcon = () => (
@@ -20,6 +21,13 @@ const WATCHED_EVENTS = [
   "appointment:slot-updated",
   "document:status-updated",
 ];
+
+// Live updates are pushed over WebSocket; this is only a safety-net poll in
+// case a socket event is missed or the connection drops silently. Mirrors
+// QueueProvider's identical fallback (this component previously had none,
+// so a blocked/dropped WebSocket meant the bell would never update again
+// without a manual reload).
+const FALLBACK_POLL_INTERVAL_MS = 45000;
 
 // Bell icon + unread-count badge + dropdown, backed by the `notifications`
 // table. `endpointBase` picks the role-scoped API prefix ("student" or
@@ -59,6 +67,14 @@ export default function NotificationBell({ endpointBase }) {
   }, [token, fetchNotifications]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    }, FALLBACK_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [token, fetchNotifications]);
+
+  useEffect(() => {
     if (!open) return undefined;
     const handleClickOutside = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
@@ -78,16 +94,22 @@ export default function NotificationBell({ endpointBase }) {
     try {
       await api.patch(`/${endpointBase}/notifications/${id}/read`);
     } catch {
-      // Best-effort -- next fetch will reconcile if this failed.
+      // Revert the optimistic update -- without this, a silently-failed
+      // PATCH left the item looking read indefinitely, since nothing else
+      // was guaranteed to re-fetch and correct it.
+      setNotifications((prev) =>
+        prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)),
+      );
     }
   };
 
   const markAllRead = async () => {
+    const previous = notifications;
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
       await api.patch(`/${endpointBase}/notifications/read-all`);
     } catch {
-      // Best-effort -- next fetch will reconcile if this failed.
+      setNotifications(previous);
     }
   };
 
@@ -124,7 +146,7 @@ export default function NotificationBell({ endpointBase }) {
                 >
                   <p className="notif-bell-message">{n.message}</p>
                   <span className="notif-bell-time">
-                    {new Date(n.created_at).toLocaleString()}
+                    {formatManilaDateTime(n.created_at)}
                   </span>
                 </button>
               ))

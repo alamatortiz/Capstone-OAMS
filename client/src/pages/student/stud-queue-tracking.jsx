@@ -148,7 +148,11 @@ export default function QueueTrackingPage() {
             message={
               leaveConfirmQueue?.status === "serving" ? (
                 <>
-                  You are currently being served for <strong>{leaveConfirmQueue?.serviceName}</strong>.
+                  {leaveConfirmQueue?.arrivedAt ? (
+                    <>You are currently being served for <strong>{leaveConfirmQueue?.serviceName}</strong>.</>
+                  ) : (
+                    <>You've been called for <strong>{leaveConfirmQueue?.serviceName}</strong>.</>
+                  )}{' '}
                   Leaving now ends your turn immediately — the staff will move on to the next student.
                 </>
               ) : (
@@ -328,7 +332,9 @@ export default function QueueTrackingPage() {
                               <span
                                 className={`qt-status-badge ${getStatusColor(queue.status)}`}
                               >
-                                {getStatusLabel(queue.status)}
+                                {queue.status === "serving"
+                                  ? (queue.arrivedAt ? "Being Served" : "Called — Please Proceed")
+                                  : getStatusLabel(queue.status)}
                               </span>
                               <span className="qt-number-badge">
                                 {queue.queueNumberBadge}
@@ -365,7 +371,9 @@ export default function QueueTrackingPage() {
                               </div>
                               <div className="qt-position-display">
                                 <p className="qt-position-number">
-                                  {queue.status === "serving" ? "Serving" : queue.position}
+                                  {queue.status === "serving"
+                                    ? (queue.arrivedAt ? "Being Served" : "Called")
+                                    : queue.position}
                                 </p>
                                 {queue.status !== "serving" && (
                                   <p className="qt-position-total">
@@ -408,7 +416,7 @@ export default function QueueTrackingPage() {
                           {(queue.status === "waiting" || queue.status === "serving") && (
                             <div className="qt-queue-actions">
                               <button
-                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status }); }}
+                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status, arrivedAt: queue.arrivedAt }); }}
                                 className="qt-btn-cancel"
                                 disabled={isLeaving}
                               >

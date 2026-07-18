@@ -22,27 +22,28 @@ router.get(
 
     try {
       const [activeQueues] = await pool.query(
-        `SELECT 
+        `SELECT
            q.queue_id,
            q.queue_number,
            q.slot_id,
            q.status,
            q.created_at,
+           q.arrived_at,
            s.service_name,
            d.department_name,
            d.department_abbreviation,
            qs.max_capacity,
            (
-             SELECT COUNT(*) 
-             FROM queues q2 
-             WHERE q2.slot_id = q.slot_id 
-               AND q2.status = 'waiting' 
+             SELECT COUNT(*)
+             FROM queues q2
+             WHERE q2.slot_id = q.slot_id
+               AND q2.status = 'waiting'
                AND q2.queue_number <= q.queue_number
            ) AS position,
            (
-             SELECT COUNT(*) 
-             FROM queues q3 
-             WHERE q3.slot_id = q.slot_id 
+             SELECT COUNT(*)
+             FROM queues q3
+             WHERE q3.slot_id = q.slot_id
                AND q3.status = 'waiting'
            ) AS total_waiting,
            (
@@ -56,7 +57,15 @@ router.get(
              FROM queues q5
              WHERE q5.slot_id = q.slot_id
                AND q5.status = 'completed'
-           ) AS serviced_count
+           ) AS serviced_count,
+           (
+             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q6.called_at, q6.completed_at)))
+             FROM queues q6
+             WHERE q6.slot_id = q.slot_id
+               AND q6.status = 'completed'
+               AND q6.called_at IS NOT NULL
+               AND q6.completed_at IS NOT NULL
+           ) AS avg_service_minutes
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -179,7 +188,12 @@ router.get(
         : null;
 
       const closestQueueDisplay = closestQueue
-        ? getQueueDisplayInfo(closestQueue.status, closestQueue.position)
+        ? getQueueDisplayInfo({
+            status: closestQueue.status,
+            rawPosition: closestQueue.position,
+            arrivedAt: closestQueue.arrived_at,
+            avgServiceMinutes: closestQueue.avg_service_minutes,
+          })
         : null;
 
       res.json({
@@ -207,6 +221,7 @@ router.get(
               college: closestQueue.department_name,
               collegeAbbrev: closestQueue.department_abbreviation,
               status: closestQueue.status,
+              arrivedAt: closestQueue.arrived_at,
               position: closestQueueDisplay.position,
               totalWaiting: closestQueue.total_waiting,
               maxCapacity,
@@ -818,6 +833,7 @@ router.get(
            q.status,
            q.notes,
            q.created_at AS joined_at,
+           q.arrived_at,
            qs.start_time,
            qs.end_time,
            qs.max_capacity,
@@ -858,7 +874,15 @@ router.get(
              FROM queues q5
              WHERE q5.slot_id = q.slot_id
                AND q5.status = 'completed'
-           ) AS serviced_count
+           ) AS serviced_count,
+           (
+             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q6.called_at, q6.completed_at)))
+             FROM queues q6
+             WHERE q6.slot_id = q.slot_id
+               AND q6.status = 'completed'
+               AND q6.called_at IS NOT NULL
+               AND q6.completed_at IS NOT NULL
+           ) AS avg_service_minutes
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -871,7 +895,12 @@ router.get(
       );
 
       const formatted = rows.map((row) => {
-        const { position, estimatedWait } = getQueueDisplayInfo(row.status, row.position);
+        const { position, estimatedWait } = getQueueDisplayInfo({
+          status: row.status,
+          rawPosition: row.position,
+          arrivedAt: row.arrived_at,
+          avgServiceMinutes: row.avg_service_minutes,
+        });
         const deptAbbrev = row.department_abbreviation;
         const serviceCode = row.service_name
           .split(" ")[0]
@@ -901,6 +930,7 @@ router.get(
           departmentName: row.department_name,
           departmentAbbrev: deptAbbrev,
           status: row.status,
+          arrivedAt: row.arrived_at,
           notes: row.notes ?? null,
           description: row.service_description || null,
           location: row.service_location || null,
@@ -1145,7 +1175,7 @@ router.post(
       // 7. Fetch full details for the response
       const [[newEntry]] = await conn.query(
         `SELECT
-           q.queue_id, q.queue_number, q.slot_id, q.service_id, q.status, q.created_at AS joined_at,
+           q.queue_id, q.queue_number, q.slot_id, q.service_id, q.status, q.created_at AS joined_at, q.arrived_at,
            qs.max_capacity,
            qs.status AS slot_status,
            qs.no_show_timeout_minutes,
@@ -1168,7 +1198,15 @@ router.post(
            (
              SELECT COUNT(*) FROM queues q5
              WHERE q5.slot_id = q.slot_id AND q5.status = 'completed'
-           ) AS serviced_count
+           ) AS serviced_count,
+           (
+             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q6.called_at, q6.completed_at)))
+             FROM queues q6
+             WHERE q6.slot_id = q.slot_id
+               AND q6.status = 'completed'
+               AND q6.called_at IS NOT NULL
+               AND q6.completed_at IS NOT NULL
+           ) AS avg_service_minutes
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -1182,7 +1220,12 @@ router.post(
         .split(" ")[0]
         .substring(0, 3)
         .toUpperCase();
-      const { position, estimatedWait } = getQueueDisplayInfo(newEntry.status, newEntry.position);
+      const { position, estimatedWait } = getQueueDisplayInfo({
+        status: newEntry.status,
+        rawPosition: newEntry.position,
+        arrivedAt: newEntry.arrived_at,
+        avgServiceMinutes: newEntry.avg_service_minutes,
+      });
       const maxCapacity = newEntry.max_capacity || 0;
       const totalInQueue = newEntry.total_in_queue || 0;
       const servicedCount = newEntry.serviced_count || 0;
@@ -1231,6 +1274,7 @@ router.post(
           departmentName: newEntry.department_name,
           departmentAbbrev: deptAbbrev,
           status: newEntry.status,
+          arrivedAt: newEntry.arrived_at,
           slotStatus: newEntry.slot_status,
           position,
           totalWaiting: newEntry.total_waiting || 0,

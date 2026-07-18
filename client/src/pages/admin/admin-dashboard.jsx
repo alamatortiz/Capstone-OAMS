@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "./admin-dashboard.css";
 import editIcon from "../../assets/edit_icon.png";
 import deleteIcon from "../../assets/delete_icon.png";
 import api from "../../utils/api";
+import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 
@@ -232,7 +233,7 @@ const quickActions = [
 ];
 
 export default function AdminDashboard() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, token } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -255,21 +256,45 @@ export default function AdminDashboard() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
 
+  const fetchStats = useCallback(async () => {
+    try {
+      setDashLoading(true);
+      const res = await api.get("/admin/dashboard-stats");
+      setDashStats(res.data);
+    } catch (err) {
+      console.error("Failed to fetch admin dashboard stats:", err);
+      setDashError("Could not load dashboard data.");
+    } finally {
+      setDashLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setDashLoading(true);
-        const res = await api.get("/admin/dashboard-stats");
-        setDashStats(res.data);
-      } catch (err) {
-        console.error("Failed to fetch admin dashboard stats:", err);
-        setDashError("Could not load dashboard data.");
-      } finally {
-        setDashLoading(false);
-      }
-    };
     if (authUser) fetchStats();
-  }, [authUser]);
+  }, [authUser, fetchStats]);
+
+  // ── Live updates: the "Active Queues" stat and "Current Hosted Queues"
+  // list previously only populated on mount with no socket or poll, so they
+  // could sit arbitrarily stale until the admin navigated away and back.
+  useEffect(() => {
+    if (!authUser || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = [
+      "queue:slot-opened",
+      "queue:slot-status",
+      "queue:called",
+      "queue:served",
+      "queue:no-show",
+      "queue:student-joined",
+      "queue:student-left",
+    ];
+    events.forEach((event) => socket.on(event, fetchStats));
+    return () => {
+      events.forEach((event) => socket.off(event, fetchStats));
+    };
+  }, [authUser, token, fetchStats]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;

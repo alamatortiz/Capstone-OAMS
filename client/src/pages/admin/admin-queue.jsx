@@ -5,13 +5,14 @@ import { ChevronLeft } from "lucide-react";
 import "./admin-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import { connectSocket } from "../../utils/socket";
+import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
 import { getCollegeLogo } from "../../data/collegeLogo";
+import { formatTimeString } from "../../utils/dateTime";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -157,30 +158,8 @@ export default function AdminQueue() {
         departmentAbbrev: "CCS",
       };
 
-  // Queue state (live data, scoped server-side to the admin's own department)
-  const [queueDetails, setQueueDetails] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [monitoringQueueId, setMonitoringQueueId] = useState(null);
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
-
-  const fetchQueueDetails = useCallback(async () => {
-    try {
-      const res = await api.get("/admin/queue-hosting");
-      setQueueDetails(res.data.queues ?? []);
-    } catch (error) {
-      console.error("Failed to fetch queues:", error);
-      toast.error("Could not load queue data");
-    }
-  }, []);
-
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      await fetchQueueDetails();
-      setLoading(false);
-    };
-    if (authUser) init();
-  }, [authUser, fetchQueueDetails]);
 
   // ── Queue entries (individual students waiting) for the monitored queue ──
   const [queueEntries, setQueueEntries] = useState([]);
@@ -208,42 +187,42 @@ export default function AdminQueue() {
     fetchQueueEntries();
   }, [fetchQueueEntries]);
 
+  // Queue state (live data, scoped server-side to the admin's own
+  // department) plus its socket-driven live-refetch, shared with
+  // admin-queue-hosting.jsx via useAdminQueueHosting so the two pages can't
+  // drift out of sync again. Entries for the currently-monitored queue also
+  // need refreshing on every relevant socket event, not just the queue list.
+  const {
+    queues: queueDetails,
+    loading,
+    fetchQueues: fetchQueueDetails,
+    reasonModal,
+    setReasonModal,
+    reasonSubmitting,
+    handlePauseQueue,
+    handleCloseQueue: handleStopQueue,
+    handleResumeQueue,
+    handleReasonConfirm: handleReasonConfirmBase,
+  } = useAdminQueueHosting({ onLiveUpdate: fetchQueueEntries });
+
   const totalEntryPages = Math.max(1, Math.ceil(queueEntries.length / ENTRIES_PER_PAGE));
+  // Keeps the stored page in sync with the live entry count, not just its
+  // displayed value -- if a live update shrinks the list while an admin is
+  // on a later page, the stored index is corrected immediately rather than
+  // only being clamped for display (which could otherwise let a stale
+  // "Next" click land on a page number that no longer make sense).
+  useEffect(() => {
+    setEntriesPage((p) => Math.min(p, Math.max(0, totalEntryPages - 1)));
+  }, [totalEntryPages]);
   const currentEntriesPage = Math.min(entriesPage, totalEntryPages - 1);
   const entriesStartIndex = currentEntriesPage * ENTRIES_PER_PAGE;
   const paginatedEntries = queueEntries.slice(entriesStartIndex, entriesStartIndex + ENTRIES_PER_PAGE);
 
-  const getEntryStatusLabel = (status) => (status === "no_show" ? "No-Show" : status);
-
-  // ── Live updates: refetch when a socket event affects this dept's queues ──
-  useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
-    if (!authUser || !token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const refetch = () => {
-      fetchQueueDetails();
-      fetchQueueEntries();
-    };
-
-    const events = [
-      "queue:slot-opened",
-      "queue:slot-status",
-      "queue:called",
-      "queue:served",
-      "queue:no-show",
-      "queue:student-joined",
-      "queue:student-left",
-      "queue:notes-updated",
-    ];
-    events.forEach((event) => socket.on(event, refetch));
-
-    return () => {
-      events.forEach((event) => socket.off(event, refetch));
-    };
-  }, [authUser, fetchQueueDetails, fetchQueueEntries]);
+  const getEntryStatusLabel = (entry) => {
+    if (entry.status === "no_show") return "No-Show";
+    if (entry.status === "serving") return entry.arrivedAt ? "Being Served" : "Called";
+    return entry.status;
+  };
 
   // Re-derive the monitored queue from live data on every refresh, so the
   // monitor view always reflects the latest call-next/serve/pause actions
@@ -349,9 +328,9 @@ export default function AdminQueue() {
     }
   };
 
-  const handleSkipStudent = async (slotId) => {
+  const handleSkipStudent = async (slotId, reason) => {
     try {
-      await api.patch(`/admin/queue-hosting/${slotId}/skip`);
+      await api.patch(`/admin/queue-hosting/${slotId}/skip`, { reason });
       toast.message("Student skipped and marked as no-show");
       await fetchQueueDetails();
     } catch (error) {
@@ -361,39 +340,39 @@ export default function AdminQueue() {
     }
   };
 
-  // Pause and stop both require a reason, collected via QueueReasonModal.
-  const [reasonModal, setReasonModal] = useState(null); // { mode: 'pause'|'close', slotId }
-  const [reasonSubmitting, setReasonSubmitting] = useState(false);
-
-  const handlePauseQueue = (slotId) => setReasonModal({ mode: "pause", slotId });
-  const handleStopQueue = (slotId) => setReasonModal({ mode: "close", slotId });
-
-  const handleResumeQueue = async (slotId) => {
+  const handleMarkArrived = async (slotId) => {
     try {
-      await api.patch(`/admin/queue-hosting/${slotId}/resume`);
-      toast.success("Queue resumed");
+      await api.patch(`/admin/queue-hosting/${slotId}/mark-arrived`);
+      toast.success("Student marked as arrived");
       await fetchQueueDetails();
     } catch (error) {
-      toast.error(error?.response?.data?.error ?? "Failed to resume queue");
+      toast.error(
+        error?.response?.data?.error ?? "Failed to mark student as arrived",
+      );
     }
   };
 
+  // Pause/close/resume + the reason-modal flow live in the shared hook
+  // above; this page only needs to additionally exit the monitor view once
+  // a close actually goes through (the queue it was showing no longer has
+  // an active/paused state to monitor).
   const handleReasonConfirm = async (reason) => {
-    if (!reasonModal) return;
-    const { mode, slotId } = reasonModal;
-    setReasonSubmitting(true);
+    const result = await handleReasonConfirmBase(reason);
+    if (result?.mode === "close") setMonitoringQueueId(null);
+  };
+
+  // Skip requires a reason too (kept consistent with pause/close) — reuses
+  // the same QueueReasonModal, keyed by a distinct 'skip' mode.
+  const [skipReasonModal, setSkipReasonModal] = useState(false);
+  const [skipSubmitting, setSkipSubmitting] = useState(false);
+  const handleSkipConfirm = async (reason) => {
+    if (!monitoringQueue) return;
+    setSkipSubmitting(true);
     try {
-      await api.patch(`/admin/queue-hosting/${slotId}/${mode}`, { reason });
-      toast[mode === "pause" ? "message" : "success"](
-        mode === "pause" ? "Queue paused" : "Queue stopped",
-      );
-      setReasonModal(null);
-      if (mode === "close") setMonitoringQueueId(null);
-      await fetchQueueDetails();
-    } catch (error) {
-      toast.error(error?.response?.data?.error ?? `Failed to ${mode} queue`);
+      await handleSkipStudent(monitoringQueue.id, reason);
+      setSkipReasonModal(false);
     } finally {
-      setReasonSubmitting(false);
+      setSkipSubmitting(false);
     }
   };
 
@@ -429,6 +408,16 @@ export default function AdminQueue() {
               submitting={reasonSubmitting}
               onConfirm={handleReasonConfirm}
               onCancel={() => setReasonModal(null)}
+            />
+
+            <QueueReasonModal
+              show={skipReasonModal}
+              title="Skip Student"
+              message="This voids the currently-served student's ticket as a no-show. They'll see this reason. This cannot be undone."
+              confirmText="Skip Student"
+              submitting={skipSubmitting}
+              onConfirm={handleSkipConfirm}
+              onCancel={() => setSkipReasonModal(false)}
             />
           </>
         }
@@ -486,7 +475,12 @@ export default function AdminQueue() {
             {/* Stats Cards */}
             <div className="queue-monitoring-stats">
               <div className="queue-stat-card">
-                <div className="queue-stat-label">Currently Serving</div>
+                <div className="queue-stat-label">
+                  Currently Serving
+                  {monitoringQueue.currentlyServingStudentNumber && (
+                    <> ({monitoringQueue.currentlyServingArrivedAt ? "Being Served" : "Called"})</>
+                  )}
+                </div>
                 <div className="queue-stat-value">
                   {monitoringQueue.currentlyServingStudentNumber || "—"}
                 </div>
@@ -563,7 +557,13 @@ export default function AdminQueue() {
                       onClick={() => handleCallNext(monitoringQueue.id)}
                       disabled={
                         !!monitoringQueue.currentlyServingStudentNumber ||
-                        monitoringQueue.currentCount === 0
+                        monitoringQueue.currentCount === 0 ||
+                        monitoringQueue.status === "paused"
+                      }
+                      title={
+                        monitoringQueue.status === "paused"
+                          ? "Queue is paused — resume it before calling students"
+                          : undefined
                       }
                     >
                       <UsersIcon />
@@ -621,7 +621,23 @@ export default function AdminQueue() {
                     </p>
                     <p className="professor-label">
                       {monitoringQueue.queueType}
+                      {monitoringQueue.currentlyServingStudentNumber && (
+                        <>
+                          {" • "}
+                          {monitoringQueue.currentlyServingArrivedAt ? "Being Served" : "Called — awaiting arrival"}
+                        </>
+                      )}
                     </p>
+                    {monitoringQueue.currentlyServingStudentNumber && !monitoringQueue.currentlyServingArrivedAt && (
+                      <button
+                        className="queue-action-btn queue-action-btn--primary"
+                        style={{ width: "100%", marginTop: "0.75rem" }}
+                        onClick={() => handleMarkArrived(monitoringQueue.id)}
+                      >
+                        <AlertCircleIcon />
+                        Mark Arrived
+                      </button>
+                    )}
                     <button
                       className="queue-action-btn queue-action-btn--success"
                       style={{ width: "100%", marginTop: "0.75rem" }}
@@ -634,7 +650,7 @@ export default function AdminQueue() {
                     <button
                       className="queue-action-btn queue-action-btn--danger"
                       style={{ width: "100%", marginTop: "0.5rem" }}
-                      onClick={() => handleSkipStudent(monitoringQueue.id)}
+                      onClick={() => setSkipReasonModal(true)}
                       disabled={!monitoringQueue.currentlyServingStudentNumber}
                     >
                       <CloseIcon />
@@ -670,7 +686,7 @@ export default function AdminQueue() {
                             </div>
                             <div className="queue-entry-badges">
                               <span className={`queue-entry-status queue-entry-status--${entry.status}`}>
-                                {getEntryStatusLabel(entry.status)}
+                                {getEntryStatusLabel(entry)}
                               </span>
                               <span className="queue-entry-queue-number">{entry.queueNumber}</span>
                             </div>
@@ -761,7 +777,7 @@ export default function AdminQueue() {
                       >
                         <span className="service-hours-label">Opens</span>
                         <span className="service-hours-value">
-                          {monitoringQueue.serviceHours.start}
+                          {formatTimeString(monitoringQueue.serviceHours.start)}
                         </span>
                       </div>
                       <div
@@ -774,7 +790,7 @@ export default function AdminQueue() {
                       >
                         <span className="service-hours-label">Closes</span>
                         <span className="service-hours-value">
-                          {monitoringQueue.serviceHours.end}
+                          {formatTimeString(monitoringQueue.serviceHours.end)}
                         </span>
                       </div>
                     </div>
@@ -988,8 +1004,8 @@ export default function AdminQueue() {
                               Service Hours
                             </span>
                             <span className="queue-detail-item-value">
-                              {detail.serviceHours.start} -{" "}
-                              {detail.serviceHours.end}
+                              {formatTimeString(detail.serviceHours.start)} -{" "}
+                              {formatTimeString(detail.serviceHours.end)}
                             </span>
                           </div>
                         )}
