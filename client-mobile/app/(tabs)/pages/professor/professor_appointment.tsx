@@ -308,6 +308,10 @@ export default function ProfessorAppointmentScreen() {
       goToDashboard();
       return;
     }
+    if (key === 'documents') {
+      router.push('/pages/professor/professor_documents');
+      return;
+    }
     comingSoon();
   };
 

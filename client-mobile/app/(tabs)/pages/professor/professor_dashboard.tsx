@@ -192,6 +192,13 @@ export default function ProfessorDashboardScreen() {
       router.push('/pages/professor/professor_appointment');
       return;
     }
+    if (key === 'documents') {
+      // Stat tile opens the tracking/status screen (professor_documents_status.tsx) —
+      // distinct from the sidebar's "Documents" destination, which is the
+      // request-list screen (professor_documents.tsx) via handleNavPress.
+      router.push('/pages/professor/professor_documents_status');
+      return;
+    }
     comingSoon();
   };
 
@@ -200,6 +207,10 @@ export default function ProfessorDashboardScreen() {
     if (key === 'dashboard') return;
     if (key === 'appointments') {
       router.push('/pages/professor/professor_appointment');
+      return;
+    }
+    if (key === 'documents') {
+      router.push('/pages/professor/professor_documents');
       return;
     }
     comingSoon();
@@ -292,7 +303,15 @@ export default function ProfessorDashboardScreen() {
           </View>
           <View style={styles.actionsGrid}>
             {quickActions.map((action) => (
-              <Pressable key={action.key} style={styles.actionCard} onPress={comingSoon}>
+              <Pressable
+                key={action.key}
+                style={styles.actionCard}
+                onPress={() =>
+                  action.key === 'document-request'
+                    ? router.push('/pages/professor/professor_documents')
+                    : comingSoon()
+                }
+              >
                 <View style={styles.actionMain}>
                   <LinearGradient colors={action.gradient} style={styles.actionIcon}>
                     <Ionicons name={action.icon} size={22} color="#ffffff" />
