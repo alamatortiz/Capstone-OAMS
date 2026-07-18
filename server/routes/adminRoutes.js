@@ -9,7 +9,7 @@ const {
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept, emitToUser, emitToAll } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
-const { voidQueueEntry } = require("../jobs/queueNoShowSweeper");
+const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const {
   DB_STATUS_MAP,
@@ -308,6 +308,13 @@ router.get(
              LIMIT 1
            ) AS currently_serving_student_number,
            (
+             SELECT q3b.arrived_at
+             FROM queues q3b
+             WHERE q3b.slot_id = qs.slot_id AND q3b.status = 'serving'
+             ORDER BY q3b.called_at DESC
+             LIMIT 1
+           ) AS currently_serving_arrived_at,
+           (
              SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q4.called_at, q4.completed_at)))
              FROM queues q4
              WHERE q4.slot_id = qs.slot_id
@@ -356,6 +363,7 @@ router.get(
           location: q.office_location || null,
           currentlyServingStudentNumber:
             q.currently_serving_student_number || null,
+          currentlyServingArrivedAt: q.currently_serving_arrived_at || null,
           avgServiceMinutes:
             q.avg_service_minutes != null ? Number(q.avg_service_minutes) : null,
           serviceHours: {
@@ -499,26 +507,6 @@ router.post(
   },
 );
 
-// Shared guard used by pause/resume/close below: confirms the slot
-// belongs to the admin's own department before any mutation.
-async function assertOwnedSlot(deptId, slotId) {
-  const [[slot]] = await pool.query(
-    `SELECT qs.slot_id, qs.status, s.department_id
-     FROM queue_slots qs
-     JOIN services s ON qs.service_id = s.service_id
-     WHERE qs.slot_id = ?`,
-    [slotId],
-  );
-  if (!slot) return { error: 404, message: "Queue slot not found" };
-  if (slot.department_id !== deptId) {
-    return {
-      error: 403,
-      message: "You can only manage queues for your own department",
-    };
-  }
-  return { slot };
-}
-
 // PATCH /api/admin/queue-hosting/:slotId/pause
 // If a student is currently 'serving' when the queue pauses, their call is
 // reverted (back to 'waiting', called_at cleared) rather than left dangling
@@ -593,7 +581,6 @@ router.patch(
         const uncalledPayload = { slotId, queueId: serving.queue_id, studentId: serving.student_id };
         emitToSlot(slotId, "queue:uncalled", uncalledPayload);
         emitToUser(serving.student_id, "queue:uncalled", uncalledPayload);
-        emitToDept(deptId, "queue:uncalled", uncalledPayload);
         createNotification(serving.student_id, "The queue was paused while you were being served. You've been moved back to waiting.");
       }
       res.json({
@@ -622,29 +609,53 @@ router.patch(
   authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
+    const conn = await pool.getConnection();
     try {
+      await conn.beginTransaction();
+
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const check = await assertOwnedSlot(deptId, slotId);
-      if (check.error)
-        return res.status(check.error).json({ error: check.message });
-      if (check.slot.status !== "paused") {
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, qs.status, s.department_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? FOR UPDATE`,
+        [slotId],
+      );
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue slot not found" });
+      }
+      if (slot.department_id !== deptId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only manage queues for your own department" });
+      }
+      if (slot.status !== "paused") {
+        await conn.rollback();
         return res
           .status(409)
           .json({ error: "Only a paused queue can be resumed" });
       }
 
-      await pool.query(
+      await conn.query(
         `UPDATE queue_slots SET status = 'open', pause_reason = NULL WHERE slot_id = ?`,
         [slotId],
       );
+
+      await conn.commit();
+
       emitToSlot(slotId, "queue:slot-status", { slotId, status: "open" });
       emitToDept(deptId, "queue:slot-status", { slotId, status: "open" });
       res.json({ message: "Queue resumed", slotId, status: "open" });
     } catch (error) {
+      await conn.rollback();
       console.error("Resume queue error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -722,7 +733,6 @@ router.patch(
       for (const entry of affected) {
         const stoppedPayload = { slotId, queueId: entry.queue_id, studentId: entry.student_id, reason };
         emitToUser(entry.student_id, "queue:queue-stopped", stoppedPayload);
-        emitToDept(deptId, "queue:queue-stopped", stoppedPayload);
         createNotification(entry.student_id, `The queue you were in was stopped: ${reason}`);
       }
 
@@ -748,51 +758,80 @@ router.patch(
 // PATCH /api/admin/queue-hosting/:slotId/call-next
 // Calls the next waiting student into 'serving'. Refuses if someone
 // is already being served — that student must be marked served first.
+// Lock order: queue_slots row first, then the queues row(s) — matches
+// pause/close/join, so this can never deadlock against them.
 router.patch(
   "/queue-hosting/:slotId/call-next",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
+    const conn = await pool.getConnection();
     try {
+      await conn.beginTransaction();
+
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const check = await assertOwnedSlot(deptId, slotId);
-      if (check.error)
-        return res.status(check.error).json({ error: check.message });
-      if (check.slot.status === "paused") {
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, qs.status, s.department_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? FOR UPDATE`,
+        [slotId],
+      );
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue slot not found" });
+      }
+      if (slot.department_id !== deptId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only manage queues for your own department" });
+      }
+      if (slot.status === "paused") {
+        await conn.rollback();
         return res.status(409).json({
           error: "Queue is paused — resume it before calling students.",
         });
       }
 
-      const [[alreadyServing]] = await pool.query(
-        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+      const [[alreadyServing]] = await conn.query(
+        `SELECT queue_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
         [slotId],
       );
       if (alreadyServing) {
+        await conn.rollback();
         return res.status(409).json({
           error:
             "A student is already being served. Mark them as served first.",
         });
       }
 
-      const [[next]] = await pool.query(
+      const [[next]] = await conn.query(
         `SELECT queue_id, student_id FROM queues
          WHERE slot_id = ? AND status = 'waiting'
          ORDER BY queue_number ASC
-         LIMIT 1`,
+         LIMIT 1
+         FOR UPDATE`,
         [slotId],
       );
       if (!next) {
+        await conn.rollback();
         return res
           .status(404)
           .json({ error: "No students waiting in this queue" });
       }
 
-      await pool.query(
-        `UPDATE queues SET status = 'serving', called_at = NOW() WHERE queue_id = ?`,
+      const [updateResult] = await conn.query(
+        `UPDATE queues SET status = 'serving', called_at = NOW() WHERE queue_id = ? AND status = 'waiting'`,
         [next.queue_id],
       );
+      if (updateResult.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({ error: "That student's status just changed — try again." });
+      }
+
+      await conn.commit();
 
       const calledPayload = {
         slotId,
@@ -807,10 +846,90 @@ router.patch(
 
       res.json({ message: "Next student called", queueId: next.queue_id });
     } catch (error) {
+      await conn.rollback();
       console.error("Call next error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// PATCH /api/admin/queue-hosting/:slotId/mark-arrived
+// Confirms the currently-serving (called) student has physically shown up.
+// Doesn't change `status` — only stamps `arrived_at`, which stops the
+// no-show sweeper's timeout clock (queueNoShowSweeper.js) for this entry
+// regardless of how long service actually takes.
+router.patch(
+  "/queue-hosting/:slotId/mark-arrived",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, s.department_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? FOR UPDATE`,
+        [slotId],
+      );
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue slot not found" });
+      }
+      if (slot.department_id !== deptId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only manage queues for your own department" });
+      }
+
+      const [[serving]] = await conn.query(
+        `SELECT queue_id, student_id FROM queues
+         WHERE slot_id = ? AND status = 'serving' AND arrived_at IS NULL
+         LIMIT 1 FOR UPDATE`,
+        [slotId],
+      );
+      if (!serving) {
+        await conn.rollback();
+        return res
+          .status(404)
+          .json({ error: "No called student is awaiting arrival" });
+      }
+
+      const [updateResult] = await conn.query(
+        `UPDATE queues SET arrived_at = NOW()
+         WHERE queue_id = ? AND status = 'serving' AND arrived_at IS NULL`,
+        [serving.queue_id],
+      );
+      if (updateResult.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({ error: "That student's status just changed — try again." });
+      }
+
+      await conn.commit();
+
+      const arrivedPayload = { slotId, queueId: serving.queue_id, studentId: serving.student_id };
+      emitToSlot(slotId, "queue:arrived", arrivedPayload);
+      emitToUser(serving.student_id, "queue:arrived", arrivedPayload);
+      emitToDept(deptId, "queue:arrived", arrivedPayload);
+
+      res.json({ message: "Student marked as arrived", queueId: serving.queue_id });
+    } catch (error) {
+      await conn.rollback();
+      console.error("Mark arrived error:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -823,26 +942,55 @@ router.patch(
   authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
+    const conn = await pool.getConnection();
     try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      const check = await assertOwnedSlot(deptId, slotId);
-      if (check.error)
-        return res.status(check.error).json({ error: check.message });
+      await conn.beginTransaction();
 
-      const [[serving]] = await pool.query(
-        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, s.department_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? FOR UPDATE`,
+        [slotId],
+      );
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue slot not found" });
+      }
+      if (slot.department_id !== deptId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only manage queues for your own department" });
+      }
+
+      const [[serving]] = await conn.query(
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
         [slotId],
       );
       if (!serving) {
+        await conn.rollback();
         return res
           .status(404)
           .json({ error: "No student is currently being served" });
       }
 
-      await pool.query(
-        `UPDATE queues SET status = 'completed', completed_at = NOW() WHERE queue_id = ?`,
+      const [updateResult] = await conn.query(
+        `UPDATE queues SET status = 'completed', completed_at = NOW() WHERE queue_id = ? AND status = 'serving'`,
         [serving.queue_id],
       );
+      if (updateResult.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({ error: "That student's status just changed — try again." });
+      }
+
+      // Marking someone served never frees a capacity seat, but it can be
+      // the last unserved entry in a 'full'/'expired' slot -- settle it,
+      // inside the same transaction/lock as the rest of this request.
+      const settleResult = await settleSlotAfterEntryChange(conn, slotId);
+
+      await conn.commit();
 
       const servedPayload = {
         slotId,
@@ -855,9 +1003,6 @@ router.patch(
       emitToDept(deptId, "queue:served", servedPayload);
       createNotification(serving.student_id, "Your queue service has been completed.");
 
-      // Marking someone served never frees a capacity seat, but it can be
-      // the last unserved entry in a 'full'/'expired' slot -- settle it.
-      const settleResult = await settleSlotAfterEntryChange(pool, slotId);
       if (settleResult) {
         const settledPayload = { slotId, status: settleResult.newStatus };
         emitToSlot(slotId, "queue:slot-status", settledPayload);
@@ -869,17 +1014,23 @@ router.patch(
         queueId: serving.queue_id,
       });
     } catch (error) {
+      await conn.rollback();
       console.error("Mark as served error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
 
 // PATCH /api/admin/queue-hosting/:slotId/skip
 // Manually voids the currently-serving student as a no-show, instead of
-// waiting for the automatic no-show timeout (queueNoShowSweeper.js).
+// waiting for the automatic no-show timeout (queueNoShowSweeper.js). Stays
+// available whether or not the student was marked arrived — an admin may
+// need to void someone who showed up but then had to leave mid-service —
+// but always requires a reason.
 router.patch(
   "/queue-hosting/:slotId/skip",
   authenticateToken,
@@ -887,40 +1038,77 @@ router.patch(
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
     const adminId = req.user.userId;
+    const reason = (req.body?.reason ?? "").trim();
+    if (!reason) {
+      return res.status(400).json({ error: "A reason is required to skip a student" });
+    }
+    const conn = await pool.getConnection();
     try {
-      const deptId = await getAdminDepartmentId(adminId);
-      const check = await assertOwnedSlot(deptId, slotId);
-      if (check.error)
-        return res.status(check.error).json({ error: check.message });
+      await conn.beginTransaction();
 
-      const [[serving]] = await pool.query(
-        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1`,
+      const deptId = await getAdminDepartmentId(adminId);
+      const [[slot]] = await conn.query(
+        `SELECT qs.slot_id, s.department_id
+         FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
+         WHERE qs.slot_id = ? FOR UPDATE`,
+        [slotId],
+      );
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue slot not found" });
+      }
+      if (slot.department_id !== deptId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only manage queues for your own department" });
+      }
+
+      const [[serving]] = await conn.query(
+        `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
         [slotId],
       );
       if (!serving) {
+        await conn.rollback();
         return res
           .status(404)
           .json({ error: "No student is currently being served" });
       }
 
-      await voidQueueEntry({
+      const result = await voidQueueEntry(conn, {
         queueId: serving.queue_id,
         slotId,
-        studentId: serving.student_id,
-        deptId,
         changedBy: adminId,
-        note: "Manually voided by admin (skipped)",
+        note: `Manually voided by admin (skipped): ${reason}`,
       });
 
+      await conn.commit();
+
+      if (result.voided) {
+        emitVoidEvents({
+          slotId,
+          queueId: serving.queue_id,
+          studentId: serving.student_id,
+          deptId,
+          settleResult: result.settleResult,
+        });
+      }
+
       res.json({
-        message: "Student skipped and marked as no-show",
+        message: result.voided
+          ? "Student skipped and marked as no-show"
+          : "That student's status had already changed",
         queueId: serving.queue_id,
       });
     } catch (error) {
+      await conn.rollback();
       console.error("Skip student error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -990,7 +1178,15 @@ router.get(
           date: dateStr,
           time: formatTime(r.appointment_time),
           status: r.status,
-          requestedAt: new Date(r.created_at).toLocaleString("en-US", { timeZone: "Asia/Manila" }),
+          requestedAt: new Date(r.created_at).toLocaleString("en-US", {
+            timeZone: "Asia/Manila",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          }),
           isToday: dateStr === todayStr,
         };
       });
@@ -1142,18 +1338,23 @@ router.get(
       if (dateParam) unionParams.push(dateParam);
       const [rows] = await pool.query(unionSql, unionParams);
 
-      // Map raw per-table statuses -> the badge vocabulary the UI uses
+      // Map raw per-table statuses -> the badge vocabulary the UI uses.
+      // Document statuses stay granular (matching /faculty/transactions'
+      // vocabulary) instead of collapsing pending/processing/generated/
+      // released into "approved" — that used to render an untouched
+      // "pending" request with a green "Approved" badge.
       const statusMap = {
         completed: "completed",
         cancelled: "cancelled",
+        no_show: "no_show",
         waiting: "completed", // not surfaced as a transaction row by default, kept for safety
         serving: "completed",
         approved: "approved",
-        pending: "approved",
+        pending: "pending",
         rejected: "rejected",
-        processing: "approved",
-        generated: "approved",
-        released: "approved",
+        processing: "processing",
+        generated: "generated",
+        released: "released",
         claimed: "completed",
       };
 
@@ -1244,6 +1445,7 @@ router.get(
            q.status,
            q.notes,
            q.created_at,
+           q.arrived_at,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number,
            d.department_abbreviation
@@ -1263,6 +1465,7 @@ router.get(
         concern: r.notes || "No concern specified",
         joinedAt: formatTime(getManilaTimeString(r.created_at)),
         status: r.status,
+        arrivedAt: r.arrived_at,
       }));
 
       res.json({ entries });
@@ -2337,7 +2540,15 @@ router.get(
         newValues: r.new_values,
         adminName: r.admin_name,
         adminEmail: r.admin_email,
-        timestamp: new Date(r.created_at).toLocaleString("en-US", { timeZone: "Asia/Manila" }),
+        timestamp: new Date(r.created_at).toLocaleString("en-US", {
+          timeZone: "Asia/Manila",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }),
       })) });
     } catch (error) {
       console.error("Audit logs fetch error:", error);
@@ -2623,6 +2834,11 @@ router.get(
   async (req, res) => {
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res
+          .status(403)
+          .json({ error: "Admin has no department assigned" });
+      }
       const { period = "Today", service = "All Services" } = req.query;
 
       // Compute date threshold, anchored to Manila midnight (a real UTC

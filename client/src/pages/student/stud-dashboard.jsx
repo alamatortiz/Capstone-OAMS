@@ -148,9 +148,15 @@ const TimerIcon = () => (
 );
 const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
 
+const formatActivityStatus = (status) => {
+  if (!status) return "";
+  if (status === "no_show") return "No Show";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, token } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -169,7 +175,7 @@ export default function StudentDashboard() {
         course: "",
       };
 
-  const { getActiveQueues } = useQueue();
+  const { getActiveQueues, isLoading: queueLoading } = useQueue();
 
   // ── Dashboard data state ──────────────────────────────────────────────────
   const [dashStats, setDashStats] = useState(null);
@@ -224,7 +230,6 @@ export default function StudentDashboard() {
 
   // ── Live updates: refetch dashboard data when relevant socket events fire ──
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!authUser || !token) return;
 
     const socket = connectSocket(token);
@@ -244,7 +249,7 @@ export default function StudentDashboard() {
       statsEvents.forEach((event) => socket.off(event, fetchStats));
       socket.off("announcement:changed", fetchAnnouncements);
     };
-  }, [authUser, fetchStats, fetchAnnouncements]);
+  }, [authUser, token, fetchStats, fetchAnnouncements]);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   // Unlike QueueProvider, this page had no such safety net: if the socket
@@ -313,22 +318,16 @@ export default function StudentDashboard() {
     }
   };
 
-  // ── Derived values from API response ─────────────────────────────────────
-  // dashboard-stats' activeQueue and QueueContext's active-queue entries use
-  // different field names for the same data (service/college/estimatedWaitTime
-  // vs. serviceName/departmentName/estimatedWait) -- normalize both to one
-  // shape so the preview card below doesn't render blank when it falls back
-  // between the two sources.
-  const apiQueue = dashStats?.activeQueue
-    ? {
-        ...dashStats.activeQueue,
-        service: dashStats.activeQueue.service,
-        college: dashStats.activeQueue.college,
-        estimatedWaitTime: dashStats.activeQueue.estimatedWaitTime,
-        slotStatus: dashStats.activeQueue.status,
-      }
-    : null;
-  // Fallback to QueueContext (for locally-joined queues before page refresh)
+  // ── Derived values ────────────────────────────────────────────────────────
+  // The "Active Queue" preview reads exclusively from QueueContext (the same
+  // source stud-queue-status.jsx uses) instead of also considering
+  // dashStats.activeQueue -- the two used to be refreshed by different,
+  // non-identical socket event sets and could show contradictory
+  // position/status for the same queue. dashStats is still used below for
+  // the other stat tiles (appointments/documents/completed) that have no
+  // QueueContext equivalent. Field names are normalized (serviceName ->
+  // service, departmentName -> college, estimatedWait -> estimatedWaitTime)
+  // to match what the preview card below renders.
   const contextQueues = getActiveQueues();
   // Sort so index [0] is always the closest to being served -- a 'serving'
   // entry always wins (its position is null, not a sortable number), then
@@ -340,7 +339,7 @@ export default function StudentDashboard() {
         return (a.position ?? Infinity) - (b.position ?? Infinity);
       })[0]
     : null;
-  const normalizedContextQueue = closestContextQueue
+  const mostRecentQueue = closestContextQueue
     ? {
         ...closestContextQueue,
         service: closestContextQueue.serviceName,
@@ -348,9 +347,7 @@ export default function StudentDashboard() {
         estimatedWaitTime: closestContextQueue.estimatedWait,
       }
     : null;
-  const mostRecentQueue = apiQueue ?? normalizedContextQueue ?? null;
-  const activeQueueCount =
-    dashStats?.stats?.activeQueueCount ?? contextQueues.length;
+  const activeQueueCount = contextQueues.length;
 
   // Two distinct progress measures, mirroring the Queue Management page:
   // 1) how full the queue is (occupied slots vs. max capacity)
@@ -366,13 +363,13 @@ export default function StudentDashboard() {
   const stats = [
     {
       title: "Queue Position",
-      value: dashLoading
+      value: queueLoading
         ? "—"
-        : dashStats?.activeQueue?.status === "serving"
-          ? "Serving"
-          : String(dashStats?.stats?.queuePosition ?? 0),
-      badge: dashLoading ? null : (dashStats?.stats?.queueNumberBadge ?? null),
-      description: dashLoading
+        : mostRecentQueue?.status === "serving"
+          ? (mostRecentQueue.arrivedAt ? "Being Served" : "Called")
+          : String(mostRecentQueue?.position ?? 0),
+      badge: queueLoading ? null : (mostRecentQueue?.queueNumberBadge ?? null),
+      description: queueLoading
         ? "Loading..."
         : activeQueueCount > 0
           ? `Waiting in ${activeQueueCount} queue${activeQueueCount > 1 ? "s" : ""}`
@@ -467,7 +464,9 @@ export default function StudentDashboard() {
     const lowerInput = userInput.toLowerCase();
     if (lowerInput.includes("queue") || lowerInput.includes("position")) {
       if (!mostRecentQueue) return "You don't have any active queues. Would you like to join one?";
-      const positionText = mostRecentQueue.status === "serving" ? "currently being served" : `at position ${mostRecentQueue.position}`;
+      const positionText = mostRecentQueue.status === "serving"
+        ? (mostRecentQueue.arrivedAt ? "currently being served" : "called — please proceed to the counter")
+        : `at position ${mostRecentQueue.position}`;
       return `You're ${positionText} in the ${mostRecentQueue.service} queue. Estimated wait: ${mostRecentQueue.estimatedWaitTime}.`;
     } else if (lowerInput.includes("appointment")) {
       const count = dashStats?.stats?.appointments?.upcoming ?? 0;
@@ -656,7 +655,9 @@ export default function StudentDashboard() {
                   <div className="queue-stats">
                     <div className="dash-queue-stat">
                       <p className="stat-num">
-                        {mostRecentQueue.status === "serving" ? "Serving" : mostRecentQueue.position}
+                        {mostRecentQueue.status === "serving"
+                          ? (mostRecentQueue.arrivedAt ? "Being Served" : "Called")
+                          : mostRecentQueue.position}
                       </p>
                       <p className="dash-stat-label">Position</p>
                     </div>
@@ -808,7 +809,7 @@ export default function StudentDashboard() {
                       <span
                         className={`activity-badge activity-status-${activity.status}`}
                       >
-                        {activity.status}
+                        {formatActivityStatus(activity.status)}
                       </span>
                     </div>
                   ))}

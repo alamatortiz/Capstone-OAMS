@@ -23,7 +23,8 @@ export default function QueuePage() {
     queues,
     availableSlots,
     isLoading,
-    error,
+    activeQueuesError,
+    availableSlotsError,
     joinQueue,
     leaveQueue,
     isAlreadyInQueue,
@@ -267,7 +268,9 @@ export default function QueuePage() {
     const lower = userInput.toLowerCase();
     if (lower.includes('queue') || lower.includes('position')) {
       if (queues.length === 0) return "You don't have any active queues. Would you like to join one?";
-      const positionText = queues[0].status === 'serving' ? 'You are currently being served' : `Your first queue position is ${queues[0].position}`;
+      const positionText = queues[0].status === 'serving'
+        ? (queues[0].arrivedAt ? 'You are currently being served' : 'You have been called — please proceed to the counter')
+        : `Your first queue position is ${queues[0].position}`;
       return `You have ${queues.length} active queue${queues.length > 1 ? 's' : ''}. ${positionText}. Est. wait: ${queues[0].estimatedWait}`;
     }
     if (lower.includes('wait') || lower.includes('time')) {
@@ -301,7 +304,11 @@ export default function QueuePage() {
             message={
               leaveConfirmQueue?.status === "serving" ? (
                 <>
-                  You are currently being served for <strong>{leaveConfirmQueue?.serviceName}</strong>.
+                  {leaveConfirmQueue?.arrivedAt ? (
+                    <>You are currently being served for <strong>{leaveConfirmQueue?.serviceName}</strong>.</>
+                  ) : (
+                    <>You've been called for <strong>{leaveConfirmQueue?.serviceName}</strong>.</>
+                  )}{' '}
                   Leaving now ends your turn immediately — the staff will move on to the next student.
                 </>
               ) : (
@@ -569,16 +576,8 @@ export default function QueuePage() {
                 </div>
               )}
 
-              {!isLoading && error && (
-                <div className="no-queues-card">
-                  <AlertCircle className="no-queues-icon" />
-                  <h3 className="no-queues-title">Something went wrong</h3>
-                  <p className="no-queues-description">{error}</p>
-                </div>
-              )}
-
               {/* Tabs */}
-              {!isLoading && !error && (
+              {!isLoading && (
                 <div className="qp-tabs-navigation">
                   <div className="qp-tabs-list">
                     <button
@@ -602,9 +601,15 @@ export default function QueuePage() {
               )}
 
               {/* My Active Queues */}
-              {!isLoading && !error && activeTab === 'active' && (
+              {!isLoading && activeTab === 'active' && (
                 <>
-                  {queues.length > 0 ? (
+                  {activeQueuesError ? (
+                    <div className="no-queues-card">
+                      <AlertCircle className="no-queues-icon" />
+                      <h3 className="no-queues-title">Something went wrong</h3>
+                      <p className="no-queues-description">{activeQueuesError}</p>
+                    </div>
+                  ) : queues.length > 0 ? (
                     <div className="queues-list">
                       {queues.map((queue) => (
                       <div
@@ -652,7 +657,9 @@ export default function QueuePage() {
                                 <div className="qp-stat">
                                   <p className="qp-stat-label">Your Position</p>
                                   <p className="qp-stat-value">
-                                    {queue.status === 'serving' ? 'Being Served' : queue.position}
+                                    {queue.status === 'serving'
+                                      ? (queue.arrivedAt ? 'Being Served' : 'Called')
+                                      : queue.position}
                                   </p>
                                 </div>
                                 <div className="qp-stat">
@@ -678,7 +685,7 @@ export default function QueuePage() {
                               />
                               <button
                                 className="queue-leave-btn"
-                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status }); }}
+                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status, arrivedAt: queue.arrivedAt }); }}
                                 disabled={leavingQueueId === queue.queueId}
                                 title="Leave this queue"
                                 type="button"
@@ -693,10 +700,14 @@ export default function QueuePage() {
                                   {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
                                 </span>
                               </button>
-                              {queue.voidTimeoutMinutes != null && (
+                              {queue.voidTimeoutMinutes != null && !(queue.status === 'serving' && queue.arrivedAt) && (
                                 <div className="qp-void-warning">
                                   <AlertCircle className="qp-void-warning-icon" />
-                                  <span>If called, arrive within {queue.voidTimeoutMinutes} min or your ticket will be voided</span>
+                                  <span>
+                                    {queue.status === 'serving'
+                                      ? `Arrive within ${queue.voidTimeoutMinutes} min of being called or your ticket will be voided`
+                                      : `If called, arrive within ${queue.voidTimeoutMinutes} min or your ticket will be voided`}
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -718,8 +729,15 @@ export default function QueuePage() {
               )}
 
               {/* Filters + Available Queues */}
-              {!isLoading && !error && activeTab === 'available' && (
+              {!isLoading && activeTab === 'available' && (
                 <>
+                  {availableSlotsError && (
+                    <div className="no-queues-card">
+                      <AlertCircle className="no-queues-icon" />
+                      <h3 className="no-queues-title">Something went wrong</h3>
+                      <p className="no-queues-description">{availableSlotsError}</p>
+                    </div>
+                  )}
                   <div className="filters-card">
                     <div className="filters-header">
                       <h3 className="filters-title">Queues Filter</h3>

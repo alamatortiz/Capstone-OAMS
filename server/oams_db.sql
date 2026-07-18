@@ -238,6 +238,11 @@ CREATE TABLE queues (
     status          ENUM('waiting','serving','completed','cancelled','no_show') DEFAULT 'waiting',
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     called_at       TIMESTAMP    NULL,
+    -- Set when an admin confirms a called ('serving') student has physically
+    -- shown up, distinct from called_at. Stops the no-show sweeper's timeout
+    -- clock (queueNoShowSweeper.js) so a long service session isn't mistaken
+    -- for an absence -- see PATCH /queue-hosting/:slotId/mark-arrived.
+    arrived_at      TIMESTAMP    NULL,
     completed_at    TIMESTAMP    NULL,
     cancelled_at    TIMESTAMP    NULL,
     notes           TEXT,
@@ -248,7 +253,11 @@ CREATE TABLE queues (
     admin_reason    VARCHAR(255) NULL,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES services(service_id),
-    FOREIGN KEY (slot_id)    REFERENCES queue_slots(slot_id)
+    FOREIGN KEY (slot_id)    REFERENCES queue_slots(slot_id),
+    -- Defense-in-depth: queue numbers are generated app-side under a row
+    -- lock on the owning slot (POST /queues/join), but nothing previously
+    -- stopped a duplicate at the DB layer if that ever got bypassed.
+    UNIQUE KEY uq_queue_slot_number (slot_id, queue_number)
 );
 
 -- Audit trail for all queue status transitions

@@ -466,6 +466,7 @@ html, body {
 .txn-badge-generated   { background: rgba(16,185,129,0.15);  color: #34d399;  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-released    { background: rgba(100,116,139,0.15); color: #94a3b8;  border: 0.5px solid rgba(100,116,139,0.3); }
 .txn-badge-claimed     { background: rgba(16,185,129,0.15);  color: #34d399;  border: 0.5px solid rgba(16,185,129,0.3); }
+.txn-badge-noshow      { background: rgba(239,68,68,0.15);   color: #f87171;  border: 0.5px solid rgba(239,68,68,0.3); }
 
 [data-theme="light"] .txn-badge-queue       { background: rgba(37,99,235,0.08);  color: #1d4ed8;  border-color: rgba(37,99,235,0.2); }
 [data-theme="light"] .txn-badge-appointment { background: rgba(5,150,105,0.08);  color: #065f46;  border-color: rgba(5,150,105,0.2); }
@@ -479,6 +480,7 @@ html, body {
 [data-theme="light"] .txn-badge-generated   { background: rgba(5,150,105,0.08);  color: #065f46;  border-color: rgba(5,150,105,0.2); }
 [data-theme="light"] .txn-badge-released    { background: rgba(71,85,105,0.08);  color: #374151;  border-color: rgba(71,85,105,0.2); }
 [data-theme="light"] .txn-badge-claimed     { background: rgba(5,150,105,0.08);  color: #065f46;  border-color: rgba(5,150,105,0.2); }
+[data-theme="light"] .txn-badge-noshow      { background: rgba(220,38,38,0.08);  color: #991b1b;  border-color: rgba(220,38,38,0.2); }
 
 /* ── Item student line ───────────────────────────────────── */
 .txn-item-student {

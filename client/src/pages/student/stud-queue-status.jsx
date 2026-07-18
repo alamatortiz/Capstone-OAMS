@@ -25,16 +25,20 @@ import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const getStatusMeta = (status) => {
-  switch (status) {
+// Takes the full queue (not just status) — 'serving' covers both "called,
+// awaiting arrival" and "arrival confirmed", distinguished by arrivedAt.
+const getStatusMeta = (queue) => {
+  switch (queue.status) {
     case "serving":
-      return { label: "It's Your Turn!", cls: "queue-status-serving", color: "#22c55e" };
+      return queue.arrivedAt
+        ? { label: "Being Served", cls: "queue-status-serving", color: "#22c55e" }
+        : { label: "Called — Please Proceed", cls: "queue-status-serving", color: "#22c55e" };
     case "completed":
       return { label: "Completed", cls: "queue-status-completed", color: "#6b7280" };
     case "cancelled":
       return { label: "Cancelled", cls: "queue-status-cancelled", color: "#ef4444" };
     case "no_show":
-      return { label: "Marked as No-Show", cls: "queue-status-no-show", color: "#f59e0b" };
+      return { label: "Marked as No-Show", cls: "queue-status-no-show", color: "#ef4444" };
     default:
       return { label: "Waiting", cls: "queue-status-waiting", color: "#f59e0b" };
   }
@@ -47,7 +51,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
   const [notesText, setNotesText] = useState(queue.notes ?? "");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  const statusMeta = getStatusMeta(queue.status);
+  const statusMeta = getStatusMeta(queue);
   const peopleAhead = Math.max(queue.position - 1, 0);
 
   const handleSaveNotes = async () => {
@@ -126,7 +130,9 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
           <CheckCircle2
             style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }}
           />
-          Please proceed to the designated location — it's your turn!
+          {queue.arrivedAt
+            ? "You are now being served."
+            : "Please proceed to the designated location — it's your turn!"}
         </div>
       )}
 
@@ -212,7 +218,9 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
                   </div>
                   <div>
                     <div className="queue-position-number">
-                      {queue.status === "serving" ? "Serving" : queue.position}
+                      {queue.status === "serving"
+                        ? (queue.arrivedAt ? "Being Served" : "Called")
+                        : queue.position}
                     </div>
                     {queue.status !== "serving" && (
                       <div className="queue-position-total">
@@ -225,7 +233,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
                     style={{ marginTop: "0.75rem" }}
                   >
                     {queue.status === "serving"
-                      ? "You're being served now!"
+                      ? (queue.arrivedAt ? "You're being served now!" : "You've been called — please proceed!")
                       : queue.position === 1
                         ? "You're next!"
                         : `${peopleAhead} ${peopleAhead === 1 ? "person" : "people"} ahead of you`}
@@ -501,7 +509,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
 export default function QueueStatusPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { queues, isLoading, error, leaveQueue, updateQueueNotes } = useQueue();
+  const { queues, isLoading, activeQueuesError, leaveQueue, updateQueueNotes } = useQueue();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const fromQueue = location.state?.fromQueue ?? false;
@@ -623,7 +631,7 @@ export default function QueueStatusPage() {
             )}
 
             {/* Error */}
-            {error && (
+            {activeQueuesError && (
               <div
                 className="queue-empty-state"
                 style={{ borderColor: "rgba(239,68,68,0.3)" }}
@@ -632,7 +640,7 @@ export default function QueueStatusPage() {
                   className="queue-empty-icon"
                   style={{ color: "#ef4444" }}
                 />
-                <p className="queue-empty-text">{error}</p>
+                <p className="queue-empty-text">{activeQueuesError}</p>
               </div>
             )}
 
@@ -648,7 +656,7 @@ export default function QueueStatusPage() {
             )}
 
             {/* Queue List */}
-            {!isLoading && !error && (
+            {!isLoading && !activeQueuesError && (
               <div className="queue-list-container">
                 {queues.length > 0 ? (
                   queues.map((queue) => {
@@ -718,7 +726,9 @@ export default function QueueStatusPage() {
                                 <div className="qsl-stat">
                                   <p className="qsl-stat-label">Your Position</p>
                                   <p className="qsl-stat-value">
-                                    {queue.status === "serving" ? "Serving" : queue.position}
+                                    {queue.status === "serving"
+                                      ? (queue.arrivedAt ? "Being Served" : "Called")
+                                      : queue.position}
                                   </p>
                                 </div>
                                 <div className="qsl-stat">

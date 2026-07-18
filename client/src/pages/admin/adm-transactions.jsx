@@ -8,9 +8,10 @@ import collegeCOElogo from "../../assets/COE.png";
 import collegeCOEDlogo from "../../assets/COED.png";
 import collegeCASlogo from "../../assets/CAS.png";
 import collegeCHASlogo from "../../assets/CHAS.png";
-import "./admin-transactions.css";
+import "./adm-transactions.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
+import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
@@ -141,8 +142,13 @@ const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
   { value: "completed", label: "Completed" },
   { value: "approved", label: "Approved" },
+  { value: "pending", label: "Pending" },
+  { value: "processing", label: "Processing" },
+  { value: "generated", label: "Ready for Pickup" },
+  { value: "released", label: "Released" },
   { value: "rejected", label: "Rejected" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "no_show", label: "No Show" },
 ];
 const DATE_OPTIONS = [
   { value: "today", label: "Today" },
@@ -152,7 +158,7 @@ const DATE_OPTIONS = [
 ];
 
 export default function AdminTransaction() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, token } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -215,6 +221,31 @@ export default function AdminTransaction() {
     if (authUser) init();
   }, [authUser, fetchTransactions]);
 
+  // ── Live updates: this log previously only refreshed on filter change or
+  // manual reload, unlike the rest of the socket-driven queue feature area —
+  // a queue/appointment/document event elsewhere wouldn't show up here until
+  // the admin changed a filter. A lightweight refetch-on-event is enough
+  // (this view doesn't need per-second freshness, just eventual consistency).
+  useEffect(() => {
+    if (!authUser || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = [
+      "queue:called",
+      "queue:served",
+      "queue:no-show",
+      "queue:student-joined",
+      "queue:student-left",
+      "appointment:status-updated",
+      "document:status-updated",
+    ];
+    events.forEach((event) => socket.on(event, fetchTransactions));
+    return () => {
+      events.forEach((event) => socket.off(event, fetchTransactions));
+    };
+  }, [authUser, token, fetchTransactions]);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
@@ -271,17 +302,23 @@ export default function AdminTransaction() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      completed: { color: "admin-transaction-badge-completed" },
-      cancelled: { color: "admin-transaction-badge-cancelled" },
-      approved: { color: "admin-transaction-badge-approved" },
-      rejected: { color: "admin-transaction-badge-rejected" },
+      completed: { color: "admin-transaction-badge-completed", label: "Completed" },
+      cancelled: { color: "admin-transaction-badge-cancelled", label: "Cancelled" },
+      no_show: { color: "admin-transaction-badge-noshow", label: "No Show" },
+      approved: { color: "admin-transaction-badge-approved", label: "Approved" },
+      rejected: { color: "admin-transaction-badge-rejected", label: "Rejected" },
+      pending: { color: "admin-transaction-badge-pending", label: "Pending" },
+      processing: { color: "admin-transaction-badge-processing", label: "Processing" },
+      generated: { color: "admin-transaction-badge-generated", label: "Ready for Pickup" },
+      released: { color: "admin-transaction-badge-released", label: "Released" },
     };
     const config = statusConfig[status] || {
       color: "admin-transaction-badge-approved",
+      label: status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown",
     };
     return (
       <span className={`admin-transaction-badge ${config.color}`}>
-        {status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown"}
+        {config.label}
       </span>
     );
   };

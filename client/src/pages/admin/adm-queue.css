@@ -1249,9 +1249,9 @@ body {
 }
 
 .queue-entry-status--no_show {
-  background: rgba(245, 158, 11, 0.2);
-  color: var(--warning);
-  border: 0.5px solid rgba(245, 158, 11, 0.4);
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
 }
 
 .queue-entry-queue-number {

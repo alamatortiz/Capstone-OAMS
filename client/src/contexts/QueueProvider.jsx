@@ -23,8 +23,12 @@ export function QueueProvider({ children }) {
   const [queueHistory, setQueueHistory] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  // Separate from `error` (which gates the Active/Available tabs) so a
+  // Kept independent (rather than one shared `error`) so a failure in one
+  // fetch can't be silently cleared by the other's unrelated success — both
+  // gate different tabs (Active vs Available) and can be true at once.
+  const [activeQueuesError, setActiveQueuesError] = useState(null);
+  const [availableSlotsError, setAvailableSlotsError] = useState(null);
+  // Separate from the two above (which gate the Active/Available tabs) so a
   // history/metrics fetch failure doesn't incorrectly hide unrelated,
   // successfully-loaded queue data.
   const [historyError, setHistoryError] = useState(null);
@@ -40,6 +44,14 @@ export function QueueProvider({ children }) {
   useEffect(() => {
     queuesRef.current = queues;
   }, [queues]);
+
+  // Monotonic request ids so an in-flight fetch that resolves *after* a
+  // newer one (e.g. the 45s poll and a socket-triggered refetch landing
+  // close together) can't overwrite fresher state with stale data, and
+  // can't double-run the transition-diffing/toast logic below against the
+  // same prevQueuesRef concurrently.
+  const activeQueuesRequestIdRef = useRef(0);
+  const availableSlotsRequestIdRef = useRef(0);
 
   // ── Fetch queue history ───────────────────────────────────────────────────
   const fetchQueueHistory = useCallback(async () => {
@@ -69,6 +81,9 @@ export function QueueProvider({ children }) {
           `It's your turn for ${q.serviceName}! Please proceed to the designated location.`,
           { duration: 8000 },
         );
+      }
+      if (!prev.arrivedAt && q.arrivedAt) {
+        toast.success(`You are now being served for ${q.serviceName}.`, { duration: 6000 });
       }
       if (prev.status === "serving" && q.status === "waiting") {
         toast.warning(
@@ -105,6 +120,16 @@ export function QueueProvider({ children }) {
     const vanishedServing = [...prevMap.entries()].filter(
       ([queueId, prev]) => prev.status === "serving" && !nextIds.has(queueId),
     );
+
+    // Advance the snapshot immediately -- before the async history lookup
+    // below -- rather than at the end of this function. "Served"/"no-show"
+    // events are broadcast to multiple rooms this student belongs to, so the
+    // same event can arrive more than once; updating the snapshot now means
+    // a concurrent duplicate call sees the already-updated state and won't
+    // re-detect the same vanished entry and double-toast for it.
+    prevMap.clear();
+    for (const q of nextQueues) prevMap.set(q.queueId, q);
+
     if (vanishedServing.length > 0) {
       const history = await fetchQueueHistory();
       for (const [queueId, prev] of vanishedServing) {
@@ -122,16 +147,18 @@ export function QueueProvider({ children }) {
         }
       }
     }
-
-    prevMap.clear();
-    for (const q of nextQueues) prevMap.set(q.queueId, q);
   }, [fetchQueueHistory]);
 
   // ── Fetch active queues ───────────────────────────────────────────────────
   const fetchActiveQueues = useCallback(async () => {
-    setError(null);
+    const requestId = ++activeQueuesRequestIdRef.current;
+    setActiveQueuesError(null);
     try {
       const { data } = await api.get("/student/queues/active");
+      // A newer fetch was kicked off while this one was in flight — its
+      // result (and the transition-diffing/toast side effects below) would
+      // be stale, so discard it rather than clobbering fresher state.
+      if (requestId !== activeQueuesRequestIdRef.current) return;
       const next = data.queues ?? [];
       if (hasLoadedOnceRef.current) {
         notifyQueueTransitions(next);
@@ -141,20 +168,24 @@ export function QueueProvider({ children }) {
       }
       setQueues(next);
     } catch (err) {
+      if (requestId !== activeQueuesRequestIdRef.current) return;
       console.error("fetchActiveQueues error:", err);
-      setError("Failed to load your active queues.");
+      setActiveQueuesError("Failed to load your active queues.");
     }
   }, [notifyQueueTransitions]);
 
   // ── Fetch available slots ─────────────────────────────────────────────────
   const fetchAvailableSlots = useCallback(async () => {
-    setError(null);
+    const requestId = ++availableSlotsRequestIdRef.current;
+    setAvailableSlotsError(null);
     try {
       const { data } = await api.get("/student/queues/available");
+      if (requestId !== availableSlotsRequestIdRef.current) return;
       setAvailableSlots(data.slots ?? []);
     } catch (err) {
+      if (requestId !== availableSlotsRequestIdRef.current) return;
       console.error("fetchAvailableSlots error:", err);
-      setError("Failed to load available queues.");
+      setAvailableSlotsError("Failed to load available queues.");
     }
   }, []);
 
@@ -178,7 +209,8 @@ export function QueueProvider({ children }) {
       setAvailableSlots([]);
       setQueueHistory([]);
       setMetrics(null);
-      setError(null);
+      setActiveQueuesError(null);
+      setAvailableSlotsError(null);
       setHistoryError(null);
       setMetricsError(null);
       prevQueuesRef.current = new Map();
@@ -254,6 +286,7 @@ export function QueueProvider({ children }) {
 
     const events = [
       "queue:called",
+      "queue:arrived",
       "queue:served",
       "queue:no-show",
       "queue:slot-status",
@@ -267,6 +300,7 @@ export function QueueProvider({ children }) {
     // reason) instead of relying on the generic diff logic, which only
     // ever notices "serving" entries vanishing, not "waiting" ones.
     const onQueueStopped = (payload) => {
+      if (payload.studentId !== user.userId) return;
       const stoppedQueue = queuesRef.current.find(
         (q) => q.queueId === payload.queueId,
       );
@@ -362,7 +396,8 @@ export function QueueProvider({ children }) {
       queueHistory,
       metrics,
       isLoading,
-      error,
+      activeQueuesError,
+      availableSlotsError,
       historyError,
       metricsError,
       fetchActiveQueues,
@@ -381,7 +416,8 @@ export function QueueProvider({ children }) {
       queueHistory,
       metrics,
       isLoading,
-      error,
+      activeQueuesError,
+      availableSlotsError,
       historyError,
       metricsError,
       fetchActiveQueues,

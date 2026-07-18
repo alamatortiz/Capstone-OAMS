@@ -106,14 +106,16 @@ export function formatManilaDateTime(value, opts = {}) {
   });
 }
 
-export function formatManilaTimeAgo(value) {
-  if (!value) return "";
-  const diffMs = Date.now() - new Date(value).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+// Converts a bare "HH:MM" wall-clock string (e.g. a queue slot's start_time/
+// end_time) into 12-hour "h:MM AM/PM". Unlike formatManilaTime, this does NOT
+// parse the input as a Date or apply a timezone conversion -- a bare "HH:MM"
+// has no date/timezone context, and is already Manila wall-clock time by the
+// time it reaches the client.
+export function formatTimeString(hhmm) {
+  if (!hhmm) return "";
+  const [h, m] = hhmm.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
+

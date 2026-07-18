@@ -8,6 +8,8 @@ import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDateTime } from "../../utils/dateTime";
+import { useAuth } from "../../context/AuthContext";
+import { connectSocket } from "../../utils/socket";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 const UserIcon = () => (
@@ -52,6 +54,8 @@ const FileTextIconSm = () => (
 // ── Transactions data ─────────────────────────────────────────────────────────
 
 export default function ProfessorTransactionsPage() {
+  const { user: authUser, token } = useAuth();
+
   // ── Filter state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -76,6 +80,7 @@ export default function ProfessorTransactionsPage() {
       approved: "txn-badge txn-badge-approved",
       rejected: "txn-badge txn-badge-rejected",
       cancelled: "txn-badge txn-badge-cancelled",
+      no_show: "txn-badge txn-badge-noshow",
       pending: "txn-badge txn-badge-pending",
       processing: "txn-badge txn-badge-processing",
       generated: "txn-badge txn-badge-generated",
@@ -85,8 +90,11 @@ export default function ProfessorTransactionsPage() {
 
   const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  const statusLabel = (status) =>
-    status === "generated" ? "Ready for Pickup" : capitalize(status);
+  const statusLabel = (status) => {
+    if (status === "generated") return "Ready for Pickup";
+    if (status === "no_show") return "No Show";
+    return capitalize(status);
+  };
 
   const fetchTransactions = async () => {
     try {
@@ -109,6 +117,28 @@ export default function ProfessorTransactionsPage() {
   };
 
   useEffect(() => { fetchTransactions(); }, [searchQuery, filterType, filterStatus]);
+
+  // ── Live updates: previously fetch-once-per-filter-change only, so
+  // activity elsewhere (e.g. a document status change) wouldn't show up
+  // here until the professor tweaked a filter or reloaded.
+  useEffect(() => {
+    if (!authUser || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = [
+      "appointment:status-updated",
+      "document:status-updated",
+      "queue:called",
+      "queue:served",
+      "queue:no-show",
+    ];
+    events.forEach((event) => socket.on(event, fetchTransactions));
+    return () => {
+      events.forEach((event) => socket.off(event, fetchTransactions));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, token]);
 
   const generateBotResponse = () =>
     "I can help you with appointment management, student requests, and document reviews. What do you need?";

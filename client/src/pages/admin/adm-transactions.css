@@ -622,9 +622,39 @@
 }
 
 .admin-transaction-badge-cancelled {
-  background-color: rgba(107, 114, 128, 0.15);
-  color: #6b7280;
-  border: 0.5px solid rgba(107, 114, 128, 0.3);
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.3);
+}
+
+.admin-transaction-badge-noshow {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.3);
+}
+
+.admin-transaction-badge-pending {
+  background-color: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 0.5px solid rgba(234, 179, 8, 0.3);
+}
+
+.admin-transaction-badge-processing {
+  background-color: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 0.5px solid rgba(249, 115, 22, 0.3);
+}
+
+.admin-transaction-badge-generated {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 0.5px solid rgba(59, 130, 246, 0.3);
+}
+
+.admin-transaction-badge-released {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 0.5px solid rgba(16, 185, 129, 0.3);
 }
 
 .admin-transaction-item-action {

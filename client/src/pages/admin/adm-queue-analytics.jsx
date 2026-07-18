@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import "./admin-queue-analytics.css";
+import "./adm-queue-analytics.css";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
+import { connectSocket } from "../../utils/socket";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const DownloadIcon = () => (
@@ -144,7 +145,7 @@ const CalendarIcon2 = () => (
 const timePeriods = ["Today", "This Week", "This Month", "This Semester"];
 
 export default function AdminQueueAnalytics() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, token } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -172,28 +173,44 @@ export default function AdminQueueAnalytics() {
   const [analyticsData, setAnalyticsData] = useState({ performance: [], positiveInsights: [], improvementAreas: [] });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+      const res = await api.get("/admin/queue-analytics", {
+        params: { period: timePeriod, service: serviceType },
+      });
+      setAnalyticsData({
+        performance: res.data.performance ?? [],
+        positiveInsights: res.data.positiveInsights ?? [],
+        improvementAreas: res.data.improvementAreas ?? [],
+      });
+      if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
+    } catch (err) {
+      console.error("Queue analytics fetch error:", err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [timePeriod, serviceType]);
+
   useEffect(() => {
     if (!authUser) return;
-    const fetchAnalytics = async () => {
-      setAnalyticsLoading(true);
-      try {
-        const res = await api.get("/admin/queue-analytics", {
-          params: { period: timePeriod, service: serviceType },
-        });
-        setAnalyticsData({
-          performance: res.data.performance ?? [],
-          positiveInsights: res.data.positiveInsights ?? [],
-          improvementAreas: res.data.improvementAreas ?? [],
-        });
-        if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
-      } catch (err) {
-        console.error("Queue analytics fetch error:", err);
-      } finally {
-        setAnalyticsLoading(false);
-      }
-    };
     fetchAnalytics();
-  }, [authUser, timePeriod, serviceType]);
+  }, [authUser, fetchAnalytics]);
+
+  // ── Live updates: this page previously only refetched when a filter
+  // changed, so it could show a stale snapshot while an admin actively
+  // worked the same department's live queue in another tab.
+  useEffect(() => {
+    if (!authUser || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ["queue:called", "queue:served", "queue:no-show"];
+    events.forEach((event) => socket.on(event, fetchAnalytics));
+    return () => {
+      events.forEach((event) => socket.off(event, fetchAnalytics));
+    };
+  }, [authUser, token, fetchAnalytics]);
 
   // Close dropdowns on outside click
   useEffect(() => {

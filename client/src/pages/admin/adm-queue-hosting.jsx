@@ -2,15 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import "./admin-queue-hosting.css";
+import "./adm-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import { connectSocket } from "../../utils/socket";
+import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
 import AdminPageShell from "../../components/AdminPageShell";
 import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
-import { formatManilaDateTime, getManilaTimeString, addMinutesClampedToDay } from "../../utils/dateTime";
+import { formatManilaDateTime, getManilaTimeString, addMinutesClampedToDay, formatTimeString } from "../../utils/dateTime";
 
 // ── Icons ──────────────────────────────────────────────────────
 const QueueIconNav = ({ className }) => (
@@ -91,21 +91,24 @@ export default function AdminQueueHosting() {
       }
     : { name: "Admin", role: "admin", college: "", departmentAbbrev: "CCS" };
 
-  // ── Real queue + service data (scoped server-side to admin's dept) ───────
-  const [queues, setQueues] = useState([]);
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  // ── Real queue data, its live-update wiring, and pause/resume/close, all
+  // shared with adm-queue.jsx via useAdminQueueHosting so the two pages'
+  // event lists and business logic can't drift out of sync again. ─────────
+  const {
+    queues,
+    loading,
+    fetchQueues,
+    reasonModal,
+    setReasonModal,
+    reasonSubmitting,
+    handlePauseQueue,
+    handleCloseQueue,
+    handleResumeQueue,
+    handleReasonConfirm,
+  } = useAdminQueueHosting();
 
-  const fetchQueues = useCallback(async () => {
-    try {
-      const res = await api.get("/admin/queue-hosting");
-      setQueues(res.data.queues ?? []);
-    } catch (error) {
-      console.error("Failed to fetch queues:", error);
-      toast.error("Could not load queue data");
-    }
-  }, []);
+  const [services, setServices] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchServices = useCallback(async () => {
     try {
@@ -117,37 +120,8 @@ export default function AdminQueueHosting() {
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      await Promise.all([fetchQueues(), fetchServices()]);
-      setLoading(false);
-    };
-    if (authUser) init();
-  }, [authUser, fetchQueues, fetchServices]);
-
-  // ── Live updates: refetch when a socket event affects this dept's queues ──
-  useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
-    if (!authUser || !token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = [
-      "queue:slot-opened",
-      "queue:slot-status",
-      "queue:called",
-      "queue:served",
-      "queue:no-show",
-      "queue:student-joined",
-      "queue:student-left",
-    ];
-    events.forEach((event) => socket.on(event, fetchQueues));
-
-    return () => {
-      events.forEach((event) => socket.off(event, fetchQueues));
-    };
-  }, [authUser, fetchQueues]);
+    if (authUser) fetchServices();
+  }, [authUser, fetchServices]);
 
   // ── Search & filter state ──────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -162,6 +136,11 @@ export default function AdminQueueHosting() {
   const [serviceStart, setServiceStart] = useState("08:00");
   const [serviceEnd, setServiceEnd] = useState("17:00");
   const [noShowTimeout, setNoShowTimeout] = useState("15");
+  // True only right after resetForm() auto-computes an end time that got
+  // clamped to 23:59 instead of the full +240min window (see
+  // addMinutesClampedToDay) — cleared as soon as the admin edits either time
+  // field themselves, since past that point it's their explicit choice.
+  const [defaultEndClamped, setDefaultEndClamped] = useState(false);
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
@@ -183,9 +162,12 @@ export default function AdminQueueHosting() {
     setServiceId("");
     setMaxCapacity("100");
     const now = getManilaTimeString();
+    const [h, m] = now.split(":").map(Number);
+    const rawTargetMinutes = h * 60 + m + 240;
     setServiceStart(now);
     setServiceEnd(addMinutesClampedToDay(now, 240));
     setNoShowTimeout("15");
+    setDefaultEndClamped(rawTargetMinutes > 23 * 60 + 59);
   };
   const openModal = () => {
     resetForm();
@@ -239,44 +221,6 @@ export default function AdminQueueHosting() {
     }
   };
 
-  // ── Queue lifecycle handlers (server-authoritative) ───────────────────────
-  // Pause and close both require a reason, collected via QueueReasonModal.
-  const [reasonModal, setReasonModal] = useState(null); // { mode: 'pause'|'close', queueId }
-  const [reasonSubmitting, setReasonSubmitting] = useState(false);
-
-  const handlePauseQueue = (id) => setReasonModal({ mode: "pause", queueId: id });
-  const handleCloseQueue = (id) => setReasonModal({ mode: "close", queueId: id });
-
-  const handleResumeQueue = async (id) => {
-    try {
-      await api.patch(`/admin/queue-hosting/${id}/resume`);
-      toast.success("Queue resumed");
-      await fetchQueues();
-    } catch (error) {
-      toast.error(error?.response?.data?.error ?? "Failed to resume queue");
-    }
-  };
-
-  const handleReasonConfirm = async (reason) => {
-    if (!reasonModal) return;
-    const { mode, queueId } = reasonModal;
-    setReasonSubmitting(true);
-    try {
-      await api.patch(`/admin/queue-hosting/${queueId}/${mode}`, { reason });
-      toast[mode === "pause" ? "message" : "success"](
-        mode === "pause" ? "Queue paused" : "Queue stopped",
-      );
-      setReasonModal(null);
-      await fetchQueues();
-    } catch (error) {
-      toast.error(
-        error?.response?.data?.error ?? `Failed to ${mode} queue`,
-      );
-    } finally {
-      setReasonSubmitting(false);
-    }
-  };
-
   // ── Derived values ─────────────────────────────────────────────────────────
   // Unique service types currently hosted, regardless of how many queue lines
   // of that same type are open/paused/closed today — always computed from the
@@ -323,7 +267,7 @@ export default function AdminQueueHosting() {
             title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
             message={
               reasonModal?.mode === "pause"
-                ? queues.find((q) => q.id === reasonModal.queueId)?.currentlyServingStudentNumber
+                ? queues.find((q) => q.id === reasonModal.id)?.currentlyServingStudentNumber
                   ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
                   : "Students in this queue will see this reason while it's paused."
                 : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
@@ -421,7 +365,7 @@ export default function AdminQueueHosting() {
                           type="time"
                           className="aqh-form-input"
                           value={serviceStart}
-                          onChange={(e) => setServiceStart(e.target.value)}
+                          onChange={(e) => { setServiceStart(e.target.value); setDefaultEndClamped(false); }}
                         />
                         <ClockIcon />
                       </div>
@@ -433,10 +377,15 @@ export default function AdminQueueHosting() {
                           type="time"
                           className="aqh-form-input"
                           value={serviceEnd}
-                          onChange={(e) => setServiceEnd(e.target.value)}
+                          onChange={(e) => { setServiceEnd(e.target.value); setDefaultEndClamped(false); }}
                         />
                         <ClockIcon />
                       </div>
+                      {defaultEndClamped && (
+                        <p className="aqh-modal-subtitle" style={{ color: "var(--warning, #f59e0b)" }}>
+                          It's late enough today that the usual 4-hour window would run past midnight — the end time was capped at 11:59 PM instead. Adjust it if you meant a shorter window.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -640,6 +589,11 @@ export default function AdminQueueHosting() {
                         <span className="aqh-status-badge aqh-status-active">
                           active
                         </span>
+                        {queue.currentlyServingStudentNumber && (
+                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-completed" : "aqh-status-paused"}`}>
+                            {queue.currentlyServingArrivedAt ? "being served" : "called"}
+                          </span>
+                        )}
                         <div className="aqh-queue-card-actions">
                           <button
                             className="aqh-action-btn aqh-action-pause"
@@ -669,7 +623,7 @@ export default function AdminQueueHosting() {
                       <div className="aqh-queue-stat">
                         <p className="aqh-queue-stat-label">Service Hours</p>
                         <p className="aqh-queue-stat-value aqh-stat-value-sm">
-                          {queue.serviceHours.start} - {queue.serviceHours.end}
+                          {formatTimeString(queue.serviceHours.start)} - {formatTimeString(queue.serviceHours.end)}
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
@@ -767,7 +721,7 @@ export default function AdminQueueHosting() {
                       <div className="aqh-queue-stat">
                         <p className="aqh-queue-stat-label">Service Hours</p>
                         <p className="aqh-queue-stat-value aqh-stat-value-sm">
-                          {queue.serviceHours.start} - {queue.serviceHours.end}
+                          {formatTimeString(queue.serviceHours.start)} - {formatTimeString(queue.serviceHours.end)}
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
@@ -820,6 +774,11 @@ export default function AdminQueueHosting() {
                         <span className="aqh-status-badge aqh-status-still-serving">
                           {queue.status === "full" ? "full" : "hours ended"}
                         </span>
+                        {queue.currentlyServingStudentNumber && (
+                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-completed" : "aqh-status-paused"}`}>
+                            {queue.currentlyServingArrivedAt ? "being served" : "called"}
+                          </span>
+                        )}
                         <div className="aqh-queue-card-actions">
                           <button
                             className="aqh-action-btn aqh-action-close"
@@ -841,7 +800,7 @@ export default function AdminQueueHosting() {
                       <div className="aqh-queue-stat">
                         <p className="aqh-queue-stat-label">Service Hours</p>
                         <p className="aqh-queue-stat-value aqh-stat-value-sm">
-                          {queue.serviceHours.start} - {queue.serviceHours.end}
+                          {formatTimeString(queue.serviceHours.start)} - {formatTimeString(queue.serviceHours.end)}
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
