@@ -187,9 +187,21 @@ export default function ProfessorDashboardScreen() {
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
 
+  const handleStatPress = (key: string) => {
+    if (key === 'appointments') {
+      router.push('/pages/professor/professor_appointment');
+      return;
+    }
+    comingSoon();
+  };
+
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
     if (key === 'dashboard') return;
+    if (key === 'appointments') {
+      router.push('/pages/professor/professor_appointment');
+      return;
+    }
     comingSoon();
   };
 
@@ -262,7 +274,7 @@ export default function ProfessorDashboardScreen() {
             {stats.map((stat) => {
               const tint = STAT_TINTS[stat.tint];
               return (
-                <Pressable key={stat.key} style={styles.statCard} onPress={comingSoon}>
+                <Pressable key={stat.key} style={styles.statCard} onPress={() => handleStatPress(stat.key)}>
                   <View style={[styles.statIcon, { backgroundColor: tint.bg, borderColor: tint.border }]}>
                     <Ionicons name={stat.icon} size={20} color={tint.color} />
                   </View>
@@ -303,7 +315,7 @@ export default function ProfessorDashboardScreen() {
 
           {/* Today's Appointments */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Appointments</Text>
+            <Text style={styles.sectionTitle}>Today&apos;s Appointments</Text>
             <Pressable onPress={comingSoon} hitSlop={8}>
               <Text style={styles.viewAllText}>View All</Text>
             </Pressable>
