@@ -295,6 +295,10 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_queue_analytics');
       return;
     }
+    if (key === 'pinnacle-sync') {
+      router.push('/pages/admin/admin_pinnacle_sync');
+      return;
+    }
     comingSoon();
   };
 
