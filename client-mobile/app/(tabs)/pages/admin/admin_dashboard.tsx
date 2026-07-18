@@ -307,6 +307,10 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_scan_document');
       return;
     }
+    if (key === 'host-queue') {
+      router.push('/pages/admin/admin_queue_hosting');
+      return;
+    }
     comingSoon();
   };
 
@@ -463,7 +467,7 @@ export default function AdminDashboardScreen() {
                 <Ionicons name="notifications-outline" size={20} color="#3b82f6" />
                 <Text style={styles.sectionTitle}>Announcement Management</Text>
               </View>
-              <Pressable onPress={comingSoon}>
+              <Pressable onPress={() => router.push('/pages/admin/admin_announcement')}>
                 <LinearGradient
                   colors={['#3b82f6', '#2563eb']}
                   start={{ x: 0, y: 0 }}
@@ -519,7 +523,7 @@ export default function AdminDashboardScreen() {
           <View style={[styles.card, styles.pendingDocsCard]}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitleText}>Pending Requested Documents</Text>
-              <Pressable onPress={comingSoon} hitSlop={8}>
+              <Pressable onPress={() => router.push('/pages/admin/admin_document_processing')} hitSlop={8}>
                 <Text style={styles.viewAllText}>View All</Text>
               </Pressable>
             </View>
@@ -551,7 +555,7 @@ export default function AdminDashboardScreen() {
           <View style={[styles.card, styles.hostedQueuesCard]}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitleText}>Current Hosted Queues</Text>
-              <Pressable onPress={comingSoon} hitSlop={8}>
+              <Pressable onPress={() => router.push('/pages/admin/admin_queue')} hitSlop={8}>
                 <Text style={styles.viewAllText}>Manage</Text>
               </Pressable>
             </View>
