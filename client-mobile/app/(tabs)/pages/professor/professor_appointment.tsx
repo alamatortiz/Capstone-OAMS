@@ -401,7 +401,14 @@ export default function ProfessorAppointmentScreen() {
           </View>
 
           {/* Schedule Manager card */}
-          <Pressable onPress={comingSoon}>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/pages/professor/professor_schedule_manager',
+                params: { from: 'appointments' },
+              })
+            }
+          >
             <LinearGradient
               colors={['rgba(124, 58, 237, 0.14)', 'rgba(168, 85, 247, 0.08)']}
               start={{ x: 0, y: 0 }}

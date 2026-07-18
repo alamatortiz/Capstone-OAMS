@@ -306,11 +306,17 @@ export default function ProfessorDashboardScreen() {
               <Pressable
                 key={action.key}
                 style={styles.actionCard}
-                onPress={() =>
-                  action.key === 'document-request'
-                    ? router.push('/pages/professor/professor_documents')
-                    : comingSoon()
-                }
+                onPress={() => {
+                  if (action.key === 'document-request') {
+                    router.push('/pages/professor/professor_documents');
+                    return;
+                  }
+                  if (action.key === 'schedule-manager') {
+                    router.push('/pages/professor/professor_schedule_manager');
+                    return;
+                  }
+                  comingSoon();
+                }}
               >
                 <View style={styles.actionMain}>
                   <LinearGradient colors={action.gradient} style={styles.actionIcon}>
