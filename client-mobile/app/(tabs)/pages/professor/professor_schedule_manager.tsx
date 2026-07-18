@@ -208,6 +208,7 @@ export default function ProfessorScheduleManagerScreen() {
     if (key === 'dashboard') { router.push('/pages/professor/professor_dashboard'); return; }
     if (key === 'appointments') { router.push('/pages/professor/professor_appointment'); return; }
     if (key === 'documents') { router.push('/pages/professor/professor_documents'); return; }
+    if (key === 'transactions') { router.push('/pages/professor/professor_transactions'); return; }
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
   };
 

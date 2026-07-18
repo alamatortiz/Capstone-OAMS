@@ -271,6 +271,10 @@ export default function ProfessorDocumentsScreen() {
       router.push('/pages/professor/professor_appointment');
       return;
     }
+    if (key === 'transactions') {
+      router.push('/pages/professor/professor_transactions');
+      return;
+    }
     comingSoon();
   };
 

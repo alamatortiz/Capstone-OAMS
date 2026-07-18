@@ -214,6 +214,7 @@ export default function ProfessorDocumentsStatusScreen() {
     if (key === 'dashboard') { goToDashboard(); return; }
     if (key === 'appointments') { router.push('/pages/professor/professor_appointment'); return; }
     if (key === 'documents') { goToRequestPage(); return; }
+    if (key === 'transactions') { router.push('/pages/professor/professor_transactions'); return; }
     comingSoon();
   };
 

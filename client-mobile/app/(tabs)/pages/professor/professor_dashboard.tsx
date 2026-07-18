@@ -213,6 +213,10 @@ export default function ProfessorDashboardScreen() {
       router.push('/pages/professor/professor_documents');
       return;
     }
+    if (key === 'transactions') {
+      router.push('/pages/professor/professor_transactions');
+      return;
+    }
     comingSoon();
   };
 
@@ -341,7 +345,7 @@ export default function ProfessorDashboardScreen() {
           {/* Today's Appointments */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today&apos;s Appointments</Text>
-            <Pressable onPress={comingSoon} hitSlop={8}>
+            <Pressable onPress={() => router.push('/pages/professor/professor_appointment')} hitSlop={8}>
               <Text style={styles.viewAllText}>View All</Text>
             </Pressable>
           </View>
@@ -388,7 +392,7 @@ export default function ProfessorDashboardScreen() {
           {/* Recent Activity */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <Pressable onPress={comingSoon} hitSlop={8}>
+            <Pressable onPress={() => router.push('/pages/professor/professor_transactions')} hitSlop={8}>
               <Text style={styles.viewAllText}>See All</Text>
             </Pressable>
           </View>

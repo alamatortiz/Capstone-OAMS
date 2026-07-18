@@ -312,6 +312,10 @@ export default function ProfessorAppointmentScreen() {
       router.push('/pages/professor/professor_documents');
       return;
     }
+    if (key === 'transactions') {
+      router.push('/pages/professor/professor_transactions');
+      return;
+    }
     comingSoon();
   };
 
