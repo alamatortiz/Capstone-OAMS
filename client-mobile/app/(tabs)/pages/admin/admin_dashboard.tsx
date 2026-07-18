@@ -302,6 +302,14 @@ export default function AdminDashboardScreen() {
     comingSoon();
   };
 
+  const handleQuickActionPress = (key: string) => {
+    if (key === 'scan-document') {
+      router.push('/pages/admin/admin_scan_document');
+      return;
+    }
+    comingSoon();
+  };
+
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
     if (key === 'dashboard') return;
@@ -435,7 +443,7 @@ export default function AdminDashboardScreen() {
             </View>
             <View style={styles.toolsGrid}>
               {quickActions.map((action) => (
-                <Pressable key={action.key} style={styles.quickActionCard} onPress={comingSoon}>
+                <Pressable key={action.key} style={styles.quickActionCard} onPress={() => handleQuickActionPress(action.key)}>
                   <LinearGradient colors={action.gradient} style={styles.toolIcon}>
                     <Ionicons name={action.icon} size={24} color="#ffffff" />
                   </LinearGradient>
