@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -171,7 +172,7 @@ export default function ProfessorDocumentsScreen() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -232,6 +233,17 @@ export default function ProfessorDocumentsScreen() {
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchRequests();
+    socket.on('document:status-updated', refetch);
+    return () => {
+      socket.off('document:status-updated', refetch);
+    };
+  }, [user, token, fetchRequests]);
 
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
 

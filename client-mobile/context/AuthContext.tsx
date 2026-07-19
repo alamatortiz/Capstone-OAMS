@@ -9,6 +9,7 @@ import React, {
 import * as SecureStore from "expo-secure-store";
 import api, { setCachedToken } from "../utils/api";
 import { disconnectSocket } from "../utils/socket";
+import { ensureNotificationPermission } from "../utils/notifications";
 
 type Role = "student" | "faculty" | "admin";
 
@@ -109,6 +110,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     initializeAuth();
   }, [saveAuthData, clearAuthData]);
+
+  useEffect(() => {
+    if (user) ensureNotificationPermission();
+  }, [user]);
 
   const login = async (emailOrSchoolId: string, password: string) => {
     setIsLoading(true);

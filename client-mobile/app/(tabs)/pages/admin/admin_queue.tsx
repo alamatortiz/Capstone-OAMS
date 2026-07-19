@@ -20,6 +20,7 @@ import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
 import api from '@/utils/api';
+import { exportRowsAsCsv } from '@/utils/csvExport';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -234,6 +235,25 @@ export default function AdminQueueScreen() {
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
 
+  const handleExportData = async () => {
+    if (!monitoringQueue) return;
+    try {
+      await exportRowsAsCsv(
+        queueEntries.map((entry: any) => ({
+          queueNumber: entry.queueNumber,
+          studentName: entry.studentName,
+          studentId: entry.studentId,
+          concern: entry.concern,
+          status: entry.status,
+          joinedAt: entry.joinedAt,
+        })),
+        `${monitoringQueue.queueType.replace(/\s+/g, '-').toLowerCase()}-queue-export.csv`,
+      );
+    } catch (error: any) {
+      Alert.alert('Export failed', error?.message ?? 'Could not export the queue data.');
+    }
+  };
+
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
 
   const handleNavPress = (key: string) => {
@@ -342,7 +362,7 @@ export default function AdminQueueScreen() {
 
   const handleSkipStudent = async (id: number) => {
     try {
-      await api.patch(`/admin/queue-hosting/${id}/skip`);
+      await api.patch(`/admin/queue-hosting/${id}/skip`, { reason: 'Did not respond when called' });
       await fetchQueues();
       await fetchEntries(id);
     } catch (error: any) {
@@ -450,7 +470,14 @@ export default function AdminQueueScreen() {
                 <Ionicons name="chevron-back" size={16} color={theme.text} />
                 <Text style={styles.backBtnText}>Back to Queue List</Text>
               </Pressable>
-              <Pressable style={styles.refreshBtn} onPress={comingSoon} hitSlop={8}>
+              <Pressable
+                style={styles.refreshBtn}
+                onPress={() => {
+                  fetchQueues();
+                  if (monitoringQueueId != null) fetchEntries(monitoringQueueId);
+                }}
+                hitSlop={8}
+              >
                 <Ionicons name="refresh-outline" size={18} color={theme.text} />
               </Pressable>
             </View>
@@ -578,7 +605,7 @@ export default function AdminQueueScreen() {
                   <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
                   <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Stop Queue</Text>
                 </Pressable>
-                <Pressable style={[styles.actionBtn, styles.actionBtnNeutral]} onPress={comingSoon}>
+                <Pressable style={[styles.actionBtn, styles.actionBtnNeutral]} onPress={handleExportData}>
                   <Ionicons name="trending-up-outline" size={16} color={theme.subtext} />
                   <Text style={[styles.actionBtnText, { color: theme.text }]}>Export Data</Text>
                 </Pressable>
@@ -796,7 +823,7 @@ export default function AdminQueueScreen() {
             </View>
           </View>
 
-          <Pressable style={styles.hostQueueBtn} onPress={comingSoon}>
+          <Pressable style={styles.hostQueueBtn} onPress={() => router.push('/pages/admin/admin_queue_hosting')}>
             <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.hostQueueIconBox}>
               <Ionicons name="add-circle-outline" size={20} color="#ffffff" />
             </LinearGradient>
@@ -844,7 +871,7 @@ export default function AdminQueueScreen() {
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
                 </Pressable>
-                <Pressable style={styles.refreshBtnSm} onPress={comingSoon} hitSlop={8}>
+                <Pressable style={styles.refreshBtnSm} onPress={fetchQueues} hitSlop={8}>
                   <Ionicons name="refresh-outline" size={16} color={theme.text} />
                 </Pressable>
               </View>

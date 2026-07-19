@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -16,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { exportRowsAsCsv } from '@/utils/csvExport';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -149,7 +152,7 @@ export default function AdminQueueAnalyticsScreen() {
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('performance');
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const [performance, setPerformance] = useState<ServicePerformance[]>([]);
   const [positiveInsights, setPositiveInsights] = useState<Insight[]>([]);
@@ -170,9 +173,40 @@ export default function AdminQueueAnalyticsScreen() {
     }
   }, [timePeriod, serviceType]);
 
+  const handleExportReport = async () => {
+    try {
+      await exportRowsAsCsv(
+        performance.map((p) => ({
+          service: p.service,
+          college: p.college,
+          status: p.status,
+          studentsServed: p.studentsServed,
+          avgWait: p.avgWait,
+          peakHours: p.peakHours,
+          satisfaction: p.satisfaction,
+        })),
+        `queue-analytics-${timePeriod.replace(/\s+/g, '-').toLowerCase()}.csv`,
+      );
+    } catch (error: any) {
+      Alert.alert('Export failed', error?.message ?? 'Could not export the report.');
+    }
+  };
+
   useEffect(() => {
     if (user) fetchAnalytics();
   }, [user, fetchAnalytics]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchAnalytics();
+    const events = ['queue:called', 'queue:served', 'queue:no-show'];
+    events.forEach((event) => socket.on(event, refetch));
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+    };
+  }, [user, token, fetchAnalytics]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -287,7 +321,7 @@ export default function AdminQueueAnalyticsScreen() {
               </View>
             </View>
             <View style={styles.filtersActionsRow}>
-              <Pressable style={styles.outlineBtn}>
+              <Pressable style={styles.outlineBtn} onPress={handleExportReport}>
                 <Ionicons name="download-outline" size={14} color={theme.text} />
                 <Text style={styles.outlineBtnText}>Export Report</Text>
               </Pressable>

@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -135,7 +136,7 @@ export default function StudentDocumentsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -172,6 +173,23 @@ export default function StudentDocumentsScreen() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  // ── Live updates: refetch when a document's status changes (mirrors
+  // stud-document-status.jsx's "document:status-updated"). This is the plain
+  // list/request screen — it refetches silently; student_document_status.tsx
+  // (the tracking/detail screen) owns the local notification for this event
+  // so a student never gets duplicate notifications from both screens. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on('document:status-updated', fetchDocuments);
+
+    return () => {
+      socket.off('document:status-updated', fetchDocuments);
+    };
+  }, [user, token, fetchDocuments]);
 
   useEffect(() => {
     const fetchServiceTypes = async () => {

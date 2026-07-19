@@ -231,6 +231,9 @@ export default function AdminDashboardScreen() {
       'queue:no-show',
       'queue:student-joined',
       'queue:student-left',
+      'document:new-request',
+      'document:cancelled',
+      'announcement:changed',
     ];
     events.forEach((event) => socket.on(event, fetchStats));
     return () => {
@@ -506,14 +509,14 @@ export default function AdminDashboardScreen() {
                     <View style={styles.announcementActions}>
                       <Pressable
                         style={[styles.iconActionBtn, styles.iconActionBtnEdit]}
-                        onPress={comingSoon}
+                        onPress={() => router.push('/pages/admin/admin_announcement')}
                         hitSlop={6}
                       >
                         <Image source={editIcon} style={styles.iconActionImg} />
                       </Pressable>
                       <Pressable
                         style={[styles.iconActionBtn, styles.iconActionBtnDelete]}
-                        onPress={comingSoon}
+                        onPress={() => router.push('/pages/admin/admin_announcement')}
                         hitSlop={6}
                       >
                         <Image source={deleteIcon} style={styles.iconActionImg} />

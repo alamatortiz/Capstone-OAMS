@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -143,7 +145,7 @@ export default function ProfessorDocumentsStatusScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -183,6 +185,22 @@ export default function ProfessorDocumentsStatusScreen() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchDocuments();
+    const onStatusUpdated = () => {
+      notify('Document update', 'A document request status has changed.');
+    };
+    socket.on('document:status-updated', refetch);
+    socket.on('document:status-updated', onStatusUpdated);
+    return () => {
+      socket.off('document:status-updated', refetch);
+      socket.off('document:status-updated', onStatusUpdated);
+    };
+  }, [user, token, fetchDocuments]);
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);

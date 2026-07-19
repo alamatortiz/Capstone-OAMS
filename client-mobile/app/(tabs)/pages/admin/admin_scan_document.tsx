@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import {
   ActivityIndicator,
   Alert,
@@ -151,6 +154,10 @@ export default function AdminScanDocumentScreen() {
   const [scanToast, setScanToast] = useState(false);
   const [claiming, setClaiming] = useState(false);
 
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const hasHandledScan = useRef(false);
+
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
@@ -252,12 +259,27 @@ export default function AdminScanDocumentScreen() {
     }
   };
 
-  const handleStartScanning = () => {
+  const handleStartScanning = async () => {
+    if (!cameraPermission?.granted) {
+      const result = await requestCameraPermission();
+      if (!result.granted) {
+        Alert.alert(
+          'Camera access needed',
+          'Please allow camera access in your device settings to scan QR codes.',
+        );
+        return;
+      }
+    }
+    hasHandledScan.current = false;
+    setShowCamera(true);
+  };
+
+  const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+    if (hasHandledScan.current) return;
+    hasHandledScan.current = true;
+    setShowCamera(false);
     setScanning(true);
-    setTimeout(() => {
-      setScanning(false);
-      processCode(QUICK_TEST_CODES[0]);
-    }, 2000);
+    processCode(result.data).finally(() => setScanning(false));
   };
 
   const handleVerify = () => processCode(manualCode);
@@ -279,6 +301,37 @@ export default function AdminScanDocumentScreen() {
       Alert.alert('Error', 'Failed to mark document as claimed.');
     } finally {
       setClaiming(false);
+    }
+  };
+
+  const handlePrintDocument = async () => {
+    if (!scannedDoc) return;
+    try {
+      const text = [
+        'Document Verification',
+        `Tracking Number: ${scannedDoc.trackingNumber}`,
+        `Document Type: ${scannedDoc.documentType}`,
+        `Student: ${scannedDoc.studentName} (${scannedDoc.studentId})`,
+        `College: ${scannedDoc.college}`,
+        `Issue Date: ${scannedDoc.issueDate}`,
+        `Valid Until: ${scannedDoc.validUntil}`,
+        `Status: ${scannedDoc.status}`,
+        `Document Status: ${scannedDoc.documentStatus}`,
+        scannedDoc.issuedBy ? `Issued By: ${scannedDoc.issuedBy}` : null,
+        scannedDoc.authorizedSignatory ? `Authorized Signatory: ${scannedDoc.authorizedSignatory}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+      const uri = `${FileSystem.cacheDirectory}${scannedDoc.trackingNumber}.txt`;
+      await FileSystem.writeAsStringAsync(uri, text, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: `${scannedDoc.trackingNumber}.txt` });
+    } catch (err) {
+      Alert.alert('Error', 'Failed to share document details.');
     }
   };
 
@@ -444,6 +497,25 @@ export default function AdminScanDocumentScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      {/* Camera QR Scanner Modal */}
+      <Modal visible={showCamera} animationType="slide" onRequestClose={() => setShowCamera(false)}>
+        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+          <CameraView
+            style={{ flex: 1 }}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            onBarcodeScanned={handleBarcodeScanned}
+          />
+          <SafeAreaView style={styles.cameraOverlay} edges={['top', 'bottom']}>
+            <Pressable style={styles.cameraCloseBtn} onPress={() => setShowCamera(false)} hitSlop={10}>
+              <Ionicons name="close" size={22} color="#ffffff" />
+            </Pressable>
+            <View style={styles.cameraFrameGuide} />
+            <Text style={styles.cameraHintText}>Position the QR code within the frame</Text>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
       {/* Document Verification Modal */}
       <Modal visible={!!scannedDocument} animationType="fade" transparent onRequestClose={handleCloseModal}>
         {scannedDocument && (
@@ -558,7 +630,7 @@ export default function AdminScanDocumentScreen() {
                     <Text style={styles.claimBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
                   </Pressable>
                 )}
-                <Pressable style={styles.printBtn} onPress={comingSoon}>
+                <Pressable style={styles.printBtn} onPress={handlePrintDocument}>
                   <Ionicons name="print-outline" size={15} color={theme.text} />
                   <Text style={styles.printBtnText}>Print</Text>
                 </Pressable>
@@ -779,6 +851,38 @@ function createStyles(theme: ThemePalette) {
     iconBtnImg: { width: 18, height: 18 },
 
     scrollContent: { padding: 16, gap: 16, paddingBottom: 40 },
+
+    // Camera scanner modal overlay
+    cameraOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 20,
+    },
+    cameraCloseBtn: {
+      alignSelf: 'flex-end',
+      marginRight: 20,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cameraFrameGuide: {
+      width: 250,
+      height: 250,
+      borderWidth: 3,
+      borderColor: '#22c55e',
+      borderRadius: 20,
+      backgroundColor: 'transparent',
+    },
+    cameraHintText: {
+      color: '#ffffff',
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 12,
+    },
 
     // Breadcrumb
     breadcrumb: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },

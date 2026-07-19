@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -162,7 +163,7 @@ export default function ProfessorDashboardScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
 
   const [dashData, setDashData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -186,6 +187,18 @@ export default function ProfessorDashboardScreen() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchStats();
+    const events = ['appointment:slot-updated', 'appointment:status-updated', 'document:status-updated'];
+    events.forEach((event) => socket.on(event, refetch));
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+    };
+  }, [user, token, fetchStats]);
 
   const s = dashData?.stats;
   const stats: StatItem[] = [

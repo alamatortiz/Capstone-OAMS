@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -201,7 +202,7 @@ export default function StudentAppointmentsScreen() {
   );
   const todayStr = useMemo(() => toDateStr(new Date()), []);
 
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
@@ -273,6 +274,23 @@ export default function StudentAppointmentsScreen() {
     fetchSlots();
     fetchMyBookings();
   }, [fetchSlots, fetchMyBookings]);
+
+  // ── Live updates: refetch slots when capacity changes elsewhere (mirrors
+  // stud-appointments.jsx's "appointment:slot-updated"/"appointment:slot-removed").
+  // This is the browse/book screen -- refetches silently; status-change
+  // notifications belong to student_appointment_status.tsx. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ['appointment:slot-updated', 'appointment:slot-removed'];
+    events.forEach((event) => socket.on(event, fetchSlots));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchSlots));
+    };
+  }, [user, token, fetchSlots]);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('slots');
   const [selectedCollege, setSelectedCollege] = useState('');

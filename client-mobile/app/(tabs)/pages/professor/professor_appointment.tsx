@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -212,7 +214,7 @@ export default function ProfessorAppointmentScreen() {
   const [confirmAction, setConfirmAction] = useState<{ type: ActionType; apt: Appointment } | null>(null);
   const [confirmSaving, setConfirmSaving] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -230,6 +232,25 @@ export default function ProfessorAppointmentScreen() {
   useEffect(() => {
     fetchAppointments();
   }, [fetchAppointments]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchAppointments();
+    const events = ['appointment:slot-updated', 'appointment:status-updated'];
+    events.forEach((event) => socket.on(event, refetch));
+
+    const onStatusUpdated = () => {
+      notify('Appointment update', 'An appointment status has changed.');
+    };
+    socket.on('appointment:status-updated', onStatusUpdated);
+
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+      socket.off('appointment:status-updated', onStatusUpdated);
+    };
+  }, [user, token, fetchAppointments]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);

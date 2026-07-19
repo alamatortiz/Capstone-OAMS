@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -162,7 +163,7 @@ export default function AdminTransactionsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const adminName = user?.name ?? 'Admin';
   const adminRole = 'Admin';
   const adminDepartmentName = user?.departmentName ?? 'Your Department';
@@ -203,6 +204,26 @@ export default function AdminTransactionsScreen() {
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchTransactions();
+    const events = [
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+      'queue:student-joined',
+      'queue:student-left',
+      'appointment:status-updated',
+      'document:status-updated',
+    ];
+    events.forEach((event) => socket.on(event, refetch));
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+    };
+  }, [user, token, fetchTransactions]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');

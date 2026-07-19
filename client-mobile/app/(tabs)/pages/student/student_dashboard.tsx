@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -205,7 +207,7 @@ export default function StudentDashboardScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -274,6 +276,36 @@ export default function StudentDashboardScreen() {
     fetchAnnouncements();
     fetchOfficeHours();
   }, [fetchStats, fetchAnnouncements, fetchOfficeHours]);
+
+  // ── Live updates: refetch dashboard data when relevant socket events fire
+  // (mirrors stud-dashboard.jsx's statsEvents array + separate announcement
+  // listener). Only announcement:changed triggers a notification here —
+  // notifying on every stat-refresh event would be spammy. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const statsEvents = [
+      'document:status-updated',
+      'appointment:status-updated',
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+    ];
+    statsEvents.forEach((event) => socket.on(event, fetchStats));
+
+    const onAnnouncementChanged = (payload: any) => {
+      fetchAnnouncements();
+      notify('New announcement', payload?.title ? String(payload.title) : 'An announcement was posted or updated.');
+    };
+    socket.on('announcement:changed', onAnnouncementChanged);
+
+    return () => {
+      statsEvents.forEach((event) => socket.off(event, fetchStats));
+      socket.off('announcement:changed', onAnnouncementChanged);
+    };
+  }, [user, token, fetchStats, fetchAnnouncements]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 

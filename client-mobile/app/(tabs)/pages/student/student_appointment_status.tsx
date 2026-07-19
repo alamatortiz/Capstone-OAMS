@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -178,7 +180,7 @@ export default function StudentAppointmentStatusScreen() {
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const statusStyles = isDarkMode ? STATUS_STYLES_DARK : STATUS_STYLES_LIGHT;
@@ -215,6 +217,26 @@ export default function StudentAppointmentStatusScreen() {
   useEffect(() => {
     fetchAppointments();
   }, [fetchAppointments]);
+
+  // ── Live updates: refetch + notify when an appointment's status changes
+  // (mirrors stud-appointment-status.jsx's "appointment:status-updated").
+  // This is the tracking/detail screen, so it owns the notification; the
+  // browse/book screen (student_appointments.tsx) refetches silently. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const onAppointmentStatusUpdated = () => {
+      fetchAppointments();
+      notify('Appointment status updated', 'One of your appointments has a new status.');
+    };
+    socket.on('appointment:status-updated', onAppointmentStatusUpdated);
+
+    return () => {
+      socket.off('appointment:status-updated', onAppointmentStatusUpdated);
+    };
+  }, [user, token, fetchAppointments]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

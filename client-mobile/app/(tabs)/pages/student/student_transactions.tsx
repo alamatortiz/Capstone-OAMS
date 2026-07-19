@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -141,7 +142,7 @@ export default function StudentTransactionsScreen() {
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState<string | null>(null);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -163,6 +164,22 @@ export default function StudentTransactionsScreen() {
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
+
+  // ── Live updates: refetch when a document or appointment status changes
+  // (mirrors stud-transactions.jsx). Transactions are a historical log, not
+  // worth interrupting the user for -- refetch silently, no notification. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const events = ['document:status-updated', 'appointment:status-updated'];
+    events.forEach((event) => socket.on(event, fetchTransactions));
+
+    return () => {
+      events.forEach((event) => socket.off(event, fetchTransactions));
+    };
+  }, [user, token, fetchTransactions]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/student/student_dashboard');

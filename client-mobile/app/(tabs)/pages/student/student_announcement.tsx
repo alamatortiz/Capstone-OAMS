@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -129,7 +131,7 @@ export default function StudentAnnouncementScreen() {
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [collegeModalVisible, setCollegeModalVisible] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,6 +154,24 @@ export default function StudentAnnouncementScreen() {
   useEffect(() => {
     fetchAnnouncements();
   }, [fetchAnnouncements]);
+
+  // ── Live updates: refetch + notify when an admin posts/edits/removes an
+  // announcement (mirrors stud-announcements.jsx's "announcement:changed"). ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const onAnnouncementChanged = (payload: any) => {
+      fetchAnnouncements();
+      notify('New announcement', payload?.title ? String(payload.title) : 'An announcement was posted or updated.');
+    };
+    socket.on('announcement:changed', onAnnouncementChanged);
+
+    return () => {
+      socket.off('announcement:changed', onAnnouncementChanged);
+    };
+  }, [user, token, fetchAnnouncements]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);

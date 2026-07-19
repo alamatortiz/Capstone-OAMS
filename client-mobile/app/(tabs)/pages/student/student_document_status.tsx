@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import { notify } from '@/utils/notifications';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -148,7 +150,7 @@ export default function StudentDocumentStatusScreen() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -170,6 +172,26 @@ export default function StudentDocumentStatusScreen() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  // ── Live updates: refetch + notify when a document's status changes
+  // (mirrors stud-document-status.jsx's "document:status-updated"). This is
+  // the tracking/detail screen, so it owns the notification; the plain list
+  // screen (student_documents.tsx) refetches silently to avoid duplicates. ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const onDocumentStatusUpdated = () => {
+      fetchDocuments();
+      notify('Document status updated', 'One of your document requests has a new status.');
+    };
+    socket.on('document:status-updated', onDocumentStatusUpdated);
+
+    return () => {
+      socket.off('document:status-updated', onDocumentStatusUpdated);
+    };
+  }, [user, token, fetchDocuments]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

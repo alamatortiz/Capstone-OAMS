@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -171,7 +172,7 @@ export default function ProfessorTransactionsScreen() {
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -211,6 +212,24 @@ export default function ProfessorTransactionsScreen() {
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const refetch = () => fetchTransactions();
+    const events = [
+      'appointment:status-updated',
+      'document:status-updated',
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+    ];
+    events.forEach((event) => socket.on(event, refetch));
+    return () => {
+      events.forEach((event) => socket.off(event, refetch));
+    };
+  }, [user, token, fetchTransactions]);
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
