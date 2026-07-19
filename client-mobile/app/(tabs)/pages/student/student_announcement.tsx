@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,15 +65,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-announcements.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type AnnouncementCategory = 'important' | 'event' | 'reminder' | 'general';
 
 const CATEGORY_STYLE: Record<
@@ -94,26 +87,13 @@ interface Announcement {
   category: AnnouncementCategory;
   date: string;
   isPinned: boolean;
+  departmentAbbrev: string;
+  departmentName: string;
+  isCrossCollege: boolean;
 }
 
-const ANNOUNCEMENTS: Announcement[] = [
-  { id: '1', title: 'Enrollment Period for Second Semester', description: 'The enrollment period for the Second Semester AY 2025-2026 will be from April 1-15, 2026. Please prepare all necessary documents and settle any outstanding balances before enrollment.', college: 'College of Computing Studies (CCS)', category: 'important', date: 'March 25, 2026', isPinned: true },
-  { id: '2', title: 'System Maintenance Notice', description: 'The OAMS system will undergo scheduled maintenance on March 29, 2026, from 12:00 AM to 6:00 AM. Services will be temporarily unavailable during this period.', college: 'All Departments', category: 'important', date: 'March 26, 2026', isPinned: true },
-  { id: '3', title: 'Career Fair 2026', description: 'Join us for the University Career Fair on April 10, 2026, at the University Gymnasium. Meet with potential employers and learn about career opportunities.', college: 'College of Business Accountancy and Administration (CBAA)', category: 'event', date: 'March 24, 2026', isPinned: false },
-  { id: '4', title: 'Thesis Defense Schedule', description: 'Final thesis defense schedules for graduating students are now available. Please check with your respective department offices for your assigned date and time.', college: 'College of Engineering (COE)', category: 'reminder', date: 'March 23, 2026', isPinned: false },
-  { id: '5', title: 'Scholarship Application Open', description: 'Scholarship applications for Academic Year 2026-2027 are now open. Deadline for submission is April 30, 2026. Visit the Scholarship Office for more details.', college: 'All Departments', category: 'general', date: 'March 22, 2026', isPinned: false },
-  { id: '6', title: 'Library Extended Hours', description: 'The University Library will extend its operating hours during the examination period. Open from 7:00 AM to 10:00 PM starting April 1, 2026.', college: 'All Departments', category: 'general', date: 'March 21, 2026', isPinned: false },
-  { id: '7', title: 'Health and Wellness Week', description: 'Join us for Health and Wellness Week from April 5-9, 2026. Free health screenings, fitness activities, and mental health awareness programs will be available.', college: 'College of Health and Allied Sciences (CHAS)', category: 'event', date: 'March 20, 2026', isPinned: false },
-  { id: '8', title: 'Clearance Processing Reminder', description: 'Graduating students are reminded to start their clearance processing. Please settle all obligations and return borrowed items to avoid delays.', college: 'All Departments', category: 'reminder', date: 'March 19, 2026', isPinned: false },
-  { id: '9', title: 'Research Symposium', description: 'The Annual Research Symposium will be held on April 15, 2026. Students are encouraged to attend and learn from research presentations across all disciplines.', college: 'College of Arts and Sciences (CAS)', category: 'event', date: 'March 18, 2026', isPinned: false },
-  { id: '10', title: 'Student Council Elections', description: 'Filing of candidacy for Student Council Elections is now open until April 5, 2026. Voting will take place on April 20-22, 2026.', college: 'All Departments', category: 'general', date: 'March 17, 2026', isPinned: false },
-  { id: '11', title: 'Practicum Orientation', description: 'Mandatory practicum orientation for Education students will be held on April 8, 2026, at 2:00 PM in the AVR. Attendance is required.', college: 'College of Education (COED)', category: 'important', date: 'March 16, 2026', isPinned: false },
-  { id: '12', title: 'No Classes on April 9', description: 'In observance of the Day of Valor, there will be no classes on April 9, 2026. Regular schedule resumes on April 10, 2026.', college: 'All Departments', category: 'general', date: 'March 15, 2026', isPinned: false },
-];
-
-// Announcements filed under "All Departments" are cross-college and always
-// stay visible regardless of which single college is selected below.
-const CROSS_COLLEGE = 'All Departments';
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
 type FilterTabKey = 'pinned' | 'all' | AnnouncementCategory;
 
@@ -149,6 +129,29 @@ export default function StudentAnnouncementScreen() {
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [collegeModalVisible, setCollegeModalVisible] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAnnouncements = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/student/announcements');
+      setAnnouncements(data.announcements ?? []);
+    } catch (err) {
+      console.error('Fetch announcements error:', err);
+      setError('Could not load announcements. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -193,28 +196,27 @@ export default function StudentAnnouncementScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  // College options derived from the demo data, same rule the web page uses:
+  // College options derived from live data, same rule the web page uses:
   // cross-college announcements stay visible no matter which college is picked.
   const collegeOptions = useMemo(() => {
-    const seen = new Set<string>();
-    ANNOUNCEMENTS.forEach((a) => {
-      if (a.college !== CROSS_COLLEGE) seen.add(a.college);
+    const seen = new Map<string, string>();
+    announcements.forEach((a) => {
+      if (!seen.has(a.departmentAbbrev)) seen.set(a.departmentAbbrev, a.college);
     });
-    return [...seen].sort();
-  }, []);
+    return [...seen.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [announcements]);
 
   const matchesCollege = (a: Announcement) =>
-    selectedCollege === 'all' || a.college === selectedCollege || a.college === CROSS_COLLEGE;
+    selectedCollege === 'all' || a.departmentAbbrev === selectedCollege || a.isCrossCollege;
 
-  const pinnedAnnouncements = ANNOUNCEMENTS.filter((a) => a.isPinned).filter(matchesCollege);
-  const filteredAnnouncements = ANNOUNCEMENTS.filter(
+  const pinnedAnnouncements = announcements.filter((a) => a.isPinned).filter(matchesCollege);
+  const filteredAnnouncements = announcements.filter(
     (a) => selectedFilter === 'all' || a.category === selectedFilter,
-  )
-    .filter(matchesCollege)
-    .filter((a) => !a.isPinned);
+  ).filter(matchesCollege);
 
   const isPinnedTab = selectedFilter === 'pinned';
   const visibleList = isPinnedTab ? pinnedAnnouncements : filteredAnnouncements;
@@ -244,7 +246,7 @@ export default function StudentAnnouncementScreen() {
             <Text style={styles.cardDescription}>{announcement.description}</Text>
             <View style={styles.cardMeta}>
               <Text style={styles.cardMetaText}>{announcement.college}</Text>
-              <Text style={styles.cardMetaText}>{announcement.date}</Text>
+              <Text style={styles.cardMetaText}>{formatDate(announcement.date)}</Text>
             </View>
           </View>
         </View>
@@ -315,12 +317,32 @@ export default function StudentAnnouncementScreen() {
           {/* College Filter */}
           <Pressable style={styles.collegeFilterBtn} onPress={() => setCollegeModalVisible(true)}>
             <Text style={styles.collegeFilterText} numberOfLines={1}>
-              {selectedCollege === 'all' ? 'All Colleges' : selectedCollege}
+              {selectedCollege === 'all'
+                ? 'All Colleges'
+                : collegeOptions.find(([abbrev]) => abbrev === selectedCollege)?.[1] ?? selectedCollege}
             </Text>
             <Ionicons name="chevron-down" size={16} color={theme.tertiary} />
           </Pressable>
 
+          {error && (
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Something went wrong</Text>
+              <Text style={styles.emptyDescription}>{error}</Text>
+              <Pressable style={styles.collegeFilterBtn} onPress={fetchAnnouncements}>
+                <Text style={styles.collegeFilterText}>Retry</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {loading && !error && (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyDescription}>Loading announcements…</Text>
+            </View>
+          )}
+
           {/* Announcement List */}
+          {!loading && !error && (
           <View>
             <Text style={styles.sectionTitle}>{sectionTitle}</Text>
             {visibleList.length === 0 ? (
@@ -339,6 +361,7 @@ export default function StudentAnnouncementScreen() {
               <View style={styles.list}>{visibleList.map((a) => renderCard(a))}</View>
             )}
           </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -356,12 +379,12 @@ export default function StudentAnnouncementScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -402,14 +425,14 @@ export default function StudentAnnouncementScreen() {
           <View style={styles.filterModalCard}>
             <Text style={styles.logoutModalTitle}>Select College</Text>
             <ScrollView style={styles.filterOptionsList}>
-              {['all', ...collegeOptions].map((opt) => {
-                const selected = opt === selectedCollege;
+              {[['all', 'All Colleges'] as [string, string], ...collegeOptions].map(([abbrev, name]) => {
+                const selected = abbrev === selectedCollege;
                 return (
                   <Pressable
-                    key={opt}
+                    key={abbrev}
                     style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
                     onPress={() => {
-                      setSelectedCollege(opt);
+                      setSelectedCollege(abbrev);
                       setCollegeModalVisible(false);
                     }}
                   >
@@ -417,7 +440,7 @@ export default function StudentAnnouncementScreen() {
                       style={[styles.filterOptionText, selected && styles.filterOptionTextActive]}
                       numberOfLines={2}
                     >
-                      {opt === 'all' ? 'All Colleges' : opt}
+                      {name}
                     </Text>
                     {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
                   </Pressable>

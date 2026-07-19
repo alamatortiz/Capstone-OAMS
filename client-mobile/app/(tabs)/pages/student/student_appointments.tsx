@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,15 +65,6 @@ function OamsLogo({
     </View>
   );
 }
-
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-appointments.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
 
 interface College {
   abbrev: string;
@@ -143,87 +136,6 @@ function buildTwoWeekDates() {
   return { thisWeek: buildWeek(0), nextWeek: buildWeek(1) };
 }
 
-function buildDemoSlots(thisWeek: string[], nextWeek: string[]): Slot[] {
-  return [
-    {
-      availabilityId: 'a1', professorId: '1', professorName: 'Prof. Maria Santos', college: 'CCS',
-      date: thisWeek[0], windowStart: '09:00', windowEnd: '10:00', location: 'CCS Faculty Room 201',
-      spotsLeft: 3, maxStudents: 5, professorAvailabilityStatus: 'available',
-      appointmentTypes: [{ id: 't1', name: 'Thesis Consultation' }, { id: 't2', name: 'Grade Inquiry' }],
-    },
-    {
-      availabilityId: 'a2', professorId: '1', professorName: 'Prof. Maria Santos', college: 'CCS',
-      date: thisWeek[2], windowStart: '13:00', windowEnd: '14:00', location: 'CCS Faculty Room 201',
-      spotsLeft: 0, maxStudents: 5, professorAvailabilityStatus: 'available',
-    },
-    {
-      availabilityId: 'a3', professorId: '2', professorName: 'Prof. Juan Reyes', college: 'CCS',
-      date: thisWeek[1], windowStart: '10:00', windowEnd: '11:00', location: 'CCS Room 105',
-      spotsLeft: 5, maxStudents: 5, professorAvailabilityStatus: 'available',
-    },
-    {
-      availabilityId: 'a4', professorId: '3', professorName: 'Dr. Pedro Garcia', college: 'CCS',
-      date: thisWeek[3], windowStart: '14:00', windowEnd: '15:00', location: "Dean's Office",
-      spotsLeft: 2, maxStudents: 3, professorAvailabilityStatus: 'unavailable',
-    },
-    {
-      availabilityId: 'a5', professorId: '4', professorName: 'Ms. Ana Cruz', college: 'CCS',
-      date: nextWeek[0], windowStart: '08:00', windowEnd: '09:00', location: 'Student Affairs Office',
-      spotsLeft: 4, maxStudents: 4, professorAvailabilityStatus: 'available',
-    },
-    {
-      availabilityId: 'a6', professorId: '5', professorName: 'Prof. Liza Fernandez', college: 'CBAA',
-      date: nextWeek[2], windowStart: '11:00', windowEnd: '12:00', location: 'CBAA Room 210',
-      spotsLeft: null, maxStudents: null, professorAvailabilityStatus: 'available',
-    },
-    {
-      availabilityId: 'a7', professorId: '6', professorName: 'Dr. Ramon Villar', college: 'COE',
-      date: nextWeek[1], windowStart: '15:00', windowEnd: '16:00', location: 'COE Consultation Room',
-      spotsLeft: 1, maxStudents: 6, professorAvailabilityStatus: 'available',
-    },
-  ];
-}
-
-function buildDemoBookings(thisWeek: string[], nextWeek: string[]): Booking[] {
-  const past = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 10);
-    return toDateStr(d);
-  })();
-  return [
-    {
-      id: 'b1', availabilityId: 'a1', person: 'Prof. Maria Santos', college: 'CCS', date: thisWeek[0],
-      windowStart: '09:00', windowEnd: '10:00', location: 'CCS Faculty Room 201',
-      purpose: 'Discuss thesis proposal outline and timeline.', appointmentType: 'Thesis Consultation', status: 'pending',
-    },
-    {
-      id: 'b2', availabilityId: 'a3', person: 'Prof. Juan Reyes', college: 'CCS', date: thisWeek[1],
-      windowStart: '10:00', windowEnd: '11:00', location: 'CCS Room 105',
-      purpose: 'Grade inquiry for Software Engineering.', status: 'approved',
-    },
-    {
-      id: 'b3', availabilityId: 'a5', person: 'Ms. Ana Cruz', college: 'CCS', date: nextWeek[0],
-      windowStart: '08:00', windowEnd: '09:00', location: 'Student Affairs Office',
-      purpose: 'Complete clearance requirements.', status: 'approved',
-    },
-    {
-      id: 'b4', availabilityId: 'old1', person: 'Dr. Pedro Garcia', college: 'CCS', date: past,
-      windowStart: '13:00', windowEnd: '14:00', location: "Dean's Office",
-      purpose: 'Academic consultation.', status: 'completed',
-    },
-    {
-      id: 'b5', availabilityId: 'old2', person: 'Prof. Liza Fernandez', college: 'CBAA', date: past,
-      windowStart: '09:00', windowEnd: '10:00', location: 'CBAA Room 210',
-      purpose: 'Internship coordination inquiry.', status: 'rejected',
-    },
-    {
-      id: 'b6', availabilityId: 'old3', person: 'Dr. Ramon Villar', college: 'COE', date: past,
-      windowStart: '14:00', windowEnd: '15:00', location: 'COE Consultation Room',
-      purpose: 'Subject enrollment concern.', status: 'cancelled',
-    },
-  ];
-}
-
 const STATUS_ORDER: BookingStatus[] = ['pending', 'approved', 'completed', 'rejected', 'cancelled'];
 const STATUS_LABELS: Record<BookingStatus, string> = {
   pending: 'Pending Approval', approved: 'Approved', completed: 'Completed', rejected: 'Rejected', cancelled: 'Cancelled',
@@ -289,13 +201,82 @@ export default function StudentAppointmentsScreen() {
   );
   const todayStr = useMemo(() => toDateStr(new Date()), []);
 
-  const [slots] = useState<Slot[]>(() => buildDemoSlots(twoWeekDates.thisWeek, twoWeekDates.nextWeek));
-  const [bookings, setBookings] = useState<Booking[]>(() =>
-    buildDemoBookings(twoWeekDates.thisWeek, twoWeekDates.nextWeek),
-  );
+  const { user, logout } = useAuth();
+
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(true);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const fetchSlots = useCallback(async () => {
+    setSlotsLoading(true);
+    try {
+      const { data } = await api.get('/student/appointments/available-slots');
+      setSlots(
+        (data.slots ?? []).map((s: any) => ({
+          availabilityId: String(s.availabilityId),
+          professorId: String(s.professorId),
+          professorName: s.professorName,
+          college: s.college,
+          date: s.date,
+          windowStart: s.windowStart,
+          windowEnd: s.windowEnd,
+          location: s.location,
+          spotsLeft: s.spotsLeft,
+          maxStudents: s.maxStudents,
+          professorAvailabilityStatus: s.professorAvailabilityStatus,
+          appointmentTypes: (s.appointmentTypes ?? []).map((t: any) => ({ id: String(t.id), name: t.name })),
+        })),
+      );
+      setSlotsError(null);
+    } catch (err) {
+      console.error('Failed to fetch available slots:', err);
+      setSlotsError('Could not load available slots. Please try again.');
+    } finally {
+      setSlotsLoading(false);
+    }
+  }, []);
+
+  const fetchMyBookings = useCallback(async () => {
+    setBookingsLoading(true);
+    try {
+      const { data } = await api.get('/student/appointments');
+      setBookings(
+        (data.appointments ?? []).map((b: any) => ({
+          id: String(b.id),
+          availabilityId: String(b.availabilityId),
+          person: b.person,
+          college: b.collegeAbbrev || b.college,
+          date: b.date,
+          windowStart: b.windowStart ?? '',
+          windowEnd: b.windowEnd ?? '',
+          location: b.location,
+          purpose: b.purpose ?? '',
+          appointmentType: b.appointmentType ?? undefined,
+          status: b.status,
+        })),
+      );
+      setBookingsError(null);
+    } catch (err) {
+      console.error('Failed to fetch bookings:', err);
+      setBookingsError('Could not load your bookings. Please try again.');
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSlots();
+    fetchMyBookings();
+  }, [fetchSlots, fetchMyBookings]);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('slots');
-  const [selectedCollege, setSelectedCollege] = useState(demoStudent.departmentAbbrev);
+  const [selectedCollege, setSelectedCollege] = useState('');
+  const [hasUserSetCollege, setHasUserSetCollege] = useState(false);
   const [selectedProfessorId, setSelectedProfessorId] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null);
@@ -303,6 +284,12 @@ export default function StudentAppointmentsScreen() {
     const [y, m] = todayStr.split('-').map(Number);
     return { year: y, month: m };
   });
+
+  useEffect(() => {
+    if (!hasUserSetCollege && user?.departmentAbbrev) {
+      setSelectedCollege(user.departmentAbbrev);
+    }
+  }, [user?.departmentAbbrev, hasUserSetCollege]);
 
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -326,7 +313,7 @@ export default function StudentAppointmentsScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
   const availableSlots = useMemo(() => slots.filter((slot) => {
     const matchesDate = !selectedDate || slot.date === selectedDate;
@@ -399,7 +386,7 @@ export default function StudentAppointmentsScreen() {
   const filterCurrentValue = activeFilter === 'college' ? selectedCollege : selectedProfessorId;
 
   const selectFilterOption = (value: string) => {
-    if (activeFilter === 'college') { setSelectedCollege(value); setSelectedProfessorId(''); setSelectedDate(''); }
+    if (activeFilter === 'college') { setSelectedCollege(value); setHasUserSetCollege(true); setSelectedProfessorId(''); setSelectedDate(''); }
     else if (activeFilter === 'professor') { setSelectedProfessorId(value); setSelectedDate(''); }
     setActiveFilter(null);
   };
@@ -408,36 +395,45 @@ export default function StudentAppointmentsScreen() {
     setSelectedSlot(slot); setSelectedApptType(''); setPurpose(''); setShowBookDialog(true);
   };
 
-  const handleBookSlot = () => {
-    if (!selectedSlot) return;
+  const handleBookSlot = async () => {
+    if (!selectedSlot || submitting) return;
     if (selectedSlot.appointmentTypes && selectedSlot.appointmentTypes.length > 0 && !selectedApptType) {
       Alert.alert('Missing information', 'Please select an appointment type.');
       return;
     }
-    const apptTypeName = selectedSlot.appointmentTypes?.find((t) => t.id === selectedApptType)?.name;
-    const newBooking: Booking = {
-      id: Date.now().toString(),
-      availabilityId: selectedSlot.availabilityId,
-      person: selectedSlot.professorName,
-      college: selectedSlot.college,
-      date: selectedSlot.date,
-      windowStart: selectedSlot.windowStart,
-      windowEnd: selectedSlot.windowEnd,
-      location: selectedSlot.location,
-      purpose: purpose.trim(),
-      appointmentType: apptTypeName,
-      status: 'pending',
-    };
-    setBookings((prev) => [...prev, newBooking]);
-    setShowBookDialog(false); setSelectedSlot(null); setSelectedApptType(''); setPurpose('');
-    Alert.alert('Success', 'Appointment booked successfully!');
+    setSubmitting(true);
+    try {
+      await api.post('/student/appointments/book-slot', {
+        availabilityId: selectedSlot.availabilityId,
+        appointmentDate: selectedSlot.date,
+        appointmentType: selectedApptType || null,
+        purpose: purpose.trim(),
+      });
+      setShowBookDialog(false); setSelectedSlot(null); setSelectedApptType(''); setPurpose('');
+      Alert.alert('Success', 'Appointment booked successfully!');
+      await Promise.all([fetchSlots(), fetchMyBookings()]);
+    } catch (err: any) {
+      console.error('Failed to book appointment:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to book appointment. The slot may no longer be available.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const doCancel = () => {
+  const doCancel = async () => {
     const id = cancelConfirmId;
     setCancelConfirmId(null);
-    if (!id) return;
-    setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status: 'cancelled' as const } : b)));
+    if (!id || cancellingId) return;
+    setCancellingId(id);
+    try {
+      await api.delete(`/student/appointments/${id}`);
+      await Promise.all([fetchSlots(), fetchMyBookings()]);
+    } catch (err: any) {
+      console.error('Failed to cancel appointment:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to cancel the appointment.');
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const collegeLabel = (abbrev: string) => COLLEGES.find((c) => c.abbrev === abbrev)?.abbrev ?? abbrev;
@@ -648,7 +644,20 @@ export default function StudentAppointmentsScreen() {
           {/* Available Slots */}
           {activeTab === 'slots' && (
             <View style={styles.tabPanel}>
-              {availableSlots.length === 0 ? (
+              {slotsLoading ? (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyDescription}>Loading available slots…</Text>
+                </View>
+              ) : slotsError ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>Could not load slots</Text>
+                  <Text style={styles.emptyDescription}>{slotsError}</Text>
+                  <Pressable style={styles.clearDateBtn} onPress={fetchSlots}>
+                    <Text style={styles.clearDateBtnText}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : availableSlots.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Available Slots</Text>
@@ -698,7 +707,20 @@ export default function StudentAppointmentsScreen() {
                 </Pressable>
               </View>
 
-              {activeBookings.length === 0 ? (
+              {bookingsLoading ? (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyDescription}>Loading your appointments…</Text>
+                </View>
+              ) : bookingsError ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>Could not load your appointments</Text>
+                  <Text style={styles.emptyDescription}>{bookingsError}</Text>
+                  <Pressable style={styles.clearDateBtn} onPress={fetchMyBookings}>
+                    <Text style={styles.clearDateBtnText}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : activeBookings.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Appointments Booked</Text>
@@ -756,9 +778,13 @@ export default function StudentAppointmentsScreen() {
                             </View>
                           ) : null}
                           {(status === 'pending' || status === 'approved') && (
-                            <Pressable style={styles.cancelBtn} onPress={() => setCancelConfirmId(booking.id)}>
+                            <Pressable
+                              style={styles.cancelBtn}
+                              onPress={() => setCancelConfirmId(booking.id)}
+                              disabled={cancellingId === booking.id}
+                            >
                               <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
-                              <Text style={styles.cancelBtnText}>Cancel</Text>
+                              <Text style={styles.cancelBtnText}>{cancellingId === booking.id ? 'Cancelling…' : 'Cancel'}</Text>
                             </Pressable>
                           )}
                         </View>
@@ -781,12 +807,12 @@ export default function StudentAppointmentsScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -881,11 +907,11 @@ export default function StudentAppointmentsScreen() {
               )}
             </ScrollView>
             <View style={styles.dialogActions}>
-              <Pressable style={styles.btnSecondary} onPress={() => setShowBookDialog(false)}>
+              <Pressable style={styles.btnSecondary} onPress={() => setShowBookDialog(false)} disabled={submitting}>
                 <Text style={styles.btnSecondaryText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.btnPrimary} onPress={handleBookSlot}>
-                <Text style={styles.btnPrimaryText}>Confirm Booking</Text>
+              <Pressable style={styles.btnPrimary} onPress={handleBookSlot} disabled={submitting}>
+                <Text style={styles.btnPrimaryText}>{submitting ? 'Booking…' : 'Confirm Booking'}</Text>
               </Pressable>
             </View>
           </View>

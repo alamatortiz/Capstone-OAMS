@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,7 +66,7 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). Field shapes mirror what
+// ─── Field shapes documented here mirror what Field shapes mirror what
 // GET /faculty/transactions really returns (type, status, studentName/studentId
 // for queue+appointment rows, trackingNumber for document rows, description,
 // date) — this screen ports the actual wired prof-transactions.jsx/.css 1:1:
@@ -72,13 +74,6 @@ function OamsLogo({
 // derives stats from the already-filtered API response), search + type/status
 // filters, and per-item type+status badges. On mobile the two <select>
 // dropdowns become modal pickers, same pattern as the other professor screens. ───
-const demoProfessor = {
-  name: 'Demo Professor',
-  role: 'Professor',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type TxnType = 'queue' | 'appointment' | 'document';
 type TxnStatus =
   | 'pending'
@@ -102,95 +97,6 @@ interface TransactionRecord {
   details: string;
   date: string;
 }
-
-const demoTransactions: TransactionRecord[] = [
-  {
-    id: '1',
-    type: 'queue',
-    status: 'completed',
-    studentName: 'Juan Dela Cruz',
-    studentId: '2200123',
-    details: 'Consultation on thesis outline',
-    date: '2026-07-18T09:15:00',
-  },
-  {
-    id: '2',
-    type: 'appointment',
-    status: 'approved',
-    studentName: 'Maria Santos',
-    studentId: '2200456',
-    details: 'Career guidance appointment approved',
-    date: '2026-07-18T14:00:00',
-  },
-  {
-    id: '3',
-    type: 'document',
-    status: 'generated',
-    trackingNumber: 'DOC-2026-0113',
-    details: 'Certificate of Employment ready for pickup',
-    date: '2026-07-17T11:00:00',
-  },
-  {
-    id: '4',
-    type: 'queue',
-    status: 'no_show',
-    studentName: 'Pedro Garcia',
-    studentId: '2100789',
-    details: 'Did not show up for queue number Q-014',
-    date: '2026-07-16T10:30:00',
-  },
-  {
-    id: '5',
-    type: 'document',
-    status: 'processing',
-    trackingNumber: 'DOC-2026-0128',
-    details: 'Service Record for visa application currently being processed',
-    date: '2026-07-15T08:45:00',
-  },
-  {
-    id: '6',
-    type: 'appointment',
-    status: 'completed',
-    studentName: 'Ana Rodriguez',
-    studentId: '2200234',
-    details: 'Research consultation completed',
-    date: '2026-07-14T15:00:00',
-  },
-  {
-    id: '7',
-    type: 'queue',
-    status: 'cancelled',
-    studentName: 'Marco Velasco',
-    studentId: '2200567',
-    details: 'Queue ticket cancelled by student',
-    date: '2026-07-12T09:00:00',
-  },
-  {
-    id: '8',
-    type: 'appointment',
-    status: 'rejected',
-    studentName: 'Andrei Villanueva',
-    studentId: '2200432',
-    details: 'Grade query appointment rejected',
-    date: '2026-07-10T13:00:00',
-  },
-  {
-    id: '9',
-    type: 'document',
-    status: 'claimed',
-    trackingNumber: 'DOC-2026-0087',
-    details: 'Certificate of No Pending Case claimed',
-    date: '2026-06-25T13:20:00',
-  },
-  {
-    id: '10',
-    type: 'document',
-    status: 'released',
-    trackingNumber: 'DOC-2026-0061',
-    details: 'Employment Certificate with Compensation released',
-    date: '2026-06-20T10:00:00',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -262,7 +168,10 @@ export default function ProfessorTransactionsScreen() {
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
   const [selectField, setSelectField] = useState<SelectField>(null);
+  const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -271,6 +180,37 @@ export default function ProfessorTransactionsScreen() {
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
   const showExportComingSoon = () =>
     Alert.alert('Coming soon', 'Export is not wired up yet on mobile.');
+
+  const fetchTransactions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = {};
+      if (searchQuery) params.search = searchQuery;
+      if (filterType !== 'all') params.filterType = filterType;
+      if (filterStatus !== 'all') params.filterStatus = filterStatus;
+      const { data } = await api.get('/faculty/transactions', { params });
+      setTransactions(
+        (data ?? []).map((t: any) => ({
+          id: String(t.id),
+          type: t.type,
+          status: t.status,
+          studentName: t.studentName,
+          studentId: t.studentId,
+          trackingNumber: t.trackingNumber,
+          details: t.description ?? '',
+          date: t.date,
+        })),
+      );
+    } catch (err) {
+      console.error('Fetch transactions error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, filterType, filterStatus]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
@@ -281,20 +221,10 @@ export default function ProfessorTransactionsScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
-  const filtered = demoTransactions.filter((t) => {
-    const q = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      t.details.toLowerCase().includes(q) ||
-      (t.studentName?.toLowerCase().includes(q) ?? false) ||
-      (t.studentId?.toLowerCase().includes(q) ?? false) ||
-      (t.trackingNumber?.toLowerCase().includes(q) ?? false);
-    const matchesType = filterType === 'all' || t.type === filterType;
-    const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
-    return matchesSearch && matchesType && matchesStatus;
-  });
+  // Server already applies search/type/status filtering.
+  const filtered = transactions;
 
   const stats = {
     total: filtered.length,
@@ -431,7 +361,11 @@ export default function ProfessorTransactionsScreen() {
           </View>
 
           {/* Transaction list */}
-          {filtered.length > 0 ? (
+          {loading ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyDescription}>Loading transactions...</Text>
+            </View>
+          ) : filtered.length > 0 ? (
             <View style={styles.txnList}>
               {filtered.map((txn) => {
                 const typeMeta = TYPE_META[txn.type];
@@ -502,12 +436,12 @@ export default function ProfessorTransactionsScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoProfessor.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Faculty'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoProfessor.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Professor</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoProfessor.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>

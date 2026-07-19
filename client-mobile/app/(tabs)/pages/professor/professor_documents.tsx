@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,19 +66,12 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). Field shapes mirror what
+// ─── Field shapes documented here mirror what Field shapes mirror what
 // GET /faculty/my-document-requests and GET /faculty/document-services really
 // return (service_name, college, purpose, created_at, status, tracking_number,
 // notes, estimated_completion, needed_by) — this screen ports the actual wired
 // prof-documents.jsx/.css 1:1: Request Document dialog (type/purpose/needed-by/
 // notes), Active/Completed tabs, and the Cancel Request confirm flow. ───
-const demoProfessor = {
-  name: 'Demo Professor',
-  role: 'Professor',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type DocStatus = 'pending' | 'processing' | 'generated' | 'released' | 'claimed' | 'rejected';
 
 interface DocumentRequest {
@@ -93,94 +88,11 @@ interface DocumentRequest {
 }
 
 interface DocumentTypeOption {
-  id: string;
+  id: number;
   name: string;
   processingTime: string;
   requirements: string[];
 }
-
-const documentTypes: DocumentTypeOption[] = [
-  {
-    id: 'coe',
-    name: 'Certificate of Employment',
-    processingTime: '3-5 business days',
-    requirements: ['Valid ID', 'Employee ID'],
-  },
-  {
-    id: 'service-record',
-    name: 'Service Record',
-    processingTime: '5-7 business days',
-    requirements: ['Valid ID'],
-  },
-  {
-    id: 'no-pending-case',
-    name: 'Certificate of No Pending Case',
-    processingTime: '2-3 business days',
-    requirements: ['Valid ID', 'Request Letter'],
-  },
-  {
-    id: 'coe-comp',
-    name: 'Employment Certificate with Compensation',
-    processingTime: '5-7 business days',
-    requirements: ['Valid ID', 'Employee ID', 'Purpose Letter'],
-  },
-];
-
-const initialRequests: DocumentRequest[] = [
-  {
-    id: '1',
-    type: 'Certificate of Employment',
-    college: demoProfessor.departmentName,
-    purpose: 'Bank loan application',
-    requestDate: '2026-07-10',
-    status: 'processing',
-    trackingNumber: 'DOC-2026-0113',
-    estimatedCompletion: '2026-07-17',
-    neededBy: '2026-07-20',
-    notes: 'Currently being processed by HR.',
-  },
-  {
-    id: '2',
-    type: 'Service Record',
-    college: demoProfessor.departmentName,
-    purpose: 'Visa application',
-    requestDate: '2026-07-14',
-    status: 'pending',
-    trackingNumber: 'DOC-2026-0128',
-    neededBy: '2026-07-25',
-  },
-  {
-    id: '3',
-    type: 'Certificate of Employment',
-    college: demoProfessor.departmentName,
-    purpose: 'Apartment rental application',
-    requestDate: '2026-07-05',
-    status: 'generated',
-    trackingNumber: 'DOC-2026-0102',
-    estimatedCompletion: '2026-07-12',
-    notes: 'Ready for pickup at the HR office.',
-  },
-  {
-    id: '4',
-    type: 'Certificate of No Pending Case',
-    college: demoProfessor.departmentName,
-    purpose: 'Loan requirement',
-    requestDate: '2026-06-20',
-    status: 'claimed',
-    trackingNumber: 'DOC-2026-0087',
-    estimatedCompletion: '2026-06-25',
-  },
-  {
-    id: '5',
-    type: 'Employment Certificate with Compensation',
-    college: demoProfessor.departmentName,
-    purpose: 'Credit card application',
-    requestDate: '2026-06-10',
-    status: 'rejected',
-    trackingNumber: 'DOC-2026-0061',
-    notes: 'Missing required documents. Please resubmit with complete requirements.',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -235,20 +147,31 @@ function buildNeededByOptions() {
 const NEEDED_BY_OPTIONS = buildNeededByOptions();
 const MIN_NEEDED_BY_DATE = getTomorrowDateString();
 
-const emptyFormData = { typeId: '', purpose: '', notes: '', neededBy: '' };
+const emptyFormData: { typeId: number | ''; purpose: string; notes: string; neededBy: string } = {
+  typeId: '',
+  purpose: '',
+  notes: '',
+  neededBy: '',
+};
 
 export default function ProfessorDocumentsScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [requests, setRequests] = useState<DocumentRequest[]>(initialRequests);
+  const [requests, setRequests] = useState<DocumentRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
+  const [typesLoading, setTypesLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState(emptyFormData);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -257,6 +180,58 @@ export default function ProfessorDocumentsScreen() {
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
+
+  useEffect(() => {
+    const fetchTypes = async () => {
+      setTypesLoading(true);
+      try {
+        const { data } = await api.get('/faculty/document-services');
+        setDocumentTypes(
+          (data ?? []).map((s: any) => ({
+            id: s.service_id,
+            name: s.service_name,
+            processingTime: s.processing_time ?? 'TBD',
+            requirements: s.requirements ?? [],
+          })),
+        );
+      } catch (err) {
+        console.error('Fetch document types error:', err);
+      } finally {
+        setTypesLoading(false);
+      }
+    };
+    fetchTypes();
+  }, []);
+
+  const fetchRequests = useCallback(async () => {
+    setRequestsLoading(true);
+    try {
+      const { data } = await api.get('/faculty/my-document-requests');
+      setRequests(
+        (data ?? []).map((r: any) => ({
+          id: String(r.request_id),
+          type: r.service_name,
+          college: r.college,
+          purpose: r.purpose,
+          requestDate: r.created_at,
+          status: r.status,
+          trackingNumber: r.tracking_number,
+          notes: r.notes || undefined,
+          estimatedCompletion: r.estimated_completion || undefined,
+          neededBy: r.needed_by || undefined,
+        })),
+      );
+    } catch (err) {
+      console.error('Fetch document requests error:', err);
+      Alert.alert('Error', 'Could not load your document requests.');
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
 
@@ -285,6 +260,7 @@ export default function ProfessorDocumentsScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -296,28 +272,41 @@ export default function ProfessorDocumentsScreen() {
   const selectedType = documentTypes.find((t) => t.id === formData.typeId);
   const canSubmit = !!formData.typeId && formData.purpose.trim().length > 0;
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
     if (!canSubmit || !selectedType) return;
-    const newRequest: DocumentRequest = {
-      id: String(Date.now()),
-      type: selectedType.name,
-      college: demoProfessor.departmentName,
-      purpose: formData.purpose.trim(),
-      requestDate: new Date().toISOString().slice(0, 10),
-      status: 'pending',
-      trackingNumber: `DOC-2026-${String(Math.floor(1000 + Math.random() * 9000))}`,
-      notes: formData.notes.trim() || undefined,
-      neededBy: formData.neededBy || undefined,
-    };
-    setRequests((prev) => [newRequest, ...prev]);
-    setDialogOpen(false);
-    setFormData(emptyFormData);
+    setSubmitting(true);
+    try {
+      await api.post('/faculty/my-document-requests', {
+        service_id: selectedType.id,
+        request_type: selectedType.name,
+        purpose: formData.purpose.trim(),
+        notes: formData.notes.trim(),
+        needed_by: formData.neededBy || null,
+      });
+      await fetchRequests();
+      setDialogOpen(false);
+      setFormData(emptyFormData);
+    } catch (err: any) {
+      console.error('Submit document request error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to submit document request.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const confirmCancelRequest = () => {
+  const confirmCancelRequest = async () => {
     if (!cancelTarget) return;
-    setRequests((prev) => prev.filter((r) => r.id !== cancelTarget.id));
-    setCancelTarget(null);
+    setCancellingId(cancelTarget.id);
+    try {
+      await api.delete(`/faculty/my-document-requests/${cancelTarget.id}`);
+      setRequests((prev) => prev.filter((r) => r.id !== cancelTarget.id));
+      setCancelTarget(null);
+    } catch (err: any) {
+      console.error('Cancel document request error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to cancel document request.');
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const activeRequests = requests.filter((r) => r.status !== 'claimed' && r.status !== 'rejected');
@@ -398,7 +387,12 @@ export default function ProfessorDocumentsScreen() {
 
           {/* Active Tab */}
           {activeTab === 'active' && (
-            activeRequests.length > 0 ? (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : activeRequests.length > 0 ? (
               <View style={styles.docList}>
                 {activeRequests.map((req) => {
                   const meta = STATUS_META[req.status];
@@ -609,11 +603,11 @@ export default function ProfessorDocumentsScreen() {
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
+                  style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
                   onPress={handleSubmitRequest}
-                  disabled={!canSubmit}
+                  disabled={!canSubmit || submitting}
                 >
-                  <Text style={styles.confirmBtnText}>Submit Request</Text>
+                  <Text style={styles.confirmBtnText}>{submitting ? 'Submitting…' : 'Submit Request'}</Text>
                 </Pressable>
               </View>
             </ScrollView>
@@ -707,8 +701,12 @@ export default function ProfessorDocumentsScreen() {
               <Pressable style={styles.cancelBtn} onPress={() => setCancelTarget(null)}>
                 <Text style={styles.cancelBtnText}>Keep Request</Text>
               </Pressable>
-              <Pressable style={[styles.confirmActionBtn, { backgroundColor: '#ef4444' }]} onPress={confirmCancelRequest}>
-                <Text style={styles.confirmBtnText}>Cancel Request</Text>
+              <Pressable
+                style={[styles.confirmActionBtn, { backgroundColor: '#ef4444' }]}
+                onPress={confirmCancelRequest}
+                disabled={!!cancellingId}
+              >
+                <Text style={styles.confirmBtnText}>{cancellingId ? 'Cancelling…' : 'Cancel Request'}</Text>
               </Pressable>
             </View>
           </View>
@@ -722,6 +720,8 @@ export default function ProfessorDocumentsScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        userName={user?.name ?? 'Faculty'}
+        userDept={user?.departmentName ?? ''}
       />
 
       <LogoutModal
@@ -743,6 +743,8 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  userName,
+  userDept,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -750,6 +752,8 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  userName: string;
+  userDept: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -760,12 +764,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoProfessor.name}</Text>
+              <Text style={styles.drawerName}>{userName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoProfessor.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>Professor</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoProfessor.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{userDept}</Text>
           </View>
 
           <View style={styles.drawerNav}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,7 +66,7 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). Field shapes mirror what
+// ─── Field shapes documented here mirror what Field shapes mirror what
 // GET /faculty/availability and GET /faculty/locations really return
 // (availability_id, day_of_week, start_time, end_time, location, max_students,
 // appointmentTypes) — this screen ports the actual wired
@@ -72,60 +74,26 @@ function OamsLogo({
 // instead of side-by-side on mobile), Add/Edit Time Slot modal with day
 // checkboxes, location picker (with "Other" free text), appointment-type tag
 // input, overlap validation, and the Weekly Schedule Summary list. ───
-const demoProfessor = {
-  name: 'Demo Professor',
-  role: 'Professor',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 interface AppointmentType {
-  id: string;
+  id: string | number;
   name: string;
 }
 
 interface AvailabilitySlot {
   availability_id: number;
   day_of_week: string;
-  start_time: string; // "HH:MM"
-  end_time: string; // "HH:MM"
+  start_time: string; // "HH:MM" or "HH:MM:SS" from server
+  end_time: string;
   location: string;
   max_students: number;
   appointmentTypes: AppointmentType[];
 }
 
 interface LocationOption {
-  id: string;
+  id: string | number;
   name: string;
   isGlobal: boolean;
 }
-
-const initialLocations: LocationOption[] = [
-  { id: 'loc-1', name: 'Faculty Room 203', isGlobal: false },
-  { id: 'loc-2', name: 'Online - Google Meet', isGlobal: false },
-  { id: 'loc-3', name: 'Faculty Lounge', isGlobal: true },
-];
-
-const initialSlots: AvailabilitySlot[] = [
-  {
-    availability_id: 1,
-    day_of_week: 'Monday',
-    start_time: '10:00',
-    end_time: '11:00',
-    location: 'Faculty Room 203',
-    max_students: 5,
-    appointmentTypes: [{ id: 't1', name: 'Thesis Consultation' }],
-  },
-  {
-    availability_id: 2,
-    day_of_week: 'Wednesday',
-    start_time: '14:00',
-    end_time: '15:30',
-    location: 'Online - Google Meet',
-    max_students: 3,
-    appointmentTypes: [],
-  },
-];
 
 interface NavItem {
   key: string;
@@ -161,18 +129,18 @@ function buildTimeOptions() {
 
 const TIME_OPTIONS = buildTimeOptions();
 
-let nextAvailabilityId = 100;
-let nextLocationId = 100;
-
 export default function ProfessorScheduleManagerScreen() {
   const params = useLocalSearchParams<{ from?: string }>();
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [slots, setSlots] = useState<AvailabilitySlot[]>(initialSlots);
-  const [locations, setLocations] = useState<LocationOption[]>(initialLocations);
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addSaving, setAddSaving] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const [showAddSlot, setShowAddSlot] = useState(false);
@@ -197,6 +165,30 @@ export default function ProfessorScheduleManagerScreen() {
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
+  const fetchSlots = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/faculty/availability');
+      setSlots(data ?? []);
+    } catch (err) {
+      console.error('Fetch availability error:', err);
+      Alert.alert('Error', 'Failed to load schedule data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSlots();
+  }, [fetchSlots]);
+
+  useEffect(() => {
+    api
+      .get('/faculty/locations')
+      .then(({ data }) => setLocations(data.locations ?? []))
+      .catch((err) => console.error('Fetch locations error:', err));
+  }, []);
+
   const cameFromAppointments = params.from === 'appointments';
   const goBack = () =>
     router.push(
@@ -213,7 +205,7 @@ export default function ProfessorScheduleManagerScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
   const slotsByDay: Record<string, AvailabilitySlot[]> = {};
   slots.forEach((slot) => {
@@ -242,8 +234,8 @@ export default function ProfessorScheduleManagerScreen() {
   const openEditSlot = (slot: AvailabilitySlot, day: string) => {
     setEditingId(slot.availability_id);
     setAddDays([day]);
-    setAddStart(slot.start_time);
-    setAddEnd(slot.end_time);
+    setAddStart(slot.start_time.slice(0, 5));
+    setAddEnd(slot.end_time.slice(0, 5));
     setAddLocation(slot.location);
     setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
     setAddMaxStudents(String(slot.max_students));
@@ -269,10 +261,12 @@ export default function ProfessorScheduleManagerScreen() {
   const findOverlap = (day: string, start: string, end: string) =>
     (slotsByDay[day] ?? []).find((s) => {
       if (editingId && s.availability_id === editingId) return false;
-      return start < s.end_time && s.start_time < end;
+      const sStart = s.start_time.slice(0, 5);
+      const sEnd = s.end_time.slice(0, 5);
+      return start < sEnd && sStart < end;
     });
 
-  const handleSaveSlot = () => {
+  const handleSaveSlot = async () => {
     if (addDays.length === 0 || !addStart || !addEnd || !addLocation.trim()) {
       Alert.alert('Missing information', 'Please select at least one day, times, and location.');
       return;
@@ -294,54 +288,77 @@ export default function ProfessorScheduleManagerScreen() {
     }
 
     const trimmedLocation = addLocation.trim();
-    if (showOtherLocation && !locations.some((loc) => loc.name === trimmedLocation)) {
-      setLocations((prev) => [...prev, { id: `loc-${nextLocationId++}`, name: trimmedLocation, isGlobal: false }]);
-    }
+    setAddSaving(true);
+    try {
+      if (showOtherLocation && !locations.some((loc) => loc.name === trimmedLocation)) {
+        try {
+          const { data } = await api.post('/faculty/locations', { name: trimmedLocation });
+          setLocations((prev) => [...prev, data]);
+        } catch (err) {
+          // Non-fatal: the slot can still be saved with the typed location text.
+        }
+      }
 
-    const appointmentTypes: AppointmentType[] = addApptTypes.map((name, i) => ({ id: `${Date.now()}-${i}`, name }));
-
-    if (editingId) {
-      setSlots((prev) =>
-        prev.map((s) =>
-          s.availability_id === editingId
-            ? {
-                ...s,
-                day_of_week: addDays[0],
-                start_time: addStart,
-                end_time: addEnd,
-                location: trimmedLocation,
-                max_students: maxStu,
-                appointmentTypes,
-              }
-            : s,
-        ),
-      );
-      setSelectedDay(addDays[0]);
-    } else {
-      const newSlots: AvailabilitySlot[] = addDays.map((day) => ({
-        availability_id: nextAvailabilityId++,
-        day_of_week: day,
-        start_time: addStart,
-        end_time: addEnd,
-        location: trimmedLocation,
-        max_students: maxStu,
-        appointmentTypes,
-      }));
-      setSlots((prev) => [...prev, ...newSlots]);
-      if (!selectedDay) setSelectedDay(addDays[0]);
+      if (editingId) {
+        await api.patch(`/faculty/availability/${editingId}`, {
+          day_of_week: addDays[0],
+          start_time: addStart,
+          end_time: addEnd,
+          location: trimmedLocation,
+          max_students: maxStu,
+          appointmentTypes: addApptTypes,
+        });
+        setShowAddSlot(false);
+        setSelectedDay(addDays[0]);
+      } else {
+        const results = await Promise.allSettled(
+          addDays.map((day) =>
+            api.post('/faculty/availability', {
+              day_of_week: day,
+              start_time: addStart,
+              end_time: addEnd,
+              location: trimmedLocation,
+              max_students: maxStu,
+              appointmentTypes: addApptTypes,
+            }),
+          ),
+        );
+        const failed = results.filter((r) => r.status === 'rejected');
+        if (failed.length === 0) {
+          setShowAddSlot(false);
+          if (!selectedDay) setSelectedDay(addDays[0]);
+        } else if (failed.length < addDays.length) {
+          Alert.alert('Partial failure', `${failed.length} of ${addDays.length} day(s) failed to save.`);
+          setShowAddSlot(false);
+        } else {
+          const reason: any = (failed[0] as PromiseRejectedResult).reason;
+          Alert.alert('Error', reason?.response?.data?.message ?? 'Failed to add time slot.');
+        }
+      }
+      await fetchSlots();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to save time slot.');
+    } finally {
+      setAddSaving(false);
     }
-    setShowAddSlot(false);
   };
 
   const requestDeleteSlot = (slot: AvailabilitySlot, day: string) => setDeleteTarget({ slot, day });
 
-  const confirmDeleteSlot = () => {
+  const confirmDeleteSlot = async () => {
     if (!deleteTarget) return;
     const { slot, day } = deleteTarget;
-    setSlots((prev) => prev.filter((s) => s.availability_id !== slot.availability_id));
-    const remaining = (slotsByDay[day] ?? []).filter((s) => s.availability_id !== slot.availability_id);
-    if (remaining.length === 0 && selectedDay === day) setSelectedDay(null);
-    setDeleteTarget(null);
+    try {
+      await api.delete(`/faculty/availability/${slot.availability_id}`);
+      await fetchSlots();
+      const remaining = (slotsByDay[day] ?? []).filter((s) => s.availability_id !== slot.availability_id);
+      if (remaining.length === 0 && selectedDay === day) setSelectedDay(null);
+    } catch (err) {
+      console.error('Delete availability error:', err);
+      Alert.alert('Error', 'Failed to remove time slot.');
+    } finally {
+      setDeleteTarget(null);
+    }
   };
 
   const selectedLocationLabel = showOtherLocation ? 'Other (type your own)…' : addLocation || 'Select a location';
@@ -394,6 +411,7 @@ export default function ProfessorScheduleManagerScreen() {
           <View style={styles.card}>
             <Text style={styles.sectionHeading}>Weekly Overview</Text>
             <Text style={styles.sectionDesc}>Select a day to view or manage its slots. Days with slots are highlighted.</Text>
+            {loading && <Text style={styles.sectionDesc}>Loading…</Text>}
             <View style={styles.dayList}>
               {DAYS.map((day) => {
                 const count = (slotsByDay[day] ?? []).length;
@@ -637,8 +655,10 @@ export default function ProfessorScheduleManagerScreen() {
                 <Pressable style={styles.cancelBtn} onPress={() => { setShowAddSlot(false); setEditingId(null); }}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
-                <Pressable style={styles.submitBtn} onPress={handleSaveSlot}>
-                  <Text style={styles.confirmBtnText}>{editingId ? 'Save Changes' : 'Add Slot'}</Text>
+                <Pressable style={styles.submitBtn} onPress={handleSaveSlot} disabled={addSaving}>
+                  <Text style={styles.confirmBtnText}>
+                    {addSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Slot'}
+                  </Text>
                 </Pressable>
               </View>
             </ScrollView>
@@ -746,6 +766,8 @@ export default function ProfessorScheduleManagerScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        userName={user?.name ?? 'Faculty'}
+        userDept={user?.departmentName ?? ''}
       />
 
       <LogoutModal
@@ -811,6 +833,8 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  userName,
+  userDept,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -818,6 +842,8 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  userName: string;
+  userDept: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -828,12 +854,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoProfessor.name}</Text>
+              <Text style={styles.drawerName}>{userName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoProfessor.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>Professor</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoProfessor.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{userDept}</Text>
           </View>
 
           <View style={styles.drawerNav}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { useQueue } from '@/context/QueueContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,15 +81,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-queue-tracking.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type QueueStatus = 'waiting' | 'serving' | 'completed' | 'cancelled' | 'no_show';
 type SlotStatus = 'open' | 'paused' | 'full' | 'expired';
 
@@ -111,88 +104,16 @@ interface ActiveQueueRecord {
   joinedAt: string;
 }
 
-const activeQueuesData: ActiveQueueRecord[] = [
-  {
-    queueId: 'q1',
-    departmentAbbrev: 'CCS',
-    departmentName: 'College of Computing Studies',
-    serviceName: 'Registrar - Document Request',
-    queueNumberBadge: 'CCS-REG-047',
-    status: 'waiting',
-    slotStatus: 'open',
-    position: 3,
-    totalWaiting: 12,
-    totalInQueue: 15,
-    maxCapacity: 20,
-    queueOccupancyPercent: 75,
-    servicedCount: 8,
-    servicedPercent: 53,
-    estimatedWait: '15-20 mins',
-    joinedAt: '10:30 AM',
-  },
-  {
-    queueId: 'q2',
-    departmentAbbrev: 'CBAA',
-    departmentName: 'College of Business, Accountancy and Administration',
-    serviceName: 'Cashier - Payment',
-    queueNumberBadge: 'CBA-CSH-029',
-    status: 'serving',
-    slotStatus: 'open',
-    position: 1,
-    totalWaiting: 8,
-    totalInQueue: 9,
-    maxCapacity: 15,
-    queueOccupancyPercent: 60,
-    servicedCount: 5,
-    servicedPercent: 56,
-    estimatedWait: 'Any moment now',
-    joinedAt: '10:15 AM',
-  },
-];
-
 interface HistoryRecord {
-  id: string;
+  id: number;
   service: string;
   college: string;
   queueNumber: string;
-  status: 'completed' | 'cancelled';
+  status: 'completed' | 'cancelled' | 'no_show';
   joinedAt: string;
   completedAt: string;
   actualWaitTime: string;
 }
-
-const queueHistoryData: HistoryRecord[] = [
-  {
-    id: 'h1',
-    service: 'Registrar - Document Request',
-    college: 'College of Computing Studies',
-    queueNumber: 'CCS-REG-032',
-    status: 'completed',
-    joinedAt: 'Mar 12, 9:00 AM',
-    completedAt: 'Mar 12, 9:25 AM',
-    actualWaitTime: '25 mins',
-  },
-  {
-    id: 'h2',
-    service: 'Library - Book Concerns',
-    college: 'College of Computing Studies',
-    queueNumber: 'CCS-LIB-018',
-    status: 'cancelled',
-    joinedAt: 'Mar 10, 10:15 AM',
-    completedAt: 'Mar 10, 10:20 AM',
-    actualWaitTime: '—',
-  },
-  {
-    id: 'h3',
-    service: 'Cashier - Payment',
-    college: 'College of Business, Accountancy and Administration',
-    queueNumber: 'CBA-CSH-005',
-    status: 'completed',
-    joinedAt: 'Mar 8, 1:00 PM',
-    completedAt: 'Mar 8, 1:12 PM',
-    actualWaitTime: '12 mins',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -224,9 +145,14 @@ export default function StudentQueueTrackingScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('active');
-  const [activeQueues, setActiveQueues] = useState<ActiveQueueRecord[]>(activeQueuesData);
-  const [leaveTarget, setLeaveTarget] = useState<ActiveQueueRecord | null>(null);
+  const [leaveTarget, setLeaveTarget] = useState<any | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const { queues: activeQueues, queueHistory, leaveQueue, metrics, metricsError, fetchMetrics } = useQueue();
+
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
   const params = useLocalSearchParams<{ from?: string }>();
   const from = Array.isArray(params.from) ? params.from[0] : params.from;
 
@@ -264,6 +190,7 @@ export default function StudentQueueTrackingScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -276,14 +203,19 @@ export default function StudentQueueTrackingScreen() {
 
   const collegeLogoFor = (abbrev: string) => collegeLogos[abbrev] ?? ccsLogo;
 
-  const totalJoined = activeQueues.length + queueHistoryData.length;
-  const totalCompleted = queueHistoryData.filter((h) => h.status === 'completed').length;
-  const totalCancelled = queueHistoryData.filter((h) => h.status === 'cancelled').length;
+  const totalJoined = metrics?.totalQueuesJoined ?? 0;
+  const totalCompleted = metrics?.totalQueuesCompleted ?? 0;
+  const totalCancelled = metrics?.totalQueuesCancelled ?? 0;
 
-  const confirmLeaveQueue = () => {
+  const confirmLeaveQueue = async () => {
     if (!leaveTarget) return;
-    setActiveQueues((prev) => prev.filter((q) => q.queueId !== leaveTarget.queueId));
-    setLeaveTarget(null);
+    try {
+      await leaveQueue(leaveTarget.queueId);
+    } catch (error: any) {
+      Alert.alert('Could not leave queue', error?.message ?? 'Please try again.');
+    } finally {
+      setLeaveTarget(null);
+    }
   };
 
   const goToQueueStatus = () => router.push('/pages/student/student_queue_status');
@@ -384,7 +316,7 @@ export default function StudentQueueTrackingScreen() {
               <Ionicons name="time-outline" size={14} color={activeTab === 'history' ? theme.blue : theme.tertiary} />
               <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>History</Text>
               <View style={[styles.tabCount, activeTab === 'history' && styles.tabCountActive]}>
-                <Text style={styles.tabCountText}>{queueHistoryData.length}</Text>
+                <Text style={styles.tabCountText}>{queueHistory.length}</Text>
               </View>
             </Pressable>
             <Pressable
@@ -411,8 +343,8 @@ export default function StudentQueueTrackingScreen() {
               </View>
             ) : (
               <View style={styles.list}>
-                {activeQueues.map((queue) => {
-                  const statusMeta = STATUS_META[queue.status];
+                {activeQueues.map((queue: any) => {
+                  const statusMeta = STATUS_META[queue.status as QueueStatus];
                   return (
                     <Pressable key={queue.queueId} style={styles.queueCard} onPress={goToQueueStatus}>
                       {/* Header */}
@@ -502,7 +434,7 @@ export default function StudentQueueTrackingScreen() {
 
           {/* ─── HISTORY TAB ─── */}
           {activeTab === 'history' && (
-            queueHistoryData.length === 0 ? (
+            queueHistory.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="time-outline" size={32} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No Queue History Yet</Text>
@@ -512,8 +444,8 @@ export default function StudentQueueTrackingScreen() {
               </View>
             ) : (
               <View style={styles.historyList}>
-                {queueHistoryData.map((item) => {
-                  const statusMeta = STATUS_META[item.status];
+                {queueHistory.map((item: any) => {
+                  const statusMeta = STATUS_META[item.status as QueueStatus];
                   return (
                     <View key={item.id} style={styles.historyItem}>
                       <View style={{ flex: 1 }}>
@@ -558,24 +490,35 @@ export default function StudentQueueTrackingScreen() {
                 <Text style={styles.cardTitleText}>Queue Statistics</Text>
               </View>
               <Text style={styles.cardSubtitle}>Overview of your total queue activity</Text>
-              <View style={styles.analyticsGrid}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Total Joined</Text>
-                  <Text style={styles.statValue}>{totalJoined}</Text>
+              {metricsError ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>Couldn&apos;t Load Analytics</Text>
+                  <Text style={styles.emptyDescription}>{metricsError}</Text>
+                  <Pressable style={styles.emptyJoinBtn} onPress={fetchMetrics}>
+                    <Text style={styles.emptyJoinBtnText}>Retry</Text>
+                  </Pressable>
                 </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Completed</Text>
-                  <Text style={styles.statValue}>{totalCompleted}</Text>
+              ) : (
+                <View style={styles.analyticsGrid}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Total Joined</Text>
+                    <Text style={styles.statValue}>{totalJoined}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Completed</Text>
+                    <Text style={styles.statValue}>{totalCompleted}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Cancelled</Text>
+                    <Text style={styles.statValue}>{totalCancelled}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Active Now</Text>
+                    <Text style={styles.statValue}>{activeQueues.length}</Text>
+                  </View>
                 </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Cancelled</Text>
-                  <Text style={styles.statValue}>{totalCancelled}</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Active Now</Text>
-                  <Text style={styles.statValue}>{activeQueues.length}</Text>
-                </View>
-              </View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -595,12 +538,12 @@ export default function StudentQueueTrackingScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,24 +65,17 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). Field shapes mirror what
+// ─── Field shapes documented here mirror what Field shapes mirror what
 // GET /faculty/appointments really returns (studentName, studentId,
 // appointmentType, date, time, location, purpose, status, requestedAt) — this
 // screen otherwise ports the actual wired prof-appointments.jsx/.css 1:1
 // (no stat cards — that's a design-mockup-only feature, not part of the real
 // page), including the "All" tab's embedded This Week/Month/All Time range
 // picker, which on mobile opens as a small modal instead of a native <select>. ───
-const demoProfessor = {
-  name: 'Demo Professor',
-  role: 'Professor',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type AppointmentStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
 
 interface Appointment {
-  id: string;
+  id: number;
   studentName: string;
   studentId: string;
   appointmentType: string | null;
@@ -91,81 +86,6 @@ interface Appointment {
   status: AppointmentStatus;
   requestedAt: string;
 }
-
-const initialAppointments: Appointment[] = [
-  {
-    id: '1',
-    studentName: 'Juan Dela Cruz',
-    studentId: '2200123',
-    appointmentType: 'Consultation',
-    location: 'Faculty Room 203',
-    purpose: 'Thesis Defense Preparation',
-    date: '2026-07-18',
-    time: '10:00 AM',
-    status: 'pending',
-    requestedAt: '2026-07-17 09:30 AM',
-  },
-  {
-    id: '2',
-    studentName: 'Maria Santos',
-    studentId: '2200456',
-    appointmentType: 'Consultation',
-    location: 'Online - Google Meet',
-    purpose: 'Career Guidance',
-    date: '2026-07-18',
-    time: '2:00 PM',
-    status: 'approved',
-    requestedAt: '2026-07-16 03:15 PM',
-  },
-  {
-    id: '3',
-    studentName: 'Pedro Garcia',
-    studentId: '2100789',
-    appointmentType: 'Grade Query',
-    location: 'Faculty Office',
-    purpose: 'Grade Consultation',
-    date: '2026-07-20',
-    time: '11:00 AM',
-    status: 'pending',
-    requestedAt: '2026-07-17 08:00 AM',
-  },
-  {
-    id: '4',
-    studentName: 'Ana Rodriguez',
-    studentId: '2200234',
-    appointmentType: 'Research',
-    location: 'Faculty Room 210',
-    purpose: 'Research Consultation',
-    date: '2026-07-14',
-    time: '3:00 PM',
-    status: 'completed',
-    requestedAt: '2026-07-12 10:00 AM',
-  },
-  {
-    id: '5',
-    studentName: 'Marco Velasco',
-    studentId: '2200567',
-    appointmentType: 'Consultation',
-    location: 'Faculty Room 108',
-    purpose: 'Capstone Adviser Meeting',
-    date: '2026-07-25',
-    time: '9:00 AM',
-    status: 'approved',
-    requestedAt: '2026-07-16 11:30 AM',
-  },
-  {
-    id: '6',
-    studentName: 'Andrei Villanueva',
-    studentId: '2200432',
-    appointmentType: null,
-    location: 'Faculty Room 201',
-    purpose: 'Grade Query for CS301',
-    date: '2026-07-10',
-    time: '1:00 PM',
-    status: 'rejected',
-    requestedAt: '2026-07-09 04:45 PM',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -284,12 +204,32 @@ export default function ProfessorAppointmentScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [allRange, setAllRange] = useState<AllRange>('week');
   const [rangeModalOpen, setRangeModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: ActionType; apt: Appointment } | null>(null);
+  const [confirmSaving, setConfirmSaving] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/faculty/appointments');
+      setAppointments(data ?? []);
+    } catch (err) {
+      console.error('Fetch appointments error:', err);
+      Alert.alert('Error', 'Could not load appointments.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -326,6 +266,7 @@ export default function ProfessorAppointmentScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -347,13 +288,21 @@ export default function ProfessorAppointmentScreen() {
 
   const requestAction = (type: ActionType, apt: Appointment) => setConfirmAction({ type, apt });
 
-  const runConfirmAction = () => {
+  const runConfirmAction = async () => {
     if (!confirmAction) return;
     const { type, apt } = confirmAction;
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === apt.id ? { ...a, status: STATUS_BY_ACTION[type] } : a)),
-    );
-    setConfirmAction(null);
+    const status = STATUS_BY_ACTION[type];
+    setConfirmSaving(true);
+    try {
+      await api.patch(`/faculty/appointments/${apt.id}/status`, { status });
+      await fetchAppointments();
+    } catch (err) {
+      console.error('Update appointment status error:', err);
+      Alert.alert('Error', 'Could not update the appointment.');
+    } finally {
+      setConfirmSaving(false);
+      setConfirmAction(null);
+    }
   };
 
   const confirmMeta = confirmAction ? CONFIRM_META[confirmAction.type](confirmAction.apt) : null;
@@ -484,7 +433,11 @@ export default function ProfessorAppointmentScreen() {
           </ScrollView>
 
           {/* List */}
-          {visibleAppointments.length === 0 ? (
+          {loading ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Loading appointments…</Text>
+            </View>
+          ) : visibleAppointments.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>
@@ -590,11 +543,13 @@ export default function ProfessorAppointmentScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        userName={user?.name ?? 'Faculty'}
+        userDept={user?.departmentName ?? ''}
       />
 
       <ConfirmActionModal
         visible={!!confirmAction}
-        meta={confirmMeta}
+        meta={confirmMeta ? { ...confirmMeta, confirmText: confirmSaving ? 'Please wait…' : confirmMeta.confirmText } : null}
         onCancel={() => setConfirmAction(null)}
         onConfirm={runConfirmAction}
         styles={styles}
@@ -697,6 +652,8 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  userName,
+  userDept,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -704,6 +661,8 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  userName: string;
+  userDept: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -714,12 +673,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoProfessor.name}</Text>
+              <Text style={styles.drawerName}>{userName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoProfessor.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>Professor</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoProfessor.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{userDept}</Text>
           </View>
 
           <View style={styles.drawerNav}>

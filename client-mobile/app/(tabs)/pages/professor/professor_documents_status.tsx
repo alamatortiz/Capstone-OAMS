@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,7 +65,7 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). Field shapes mirror what
+// ─── Field shapes documented here mirror what Field shapes mirror what
 // GET /faculty/my-document-requests really returns (service_name, college,
 // purpose, created_at, status, tracking_number, notes, estimated_completion,
 // released_at, claimed_at) — this screen ports the actual wired
@@ -71,13 +73,6 @@ function OamsLogo({
 // full detail view (hero, request details, notes, tracking number, cancel),
 // and the "opened from the request page" back-navigation behavior. IDs match
 // the demo set in professor_documents.tsx so a tap-through from there resolves. ───
-const demoProfessor = {
-  name: 'Demo Professor',
-  role: 'Professor',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type DocStatus = 'pending' | 'processing' | 'generated' | 'released' | 'claimed' | 'rejected';
 
 interface DocumentRecord {
@@ -93,60 +88,6 @@ interface DocumentRecord {
   releasedDate?: string;
   claimedDate?: string;
 }
-
-const initialDocuments: DocumentRecord[] = [
-  {
-    id: '1',
-    type: 'Certificate of Employment',
-    college: demoProfessor.departmentName,
-    purpose: 'Bank loan application',
-    requestDate: '2026-07-10',
-    status: 'processing',
-    trackingNumber: 'DOC-2026-0113',
-    estimatedCompletion: '2026-07-17',
-    notes: 'Currently being processed by HR.',
-  },
-  {
-    id: '2',
-    type: 'Service Record',
-    college: demoProfessor.departmentName,
-    purpose: 'Visa application',
-    requestDate: '2026-07-14',
-    status: 'pending',
-    trackingNumber: 'DOC-2026-0128',
-  },
-  {
-    id: '3',
-    type: 'Certificate of Employment',
-    college: demoProfessor.departmentName,
-    purpose: 'Apartment rental application',
-    requestDate: '2026-07-05',
-    status: 'generated',
-    trackingNumber: 'DOC-2026-0102',
-    estimatedCompletion: '2026-07-12',
-    notes: 'Ready for pickup at the HR office.',
-  },
-  {
-    id: '4',
-    type: 'Certificate of No Pending Case',
-    college: demoProfessor.departmentName,
-    purpose: 'Loan requirement',
-    requestDate: '2026-06-20',
-    status: 'claimed',
-    trackingNumber: 'DOC-2026-0087',
-    claimedDate: '2026-06-25',
-  },
-  {
-    id: '5',
-    type: 'Employment Certificate with Compensation',
-    college: demoProfessor.departmentName,
-    purpose: 'Credit card application',
-    requestDate: '2026-06-10',
-    status: 'rejected',
-    trackingNumber: 'DOC-2026-0061',
-    notes: 'Missing required documents. Please resubmit with complete requirements.',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -193,13 +134,16 @@ export default function ProfessorDocumentsStatusScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(params.docId ?? null);
   const [detailOpenedFromExternal, setDetailOpenedFromExternal] = useState(
     params.from === 'document-request' && !!params.docId,
   );
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -208,6 +152,37 @@ export default function ProfessorDocumentsStatusScreen() {
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
   const goToRequestPage = () => router.push('/pages/professor/professor_documents');
+
+  const fetchDocuments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/faculty/my-document-requests');
+      setDocuments(
+        (data ?? []).map((r: any) => ({
+          id: String(r.request_id),
+          type: r.service_name,
+          college: r.college,
+          purpose: r.purpose,
+          requestDate: r.created_at,
+          status: r.status,
+          trackingNumber: r.tracking_number,
+          notes: r.notes || undefined,
+          estimatedCompletion: r.estimated_completion || undefined,
+          releasedDate: r.released_at || undefined,
+          claimedDate: r.claimed_at || undefined,
+        })),
+      );
+    } catch (err) {
+      console.error('Fetch document requests error:', err);
+      Alert.alert('Error', 'Could not load your document requests.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
@@ -219,7 +194,7 @@ export default function ProfessorDocumentsStatusScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) ?? null : null;
 
@@ -236,12 +211,21 @@ export default function ProfessorDocumentsStatusScreen() {
     setSelectedDocId(null);
   };
 
-  const confirmCancelRequest = () => {
+  const confirmCancelRequest = async () => {
     if (!selectedDoc) return;
-    setDocuments((prev) => prev.filter((d) => d.id !== selectedDoc.id));
-    setShowCancelDialog(false);
-    setSelectedDocId(null);
-    Alert.alert('Request cancelled', 'Your document request has been cancelled.');
+    setCancelling(true);
+    try {
+      await api.delete(`/faculty/my-document-requests/${selectedDoc.id}`);
+      setDocuments((prev) => prev.filter((d) => d.id !== selectedDoc.id));
+      setShowCancelDialog(false);
+      setSelectedDocId(null);
+      Alert.alert('Request cancelled', 'Your document request has been cancelled.');
+    } catch (err: any) {
+      console.error('Cancel document request error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to cancel document request.');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const breadcrumbFromRequestPage = params.from === 'document-request';
@@ -318,7 +302,11 @@ export default function ProfessorDocumentsStatusScreen() {
 
               {/* Active Tab */}
               {activeTab === 'active' && (
-                activeDocuments.length > 0 ? (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : activeDocuments.length > 0 ? (
                   <View style={styles.docsList}>
                     {activeDocuments.map((doc) => (
                       <DocumentListItem
@@ -380,12 +368,12 @@ export default function ProfessorDocumentsStatusScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoProfessor.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Faculty'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoProfessor.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Professor</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoProfessor.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -432,9 +420,9 @@ export default function ProfessorDocumentsStatusScreen() {
               <Pressable style={styles.logoutCancelBtn} onPress={() => setShowCancelDialog(false)}>
                 <Text style={styles.logoutCancelBtnText}>Keep Request</Text>
               </Pressable>
-              <Pressable style={styles.logoutConfirmBtn} onPress={confirmCancelRequest}>
+              <Pressable style={styles.logoutConfirmBtn} onPress={confirmCancelRequest} disabled={cancelling}>
                 <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
-                <Text style={styles.logoutConfirmBtnText}>Cancel Request</Text>
+                <Text style={styles.logoutConfirmBtnText}>{cancelling ? 'Cancelling…' : 'Cancel Request'}</Text>
               </Pressable>
             </View>
           </View>

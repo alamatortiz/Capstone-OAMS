@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,7 +67,7 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). The real server routes,
+// ─── Field shapes documented here mirror what The real server routes,
 // GET /api/admin/document-processing and GET /api/admin/faculty-document-processing
 // (adminRoutes.js), are both scoped strictly to the signed-in admin's own
 // department (joined through document_services.department_id) — there is no
@@ -74,13 +77,6 @@ function OamsLogo({
 // Field shapes match what those endpoints really return (trackingNumber,
 // requesterIdLabel/Value, neededBy, releasedDate, claimedDate, etc.) —
 // faculty requests have no "copies" column, so it isn't rendered for them. ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type RequestSource = 'student' | 'faculty';
 type DocumentStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected';
 
@@ -102,188 +98,6 @@ interface DocumentRequest {
   releasedDate: string | null;
   claimedDate: string | null;
 }
-
-// Exported so admin_dashboard.tsx's "Pending Documents" stat card can reflect
-// the same demo dataset instead of a disconnected hardcoded number.
-export const initialDocuments: DocumentRequest[] = [
-  {
-    id: '1',
-    source: 'student',
-    trackingNumber: 'CCS-DOC-2026-0145',
-    requesterName: 'Bea Santos',
-    requesterIdLabel: 'Student ID',
-    requesterIdValue: '2200765',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Certificate of Grades',
-    purpose: 'Loan Application',
-    copies: 1,
-    requestDate: '2026-07-16',
-    neededBy: '2026-07-24',
-    status: 'pending',
-    notes: '',
-    releasedDate: null,
-    claimedDate: null,
-  },
-  {
-    id: '2',
-    source: 'student',
-    trackingNumber: 'CCS-DOC-2026-0142',
-    requesterName: 'Juan Dela Cruz',
-    requesterIdLabel: 'Student ID',
-    requesterIdValue: '2200123',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Transcript of Records',
-    purpose: 'Job Application',
-    copies: 2,
-    requestDate: '2026-07-15',
-    neededBy: '2026-07-20',
-    status: 'pending',
-    notes: '',
-    releasedDate: null,
-    claimedDate: null,
-  },
-  {
-    id: '3',
-    source: 'student',
-    trackingNumber: 'CCS-DOC-2026-0139',
-    requesterName: 'Maria Garcia',
-    requesterIdLabel: 'Student ID',
-    requesterIdValue: '2200456',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Certificate of Grades',
-    purpose: 'Scholarship Application',
-    copies: 1,
-    requestDate: '2026-07-14',
-    neededBy: '2026-07-17',
-    status: 'processing',
-    notes: 'Verifying grades with the registrar',
-    releasedDate: null,
-    claimedDate: null,
-  },
-  {
-    id: '4',
-    source: 'student',
-    trackingNumber: 'CCS-DOC-2026-0130',
-    requesterName: 'Andrei Villanueva',
-    requesterIdLabel: 'Student ID',
-    requesterIdValue: '2200432',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Honorable Dismissal',
-    purpose: 'University Transfer',
-    copies: 1,
-    requestDate: '2026-07-11',
-    neededBy: '2026-07-30',
-    status: 'rejected',
-    notes: 'Outstanding library clearance not yet settled',
-    releasedDate: null,
-    claimedDate: null,
-  },
-  {
-    id: '5',
-    source: 'student',
-    trackingNumber: 'CCS-DOC-2026-0125',
-    requesterName: 'Carlos Rodriguez',
-    requesterIdLabel: 'Student ID',
-    requesterIdValue: '2200789',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Recommendation Letter',
-    purpose: 'Graduate School Application',
-    copies: 3,
-    requestDate: '2026-07-10',
-    neededBy: '2026-07-12',
-    status: 'ready',
-    notes: 'Letter signed and ready for pickup',
-    releasedDate: null,
-    claimedDate: null,
-  },
-  {
-    id: '6',
-    source: 'student',
-    trackingNumber: 'CCS-DOC-2026-0118',
-    requesterName: 'Lisa Fernandez',
-    requesterIdLabel: 'Student ID',
-    requesterIdValue: '2200234',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Certificate of Enrollment',
-    purpose: 'Student Visa Application',
-    copies: 1,
-    requestDate: '2026-07-08',
-    neededBy: '2026-07-15',
-    status: 'released',
-    notes: 'Released to requester',
-    releasedDate: '2026-07-16',
-    claimedDate: null,
-  },
-  {
-    id: '7',
-    source: 'student',
-    trackingNumber: 'CCS-DOC-2026-0102',
-    requesterName: 'Marco Velasco',
-    requesterIdLabel: 'Student ID',
-    requesterIdValue: '2200567',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Good Moral Certificate',
-    purpose: 'Transfer Credential',
-    copies: 1,
-    requestDate: '2026-07-05',
-    neededBy: null,
-    status: 'claimed',
-    notes: 'Picked up by requester in person',
-    releasedDate: '2026-07-09',
-    claimedDate: '2026-07-10',
-  },
-  {
-    id: '8',
-    source: 'faculty',
-    trackingNumber: 'CCS-FDR-2026-0022',
-    requesterName: 'Asst. Prof. Maria Santos',
-    requesterIdLabel: 'Employee ID',
-    requesterIdValue: 'CCS-FAC-0091',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Service Record',
-    purpose: 'Loan Requirement',
-    requestDate: '2026-07-13',
-    neededBy: '2026-07-18',
-    status: 'processing',
-    notes: 'Coordinating with HR for signature',
-    releasedDate: null,
-    claimedDate: null,
-  },
-  {
-    id: '9',
-    source: 'faculty',
-    trackingNumber: 'CCS-FDR-2026-0015',
-    requesterName: 'Prof. Pedro Reyes',
-    requesterIdLabel: 'Employee ID',
-    requesterIdValue: 'CCS-FAC-0034',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Certificate of Employment',
-    purpose: 'Visa Application',
-    requestDate: '2026-07-09',
-    neededBy: '2026-07-14',
-    status: 'ready',
-    notes: 'Certificate signed by the Dean',
-    releasedDate: null,
-    claimedDate: null,
-  },
-  {
-    id: '10',
-    source: 'faculty',
-    trackingNumber: 'CCS-FDR-2026-0008',
-    requesterName: 'Prof. Ana Mendoza',
-    requesterIdLabel: 'Employee ID',
-    requesterIdValue: 'CCS-FAC-0058',
-    college: demoAdmin.departmentAbbrev,
-    documentType: 'Clearance Certificate',
-    purpose: 'Retirement Processing',
-    requestDate: '2026-07-01',
-    neededBy: null,
-    status: 'claimed',
-    notes: "Claimed at the Dean's Office",
-    releasedDate: '2026-07-05',
-    claimedDate: '2026-07-06',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -343,7 +157,9 @@ export default function AdminDocumentProcessingScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [documents, setDocuments] = useState<DocumentRequest[]>(initialDocuments);
+  const [documents, setDocuments] = useState<DocumentRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<RequestSource>('student');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('all');
@@ -352,10 +168,45 @@ export default function AdminDocumentProcessingScreen() {
   const [selectedDocument, setSelectedDocument] = useState<DocumentRequest | null>(null);
   const [processingNotes, setProcessingNotes] = useState('');
   const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus | null>(null);
+  const [updating, setUpdating] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+  const adminDepartmentAbbrev = user?.departmentAbbrev ?? '';
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchDocuments = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [studentRes, facultyRes] = await Promise.all([
+        api.get('/admin/document-processing'),
+        api.get('/admin/faculty-document-processing'),
+      ]);
+      const studentDocs: DocumentRequest[] = (studentRes.data.documents ?? []).map((d: any) => ({
+        ...d,
+        source: 'student' as RequestSource,
+      }));
+      const facultyDocs: DocumentRequest[] = (facultyRes.data.documents ?? []).map((d: any) => ({
+        ...d,
+        source: 'faculty' as RequestSource,
+      }));
+      setDocuments([...studentDocs, ...facultyDocs]);
+    } catch (err) {
+      console.error('Failed to load document requests:', err);
+      setError('Failed to load document requests.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
@@ -393,6 +244,7 @@ export default function AdminDocumentProcessingScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -474,23 +326,35 @@ export default function AdminDocumentProcessingScreen() {
     setProcessingNotes('');
   };
 
-  const handleUpdateStatus = (newStatus: DocumentStatus) => {
+  const handleUpdateStatus = async (newStatus: DocumentStatus) => {
     if (!selectedDocument) return;
     const todayStr = weekDates.todayStr;
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.id === selectedDocument.id
-          ? {
-              ...d,
-              status: newStatus,
-              notes: processingNotes,
-              releasedDate: newStatus === 'released' ? todayStr : d.releasedDate,
-              claimedDate: newStatus === 'claimed' ? todayStr : d.claimedDate,
-            }
-          : d,
-      ),
-    );
-    handleCloseDetails();
+    const endpoint =
+      selectedDocument.source === 'faculty'
+        ? `/admin/faculty-document-processing/${selectedDocument.id}/status`
+        : `/admin/document-processing/${selectedDocument.id}/status`;
+    setUpdating(true);
+    try {
+      await api.patch(endpoint, { status: newStatus, notes: processingNotes });
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === selectedDocument.id
+            ? {
+                ...d,
+                status: newStatus,
+                notes: processingNotes,
+                releasedDate: newStatus === 'released' ? todayStr : d.releasedDate,
+                claimedDate: newStatus === 'claimed' ? todayStr : d.claimedDate,
+              }
+            : d,
+        ),
+      );
+      handleCloseDetails();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update document status.');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const runConfirmStatusChange = () => {
@@ -569,7 +433,7 @@ export default function AdminDocumentProcessingScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Document Processing</Text>
-              <Text style={styles.pageSubtitle}>Process and manage document requests for {demoAdmin.departmentName}</Text>
+              <Text style={styles.pageSubtitle}>Process and manage document requests for {adminDepartmentName}</Text>
             </View>
           </View>
 
@@ -613,7 +477,7 @@ export default function AdminDocumentProcessingScreen() {
           {/* Documents */}
           <View style={styles.card}>
             <Text style={styles.cardTitleText}>Document Requests</Text>
-            <Text style={styles.cardSubtitleText}>Tracking and workflow management for {demoAdmin.departmentAbbrev}</Text>
+            <Text style={styles.cardSubtitleText}>Tracking and workflow management for {adminDepartmentAbbrev}</Text>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
               <View style={styles.tabsList}>
@@ -639,7 +503,20 @@ export default function AdminDocumentProcessingScreen() {
               </View>
             </ScrollView>
 
-            {visibleDocuments.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyCard}>
+                <ActivityIndicator color={theme.primary} />
+                <Text style={styles.emptyTitle}>Loading document requests…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>{error}</Text>
+                <Pressable style={styles.viewProcessBtn} onPress={fetchDocuments}>
+                  <Text style={styles.viewProcessBtnText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : visibleDocuments.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="document-text-outline" size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No documents found</Text>
@@ -716,6 +593,9 @@ export default function AdminDocumentProcessingScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
       />
 
       {/* Week filter modal */}
@@ -922,6 +802,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -929,6 +812,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -939,12 +825,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

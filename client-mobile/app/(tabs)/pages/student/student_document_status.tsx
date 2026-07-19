@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -15,7 +15,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,25 +81,16 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-document-status.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected';
 
 interface DocumentRecord {
   id: string;
   type: string;
   college: string;
-  collegeAbbrev: string;
+  collegeAbbrev?: string;
   requestDate: string;
   purpose: string;
-  copies: number;
+  copies?: number;
   status: DocStatus;
   trackingNumber: string;
   notes?: string;
@@ -105,29 +98,6 @@ interface DocumentRecord {
   claimedDate?: string;
   releasedDate?: string;
 }
-
-const initialDocuments: DocumentRecord[] = [
-  {
-    id: 'd1', type: 'Good Moral Certificate', college: 'College of Computing Studies', collegeAbbrev: 'CCS',
-    requestDate: '2026-03-25', purpose: 'Job application requirement', copies: 2,
-    status: 'processing', trackingNumber: 'DOC-2026-001234', estimatedCompletion: '2026-03-30',
-  },
-  {
-    id: 'd2', type: 'Transcript of Records', college: 'College of Computing Studies', collegeAbbrev: 'CCS',
-    requestDate: '2026-03-20', purpose: 'Graduate school application', copies: 1,
-    status: 'ready', trackingNumber: 'DOC-2026-001189', notes: 'Ready for pickup at Registrar Office',
-  },
-  {
-    id: 'd3', type: 'Certificate of Enrollment', college: 'College of Computing Studies', collegeAbbrev: 'CCS',
-    requestDate: '2026-02-10', purpose: 'Scholarship application', copies: 1,
-    status: 'claimed', trackingNumber: 'DOC-2026-000871', claimedDate: '2026-02-14',
-  },
-  {
-    id: 'd4', type: 'Certificate of Grades', college: 'College of Computing Studies', collegeAbbrev: 'CCS',
-    requestDate: '2026-01-18', purpose: 'Transfer credit evaluation', copies: 1,
-    status: 'rejected', trackingNumber: 'DOC-2026-000602', notes: 'Incomplete requirements submitted. Please resubmit with your latest grade slip.',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -153,14 +123,14 @@ const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string
   rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
 };
 
-const formatDateLong = (dateString: string) => {
-  const [y, m, d] = dateString.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const formatDateLong = (dateString?: string) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
-const formatDateShort = (dateString: string) => {
-  const [y, m, d] = dateString.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const formatDateShort = (dateString?: string) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 type TabKey = 'active' | 'completed';
@@ -169,14 +139,37 @@ export default function StudentDocumentStatusScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [documents, setDocuments] = useState<DocumentRecord[]>(initialDocuments);
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ docId?: string }>();
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(params.docId ?? null);
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchDocuments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/student/documents');
+      setDocuments(data.documents ?? []);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch documents:', err);
+      setError('Could not load your documents.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
@@ -194,20 +187,29 @@ export default function StudentDocumentStatusScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) ?? null : null;
-  const collegeLogoFor = (abbrev: string) => collegeLogos[abbrev] ?? ccsLogo;
+  const collegeLogoFor = (abbrev?: string) => (abbrev ? collegeLogos[abbrev] : undefined) ?? ccsLogo;
 
   const activeDocuments = documents.filter((d) => d.status !== 'claimed' && d.status !== 'rejected');
   const completedDocuments = documents.filter((d) => d.status === 'claimed' || d.status === 'rejected');
 
-  const confirmCancelRequest = () => {
+  const confirmCancelRequest = async () => {
     if (!selectedDoc) return;
-    setDocuments((prev) => prev.filter((d) => d.id !== selectedDoc.id));
-    setShowCancelDialog(false);
-    setSelectedDocId(null);
-    Alert.alert('Request cancelled', 'Your document request has been cancelled.');
+    setCancelling(true);
+    try {
+      await api.delete(`/student/documents/${selectedDoc.id}`);
+      setDocuments((prev) => prev.filter((d) => d.id !== selectedDoc.id));
+      setShowCancelDialog(false);
+      setSelectedDocId(null);
+      Alert.alert('Request cancelled', 'Your document request has been cancelled.');
+    } catch (err: any) {
+      console.error('Failed to cancel document request:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to cancel document request');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -260,6 +262,25 @@ export default function StudentDocumentStatusScreen() {
                 </View>
               </View>
 
+              {error && (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>Something went wrong</Text>
+                  <Text style={styles.emptyDescription}>{error}</Text>
+                  <Pressable style={styles.emptyRequestBtn} onPress={fetchDocuments}>
+                    <Text style={styles.emptyRequestBtnText}>Retry</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {loading && !error && (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyDescription}>Loading documents…</Text>
+                </View>
+              )}
+
+              {!loading && !error && (
+              <>
               {/* Tabs */}
               <View style={styles.tabsRow}>
                 <Pressable style={[styles.tab, activeTab === 'active' && styles.tabActive]} onPress={() => setActiveTab('active')}>
@@ -324,6 +345,8 @@ export default function StudentDocumentStatusScreen() {
                   </View>
                 )
               )}
+              </>
+              )}
             </>
           )}
         </ScrollView>
@@ -338,12 +361,12 @@ export default function StudentDocumentStatusScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -387,9 +410,9 @@ export default function StudentDocumentStatusScreen() {
               <Pressable style={styles.logoutCancelBtn} onPress={() => setShowCancelDialog(false)}>
                 <Text style={styles.logoutCancelBtnText}>Keep Request</Text>
               </Pressable>
-              <Pressable style={styles.logoutConfirmBtn} onPress={confirmCancelRequest}>
+              <Pressable style={styles.logoutConfirmBtn} onPress={confirmCancelRequest} disabled={cancelling}>
                 <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
-                <Text style={styles.logoutConfirmBtnText}>Cancel Request</Text>
+                <Text style={styles.logoutConfirmBtnText}>{cancelling ? 'Cancelling…' : 'Cancel Request'}</Text>
               </Pressable>
             </View>
           </View>
@@ -494,7 +517,7 @@ function DocumentDetail({
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
   doc: DocumentRecord;
-  collegeLogoFor: (abbrev: string) => ImageSourcePropType;
+  collegeLogoFor: (abbrev?: string) => ImageSourcePropType;
   onBack: () => void;
   onCancel: () => void;
 }) {

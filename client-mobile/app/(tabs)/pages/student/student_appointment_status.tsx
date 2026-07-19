@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -15,7 +15,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,21 +81,13 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-appointment-status.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type BookingStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
 
 interface Appointment {
   id: string;
   person: string;
   college: string;
+  collegeAbbrev?: string;
   date: string;
   windowStart: string;
   windowEnd: string;
@@ -102,48 +96,6 @@ interface Appointment {
   status: BookingStatus;
   createdAt: string;
 }
-
-const toDateStr = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-const addDays = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return toDateStr(d);
-};
-
-const demoAppointments: Appointment[] = [
-  {
-    id: 'b1', person: 'Prof. Maria Santos', college: 'CCS', date: addDays(3),
-    windowStart: '09:00', windowEnd: '10:00', location: 'CCS Faculty Room 201',
-    purpose: 'Discuss thesis proposal outline and timeline.', status: 'pending', createdAt: addDays(-2),
-  },
-  {
-    id: 'b2', person: 'Prof. Juan Reyes', college: 'CCS', date: addDays(6),
-    windowStart: '10:00', windowEnd: '11:00', location: 'CCS Room 105',
-    purpose: 'Grade inquiry for Software Engineering.', status: 'approved', createdAt: addDays(-3),
-  },
-  {
-    id: 'b3', person: 'Ms. Ana Cruz', college: 'CCS', date: addDays(9),
-    windowStart: '08:00', windowEnd: '09:00', location: 'Student Affairs Office',
-    purpose: 'Complete clearance requirements.', status: 'approved', createdAt: addDays(-1),
-  },
-  {
-    id: 'b4', person: 'Dr. Pedro Garcia', college: 'CCS', date: addDays(-12),
-    windowStart: '13:00', windowEnd: '14:00', location: "Dean's Office",
-    purpose: 'Academic consultation.', status: 'completed', createdAt: addDays(-19),
-  },
-  {
-    id: 'b5', person: 'Prof. Liza Fernandez', college: 'CBAA', date: addDays(-20),
-    windowStart: '09:00', windowEnd: '10:00', location: 'CBAA Room 210',
-    purpose: 'Internship coordination inquiry.', status: 'rejected', createdAt: addDays(-25),
-  },
-  {
-    id: 'b6', person: 'Dr. Ramon Villar', college: 'COE', date: addDays(-25),
-    windowStart: '14:00', windowEnd: '15:00', location: 'COE Consultation Room',
-    purpose: 'Subject enrollment concern.', status: 'cancelled', createdAt: addDays(-30),
-  },
-];
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   pending: 'Pending', approved: 'Approved', completed: 'Completed', rejected: 'Rejected', cancelled: 'Cancelled',
@@ -217,15 +169,52 @@ export default function StudentAppointmentStatusScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [appointments, setAppointments] = useState<Appointment[]>(demoAppointments);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ appointmentId?: string }>();
+  const [selectedId, setSelectedId] = useState<string | null>(params.appointmentId ?? null);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const statusStyles = isDarkMode ? STATUS_STYLES_DARK : STATUS_STYLES_LIGHT;
   const styles = createStyles(theme);
+
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/student/appointments');
+      setAppointments(
+        (data.appointments ?? []).map((a: any) => ({
+          id: String(a.id),
+          person: a.person,
+          college: a.collegeAbbrev || a.college,
+          collegeAbbrev: a.collegeAbbrev,
+          date: a.date,
+          windowStart: a.windowStart ?? '',
+          windowEnd: a.windowEnd ?? '',
+          location: a.location,
+          purpose: a.purpose ?? '',
+          status: a.status,
+          createdAt: a.createdAt,
+        })),
+      );
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch appointments:', err);
+      setError('Could not load your appointments. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
@@ -242,7 +231,7 @@ export default function StudentAppointmentStatusScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
   const byStatus = (status: BookingStatus) => appointments.filter((a) => a.status === status);
   const tabLists: Record<TabKey, Appointment[]> = {
@@ -256,12 +245,21 @@ export default function StudentAppointmentStatusScreen() {
 
   const selectedAppt = appointments.find((a) => a.id === selectedId) ?? null;
 
-  const doCancel = () => {
+  const doCancel = async () => {
     const id = cancelConfirmId;
     setCancelConfirmId(null);
-    if (!id) return;
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'cancelled' as const } : a)));
-    setSelectedId(null);
+    if (!id || cancelling) return;
+    setCancelling(id);
+    try {
+      await api.delete(`/student/appointments/${id}`);
+      setSelectedId(null);
+      await fetchAppointments();
+    } catch (err: any) {
+      console.error('Failed to cancel appointment:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to cancel the appointment.');
+    } finally {
+      setCancelling(null);
+    }
   };
 
   const collegeLogoFor = (abbrev: string) => collegeLogos[abbrev] ?? ccsLogo;
@@ -438,6 +436,25 @@ export default function StudentAppointmentStatusScreen() {
                 <Ionicons name="chevron-forward" size={18} color={theme.purple} />
               </Pressable>
 
+              {error && (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>Something went wrong</Text>
+                  <Text style={styles.emptyDescription}>{error}</Text>
+                  <Pressable style={styles.bookCtaBtn} onPress={fetchAppointments}>
+                    <Text style={styles.bookCtaBtnText}>Retry</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {loading && !error && (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyDescription}>Loading your appointments…</Text>
+                </View>
+              )}
+
+              {!loading && !error && (
+              <>
               {/* Tabs */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
                 <View style={styles.tabsRow}>
@@ -522,6 +539,8 @@ export default function StudentAppointmentStatusScreen() {
                   )}
                 </View>
               )}
+              </>
+              )}
             </>
           )}
         </ScrollView>
@@ -536,12 +555,12 @@ export default function StudentAppointmentStatusScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -584,9 +603,9 @@ export default function StudentAppointmentStatusScreen() {
               <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelConfirmId(null)}>
                 <Text style={styles.logoutCancelBtnText}>Keep Appointment</Text>
               </Pressable>
-              <Pressable style={styles.logoutConfirmBtn} onPress={doCancel}>
+              <Pressable style={styles.logoutConfirmBtn} onPress={doCancel} disabled={cancelling === cancelConfirmId}>
                 <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
-                <Text style={styles.logoutConfirmBtnText}>Cancel Appointment</Text>
+                <Text style={styles.logoutConfirmBtnText}>{cancelling === cancelConfirmId ? 'Cancelling…' : 'Cancel Appointment'}</Text>
               </Pressable>
             </View>
           </View>

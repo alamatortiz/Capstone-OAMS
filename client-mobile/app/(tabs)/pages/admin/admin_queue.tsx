@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Toast from 'react-native-toast-message';
+import { useAuth } from '@/context/AuthContext';
+import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,14 +83,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors admin-queue.jsx) ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 interface CollegeOverview {
   abbrev: string;
   name: string;
@@ -95,16 +91,6 @@ interface CollegeOverview {
   avgWaitTime: string;
   status: 'operational' | 'busy' | 'closed';
 }
-
-// College-level overview grid. In the real app only the signed-in admin's own department has live queue data (admin-queue.jsx fetches /admin/queue-hosting, which is scoped server-side to req.user's department) — the other five colleges here are static demo figures, same as every other mobile screen.
-const collegeOverviewData: CollegeOverview[] = [
-  { abbrev: 'CCS', name: 'College of Computing Studies (CCS)', activeQueues: 5, waitingStudents: 23, avgWaitTime: '8 mins', status: 'operational' },
-  { abbrev: 'CBAA', name: 'College of Business, Accountancy and Administration (CBAA)', activeQueues: 4, waitingStudents: 31, avgWaitTime: '12 mins', status: 'busy' },
-  { abbrev: 'COE', name: 'College of Engineering (COE)', activeQueues: 3, waitingStudents: 15, avgWaitTime: '10 mins', status: 'operational' },
-  { abbrev: 'COED', name: 'College of Education (COED)', activeQueues: 4, waitingStudents: 18, avgWaitTime: '7 mins', status: 'operational' },
-  { abbrev: 'CAS', name: 'College of Arts and Sciences (CAS)', activeQueues: 3, waitingStudents: 12, avgWaitTime: '6 mins', status: 'operational' },
-  { abbrev: 'CHAS', name: 'College of Health and Allied Sciences (CHAS)', activeQueues: 2, waitingStudents: 9, avgWaitTime: '5 mins', status: 'operational' },
-];
 
 type QueueSlotStatus = 'open' | 'paused' | 'full' | 'expired' | 'closed';
 type QueueEntryStatus = 'waiting' | 'serving' | 'completed' | 'no_show';
@@ -134,56 +120,6 @@ interface QueueDetail {
   serviceHours: { start: string; end: string } | null;
   entries: QueueEntry[];
 }
-
-// Only the admin's own department (CCS) has queues wired up here — matches
-// admin-queue.jsx, which only ever renders queues for req.user's department.
-export const initialQueueDetails: QueueDetail[] = [
-  {
-    id: 'q1',
-    queueType: 'Academic Consultation',
-    status: 'open',
-    currentlyServingStudentNumber: 'CCS-CON-047',
-    currentCount: 6,
-    servedCount: 9,
-    totalInQueue: 16,
-    maxCapacity: 20,
-    queueOccupancyPercent: 80,
-    servicedPercent: 56,
-    avgServiceMinutes: 10,
-    location: 'CCS Faculty Room 201',
-    serviceHours: { start: '08:00', end: '17:00' },
-    entries: [
-      { queueNumber: 'CCS-CON-047', studentName: 'Juan Dela Cruz', studentId: '2200123', concern: 'Thesis adviser consultation', status: 'serving', joinedAt: '9:45 AM' },
-      { queueNumber: 'CCS-CON-048', studentName: 'Maria Santos', studentId: '2200456', concern: 'Grade query for CS301', status: 'waiting', joinedAt: '10:02 AM' },
-      { queueNumber: 'CCS-CON-049', studentName: 'Pedro Garcia', studentId: '2200789', concern: 'Capstone documentation review', status: 'waiting', joinedAt: '10:08 AM' },
-      { queueNumber: 'CCS-CON-050', studentName: 'Ana Reyes', studentId: '2200234', concern: 'Enrollment adjustment concern', status: 'waiting', joinedAt: '10:15 AM' },
-      { queueNumber: 'CCS-CON-051', studentName: 'Carlos Bautista', studentId: '2200567', concern: 'OJT endorsement signing', status: 'waiting', joinedAt: '10:20 AM' },
-      { queueNumber: 'CCS-CON-052', studentName: 'Liza Fernandez', studentId: '2200890', concern: 'Special class permit', status: 'waiting', joinedAt: '10:26 AM' },
-      { queueNumber: 'CCS-CON-053', studentName: 'Miguel Torres', studentId: '2200345', concern: 'Subject prerequisite waiver', status: 'waiting', joinedAt: '10:31 AM' },
-    ],
-  },
-  {
-    id: 'q2',
-    queueType: 'Document Signing',
-    status: 'open',
-    currentlyServingStudentNumber: null,
-    currentCount: 4,
-    servedCount: 7,
-    totalInQueue: 11,
-    maxCapacity: 15,
-    queueOccupancyPercent: 73,
-    servicedPercent: 64,
-    avgServiceMinutes: 5,
-    location: "CCS Dean's Office",
-    serviceHours: { start: '09:00', end: '16:00' },
-    entries: [
-      { queueNumber: 'CCS-DOC-023', studentName: 'Kevin Ramos', studentId: '2200678', concern: 'Certificate of Enrollment signing', status: 'waiting', joinedAt: '9:50 AM' },
-      { queueNumber: 'CCS-DOC-024', studentName: 'Jasmine Cruz', studentId: '2200901', concern: 'Good Moral Certificate request', status: 'waiting', joinedAt: '10:00 AM' },
-      { queueNumber: 'CCS-DOC-025', studentName: 'Andrei Villanueva', studentId: '2200432', concern: 'Transcript of Records signing', status: 'waiting', joinedAt: '10:10 AM' },
-      { queueNumber: 'CCS-DOC-026', studentName: 'Bea Santos', studentId: '2200765', concern: 'Clearance form signing', status: 'waiting', joinedAt: '10:18 AM' },
-    ],
-  },
-];
 
 interface NavItem {
   key: string;
@@ -266,14 +202,29 @@ export default function AdminQueueScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [queueDetails, setQueueDetails] = useState<QueueDetail[]>(initialQueueDetails);
-  const [monitoringQueueId, setMonitoringQueueId] = useState<string | null>(null);
+  const [monitoringQueueId, setMonitoringQueueId] = useState<number | null>(null);
+  const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([]);
   const [entriesPage, setEntriesPage] = useState(0);
   const [collegeOverviewFilter, setCollegeOverviewFilter] = useState('all');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const { queues: queueDetails, fetchQueues } = useAdminQueueHosting();
+
+  const fetchEntries = useCallback(async (slotId: number) => {
+    try {
+      const res = await api.get(`/admin/queue-hosting/${slotId}/entries`);
+      setQueueEntries(res.data.entries ?? []);
+    } catch (error) {
+      console.error('Failed to fetch queue entries:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (monitoringQueueId != null) fetchEntries(monitoringQueueId);
+  }, [monitoringQueueId, fetchEntries]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -314,108 +265,115 @@ export default function AdminQueueScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const activeQueueDetails = queueDetails.filter((q) => ACTIVE_STATUSES.includes(q.status));
-  const serviceTypes = [...new Set(activeQueueDetails.map((q) => q.queueType))].sort();
+  const activeQueueDetails = queueDetails.filter((q: any) => ACTIVE_STATUSES.includes(q.status));
+  const serviceTypes = [...new Set(activeQueueDetails.map((q: any) => q.queueType))].sort();
   const filteredQueueDetails =
     serviceTypeFilter === 'all'
       ? activeQueueDetails
-      : activeQueueDetails.filter((q) => q.queueType === serviceTypeFilter);
+      : activeQueueDetails.filter((q: any) => q.queueType === serviceTypeFilter);
 
   const systemStats = {
     totalQueues: activeQueueDetails.length,
-    totalWaiting: activeQueueDetails.reduce((sum, q) => sum + q.currentCount, 0),
+    totalWaiting: activeQueueDetails.reduce((sum: number, q: any) => sum + q.currentCount, 0),
     avgWaitTime: (() => {
-      const withAvg = activeQueueDetails.filter((q) => q.avgServiceMinutes != null);
+      const withAvg = activeQueueDetails.filter((q: any) => q.avgServiceMinutes != null);
       if (withAvg.length === 0) return 'N/A';
-      const avg = withAvg.reduce((sum, q) => sum + (q.avgServiceMinutes ?? 0), 0) / withAvg.length;
+      const avg = withAvg.reduce((sum: number, q: any) => sum + (q.avgServiceMinutes ?? 0), 0) / withAvg.length;
       return `${Math.round(avg)} mins`;
     })(),
-    operational: activeQueueDetails.filter((q) => q.status === 'open').length,
+    operational: activeQueueDetails.filter((q: any) => q.status === 'open').length,
   };
+
+  // No cross-college live endpoint exists yet — the overview grid shows only
+  // the signed-in admin's own department, derived from real queue-hosting data.
+  const collegeOverviewData: CollegeOverview[] = user
+    ? [
+        {
+          abbrev: user.departmentAbbrev ?? '',
+          name: user.departmentName ?? '',
+          activeQueues: systemStats.totalQueues,
+          waitingStudents: systemStats.totalWaiting,
+          avgWaitTime: systemStats.avgWaitTime,
+          status: systemStats.totalQueues > 0 ? 'operational' : 'closed',
+        },
+      ]
+    : [];
 
   const filteredCollegeOverview =
     collegeOverviewFilter === 'all'
       ? collegeOverviewData
       : collegeOverviewData.filter((c) => c.abbrev === collegeOverviewFilter);
 
-  const monitoringQueue = queueDetails.find((q) => q.id === monitoringQueueId) ?? null;
-  const queueEntries = monitoringQueue?.entries ?? [];
+  const monitoringQueue = queueDetails.find((q: any) => q.id === monitoringQueueId) ?? null;
   const totalEntryPages = Math.max(1, Math.ceil(queueEntries.length / ENTRIES_PER_PAGE));
   const currentEntriesPage = Math.min(entriesPage, totalEntryPages - 1);
   const entriesStartIndex = currentEntriesPage * ENTRIES_PER_PAGE;
   const paginatedEntries = queueEntries.slice(entriesStartIndex, entriesStartIndex + ENTRIES_PER_PAGE);
 
-  const openMonitor = (id: string) => {
+  const openMonitor = (id: number) => {
     setMonitoringQueueId(id);
     setEntriesPage(0);
   };
 
-  // ── Queue actions — mutate local demo state directly (mirrors the shape of
-  // admin-queue.jsx's server-authoritative handlers, just without a backend) ──
-  const handleCallNext = (id: string) => {
-    setQueueDetails((prev) =>
-      prev.map((q) => {
-        if (q.id !== id || q.currentlyServingStudentNumber || q.currentCount === 0) return q;
-        const nextWaiting = q.entries.find((e) => e.status === 'waiting');
-        if (!nextWaiting) return q;
-        return {
-          ...q,
-          currentlyServingStudentNumber: nextWaiting.queueNumber,
-          currentCount: q.currentCount - 1,
-          entries: q.entries.map((e) =>
-            e.queueNumber === nextWaiting.queueNumber ? { ...e, status: 'serving' } : e,
-          ),
-        };
-      }),
-    );
+  // ── Queue actions — real API calls against the admin's own department ──
+  const handleCallNext = async (id: number) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${id}/call-next`);
+      await fetchQueues();
+      await fetchEntries(id);
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.response?.data?.error ?? 'Failed to call next student' });
+    }
   };
 
-  const handleMarkAsServed = (id: string) => {
-    setQueueDetails((prev) =>
-      prev.map((q) => {
-        if (q.id !== id || !q.currentlyServingStudentNumber) return q;
-        return {
-          ...q,
-          currentlyServingStudentNumber: null,
-          servedCount: q.servedCount + 1,
-          entries: q.entries.map((e) =>
-            e.queueNumber === q.currentlyServingStudentNumber ? { ...e, status: 'completed' } : e,
-          ),
-        };
-      }),
-    );
+  const handleMarkAsServed = async (id: number) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${id}/serve`);
+      await fetchQueues();
+      await fetchEntries(id);
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.response?.data?.error ?? 'Failed to mark as served' });
+    }
   };
 
-  const handleSkipStudent = (id: string) => {
-    setQueueDetails((prev) =>
-      prev.map((q) => {
-        if (q.id !== id || !q.currentlyServingStudentNumber) return q;
-        return {
-          ...q,
-          currentlyServingStudentNumber: null,
-          entries: q.entries.map((e) =>
-            e.queueNumber === q.currentlyServingStudentNumber ? { ...e, status: 'no_show' } : e,
-          ),
-        };
-      }),
-    );
+  const handleSkipStudent = async (id: number) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${id}/skip`);
+      await fetchQueues();
+      await fetchEntries(id);
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.response?.data?.error ?? 'Failed to skip student' });
+    }
   };
 
-  const handleResumeQueue = (id: string) => {
-    setQueueDetails((prev) => prev.map((q) => (q.id === id ? { ...q, status: 'open' } : q)));
+  const handleResumeQueue = async (id: number) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${id}/resume`);
+      Toast.show({ type: 'success', text1: 'Queue resumed' });
+      await fetchQueues();
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.response?.data?.error ?? 'Failed to resume queue' });
+    }
   };
 
-  const runConfirmAction = () => {
+  const runConfirmAction = async () => {
     if (!confirmAction) return;
     const { type, queueId } = confirmAction;
-    setQueueDetails((prev) =>
-      prev.map((q) => (q.id === queueId ? { ...q, status: type === 'pause' ? 'paused' : 'closed' } : q)),
-    );
-    setConfirmAction(null);
-    if (type === 'stop') setMonitoringQueueId(null);
+    try {
+      await api.patch(`/admin/queue-hosting/${queueId}/${type === 'pause' ? 'pause' : 'close'}`, {
+        reason: type === 'pause' ? 'Paused by admin' : 'Stopped by admin',
+      });
+      Toast.show({ type: 'success', text1: type === 'pause' ? 'Queue paused' : 'Queue stopped' });
+      await fetchQueues();
+      setConfirmAction(null);
+      if (type === 'stop') setMonitoringQueueId(null);
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.response?.data?.error ?? `Failed to ${type} queue` });
+    }
   };
 
   const collegeFilterOptions = [
@@ -460,7 +418,7 @@ export default function AdminQueueScreen() {
       monitoringQueue.avgServiceMinutes != null
         ? monitoringQueue.avgServiceMinutes * monitoringQueue.currentCount
         : null;
-    const statusTint = QUEUE_STATUS_TINTS[monitoringQueue.status];
+    const statusTint = QUEUE_STATUS_TINTS[monitoringQueue.status as QueueSlotStatus];
 
     return (
       <View style={styles.root}>
@@ -503,7 +461,7 @@ export default function AdminQueueScreen() {
               </LinearGradient>
               <View style={styles.titleTextWrap}>
                 <Text style={styles.pageTitle}>{monitoringQueue.queueType}</Text>
-                <Text style={styles.pageSubtitle}>{demoAdmin.departmentName}</Text>
+                <Text style={styles.pageSubtitle}>{user?.departmentName ?? ''}</Text>
               </View>
             </View>
 
@@ -774,6 +732,8 @@ export default function AdminQueueScreen() {
           onLogout={handleLogout}
           theme={theme}
           styles={styles}
+          adminName={user?.name ?? 'Admin'}
+          adminDepartmentName={user?.departmentName ?? ''}
         />
 
         <ConfirmActionModal
@@ -832,7 +792,7 @@ export default function AdminQueueScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Centralized Queue Management</Text>
-              <Text style={styles.pageSubtitle}>Monitor and control queues for {demoAdmin.departmentName}</Text>
+              <Text style={styles.pageSubtitle}>Monitor and control queues for {user?.departmentName ?? ''}</Text>
             </View>
           </View>
 
@@ -892,7 +852,7 @@ export default function AdminQueueScreen() {
             <View style={styles.collegeGrid}>
               {filteredCollegeOverview.map((c) => {
                 const tint = COLLEGE_STATUS_TINTS[c.status];
-                const isOwnCollege = c.abbrev === demoAdmin.departmentAbbrev;
+                const isOwnCollege = c.abbrev === user?.departmentAbbrev;
                 return (
                   <View key={c.abbrev} style={styles.collegeCard}>
                     <View style={styles.collegeCardHeaderRow}>
@@ -934,7 +894,7 @@ export default function AdminQueueScreen() {
             <View style={styles.overviewHeaderRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitleText}>Active Queue Details</Text>
-                <Text style={styles.cardSubtitleText}>Queue information for {demoAdmin.departmentName}</Text>
+                <Text style={styles.cardSubtitleText}>Queue information for {user?.departmentName ?? ''}</Text>
               </View>
               {serviceTypes.length > 0 && (
                 <Pressable style={styles.filterSelect} onPress={() => setActiveFilter('serviceType')}>
@@ -962,11 +922,11 @@ export default function AdminQueueScreen() {
                   <View key={detail.id} style={styles.queueDetailRow}>
                     <View style={styles.queueDetailHeaderRow}>
                       <Image
-                        source={collegeLogos[demoAdmin.departmentAbbrev] ?? ccsLogo}
+                        source={collegeLogos[user?.departmentAbbrev ?? ''] ?? ccsLogo}
                         style={styles.queueDetailLogo}
                         resizeMode="contain"
                       />
-                      <Text style={styles.queueDetailAbbrev}>{demoAdmin.departmentAbbrev}</Text>
+                      <Text style={styles.queueDetailAbbrev}>{user?.departmentAbbrev ?? ''}</Text>
                       <View style={styles.queueDetailServicePill}>
                         <Text style={styles.queueDetailServiceText}>{detail.queueType}</Text>
                       </View>
@@ -1022,6 +982,8 @@ export default function AdminQueueScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={user?.name ?? 'Admin'}
+        adminDepartmentName={user?.departmentName ?? ''}
       />
 
       {/* Filter Options Modal (shared by college + service type filters) */}
@@ -1067,6 +1029,8 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -1074,6 +1038,8 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1084,12 +1050,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>Admin</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

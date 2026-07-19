@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -66,15 +69,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors admin-announcements.jsx's
-// field shape: title/content/type/isPinned/isCrossCollege/date/createdBy/status) ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type AnnouncementType = 'important' | 'event' | 'reminder' | 'general';
 type AnnouncementStatus = 'active' | 'archived';
 
@@ -89,107 +83,6 @@ interface AnnouncementItem {
   createdBy: string;
   status: AnnouncementStatus;
 }
-
-let nextAnnouncementId = 100;
-
-const INITIAL_ANNOUNCEMENTS: AnnouncementItem[] = [
-  {
-    id: '1',
-    title: 'System Maintenance Notice',
-    content:
-      'The OAMS system will undergo scheduled maintenance on July 20, 2026, from 12:00 AM to 6:00 AM. Services will be temporarily unavailable during this period.',
-    type: 'important',
-    date: 'July 16, 2026',
-    isPinned: true,
-    isCrossCollege: true,
-    createdBy: 'Admin Office',
-    status: 'active',
-  },
-  {
-    id: '2',
-    title: 'Enrollment Period Reminder',
-    content:
-      'Second Semester enrollment period runs from August 1-15, 2026. Please prepare all necessary documents and settle any outstanding balances before enrollment.',
-    type: 'reminder',
-    date: 'July 15, 2026',
-    isPinned: true,
-    isCrossCollege: false,
-    createdBy: 'Demo Admin',
-    status: 'active',
-  },
-  {
-    id: '3',
-    title: 'Career Fair 2026',
-    content:
-      'Join us for the University Career Fair on August 10, 2026, at the University Gymnasium. Meet with potential employers and learn about career opportunities.',
-    type: 'event',
-    date: 'July 14, 2026',
-    isPinned: false,
-    isCrossCollege: false,
-    createdBy: 'Demo Admin',
-    status: 'active',
-  },
-  {
-    id: '4',
-    title: 'Thesis Defense Schedule',
-    content:
-      'Final thesis defense schedules for graduating students are now available. Please check with the department office for your assigned date and time.',
-    type: 'reminder',
-    date: 'July 13, 2026',
-    isPinned: false,
-    isCrossCollege: false,
-    createdBy: 'Demo Admin',
-    status: 'active',
-  },
-  {
-    id: '5',
-    title: 'Scholarship Application Open',
-    content:
-      'Scholarship applications for Academic Year 2026-2027 are now open. Deadline for submission is August 30, 2026. Visit the Scholarship Office for more details.',
-    type: 'general',
-    date: 'July 12, 2026',
-    isPinned: false,
-    isCrossCollege: true,
-    createdBy: 'Admin Office',
-    status: 'active',
-  },
-  {
-    id: '6',
-    title: 'Practicum Orientation',
-    content:
-      'Mandatory practicum orientation will be held on August 8, 2026, at 2:00 PM in the AVR. Attendance is required for all qualified students.',
-    type: 'important',
-    date: 'July 11, 2026',
-    isPinned: false,
-    isCrossCollege: false,
-    createdBy: 'Demo Admin',
-    status: 'active',
-  },
-  {
-    id: '7',
-    title: 'Library Extended Hours',
-    content:
-      'The University Library extended its operating hours during the previous examination period. Open from 7:00 AM to 10:00 PM.',
-    type: 'general',
-    date: 'June 21, 2026',
-    isPinned: false,
-    isCrossCollege: true,
-    createdBy: 'Library Staff',
-    status: 'archived',
-  },
-  {
-    id: '8',
-    title: 'Clearance Processing Reminder',
-    content:
-      'Graduating students were reminded to start their clearance processing and settle all obligations to avoid delays.',
-    type: 'reminder',
-    date: 'June 19, 2026',
-    isPinned: false,
-    isCrossCollege: true,
-    createdBy: 'Registrar Office',
-    status: 'archived',
-  },
-];
 
 // Mirrors admin-announcements.css badge/icon colors (important=red, event=blue,
 // reminder=amber, general=gray — this admin page never uses the student side's purple).
@@ -314,11 +207,17 @@ export default function AdminAnnouncementScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(INITIAL_ANNOUNCEMENTS);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<TypeFilter>('all');
   const [activeTab, setActiveTab] = useState<TabKey>('active');
@@ -330,6 +229,24 @@ export default function AdminAnnouncementScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const fetchAnnouncements = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/admin/announcements');
+      setAnnouncements(data.announcements ?? []);
+    } catch (err) {
+      console.error('Failed to load announcements:', err);
+      setError('Failed to load announcements.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
@@ -365,6 +282,7 @@ export default function AdminAnnouncementScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -405,20 +323,44 @@ export default function AdminAnnouncementScreen() {
     { key: 'archived', label: 'Archived', icon: 'close-outline', border: 'rgba(148, 163, 184, 0.3)', color: theme.tertiary },
   ];
 
-  // ── CRUD handlers (local-only — mobile has no API wiring yet) ──
-  const togglePin = (id: string) =>
-    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, isPinned: !a.isPinned } : a)));
+  // ── CRUD handlers (wired to /admin/announcements) ──
+  const togglePin = async (id: string) => {
+    try {
+      const { data } = await api.patch(`/admin/announcements/${id}/pin`);
+      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, isPinned: data.isPinned } : a)));
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update pin status.');
+    }
+  };
 
-  const archiveAnnouncement = (id: string) =>
-    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'archived' } : a)));
+  const archiveAnnouncement = async (id: string) => {
+    try {
+      await api.patch(`/admin/announcements/${id}/archive`);
+      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'archived' } : a)));
+    } catch (err) {
+      Alert.alert('Error', 'Failed to archive announcement.');
+    }
+  };
 
-  const restoreAnnouncement = (id: string) =>
-    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'active' } : a)));
+  const restoreAnnouncement = async (id: string) => {
+    try {
+      await api.patch(`/admin/announcements/${id}/restore`);
+      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'active' } : a)));
+    } catch (err) {
+      Alert.alert('Error', 'Failed to restore announcement.');
+    }
+  };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteId) return;
-    setAnnouncements((prev) => prev.filter((a) => a.id !== deleteId));
-    setDeleteId(null);
+    try {
+      await api.delete(`/admin/announcements/${deleteId}`);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== deleteId));
+    } catch (err) {
+      Alert.alert('Error', 'Failed to delete announcement.');
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   const openEdit = (a: AnnouncementItem) => {
@@ -429,19 +371,30 @@ export default function AdminAnnouncementScreen() {
     setEditingAnnouncement(null);
     setEditForm(EMPTY_FORM);
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editForm.title.trim() || !editForm.content.trim()) {
       Alert.alert('Missing fields', 'Please fill in all required fields.');
       return;
     }
-    setAnnouncements((prev) =>
-      prev.map((a) =>
-        a.id === editingAnnouncement?.id
-          ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, isCrossCollege: editForm.isCrossCollege }
-          : a,
-      ),
-    );
-    closeEdit();
+    if (!editingAnnouncement) return;
+    try {
+      await api.put(`/admin/announcements/${editingAnnouncement.id}`, {
+        title: editForm.title,
+        content: editForm.content,
+        type: editForm.type,
+        isCrossCollege: editForm.isCrossCollege,
+      });
+      setAnnouncements((prev) =>
+        prev.map((a) =>
+          a.id === editingAnnouncement.id
+            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, isCrossCollege: editForm.isCrossCollege }
+            : a,
+        ),
+      );
+      closeEdit();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update announcement.');
+    }
   };
 
   const openCreate = () => {
@@ -452,25 +405,24 @@ export default function AdminAnnouncementScreen() {
     setIsCreating(false);
     setCreateForm(EMPTY_CREATE_FORM);
   };
-  const saveCreate = () => {
+  const saveCreate = async () => {
     if (!createForm.title.trim() || !createForm.content.trim()) {
       Alert.alert('Missing fields', 'Please fill in all required fields.');
       return;
     }
-    nextAnnouncementId += 1;
-    const newAnnouncement: AnnouncementItem = {
-      id: String(nextAnnouncementId),
-      title: createForm.title,
-      content: createForm.content,
-      type: createForm.type,
-      isPinned: createForm.isPinned,
-      isCrossCollege: createForm.isCrossCollege,
-      date: 'Today',
-      createdBy: demoAdmin.name,
-      status: 'active',
-    };
-    setAnnouncements((prev) => [newAnnouncement, ...prev]);
-    closeCreate();
+    try {
+      const { data } = await api.post('/admin/announcements', {
+        title: createForm.title,
+        content: createForm.content,
+        type: createForm.type,
+        isPinned: createForm.isPinned,
+        isCrossCollege: createForm.isCrossCollege,
+      });
+      setAnnouncements((prev) => [data.announcement, ...prev]);
+      closeCreate();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to create announcement.');
+    }
   };
 
   const typeFilterLabel = TYPE_FILTER_OPTIONS.find((o) => o.value === selectedType)?.label ?? 'All Types';
@@ -514,7 +466,7 @@ export default function AdminAnnouncementScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Announcements Management</Text>
-              <Text style={styles.pageSubtitle}>Manage announcements for {demoAdmin.departmentName}</Text>
+              <Text style={styles.pageSubtitle}>Manage announcements for {adminDepartmentName}</Text>
             </View>
           </View>
 
@@ -591,7 +543,20 @@ export default function AdminAnnouncementScreen() {
           </View>
 
           {/* List */}
-          {list.length === 0 ? (
+          {loading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator color={theme.primary} />
+              <Text style={styles.emptyTitle}>Loading announcements…</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>{error}</Text>
+              <Pressable style={styles.actionBtn} onPress={fetchAnnouncements}>
+                <Text style={styles.actionBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : list.length === 0 ? (
             <View style={styles.emptyCard}>
               <Ionicons name="megaphone-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No {activeTab} announcements found.</Text>
@@ -700,6 +665,9 @@ export default function AdminAnnouncementScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
       />
 
       {/* View Modal */}
@@ -1083,6 +1051,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -1090,6 +1061,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1100,12 +1074,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

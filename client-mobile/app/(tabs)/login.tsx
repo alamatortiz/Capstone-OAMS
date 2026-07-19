@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth, getRouteRole } from '@/context/AuthContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -27,14 +28,6 @@ const demoAccounts = [
   { label: 'Professor', email: 'professor@pnc.edu.ph' },
   { label: 'Admin', email: 'admin@pnc.edu.ph' },
 ];
-
-function detectRole(emailValue: string) {
-  const normalized = emailValue.trim().toLowerCase();
-  if (normalized.includes('student')) return 'student';
-  if (normalized.includes('professor')) return 'professor';
-  if (normalized.includes('admin')) return 'admin';
-  return null;
-}
 
 function OamsLogo({
   style,
@@ -83,6 +76,7 @@ export default function LoginScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -91,7 +85,6 @@ export default function LoginScreen() {
 
   const fillDemoAccount = (demoEmail: string) => {
     setEmail(demoEmail);
-    setPassword('any');
   };
 
   const handleSubmit = async () => {
@@ -110,21 +103,14 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      const role = detectRole(email);
-      if (role === 'student') {
-        router.replace('/pages/student/student_dashboard');
-        return;
-      }
-      if (role === 'professor') {
-        router.replace('/pages/professor/professor_dashboard');
-        return;
-      }
-      if (role === 'admin') {
-        router.replace('/pages/admin/admin_dashboard');
-        return;
-      }
-      Alert.alert('Signed in', 'Login functionality is not wired up yet on mobile.');
+      const authedUser = await login(email, password);
+      const routeRole = getRouteRole(authedUser.role);
+      router.replace(`/pages/${routeRole}/${routeRole}_dashboard` as any);
+    } catch (error: any) {
+      Alert.alert(
+        'Sign in failed',
+        error?.response?.data?.error ?? 'Please check your credentials and try again.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -259,7 +245,7 @@ export default function LoginScreen() {
                     </Text>
                   </Pressable>
                 ))}
-                <Text style={styles.demoPassword}>Password: any</Text>
+                <Text style={styles.demoPassword}>Tap a role to fill the email, then enter its password.</Text>
               </View>
             </View>
 

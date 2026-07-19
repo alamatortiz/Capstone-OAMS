@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,22 +67,13 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). Unlike the other admin_*
-// screens, GET /api/admin/users (adminRoutes.js) is genuinely system-wide —
-// it joins students/faculty/administrators across every department, not just
-// the signed-in admin's own college — so a cross-college demo list here does
-// mirror the real endpoint. This screen mirrors admin-user-management.jsx
-// (the actually-wired web page) rather than the design-mockup
-// UserManagementPage.tsx: no stats grid and no "Add User" — there is no
-// POST /users route — and the edit form locks Role, since
-// PUT /api/admin/users/:id treats it as read-only. ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
+// Unlike the other admin_* screens, GET /api/admin/users (adminRoutes.js) is
+// genuinely system-wide — it joins students/faculty/administrators across
+// every department, not just the signed-in admin's own college. This screen
+// mirrors admin-user-management.jsx (the web page) rather than the
+// design-mockup UserManagementPage.tsx: no stats grid and no "Add User" —
+// there is no POST /users route — and the edit form locks Role, since
+// PUT /api/admin/users/:id treats it as read-only.
 type Role = 'student' | 'professor' | 'admin';
 type Status = 'active' | 'inactive' | 'suspended';
 
@@ -95,75 +89,6 @@ interface AppUser {
   lastLogin?: string;
   createdDate: string;
 }
-
-const INITIAL_USERS: AppUser[] = [
-  {
-    id: '1',
-    name: 'Juan Dela Cruz',
-    email: 'juan.delacruz@pnc.edu.ph',
-    role: 'student',
-    college: 'CCS',
-    studentId: '2100123',
-    status: 'active',
-    lastLogin: '2026-05-20T08:30:00',
-    createdDate: '2021-08-15',
-  },
-  {
-    id: '2',
-    name: 'Maria Santos',
-    email: 'maria.santos@pnc.edu.ph',
-    role: 'student',
-    college: 'CBAA',
-    studentId: '2100456',
-    status: 'active',
-    lastLogin: '2026-05-19T14:20:00',
-    createdDate: '2021-08-15',
-  },
-  {
-    id: '3',
-    name: 'Dr. Roberto Cruz',
-    email: 'roberto.cruz@pnc.edu.ph',
-    role: 'professor',
-    college: 'CCS',
-    employeeId: 'EMP-2020-045',
-    status: 'active',
-    lastLogin: '2026-05-20T09:15:00',
-    createdDate: '2020-06-01',
-  },
-  {
-    id: '4',
-    name: 'Prof. Carmen Ramos',
-    email: 'carmen.ramos@pnc.edu.ph',
-    role: 'professor',
-    college: 'CBAA',
-    employeeId: 'EMP-2019-023',
-    status: 'active',
-    lastLogin: '2026-05-20T07:45:00',
-    createdDate: '2019-08-20',
-  },
-  {
-    id: '5',
-    name: 'Admin Office CCS',
-    email: 'admin.ccs@pnc.edu.ph',
-    role: 'admin',
-    college: 'CCS',
-    employeeId: 'ADM-2021-001',
-    status: 'active',
-    lastLogin: '2026-05-20T10:00:00',
-    createdDate: '2021-01-10',
-  },
-  {
-    id: '6',
-    name: 'Pedro Garcia',
-    email: 'pedro.garcia@pnc.edu.ph',
-    role: 'student',
-    college: 'COE',
-    studentId: '2200789',
-    status: 'suspended',
-    lastLogin: '2026-05-10T16:30:00',
-    createdDate: '2022-08-20',
-  },
-];
 
 const COLLEGE_OPTIONS = [
   { value: 'CCS', label: 'College of Computing Studies (CCS)' },
@@ -248,15 +173,13 @@ function formatDateTime(dateStr: string) {
   });
 }
 
-function genTempPassword() {
-  return `Pnc${Math.random().toString(36).slice(-6)}!`;
-}
-
 export default function AdminUserManagementScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [users, setUsers] = useState<AppUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<'all' | Role>('all');
@@ -271,8 +194,30 @@ export default function AdminUserManagementScreen() {
   const [confirmAction, setConfirmAction] = useState<{ type: ActionType; user: AppUser } | null>(null);
 
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/admin/users');
+      setUsers(data.users ?? []);
+    } catch (err) {
+      console.error('Failed to load users:', err);
+      setError('Failed to load users.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
@@ -307,6 +252,7 @@ export default function AdminUserManagementScreen() {
   };
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -330,30 +276,54 @@ export default function AdminUserManagementScreen() {
     setForm(BLANK_FORM);
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
     if (!editingUser) return;
     if (!form.name || !form.email || !form.college) return Alert.alert('Missing information', 'Please fill in all required fields');
     if (!form.email.endsWith('@pnc.edu.ph')) return Alert.alert('Invalid email', 'Email must use @pnc.edu.ph domain');
     if (form.role === 'student' && !form.studentId) return Alert.alert('Missing information', 'Student ID is required for students');
     if (form.role !== 'student' && !form.employeeId) return Alert.alert('Missing information', 'Employee ID is required for professors and admins');
 
-    setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...form } : u)));
-    Alert.alert('Success', 'User updated successfully');
-    closeFormModal();
+    try {
+      await api.put(`/admin/users/${editingUser.id}`, form);
+      Alert.alert('Success', 'User updated successfully');
+      closeFormModal();
+      fetchUsers();
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      Alert.alert('Error', 'Failed to update user');
+    }
   };
 
   // ── Row actions ───────────────────────────────────────────────────────
-  const handleDelete = (id: string) => {
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-    Alert.alert('Success', 'User deleted successfully');
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/admin/users/${id}`);
+      Alert.alert('Success', 'User deleted successfully');
+      fetchUsers();
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      Alert.alert('Error', 'Failed to delete user');
+    }
   };
-  const handleResetPassword = (u: AppUser) => {
-    Alert.alert('Temporary password generated', `${genTempPassword()}\n\nRelay this to ${u.name} manually.`);
+  const handleResetPassword = async (u: AppUser) => {
+    try {
+      const { data } = await api.post(`/admin/users/${u.id}/reset-password`);
+      Alert.alert('Temporary password generated', `${data.tempPassword}\n\nRelay this to ${u.name} manually.`);
+    } catch (err) {
+      console.error('Failed to reset password:', err);
+      Alert.alert('Error', 'Failed to reset password');
+    }
   };
-  const handleToggleSuspend = (u: AppUser) => {
+  const handleToggleSuspend = async (u: AppUser) => {
     const suspending = u.status !== 'suspended';
-    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status: suspending ? 'suspended' : 'active' } : x)));
-    Alert.alert('Success', `Account ${suspending ? 'suspended' : 'reactivated'}`);
+    try {
+      await api.patch(`/admin/users/${u.id}/status`, { status: suspending ? 'suspended' : 'active' });
+      Alert.alert('Success', `Account ${suspending ? 'suspended' : 'reactivated'}`);
+      fetchUsers();
+    } catch (err) {
+      console.error('Failed to update account status:', err);
+      Alert.alert('Error', 'Failed to update account status');
+    }
   };
 
   const runConfirmAction = () => {
@@ -485,7 +455,7 @@ export default function AdminUserManagementScreen() {
                 <Ionicons name="cloud-upload-outline" size={13} color={theme.subtext} />
                 <Text style={styles.smBtnText}>Import</Text>
               </Pressable>
-              <Pressable style={styles.smBtn} onPress={() => Alert.alert('Refreshed', 'Data refreshed')}>
+              <Pressable style={styles.smBtn} onPress={() => { fetchUsers(); Alert.alert('Refreshed', 'Data refreshed'); }}>
                 <Ionicons name="refresh-outline" size={13} color={theme.subtext} />
                 <Text style={styles.smBtnText}>Refresh</Text>
               </Pressable>
@@ -537,7 +507,20 @@ export default function AdminUserManagementScreen() {
               <Text style={styles.cardSubtitleText}>{activeTabMeta.desc}</Text>
             </View>
 
-            {displayUsers.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyCard}>
+                <ActivityIndicator color={theme.primary} />
+                <Text style={styles.emptyTitle}>Loading users…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>{error}</Text>
+                <Pressable style={styles.smBtn} onPress={fetchUsers}>
+                  <Text style={styles.smBtnText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : displayUsers.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="people-outline" size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No users found matching your filters.</Text>
@@ -600,7 +583,17 @@ export default function AdminUserManagementScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      <NavDrawer visible={menuOpen} onClose={() => setMenuOpen(false)} onNavPress={handleNavPress} onLogout={handleLogout} theme={theme} styles={styles} />
+      <NavDrawer
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavPress={handleNavPress}
+        onLogout={handleLogout}
+        theme={theme}
+        styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
+      />
 
       {/* Edit user modal */}
       <Modal visible={showFormModal} animationType="fade" transparent onRequestClose={closeFormModal}>
@@ -770,6 +763,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -777,6 +773,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -787,12 +786,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -15,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,7 +66,7 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). The real server route,
+// ─── Field shapes documented here mirror what The real server route,
 // GET /api/admin/faculty-availability (adminRoutes.js), is scoped strictly to
 // the signed-in admin's own department — it returns
 // id/name/position/college/status/currentActivity/nextAvailableSlot/email/
@@ -73,13 +76,6 @@ function OamsLogo({
 // department only, filtered with status tabs (all/available/busy/unavailable)
 // rather than a college dropdown, since the response only ever contains one
 // college. ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type FacultyStatus = 'available' | 'busy' | 'unavailable';
 type SlotStatus = 'free' | 'booked' | 'unavailable';
 
@@ -101,80 +97,6 @@ interface FacultyMember {
   email: string;
   todaySchedule: ScheduleSlot[];
 }
-
-const facultyList: FacultyMember[] = [
-  {
-    id: '1',
-    name: 'Asst. Prof. Maria Santos',
-    position: 'Department Chair',
-    college: demoAdmin.departmentName,
-    status: 'available',
-    currentActivity: null,
-    nextAvailableSlot: '10:00 AM - 11:00 AM',
-    email: 'maria.santos@ucab.edu.ph',
-    todaySchedule: [
-      { time: '9:00 AM - 10:00 AM', activity: 'Consultation', location: 'CCS Faculty Room 201', status: 'booked' },
-      { time: '10:00 AM - 11:00 AM', activity: 'Available', location: 'CCS Faculty Room 201', status: 'free' },
-      { time: '11:00 AM - 12:00 PM', activity: 'Consultation', location: 'CCS Faculty Room 201', status: 'booked' },
-      { time: '2:00 PM - 3:00 PM', activity: 'Available', location: 'CCS Faculty Room 201', status: 'free' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Prof. Pedro Reyes',
-    position: 'Faculty Member',
-    college: demoAdmin.departmentName,
-    status: 'busy',
-    currentActivity: 'In consultation with student',
-    nextAvailableSlot: '2:00 PM - 3:00 PM',
-    email: 'pedro.reyes@ucab.edu.ph',
-    todaySchedule: [
-      { time: '11:00 AM - 12:00 PM', activity: 'Consultation', location: "CCS Dean's Office", status: 'booked' },
-      { time: '2:00 PM - 3:00 PM', activity: 'Available', location: "CCS Dean's Office", status: 'free' },
-      { time: '3:00 PM - 4:00 PM', activity: 'Available', location: "CCS Dean's Office", status: 'free' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Prof. Ana Mendoza',
-    position: 'Faculty Member',
-    college: demoAdmin.departmentName,
-    status: 'available',
-    currentActivity: null,
-    nextAvailableSlot: '1:00 PM - 2:00 PM',
-    email: 'ana.mendoza@ucab.edu.ph',
-    todaySchedule: [
-      { time: '9:00 AM - 10:00 AM', activity: 'Consultation', location: 'CCS Faculty Room 105', status: 'booked' },
-      { time: '1:00 PM - 2:00 PM', activity: 'Available', location: 'CCS Faculty Room 105', status: 'free' },
-      { time: '3:00 PM - 4:00 PM', activity: 'Available', location: 'CCS Faculty Room 105', status: 'free' },
-    ],
-  },
-  {
-    id: '4',
-    name: 'Prof. Sofia Cruz',
-    position: 'Faculty Member',
-    college: demoAdmin.departmentName,
-    status: 'available',
-    currentActivity: null,
-    nextAvailableSlot: 'No more slots today',
-    email: 'sofia.cruz@ucab.edu.ph',
-    todaySchedule: [
-      { time: '9:00 AM - 10:00 AM', activity: 'Consultation', location: 'CCS Faculty Room 108', status: 'booked' },
-      { time: '10:00 AM - 11:00 AM', activity: 'Consultation', location: 'CCS Faculty Room 108', status: 'booked' },
-    ],
-  },
-  {
-    id: '5',
-    name: 'Prof. Juan Lopez',
-    position: 'Faculty Member',
-    college: demoAdmin.departmentName,
-    status: 'unavailable',
-    currentActivity: 'Marked unavailable by professor',
-    nextAvailableSlot: 'Unavailable',
-    email: 'juan.lopez@ucab.edu.ph',
-    todaySchedule: [],
-  },
-];
 
 const STATUS_TABS = ['all', 'available', 'busy', 'unavailable'] as const;
 type StatusTab = (typeof STATUS_TABS)[number];
@@ -219,10 +141,35 @@ export default function AdminProfessorAvailabilityScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<StatusTab>('all');
+  const [facultyList, setFacultyList] = useState<FacultyMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchFaculty = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/admin/faculty-availability');
+      setFacultyList(data.faculty ?? []);
+    } catch (err) {
+      console.error('Failed to load faculty availability:', err);
+      setError('Failed to load faculty availability.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFaculty();
+  }, [fetchFaculty]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
@@ -258,6 +205,7 @@ export default function AdminProfessorAvailabilityScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -308,7 +256,7 @@ export default function AdminProfessorAvailabilityScreen() {
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Faculty Availability</Text>
               <Text style={styles.pageSubtitle}>
-                Monitor faculty consultation schedules and availability for {demoAdmin.departmentName}
+                Monitor faculty consultation schedules and availability for {adminDepartmentName}
               </Text>
             </View>
           </View>
@@ -337,7 +285,20 @@ export default function AdminProfessorAvailabilityScreen() {
           </View>
 
           {/* Faculty List */}
-          {visibleFaculty.length === 0 ? (
+          {loading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator color={theme.primary} />
+              <Text style={styles.emptyTitle}>Loading faculty availability…</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>{error}</Text>
+              <Pressable onPress={fetchFaculty}>
+                <Text style={styles.emptyText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : visibleFaculty.length === 0 ? (
             <View style={styles.emptyCard}>
               <Ionicons name="people-outline" size={28} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No faculty found</Text>
@@ -428,6 +389,9 @@ export default function AdminProfessorAvailabilityScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
       />
 
       <LogoutModal
@@ -449,6 +413,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -456,6 +423,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -466,12 +436,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

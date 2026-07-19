@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { useQueue } from '@/context/QueueContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,75 +81,10 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors QueuePage.tsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 interface College {
   abbrev: string;
   name: string;
 }
-
-const COLLEGES: College[] = [
-  { abbrev: 'CCS', name: 'College of Computing Studies' },
-  { abbrev: 'CBAA', name: 'College of Business, Accountancy and Administration' },
-  { abbrev: 'COED', name: 'College of Education' },
-  { abbrev: 'COE', name: 'College of Engineering' },
-  { abbrev: 'CAS', name: 'College of Arts and Sciences' },
-  { abbrev: 'CHAS', name: 'College of Health and Allied Sciences' },
-];
-
-const SERVICES = [
-  'Registrar - Document Request',
-  'Registrar - Enrollment Concerns',
-  'Cashier - Payment',
-  'Student Affairs - Clearance',
-  'Guidance Office - Consultation',
-  'Library - Book Concerns',
-];
-
-interface QueueItem {
-  id: string;
-  college: string;
-  service: string;
-  position: number;
-  totalWaiting: number;
-  estimatedWait: string;
-  queueNumber: string;
-  joinedAt: string;
-}
-
-const initialQueues: QueueItem[] = [
-  {
-    id: '1',
-    college: 'College of Computing Studies',
-    service: 'Registrar - Document Request',
-    position: 3,
-    totalWaiting: 12,
-    estimatedWait: '15-20 mins',
-    queueNumber: 'CCS-REG-047',
-    joinedAt: '10:30 AM',
-  },
-];
-
-interface AvailableQueue {
-  college: string;
-  service: string;
-  currentServing: string;
-  totalWaiting: number;
-  avgWaitTime: string;
-}
-
-const availableQueues: AvailableQueue[] = [
-  { college: 'College of Computing Studies', service: 'Registrar - Document Request', currentServing: 'CCS-REG-044', totalWaiting: 12, avgWaitTime: '5-7 mins per person' },
-  { college: 'College of Business, Accountancy and Administration', service: 'Cashier - Payment', currentServing: 'CBA-CSH-028', totalWaiting: 8, avgWaitTime: '3-5 mins per person' },
-  { college: 'College of Engineering', service: 'Student Affairs - Clearance', currentServing: 'COE-SAF-015', totalWaiting: 5, avgWaitTime: '8-10 mins per person' },
-];
 
 interface NavItem {
   key: string;
@@ -170,12 +107,28 @@ export default function StudentQueueScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [myQueues, setMyQueues] = useState<QueueItem[]>(initialQueues);
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
-  const [leaveTarget, setLeaveTarget] = useState<QueueItem | null>(null);
+  const [leaveTarget, setLeaveTarget] = useState<any | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const { queues: myQueues, availableSlots, joinQueue, leaveQueue, isAlreadyInQueue: isSlotJoined } = useQueue();
+
+  const COLLEGES: College[] = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const slot of availableSlots) {
+      if (!seen.has(slot.departmentAbbrev)) {
+        seen.set(slot.departmentAbbrev, slot.departmentName);
+      }
+    }
+    return [...seen.entries()].map(([abbrev, name]) => ({ abbrev, name }));
+  }, [availableSlots]);
+
+  const SERVICES: string[] = useMemo(
+    () => [...new Set<string>(availableSlots.map((slot: any) => slot.serviceName))],
+    [availableSlots],
+  );
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -220,32 +173,28 @@ export default function StudentQueueScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const isAlreadyInQueue = (college: string, service: string) =>
-    myQueues.some((q) => q.college === college && q.service === service);
-
-  const handleJoinQueue = (college: string, service: string) => {
-    const abbrev = COLLEGES.find((c) => c.name === college)?.abbrev ?? 'XXX';
-    const newQueue: QueueItem = {
-      id: Date.now().toString(),
-      college,
-      service,
-      position: Math.floor(Math.random() * 10) + 1,
-      totalWaiting: Math.floor(Math.random() * 20) + 5,
-      estimatedWait: `${Math.floor(Math.random() * 20) + 10}-${Math.floor(Math.random() * 10) + 20} mins`,
-      queueNumber: `${abbrev}-${service.split(' ')[0].slice(0, 3).toUpperCase()}-${Math.floor(Math.random() * 900) + 100}`,
-      joinedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMyQueues((prev) => [...prev, newQueue]);
-    Alert.alert('Success', 'Successfully joined the queue!');
+  const handleJoinQueue = async (slotId: number) => {
+    try {
+      await joinQueue(slotId, undefined);
+      Alert.alert('Success', 'Successfully joined the queue!');
+    } catch (error: any) {
+      Alert.alert('Could not join queue', error?.message ?? 'Please try again.');
+    }
   };
 
-  const confirmLeaveQueue = () => {
+  const confirmLeaveQueue = async () => {
     if (!leaveTarget) return;
-    setMyQueues((prev) => prev.filter((q) => q.id !== leaveTarget.id));
-    setLeaveTarget(null);
+    try {
+      await leaveQueue(leaveTarget.queueId);
+    } catch (error: any) {
+      Alert.alert('Could not leave queue', error?.message ?? 'Please try again.');
+    } finally {
+      setLeaveTarget(null);
+    }
   };
 
   const collegeOptions = [
@@ -266,16 +215,13 @@ export default function StudentQueueScreen() {
     setActiveFilter(null);
   };
 
-  const filteredQueues = availableQueues.filter(
-    (q) =>
-      (selectedCollege === 'all' || q.college === selectedCollege) &&
-      (selectedService === 'all' || q.service === selectedService),
+  const filteredQueues = availableSlots.filter(
+    (q: any) =>
+      (selectedCollege === 'all' || q.departmentName === selectedCollege) &&
+      (selectedService === 'all' || q.serviceName === selectedService),
   );
 
-  const collegeLogoFor = (collegeName: string) => {
-    const abbrev = COLLEGES.find((c) => c.name === collegeName)?.abbrev;
-    return collegeLogos[abbrev ?? 'CCS'] ?? ccsLogo;
-  };
+  const collegeLogoFor = (abbrev: string) => collegeLogos[abbrev ?? 'CCS'] ?? ccsLogo;
 
   const selectLabel = (value: string, fallback: string) => (value === 'all' ? fallback : value);
 
@@ -335,30 +281,29 @@ export default function StudentQueueScreen() {
 
           {myQueues.length > 0 ? (
             <View style={styles.queueList}>
-              {myQueues.map((queue) => {
-                const percent = Math.max(
-                  0,
-                  Math.min(100, Math.round((1 - queue.position / queue.totalWaiting) * 100)),
-                );
+              {myQueues.map((queue: any) => {
+                const percent = queue.totalWaiting > 0
+                  ? Math.max(0, Math.min(100, Math.round((1 - queue.position / queue.totalWaiting) * 100)))
+                  : 100;
                 return (
                   <Pressable
-                    key={queue.id}
+                    key={queue.queueId}
                     style={styles.activeQueueCard}
                     onPress={() => router.push('/pages/student/student_queue_status')}
                   >
                     <View style={styles.activeQueueHeaderRow}>
                       <Image
-                        source={collegeLogoFor(queue.college)}
+                        source={collegeLogoFor(queue.departmentAbbrev)}
                         style={styles.collegeLogoImg}
                         resizeMode="contain"
                       />
                       <View style={styles.activeQueueTopRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.serviceName}>{queue.service}</Text>
-                          <Text style={styles.collegeNameText}>{queue.college}</Text>
+                          <Text style={styles.serviceName}>{queue.serviceName}</Text>
+                          <Text style={styles.collegeNameText}>{queue.departmentName}</Text>
                         </View>
                         <View style={styles.numberBadge}>
-                          <Text style={styles.numberBadgeText}>{queue.queueNumber}</Text>
+                          <Text style={styles.numberBadgeText}>{queue.queueNumberBadge}</Text>
                         </View>
                       </View>
                     </View>
@@ -445,25 +390,26 @@ export default function StudentQueueScreen() {
           {/* Available Queues List */}
           {filteredQueues.length > 0 ? (
             <View style={styles.queueList}>
-              {filteredQueues.map((q) => {
-                const alreadyIn = isAlreadyInQueue(q.college, q.service);
+              {filteredQueues.map((q: any) => {
+                const alreadyIn = isSlotJoined(q.slotId);
+                const canJoin = q.hasCapacity && !alreadyIn;
                 return (
-                  <View key={`${q.college}-${q.service}`} style={styles.availableQueueCard}>
+                  <View key={q.slotId} style={styles.availableQueueCard}>
                     <View style={styles.availableQueueLeft}>
                       <View style={styles.logoCircle}>
                         <Image
-                          source={collegeLogoFor(q.college)}
+                          source={collegeLogoFor(q.departmentAbbrev)}
                           style={styles.collegeLogoImgSm}
                           resizeMode="contain"
                         />
                       </View>
                       <View style={styles.availableQueueHeaderRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.serviceName}>{q.service}</Text>
-                          <Text style={styles.collegeNameText}>{q.college}</Text>
+                          <Text style={styles.serviceName}>{q.serviceName}</Text>
+                          <Text style={styles.collegeNameText}>{q.departmentName}</Text>
                         </View>
                         <View style={styles.statusBadge}>
-                          <Text style={styles.statusBadgeText}>Open</Text>
+                          <Text style={styles.statusBadgeText}>{q.status === 'full' ? 'Full' : 'Open'}</Text>
                         </View>
                       </View>
                     </View>
@@ -475,7 +421,7 @@ export default function StudentQueueScreen() {
                         </View>
                         <View>
                           <Text style={styles.detailLabel}>Waiting</Text>
-                          <Text style={styles.detailValue}>{q.totalWaiting}</Text>
+                          <Text style={styles.detailValue}>{q.waitingCount}</Text>
                         </View>
                       </View>
                       <View style={styles.detailItem}>
@@ -494,17 +440,17 @@ export default function StudentQueueScreen() {
                       </View>
                       <View>
                         <Text style={styles.detailLabel}>Now Serving</Text>
-                        <Text style={styles.detailValue}>{q.currentServing}</Text>
+                        <Text style={styles.detailValue}>{q.currentlyServing}</Text>
                       </View>
                     </View>
 
                     <Pressable
-                      style={[styles.joinBtn, alreadyIn && styles.joinBtnDisabled]}
-                      onPress={() => handleJoinQueue(q.college, q.service)}
-                      disabled={alreadyIn}
+                      style={[styles.joinBtn, !canJoin && styles.joinBtnDisabled]}
+                      onPress={() => handleJoinQueue(q.slotId)}
+                      disabled={!canJoin}
                     >
-                      <Text style={[styles.joinBtnText, alreadyIn && styles.joinBtnTextDisabled]}>
-                        {alreadyIn ? 'Already in Queue' : 'Join Queue'}
+                      <Text style={[styles.joinBtnText, !canJoin && styles.joinBtnTextDisabled]}>
+                        {alreadyIn ? 'Already in Queue' : q.hasCapacity ? 'Join Queue' : 'Full'}
                       </Text>
                     </Pressable>
                   </View>
@@ -539,12 +485,12 @@ export default function StudentQueueScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -588,7 +534,7 @@ export default function StudentQueueScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Leave Queue?</Text>
             <Text style={styles.logoutModalDescription}>
-              You are about to leave the {leaveTarget?.service} queue. You will need to rejoin
+              You are about to leave the {leaveTarget?.serviceName} queue. You will need to rejoin
               and wait from the back of the line if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>

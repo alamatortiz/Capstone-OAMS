@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,15 +81,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors StudentDashboard.tsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 const STAT_TINTS = {
   blue: { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.25)', color: '#3b82f6' },
   purple: { bg: 'rgba(168, 85, 247, 0.16)', border: 'rgba(168, 85, 247, 0.25)', color: '#a855f7' },
@@ -104,13 +97,6 @@ interface StatItem {
   tint: keyof typeof STAT_TINTS;
 }
 
-const stats: StatItem[] = [
-  { key: 'queue', title: 'Queue Position', value: '0', description: 'No active queues', icon: 'time-outline', tint: 'blue' },
-  { key: 'appointments', title: 'Appointments', value: '2', description: 'Upcoming this week', icon: 'calendar-outline', tint: 'purple' },
-  { key: 'documents', title: 'Documents', value: '5', description: '2 pending approval', icon: 'document-text-outline', tint: 'orange' },
-  { key: 'completed', title: 'Completed', value: '12', description: 'Total transactions', icon: 'checkmark-circle-outline', tint: 'green' },
-];
-
 const BADGE_TINTS = {
   green: { bg: 'rgba(22, 163, 74, 0.15)', border: 'rgba(22, 163, 74, 0.25)', color: '#4ade80' },
   violet: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.25)', color: '#d8b4fe' },
@@ -126,13 +112,6 @@ interface QuickAction {
   gradient: readonly [string, string];
 }
 
-const quickActions: QuickAction[] = [
-  { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from all colleges.', icon: 'megaphone-outline', badge: '2 Pinned', badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
-  { key: 'appointment-booking', title: 'Appointment Booking', description: 'Schedule appointments with professors and view available slots.', icon: 'calendar-outline', badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-  { key: 'queue-tracking', title: 'Queue Tracking', description: 'View detailed analytics and history of all your queue activities.', icon: 'pulse-outline', badgeTint: 'violet', gradient: ['#3b82f6', '#6366f1'] },
-  { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check faculty consultation hours and room availability.', icon: 'school-outline', badge: '13 Faculty', badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-];
-
 const ANNOUNCEMENT_META = {
   important: { icon: 'alert-circle-outline' as IoniconName, iconBg: ['#ef4444', '#dc2626'] as const, badgeBg: 'rgba(239, 68, 68, 0.15)', badgeBorder: 'rgba(239, 68, 68, 0.3)', badgeColor: '#ef4444', label: 'Important' },
   event: { icon: 'calendar-outline' as IoniconName, iconBg: ['#3b82f6', '#2563eb'] as const, badgeBg: 'rgba(59, 130, 246, 0.15)', badgeBorder: 'rgba(59, 130, 246, 0.3)', badgeColor: '#3b82f6', label: 'Event' },
@@ -143,15 +122,12 @@ const ANNOUNCEMENT_META = {
 interface Announcement {
   id: string;
   title: string;
+  description?: string;
   college: string;
   date: string;
+  isPinned: boolean;
   category: keyof typeof ANNOUNCEMENT_META;
 }
-
-const pinnedAnnouncements: Announcement[] = [
-  { id: '1', title: 'Enrollment Period for Second Semester', college: 'College of Computing Studies (CCS)', date: 'Mar 25, 2026', category: 'important' },
-  { id: '2', title: 'System Maintenance Notice', college: 'All Departments', date: 'Mar 26, 2026', category: 'important' },
-];
 
 const ACTIVITY_META = {
   queue: { icon: 'time-outline' as IoniconName, bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
@@ -159,11 +135,21 @@ const ACTIVITY_META = {
   document: { icon: 'document-text-outline' as IoniconName, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
 } as const;
 
-const STATUS_META = {
-  active: { label: 'Active', bg: 'rgba(22, 163, 74, 0.15)', color: '#16a34a' },
-  confirmed: { label: 'Confirmed', bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
-  processing: { label: 'Processing', bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
-} as const;
+const STATUS_TINT_FALLBACK = { bg: 'rgba(107, 114, 128, 0.15)', color: '#9ca3af' };
+const STATUS_COLOR_MAP: Record<string, { bg: string; color: string }> = {
+  waiting: { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
+  serving: { bg: 'rgba(22, 163, 74, 0.15)', color: '#16a34a' },
+  pending: { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
+  approved: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  processing: { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
+  completed: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  claimed: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  released: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  generated: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  cancelled: { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' },
+  rejected: { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' },
+  no_show: { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' },
+};
 
 interface ActivityEntry {
   id: string;
@@ -171,30 +157,39 @@ interface ActivityEntry {
   title: string;
   college: string;
   time: string;
-  status: keyof typeof STATUS_META;
+  status: string;
 }
 
-const recentActivity: ActivityEntry[] = [
-  { id: '1', type: 'queue', title: 'Joined Queue at Registrar', college: 'College of Computing Studies', time: '10 minutes ago', status: 'active' },
-  { id: '2', type: 'appointment', title: 'Appointment with Prof. Santos', college: 'College of Computing Studies', time: 'Tomorrow, 2:00 PM', status: 'confirmed' },
-  { id: '3', type: 'document', title: 'Good Moral Certificate', college: 'College of Computing Studies', time: '2 days ago', status: 'processing' },
-];
+interface QuickActionCounts {
+  pinnedAnnouncements: number;
+  totalFaculty: number;
+}
+
+interface OfficeHoursData {
+  departmentName: string;
+  departmentAbbrev: string;
+  schedule: { day: string; time: string }[];
+  location: string;
+}
+
+// Splits only on a comma followed by a weekday name -- mirrors the web
+// parser in stud-dashboard.jsx so free-text office hours strings render
+// the same way on mobile.
+function parseSchedule(hoursStr?: string): { day: string; time: string }[] {
+  if (!hoursStr) return [];
+  const weekdayNames = 'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+  return hoursStr.split(new RegExp(`,\\s*(?=(?:${weekdayNames})\\b)`)).map((entry) => {
+    const colonIdx = entry.indexOf(': ');
+    if (colonIdx === -1) return { day: entry.trim(), time: '' };
+    return { day: entry.substring(0, colonIdx).trim(), time: entry.substring(colonIdx + 2).trim() };
+  });
+}
 
 interface NavItem {
   key: string;
   label: string;
   icon: IoniconName;
 }
-
-const officeHours = {
-  departmentName: 'College of Computing Studies',
-  departmentAbbrev: 'CCS',
-  schedule: [
-    { day: 'Monday - Friday', time: '8:00 AM - 5:00 PM' },
-    { day: 'Saturday', time: '8:00 AM - 12:00 PM' },
-  ],
-  location: 'CCS Building, Room 101',
-};
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
@@ -210,9 +205,75 @@ export default function StudentDashboardScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const [dashStats, setDashStats] = useState<any>(null);
+  const [dashLoading, setDashLoading] = useState(true);
+  const [dashError, setDashError] = useState<string | null>(null);
+
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
+  const [announcementsError, setAnnouncementsError] = useState<string | null>(null);
+
+  const [officeHours, setOfficeHours] = useState<OfficeHoursData | null>(null);
+  const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
+  const [officeHoursError, setOfficeHoursError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    setDashLoading(true);
+    try {
+      const { data } = await api.get('/student/dashboard-stats');
+      setDashStats(data);
+      setDashError(null);
+    } catch (err) {
+      console.error('Failed to fetch dashboard stats:', err);
+      setDashError('Could not load dashboard data.');
+    } finally {
+      setDashLoading(false);
+    }
+  }, []);
+
+  const fetchAnnouncements = useCallback(async () => {
+    setAnnouncementsLoading(true);
+    try {
+      const { data } = await api.get('/student/announcements');
+      setAnnouncements(data?.announcements ?? []);
+      setAnnouncementsError(null);
+    } catch (err) {
+      console.error('Failed to fetch announcements:', err);
+      setAnnouncementsError('Could not load announcements.');
+    } finally {
+      setAnnouncementsLoading(false);
+    }
+  }, []);
+
+  const fetchOfficeHours = useCallback(async () => {
+    setOfficeHoursLoading(true);
+    try {
+      const { data } = await api.get('/student/office-hours');
+      setOfficeHours({
+        departmentName: data.departmentName,
+        departmentAbbrev: data.departmentAbbrev,
+        schedule: parseSchedule(data.officeHours),
+        location: data.officeLocation ?? '',
+      });
+      setOfficeHoursError(null);
+    } catch (err) {
+      console.error('Failed to fetch office hours:', err);
+      setOfficeHoursError('Could not load office hours.');
+    } finally {
+      setOfficeHoursLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    fetchAnnouncements();
+    fetchOfficeHours();
+  }, [fetchStats, fetchAnnouncements, fetchOfficeHours]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
@@ -252,10 +313,56 @@ export default function StudentDashboardScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const collegeLogo = collegeLogos[demoStudent.departmentAbbrev] ?? ccsLogo;
+  const collegeLogo = collegeLogos[user?.departmentAbbrev ?? ''] ?? ccsLogo;
+
+  const activeQueueCount = dashStats?.stats?.activeQueueCount ?? 0;
+  const queuePositionValue = dashLoading
+    ? '—'
+    : dashStats?.stats?.queuePosition != null
+      ? String(dashStats.stats.queuePosition)
+      : '0';
+
+  const stats: StatItem[] = [
+    {
+      key: 'queue', title: 'Queue Position', value: queuePositionValue,
+      description: dashLoading ? 'Loading...' : activeQueueCount > 0 ? `Waiting in ${activeQueueCount} queue${activeQueueCount > 1 ? 's' : ''}` : 'No active queues',
+      icon: 'time-outline', tint: 'blue',
+    },
+    {
+      key: 'appointments', title: 'Appointments',
+      value: dashLoading ? '—' : String(dashStats?.stats?.appointments?.upcoming ?? 0),
+      description: dashLoading ? 'Loading...' : (dashStats?.stats?.appointments?.pending ?? 0) > 0 ? `${dashStats.stats.appointments.pending} pending approval` : 'No pending appointments',
+      icon: 'calendar-outline', tint: 'purple',
+    },
+    {
+      key: 'documents', title: 'Documents',
+      value: dashLoading ? '—' : String(dashStats?.stats?.documents?.total ?? 0),
+      description: dashLoading ? 'Loading...' : (dashStats?.stats?.documents?.pending ?? 0) > 0 ? `${dashStats.stats.documents.pending} need your attention` : 'No pending documents',
+      icon: 'document-text-outline', tint: 'orange',
+    },
+    {
+      key: 'completed', title: 'Completed',
+      value: dashLoading ? '—' : String(dashStats?.stats?.completed ?? 0),
+      description: 'Total transactions', icon: 'checkmark-circle-outline', tint: 'green',
+    },
+  ];
+
+  const allPinnedAnnouncements = announcements.filter((a) => a.isPinned);
+  const pinnedPreview = allPinnedAnnouncements.slice(0, 2);
+  const morePinnedCount = allPinnedAnnouncements.length - pinnedPreview.length;
+
+  const quickActions: QuickAction[] = [
+    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from all colleges.', icon: 'megaphone-outline', badge: `${allPinnedAnnouncements.length} Pinned`, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
+    { key: 'appointment-booking', title: 'Appointment Booking', description: 'Schedule appointments with professors and view available slots.', icon: 'calendar-outline', badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'queue-tracking', title: 'Queue Tracking', description: 'View detailed analytics and history of all your queue activities.', icon: 'pulse-outline', badgeTint: 'violet', gradient: ['#3b82f6', '#6366f1'] },
+    { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check faculty consultation hours and room availability.', icon: 'school-outline', badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
+  ];
+
+  const recentActivity: ActivityEntry[] = dashStats?.recentActivity ?? [];
 
   return (
     <View style={styles.root}>
@@ -295,17 +402,23 @@ export default function StudentDashboardScreen() {
             <Text style={styles.bannerGreeting}>Good day!</Text>
             <View style={styles.bannerTitleRow}>
               <Image source={collegeLogo} style={styles.bannerLogo} resizeMode="contain" />
-              <Text style={styles.bannerTitle}>{demoStudent.name}</Text>
+              <Text style={styles.bannerTitle}>{user?.name ?? 'Student'}</Text>
             </View>
             <View style={styles.bannerBadges}>
               <View style={styles.bannerBadge}>
                 <Text style={styles.bannerBadgeText}>Student Portal</Text>
               </View>
               <View style={styles.bannerBadge}>
-                <Text style={styles.bannerBadgeText}>{demoStudent.studentNumber}</Text>
+                <Text style={styles.bannerBadgeText}>{user?.studentNumber ?? 'Student Number'}</Text>
               </View>
             </View>
           </LinearGradient>
+
+          {dashError && (
+            <View style={styles.card}>
+              <Text style={styles.emptyText}>{dashError}</Text>
+            </View>
+          )}
 
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
@@ -389,20 +502,33 @@ export default function StudentDashboardScreen() {
           </View>
 
           {/* Active Queue Preview */}
-          <View style={styles.card}>
+          <Pressable style={styles.card} onPress={() => router.push('/pages/student/student_queue_status')}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardTitleRow}>
                 <Ionicons name="timer-outline" size={18} color={theme.blue} />
                 <Text style={styles.cardTitleText}>Active Queue</Text>
               </View>
             </View>
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="time-outline" size={22} color={theme.blue} />
+            {dashStats?.activeQueue ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.statValue}>
+                  {dashStats.activeQueue.status === 'serving'
+                    ? (dashStats.activeQueue.arrivedAt ? 'Being Served' : 'Called')
+                    : String(dashStats.activeQueue.position ?? 0)}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {dashStats.activeQueue.service} — {dashStats.activeQueue.college}
+                </Text>
               </View>
-              <Text style={styles.emptyText}>No Active Queues</Text>
-            </View>
-          </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="time-outline" size={22} color={theme.blue} />
+                </View>
+                <Text style={styles.emptyText}>No Active Queues</Text>
+              </View>
+            )}
+          </Pressable>
 
           {/* Pinned Announcements */}
           <View style={styles.card}>
@@ -419,39 +545,56 @@ export default function StudentDashboardScreen() {
               </Pressable>
             </View>
             <View style={styles.announcementsList}>
-              {pinnedAnnouncements.map((ann) => {
-                const meta = ANNOUNCEMENT_META[ann.category];
-                return (
-                  <Pressable
-                    key={ann.id}
-                    style={styles.announcementCard}
-                    onPress={() => router.push('/pages/student/student_announcement')}
-                  >
-                    <LinearGradient colors={meta.iconBg} style={styles.announcementIcon}>
-                      <Ionicons name={meta.icon} size={18} color="#ffffff" />
-                    </LinearGradient>
-                    <View style={styles.announcementBody}>
-                      <Text style={styles.announcementTitle} numberOfLines={2}>
-                        {ann.title}
-                      </Text>
-                      <View style={styles.announcementMeta}>
-                        <Text style={styles.announcementMetaText}>{ann.college}</Text>
-                        <Text style={styles.announcementMetaText}>{ann.date}</Text>
-                      </View>
-                    </View>
-                    <View
-                      style={[
-                        styles.announcementBadge,
-                        { backgroundColor: meta.badgeBg, borderColor: meta.badgeBorder },
-                      ]}
-                    >
-                      <Text style={[styles.announcementBadgeText, { color: meta.badgeColor }]}>
-                        {meta.label}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
+              {announcementsLoading ? (
+                <Text style={styles.emptyText}>Loading announcements...</Text>
+              ) : announcementsError ? (
+                <Text style={styles.emptyText}>{announcementsError}</Text>
+              ) : allPinnedAnnouncements.length === 0 ? (
+                <Text style={styles.emptyText}>No pinned announcements.</Text>
+              ) : (
+                <>
+                  {pinnedPreview.map((ann) => {
+                    const meta = ANNOUNCEMENT_META[ann.category] ?? ANNOUNCEMENT_META.general;
+                    return (
+                      <Pressable
+                        key={ann.id}
+                        style={styles.announcementCard}
+                        onPress={() => router.push('/pages/student/student_announcement')}
+                      >
+                        <LinearGradient colors={meta.iconBg} style={styles.announcementIcon}>
+                          <Ionicons name={meta.icon} size={18} color="#ffffff" />
+                        </LinearGradient>
+                        <View style={styles.announcementBody}>
+                          <Text style={styles.announcementTitle} numberOfLines={2}>
+                            {ann.title}
+                          </Text>
+                          <View style={styles.announcementMeta}>
+                            <Text style={styles.announcementMetaText}>{ann.college}</Text>
+                            <Text style={styles.announcementMetaText}>
+                              {new Date(ann.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </Text>
+                          </View>
+                        </View>
+                        <View
+                          style={[
+                            styles.announcementBadge,
+                            { backgroundColor: meta.badgeBg, borderColor: meta.badgeBorder },
+                          ]}
+                        >
+                          <Text style={[styles.announcementBadgeText, { color: meta.badgeColor }]}>
+                            {meta.label}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                  {morePinnedCount > 0 && (
+                    <Pressable onPress={() => router.push('/pages/student/student_announcement')}>
+                      <Text style={styles.viewAllText}>+ {morePinnedCount} more pinned</Text>
+                    </Pressable>
+                  )}
+                </>
+              )}
             </View>
           </View>
 
@@ -463,33 +606,42 @@ export default function StudentDashboardScreen() {
             </Pressable>
           </View>
           <View style={styles.card}>
-            {recentActivity.map((activity, index) => {
-              const meta = ACTIVITY_META[activity.type];
-              const status = STATUS_META[activity.status];
-              return (
-                <View
-                  key={activity.id}
-                  style={[
-                    styles.activityItem,
-                    index === recentActivity.length - 1 && styles.activityItemLast,
-                  ]}
-                >
-                  <View style={[styles.activityIcon, { backgroundColor: meta.bg }]}>
-                    <Ionicons name={meta.icon} size={16} color={meta.color} />
+            {dashLoading ? (
+              <Text style={styles.emptyText}>Loading activity...</Text>
+            ) : recentActivity.length === 0 ? (
+              <Text style={styles.emptyText}>No recent activity yet.</Text>
+            ) : (
+              recentActivity.map((activity, index) => {
+                const meta = ACTIVITY_META[activity.type] ?? ACTIVITY_META.queue;
+                const status = STATUS_COLOR_MAP[activity.status] ?? STATUS_TINT_FALLBACK;
+                const statusLabel = activity.status === 'no_show'
+                  ? 'No Show'
+                  : activity.status.charAt(0).toUpperCase() + activity.status.slice(1);
+                return (
+                  <View
+                    key={activity.id}
+                    style={[
+                      styles.activityItem,
+                      index === recentActivity.length - 1 && styles.activityItemLast,
+                    ]}
+                  >
+                    <View style={[styles.activityIcon, { backgroundColor: meta.bg }]}>
+                      <Ionicons name={meta.icon} size={16} color={meta.color} />
+                    </View>
+                    <View style={styles.activityBody}>
+                      <Text style={styles.activityTitle}>{activity.title}</Text>
+                      <Text style={styles.activityMeta}>{activity.college}</Text>
+                      <Text style={styles.activityMeta}>{activity.time}</Text>
+                    </View>
+                    <View style={[styles.activityBadge, { backgroundColor: status.bg }]}>
+                      <Text style={[styles.activityBadgeText, { color: status.color }]}>
+                        {statusLabel}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.activityBody}>
-                    <Text style={styles.activityTitle}>{activity.title}</Text>
-                    <Text style={styles.activityMeta}>{activity.college}</Text>
-                    <Text style={styles.activityMeta}>{activity.time}</Text>
-                  </View>
-                  <View style={[styles.activityBadge, { backgroundColor: status.bg }]}>
-                    <Text style={[styles.activityBadgeText, { color: status.color }]}>
-                      {status.label}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
+                );
+              })
+            )}
           </View>
 
           {/* Office Hours */}
@@ -504,25 +656,37 @@ export default function StudentDashboardScreen() {
                 <Ionicons name="time-outline" size={18} color="#ffffff" />
                 <Text style={styles.hoursTitle}>Office Hours</Text>
               </View>
-              <View style={styles.hoursDeptPill}>
-                <Text style={styles.hoursDeptText}>
-                  {officeHours.departmentName} ({officeHours.departmentAbbrev})
-                </Text>
-              </View>
-            </View>
-            <View style={styles.hoursSchedule}>
-              {officeHours.schedule.map((entry, i) => (
-                <View key={i} style={styles.hoursItem}>
-                  <Text style={styles.hoursDay}>{entry.day}</Text>
-                  <Text style={styles.hoursTime}>{entry.time}</Text>
+              {!officeHoursLoading && officeHours && (
+                <View style={styles.hoursDeptPill}>
+                  <Text style={styles.hoursDeptText}>
+                    {officeHours.departmentName} ({officeHours.departmentAbbrev})
+                  </Text>
                 </View>
-              ))}
+              )}
             </View>
-            {officeHours.location && (
-              <View style={styles.hoursLocationRow}>
-                <Text style={styles.hoursLocationLabel}>Location:</Text>
-                <Text style={styles.hoursLocationValue}>{officeHours.location}</Text>
-              </View>
+            {officeHoursLoading ? (
+              <Text style={styles.hoursTime}>Loading office hours...</Text>
+            ) : officeHoursError ? (
+              <Text style={styles.hoursTime}>{officeHoursError}</Text>
+            ) : !officeHours ? (
+              <Text style={styles.hoursTime}>No office hours available.</Text>
+            ) : (
+              <>
+                <View style={styles.hoursSchedule}>
+                  {officeHours.schedule.map((entry, i) => (
+                    <View key={i} style={styles.hoursItem}>
+                      <Text style={styles.hoursDay}>{entry.day}</Text>
+                      <Text style={styles.hoursTime}>{entry.time}</Text>
+                    </View>
+                  ))}
+                </View>
+                {officeHours.location && (
+                  <View style={styles.hoursLocationRow}>
+                    <Text style={styles.hoursLocationLabel}>Location:</Text>
+                    <Text style={styles.hoursLocationValue}>{officeHours.location}</Text>
+                  </View>
+                )}
+              </>
             )}
           </LinearGradient>
         </ScrollView>
@@ -542,12 +706,12 @@ export default function StudentDashboardScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>

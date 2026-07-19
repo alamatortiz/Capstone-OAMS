@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -80,15 +82,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors ProfessorDashboard.tsx) ───
-const demoProfessor = {
-  name: 'Demo Professor',
-  role: 'Professor',
-  employeeId: 'EMP-2020-001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 const STAT_TINTS = {
   violet: { bg: 'rgba(124, 58, 237, 0.16)', border: 'rgba(124, 58, 237, 0.25)', color: '#7c3aed' },
   orange: { bg: 'rgba(245, 158, 11, 0.16)', border: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b' },
@@ -103,12 +96,6 @@ interface StatItem {
   icon: IoniconName;
   tint: keyof typeof STAT_TINTS;
 }
-
-const stats: StatItem[] = [
-  { key: 'appointments', title: 'Pending Appointments', value: '8', description: '3 for today', icon: 'calendar-outline', tint: 'violet' },
-  { key: 'documents', title: 'Documents', value: '6', description: 'Pending requests', icon: 'document-text-outline', tint: 'orange' },
-  { key: 'completed', title: 'Completed', value: '47', description: 'This month', icon: 'checkmark-circle-outline', tint: 'green' },
-];
 
 interface QuickAction {
   key: string;
@@ -125,34 +112,31 @@ const quickActions: QuickAction[] = [
 ];
 
 interface TodayAppointment {
-  id: string;
+  id: number;
   student: string;
   purpose: string;
   time: string;
-  status: 'confirmed' | 'pending';
+  status: string;
 }
 
-const todaysAppointments: TodayAppointment[] = [
-  { id: '1', student: 'Juan Dela Cruz', purpose: 'Thesis consultation', time: '2:00 PM', status: 'confirmed' },
-  { id: '2', student: 'Maria Santos', purpose: 'Grade inquiry', time: '3:30 PM', status: 'confirmed' },
-];
-
-const STATUS_META = {
-  confirmed: { bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' },
+const STATUS_META: Record<string, { bg: string; border: string; color: string }> = {
+  approved: { bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' },
   pending: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
-} as const;
+};
+
+const DOT_COLORS: Record<string, string> = {
+  'dot-green': '#22c55e',
+  'dot-amber': '#f59e0b',
+  'dot-red': '#ef4444',
+  'dot-gray': '#94a3b8',
+};
 
 interface ActivityEntry {
-  id: string;
+  id: number;
   dot: string;
-  text: string;
+  title: string;
+  time: string;
 }
-
-const recentActivity: ActivityEntry[] = [
-  { id: '1', dot: '#22c55e', text: 'New appointment request from Maria Santos' },
-  { id: '2', dot: '#3b82f6', text: 'Document submitted for review' },
-  { id: '3', dot: '#a855f7', text: 'Appointment completed with Juan Dela Cruz' },
-];
 
 const officeHours = [
   { label: 'Weekdays', time: 'Monday – Friday: 8:00 AM – 5:00 PM' },
@@ -178,6 +162,40 @@ export default function ProfessorDashboardScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const [dashData, setDashData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/faculty/dashboard-stats');
+      setDashData(data);
+      setIsAvailable((data.availabilityStatus ?? 'available') === 'available');
+    } catch (err) {
+      console.error('Fetch dashboard stats error:', err);
+      setError('Could not load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const s = dashData?.stats;
+  const stats: StatItem[] = [
+    { key: 'appointments', title: 'Pending Appointments', value: loading ? '—' : String(s?.pendingAppointments ?? 0), description: loading ? 'Loading...' : `${s?.todayAppointments ?? 0} for today`, icon: 'calendar-outline', tint: 'violet' },
+    { key: 'documents', title: 'Documents', value: loading ? '—' : String(s?.documentsToReview ?? 0), description: 'Pending requests', icon: 'document-text-outline', tint: 'orange' },
+    { key: 'completed', title: 'Completed', value: loading ? '—' : String(s?.completedThisMonth ?? 0), description: 'This month', icon: 'checkmark-circle-outline', tint: 'green' },
+  ];
+
+  const todaysAppointments: TodayAppointment[] = dashData?.todayAppointments ?? [];
+  const recentActivity: ActivityEntry[] = dashData?.recentActivity ?? [];
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -186,6 +204,20 @@ export default function ProfessorDashboardScreen() {
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
+
+  const toggleAvailability = async (value: boolean) => {
+    const prev = isAvailable;
+    setIsAvailable(value);
+    try {
+      await api.patch('/faculty/availability-status', {
+        status: value ? 'available' : 'unavailable',
+      });
+    } catch (err) {
+      console.error('Update availability error:', err);
+      setIsAvailable(prev);
+      Alert.alert('Error', 'Could not update availability status.');
+    }
+  };
 
   const handleStatPress = (key: string) => {
     if (key === 'appointments') {
@@ -227,10 +259,11 @@ export default function ProfessorDashboardScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const collegeLogo = collegeLogos[demoProfessor.departmentAbbrev] ?? ccsLogo;
+  const collegeLogo = collegeLogos[user?.departmentAbbrev ?? 'CCS'] ?? ccsLogo;
 
   return (
     <View style={styles.root}>
@@ -268,21 +301,30 @@ export default function ProfessorDashboardScreen() {
             <View style={styles.bannerBackdrop1} />
             <View style={styles.bannerBackdrop2} />
             <Text style={styles.bannerGreeting}>
-              Welcome back, Prof. {demoProfessor.name.split(' ')[0]}!
+              Welcome back, Prof. {(user?.name ?? 'Faculty').split(' ')[0]}!
             </Text>
             <View style={styles.bannerTitleRow}>
               <Image source={collegeLogo} style={styles.bannerLogo} resizeMode="contain" />
-              <Text style={styles.bannerTitle}>{demoProfessor.departmentName}</Text>
+              <Text style={styles.bannerTitle}>{user?.departmentName ?? ''}</Text>
             </View>
             <View style={styles.bannerBadges}>
               <View style={styles.bannerBadge}>
                 <Text style={styles.bannerBadgeText}>Professor Portal</Text>
               </View>
               <View style={styles.bannerBadge}>
-                <Text style={styles.bannerBadgeText}>{demoProfessor.employeeId}</Text>
+                <Text style={styles.bannerBadgeText}>{user?.employeeId ?? ''}</Text>
               </View>
             </View>
           </LinearGradient>
+
+          {error && (
+            <View style={styles.card}>
+              <Text style={styles.emptyText}>{error}</Text>
+              <Pressable onPress={fetchStats}>
+                <Text style={styles.viewAllText}>Retry</Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
@@ -350,11 +392,13 @@ export default function ProfessorDashboardScreen() {
             </Pressable>
           </View>
           <View style={styles.card}>
-            {todaysAppointments.length === 0 ? (
+            {loading ? (
+              <Text style={styles.emptyText}>Loading appointments...</Text>
+            ) : todaysAppointments.length === 0 ? (
               <Text style={styles.emptyText}>No appointments scheduled for today.</Text>
             ) : (
               todaysAppointments.map((apt, index) => {
-                const status = STATUS_META[apt.status];
+                const status = STATUS_META[apt.status] ?? STATUS_META.pending;
                 return (
                   <View
                     key={apt.id}
@@ -397,18 +441,27 @@ export default function ProfessorDashboardScreen() {
             </Pressable>
           </View>
           <View style={styles.card}>
-            {recentActivity.map((activity, index) => (
-              <View
-                key={activity.id}
-                style={[
-                  styles.activityItem,
-                  index === recentActivity.length - 1 && styles.activityItemLast,
-                ]}
-              >
-                <View style={[styles.activityDot, { backgroundColor: activity.dot }]} />
-                <Text style={styles.activityText}>{activity.text}</Text>
-              </View>
-            ))}
+            {loading ? (
+              <Text style={styles.emptyText}>Loading...</Text>
+            ) : recentActivity.length === 0 ? (
+              <Text style={styles.emptyText}>No recent activity.</Text>
+            ) : (
+              recentActivity.map((activity, index) => (
+                <View
+                  key={activity.id}
+                  style={[
+                    styles.activityItem,
+                    index === recentActivity.length - 1 && styles.activityItemLast,
+                  ]}
+                >
+                  <View style={[styles.activityDot, { backgroundColor: DOT_COLORS[activity.dot] ?? '#94a3b8' }]} />
+                  <View>
+                    <Text style={styles.activityText}>{activity.title}</Text>
+                    <Text style={styles.appointmentPurpose}>{activity.time}</Text>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
 
           {/* Office Hours */}
@@ -448,19 +501,19 @@ export default function ProfessorDashboardScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoProfessor.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Faculty'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoProfessor.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Professor</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoProfessor.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.availabilityRow}>
               <Text style={styles.availabilityLabel}>Available</Text>
               <Switch
                 value={isAvailable}
-                onValueChange={setIsAvailable}
+                onValueChange={toggleAvailability}
                 trackColor={{ false: '#3f3f46', true: '#22c55e' }}
                 thumbColor="#ffffff"
               />

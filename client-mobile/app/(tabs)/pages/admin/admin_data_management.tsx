@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,14 +67,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors AdminDataManagement/admin-data-management.jsx) ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type DocStatus = 'active' | 'inactive';
 type RecipientType = 'students' | 'faculty' | 'both';
 
@@ -92,7 +87,7 @@ interface DocumentType {
   isCrossCollege: boolean;
   recipientType: RecipientType;
   deptAbbrev: string;
-  requirements: Requirement[];
+  requirementCount: number;
 }
 
 interface ServiceStep {
@@ -109,10 +104,8 @@ interface ServiceType {
   avgServiceTime: number;
   isCrossCollege: boolean;
   deptAbbrev: string;
-  locationId: string;
-  locationName: string;
-  requirements: Requirement[];
-  steps: ServiceStep[];
+  locationId: string | null;
+  locationName: string | null;
 }
 
 type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'EXPORT' | 'READ';
@@ -129,164 +122,11 @@ interface AuditLog {
   timestamp: string;
 }
 
-const INITIAL_DOCUMENT_TYPES: DocumentType[] = [
-  {
-    id: '1',
-    name: 'Certificate of Grades',
-    description: 'Official transcript of academic records',
-    processingTime: '3-5 business days',
-    fee: 100,
-    status: 'active',
-    isCrossCollege: false,
-    recipientType: 'students',
-    deptAbbrev: 'CCS',
-    requirements: [
-      { id: 'r1', name: 'Registrar Clearance', description: 'No outstanding balance', isMandatory: true },
-      { id: 'r2', name: 'Valid ID', description: '', isMandatory: true },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Certificate of Enrollment',
-    description: 'Proof of current enrollment status',
-    processingTime: '1-2 business days',
-    fee: 50,
-    status: 'active',
-    isCrossCollege: false,
-    recipientType: 'students',
-    deptAbbrev: 'CCS',
-    requirements: [{ id: 'r3', name: 'Valid ID', description: '', isMandatory: true }],
-  },
-  {
-    id: '3',
-    name: 'Good Moral Certificate',
-    description: 'Certificate of good moral character',
-    processingTime: '3-5 business days',
-    fee: 75,
-    status: 'active',
-    isCrossCollege: true,
-    recipientType: 'both',
-    deptAbbrev: 'All',
-    requirements: [{ id: 'r4', name: 'Clearance Form', description: 'Signed by department head', isMandatory: true }],
-  },
-];
-
-const LOCATIONS = [
-  { id: '1', name: 'Registrar Office' },
-  { id: '2', name: 'Records Office' },
-  { id: '3', name: 'Cashier' },
-];
-
-const INITIAL_SERVICE_TYPES: ServiceType[] = [
-  {
-    id: '1',
-    name: 'Subject Enrollment',
-    description: 'Assistance with subject loading and adjustments',
-    avgServiceTime: 15,
-    isCrossCollege: false,
-    deptAbbrev: 'CCS',
-    locationId: '1',
-    locationName: 'Registrar Office',
-    requirements: [{ id: 'sr1', name: 'Class Schedule', description: '', isMandatory: true }],
-    steps: [
-      { id: 'st1', stepNumber: 1, title: 'Verify enrollment slot', description: 'Check available slots for the requested subject' },
-      { id: 'st2', stepNumber: 2, title: 'Confirm and encode', description: 'Encode the subject into the student record' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Document Request',
-    description: 'Request and release of official documents',
-    avgServiceTime: 10,
-    isCrossCollege: false,
-    deptAbbrev: 'CCS',
-    locationId: '2',
-    locationName: 'Records Office',
-    requirements: [],
-    steps: [],
-  },
-  {
-    id: '3',
-    name: 'Payment Processing',
-    description: 'Tuition and miscellaneous fee payments',
-    avgServiceTime: 8,
-    isCrossCollege: true,
-    deptAbbrev: 'All',
-    locationId: '3',
-    locationName: 'Cashier',
-    requirements: [],
-    steps: [],
-  },
-];
-
-const INITIAL_AUDIT_LOGS: AuditLog[] = [
-  {
-    id: '1',
-    action: 'CREATE',
-    adminName: 'Admin Office CCS',
-    adminEmail: 'admin.ccs@pnc.edu.ph',
-    targetTable: 'document_services',
-    targetRecordId: '1',
-    oldValues: null,
-    newValues: { name: 'Certificate of Grades', status: 'active' },
-    timestamp: '5/20/2026, 10:30:00 AM',
-  },
-  {
-    id: '2',
-    action: 'UPDATE',
-    adminName: 'Admin Office CCS',
-    adminEmail: 'admin.ccs@pnc.edu.ph',
-    targetTable: 'services',
-    targetRecordId: '3',
-    oldValues: { name: 'Payment Processing', status: 'inactive', fee: 0 },
-    newValues: { name: 'Payment Processing', status: 'active', fee: 0 },
-    timestamp: '5/20/2026, 9:15:00 AM',
-  },
-  {
-    id: '3',
-    action: 'DELETE',
-    adminName: 'Admin Office CCS',
-    adminEmail: 'admin.ccs@pnc.edu.ph',
-    targetTable: 'document_services',
-    targetRecordId: '9',
-    oldValues: { name: 'Old Clearance Form' },
-    newValues: null,
-    timestamp: '5/19/2026, 4:45:00 PM',
-  },
-  {
-    id: '4',
-    action: 'LOGIN',
-    adminName: 'Admin Office CCS',
-    adminEmail: 'admin.ccs@pnc.edu.ph',
-    targetTable: null,
-    targetRecordId: null,
-    oldValues: null,
-    newValues: null,
-    timestamp: '5/19/2026, 8:02:00 AM',
-  },
-  {
-    id: '5',
-    action: 'EXPORT',
-    adminName: 'Admin Office CCS',
-    adminEmail: 'admin.ccs@pnc.edu.ph',
-    targetTable: null,
-    targetRecordId: null,
-    oldValues: null,
-    newValues: null,
-    timestamp: '5/18/2026, 3:20:00 PM',
-  },
-  {
-    id: '6',
-    action: 'READ',
-    adminName: 'Admin Office CCS',
-    adminEmail: 'admin.ccs@pnc.edu.ph',
-    targetTable: 'users',
-    targetRecordId: '42',
-    oldValues: null,
-    newValues: null,
-    timestamp: '5/18/2026, 11:05:00 AM',
-  },
-];
+interface LocationOption {
+  id: string;
+  name: string;
+  isGlobal: boolean;
+}
 
 const STATUS_FILTERS: { value: 'all' | DocStatus; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -404,8 +244,17 @@ export default function AdminDataManagementScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('documents');
 
-  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>(INITIAL_DOCUMENT_TYPES);
-  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>(INITIAL_SERVICE_TYPES);
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+
+  const [docLoading, setDocLoading] = useState(true);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [serviceLoading, setServiceLoading] = useState(true);
+  const [serviceError, setServiceError] = useState<string | null>(null);
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
   const [docStatusFilter, setDocStatusFilter] = useState<'all' | DocStatus>('all');
   const [auditActionFilter, setAuditActionFilter] = useState<'all' | AuditAction>('all');
@@ -416,6 +265,8 @@ export default function AdminDataManagementScreen() {
   const [docForm, setDocForm] = useState(BLANK_DOC_FORM);
   const [docRequirements, setDocRequirements] = useState<Requirement[]>([]);
   const [docReqForm, setDocReqForm] = useState(BLANK_REQ_FORM);
+  const [docReqLoading, setDocReqLoading] = useState(false);
+  const [docSaving, setDocSaving] = useState(false);
 
   // Service modal
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -425,13 +276,88 @@ export default function AdminDataManagementScreen() {
   const [serviceSteps, setServiceSteps] = useState<ServiceStep[]>([]);
   const [svcReqForm, setSvcReqForm] = useState(BLANK_REQ_FORM);
   const [svcStepForm, setSvcStepForm] = useState(BLANK_STEP_FORM);
+  const [svcReqLoading, setSvcReqLoading] = useState(false);
+  const [serviceSaving, setServiceSaving] = useState(false);
 
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+  const adminDepartmentAbbrev = user?.departmentAbbrev ?? '';
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchDocumentTypes = useCallback(async (status: 'all' | DocStatus = 'all') => {
+    setDocLoading(true);
+    setDocError(null);
+    try {
+      const params = status !== 'all' ? { status } : {};
+      const { data } = await api.get('/admin/data-management/document-types', { params });
+      setDocumentTypes(data.documentTypes ?? []);
+    } catch (err) {
+      console.error('Failed to load document types:', err);
+      setDocError('Failed to load document types.');
+    } finally {
+      setDocLoading(false);
+    }
+  }, []);
+
+  const fetchServiceTypes = useCallback(async () => {
+    setServiceLoading(true);
+    setServiceError(null);
+    try {
+      const { data } = await api.get('/admin/data-management/service-types');
+      setServiceTypes(data.serviceTypes ?? []);
+    } catch (err) {
+      console.error('Failed to load service types:', err);
+      setServiceError('Failed to load services.');
+    } finally {
+      setServiceLoading(false);
+    }
+  }, []);
+
+  const fetchLocations = useCallback(async () => {
+    try {
+      const { data } = await api.get('/admin/locations');
+      setLocations(data.locations ?? []);
+    } catch (err) {
+      console.error('Failed to load locations:', err);
+    }
+  }, []);
+
+  const fetchAuditLogs = useCallback(async (action: 'all' | AuditAction = 'all') => {
+    setAuditLoading(true);
+    setAuditError(null);
+    try {
+      const params = action !== 'all' ? { action } : {};
+      const { data } = await api.get('/admin/data-management/audit-logs', { params });
+      setAuditLogs(data.auditLogs ?? []);
+    } catch (err) {
+      console.error('Failed to load audit logs:', err);
+      setAuditError('Failed to load audit logs.');
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'documents') fetchDocumentTypes(docStatusFilter);
+  }, [activeTab, docStatusFilter, fetchDocumentTypes]);
+
+  useEffect(() => {
+    if (activeTab === 'services') {
+      fetchServiceTypes();
+      fetchLocations();
+    }
+  }, [activeTab, fetchServiceTypes, fetchLocations]);
+
+  useEffect(() => {
+    if (activeTab === 'audit') fetchAuditLogs(auditActionFilter);
+  }, [activeTab, auditActionFilter, fetchAuditLogs]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
@@ -466,6 +392,7 @@ export default function AdminDataManagementScreen() {
   };
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -478,7 +405,7 @@ export default function AdminDataManagementScreen() {
     setShowDocModal(true);
   };
 
-  const openEditDocModal = (doc: DocumentType) => {
+  const openEditDocModal = async (doc: DocumentType) => {
     setEditingDocId(doc.id);
     setDocForm({
       name: doc.name,
@@ -489,9 +416,20 @@ export default function AdminDataManagementScreen() {
       isCrossCollege: doc.isCrossCollege,
       recipientType: doc.recipientType,
     });
-    setDocRequirements(doc.requirements);
+    setDocRequirements([]);
     setDocReqForm(BLANK_REQ_FORM);
     setShowDocModal(true);
+
+    setDocReqLoading(true);
+    try {
+      const { data } = await api.get(`/admin/data-management/document-types/${doc.id}/requirements`);
+      setDocRequirements(data.requirements ?? []);
+    } catch (err) {
+      console.error('Failed to load requirements:', err);
+      Alert.alert('Error', 'Failed to load requirements.');
+    } finally {
+      setDocReqLoading(false);
+    }
   };
 
   const closeDocModal = () => {
@@ -509,33 +447,44 @@ export default function AdminDataManagementScreen() {
   };
   const removeDocRequirement = (idx: number) => setDocRequirements((prev) => prev.filter((_, i) => i !== idx));
 
-  const handleSaveDocument = () => {
+  const handleSaveDocument = async () => {
     const { name, description, processingTime, fee } = docForm;
     if (!name || !description || !processingTime || !fee) {
       Alert.alert('Missing information', 'Please fill in all required fields.');
       return;
     }
-    if (editingDocId) {
-      setDocumentTypes((prev) =>
-        prev.map((d) =>
-          d.id === editingDocId
-            ? { ...d, ...docForm, fee: parseFloat(fee), requirements: docRequirements }
-            : d
-        )
-      );
-      Alert.alert('Success', 'Document type updated.');
-    } else {
-      const newDoc: DocumentType = {
-        id: genId(),
-        ...docForm,
+    setDocSaving(true);
+    try {
+      const payload = {
+        name,
+        description,
+        processingTime,
         fee: parseFloat(fee),
-        deptAbbrev: demoAdmin.departmentAbbrev,
-        requirements: docRequirements,
+        status: docForm.status,
+        isCrossCollege: docForm.isCrossCollege,
+        recipientType: docForm.recipientType,
+        requirements: docRequirements.map((r) => ({
+          name: r.name,
+          description: r.description || '',
+          isMandatory: r.isMandatory !== false,
+        })),
       };
-      setDocumentTypes((prev) => [...prev, newDoc]);
-      Alert.alert('Success', 'Document type created.');
+
+      if (editingDocId) {
+        await api.put(`/admin/data-management/document-types/${editingDocId}`, payload);
+        Alert.alert('Success', 'Document type updated.');
+      } else {
+        await api.post('/admin/data-management/document-types', payload);
+        Alert.alert('Success', 'Document type created.');
+      }
+      closeDocModal();
+      fetchDocumentTypes(docStatusFilter);
+    } catch (err) {
+      console.error('Failed to save document type:', err);
+      Alert.alert('Error', 'Failed to save document type.');
+    } finally {
+      setDocSaving(false);
     }
-    closeDocModal();
   };
 
   // ── Service handlers ─────────────────────────────────────────────────
@@ -549,21 +498,36 @@ export default function AdminDataManagementScreen() {
     setShowServiceModal(true);
   };
 
-  const openEditServiceModal = (s: ServiceType) => {
+  const openEditServiceModal = async (s: ServiceType) => {
     setEditingServiceId(s.id);
     setServiceForm({
       name: s.name,
-      description: s.description,
+      description: s.description || '',
       avgServiceTime: String(s.avgServiceTime),
       isCrossCollege: s.isCrossCollege,
-      locationId: s.locationId,
+      locationId: s.locationId ? String(s.locationId) : '',
       otherLocationName: '',
     });
-    setServiceRequirements(s.requirements);
-    setServiceSteps(s.steps);
+    setServiceRequirements([]);
+    setServiceSteps([]);
     setSvcReqForm(BLANK_REQ_FORM);
     setSvcStepForm(BLANK_STEP_FORM);
     setShowServiceModal(true);
+
+    setSvcReqLoading(true);
+    try {
+      const [reqRes, stepRes] = await Promise.all([
+        api.get(`/admin/data-management/service-types/${s.id}/requirements`),
+        api.get(`/admin/data-management/service-types/${s.id}/steps`),
+      ]);
+      setServiceRequirements(reqRes.data.requirements ?? []);
+      setServiceSteps(stepRes.data.steps ?? []);
+    } catch (err) {
+      console.error('Failed to load service details:', err);
+      Alert.alert('Error', 'Failed to load service details.');
+    } finally {
+      setSvcReqLoading(false);
+    }
   };
 
   const closeServiceModal = () => {
@@ -591,7 +555,7 @@ export default function AdminDataManagementScreen() {
   const removeServiceStep = (idx: number) =>
     setServiceSteps((prev) => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, stepNumber: i + 1 })));
 
-  const handleSaveService = () => {
+  const handleSaveService = async () => {
     const { name, avgServiceTime, locationId, otherLocationName } = serviceForm;
     if (!name || !avgServiceTime) {
       Alert.alert('Missing information', 'Service name and average service time are required.');
@@ -601,67 +565,86 @@ export default function AdminDataManagementScreen() {
       Alert.alert('Missing information', 'Please type a location name.');
       return;
     }
-    const locationName =
-      locationId === '__other__'
-        ? otherLocationName.trim()
-        : LOCATIONS.find((l) => l.id === locationId)?.name || '';
+    setServiceSaving(true);
+    try {
+      let finalLocationId: string | null = locationId || null;
+      if (finalLocationId === '__other__') {
+        const { data } = await api.post('/admin/locations', { name: otherLocationName.trim() });
+        finalLocationId = String(data.id);
+        setLocations((prev) => [...prev, data]);
+      }
 
-    if (editingServiceId) {
-      setServiceTypes((prev) =>
-        prev.map((s) =>
-          s.id === editingServiceId
-            ? {
-                ...s,
-                name,
-                description: serviceForm.description,
-                avgServiceTime: parseInt(avgServiceTime, 10),
-                isCrossCollege: serviceForm.isCrossCollege,
-                locationId,
-                locationName,
-                requirements: serviceRequirements,
-                steps: serviceSteps,
-              }
-            : s
-        )
-      );
-      Alert.alert('Success', 'Service updated.');
-    } else {
-      const newService: ServiceType = {
-        id: genId(),
+      const payload = {
         name,
         description: serviceForm.description,
         avgServiceTime: parseInt(avgServiceTime, 10),
         isCrossCollege: serviceForm.isCrossCollege,
-        deptAbbrev: demoAdmin.departmentAbbrev,
-        locationId,
-        locationName,
-        requirements: serviceRequirements,
-        steps: serviceSteps,
+        locationId: finalLocationId,
       };
-      setServiceTypes((prev) => [...prev, newService]);
-      Alert.alert('Success', 'Service created.');
+
+      let serviceId = editingServiceId;
+      if (editingServiceId) {
+        await api.put(`/admin/data-management/service-types/${editingServiceId}`, payload);
+        Alert.alert('Success', 'Service updated.');
+      } else {
+        const { data } = await api.post('/admin/data-management/service-types', payload);
+        serviceId = String(data.id);
+        Alert.alert('Success', 'Service created.');
+      }
+
+      await Promise.all([
+        api.put(`/admin/data-management/service-types/${serviceId}/requirements`, {
+          requirements: serviceRequirements.map((r) => ({
+            name: r.name,
+            description: r.description || '',
+            isMandatory: r.isMandatory !== false,
+          })),
+        }),
+        api.put(`/admin/data-management/service-types/${serviceId}/steps`, {
+          steps: serviceSteps.map((s) => ({
+            stepNumber: s.stepNumber,
+            title: s.title,
+            description: s.description || '',
+          })),
+        }),
+      ]);
+
+      closeServiceModal();
+      fetchServiceTypes();
+    } catch (err) {
+      console.error('Failed to save service:', err);
+      Alert.alert('Error', 'Failed to save service.');
+    } finally {
+      setServiceSaving(false);
     }
-    closeServiceModal();
   };
 
   // ── Delete ────────────────────────────────────────────────────────────
-  const runDeleteAction = () => {
+  const runDeleteAction = async () => {
     if (!deleteTarget) return;
-    if (deleteTarget.type === 'document') {
-      setDocumentTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
-      Alert.alert('Success', 'Document type deleted.');
-    } else {
-      setServiceTypes((prev) => prev.filter((s) => s.id !== deleteTarget.id));
-      Alert.alert('Success', 'Service deleted.');
+    try {
+      if (deleteTarget.type === 'document') {
+        await api.delete(`/admin/data-management/document-types/${deleteTarget.id}`);
+        Alert.alert('Success', 'Document type deleted.');
+        fetchDocumentTypes(docStatusFilter);
+      } else {
+        await api.delete(`/admin/data-management/service-types/${deleteTarget.id}`);
+        Alert.alert('Success', 'Service deleted.');
+        fetchServiceTypes();
+      }
+    } catch (err) {
+      console.error('Failed to delete:', err);
+      Alert.alert('Error', deleteTarget.type === 'document' ? 'Failed to delete document type.' : 'Failed to delete service.');
+    } finally {
+      setDeleteTarget(null);
     }
-    setDeleteTarget(null);
   };
 
   const handleExportLogs = () => Alert.alert('Success', 'Logs exported successfully.');
 
-  // ── Derived ───────────────────────────────────────────────────────────
-  const filteredDocs = documentTypes.filter((d) => docStatusFilter === 'all' || d.status === docStatusFilter);
-  const filteredLogs = INITIAL_AUDIT_LOGS.filter((l) => auditActionFilter === 'all' || l.action === auditActionFilter);
+  // ── Derived (server already filters by status/action) ──────────────────
+  const filteredDocs = documentTypes;
+  const filteredLogs = auditLogs;
 
   const pickerConfig = (() => {
     switch (activePicker) {
@@ -691,7 +674,7 @@ export default function AdminDataManagementScreen() {
           title: 'Select Location',
           options: [
             { value: '', label: 'No specific location' },
-            ...LOCATIONS.map((l) => ({ value: l.id, label: l.name })),
+            ...locations.map((l) => ({ value: l.id, label: l.isGlobal ? `${l.name} (Shared)` : l.name })),
             { value: '__other__', label: 'Other (type your own)…' },
           ],
           value: serviceForm.locationId,
@@ -744,7 +727,7 @@ export default function AdminDataManagementScreen() {
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Data Management</Text>
               <Text style={styles.pageSubtitle}>
-                {demoAdmin.departmentName} ({demoAdmin.departmentAbbrev}) — Configure document types and queue services
+                {adminDepartmentName} ({adminDepartmentAbbrev}) — Configure document types and queue services
               </Text>
             </View>
           </View>
@@ -774,7 +757,7 @@ export default function AdminDataManagementScreen() {
               <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardTitleText}>Document Type Management</Text>
                 <Text style={styles.cardSubtitleText}>
-                  Configure available document types, fees, and requirements for {demoAdmin.departmentAbbrev}
+                  Configure available document types, fees, and requirements for {adminDepartmentAbbrev}
                 </Text>
               </View>
               <Pressable onPress={openAddDocModal}>
@@ -799,7 +782,20 @@ export default function AdminDataManagementScreen() {
                 })}
               </View>
 
-              {filteredDocs.length === 0 ? (
+              {docLoading ? (
+                <View style={styles.emptyCard}>
+                  <ActivityIndicator color={theme.primary} />
+                  <Text style={styles.emptyTitle}>Loading document types…</Text>
+                </View>
+              ) : docError ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>{docError}</Text>
+                  <Pressable style={styles.filterPill} onPress={() => fetchDocumentTypes(docStatusFilter)}>
+                    <Text style={styles.filterPillTextActive}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : filteredDocs.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="document-text-outline" size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No document types found. Add one to get started.</Text>
@@ -838,7 +834,7 @@ export default function AdminDataManagementScreen() {
                             <Text style={styles.itemMetaText}>Processing: {doc.processingTime}</Text>
                             <Text style={styles.itemMetaText}>Fee: ₱{doc.fee.toFixed(2)}</Text>
                             <Text style={styles.itemMetaText}>
-                              {doc.requirements.length} requirement{doc.requirements.length !== 1 ? 's' : ''}
+                              {doc.requirementCount} requirement{doc.requirementCount !== 1 ? 's' : ''}
                             </Text>
                           </View>
                         </View>
@@ -871,7 +867,7 @@ export default function AdminDataManagementScreen() {
             <View style={styles.tabContent}>
               <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardTitleText}>Service Configuration</Text>
-                <Text style={styles.cardSubtitleText}>Manage queue services for {demoAdmin.departmentAbbrev}</Text>
+                <Text style={styles.cardSubtitleText}>Manage queue services for {adminDepartmentAbbrev}</Text>
               </View>
               <Pressable onPress={openAddServiceModal}>
                 <LinearGradient colors={[theme.primary, theme.success]} style={styles.addBtnFull}>
@@ -880,7 +876,20 @@ export default function AdminDataManagementScreen() {
                 </LinearGradient>
               </Pressable>
 
-              {serviceTypes.length === 0 ? (
+              {serviceLoading ? (
+                <View style={styles.emptyCard}>
+                  <ActivityIndicator color={theme.primary} />
+                  <Text style={styles.emptyTitle}>Loading services…</Text>
+                </View>
+              ) : serviceError ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>{serviceError}</Text>
+                  <Pressable style={styles.filterPill} onPress={fetchServiceTypes}>
+                    <Text style={styles.filterPillTextActive}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : serviceTypes.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="time-outline" size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No services found. Add one to get started.</Text>
@@ -936,7 +945,7 @@ export default function AdminDataManagementScreen() {
             <View style={styles.tabContent}>
               <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardTitleText}>System Audit Logs</Text>
-                <Text style={styles.cardSubtitleText}>Track all administrative actions for {demoAdmin.departmentAbbrev}</Text>
+                <Text style={styles.cardSubtitleText}>Track all administrative actions for {adminDepartmentAbbrev}</Text>
               </View>
               <Pressable style={styles.exportBtn} onPress={handleExportLogs}>
                 <Ionicons name="download-outline" size={14} color={theme.text} />
@@ -961,7 +970,20 @@ export default function AdminDataManagementScreen() {
                 </View>
               </ScrollView>
 
-              {filteredLogs.length === 0 ? (
+              {auditLoading ? (
+                <View style={styles.emptyCard}>
+                  <ActivityIndicator color={theme.primary} />
+                  <Text style={styles.emptyTitle}>Loading audit logs…</Text>
+                </View>
+              ) : auditError ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>{auditError}</Text>
+                  <Pressable style={styles.filterPill} onPress={() => fetchAuditLogs(auditActionFilter)}>
+                    <Text style={styles.filterPillTextActive}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : filteredLogs.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="reload-circle-outline" size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No audit log entries found.</Text>
@@ -995,7 +1017,17 @@ export default function AdminDataManagementScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      <NavDrawer visible={menuOpen} onClose={() => setMenuOpen(false)} onNavPress={handleNavPress} onLogout={handleLogout} theme={theme} styles={styles} />
+      <NavDrawer
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavPress={handleNavPress}
+        onLogout={handleLogout}
+        theme={theme}
+        styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
+      />
 
       {/* Document Add/Edit Modal */}
       <Modal visible={showDocModal} animationType="fade" transparent onRequestClose={closeDocModal}>
@@ -1089,7 +1121,9 @@ export default function AdminDataManagementScreen() {
                 <Text style={styles.reqTitle}>Document Requirements</Text>
                 <Text style={styles.reqSubtitle}>List what students need to submit for this document type</Text>
 
-                {docRequirements.length > 0 && (
+                {docReqLoading && <ActivityIndicator color={theme.primary} />}
+
+                {!docReqLoading && docRequirements.length > 0 && (
                   <View style={styles.reqList}>
                     {docRequirements.map((req, idx) => (
                       <View key={req.id} style={styles.reqItem}>
@@ -1150,8 +1184,8 @@ export default function AdminDataManagementScreen() {
               <Pressable style={styles.cancelBtn} onPress={closeDocModal}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.submitBtn} onPress={handleSaveDocument}>
-                <Text style={styles.confirmBtnText}>{editingDocId ? 'Update' : 'Create'}</Text>
+              <Pressable style={styles.submitBtn} onPress={handleSaveDocument} disabled={docSaving}>
+                <Text style={styles.confirmBtnText}>{docSaving ? 'Saving…' : editingDocId ? 'Update' : 'Create'}</Text>
               </Pressable>
             </View>
           </View>
@@ -1213,7 +1247,7 @@ export default function AdminDataManagementScreen() {
                   <Text style={styles.formSelectText}>
                     {serviceForm.locationId === '__other__'
                       ? 'Other (type your own)…'
-                      : LOCATIONS.find((l) => l.id === serviceForm.locationId)?.name || 'No specific location'}
+                      : locations.find((l) => l.id === serviceForm.locationId)?.name || 'No specific location'}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
                 </Pressable>
@@ -1244,7 +1278,9 @@ export default function AdminDataManagementScreen() {
                 <Text style={styles.reqTitle}>Service Requirements</Text>
                 <Text style={styles.reqSubtitle}>List what students need to bring or prepare</Text>
 
-                {serviceRequirements.length > 0 && (
+                {svcReqLoading && <ActivityIndicator color={theme.primary} />}
+
+                {!svcReqLoading && serviceRequirements.length > 0 && (
                   <View style={styles.reqList}>
                     {serviceRequirements.map((req, idx) => (
                       <View key={req.id} style={styles.reqItem}>
@@ -1305,7 +1341,7 @@ export default function AdminDataManagementScreen() {
                 <Text style={styles.reqTitle}>Procedure Steps</Text>
                 <Text style={styles.reqSubtitle}>Step-by-step process students will follow</Text>
 
-                {serviceSteps.length > 0 && (
+                {!svcReqLoading && serviceSteps.length > 0 && (
                   <View style={styles.reqList}>
                     {serviceSteps.map((step, idx) => (
                       <View key={step.id} style={styles.reqItem}>
@@ -1353,8 +1389,8 @@ export default function AdminDataManagementScreen() {
               <Pressable style={styles.cancelBtn} onPress={closeServiceModal}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.submitBtn} onPress={handleSaveService}>
-                <Text style={styles.confirmBtnText}>{editingServiceId ? 'Update' : 'Add Service'}</Text>
+              <Pressable style={styles.submitBtn} onPress={handleSaveService} disabled={serviceSaving}>
+                <Text style={styles.confirmBtnText}>{serviceSaving ? 'Saving…' : editingServiceId ? 'Update' : 'Add Service'}</Text>
               </Pressable>
             </View>
           </View>
@@ -1428,6 +1464,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -1435,6 +1474,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1445,12 +1487,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

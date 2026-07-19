@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,15 +81,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-professor-schedules.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 interface AvailabilitySlot {
   day: string;
   timeStart: string;
@@ -111,207 +104,6 @@ interface Department {
   departmentAbbrev: string;
   faculty: Faculty[];
 }
-
-const demoDepartments: Department[] = [
-  {
-    departmentId: 'CCS',
-    departmentName: 'College of Computing Studies (CCS)',
-    departmentAbbrev: 'CCS',
-    faculty: [
-      {
-        facultyId: 'ccs-1',
-        name: 'Prof. Maria Santos',
-        position: 'Department Chair',
-        specialization: 'Software Engineering',
-        email: 'maria.santos@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Monday', timeStart: '9:00 AM', timeEnd: '12:00 PM', location: 'CCS Faculty Room 201' },
-          { day: 'Monday', timeStart: '2:00 PM', timeEnd: '5:00 PM', location: 'CCS Faculty Room 201' },
-          { day: 'Wednesday', timeStart: '9:00 AM', timeEnd: '12:00 PM', location: 'CCS Faculty Room 201' },
-          { day: 'Friday', timeStart: '1:00 PM', timeEnd: '4:00 PM', location: 'CCS Faculty Room 201' },
-        ],
-      },
-      {
-        facultyId: 'ccs-2',
-        name: 'Prof. Juan Reyes',
-        position: 'Faculty Member',
-        specialization: 'Data Science & AI',
-        email: 'juan.reyes@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Tuesday', timeStart: '10:00 AM', timeEnd: '12:00 PM', location: 'CCS Faculty Room 203' },
-          { day: 'Tuesday', timeStart: '2:00 PM', timeEnd: '5:00 PM', location: 'CCS Faculty Room 203' },
-          { day: 'Thursday', timeStart: '9:00 AM', timeEnd: '11:00 AM', location: 'CCS Faculty Room 203' },
-          { day: 'Thursday', timeStart: '1:00 PM', timeEnd: '4:00 PM', location: 'CCS Faculty Room 203' },
-        ],
-      },
-      {
-        facultyId: 'ccs-3',
-        name: 'Dr. Anna Lim',
-        position: 'Program Coordinator',
-        specialization: 'Computer Networks',
-        email: 'anna.lim@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Monday', timeStart: '10:00 AM', timeEnd: '12:00 PM', location: "Dean's Office" },
-          { day: 'Wednesday', timeStart: '10:00 AM', timeEnd: '12:00 PM', location: "Dean's Office" },
-          { day: 'Wednesday', timeStart: '2:00 PM', timeEnd: '4:00 PM', location: "Dean's Office" },
-          { day: 'Friday', timeStart: '9:00 AM', timeEnd: '12:00 PM', location: "Dean's Office" },
-        ],
-      },
-    ],
-  },
-  {
-    departmentId: 'CBAA',
-    departmentName: 'College of Business Accountancy and Administration (CBAA)',
-    departmentAbbrev: 'CBAA',
-    faculty: [
-      {
-        facultyId: 'cbaa-1',
-        name: 'Prof. Ricardo Dela Cruz',
-        position: 'Department Chair',
-        specialization: 'Financial Accounting',
-        email: 'ricardo.delacruz@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Monday', timeStart: '9:00 AM', timeEnd: '11:00 AM', location: 'CBAA Faculty Room 101' },
-          { day: 'Wednesday', timeStart: '1:00 PM', timeEnd: '3:00 PM', location: 'CBAA Faculty Room 101' },
-        ],
-      },
-      {
-        facultyId: 'cbaa-2',
-        name: 'Ms. Carmela Villanueva',
-        position: 'Faculty Member',
-        specialization: 'Business Management',
-        email: 'carmela.villanueva@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Tuesday', timeStart: '10:00 AM', timeEnd: '12:00 PM', location: 'CBAA Room 105' },
-          { day: 'Thursday', timeStart: '2:00 PM', timeEnd: '4:00 PM', location: 'CBAA Room 105' },
-        ],
-      },
-    ],
-  },
-  {
-    departmentId: 'COED',
-    departmentName: 'College of Education (COED)',
-    departmentAbbrev: 'COED',
-    faculty: [
-      {
-        facultyId: 'coed-1',
-        name: 'Dr. Josefina Ramos',
-        position: 'Department Chair',
-        specialization: 'Educational Psychology',
-        email: 'josefina.ramos@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Monday', timeStart: '1:00 PM', timeEnd: '3:00 PM', location: 'COED Faculty Room' },
-          { day: 'Friday', timeStart: '9:00 AM', timeEnd: '11:00 AM', location: 'COED Faculty Room' },
-        ],
-      },
-      {
-        facultyId: 'coed-2',
-        name: 'Prof. Michael Torres',
-        position: 'Faculty Member',
-        specialization: 'Mathematics Education',
-        email: 'michael.torres@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Wednesday', timeStart: '10:00 AM', timeEnd: '12:00 PM', location: 'COED Room 202' },
-        ],
-      },
-    ],
-  },
-  {
-    departmentId: 'COE',
-    departmentName: 'College of Engineering (COE)',
-    departmentAbbrev: 'COE',
-    faculty: [
-      {
-        facultyId: 'coe-1',
-        name: 'Dr. Ramon Villar',
-        position: 'Department Chair',
-        specialization: 'Civil Engineering',
-        email: 'ramon.villar@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Tuesday', timeStart: '9:00 AM', timeEnd: '11:00 AM', location: 'COE Consultation Room' },
-          { day: 'Thursday', timeStart: '1:00 PM', timeEnd: '3:00 PM', location: 'COE Consultation Room' },
-        ],
-      },
-      {
-        facultyId: 'coe-2',
-        name: 'Engr. Patricia Nolasco',
-        position: 'Faculty Member',
-        specialization: 'Electronics Engineering',
-        email: 'patricia.nolasco@pnc.edu.ph',
-        availabilityStatus: 'unavailable',
-        availability: [],
-      },
-    ],
-  },
-  {
-    departmentId: 'CAS',
-    departmentName: 'College of Arts and Sciences (CAS)',
-    departmentAbbrev: 'CAS',
-    faculty: [
-      {
-        facultyId: 'cas-1',
-        name: 'Dr. Teresita Manalo',
-        position: 'Department Chair',
-        specialization: 'Applied Mathematics',
-        email: 'teresita.manalo@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Monday', timeStart: '9:00 AM', timeEnd: '11:00 AM', location: 'CAS Faculty Lounge' },
-          { day: 'Wednesday', timeStart: '2:00 PM', timeEnd: '4:00 PM', location: 'CAS Faculty Lounge' },
-        ],
-      },
-      {
-        facultyId: 'cas-2',
-        name: 'Prof. Daniel Aquino',
-        position: 'Faculty Member',
-        specialization: 'Physical Sciences',
-        email: 'daniel.aquino@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Friday', timeStart: '10:00 AM', timeEnd: '12:00 PM', location: 'CAS Room 110' },
-        ],
-      },
-    ],
-  },
-  {
-    departmentId: 'CHAS',
-    departmentName: 'College of Health and Allied Sciences (CHAS)',
-    departmentAbbrev: 'CHAS',
-    faculty: [
-      {
-        facultyId: 'chas-1',
-        name: 'Dr. Grace Fernandez',
-        position: 'Department Chair',
-        specialization: 'Nursing',
-        email: 'grace.fernandez@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Tuesday', timeStart: '9:00 AM', timeEnd: '11:00 AM', location: 'CHAS Clinical Skills Lab' },
-          { day: 'Thursday', timeStart: '1:00 PM', timeEnd: '3:00 PM', location: 'CHAS Clinical Skills Lab' },
-        ],
-      },
-      {
-        facultyId: 'chas-2',
-        name: 'Ms. Bianca Santos',
-        position: 'Faculty Member',
-        specialization: 'Public Health',
-        email: 'bianca.santos@pnc.edu.ph',
-        availabilityStatus: 'available',
-        availability: [
-          { day: 'Monday', timeStart: '2:00 PM', timeEnd: '4:00 PM', location: 'CHAS Room 3' },
-        ],
-      },
-    ],
-  },
-];
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -346,12 +138,49 @@ export default function StudentProfessorSchedulesScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('departments');
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
   const from = Array.isArray(params.from) ? params.from[0] : params.from;
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchSchedules = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/student/professor-schedules');
+      setDepartments(
+        (data.departments ?? []).map((d: any) => ({
+          departmentId: String(d.departmentId),
+          departmentName: d.departmentName,
+          departmentAbbrev: d.departmentAbbrev,
+          faculty: (d.faculty ?? []).map((f: any) => ({
+            facultyId: String(f.facultyId),
+            name: f.name,
+            position: f.position,
+            specialization: f.specialization,
+            email: f.email,
+            availabilityStatus: f.availabilityStatus,
+            availability: f.availability ?? [],
+          })),
+        })),
+      );
+      setLoadError(null);
+    } catch (err) {
+      console.error('Fetch professor schedules error:', err);
+      setLoadError('Could not load professor schedules. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
@@ -369,7 +198,7 @@ export default function StudentProfessorSchedulesScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
   const handleDepartmentSelect = (deptId: string) => {
     setSelectedDeptId(deptId);
@@ -381,7 +210,7 @@ export default function StudentProfessorSchedulesScreen() {
     setSelectedDeptId(null);
   };
 
-  const selectedDepartment = demoDepartments.find((d) => d.departmentId === selectedDeptId) ?? null;
+  const selectedDepartment = departments.find((d) => d.departmentId === selectedDeptId) ?? null;
 
   const breadcrumb =
     viewMode === 'schedules'
@@ -435,10 +264,32 @@ export default function StudentProfessorSchedulesScreen() {
             </View>
           </View>
 
+          {loading && (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Loading professor schedules…</Text>
+            </View>
+          )}
+
+          {!loading && loadError && (
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>{loadError}</Text>
+              <Pressable style={styles.drawerNavItem} onPress={fetchSchedules}>
+                <Text style={styles.breadcrumbText}>Retry</Text>
+              </Pressable>
+            </View>
+          )}
+
           {/* Departments View */}
-          {viewMode === 'departments' && (
+          {!loading && !loadError && viewMode === 'departments' && (
             <View style={styles.departmentsGrid}>
-              {demoDepartments.map((dept) => {
+              {departments.length === 0 && (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>No faculty schedules are available yet.</Text>
+                </View>
+              )}
+              {departments.map((dept) => {
                 const logoSrc = collegeLogos[dept.departmentAbbrev] ?? pncLogo;
                 const professorCount = dept.faculty.length;
                 return (
@@ -469,7 +320,7 @@ export default function StudentProfessorSchedulesScreen() {
           )}
 
           {/* Schedules View */}
-          {viewMode === 'schedules' && selectedDepartment && (
+          {!loading && !loadError && viewMode === 'schedules' && selectedDepartment && (
             <View style={styles.schedulesView}>
               {/* Department Header */}
               <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.departmentHeaderCard}>
@@ -584,12 +435,12 @@ export default function StudentProfessorSchedulesScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>

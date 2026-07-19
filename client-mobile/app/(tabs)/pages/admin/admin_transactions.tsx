@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -15,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,22 +66,15 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). The real server route,
+// ─── Field shapes documented here mirror what The real server route,
 // GET /api/admin/transactions (adminRoutes.js), is scoped strictly to the
 // signed-in admin's own department — it UNIONs queue/appointment/document
 // history for that one department only, with no cross-college listing. So
 // unlike the design-mockup AdminTransactionsPage.tsx (a "Comprehensive /
 // system-wide" view across all six colleges), this mirrors the actual wired
 // admin-transactions.jsx: one department's transaction log only. ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type TxType = 'queue' | 'appointment' | 'document';
-type TxStatus = 'completed' | 'approved' | 'rejected' | 'cancelled';
+type TxStatus = string;
 
 interface Transaction {
   id: string;
@@ -91,97 +87,6 @@ interface Transaction {
   status: TxStatus;
   timestamp: string;
 }
-
-const TRANSACTIONS: Transaction[] = [
-  {
-    id: 'queue-1',
-    type: 'queue',
-    action: 'Completed Queue Service',
-    studentName: 'Juan Dela Cruz',
-    studentId: '2100123',
-    processor: 'Academic Consultation',
-    details: 'Thesis guidance',
-    status: 'completed',
-    timestamp: '2026-07-16 11:30 AM',
-  },
-  {
-    id: 'appointment-1',
-    type: 'appointment',
-    action: 'Approved Appointment',
-    studentName: 'Maria Garcia',
-    studentId: '2100456',
-    processor: 'Prof. Pedro Reyes',
-    details: 'Career Guidance - Online meeting scheduled',
-    status: 'approved',
-    timestamp: '2026-07-16 10:15 AM',
-  },
-  {
-    id: 'document-1',
-    type: 'document',
-    action: 'Approved Document Request',
-    studentName: 'Carlos Rodriguez',
-    studentId: '2000789',
-    processor: 'Recommendation Letter',
-    details: 'For job application',
-    status: 'approved',
-    timestamp: '2026-07-16 09:45 AM',
-  },
-  {
-    id: 'queue-2',
-    type: 'queue',
-    action: 'Cancelled Queue Request',
-    studentName: 'Lisa Fernandez',
-    studentId: '2100234',
-    processor: 'Grade Inquiry',
-    details: 'Student no-show',
-    status: 'cancelled',
-    timestamp: '2026-07-16 09:00 AM',
-  },
-  {
-    id: 'appointment-2',
-    type: 'appointment',
-    action: 'Completed Appointment',
-    studentName: 'Marco Velasco',
-    studentId: '2100567',
-    processor: 'Prof. Sofia Cruz',
-    details: 'Research Consultation - Methodology discussion',
-    status: 'completed',
-    timestamp: '2026-07-15 03:00 PM',
-  },
-  {
-    id: 'document-2',
-    type: 'document',
-    action: 'Rejected Document Request',
-    studentName: 'Anna Reyes',
-    studentId: '2200123',
-    processor: 'Grade Certification',
-    details: 'Incomplete requirements',
-    status: 'rejected',
-    timestamp: '2026-07-15 02:30 PM',
-  },
-  {
-    id: 'queue-3',
-    type: 'queue',
-    action: 'Completed Queue Service',
-    studentName: 'Pedro Santos',
-    studentId: '2000456',
-    processor: 'Document Signing',
-    details: 'Clearance form',
-    status: 'completed',
-    timestamp: '2026-07-15 01:15 PM',
-  },
-  {
-    id: 'appointment-3',
-    type: 'appointment',
-    action: 'Approved Appointment',
-    studentName: 'Sofia Mendoza',
-    studentId: '2100789',
-    processor: 'Prof. Marco Velasco',
-    details: 'Academic Advising - Course selection',
-    status: 'approved',
-    timestamp: '2026-07-15 11:00 AM',
-  },
-];
 
 interface NavItem {
   key: string;
@@ -203,12 +108,18 @@ const TYPE_META: Record<TxType, { label: string; icon: IoniconName; bg: string; 
   document: { label: 'Document', icon: 'document-text-outline', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
 };
 
-const STATUS_META: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
+const STATUS_META: Record<string, { label: string; bg: string; border: string; color: string }> = {
   completed: { label: 'Completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   approved: { label: 'Approved', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
   rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
   cancelled: { label: 'Cancelled', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.3)', color: '#6b7280' },
+  pending: { label: 'Pending', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
+  processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
+  generated: { label: 'Generated', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
+  released: { label: 'Released', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.3)', color: '#6b7280' },
+  no_show: { label: 'No Show', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
 };
+const DEFAULT_STATUS_META = { label: 'Unknown', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.3)', color: '#6b7280' };
 
 type TypeFilter = 'all' | TxType;
 type StatusFilter = 'all' | TxStatus;
@@ -246,10 +157,52 @@ export default function AdminTransactionsScreen() {
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
   const [dateRange, setDateRange] = useState<DateFilter>('all');
   const [selectField, setSelectField] = useState<SelectField>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+  const adminDepartmentAbbrev = user?.departmentAbbrev ?? '';
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchTransactions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/admin/transactions', {
+        params: { type: filterType, status: filterStatus, range: dateRange },
+      });
+      setTransactions(
+        (data.transactions ?? []).map((t: any) => ({
+          id: t.id,
+          type: t.type,
+          action: t.action,
+          studentName: t.studentName,
+          studentId: t.studentId,
+          processor: t.processor,
+          details: t.details,
+          status: t.status,
+          timestamp: t.timestamp,
+        })),
+      );
+      if (data.stats) setStats(data.stats);
+    } catch (err) {
+      console.error('Failed to load transactions:', err);
+      setError('Failed to load transactions.');
+    } finally {
+      setLoading(false);
+    }
+  }, [filterType, filterStatus, dateRange]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
@@ -282,10 +235,11 @@ export default function AdminTransactionsScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const filteredTransactions = TRANSACTIONS.filter((t) => {
+  const filteredTransactions = transactions.filter((t) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !q ||
@@ -293,17 +247,8 @@ export default function AdminTransactionsScreen() {
       t.studentId.toLowerCase().includes(q) ||
       t.processor.toLowerCase().includes(q) ||
       t.details.toLowerCase().includes(q);
-    const matchesType = filterType === 'all' || t.type === filterType;
-    const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
-    return matchesSearch && matchesType && matchesStatus;
+    return matchesSearch;
   });
-
-  const stats = {
-    total: TRANSACTIONS.length,
-    queue: TRANSACTIONS.filter((t) => t.type === 'queue').length,
-    appointments: TRANSACTIONS.filter((t) => t.type === 'appointment').length,
-    documents: TRANSACTIONS.filter((t) => t.type === 'document').length,
-  };
 
   const STAT_TINTS = {
     total: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: theme.primary },
@@ -376,7 +321,7 @@ export default function AdminTransactionsScreen() {
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Transaction Logs</Text>
               <Text style={styles.pageSubtitle}>
-                View transaction logs for {demoAdmin.departmentName}
+                View transaction logs for {adminDepartmentName}
               </Text>
             </View>
           </View>
@@ -401,7 +346,7 @@ export default function AdminTransactionsScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitleText}>Transaction Log</Text>
             <Text style={styles.cardSubtitleText}>
-              Complete history of activity in {demoAdmin.departmentAbbrev}
+              Complete history of activity in {adminDepartmentAbbrev}
             </Text>
 
             <View style={styles.filterField}>
@@ -435,11 +380,24 @@ export default function AdminTransactionsScreen() {
           </View>
 
           {/* Transaction List */}
-          {filteredTransactions.length > 0 ? (
+          {loading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator color={theme.primary} />
+              <Text style={styles.emptyTitle}>Loading transactions…</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>{error}</Text>
+              <Pressable style={styles.filterSelect} onPress={fetchTransactions}>
+                <Text style={styles.filterSelectText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : filteredTransactions.length > 0 ? (
             <View style={styles.txList}>
               {filteredTransactions.map((t) => {
                 const typeMeta = TYPE_META[t.type];
-                const statusMeta = STATUS_META[t.status];
+                const statusMeta = STATUS_META[t.status] ?? DEFAULT_STATUS_META;
                 return (
                   <View key={t.id} style={styles.txCard}>
                     <View style={styles.txBadgesRow}>
@@ -487,6 +445,9 @@ export default function AdminTransactionsScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
       />
 
       {/* Filter Options Modal (Type / Status / Date) */}
@@ -535,6 +496,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -542,6 +506,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -552,12 +519,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

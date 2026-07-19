@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Image,
@@ -16,6 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Toast from 'react-native-toast-message';
+import { useAuth } from '@/context/AuthContext';
+import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -79,27 +83,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors admin-queue-hosting.jsx, ───
-// ─── which is scoped server-side to req.user's own department: GET /admin/queue-hosting ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
-// Mirrors GET /admin/queue-hosting/services (services configured for the admin's own dept)
-const initialServices = [
-  { id: '1', name: 'Academic Consultation' },
-  { id: '2', name: 'Document Signing' },
-  { id: '3', name: 'Payment Processing' },
-  { id: '4', name: 'Grade Inquiry' },
-  { id: '5', name: 'Certificate Request' },
-  { id: '6', name: 'Clearance Processing' },
-  { id: '7', name: 'ID Processing' },
-  { id: '8', name: 'Subject Enrollment' },
-];
-
 // 'full' (capacity reached) and 'expired' (hours ended) both mean "closed to new
 // joins, but still has unserved students" -- grouped as "Still Serving" on-screen.
 // 'closed' means exclusively "an admin manually stopped this queue".
@@ -117,94 +100,6 @@ interface Queue {
   createdAt: string;
   serviceHours: { start: string; end: string };
 }
-
-// Demo data mirroring the real Queue Hosting Management page (mobile has no backend wiring yet)
-const initialQueues: Queue[] = [
-  {
-    id: '1',
-    queueType: 'Academic Consultation',
-    department: demoAdmin.departmentAbbrev,
-    currentlyServingStudentNumber: 'CCS-CON-047',
-    currentCount: 6,
-    servedCount: 9,
-    maxCapacity: 20,
-    status: 'open',
-    createdAt: '07/18/2026, 08:00',
-    serviceHours: { start: '08:00', end: '17:00' },
-  },
-  {
-    id: '2',
-    queueType: 'Document Signing',
-    department: demoAdmin.departmentAbbrev,
-    currentlyServingStudentNumber: null,
-    currentCount: 4,
-    servedCount: 7,
-    maxCapacity: 15,
-    status: 'open',
-    createdAt: '07/18/2026, 09:00',
-    serviceHours: { start: '09:00', end: '16:00' },
-  },
-  {
-    id: '3',
-    queueType: 'Payment Processing',
-    department: demoAdmin.departmentAbbrev,
-    currentlyServingStudentNumber: null,
-    currentCount: 5,
-    servedCount: 12,
-    maxCapacity: 30,
-    status: 'paused',
-    createdAt: '07/18/2026, 08:30',
-    serviceHours: { start: '08:00', end: '17:00' },
-  },
-  {
-    id: '4',
-    queueType: 'Grade Inquiry',
-    department: demoAdmin.departmentAbbrev,
-    currentlyServingStudentNumber: 'CCS-GRD-020',
-    currentCount: 20,
-    servedCount: 18,
-    maxCapacity: 20,
-    status: 'full',
-    createdAt: '07/18/2026, 08:00',
-    serviceHours: { start: '08:00', end: '17:00' },
-  },
-  {
-    id: '5',
-    queueType: 'Certificate Request',
-    department: demoAdmin.departmentAbbrev,
-    currentlyServingStudentNumber: null,
-    currentCount: 3,
-    servedCount: 22,
-    maxCapacity: 25,
-    status: 'expired',
-    createdAt: '07/18/2026, 08:00',
-    serviceHours: { start: '08:00', end: '12:00' },
-  },
-  {
-    id: '6',
-    queueType: 'Clearance Processing',
-    department: demoAdmin.departmentAbbrev,
-    currentlyServingStudentNumber: null,
-    currentCount: 0,
-    servedCount: 40,
-    maxCapacity: 40,
-    status: 'completed',
-    createdAt: '07/18/2026, 08:00',
-    serviceHours: { start: '08:00', end: '17:00' },
-  },
-  {
-    id: '7',
-    queueType: 'ID Processing',
-    department: demoAdmin.departmentAbbrev,
-    currentlyServingStudentNumber: null,
-    currentCount: 0,
-    servedCount: 6,
-    maxCapacity: 10,
-    status: 'closed',
-    createdAt: '07/18/2026, 08:00',
-    serviceHours: { start: '08:00', end: '17:00' },
-  },
-];
 
 interface NavItem {
   key: string;
@@ -247,12 +142,6 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'closed', label: 'Closed' },
 ];
 
-function formatOpenedAt() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(now.getMonth() + 1)}/${pad(now.getDate())}/${now.getFullYear()}, ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-}
-
 function getNowHHMM() {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -260,18 +149,40 @@ function getNowHHMM() {
 }
 
 type SelectField = 'service' | 'status' | 'type' | null;
-type ReasonMode = 'pause' | 'close';
-interface ReasonAction {
-  mode: ReasonMode;
-  queueId: string;
-}
 
 export default function AdminQueueHostingScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [queues, setQueues] = useState<Queue[]>(initialQueues);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const {
+    queues,
+    fetchQueues,
+    reasonModal,
+    setReasonModal,
+    reasonSubmitting,
+    handlePauseQueue,
+    handleCloseQueue,
+    handleResumeQueue,
+    handleReasonConfirm,
+  } = useAdminQueueHosting();
+
+  const [services, setServices] = useState<{ service_id: string; service_name: string }[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchServices = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/queue-hosting/services');
+      setServices(res.data.services ?? []);
+    } catch (error) {
+      console.error('Failed to fetch services:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchServices();
+  }, [user, fetchServices]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -310,6 +221,7 @@ export default function AdminQueueHostingScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -345,7 +257,7 @@ export default function AdminQueueHostingScreen() {
     resetForm();
   };
 
-  const handleOpenQueueSubmit = () => {
+  const handleOpenQueueSubmit = async () => {
     if (!serviceId) {
       setFormError('Please select a service to queue');
       return;
@@ -369,51 +281,28 @@ export default function AdminQueueHostingScreen() {
       return;
     }
 
-    const service = initialServices.find((s) => s.id === serviceId);
-    const newQueue: Queue = {
-      id: Date.now().toString(),
-      queueType: service?.name ?? 'Service',
-      department: demoAdmin.departmentAbbrev,
-      currentlyServingStudentNumber: null,
-      currentCount: 0,
-      servedCount: 0,
-      maxCapacity: capacityNum,
-      status: 'open',
-      createdAt: formatOpenedAt(),
-      serviceHours: { start: serviceStart, end: serviceEnd },
-    };
-    setQueues((prev) => [newQueue, ...prev]);
-    closeModal();
+    setSubmitting(true);
+    try {
+      await api.post('/admin/queue-hosting', {
+        serviceId,
+        maxCapacity: capacityNum,
+        startTime: `${serviceStart}:00`,
+        endTime: `${serviceEnd}:00`,
+        noShowTimeoutMinutes: noShowTimeoutNum,
+      });
+      Toast.show({ type: 'success', text1: 'Queue line opened successfully!' });
+      closeModal();
+      await fetchQueues();
+    } catch (error: any) {
+      setFormError(error?.response?.data?.error ?? 'Failed to open queue line');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // ── Queue lifecycle (mutates local demo state, mirrors admin-queue-hosting.jsx's server-authoritative handlers) ──
-  const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
-  const [reasonText, setReasonText] = useState('');
-
-  const handlePauseQueue = (id: string) => {
-    setReasonText('');
-    setReasonAction({ mode: 'pause', queueId: id });
-  };
-  const handleCloseQueue = (id: string) => {
-    setReasonText('');
-    setReasonAction({ mode: 'close', queueId: id });
-  };
-  const handleResumeQueue = (id: string) => {
-    setQueues((prev) => prev.map((q) => (q.id === id ? { ...q, status: 'open' } : q)));
-  };
-  const runReasonAction = () => {
-    if (!reasonAction) return;
-    setQueues((prev) =>
-      prev.map((q) =>
-        q.id === reasonAction.queueId ? { ...q, status: reasonAction.mode === 'pause' ? 'paused' : 'closed' } : q,
-      ),
-    );
-    setReasonAction(null);
-  };
-
-  const reasonTarget = queues.find((q) => q.id === reasonAction?.queueId) ?? null;
+  const reasonTarget = queues.find((q: any) => q.id === reasonModal?.id) ?? null;
   const reasonCopy =
-    reasonAction?.mode === 'pause'
+    reasonModal?.mode === 'pause'
       ? {
           title: 'Pause Queue',
           message: reasonTarget?.currentlyServingStudentNumber
@@ -429,16 +318,17 @@ export default function AdminQueueHostingScreen() {
           confirmText: 'Stop Queue',
           confirmColor: '#ef4444',
         };
+  const [reasonText, setReasonText] = useState('');
 
   // ── Derived values ──
   // Unique service types currently hosted -- always computed from the full queue
   // list so the dropdown options don't shift as filters are applied.
-  const serviceTypeOptions = [...new Set(queues.map((q) => q.queueType))].sort();
+  const serviceTypeOptions = [...new Set(queues.map((q: any) => q.queueType))].sort();
 
-  const filteredQueues = queues.filter((q) => {
+  const filteredQueues = queues.filter((q: any) => {
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
-      !query || q.queueType.toLowerCase().includes(query) || q.department.toLowerCase().includes(query);
+      !query || q.queueType.toLowerCase().includes(query) || (q.department || '').toLowerCase().includes(query);
     const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
     const matchesType = typeFilter === 'all' || q.queueType === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
@@ -460,7 +350,7 @@ export default function AdminQueueHostingScreen() {
   const typeFilterOptions = [{ value: 'all', label: 'All Service Types' }, ...serviceTypeOptions.map((t) => ({ value: t, label: t }))];
   const selectOptions =
     selectField === 'service'
-      ? initialServices.map((s) => ({ value: s.id, label: s.name }))
+      ? services.map((s) => ({ value: s.service_id, label: s.service_name }))
       : selectField === 'status'
         ? STATUS_FILTER_OPTIONS
         : typeFilterOptions;
@@ -473,7 +363,7 @@ export default function AdminQueueHostingScreen() {
     else if (selectField === 'type') setTypeFilter(value);
     setSelectField(null);
   };
-  const selectedServiceName = initialServices.find((s) => s.id === serviceId)?.name ?? '';
+  const selectedServiceName = services.find((s) => s.service_id === serviceId)?.service_name ?? '';
 
   return (
     <View style={styles.root}>
@@ -512,7 +402,7 @@ export default function AdminQueueHostingScreen() {
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Queue Hosting Management</Text>
               <Text style={styles.pageSubtitle}>
-                {demoAdmin.departmentName} ({demoAdmin.departmentAbbrev}) — open, manage, and close your
+                {user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''}) — open, manage, and close your
                 department&apos;s queue lines
               </Text>
             </View>
@@ -745,8 +635,8 @@ export default function AdminQueueHostingScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Still Serving (Closed to New Joins)</Text>
               <View style={styles.queueList}>
-                {stillServingQueues.map((queue) => {
-                  const tint = STATUS_TINTS[queue.status];
+                {stillServingQueues.map((queue: any) => {
+                  const tint = STATUS_TINTS[queue.status as QueueStatus];
                   return (
                     <View key={queue.id} style={[styles.queueCard, styles.queueCardStillServing]}>
                       <View style={styles.queueCardTopRow}>
@@ -883,7 +773,7 @@ export default function AdminQueueHostingScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="time-outline" size={28} color={theme.tertiary} />
               <Text style={styles.emptyStateText}>
-                No queue lines yet today for {demoAdmin.departmentAbbrev}. Open one to start serving students.
+                No queue lines yet today for {user?.departmentAbbrev ?? 'your department'}. Open one to start serving students.
               </Text>
             </View>
           )}
@@ -909,6 +799,8 @@ export default function AdminQueueHostingScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={user?.name ?? 'Admin'}
+        adminDepartmentName={user?.departmentName ?? ''}
       />
 
       <OpenQueueModal
@@ -928,6 +820,9 @@ export default function AdminQueueHostingScreen() {
         onSubmit={handleOpenQueueSubmit}
         theme={theme}
         styles={styles}
+        adminDepartmentName={user?.departmentName ?? ''}
+        adminDepartmentAbbrev={user?.departmentAbbrev ?? ''}
+        submitting={submitting}
       />
 
       {/* Shared select modal: service picker + status/type filters */}
@@ -960,17 +855,21 @@ export default function AdminQueueHostingScreen() {
       </Modal>
 
       <QueueReasonModal
-        visible={!!reasonAction}
+        visible={!!reasonModal}
         title={reasonCopy.title}
         message={reasonCopy.message}
-        confirmText={reasonCopy.confirmText}
+        confirmText={reasonSubmitting ? 'Submitting...' : reasonCopy.confirmText}
         confirmColor={reasonCopy.confirmColor}
         reason={reasonText}
         onChangeReason={setReasonText}
-        onCancel={() => setReasonAction(null)}
-        onConfirm={runReasonAction}
+        onCancel={() => setReasonModal(null)}
+        onConfirm={() => {
+          handleReasonConfirm(reasonText);
+          setReasonText('');
+        }}
         theme={theme}
         styles={styles}
+        submitting={reasonSubmitting}
       />
 
       <LogoutModal
@@ -992,6 +891,8 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -999,6 +900,8 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1009,12 +912,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>Admin</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>
@@ -1054,6 +957,9 @@ function OpenQueueModal({
   onSubmit,
   theme,
   styles,
+  adminDepartmentName,
+  adminDepartmentAbbrev,
+  submitting,
 }: {
   visible: boolean;
   selectedServiceName: string;
@@ -1071,6 +977,9 @@ function OpenQueueModal({
   onSubmit: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminDepartmentName: string;
+  adminDepartmentAbbrev: string;
+  submitting: boolean;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1080,7 +989,7 @@ function OpenQueueModal({
             <View style={{ flex: 1 }}>
               <Text style={styles.formModalTitle}>Open New Queue Line</Text>
               <Text style={styles.pageSubtitle}>
-                For {demoAdmin.departmentName} ({demoAdmin.departmentAbbrev}) only
+                For {adminDepartmentName} ({adminDepartmentAbbrev}) only
               </Text>
             </View>
             <Pressable style={styles.formModalCloseBtn} onPress={onClose} hitSlop={8}>
@@ -1162,11 +1071,15 @@ function OpenQueueModal({
           </ScrollView>
 
           <View style={styles.formFooter}>
-            <Pressable style={styles.formCancelBtn} onPress={onClose}>
+            <Pressable style={styles.formCancelBtn} onPress={onClose} disabled={submitting}>
               <Text style={styles.formCancelBtnText}>Cancel</Text>
             </Pressable>
-            <Pressable style={styles.formSubmitBtn} onPress={onSubmit}>
-              <Text style={styles.formSubmitBtnText}>Open Queue Line</Text>
+            <Pressable
+              style={[styles.formSubmitBtn, submitting && styles.formSubmitBtnDisabled]}
+              onPress={onSubmit}
+              disabled={submitting}
+            >
+              <Text style={styles.formSubmitBtnText}>{submitting ? 'Opening...' : 'Open Queue Line'}</Text>
             </Pressable>
           </View>
         </View>
@@ -1187,6 +1100,7 @@ function QueueReasonModal({
   onConfirm,
   theme,
   styles,
+  submitting,
 }: {
   visible: boolean;
   title: string;
@@ -1199,6 +1113,7 @@ function QueueReasonModal({
   onConfirm: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  submitting: boolean;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
@@ -1216,12 +1131,17 @@ function QueueReasonModal({
             value={reason}
             onChangeText={onChangeReason}
             multiline
+            editable={!submitting}
           />
           <View style={styles.confirmActionsRow}>
-            <Pressable style={styles.cancelBtn} onPress={onCancel}>
+            <Pressable style={styles.cancelBtn} onPress={onCancel} disabled={submitting}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </Pressable>
-            <Pressable style={[styles.confirmBtn, { backgroundColor: confirmColor }]} onPress={onConfirm}>
+            <Pressable
+              style={[styles.confirmBtn, { backgroundColor: confirmColor }, submitting && styles.formSubmitBtnDisabled]}
+              onPress={onConfirm}
+              disabled={submitting}
+            >
               <Text style={styles.confirmBtnText}>{confirmText}</Text>
             </Pressable>
           </View>
@@ -1602,6 +1522,7 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 12,
       backgroundColor: theme.blue,
     },
+    formSubmitBtnDisabled: { opacity: 0.6 },
     formSubmitBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
 
     // Nav drawer (shared visual language with admin_dashboard.tsx)

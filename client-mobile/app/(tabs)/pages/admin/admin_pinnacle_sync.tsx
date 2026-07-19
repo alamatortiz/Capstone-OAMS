@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -15,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,26 +66,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors PinnacleSyncPage.tsx /
-// admin-pinnacle-sync.jsx, whose real config+stats load from
-// GET /admin/pinnacle-sync/config and /stats) ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
-type SyncedUser = {
-  userId: string;
-  fullName: string;
-  email: string;
-  role: 'student' | 'professor' | 'admin';
-  college: string;
-  status: string;
-  lastSyncedAt: string;
-};
-
 const PINNACLE_TABS = ['configuration', 'sync-control', 'synced-users'] as const;
 type PinnacleTab = (typeof PINNACLE_TABS)[number];
 
@@ -114,20 +97,46 @@ export default function AdminPinnacleSyncScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<PinnacleTab>('configuration');
   const [apiUrl, setApiUrl] = useState('https://pinnacle-api.pnc.edu.ph/v1');
   const [apiKey, setApiKey] = useState('');
   const [syncInterval, setSyncInterval] = useState('60');
   const [syncEnabled, setSyncEnabled] = useState(false);
-  const [syncedUsers, setSyncedUsers] = useState<SyncedUser[]>([]);
+  const [syncStats, setSyncStats] = useState({ total: 0, students: 0, professors: 0, admins: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState<SyncMessage | null>(null);
 
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [cfgRes, statsRes] = await Promise.all([
+          api.get('/admin/pinnacle-sync/config'),
+          api.get('/admin/pinnacle-sync/stats'),
+        ]);
+        const cfg = cfgRes.data;
+        setApiUrl(cfg.apiUrl);
+        setApiKey(cfg.apiKey);
+        setSyncInterval(String(cfg.syncInterval));
+        setSyncEnabled(cfg.syncEnabled);
+        const s = statsRes.data;
+        setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
+      } catch (err) {
+        console.error('Pinnacle sync load error:', err);
+      }
+    };
+    load();
+  }, []);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
@@ -162,6 +171,7 @@ export default function AdminPinnacleSyncScreen() {
   };
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -170,8 +180,22 @@ export default function AdminPinnacleSyncScreen() {
     setTimeout(() => setSyncMessage(null), holdMs);
   };
 
-  const handleSaveConfiguration = () => {
-    flashMessage({ type: 'success', text: 'Configuration saved successfully.' });
+  const handleSaveConfiguration = async () => {
+    setIsSaving(true);
+    try {
+      await api.post('/admin/pinnacle-sync/config', {
+        apiUrl,
+        apiKey,
+        syncInterval: parseInt(syncInterval, 10) || 60,
+        syncEnabled,
+      });
+      flashMessage({ type: 'success', text: 'Configuration saved successfully.' });
+    } catch (err) {
+      console.error('Failed to save configuration:', err);
+      flashMessage({ type: 'error', text: 'Failed to save configuration.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTestConnection = () => {
@@ -188,31 +212,38 @@ export default function AdminPinnacleSyncScreen() {
     }, 1500);
   };
 
-  const handleSyncNow = () => {
+  const handleSyncNow = async () => {
     if (!syncEnabled) {
       flashMessage({ type: 'warning', text: 'PinnaCle sync is currently disabled. Enable it in the Configuration tab.' });
       return;
     }
     setIsSyncing(true);
     setSyncMessage({ type: 'info', text: 'Syncing data from PinnaCle...' });
-    setTimeout(() => {
-      setSyncedUsers(DEMO_SYNCED_USERS);
+    try {
+      const res = await api.post('/admin/pinnacle-sync/trigger');
+      const statsRes = await api.get('/admin/pinnacle-sync/stats');
+      const s = statsRes.data;
+      setSyncStats({ total: s.total, students: s.students, professors: s.professors, admins: s.admins });
+      flashMessage({ type: 'success', text: res.data.message || 'Sync completed successfully.' });
+    } catch (err) {
+      console.error('Sync failed:', err);
+      flashMessage({ type: 'error', text: 'Sync failed. Please try again.' });
+    } finally {
       setIsSyncing(false);
-      flashMessage({ type: 'success', text: 'Sync completed! 4 added, 0 updated.' });
-    }, 1500);
+    }
   };
 
   const stats = [
-    { key: 'total', label: 'Total Synced Users', value: syncedUsers.length, tint: 'blue' as const },
-    { key: 'students', label: 'Students', value: syncedUsers.filter((u) => u.role === 'student').length, tint: 'green' as const },
-    { key: 'professors', label: 'Professors', value: syncedUsers.filter((u) => u.role === 'professor').length, tint: 'purple' as const },
-    { key: 'admins', label: 'Admins', value: syncedUsers.filter((u) => u.role === 'admin').length, tint: 'orange' as const },
+    { key: 'total', label: 'Total Synced Users', value: syncStats.total, tint: 'blue' as const },
+    { key: 'students', label: 'Students', value: syncStats.students, tint: 'green' as const },
+    { key: 'professors', label: 'Professors', value: syncStats.professors, tint: 'purple' as const },
+    { key: 'admins', label: 'Admins', value: syncStats.admins, tint: 'orange' as const },
   ];
 
   const tabMeta: Record<PinnacleTab, { label: string; icon: IoniconName }> = {
     configuration: { label: 'Configuration', icon: 'settings-outline' },
     'sync-control': { label: 'Sync Control', icon: 'sync-outline' },
-    'synced-users': { label: `Synced Users (${syncedUsers.length})`, icon: 'people-outline' },
+    'synced-users': { label: `Synced Users (${syncStats.total})`, icon: 'people-outline' },
   };
 
   return (
@@ -382,9 +413,9 @@ export default function AdminPinnacleSyncScreen() {
               </View>
 
               <View style={styles.panelActions}>
-                <Pressable style={styles.primaryBtn} onPress={handleSaveConfiguration}>
+                <Pressable style={styles.primaryBtn} onPress={handleSaveConfiguration} disabled={isSaving}>
                   <Ionicons name="settings-outline" size={15} color="#ffffff" />
-                  <Text style={styles.primaryBtnText}>Save Configuration</Text>
+                  <Text style={styles.primaryBtnText}>{isSaving ? 'Saving…' : 'Save Configuration'}</Text>
                 </Pressable>
                 <Pressable style={styles.secondaryBtn} onPress={handleTestConnection} disabled={isTesting}>
                   <Ionicons name={isTesting ? 'refresh-outline' : 'flash-outline'} size={15} color={theme.text} />
@@ -452,7 +483,7 @@ export default function AdminPinnacleSyncScreen() {
                 <Text style={styles.panelSubtitle}>User accounts synced from PinnaCle microservice</Text>
               </View>
 
-              {syncedUsers.length === 0 ? (
+              {syncStats.total === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="server-outline" size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Synced Users</Text>
@@ -464,23 +495,7 @@ export default function AdminPinnacleSyncScreen() {
                 </View>
               ) : (
                 <View style={styles.usersList}>
-                  {syncedUsers.map((u) => (
-                    <View key={u.userId} style={styles.userItem}>
-                      <View style={styles.userTopRow}>
-                        <Text style={styles.userName} numberOfLines={1}>{u.fullName}</Text>
-                        <View style={[styles.rolePill, { backgroundColor: ROLE_TINTS[u.role].bg }]}>
-                          <Text style={[styles.rolePillText, { color: ROLE_TINTS[u.role].color }]}>{u.role}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.userEmail}>{u.email}</Text>
-                      <View style={styles.userMetaRow}>
-                        <View style={styles.collegePill}>
-                          <Text style={styles.collegePillText}>{u.college}</Text>
-                        </View>
-                        <Text style={styles.userMetaText}>Synced: {u.lastSyncedAt}</Text>
-                      </View>
-                    </View>
-                  ))}
+                  <Text style={styles.userEmail}>Users will appear here after syncing.</Text>
                 </View>
               )}
             </View>
@@ -495,6 +510,9 @@ export default function AdminPinnacleSyncScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
       />
 
       <LogoutModal
@@ -507,25 +525,12 @@ export default function AdminPinnacleSyncScreen() {
   );
 }
 
-const DEMO_SYNCED_USERS: SyncedUser[] = [
-  { userId: 'PNC-2021-001', fullName: 'Juan Dela Cruz', email: 'juan.delacruz@pnc.edu.ph', role: 'student', college: 'CCS', status: 'active', lastSyncedAt: 'Jul 18, 2026, 9:02 AM' },
-  { userId: 'PNC-2019-014', fullName: 'Maria Santos', email: 'maria.santos@pnc.edu.ph', role: 'professor', college: 'CCS', status: 'active', lastSyncedAt: 'Jul 18, 2026, 9:02 AM' },
-  { userId: 'PNC-ADM-004', fullName: 'Admin Office CCS', email: 'admin.ccs@pnc.edu.ph', role: 'admin', college: 'CCS', status: 'active', lastSyncedAt: 'Jul 18, 2026, 9:02 AM' },
-  { userId: 'PNC-2022-088', fullName: 'Pedro Garcia', email: 'pedro.garcia@pnc.edu.ph', role: 'student', college: 'CCS', status: 'active', lastSyncedAt: 'Jul 18, 2026, 9:02 AM' },
-];
-
 const STAT_TINTS = {
   blue: { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
   green: { bg: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' },
   purple: { bg: 'rgba(168, 85, 247, 0.15)', color: '#a855f7' },
   orange: { bg: 'rgba(249, 115, 22, 0.15)', color: '#f97316' },
 } as const;
-
-const ROLE_TINTS: Record<SyncedUser['role'], { bg: string; color: string }> = {
-  student: { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
-  professor: { bg: 'rgba(168, 85, 247, 0.15)', color: '#a855f7' },
-  admin: { bg: 'rgba(249, 115, 22, 0.15)', color: '#f97316' },
-};
 
 // ─────────────────────────── Shared sub-components ───────────────────────────
 
@@ -536,6 +541,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -543,6 +551,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -553,12 +564,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

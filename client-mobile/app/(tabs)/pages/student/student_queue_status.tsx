@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { useQueue } from '@/context/QueueContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -80,15 +82,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-queue-status.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type QueueStatus = 'waiting' | 'serving' | 'completed' | 'cancelled' | 'no_show';
 type SlotStatus = 'open' | 'paused' | 'full' | 'expired';
 
@@ -117,55 +110,6 @@ interface QueueRecord {
   notes: string;
 }
 
-const initialQueues: QueueRecord[] = [
-  {
-    queueId: 'q1',
-    departmentAbbrev: 'CCS',
-    departmentName: 'College of Computing Studies',
-    serviceName: 'Registrar - Document Request',
-    queueNumberBadge: 'CCS-REG-047',
-    location: 'CCS Building, Room 101',
-    description: 'Request official transcripts, certificates, and other academic documents.',
-    status: 'waiting',
-    slotStatus: 'open',
-    position: 3,
-    totalWaiting: 12,
-    totalInQueue: 15,
-    maxCapacity: 20,
-    queueOccupancyPercent: 75,
-    servicedCount: 8,
-    servicedPercent: 53,
-    estimatedWait: '15-20 mins',
-    joinedAt: '10:30 AM',
-    startTime: '8:00 AM',
-    endTime: '5:00 PM',
-    notes: '',
-  },
-  {
-    queueId: 'q2',
-    departmentAbbrev: 'CBAA',
-    departmentName: 'College of Business, Accountancy and Administration',
-    serviceName: 'Cashier - Payment',
-    queueNumberBadge: 'CBA-CSH-029',
-    location: 'CBAA Building, Ground Floor',
-    description: 'Settle tuition, miscellaneous fees, and other school payments.',
-    status: 'serving',
-    slotStatus: 'open',
-    position: 1,
-    totalWaiting: 8,
-    totalInQueue: 9,
-    maxCapacity: 15,
-    queueOccupancyPercent: 60,
-    servicedCount: 5,
-    servicedPercent: 56,
-    estimatedWait: 'Any moment now',
-    joinedAt: '10:15 AM',
-    startTime: '8:00 AM',
-    endTime: '5:00 PM',
-    notes: 'Paying second semester tuition balance.',
-  },
-];
-
 interface NavItem {
   key: string;
   label: string;
@@ -193,12 +137,13 @@ export default function StudentQueueStatusScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [queues, setQueues] = useState<QueueRecord[]>(initialQueues);
-  const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
+  const [selectedQueueId, setSelectedQueueId] = useState<number | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [notesText, setNotesText] = useState('');
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const { queues, leaveQueue, updateQueueNotes } = useQueue();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -234,34 +179,43 @@ export default function StudentQueueStatusScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const selectedQueue = selectedQueueId ? queues.find((q) => q.queueId === selectedQueueId) ?? null : null;
+  const selectedQueue = selectedQueueId
+    ? (queues.find((q: any) => q.queueId === selectedQueueId) as QueueRecord | undefined) ?? null
+    : null;
 
   const collegeLogoFor = (abbrev: string) => collegeLogos[abbrev] ?? ccsLogo;
 
   const openNotesDialog = () => {
     if (!selectedQueue) return;
-    setNotesText(selectedQueue.notes);
+    setNotesText(selectedQueue.notes ?? '');
     setShowNotesDialog(true);
   };
 
-  const saveNotes = () => {
+  const saveNotes = async () => {
     if (!selectedQueue) return;
-    setQueues((prev) =>
-      prev.map((q) => (q.queueId === selectedQueue.queueId ? { ...q, notes: notesText.trim() } : q)),
-    );
-    setShowNotesDialog(false);
-    Alert.alert('Notes updated', 'Your concern has been saved.');
+    try {
+      await updateQueueNotes(selectedQueue.queueId, notesText.trim());
+      setShowNotesDialog(false);
+      Alert.alert('Notes updated', 'Your concern has been saved.');
+    } catch (error: any) {
+      Alert.alert('Could not save notes', error?.message ?? 'Please try again.');
+    }
   };
 
-  const confirmLeaveQueue = () => {
+  const confirmLeaveQueue = async () => {
     if (!selectedQueue) return;
-    setQueues((prev) => prev.filter((q) => q.queueId !== selectedQueue.queueId));
-    setShowCancelDialog(false);
-    setSelectedQueueId(null);
-    Alert.alert('You have left the queue.');
+    try {
+      await leaveQueue(selectedQueue.queueId);
+      setShowCancelDialog(false);
+      setSelectedQueueId(null);
+      Alert.alert('You have left the queue.');
+    } catch (error: any) {
+      Alert.alert('Could not leave queue', error?.message ?? 'Please try again.');
+    }
   };
 
   return (
@@ -342,7 +296,7 @@ export default function StudentQueueStatusScreen() {
               {/* Queue List */}
               {queues.length > 0 ? (
                 <View style={styles.queueList}>
-                  {queues.map((queue) => {
+                  {queues.map((queue: any) => {
                     return (
                       <Pressable
                         key={queue.queueId}
@@ -443,12 +397,12 @@ export default function StudentQueueStatusScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>

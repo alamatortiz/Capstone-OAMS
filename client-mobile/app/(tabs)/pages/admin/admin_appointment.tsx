@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,7 +67,7 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). The real server route,
+// ─── Field shapes documented here mirror what The real server route,
 // GET /api/admin/appointments (adminRoutes.js), is scoped strictly to the
 // signed-in admin's own department — it has no cross-college listing, so
 // unlike the design-mockup AdminAppointmentsPage.tsx this mirrors the actual
@@ -72,13 +75,6 @@ function OamsLogo({
 // shapes below match what that endpoint really returns (college, location,
 // studentCourse, serviceName, isToday, etc.) — there is no "type" field, so
 // it isn't rendered here. ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type AppointmentStatus = 'pending' | 'approved' | 'rejected' | 'completed' | 'cancelled';
 
 interface Appointment {
@@ -97,105 +93,6 @@ interface Appointment {
   requestedAt: string;
   isToday: boolean;
 }
-
-const initialAppointments: Appointment[] = [
-  {
-    id: '1',
-    college: demoAdmin.departmentName,
-    location: 'CCS Faculty Room 201',
-    studentName: 'Juan Dela Cruz',
-    studentId: '2200123',
-    studentCourse: 'BSCS-3',
-    professor: 'Asst. Prof. Maria Santos',
-    serviceName: 'Thesis Consultation',
-    purpose: 'Thesis Defense Preparation',
-    date: '2026-07-16',
-    time: '10:00 AM',
-    status: 'pending',
-    requestedAt: '2026-07-15 09:30 AM',
-    isToday: true,
-  },
-  {
-    id: '2',
-    college: demoAdmin.departmentName,
-    location: "CCS Dean's Office",
-    studentName: 'Maria Garcia',
-    studentId: '2200456',
-    studentCourse: 'BSIT-2',
-    professor: 'Prof. Pedro Reyes',
-    serviceName: null,
-    purpose: 'Career Guidance',
-    date: '2026-07-17',
-    time: '2:00 PM',
-    status: 'approved',
-    requestedAt: '2026-07-15 03:15 PM',
-    isToday: false,
-  },
-  {
-    id: '3',
-    college: demoAdmin.departmentName,
-    location: 'CCS Faculty Room 105',
-    studentName: 'Carlos Rodriguez',
-    studentId: '2200789',
-    studentCourse: 'BSCS-4',
-    professor: 'Prof. Ana Mendoza',
-    serviceName: 'Capstone Review',
-    purpose: 'Capstone Project Consultation',
-    date: '2026-07-18',
-    time: '11:00 AM',
-    status: 'pending',
-    requestedAt: '2026-07-16 08:00 AM',
-    isToday: false,
-  },
-  {
-    id: '4',
-    college: demoAdmin.departmentName,
-    location: 'CCS Faculty Room 210',
-    studentName: 'Lisa Fernandez',
-    studentId: '2200234',
-    studentCourse: 'BSIT-3',
-    professor: 'Prof. Juan Lopez',
-    serviceName: null,
-    purpose: 'Academic Advising',
-    date: '2026-07-14',
-    time: '3:00 PM',
-    status: 'completed',
-    requestedAt: '2026-07-13 10:00 AM',
-    isToday: false,
-  },
-  {
-    id: '5',
-    college: demoAdmin.departmentName,
-    location: 'CCS Faculty Room 108',
-    studentName: 'Marco Velasco',
-    studentId: '2200567',
-    studentCourse: 'BSCS-2',
-    professor: 'Prof. Sofia Cruz',
-    serviceName: 'Research Guidance',
-    purpose: 'Research Guidance',
-    date: '2026-07-19',
-    time: '9:00 AM',
-    status: 'approved',
-    requestedAt: '2026-07-15 11:30 AM',
-    isToday: false,
-  },
-  {
-    id: '6',
-    college: demoAdmin.departmentName,
-    location: 'CCS Faculty Room 201',
-    studentName: 'Andrei Villanueva',
-    studentId: '2200432',
-    studentCourse: 'BSIT-4',
-    professor: 'Asst. Prof. Maria Santos',
-    serviceName: null,
-    purpose: 'Grade Query for CS301',
-    date: '2026-07-12',
-    time: '1:00 PM',
-    status: 'rejected',
-    requestedAt: '2026-07-11 04:45 PM',
-    isToday: false,
-  },
-];
 
 interface NavItem {
   key: string;
@@ -239,14 +136,39 @@ export default function AdminAppointmentScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [appointments] = useState<Appointment[]>(initialAppointments);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+  const adminDepartmentAbbrev = user?.departmentAbbrev ?? '';
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/admin/appointments');
+      setAppointments(data.appointments ?? []);
+    } catch (err) {
+      console.error('Failed to load appointments:', err);
+      setError('Failed to load appointments.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
@@ -284,6 +206,7 @@ export default function AdminAppointmentScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -353,7 +276,7 @@ export default function AdminAppointmentScreen() {
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Centralized Appointment Management</Text>
               <Text style={styles.pageSubtitle}>
-                Monitor and manage appointments for {demoAdmin.departmentName}
+                Monitor and manage appointments for {adminDepartmentName}
               </Text>
             </View>
           </View>
@@ -399,7 +322,7 @@ export default function AdminAppointmentScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitleText}>Appointment Overview</Text>
             <Text style={styles.cardSubtitleText}>
-              Appointment tracking and management for {demoAdmin.departmentAbbrev}
+              Appointment tracking and management for {adminDepartmentAbbrev}
             </Text>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
@@ -426,7 +349,20 @@ export default function AdminAppointmentScreen() {
               </View>
             </ScrollView>
 
-            {visibleAppointments.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyCard}>
+                <ActivityIndicator color={theme.primary} />
+                <Text style={styles.emptyTitle}>Loading appointments…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>{error}</Text>
+                <Pressable style={styles.viewDetailsBtn} onPress={fetchAppointments}>
+                  <Text style={styles.viewDetailsBtnText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : visibleAppointments.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="calendar-outline" size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No appointments found</Text>
@@ -441,7 +377,7 @@ export default function AdminAppointmentScreen() {
                         <View style={{ flex: 1, gap: 6 }}>
                           <View style={styles.collegeBadge}>
                             <Ionicons name="business-outline" size={13} color="#a855f7" />
-                            <Text style={styles.collegeBadgeText}>{demoAdmin.departmentAbbrev}</Text>
+                            <Text style={styles.collegeBadgeText}>{adminDepartmentAbbrev}</Text>
                           </View>
                           <View style={styles.studentInfoRow}>
                             <Ionicons name="person-outline" size={15} color={theme.tertiary} />
@@ -502,6 +438,9 @@ export default function AdminAppointmentScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
       />
 
       <AppointmentDetailsModal
@@ -628,6 +567,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -635,6 +577,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -645,12 +590,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

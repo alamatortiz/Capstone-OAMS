@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -64,36 +66,7 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-documents.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
-const COLLEGE_NAMES = [
-  'College of Computing Studies',
-  'College of Business, Accountancy and Administration',
-  'College of Education',
-  'College of Engineering',
-  'College of Arts and Sciences',
-  'College of Health and Allied Sciences',
-];
-
-const DOCUMENT_TYPES = [
-  'Good Moral Certificate',
-  'Transcript of Records',
-  'Certificate of Enrollment',
-  'Certificate of Grades',
-  'Diploma',
-  'Honorable Dismissal',
-  'Certificate of Registration',
-  'Certificate of Completion',
-];
-
-type DocStatus = 'pending' | 'processing' | 'ready' | 'claimed' | 'rejected';
+type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected';
 
 interface DocumentRequest {
   id: string;
@@ -101,29 +74,27 @@ interface DocumentRequest {
   college: string;
   requestDate: string;
   purpose: string;
+  copies?: number;
   status: DocStatus;
   trackingNumber: string;
   notes?: string;
   estimatedCompletion?: string;
+  neededBy?: string;
+  releasedDate?: string;
+  claimedDate?: string;
 }
 
-const INITIAL_DOCUMENTS: DocumentRequest[] = [
-  {
-    id: '1', type: 'Good Moral Certificate', college: 'College of Computing Studies',
-    requestDate: '2026-03-25', purpose: 'Job application requirement',
-    status: 'processing', trackingNumber: 'DOC-2026-001234', estimatedCompletion: '2026-03-30',
-  },
-  {
-    id: '2', type: 'Transcript of Records', college: 'College of Computing Studies',
-    requestDate: '2026-03-20', purpose: 'Graduate school application',
-    status: 'ready', trackingNumber: 'DOC-2026-001189', notes: 'Ready for pickup at Registrar Office',
-  },
-];
+interface CollegeOption {
+  id: number;
+  name: string;
+  abbrev: string;
+}
 
 const STATUS_META: Record<DocStatus, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
   pending: { label: 'pending', icon: 'time-outline', bg: 'rgba(251, 191, 36, 0.15)', border: 'rgba(251, 191, 36, 0.35)', color: '#f59e0b' },
   processing: { label: 'processing', icon: 'alert-circle-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
   ready: { label: 'ready', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
+  released: { label: 'released', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
   claimed: { label: 'claimed', icon: 'checkmark-circle-outline', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' },
   rejected: { label: 'rejected', icon: 'close-circle-outline', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
 };
@@ -131,14 +102,14 @@ const STATUS_META: Record<DocStatus, { label: string; icon: IoniconName; bg: str
 const toDateStr = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-const formatDateLong = (dateString: string) => {
-  const [y, m, d] = dateString.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const formatDateLong = (dateString?: string) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
-const formatDateShort = (dateString: string) => {
-  const [y, m, d] = dateString.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const formatDateShort = (dateString?: string) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 interface NavItem {
@@ -164,17 +135,56 @@ export default function StudentDocumentsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  const [documents, setDocuments] = useState<DocumentRequest[]>(INITIAL_DOCUMENTS);
+  const [documents, setDocuments] = useState<DocumentRequest[]>([]);
+  const [docsLoading, setDocsLoading] = useState(true);
+  const [docsError, setDocsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('active');
 
+  const [collegesFromDB, setCollegesFromDB] = useState<CollegeOption[]>([]);
+  const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, string[]>>({});
+
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ type: '', college: '', copies: '1', purpose: '' });
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
+
+  const fetchDocuments = useCallback(async () => {
+    setDocsLoading(true);
+    try {
+      const { data } = await api.get('/student/documents');
+      setDocuments(data.documents ?? []);
+      setDocsError(null);
+    } catch (err) {
+      console.error('Failed to fetch documents:', err);
+      setDocsError('Could not load your documents.');
+    } finally {
+      setDocsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      try {
+        const { data } = await api.get('/student/documents/service-types');
+        setCollegesFromDB(data.departments ?? []);
+        setServicesByDepartmentId(data.servicesByDepartmentId ?? {});
+      } catch (err) {
+        console.error('Failed to fetch document service types:', err);
+      }
+    };
+    fetchServiceTypes();
+  }, []);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
@@ -192,7 +202,7 @@ export default function StudentDocumentsScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
   const activeDocuments = documents.filter((doc) => doc.status !== 'claimed' && doc.status !== 'rejected');
   const completedDocuments = documents.filter((doc) => doc.status === 'claimed' || doc.status === 'rejected');
@@ -202,50 +212,72 @@ export default function StudentDocumentsScreen() {
     setDialogOpen(true);
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
+    if (submitting) return;
     if (!formData.type || !formData.college || !formData.purpose.trim()) {
       Alert.alert('Missing information', 'Please fill in all required fields.');
       return;
     }
-    const newDoc: DocumentRequest = {
-      id: Date.now().toString(),
-      type: formData.type,
-      college: formData.college,
-      requestDate: toDateStr(new Date()),
-      purpose: formData.purpose.trim(),
-      status: 'pending',
-      trackingNumber: `DOC-2026-${Math.floor(Math.random() * 900000) + 100000}`,
-      estimatedCompletion: toDateStr(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)),
-    };
-    setDocuments((prev) => [newDoc, ...prev]);
-    setDialogOpen(false);
-    setFormData({ type: '', college: '', copies: '1', purpose: '' });
-    Alert.alert('Success', 'Document request submitted successfully!');
+    setSubmitting(true);
+    try {
+      const { data } = await api.post('/student/documents', formData);
+      if (data?.document) {
+        setDocuments((prev) => [data.document, ...prev]);
+      } else {
+        await fetchDocuments();
+      }
+      setDialogOpen(false);
+      setFormData({ type: '', college: '', copies: '1', purpose: '' });
+      Alert.alert('Success', 'Document request submitted successfully!');
+    } catch (err: any) {
+      console.error('Failed to submit document request:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to submit document request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const doCancelRequest = () => {
+  const doCancelRequest = async () => {
     const target = cancelTarget;
-    setCancelTarget(null);
     if (!target) return;
-    setDocuments((prev) => prev.filter((d) => d.id !== target.id));
+    setCancellingId(target.id);
+    try {
+      await api.delete(`/student/documents/${target.id}`);
+      setDocuments((prev) => prev.filter((d) => d.id !== target.id));
+      setCancelTarget(null);
+      Alert.alert('Cancelled', 'Document request cancelled.');
+    } catch (err: any) {
+      console.error('Failed to cancel document request:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to cancel document request');
+    } finally {
+      setCancellingId(null);
+    }
   };
 
+  const selectedCollegeId = collegesFromDB.find((c) => c.name === formData.college)?.id;
   const selectOptions = selectField === 'college'
-    ? COLLEGE_NAMES.map((name) => ({ value: name, label: name }))
-    : DOCUMENT_TYPES.map((type) => ({ value: type, label: type }));
+    ? collegesFromDB.map((c) => ({ value: c.name, label: `${c.name} (${c.abbrev})` }))
+    : (selectedCollegeId != null ? servicesByDepartmentId[selectedCollegeId] ?? [] : []).map((type) => ({ value: type, label: type }));
   const selectTitle = selectField === 'college' ? 'Select College' : 'Select Document Type';
   const selectCurrentValue = selectField === 'college' ? formData.college : formData.type;
 
   const chooseOption = (value: string) => {
-    if (selectField === 'college') setFormData((f) => ({ ...f, college: value }));
+    if (selectField === 'college') setFormData((f) => ({ ...f, college: value, type: '' }));
     else if (selectField === 'type') setFormData((f) => ({ ...f, type: value }));
     setSelectField(null);
+  };
+
+  const goToDocumentStatus = (doc: DocumentRequest) => {
+    router.push({
+      pathname: '/pages/student/student_document_status',
+      params: { docId: doc.id },
+    });
   };
 
   const renderDocumentCard = (doc: DocumentRequest, completed: boolean) => {
     const meta = STATUS_META[doc.status];
     return (
-      <View key={doc.id} style={[styles.docCard, completed && styles.docCardCompleted]}>
+      <Pressable key={doc.id} onPress={() => goToDocumentStatus(doc)} style={[styles.docCard, completed && styles.docCardCompleted]}>
         <View style={styles.docCardHeader}>
           <View style={[styles.docIconWrap, completed && styles.docIconWrapCompleted]}>
             <Ionicons name="document-text-outline" size={22} color={completed ? theme.tertiary : theme.orange} />
@@ -295,22 +327,26 @@ export default function StudentDocumentsScreen() {
               </View>
             )}
 
-            {doc.status === 'ready' && (
-              <Pressable style={styles.claimBtn} onPress={comingSoon}>
+            {(doc.status === 'ready' || doc.status === 'released') && (
+              <Pressable style={styles.claimBtn} onPress={(e: any) => { e.stopPropagation?.(); goToDocumentStatus(doc); }}>
                 <Ionicons name="download-outline" size={16} color="#ffffff" />
-                <Text style={styles.claimBtnText}>Claim Document</Text>
+                <Text style={styles.claimBtnText}>View Pickup Details</Text>
               </Pressable>
             )}
 
             {(doc.status === 'pending' || doc.status === 'processing') && (
-              <Pressable style={styles.cancelBtn} onPress={() => setCancelTarget(doc)}>
+              <Pressable
+                style={styles.cancelBtn}
+                onPress={(e: any) => { e.stopPropagation?.(); setCancelTarget(doc); }}
+                disabled={cancellingId === doc.id}
+              >
                 <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
-                <Text style={styles.cancelBtnText}>Cancel Request</Text>
+                <Text style={styles.cancelBtnText}>{cancellingId === doc.id ? 'Cancelling…' : 'Cancel Request'}</Text>
               </Pressable>
             )}
           </>
         )}
-      </View>
+      </Pressable>
     );
   };
 
@@ -373,8 +409,25 @@ export default function StudentDocumentsScreen() {
             </Pressable>
           </View>
 
+          {docsError && (
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Something went wrong</Text>
+              <Text style={styles.emptyDescription}>{docsError}</Text>
+              <Pressable style={styles.requestBtn} onPress={fetchDocuments}>
+                <Text style={styles.requestBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {docsLoading && !docsError && (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyDescription}>Loading documents…</Text>
+            </View>
+          )}
+
           {/* Active Tab */}
-          {activeTab === 'active' && (
+          {!docsLoading && !docsError && activeTab === 'active' && (
             <View style={styles.tabPanel}>
               {activeDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
@@ -391,7 +444,7 @@ export default function StudentDocumentsScreen() {
           )}
 
           {/* Completed Tab */}
-          {activeTab === 'completed' && (
+          {!docsLoading && !docsError && activeTab === 'completed' && (
             <View style={styles.tabPanel}>
               {completedDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
@@ -441,12 +494,12 @@ export default function StudentDocumentsScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -533,11 +586,11 @@ export default function StudentDocumentsScreen() {
               </View>
             </ScrollView>
             <View style={styles.dialogActions}>
-              <Pressable style={styles.btnSecondary} onPress={() => setDialogOpen(false)}>
+              <Pressable style={styles.btnSecondary} onPress={() => setDialogOpen(false)} disabled={submitting}>
                 <Text style={styles.btnSecondaryText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.btnPrimary} onPress={handleSubmitRequest}>
-                <Text style={styles.btnPrimaryText}>Submit Request</Text>
+              <Pressable style={styles.btnPrimary} onPress={handleSubmitRequest} disabled={submitting}>
+                <Text style={styles.btnPrimaryText}>{submitting ? 'Submitting…' : 'Submit Request'}</Text>
               </Pressable>
             </View>
           </View>
@@ -589,9 +642,11 @@ export default function StudentDocumentsScreen() {
               <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelTarget(null)}>
                 <Text style={styles.logoutCancelBtnText}>Keep Request</Text>
               </Pressable>
-              <Pressable style={styles.logoutConfirmBtn} onPress={doCancelRequest}>
+              <Pressable style={styles.logoutConfirmBtn} onPress={doCancelRequest} disabled={cancellingId === cancelTarget?.id}>
                 <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
-                <Text style={styles.logoutConfirmBtnText}>Cancel Request</Text>
+                <Text style={styles.logoutConfirmBtnText}>
+                  {cancellingId === cancelTarget?.id ? 'Cancelling…' : 'Cancel Request'}
+                </Text>
               </Pressable>
             </View>
           </View>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Image,
@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -63,15 +65,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors stud-transactions.jsx) ───
-const demoStudent = {
-  name: 'Demo Student',
-  role: 'Student',
-  studentNumber: '2300001',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 type TxType = 'queue' | 'appointment' | 'document';
 type TxStatus = 'completed' | 'ongoing' | 'cancelled';
 
@@ -85,17 +78,6 @@ interface Transaction {
   status: TxStatus;
   details: string;
 }
-
-const TRANSACTIONS: Transaction[] = [
-  { id: '1', type: 'queue', title: 'Queue at Registrar Office', college: 'College of Computing Studies', date: '2026-03-27', time: '10:30 AM', status: 'ongoing', details: 'Document request for Certificate of Enrollment' },
-  { id: '2', type: 'appointment', title: 'Meeting with Prof. Santos', college: 'College of Computing Studies', date: '2026-03-26', time: '2:00 PM', status: 'completed', details: 'Academic consultation regarding thesis proposal' },
-  { id: '3', type: 'document', title: 'Good Moral Certificate Request', college: 'College of Computing Studies', date: '2026-03-25', time: '9:15 AM', status: 'ongoing', details: 'Request submitted for job application' },
-  { id: '4', type: 'queue', title: 'Queue at Cashier', college: 'College of Computing Studies', date: '2026-03-24', time: '11:00 AM', status: 'completed', details: 'Payment for tuition fees' },
-  { id: '5', type: 'appointment', title: 'Guidance Counseling Session', college: 'College of Computing Studies', date: '2026-03-23', time: '3:00 PM', status: 'completed', details: 'Career guidance and academic planning' },
-  { id: '6', type: 'document', title: 'Transcript of Records Request', college: 'College of Computing Studies', date: '2026-03-20', time: '10:00 AM', status: 'completed', details: 'TOR for graduate school application' },
-  { id: '7', type: 'queue', title: 'Queue at Library', college: 'College of Computing Studies', date: '2026-03-19', time: '2:30 PM', status: 'cancelled', details: 'Book borrowing request' },
-  { id: '8', type: 'appointment', title: 'Department Chair Meeting', college: 'College of Computing Studies', date: '2026-03-18', time: '1:00 PM', status: 'completed', details: 'Discussion about curriculum requirements' },
-];
 
 const TYPE_META: Record<TxType, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
   queue: { label: 'queue', icon: 'time-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
@@ -155,10 +137,32 @@ export default function StudentTransactionsScreen() {
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
   const [selectField, setSelectField] = useState<SelectField>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState<string | null>(null);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchTransactions = useCallback(async () => {
+    setTxLoading(true);
+    try {
+      const { data } = await api.get('/student/transactions');
+      setTransactions(data.transactions ?? []);
+      setTxError(null);
+    } catch (err) {
+      console.error('Failed to fetch transactions:', err);
+      setTxError('Could not load your transaction history.');
+    } finally {
+      setTxLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/student/student_dashboard');
@@ -174,9 +178,9 @@ export default function StudentTransactionsScreen() {
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
-  const confirmLogout = () => { setLogoutModalVisible(false); router.replace('/login'); };
+  const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
-  const filteredTransactions = TRANSACTIONS.filter((t) => {
+  const filteredTransactions = transactions.filter((t) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch = !q || t.title.toLowerCase().includes(q) || t.details.toLowerCase().includes(q);
     const matchesType = filterType === 'all' || t.type === filterType;
@@ -184,12 +188,12 @@ export default function StudentTransactionsScreen() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const currentMonth = TRANSACTIONS[0]?.date.slice(0, 7);
+  const currentMonth = new Date().toISOString().slice(0, 7);
   const stats: { key: string; label: string; value: number; icon: IoniconName; color: string; bg: string; border: string }[] = [
-    { key: 'total', label: 'Total', value: TRANSACTIONS.length, icon: 'list-outline', color: theme.blue, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)' },
-    { key: 'completed', label: 'Completed', value: TRANSACTIONS.filter((t) => t.status === 'completed').length, icon: 'checkmark-circle-outline', color: theme.success, bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)' },
-    { key: 'ongoing', label: 'Ongoing', value: TRANSACTIONS.filter((t) => t.status === 'ongoing').length, icon: 'time-outline', color: theme.orange, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' },
-    { key: 'month', label: 'This Month', value: TRANSACTIONS.filter((t) => t.date.slice(0, 7) === currentMonth).length, icon: 'calendar-outline', color: theme.purple, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)' },
+    { key: 'total', label: 'Total', value: transactions.length, icon: 'list-outline', color: theme.blue, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)' },
+    { key: 'completed', label: 'Completed', value: transactions.filter((t) => t.status === 'completed').length, icon: 'checkmark-circle-outline', color: theme.success, bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)' },
+    { key: 'ongoing', label: 'Ongoing', value: transactions.filter((t) => t.status === 'ongoing').length, icon: 'time-outline', color: theme.orange, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' },
+    { key: 'month', label: 'This Month', value: transactions.filter((t) => t.date.slice(0, 7) === currentMonth).length, icon: 'calendar-outline', color: theme.purple, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)' },
   ];
 
   const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
@@ -293,7 +297,20 @@ export default function StudentTransactionsScreen() {
           </View>
 
           {/* Transaction List */}
-          {filteredTransactions.length > 0 ? (
+          {txLoading ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyDescription}>Loading transactions…</Text>
+            </View>
+          ) : txError ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Could not load transactions</Text>
+              <Text style={styles.emptyDescription}>{txError}</Text>
+              <Pressable style={styles.filterSelect} onPress={fetchTransactions}>
+                <Text style={styles.filterSelectText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : filteredTransactions.length > 0 ? (
             <View style={styles.txList}>
               {filteredTransactions.map((t) => {
                 const typeMeta = TYPE_META[t.type];
@@ -353,12 +370,12 @@ export default function StudentTransactionsScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoStudent.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoStudent.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoStudent.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>

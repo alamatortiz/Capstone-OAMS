@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,8 +16,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { initialDocuments } from './admin_document_processing';
-import { initialQueueDetails, ACTIVE_STATUSES } from './admin_queue';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -83,15 +84,6 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors AdminDashboard/admin-dashboard.jsx) ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  employeeId: 'ADM-2021-999',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
 const STAT_TINTS = {
   blue: { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.25)', color: '#3b82f6' },
   orange: { bg: 'rgba(245, 158, 11, 0.16)', border: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b' },
@@ -107,20 +99,6 @@ interface StatItem {
   icon: IoniconName;
   tint: keyof typeof STAT_TINTS;
 }
-
-// Mirrors the same demo dataset admin_document_processing.tsx renders, so this count doesn't drift from what the Documents screen actually shows.
-const pendingDocumentsCount = initialDocuments.filter((d) => d.status === 'pending').length;
-
-// Mirrors the same demo dataset admin_queue.tsx renders (GET /admin/queue-hosting is scoped
-// to the admin's own department server-side, so this is never a cross-college count).
-const activeQueuesCount = initialQueueDetails.filter((q) => ACTIVE_STATUSES.includes(q.status)).length;
-
-const stats: StatItem[] = [
-  { key: 'queues', title: 'Active Queues', value: String(activeQueuesCount), description: `In ${demoAdmin.departmentName}`, icon: 'time-outline', tint: 'blue' },
-  { key: 'documents', title: 'Pending Documents', value: String(pendingDocumentsCount), description: 'Awaiting processing', icon: 'document-text-outline', tint: 'orange' },
-  { key: 'faculty', title: 'Faculty Available', value: '45', description: 'Today', icon: 'people-outline', tint: 'emerald' },
-  { key: 'announcements', title: 'Announcements', value: '2', description: 'Published', icon: 'notifications-outline', tint: 'purple' },
-];
 
 interface ToolItem {
   key: string;
@@ -144,42 +122,26 @@ const quickActions: ToolItem[] = [
   { key: 'host-queue', title: 'Host Queue', description: 'Manage and host student queues', icon: 'people-circle-outline', gradient: ['#3b82f6', '#2563eb'] },
 ];
 
-const ANNOUNCEMENT_TAG_TINTS = {
+const ANNOUNCEMENT_TAG_TINTS: Record<string, { bg: string; border: string; color: string }> = {
   important: { bg: 'rgba(239, 68, 68, 0.2)', border: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' },
   reminder: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
-} as const;
+  event: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
+  general: { bg: 'rgba(139, 92, 246, 0.2)', border: 'rgba(139, 92, 246, 0.4)', color: '#8b5cf6' },
+};
 
 interface AnnouncementItem {
   id: string;
   title: string;
   description: string;
-  tag: keyof typeof ANNOUNCEMENT_TAG_TINTS;
+  tag: string;
   date: string;
   isPinned?: boolean;
 }
 
-const announcements: AnnouncementItem[] = [
-  {
-    id: '1',
-    title: 'System Maintenance Notice',
-    description: 'The OAMS system will undergo scheduled maintenance this weekend.',
-    tag: 'important',
-    date: '3/26/2026',
-    isPinned: true,
-  },
-  {
-    id: '2',
-    title: 'Enrollment Period Reminder',
-    description: 'Second Semester enrollment period: April 1 - April 15.',
-    tag: 'reminder',
-    date: '3/25/2026',
-  },
-];
-
-const DOCUMENT_STATUS_TINTS = {
+const DOCUMENT_STATUS_TINTS: Record<string, { bg: string; border: string; color: string }> = {
   pending: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
   processing: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
-} as const;
+};
 
 const COLLEGE_TEXT_COLORS: Record<string, string> = {
   CCS: '#f97316',
@@ -196,28 +158,15 @@ interface PendingDocument {
   document: string;
   college: string;
   date: string;
-  status: keyof typeof DOCUMENT_STATUS_TINTS;
+  status: string;
 }
-
-const pendingDocuments: PendingDocument[] = [
-  { id: '1', name: 'Juan Dela Cruz', document: 'Certificate of Grades', college: 'CCS', date: '3/25/2026', status: 'pending' },
-  { id: '2', name: 'Maria Santos', document: 'Good Moral Certificate', college: 'CBAA', date: '3/25/2026', status: 'processing' },
-  { id: '3', name: 'Pedro Garcia', document: 'Certificate of Enrollment', college: 'COE', date: '3/24/2026', status: 'pending' },
-];
 
 interface HostedQueue {
   id: string;
   name: string;
-  code: string;
   status: string;
   count: string;
 }
-
-const hostedQueues: HostedQueue[] = [
-  { id: '1', name: 'Subject Enrollment', code: 'CCS-REG-044', status: 'Active', count: '15 waiting' },
-  { id: '2', name: 'Payment Processing', code: 'CBAA-CSH-025', status: 'Active', count: '8 waiting' },
-  { id: '3', name: 'Document Request', code: 'COE-DOC-017', status: 'Active', count: '5 waiting' },
-];
 
 interface FacultyMember {
   id: string;
@@ -226,13 +175,6 @@ interface FacultyMember {
   status: 'available' | 'busy';
   time: string;
 }
-
-const facultyAvailability: FacultyMember[] = [
-  { id: '1', name: 'Prof. Maria Santos', college: 'CCS', status: 'available', time: 'Next: 10:00 AM - 11:00 AM' },
-  { id: '2', name: 'Dr. Roberto Cruz', college: 'CBAA', status: 'busy', time: 'Next: 2:00 PM - 3:00 PM' },
-  { id: '3', name: 'Dr. Carmen Ramos', college: 'COED', status: 'busy', time: 'Next: 3:00 PM - 4:00 PM' },
-  { id: '4', name: 'Engr. Pedro Villanueva', college: 'COE', status: 'available', time: 'Next: 1:00 PM - 2:00 PM' },
-];
 
 interface NavItem {
   key: string;
@@ -253,6 +195,63 @@ export default function AdminDashboardScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
+  const { user, token, logout } = useAuth();
+
+  const [dashStats, setDashStats] = useState<any>(null);
+  const [dashLoading, setDashLoading] = useState(true);
+  const [dashError, setDashError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setDashLoading(true);
+      const res = await api.get('/admin/dashboard-stats');
+      setDashStats(res.data);
+      setDashError(null);
+    } catch (err) {
+      console.error('Failed to fetch admin dashboard stats:', err);
+      setDashError('Could not load dashboard data.');
+    } finally {
+      setDashLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchStats();
+  }, [user, fetchStats]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    const events = [
+      'queue:slot-opened',
+      'queue:slot-status',
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+      'queue:student-joined',
+      'queue:student-left',
+    ];
+    events.forEach((event) => socket.on(event, fetchStats));
+    return () => {
+      events.forEach((event) => socket.off(event, fetchStats));
+    };
+  }, [user, token, fetchStats]);
+
+  const s = dashStats?.stats;
+  const loading = dashLoading;
+
+  const stats: StatItem[] = [
+    { key: 'queues', title: 'Active Queues', value: loading ? '—' : String(s?.activeQueues ?? 0), description: `In ${user?.departmentName ?? ''}`, icon: 'time-outline', tint: 'blue' },
+    { key: 'documents', title: 'Pending Documents', value: loading ? '—' : String(s?.pendingDocuments ?? 0), description: 'Awaiting processing', icon: 'document-text-outline', tint: 'orange' },
+    { key: 'faculty', title: 'Faculty Available', value: loading ? '—' : String(s?.facultyAvailable ?? 0), description: 'Today', icon: 'people-outline', tint: 'emerald' },
+    { key: 'announcements', title: 'Announcements', value: loading ? '—' : String(s?.announcements ?? 0), description: 'Published', icon: 'notifications-outline', tint: 'purple' },
+  ];
+
+  const announcements: AnnouncementItem[] = dashStats?.announcements ?? [];
+  const pendingDocuments: PendingDocument[] = dashStats?.pendingDocuments ?? [];
+  const hostedQueues: HostedQueue[] = dashStats?.hostedQueues ?? [];
+  const facultyAvailability: FacultyMember[] = dashStats?.facultyAvailability ?? [];
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -343,10 +342,11 @@ export default function AdminDashboardScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const collegeLogo = collegeLogos[demoAdmin.departmentAbbrev] ?? ccsLogo;
+  const collegeLogo = collegeLogos[user?.departmentAbbrev ?? ''] ?? ccsLogo;
 
   return (
     <View style={styles.root}>
@@ -374,6 +374,12 @@ export default function AdminDashboardScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {dashError && (
+            <View style={[styles.card, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+              <Text style={{ color: '#ef4444', fontSize: 13 }}>{dashError}</Text>
+            </View>
+          )}
+
           {/* Welcome Banner */}
           <LinearGradient
             colors={[theme.primary, theme.success]}
@@ -384,7 +390,7 @@ export default function AdminDashboardScreen() {
             <View style={styles.bannerBackdrop1} />
             <View style={styles.bannerBackdrop2} />
             <Text style={styles.bannerTitle}>Admin Dashboard</Text>
-            <Text style={styles.bannerSubtitle}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.bannerSubtitle}>{user?.departmentName ?? ''}</Text>
             <View style={styles.bannerBadges}>
               <View style={styles.welcomeAdminBadge}>
                 <Image source={collegeLogo} style={styles.bannerLogo} resizeMode="contain" />
@@ -481,7 +487,7 @@ export default function AdminDashboardScreen() {
             </View>
             <View style={styles.announcementsList}>
               {announcements.map((ann) => {
-                const tint = ANNOUNCEMENT_TAG_TINTS[ann.tag];
+                const tint = ANNOUNCEMENT_TAG_TINTS[ann.tag] ?? ANNOUNCEMENT_TAG_TINTS.general;
                 return (
                   <View key={ann.id} style={styles.announcementItem}>
                     <View style={styles.announcementBody}>
@@ -529,7 +535,7 @@ export default function AdminDashboardScreen() {
             </View>
             <View style={styles.listGap}>
               {pendingDocuments.map((doc) => {
-                const tint = DOCUMENT_STATUS_TINTS[doc.status];
+                const tint = DOCUMENT_STATUS_TINTS[doc.status] ?? DOCUMENT_STATUS_TINTS.pending;
                 return (
                   <View key={doc.id} style={styles.documentItem}>
                     <View style={styles.documentInfo}>
@@ -564,7 +570,6 @@ export default function AdminDashboardScreen() {
                 <View key={queue.id} style={styles.queueItem}>
                   <View style={styles.queueInfo}>
                     <Text style={styles.queueName}>{queue.name}</Text>
-                    <Text style={styles.queueCode}>{queue.code}</Text>
                   </View>
                   <View style={styles.queueStatusInfo}>
                     <View style={styles.queueActiveBadge}>
@@ -618,12 +623,12 @@ export default function AdminDashboardScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Admin'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+                <Text style={styles.drawerRoleBadgeText}>Admin</Text>
               </View>
-              <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>

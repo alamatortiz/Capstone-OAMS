@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Image,
@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -62,21 +64,10 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet). The real server route,
-// GET /api/admin/queue-analytics (adminRoutes.js), is scoped strictly to the
+// GET /api/admin/queue-analytics (adminRoutes.js) is scoped strictly to the
 // signed-in admin's own department — it aggregates completed queues for that
 // one department only, filtered by period/service, with no cross-college
-// breakdown. So unlike the design-mockup QueueAnalyticsPage.tsx (a
-// multi-college "College" dropdown spanning all six colleges), this mirrors
-// the actual wired admin-queue-analytics.jsx: one department's service
-// performance only, with a read-only department field instead of a picker. ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
+// breakdown, and returns performance/insights/serviceTypes pre-computed.
 type PerfStatus = 'excellent' | 'good' | 'needs improvement';
 
 interface ServicePerformance {
@@ -84,47 +75,18 @@ interface ServicePerformance {
   college: string;
   status: PerfStatus;
   studentsServed: number;
-  avgWaitMinutes: number;
+  avgWait: string;
   peakHours: string;
   satisfaction: number;
 }
 
-// Mirrors the shape the real endpoint returns for a department (service,
-// college, status, studentsServed, avgWait, peakHours, satisfaction).
-const PERFORMANCE: ServicePerformance[] = [
-  {
-    service: 'Subject Enrollment',
-    college: demoAdmin.departmentAbbrev,
-    status: 'excellent',
-    studentsServed: 156,
-    avgWaitMinutes: 18,
-    peakHours: '9:00 AM - 11:00 AM',
-    satisfaction: 92,
-  },
-  {
-    service: 'Document Request',
-    college: demoAdmin.departmentAbbrev,
-    status: 'good',
-    studentsServed: 89,
-    avgWaitMinutes: 12,
-    peakHours: '10:00 AM - 12:00 PM',
-    satisfaction: 88,
-  },
-  {
-    service: 'Consultation',
-    college: demoAdmin.departmentAbbrev,
-    status: 'needs improvement',
-    studentsServed: 34,
-    avgWaitMinutes: 22,
-    peakHours: '1:00 PM - 3:00 PM',
-    satisfaction: 76,
-  },
-];
+interface Insight {
+  title: string;
+  desc: string;
+}
 
 const TIME_PERIODS = ['Today', 'This Week', 'This Month', 'This Semester'] as const;
 type TimePeriod = (typeof TIME_PERIODS)[number];
-
-const SERVICE_TYPES = ['All Services', ...PERFORMANCE.map((p) => p.service)];
 
 type SelectField = 'period' | 'service' | null;
 
@@ -183,10 +145,34 @@ export default function AdminQueueAnalyticsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('Today');
-  const [serviceType, setServiceType] = useState(SERVICE_TYPES[0]);
+  const [serviceType, setServiceType] = useState('All Services');
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('performance');
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const [performance, setPerformance] = useState<ServicePerformance[]>([]);
+  const [positiveInsights, setPositiveInsights] = useState<Insight[]>([]);
+  const [improvementAreas, setImprovementAreas] = useState<Insight[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<string[]>(['All Services']);
+
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/queue-analytics', {
+        params: { period: timePeriod, service: serviceType },
+      });
+      setPerformance(res.data.performance ?? []);
+      setPositiveInsights(res.data.positiveInsights ?? []);
+      setImprovementAreas(res.data.improvementAreas ?? []);
+      setServiceTypes(res.data.serviceTypes ?? ['All Services']);
+    } catch (error) {
+      console.error('Failed to fetch queue analytics:', error);
+    }
+  }, [timePeriod, serviceType]);
+
+  useEffect(() => {
+    if (user) fetchAnalytics();
+  }, [user, fetchAnalytics]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -225,39 +211,24 @@ export default function AdminQueueAnalyticsScreen() {
 
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
-  const filteredPerformance =
-    serviceType === 'All Services' ? PERFORMANCE : PERFORMANCE.filter((p) => p.service === serviceType);
+  const filteredPerformance = performance;
 
   const totalServed = filteredPerformance.reduce((sum, p) => sum + p.studentsServed, 0);
+  const parseAvgWait = (avgWait: string) => parseFloat(avgWait) || 0;
   const avgWaitAll =
     filteredPerformance.length > 0
-      ? Math.round(filteredPerformance.reduce((sum, p) => sum + p.avgWaitMinutes, 0) / filteredPerformance.length)
+      ? Math.round(filteredPerformance.reduce((sum, p) => sum + parseAvgWait(p.avgWait), 0) / filteredPerformance.length)
       : 0;
   const avgSatisfaction =
     filteredPerformance.length > 0
       ? Math.round(filteredPerformance.reduce((sum, p) => sum + p.satisfaction, 0) / filteredPerformance.length)
       : 0;
 
-  const sortedBySatisfaction = [...filteredPerformance].sort((a, b) => b.satisfaction - a.satisfaction);
-  const positiveInsights = sortedBySatisfaction
-    .filter((p) => p.satisfaction >= 80)
-    .slice(0, 3)
-    .map((p) => ({
-      title: `${p.status === 'excellent' ? 'Excellent' : 'Good'} Performance: ${p.service}`,
-      desc: `${p.college} ${p.service} has a ${p.satisfaction}% satisfaction rate with an average wait of ${p.avgWaitMinutes} min.`,
-    }));
-  const improvementAreas = sortedBySatisfaction
-    .filter((p) => p.status === 'needs improvement' || p.avgWaitMinutes > 18)
-    .slice(0, 3)
-    .map((p) => ({
-      title: `Long Wait Times: ${p.service}`,
-      desc: `${p.college} ${p.service} averages ${p.avgWaitMinutes} min wait time. Consider adding more service windows during peak hours (${p.peakHours}).`,
-    }));
-
-  const selectOptions: string[] = selectField === 'period' ? [...TIME_PERIODS] : SERVICE_TYPES;
+  const selectOptions: string[] = selectField === 'period' ? [...TIME_PERIODS] : serviceTypes;
   const selectTitle = selectField === 'period' ? 'Select Time Period' : 'Select Service Type';
   const selectCurrentValue = selectField === 'period' ? timePeriod : serviceType;
 
@@ -320,7 +291,7 @@ export default function AdminQueueAnalyticsScreen() {
                 <Ionicons name="download-outline" size={14} color={theme.text} />
                 <Text style={styles.outlineBtnText}>Export Report</Text>
               </Pressable>
-              <Pressable style={styles.outlineBtn}>
+              <Pressable style={styles.outlineBtn} onPress={fetchAnalytics}>
                 <Ionicons name="refresh-outline" size={14} color={theme.text} />
                 <Text style={styles.outlineBtnText}>Refresh</Text>
               </Pressable>
@@ -329,7 +300,7 @@ export default function AdminQueueAnalyticsScreen() {
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>Department</Text>
               <View style={styles.filterDisplay}>
-                <Text style={styles.filterDisplayText}>{demoAdmin.departmentName}</Text>
+                <Text style={styles.filterDisplayText}>{user?.departmentName ?? ''}</Text>
               </View>
             </View>
 
@@ -386,7 +357,7 @@ export default function AdminQueueAnalyticsScreen() {
                 <Text style={styles.statCardLabel}>Services Tracked</Text>
               </View>
               <Text style={[styles.statCardValue, { color: STAT_TINTS.services.color }]}>{filteredPerformance.length}</Text>
-              <Text style={styles.statCardSub}>{demoAdmin.departmentAbbrev} department</Text>
+              <Text style={styles.statCardSub}>{user?.departmentAbbrev ?? ''} department</Text>
             </View>
           </View>
 
@@ -441,7 +412,7 @@ export default function AdminQueueAnalyticsScreen() {
                           </View>
                           <View style={styles.perfMetric}>
                             <Text style={styles.perfMetricLabel}>Avg Wait Time</Text>
-                            <Text style={[styles.perfMetricValue, { color: '#3b82f6' }]}>{item.avgWaitMinutes} min</Text>
+                            <Text style={[styles.perfMetricValue, { color: '#3b82f6' }]}>{item.avgWait}</Text>
                           </View>
                           <View style={styles.perfMetric}>
                             <Text style={styles.perfMetricLabel}>Peak Hours</Text>
@@ -558,6 +529,8 @@ export default function AdminQueueAnalyticsScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={user?.name ?? 'Admin'}
+        adminDepartmentName={user?.departmentName ?? ''}
       />
 
       {/* Filter Options Modal (Time Period / Service Type) */}
@@ -608,6 +581,8 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -615,6 +590,8 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -625,12 +602,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>Admin</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

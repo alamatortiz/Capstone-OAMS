@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -65,22 +67,16 @@ function OamsLogo({
   );
 }
 
-// ─── Demo data (mobile has no auth/API wiring yet — mirrors ScanDocumentPage.tsx's
+// ─── Field shapes documented here mirror what ScanDocumentPage.tsx's
 // mock document set, merged with the real admin-scan-document.jsx's generated/
 // released/claimed document-status + claim workflow, whose real endpoints are
 // GET /admin/scan-document/verify/:code, GET /admin/scan-document/recent and
 // PATCH /admin/document-processing/:id/status) ───
-const demoAdmin = {
-  name: 'Demo Admin',
-  role: 'Admin',
-  departmentAbbrev: 'CCS',
-  departmentName: 'College of Computing Studies (CCS)',
-};
-
-type DocStatus = 'valid' | 'expired';
-type DocumentStatus = 'generated' | 'released' | 'claimed';
+type DocStatus = 'VALID' | 'EXPIRED';
+type DocumentStatus = 'generated' | 'released' | 'claimed' | string;
 
 interface ScannedDocument {
+  requestId?: number;
   trackingNumber: string;
   documentType: string;
   studentName: string;
@@ -90,100 +86,15 @@ interface ScannedDocument {
   validUntil: string;
   status: DocStatus;
   documentStatus: DocumentStatus;
-  content: string;
-  issuedBy: string;
-  authorizedSignatory: string;
+  content: string | null;
+  issuedBy: string | null;
+  authorizedSignatory: string | null;
 }
 
-const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
+const DOCUMENT_STATUS_LABELS: Record<string, string> = {
   generated: 'Ready for Pickup',
   released: 'Released — awaiting claim',
   claimed: 'Claimed',
-};
-
-const INITIAL_DOCUMENTS: Record<string, ScannedDocument> = {
-  'DOC-2026-0327-001-QR': {
-    trackingNumber: 'DOC-2026-0327-001',
-    documentType: 'Certificate of Grades',
-    studentName: 'Juan Dela Cruz',
-    studentId: '2100001',
-    college: 'College of Computing Studies (CCS)',
-    issueDate: '2026-03-27',
-    validUntil: '2026-12-31',
-    status: 'valid',
-    documentStatus: 'released',
-    content: `UNIVERSITY OF CABUYAO
-College of Computing Studies
-
-CERTIFICATE OF GRADES
-
-This is to certify that JUAN DELA CRUZ, with Student ID: 2100001,
-has completed the following courses:
-
-First Semester, AY 2025-2026:
-- CS 101 Introduction to Programming - 1.50
-- CS 102 Data Structures - 1.75
-- MATH 101 Calculus I - 2.00
-- ENG 101 Technical Writing - 1.75
-
-General Weighted Average: 1.81
-
-This certificate is valid until December 31, 2026.`,
-    issuedBy: 'Office of the University Registrar',
-    authorizedSignatory: 'Maria T. Santos, University Registrar',
-  },
-  'DOC-2026-0326-012-QR': {
-    trackingNumber: 'DOC-2026-0326-012',
-    documentType: 'Good Moral Certificate',
-    studentName: 'Ana Lopez',
-    studentId: '2100045',
-    college: 'College of Education (COED)',
-    issueDate: '2026-03-26',
-    validUntil: '2026-09-26',
-    status: 'valid',
-    documentStatus: 'claimed',
-    content: `UNIVERSITY OF CABUYAO
-Office of Student Affairs
-
-CERTIFICATE OF GOOD MORAL CHARACTER
-
-TO WHOM IT MAY CONCERN:
-
-This is to certify that ANA LOPEZ, with Student ID: 2100045,
-currently enrolled in the College of Education (COED), has demonstrated
-good moral character during their stay in the university.
-
-Valid for six (6) months from the date of issue.`,
-    issuedBy: 'Office of Student Affairs',
-    authorizedSignatory: 'Roberto D. Cruz, Director of Student Affairs',
-  },
-  'DOC-2026-0320-008-QR': {
-    trackingNumber: 'DOC-2026-0320-008',
-    documentType: 'Certificate of Enrollment',
-    studentName: 'Sofia Martinez',
-    studentId: '2100078',
-    college: 'College of Health and Allied Sciences (CHAS)',
-    issueDate: '2026-03-20',
-    validUntil: '2026-03-19',
-    status: 'expired',
-    documentStatus: 'generated',
-    content: `UNIVERSITY OF CABUYAO
-Office of the University Registrar
-
-CERTIFICATE OF ENROLLMENT
-
-This is to certify that SOFIA MARTINEZ, with Student ID: 2100078,
-is currently enrolled in the College of Health and Allied Sciences (CHAS)
-for the Second Semester, Academic Year 2025-2026.
-
-Course: Bachelor of Science in Nursing
-Year Level: 4th Year
-Status: Regular Student
-
-Valid until March 19, 2026 (Expired)`,
-    issuedBy: 'Office of the University Registrar',
-    authorizedSignatory: 'Maria T. Santos, University Registrar',
-  },
 };
 
 interface RecentScan {
@@ -191,18 +102,14 @@ interface RecentScan {
   documentType: string;
   studentName: string;
   scannedAt: string;
-  status: DocStatus;
+  status: 'valid' | 'expired';
 }
 
-const INITIAL_RECENT_SCANS: RecentScan[] = [
-  { trackingNumber: 'DOC-2026-0327-001', documentType: 'Certificate of Grades', studentName: 'Juan Dela Cruz', scannedAt: '2 minutes ago', status: 'valid' },
-  { trackingNumber: 'DOC-2026-0326-012', documentType: 'Good Moral Certificate', studentName: 'Ana Lopez', scannedAt: '15 minutes ago', status: 'valid' },
-  { trackingNumber: 'DOC-2026-0320-008', documentType: 'Certificate of Enrollment', studentName: 'Sofia Martinez', scannedAt: '1 hour ago', status: 'expired' },
-];
+const QUICK_TEST_CODES = ['REQ-00002-QR', 'REQ-00005-QR'];
 
 const STATUS_TINTS: Record<DocStatus, { bg: string; border: string; color: string }> = {
-  valid: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
-  expired: { bg: 'rgba(248, 113, 113, 0.15)', border: 'rgba(248, 113, 113, 0.35)', color: '#f87171' },
+  VALID: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
+  EXPIRED: { bg: 'rgba(248, 113, 113, 0.15)', border: 'rgba(248, 113, 113, 0.35)', color: '#f87171' },
 };
 
 interface NavItem {
@@ -231,16 +138,41 @@ export default function AdminScanDocumentScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
 
-  const [documents, setDocuments] = useState<Record<string, ScannedDocument>>(INITIAL_DOCUMENTS);
+  const { user, logout } = useAuth();
+  const adminName = user?.name ?? 'Admin';
+  const adminRole = 'Admin';
+  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+
   const [manualCode, setManualCode] = useState('');
   const [scanning, setScanning] = useState(false);
-  const [scannedCode, setScannedCode] = useState<string | null>(null);
+  const [scannedDoc, setScannedDoc] = useState<ScannedDocument | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [recentScans, setRecentScans] = useState<RecentScan[]>(INITIAL_RECENT_SCANS);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [scanToast, setScanToast] = useState(false);
+  const [claiming, setClaiming] = useState(false);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
+
+  const fetchRecentScans = useCallback(async () => {
+    try {
+      const { data } = await api.get('/admin/scan-document/recent');
+      const scans: RecentScan[] = (data.scans ?? []).map((s: any) => ({
+        trackingNumber: s.tracking,
+        documentType: s.docType,
+        studentName: s.name,
+        scannedAt: s.time,
+        status: s.status,
+      }));
+      setRecentScans(scans);
+    } catch (err) {
+      console.error('Recent scans fetch error:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRecentScans();
+  }, [fetchRecentScans]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
@@ -279,6 +211,7 @@ export default function AdminScanDocumentScreen() {
   };
   const confirmLogout = () => {
     setLogoutModalVisible(false);
+    logout();
     router.replace('/login');
   };
 
@@ -287,42 +220,44 @@ export default function AdminScanDocumentScreen() {
     setTimeout(() => setScanToast(false), 3000);
   };
 
-  const applyScan = (code: string, doc: ScannedDocument) => {
-    setScannedCode(code);
+  const processCode = async (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
     setErrorMsg('');
-    flashToast();
-    setRecentScans((prev) =>
-      [
-        {
-          trackingNumber: doc.trackingNumber,
-          documentType: doc.documentType,
-          studentName: doc.studentName,
-          scannedAt: 'Just now',
-          status: doc.status,
-        },
-        ...prev,
-      ].slice(0, 5),
-    );
+    try {
+      const { data } = await api.get(`/admin/scan-document/verify/${encodeURIComponent(trimmed)}`);
+      if (!data.found) {
+        setErrorMsg('No document found for this QR code. Please check and try again.');
+        return;
+      }
+      const doc: ScannedDocument = data.doc;
+      setScannedDoc(doc);
+      flashToast();
+      setRecentScans((prev) =>
+        [
+          {
+            trackingNumber: doc.trackingNumber,
+            documentType: doc.documentType,
+            studentName: doc.studentName,
+            scannedAt: 'Just now',
+            status: (doc.status === 'VALID' ? 'valid' : 'expired') as 'valid' | 'expired',
+          },
+          ...prev,
+        ].slice(0, 5),
+      );
+      setManualCode('');
+    } catch (err) {
+      console.error('Scan verify error:', err);
+      setErrorMsg('Scan failed. Please try again.');
+    }
   };
 
   const handleStartScanning = () => {
     setScanning(true);
     setTimeout(() => {
       setScanning(false);
-      applyScan('DOC-2026-0327-001-QR', documents['DOC-2026-0327-001-QR']);
+      processCode(QUICK_TEST_CODES[0]);
     }, 2000);
-  };
-
-  const processCode = (code: string) => {
-    const trimmed = code.trim();
-    if (!trimmed) return;
-    const doc = documents[trimmed];
-    if (!doc) {
-      setErrorMsg('No document found for this QR code. Please check and try again.');
-      return;
-    }
-    applyScan(trimmed, doc);
-    setManualCode('');
   };
 
   const handleVerify = () => processCode(manualCode);
@@ -332,17 +267,22 @@ export default function AdminScanDocumentScreen() {
     processCode(code);
   };
 
-  const handleCloseModal = () => setScannedCode(null);
+  const handleCloseModal = () => setScannedDoc(null);
 
-  const handleMarkClaimed = () => {
-    if (!scannedCode) return;
-    setDocuments((prev) => ({
-      ...prev,
-      [scannedCode]: { ...prev[scannedCode], documentStatus: 'claimed' },
-    }));
+  const handleMarkClaimed = async () => {
+    if (!scannedDoc?.requestId) return;
+    setClaiming(true);
+    try {
+      await api.patch(`/admin/document-processing/${scannedDoc.requestId}/status`, { status: 'claimed' });
+      setScannedDoc((prev) => prev && { ...prev, documentStatus: 'claimed' });
+    } catch (err) {
+      Alert.alert('Error', 'Failed to mark document as claimed.');
+    } finally {
+      setClaiming(false);
+    }
   };
 
-  const scannedDocument = scannedCode ? documents[scannedCode] : null;
+  const scannedDocument = scannedDoc;
 
   return (
     <View style={styles.root}>
@@ -445,7 +385,7 @@ export default function AdminScanDocumentScreen() {
 
             <Text style={styles.quickLabel}>Quick test codes:</Text>
             <View style={styles.quickCodesRow}>
-              {Object.keys(documents).map((code) => (
+              {QUICK_TEST_CODES.map((code) => (
                 <Pressable key={code} style={styles.quickCodeBtn} onPress={() => handleQuickCode(code)}>
                   <Text style={styles.quickCodeBtnText}>{code}</Text>
                 </Pressable>
@@ -464,7 +404,7 @@ export default function AdminScanDocumentScreen() {
             </View>
             <View style={styles.recentList}>
               {recentScans.map((scan, i) => {
-                const tint = STATUS_TINTS[scan.status];
+                const tint = STATUS_TINTS[scan.status === 'valid' ? 'VALID' : 'EXPIRED'];
                 return (
                   <View key={`${scan.trackingNumber}-${i}`} style={styles.recentItem}>
                     <View style={styles.recentTopRow}>
@@ -523,29 +463,29 @@ export default function AdminScanDocumentScreen() {
                 <View
                   style={[
                     styles.verifiedBanner,
-                    scannedDocument.status === 'valid' ? styles.verifiedBannerValid : styles.verifiedBannerExpired,
+                    scannedDocument.status === 'VALID' ? styles.verifiedBannerValid : styles.verifiedBannerExpired,
                   ]}
                 >
                   <Ionicons
-                    name={scannedDocument.status === 'valid' ? 'checkmark-circle' : 'alert-circle'}
+                    name={scannedDocument.status === 'VALID' ? 'checkmark-circle' : 'alert-circle'}
                     size={26}
-                    color={scannedDocument.status === 'valid' ? '#22c55e' : '#f87171'}
+                    color={scannedDocument.status === 'VALID' ? '#22c55e' : '#f87171'}
                   />
                   <Text
                     style={[
                       styles.verifiedTitle,
-                      { color: scannedDocument.status === 'valid' ? '#22c55e' : '#f87171' },
+                      { color: scannedDocument.status === 'VALID' ? '#22c55e' : '#f87171' },
                     ]}
                   >
-                    {scannedDocument.status === 'valid' ? 'Document Verified ✓' : 'Document Expired'}
+                    {scannedDocument.status === 'VALID' ? 'Document Verified ✓' : 'Document Expired'}
                   </Text>
                   <Text
                     style={[
                       styles.verifiedDesc,
-                      { color: scannedDocument.status === 'valid' ? '#22c55e' : '#f87171' },
+                      { color: scannedDocument.status === 'VALID' ? '#22c55e' : '#f87171' },
                     ]}
                   >
-                    {scannedDocument.status === 'valid'
+                    {scannedDocument.status === 'VALID'
                       ? 'This document has been authenticated against university records'
                       : 'This document has passed its validity date'}
                   </Text>
@@ -580,15 +520,15 @@ export default function AdminScanDocumentScreen() {
                   </View>
                   <View style={styles.metaItem}>
                     <Text style={styles.metaLabel}>Document Status</Text>
-                    <Text style={styles.metaValue}>{DOCUMENT_STATUS_LABELS[scannedDocument.documentStatus]}</Text>
+                    <Text style={styles.metaValue}>{DOCUMENT_STATUS_LABELS[scannedDocument.documentStatus] ?? scannedDocument.documentStatus}</Text>
                   </View>
                   <View style={styles.metaItem}>
                     <Text style={styles.metaLabel}>Issue Date</Text>
-                    <Text style={styles.metaValue}>{formatDisplayDate(scannedDocument.issueDate)}</Text>
+                    <Text style={styles.metaValue}>{scannedDocument.issueDate}</Text>
                   </View>
                   <View style={styles.metaItem}>
                     <Text style={styles.metaLabel}>Valid Until</Text>
-                    <Text style={styles.metaValue}>{formatDisplayDate(scannedDocument.validUntil)}</Text>
+                    <Text style={styles.metaValue}>{scannedDocument.validUntil}</Text>
                   </View>
                 </View>
 
@@ -613,9 +553,9 @@ export default function AdminScanDocumentScreen() {
 
               <View style={styles.docModalActions}>
                 {scannedDocument.documentStatus === 'released' && (
-                  <Pressable style={styles.claimBtn} onPress={handleMarkClaimed}>
+                  <Pressable style={styles.claimBtn} onPress={handleMarkClaimed} disabled={claiming}>
                     <Ionicons name="checkmark-circle-outline" size={15} color="#10b981" />
-                    <Text style={styles.claimBtnText}>Mark as Claimed</Text>
+                    <Text style={styles.claimBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
                   </Pressable>
                 )}
                 <Pressable style={styles.printBtn} onPress={comingSoon}>
@@ -650,6 +590,9 @@ export default function AdminScanDocumentScreen() {
         onLogout={handleLogout}
         theme={theme}
         styles={styles}
+        adminName={adminName}
+        adminRole={adminRole}
+        adminDepartmentName={adminDepartmentName}
       />
 
       <LogoutModal
@@ -671,6 +614,9 @@ function NavDrawer({
   onLogout,
   theme,
   styles,
+  adminName,
+  adminRole,
+  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -678,6 +624,9 @@ function NavDrawer({
   onLogout: () => void;
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
+  adminName: string;
+  adminRole: string;
+  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -688,12 +637,12 @@ function NavDrawer({
               <View style={styles.drawerAvatar}>
                 <Ionicons name="person-outline" size={15} color={theme.primary} />
               </View>
-              <Text style={styles.drawerName}>{demoAdmin.name}</Text>
+              <Text style={styles.drawerName}>{adminName}</Text>
             </View>
             <View style={styles.drawerRoleBadge}>
-              <Text style={styles.drawerRoleBadgeText}>{demoAdmin.role}</Text>
+              <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{demoAdmin.departmentName}</Text>
+            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>
