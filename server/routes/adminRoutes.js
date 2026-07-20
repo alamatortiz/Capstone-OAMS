@@ -524,7 +524,7 @@ router.patch(
       );
       if (serving) {
         await conn.query(
-          `UPDATE queues SET status = 'waiting', called_at = NULL WHERE queue_id = ?`,
+          `UPDATE queues SET status = 'waiting', called_at = NULL, arrived_at = NULL WHERE queue_id = ?`,
           [serving.queue_id],
         );
         await conn.query(
@@ -1316,6 +1316,10 @@ router.get(
       // vocabulary) instead of collapsing pending/processing/generated/
       // released into "approved" — that used to render an untouched
       // "pending" request with a green "Approved" badge.
+      // Deliberately NOT the same shape as student's statusMap in
+      // studentRoutes.js's GET /transactions (which collapses everything
+      // into 3 generic badge states) -- this one needs the granular labels
+      // for admin's filter dropdown, so the two are intentionally different.
       const statusMap = {
         completed: "completed",
         cancelled: "cancelled",

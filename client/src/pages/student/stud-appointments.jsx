@@ -134,6 +134,10 @@ export default function AppointmentsPage() {
     const [year, month] = getManilaDateString().split("-").map(Number);
     return { year, month };
   });
+  // Tracks the Manila calendar date so twoWeekDates below can recompute if a
+  // student leaves this tab open across a midnight/week rollover -- the 15s
+  // poll refreshes slot data but wouldn't otherwise catch a stale date window.
+  const [todayAnchor, setTodayAnchor] = useState(() => getManilaDateString());
 
   // Default the college filter to the student's own college once auth
   // finishes loading -- a useState initializer would race ahead of user
@@ -183,13 +187,40 @@ export default function AppointmentsPage() {
     };
   }, [fetchSlots]);
 
+  // ── Live updates: refetch "My Bookings" when one of this student's own
+  // appointments changes status (approval, rejection, or an auto-cancel from
+  // the professor editing/removing their schedule) ──────────────────────────
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const handleStatusUpdate = (payload) => {
+      if (payload?.reason === "schedule_removed" || payload?.reason === "schedule_changed") {
+        toast.error("An appointment was cancelled because the professor changed their schedule. Please book a new time.");
+      }
+      fetchMyBookings();
+    };
+
+    socket.on("appointment:status-updated", handleStatusUpdate);
+
+    return () => {
+      socket.off("appointment:status-updated", handleStatusUpdate);
+    };
+  }, [fetchMyBookings]);
+
   // Fallback poll: a student browsing a professor from another college is
   // in their own department's socket room, not the professor's, so
   // appointment:slot-updated/removed events for that professor never reach
   // them -- this keeps spotsLeft/removed slots from drifting stale.
   useEffect(() => {
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible") fetchSlots();
+      if (document.visibilityState !== "visible") return;
+      fetchSlots();
+      const nowStr = getManilaDateString();
+      setTodayAnchor((prev) => (prev === nowStr ? prev : nowStr));
     }, 15000);
     return () => clearInterval(interval);
   }, [fetchSlots]);
@@ -202,10 +233,12 @@ export default function AppointmentsPage() {
   }), [slots, selectedDate, selectedCollege, selectedProfessorId]);
 
   // The Available Slots tab only ever shows this week and next week (Monday–Saturday,
-  // matching the days a faculty_availability row can recur on), computed once per mount.
+  // matching the days a faculty_availability row can recur on). Recomputes
+  // when todayAnchor changes (see the poll above), so a tab left open across
+  // a midnight/week rollover doesn't keep showing a stale window.
   const twoWeekDates = useMemo(() => {
     const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const [y, m, d] = getManilaDateString().split("-").map(Number);
+    const [y, m, d] = todayAnchor.split("-").map(Number);
     const today = new Date(y, m - 1, d);
     const dow = today.getDay(); // 0=Sun..6=Sat
     const monday = new Date(today);
@@ -216,7 +249,7 @@ export default function AppointmentsPage() {
       return toDateStr(dt);
     });
     return { thisWeek: buildWeek(0), nextWeek: buildWeek(1) };
-  }, []);
+  }, [todayAnchor]);
 
   const twoWeekDateSet = useMemo(
     () => new Set([...twoWeekDates.thisWeek, ...twoWeekDates.nextWeek]),
@@ -377,7 +410,7 @@ export default function AppointmentsPage() {
                 ) : isAlreadyBooked ? (
                   <button className="book-btn book-btn--disabled" disabled>Already Booked</button>
                 ) : (
-                  <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setShowBookDialog(true); }}>Book this Slot</button>
+                  <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setPurpose(""); setShowBookDialog(true); }}>Book this Slot</button>
                 )}
               </div>
             );
@@ -399,7 +432,7 @@ export default function AppointmentsPage() {
               <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
                 <div className="dialog-header">
                   <h3>Confirm Appointment</h3>
-                  <button className="dialog-close" onClick={() => setShowBookDialog(false)} disabled={submitting}><CloseIcon /></button>
+                  <button className="dialog-close" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); setPurpose(""); }} disabled={submitting}><CloseIcon /></button>
                 </div>
                 <div className="dialog-body">
                   <div className="slot-summary">
@@ -433,7 +466,7 @@ export default function AppointmentsPage() {
                     <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
                   </div>
                   <div className="dialog-actions">
-                    <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); }} disabled={submitting}>Cancel</button>
+                    <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); setPurpose(""); }} disabled={submitting}>Cancel</button>
                     <button className="btn-primary" onClick={handleBookSlot} disabled={submitting}>{submitting ? "Booking…" : "Confirm Booking"}</button>
                   </div>
                 </div>
@@ -452,6 +485,7 @@ export default function AppointmentsPage() {
             icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="10" y1="14" x2="14" y2="18"></line><line x1="14" y1="14" x2="10" y2="18"></line></svg>}
             cancelText="Keep Appointment"
             confirmText="Cancel Appointment"
+            confirmDisabled={cancellingId !== null}
           />
         </>
       }

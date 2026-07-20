@@ -176,9 +176,13 @@ export default function ProfessorDashboard() {
     {
       title: "Pending Appointments",
       value: loading ? "—" : String(s?.pendingAppointments ?? 0),
+      // This card always counts every upcoming pending/approved appointment,
+      // not just this week -- the Appointment Manager page now defaults to a
+      // "This Week" view, so the caption keeps the two numbers from looking
+      // like a mismatch/bug.
       description: loading
         ? "Loading..."
-        : `${s?.todayAppointments ?? 0} for today`,
+        : `${s?.todayAppointments ?? 0} for today · All upcoming`,
       icon: CalendarIcon,
       bgColor: "bg-violet-50",
       link: "/professor/appointments",

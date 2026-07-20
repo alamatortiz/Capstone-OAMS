@@ -97,6 +97,7 @@ export default function AdminQueueHosting() {
   const {
     queues,
     loading,
+    error: queueHostingError,
     fetchQueues,
     reasonModal,
     setReasonModal,
@@ -435,6 +436,12 @@ export default function AdminQueueHosting() {
             </button>
           </div>
           </div>
+
+          {queueHostingError && (
+            <div className="dash-error-banner" role="alert">
+              {queueHostingError}
+            </div>
+          )}
 
           {/* Summary Stats */}
           <div className="aqh-summary-grid">

@@ -296,6 +296,18 @@ export default function AdminDashboard() {
     };
   }, [authUser, token, fetchStats]);
 
+  // ── Fallback poll: covers a silently-dropped/blocked WebSocket connection,
+  // same pattern as QueueProvider.jsx / stud-dashboard.jsx ──
+  useEffect(() => {
+    if (!authUser) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchStats();
+      }
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [authUser, fetchStats]);
+
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;
   const loading = dashLoading;

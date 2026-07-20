@@ -463,6 +463,8 @@ body {
   transition: color 0.3s ease;
   line-height: 1.5;
   margin-top: 0.75rem;
+  text-align: left;
+  width: 100%;
 }
 
 /* ===== IMPROVED Quick Actions Section ===== */

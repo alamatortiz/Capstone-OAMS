@@ -27,14 +27,17 @@ export function useAdminQueueHosting({ onLiveUpdate } = {}) {
 
   const [queues, setQueues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchQueues = useCallback(async () => {
     try {
       const res = await api.get("/admin/queue-hosting");
       setQueues(res.data.queues ?? []);
+      setError(null);
     } catch (error) {
       console.error("Failed to fetch queues:", error);
       toast.error("Could not load queue data");
+      setError("Could not load queue data. Retrying automatically.");
     }
   }, []);
 
@@ -116,6 +119,7 @@ export function useAdminQueueHosting({ onLiveUpdate } = {}) {
   return {
     queues,
     loading,
+    error,
     fetchQueues,
     reasonModal,
     setReasonModal,

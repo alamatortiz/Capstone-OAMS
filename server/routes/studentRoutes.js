@@ -1060,11 +1060,18 @@ router.post(
     try {
       await conn.beginTransaction();
 
-      // 1. Lock and fetch the slot
+      // 1. Lock and fetch the slot, including the owning service's
+      // department/cross-college scope so we can re-check eligibility
+      // below (the same condition GET /queues/available already applies
+      // when deciding what to show — this re-applies it at write time so
+      // a department-exclusive queue can't be joined by guessing/reusing
+      // a slotId that was never actually shown to this student).
       const [[slot]] = await conn.query(
         `SELECT qs.slot_id, qs.service_id, qs.status, qs.current_count, qs.max_capacity,
-                qs.start_time, qs.end_time
+                qs.start_time, qs.end_time,
+                s.department_id AS service_department_id, s.is_cross_college
          FROM queue_slots qs
+         JOIN services s ON qs.service_id = s.service_id
          WHERE qs.slot_id = ? AND qs.slot_date = ?
          FOR UPDATE`,
         [slotId, getManilaDateString()],
@@ -1076,6 +1083,18 @@ router.post(
           .status(404)
           .json({ error: "Queue slot not found or not available today" });
       }
+
+      const [[stu]] = await conn.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      if (!slot.is_cross_college && slot.service_department_id !== stu?.department_id) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "This queue is not available to your department" });
+      }
+
       if (slot.status !== "open") {
         await conn.rollback();
         return res
@@ -1321,7 +1340,26 @@ router.post(
     try {
       await conn.beginTransaction();
 
-      // 1. Fetch and lock the queue entry
+      // 1. Look up which slot this entry belongs to. This plain read is
+      // safe without a lock because slot_id is immutable once a queue
+      // entry is created.
+      const [[entryLookup]] = await conn.query(
+        `SELECT slot_id FROM queues WHERE queue_id = ?`,
+        [queueId],
+      );
+      if (!entryLookup) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Queue entry not found" });
+      }
+
+      // 2. Lock order: queue_slots row first, then the queues row — matches
+      // join/pause/close/call-next/mark-arrived/serve/skip, so this can
+      // never deadlock against them.
+      await conn.query(
+        `SELECT slot_id FROM queue_slots WHERE slot_id = ? FOR UPDATE`,
+        [entryLookup.slot_id],
+      );
+
       const [[entry]] = await conn.query(
         `SELECT queue_id, student_id, slot_id, status
          FROM queues WHERE queue_id = ? FOR UPDATE`,
@@ -1581,31 +1619,46 @@ router.delete(
       return res.status(400).json({ error: "Invalid appointmentId" });
     }
 
+    const conn = await pool.getConnection();
     try {
-      const [[appt]] = await pool.query(
+      await conn.beginTransaction();
+
+      const [[appt]] = await conn.query(
         `SELECT appointment_id, student_id, status, faculty_id, department_id
-         FROM appointments WHERE appointment_id = ?`,
+         FROM appointments WHERE appointment_id = ? FOR UPDATE`,
         [appointmentId],
       );
 
       if (!appt) {
+        await conn.rollback();
         return res.status(404).json({ error: "Appointment not found" });
       }
       if (appt.student_id !== studentId) {
+        await conn.rollback();
         return res
           .status(403)
           .json({ error: "You can only cancel your own appointments" });
       }
       if (!["pending", "approved"].includes(appt.status)) {
+        await conn.rollback();
         return res.status(409).json({
           error: `Cannot cancel an appointment that is already ${appt.status}`,
         });
       }
 
-      await pool.query(
-        `UPDATE appointments SET status = 'cancelled' WHERE appointment_id = ?`,
-        [appointmentId],
+      const [result] = await conn.query(
+        `UPDATE appointments SET status = 'cancelled', cancelled_by = 'student'
+         WHERE appointment_id = ? AND status = ?`,
+        [appointmentId, appt.status],
       );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "This appointment was just updated elsewhere. Please refresh and try again.",
+        });
+      }
+
+      await conn.commit();
 
       emitToDept(appt.department_id, "appointment:status-updated", {
         appointmentId,
@@ -1622,10 +1675,13 @@ router.delete(
         appointmentId,
       });
     } catch (error) {
+      await conn.rollback();
       console.error("Cancel appointment error:", error);
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -1788,7 +1844,12 @@ router.get(
         [studentId, studentId, studentId],
       );
 
-      // Map raw DB statuses -> the 3 badge states the UI understands
+      // Map raw DB statuses -> the 3 badge states the UI understands. This is
+      // deliberately a coarser, differently-shaped mapping than admin's
+      // equivalent map in adminRoutes.js's GET /transactions (which keeps
+      // granular per-status labels for its filter dropdown) -- the two
+      // aren't meant to agree, since they serve different audiences/UIs, so
+      // don't merge them into one shared map.
       const statusMap = {
         waiting: "ongoing",
         serving: "ongoing",
@@ -1930,9 +1991,13 @@ router.get(
         for (const t of templates) {
           if (t.day_of_week !== weekday) continue;
 
-          // Skip windows that have already ended (only relevant for today)
+          // Skip windows that have already ended (only relevant for today).
+          // Anchored to +08:00 explicitly so this is correct regardless of
+          // the server process's own timezone, not just when TZ=Asia/Manila
+          // happens to be set (see adminRoutes.js's manilaMidnightUTC for
+          // the same pattern).
           if (dateStr === todayStr) {
-            const windowEnd = new Date(`${dateStr}T${t.end_time}`);
+            const windowEnd = new Date(`${dateStr}T${t.end_time}+08:00`);
             if (windowEnd <= now) continue;
           }
 
@@ -2025,9 +2090,10 @@ router.post(
       // Reject a same-day booking whose window has already ended — mirrors
       // the identical check in GET /appointments/available-slots, which the
       // client's cached list can drift out of sync with if left open past
-      // the window's end without a refresh.
+      // the window's end without a refresh. Anchored to +08:00 explicitly,
+      // same reasoning as that check.
       if (appointmentDate === getManilaDateString()) {
-        const windowEnd = new Date(`${appointmentDate}T${slot.end_time}`);
+        const windowEnd = new Date(`${appointmentDate}T${slot.end_time}+08:00`);
         if (windowEnd <= new Date()) {
           await conn.rollback();
           return res.status(409).json({ error: "This availability window has already ended for today" });

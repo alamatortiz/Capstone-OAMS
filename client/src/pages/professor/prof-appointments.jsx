@@ -8,7 +8,8 @@ import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import { formatManilaDate, getManilaDateString, getManilaTodayAsLocalDate } from "../../utils/dateTime";
+import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import {
   Calendar,
@@ -94,24 +95,6 @@ const CONFIRM_META = {
   }),
 };
 
-// Week starts on Sunday, matching the appointment booking calendar elsewhere in the app.
-function getWeekRange(now = getManilaTodayAsLocalDate()) {
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
-  return { start, end };
-}
-
-function getMonthRange(now = getManilaTodayAsLocalDate()) {
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  return { start, end };
-}
-
-function isWithinRange(dateStr, range) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  return d >= range.start && d <= range.end;
-}
-
 // ── AppointmentCard ────────────────────────────────────────────────────────────
 function AppointmentCard({
   appointment,
@@ -127,6 +110,10 @@ function AppointmentCard({
       return appointment.date;
     }
   })();
+
+  // The server rejects marking a future-dated appointment as completed --
+  // disable the button here too so the click doesn't just bounce off an error.
+  const isFutureDate = appointment.date > getManilaDateString();
 
   const statusLabel =
     appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1);
@@ -197,6 +184,8 @@ function AppointmentCard({
             <button
               className="appt-btn appt-btn-complete"
               onClick={() => onComplete(appointment.id)}
+              disabled={isFutureDate}
+              title={isFutureDate ? "This appointment hasn't happened yet" : undefined}
             >
               <CheckCircle2Icon /> Mark Complete
             </button>
@@ -261,17 +250,15 @@ export default function ProfessorAppointmentsPage() {
 
   const TABS = ["all", "pending", "approved", "completed", "rejected"];
 
-  const allRangeAppointments =
-    allRange === "all"
-      ? appointments
-      : appointments.filter((a) =>
-          isWithinRange(a.date, allRange === "week" ? getWeekRange() : getMonthRange()),
-        );
+  // The This Week/This Month/All Time control governs every tab, not just
+  // "All" — otherwise a tab's badge count and its rendered list would come
+  // from two different-shaped arrays and visibly disagree with each other.
+  const rangeFilteredAppointments = filterByRange(appointments, allRange);
 
   const filteredAppointments =
     activeTab === "all"
-      ? allRangeAppointments
-      : appointments.filter((a) => a.status === activeTab);
+      ? rangeFilteredAppointments
+      : rangeFilteredAppointments.filter((a) => a.status === activeTab);
 
   const updateStatus = async (id, status, successMsg, errorMsg) => {
     const apt = appointments.find((a) => a.id === id);
@@ -280,8 +267,8 @@ export default function ProfessorAppointmentsPage() {
       await fetchAppointments();
       if (successMsg)
         toast.success(successMsg.replace("{name}", apt?.studentName ?? ""));
-    } catch {
-      toast.error(errorMsg ?? "Failed to update appointment");
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? errorMsg ?? "Failed to update appointment");
     }
   };
 
@@ -425,13 +412,13 @@ export default function ProfessorAppointmentsPage() {
                         ))}
                       </select>
                       <span className="appt-tab-count">
-                        {loading ? "—" : allRangeAppointments.length}
+                        {loading ? "—" : rangeFilteredAppointments.length}
                       </span>
                     </div>
                   );
                 }
 
-                const count = appointments.filter((a) => a.status === tab).length;
+                const count = rangeFilteredAppointments.filter((a) => a.status === tab).length;
                 return (
                   <button
                     key={tab}

@@ -8,6 +8,9 @@ const {
 const { getManilaDateString } = require("../utils/dateTime");
 const { createNotification } = require("../utils/notifications");
 const { emitToUser, emitToDept } = require("../sockets");
+const { isValidTransition } = require("../utils/appointmentStatus");
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // GET /api/faculty/dashboard-stats
 router.get(
@@ -89,6 +92,7 @@ router.get(
         `SELECT
            a.appointment_id,
            a.status,
+           a.cancelled_by,
            a.created_at AS event_time,
            CONCAT(s.first_name, ' ', s.last_name) AS student_name,
            a.notes AS purpose
@@ -192,12 +196,20 @@ function formatTime(timeStr) {
 }
 
 function buildActivityTitle(row) {
+  if (row.status === "cancelled") {
+    // cancelled_by distinguishes a student's own cancellation from one this
+    // faculty member triggered themselves, or an automatic cancellation
+    // caused by editing/deleting the schedule slot the appointment was in --
+    // without this, all three used to render as "cancelled by {student}".
+    if (row.cancelled_by === "system") return `Appointment with ${row.student_name} auto-cancelled — schedule changed`;
+    if (row.cancelled_by === "faculty") return `You cancelled the appointment with ${row.student_name}`;
+    return `Appointment cancelled by ${row.student_name}`;
+  }
   const map = {
     pending: `New appointment request from ${row.student_name}`,
     approved: `Appointment confirmed with ${row.student_name}`,
     completed: `Appointment completed with ${row.student_name}`,
     rejected: `Appointment rejected for ${row.student_name}`,
-    cancelled: `Appointment cancelled by ${row.student_name}`,
   };
   return map[row.status] ?? `Appointment update for ${row.student_name}`;
 }
@@ -295,19 +307,69 @@ router.patch(
     const { status } = req.body;
     const allowed = ["approved", "rejected", "completed", "cancelled"];
     if (!allowed.includes(status)) {
-      return res.status(400).json({ message: "Invalid status value" });
+      return res.status(400).json({ error: "Invalid status value" });
     }
-    try {
-      const [[appt]] = await pool.query(
-        "SELECT student_id, department_id FROM appointments WHERE appointment_id = ? AND faculty_id = ?",
-        [id, facultyId]
-      );
-      if (!appt) return res.status(404).json({ message: "Appointment not found" });
 
-      await pool.query(
-        "UPDATE appointments SET status = ? WHERE appointment_id = ? AND faculty_id = ?",
-        [status, id, facultyId]
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[appt]] = await conn.query(
+        `SELECT student_id, department_id, status, availability_id, appointment_date
+         FROM appointments WHERE appointment_id = ? AND faculty_id = ? FOR UPDATE`,
+        [id, facultyId],
       );
+      if (!appt) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      if (!isValidTransition(appt.status, status)) {
+        await conn.rollback();
+        return res.status(409).json({ error: `Cannot change status from ${appt.status} to ${status}` });
+      }
+
+      const apptDateStr = appt.appointment_date instanceof Date
+        ? getManilaDateString(appt.appointment_date)
+        : String(appt.appointment_date).split("T")[0];
+      if (status === "completed" && apptDateStr > getManilaDateString()) {
+        await conn.rollback();
+        return res.status(400).json({ error: "Cannot mark a future appointment as completed" });
+      }
+
+      // Re-check capacity when reviving a pending request into approved --
+      // book-slot only enforced this once, at creation time, so a slot that
+      // filled up in the meantime must be re-verified here. Lock the
+      // template row first, and exclude this appointment's own (already
+      // counted, as 'pending') row from the count.
+      if (status === "approved" && appt.availability_id) {
+        const [[slot]] = await conn.query(
+          "SELECT max_students FROM faculty_availability WHERE availability_id = ? FOR UPDATE",
+          [appt.availability_id],
+        );
+        if (slot) {
+          const [[{ total }]] = await conn.query(
+            `SELECT COUNT(*) AS total FROM appointments
+             WHERE availability_id = ? AND appointment_date = ? AND appointment_id != ?
+               AND status NOT IN ('cancelled', 'rejected')`,
+            [appt.availability_id, appt.appointment_date, id],
+          );
+          if (slot.max_students != null && total >= slot.max_students) {
+            await conn.rollback();
+            return res.status(409).json({ error: "This availability window is now fully booked" });
+          }
+        }
+      }
+
+      const cancelledBy = status === "cancelled" ? "faculty" : null;
+      await conn.query(
+        `UPDATE appointments
+         SET status = ?, cancelled_by = COALESCE(?, cancelled_by)
+         WHERE appointment_id = ? AND faculty_id = ?`,
+        [status, cancelledBy, id, facultyId],
+      );
+
+      await conn.commit();
 
       emitToUser(appt.student_id, "appointment:status-updated", { appointmentId: Number(id), status });
       emitToDept(appt.department_id, "appointment:status-updated", { appointmentId: Number(id), status });
@@ -315,8 +377,11 @@ router.patch(
 
       res.json({ message: "Status updated" });
     } catch (err) {
+      await conn.rollback();
       console.error("PATCH /appointments/:id/status error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    } finally {
+      conn.release();
     }
   }
 );
@@ -536,11 +601,23 @@ router.post(
       ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
       : [];
 
+    const conn = await pool.getConnection();
     try {
+      await conn.beginTransaction();
+
+      // Lock this faculty member's row so two concurrent create/edit requests
+      // (double-submit, retried request) can't both pass the overlap check
+      // below before either commits. A brand-new row can't be locked before
+      // it exists, so the faculty row is used as the serialization point.
+      const [[fac]] = await conn.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ? FOR UPDATE",
+        [facultyId]
+      );
+
       // Reject any slot whose window intersects an existing slot on the same
       // day — a professor can't run two overlapping consultation blocks at
       // once (different rooms/caps/types would make booking ambiguous).
-      const [sameDay] = await pool.query(
+      const [sameDay] = await conn.query(
         "SELECT start_time, end_time FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ?",
         [facultyId, day_of_week]
       );
@@ -550,11 +627,12 @@ router.post(
         return start_time < sEnd && sStart < end_time;
       });
       if (overlap) {
+        await conn.rollback();
         return res.status(409).json({
           message: `This time overlaps an existing slot on ${day_of_week} (${String(overlap.start_time).slice(0, 5)}–${String(overlap.end_time).slice(0, 5)})`,
         });
       }
-      const [result] = await pool.query(
+      const [result] = await conn.query(
         "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES (?,?,?,?,?,?)",
         [facultyId, day_of_week, start_time, end_time, location ?? null, maxStu]
       );
@@ -562,28 +640,26 @@ router.post(
       const linkedServices = [];
       for (const name of types) {
         // Find existing service for this faculty with the same name, or create it
-        let [[svc]] = await pool.query(
+        let [[svc]] = await conn.query(
           "SELECT service_id, service_name FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
           [facultyId, name]
         );
         if (!svc) {
-          const [ins] = await pool.query(
+          const [ins] = await conn.query(
             "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
             [name, facultyId]
           );
           svc = { service_id: ins.insertId, service_name: name };
         }
-        await pool.query(
+        await conn.query(
           "INSERT IGNORE INTO faculty_availability_services (availability_id, service_id) VALUES (?, ?)",
           [newId, svc.service_id]
         );
         linkedServices.push({ id: svc.service_id, name: svc.service_name });
       }
 
-      const [[fac]] = await pool.query(
-        "SELECT department_id FROM faculty WHERE faculty_id = ?",
-        [facultyId]
-      );
+      await conn.commit();
+
       emitToDept(fac?.department_id, "appointment:slot-updated", { availabilityId: newId });
 
       res.status(201).json({
@@ -593,8 +669,11 @@ router.post(
         appointmentTypes: linkedServices,
       });
     } catch (err) {
+      await conn.rollback();
       console.error("POST /availability error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    } finally {
+      conn.release();
     }
   }
 );
@@ -623,12 +702,22 @@ router.patch(
       ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
       : null;
 
+    const conn = await pool.getConnection();
     try {
-      const [[current]] = await pool.query(
+      await conn.beginTransaction();
+
+      // Lock this faculty member's row so a concurrent create/edit can't
+      // slip an overlapping slot past the check below before this commits.
+      await conn.query("SELECT department_id FROM faculty WHERE faculty_id = ? FOR UPDATE", [facultyId]);
+
+      const [[current]] = await conn.query(
         "SELECT day_of_week, start_time, end_time FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
         [id, facultyId]
       );
-      if (!current) return res.status(404).json({ message: "Availability not found" });
+      if (!current) {
+        await conn.rollback();
+        return res.status(404).json({ message: "Availability not found" });
+      }
 
       // Resolve the effective day/time window this edit would produce (falling
       // back to the current row for any field not included in the request),
@@ -637,10 +726,11 @@ router.patch(
       const effectiveStart = start_time ?? String(current.start_time).slice(0, 5);
       const effectiveEnd = end_time ?? String(current.end_time).slice(0, 5);
       if (effectiveEnd <= effectiveStart) {
+        await conn.rollback();
         return res.status(400).json({ message: "end_time must be after start_time" });
       }
 
-      const [sameDay] = await pool.query(
+      const [sameDay] = await conn.query(
         "SELECT start_time, end_time FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ? AND availability_id != ?",
         [facultyId, effectiveDay, id]
       );
@@ -650,12 +740,39 @@ router.patch(
         return effectiveStart < sEnd && sStart < effectiveEnd;
       });
       if (overlap) {
+        await conn.rollback();
         return res.status(409).json({
           message: `This time overlaps an existing slot on ${effectiveDay} (${String(overlap.start_time).slice(0, 5)}–${String(overlap.end_time).slice(0, 5)})`,
         });
       }
 
-      const [result] = await pool.query(
+      // Cancel bookings that no longer fit the edited window/day -- otherwise
+      // a student's card would silently start showing the new window while
+      // their actual (unvalidated) appointment_date/appointment_time stays
+      // whatever it was originally booked as.
+      const [bookings] = await conn.query(
+        `SELECT appointment_id, student_id, department_id, appointment_date, appointment_time
+         FROM appointments
+         WHERE availability_id = ? AND status IN ('pending', 'approved')
+         FOR UPDATE`,
+        [id],
+      );
+      const noLongerFits = bookings.filter((b) => {
+        const dateObj = b.appointment_date instanceof Date ? b.appointment_date : new Date(`${b.appointment_date}T00:00:00`);
+        const weekday = WEEKDAY_NAMES[dateObj.getDay()];
+        if (weekday !== effectiveDay) return true;
+        const apptTime = String(b.appointment_time).slice(0, 5);
+        return apptTime < effectiveStart || apptTime >= effectiveEnd;
+      });
+      if (noLongerFits.length > 0) {
+        await conn.query(
+          `UPDATE appointments SET status = 'cancelled', cancelled_by = 'system'
+           WHERE appointment_id IN (?)`,
+          [noLongerFits.map((b) => b.appointment_id)],
+        );
+      }
+
+      const [result] = await conn.query(
         `UPDATE faculty_availability
          SET day_of_week = COALESCE(?, day_of_week),
              start_time = COALESCE(?, start_time),
@@ -665,28 +782,33 @@ router.patch(
          WHERE availability_id = ? AND faculty_id = ?`,
         [day_of_week ?? null, start_time ?? null, end_time ?? null, location ?? null, maxStu ?? null, id, facultyId]
       );
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Availability not found" });
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(404).json({ message: "Availability not found" });
+      }
 
       if (replaceTypes) {
-        await pool.query("DELETE FROM faculty_availability_services WHERE availability_id = ?", [id]);
+        await conn.query("DELETE FROM faculty_availability_services WHERE availability_id = ?", [id]);
         for (const name of types) {
-          let [[svc]] = await pool.query(
+          let [[svc]] = await conn.query(
             "SELECT service_id FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
             [facultyId, name]
           );
           if (!svc) {
-            const [ins] = await pool.query(
+            const [ins] = await conn.query(
               "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
               [name, facultyId]
             );
             svc = { service_id: ins.insertId };
           }
-          await pool.query(
+          await conn.query(
             "INSERT IGNORE INTO faculty_availability_services (availability_id, service_id) VALUES (?, ?)",
             [id, svc.service_id]
           );
         }
       }
+
+      await conn.commit();
 
       const [[fac]] = await pool.query(
         "SELECT department_id FROM faculty WHERE faculty_id = ?",
@@ -694,10 +816,28 @@ router.patch(
       );
       emitToDept(fac?.department_id, "appointment:slot-updated", { availabilityId: Number(id) });
 
-      res.json({ message: "Availability updated" });
+      for (const b of noLongerFits) {
+        const dateStr = b.appointment_date instanceof Date
+          ? getManilaDateString(b.appointment_date)
+          : String(b.appointment_date).split("T")[0];
+        emitToUser(b.student_id, "appointment:status-updated", {
+          appointmentId: b.appointment_id,
+          status: "cancelled",
+          reason: "schedule_changed",
+        });
+        createNotification(
+          b.student_id,
+          `Your appointment on ${dateStr} was cancelled because the professor changed that time slot. Please book a new one.`,
+        );
+      }
+
+      res.json({ message: "Availability updated", cancelledAppointments: noLongerFits.length });
     } catch (err) {
+      await conn.rollback();
       console.error("PATCH /availability/:id error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    } finally {
+      conn.release();
     }
   }
 );
@@ -710,12 +850,48 @@ router.delete(
   async (req, res) => {
     const facultyId = req.user.userId;
     const { id } = req.params;
+    const conn = await pool.getConnection();
     try {
-      const [result] = await pool.query(
+      await conn.beginTransaction();
+
+      const [[slot]] = await conn.query(
+        "SELECT availability_id FROM faculty_availability WHERE availability_id = ? AND faculty_id = ? FOR UPDATE",
+        [id, facultyId]
+      );
+      if (!slot) {
+        await conn.rollback();
+        return res.status(404).json({ message: "Availability not found" });
+      }
+
+      // Cancel every pending/approved booking against this template before
+      // deleting it -- the FK is ON DELETE SET NULL, so without this they'd
+      // survive with availability_id wiped and silently show "TBA"/a blank
+      // window instead of being cancelled and the student notified.
+      const [affected] = await conn.query(
+        `SELECT appointment_id, student_id, department_id, appointment_date
+         FROM appointments
+         WHERE availability_id = ? AND status IN ('pending', 'approved')
+         FOR UPDATE`,
+        [id],
+      );
+      if (affected.length > 0) {
+        await conn.query(
+          `UPDATE appointments SET status = 'cancelled', cancelled_by = 'system'
+           WHERE availability_id = ? AND status IN ('pending', 'approved')`,
+          [id],
+        );
+      }
+
+      const [result] = await conn.query(
         "DELETE FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
         [id, facultyId]
       );
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Availability not found" });
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(404).json({ message: "Availability not found" });
+      }
+
+      await conn.commit();
 
       const [[fac]] = await pool.query(
         "SELECT department_id FROM faculty WHERE faculty_id = ?",
@@ -723,10 +899,28 @@ router.delete(
       );
       emitToDept(fac?.department_id, "appointment:slot-removed", { availabilityId: Number(id) });
 
-      res.json({ message: "Availability deleted" });
+      for (const appt of affected) {
+        const dateStr = appt.appointment_date instanceof Date
+          ? getManilaDateString(appt.appointment_date)
+          : String(appt.appointment_date).split("T")[0];
+        emitToUser(appt.student_id, "appointment:status-updated", {
+          appointmentId: appt.appointment_id,
+          status: "cancelled",
+          reason: "schedule_removed",
+        });
+        createNotification(
+          appt.student_id,
+          `Your appointment on ${dateStr} was cancelled because the professor removed that time slot. Please book a new one.`,
+        );
+      }
+
+      res.json({ message: "Availability deleted", cancelledAppointments: affected.length });
     } catch (err) {
+      await conn.rollback();
       console.error("DELETE /availability/:id error:", err);
       res.status(500).json({ message: "Internal server error", dev_error: err.message });
+    } finally {
+      conn.release();
     }
   }
 );

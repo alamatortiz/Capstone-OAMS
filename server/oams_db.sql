@@ -314,6 +314,7 @@ CREATE TABLE appointments (
     appointment_date    DATE         NOT NULL,
     appointment_time    TIME         NOT NULL,
     status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
+    cancelled_by        ENUM('student','faculty','system') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
     notes               TEXT,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id)      REFERENCES students(student_id),

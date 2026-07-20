@@ -212,6 +212,18 @@ export default function AdminQueueAnalytics() {
     };
   }, [authUser, token, fetchAnalytics]);
 
+  // ── Fallback poll: covers a silently-dropped/blocked WebSocket connection,
+  // same pattern as QueueProvider.jsx / stud-dashboard.jsx ──
+  useEffect(() => {
+    if (!authUser) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchAnalytics();
+      }
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [authUser, fetchAnalytics]);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = () => {

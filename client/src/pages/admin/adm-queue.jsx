@@ -176,7 +176,9 @@ export default function AdminQueue() {
     try {
       const res = await api.get(`/admin/queue-hosting/${monitoringQueueId}/entries`);
       setQueueEntries(res.data.entries ?? []);
-    } catch {
+    } catch (error) {
+      console.error("Failed to fetch queue entries:", error);
+      toast.error("Could not load the list of students in this queue");
       setQueueEntries([]);
     } finally {
       setLoadingEntries(false);
@@ -195,6 +197,7 @@ export default function AdminQueue() {
   const {
     queues: queueDetails,
     loading,
+    error: queueHostingError,
     fetchQueues: fetchQueueDetails,
     reasonModal,
     setReasonModal,
@@ -843,6 +846,12 @@ export default function AdminQueue() {
             titleClassName="aq-title"
             subtitleClassName="aq-subtitle"
           />
+
+          {queueHostingError && (
+            <div className="dash-error-banner" role="alert">
+              {queueHostingError}
+            </div>
+          )}
 
           <Link to="/admin/queue-hosting" className="aq-host-link-btn">
             <div className="aq-host-link-btn-icon-box">

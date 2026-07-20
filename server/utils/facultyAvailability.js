@@ -14,9 +14,24 @@ function toTimeStr(val) {
   return s.length === 8 ? s : s.slice(0, 8).padEnd(8, "0");
 }
 
-function addOneHour(timeStr) {
-  const [h, m, s] = timeStr.split(":").map(Number);
-  return `${String(Math.min(h + 1, 23)).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+// Is this professor mid-appointment right now? Uses the *real* booked
+// availability window's end time (any length), not a fixed guess -- an
+// appointment only has a start time on its own, so this finds the
+// faculty_availability slot it was booked into and uses that slot's actual
+// end_time as the busy cutoff. Pure/exported for unit testing.
+function computeIsBusy(avails, appts, currentTimeStr) {
+  return appts.some((a) => {
+    if (a.status !== "approved") return false;
+    const apptTime = toTimeStr(a.appointment_time);
+    const matchingSlot = avails.find((slot) => {
+      const slotStart = toTimeStr(slot.start_time);
+      const slotEnd = toTimeStr(slot.end_time);
+      return apptTime >= slotStart && apptTime < slotEnd;
+    });
+    if (!matchingSlot) return false; // window no longer exists (e.g. deleted) -- don't guess
+    const slotEnd = toTimeStr(matchingSlot.end_time);
+    return currentTimeStr >= apptTime && currentTimeStr < slotEnd;
+  });
 }
 
 // Single source of truth for "is this faculty member available right now" --
@@ -86,12 +101,7 @@ async function getFacultyAvailabilityToday(deptId) {
     const avails = availMap[f.faculty_id] || [];
     const appts = apptMap[f.faculty_id] || [];
 
-    const isBusy = appts.some((a) => {
-      if (a.status !== "approved") return false;
-      const start = toTimeStr(a.appointment_time);
-      const end = addOneHour(start);
-      return currentTimeStr >= start && currentTimeStr < end;
-    });
+    const isBusy = computeIsBusy(avails, appts, currentTimeStr);
 
     const schedule = avails.map((slot) => {
       const slotStart = toTimeStr(slot.start_time);
@@ -156,4 +166,4 @@ async function getFacultyAvailabilityToday(deptId) {
   });
 }
 
-module.exports = { getFacultyAvailabilityToday, formatTime };
+module.exports = { getFacultyAvailabilityToday, formatTime, computeIsBusy };

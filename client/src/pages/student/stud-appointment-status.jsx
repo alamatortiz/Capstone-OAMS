@@ -20,6 +20,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
+import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import "./stud-appointment-status.css";
 
@@ -196,6 +197,7 @@ export default function AppointmentStatusPage() {
   const [selectedId, setSelectedId] = useState(navState.appointmentId ?? null);
   const [cancelling, setCancelling] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [allRange, setAllRange] = useState("week");
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -220,10 +222,17 @@ export default function AppointmentStatusPage() {
     const socket = connectSocket(token);
     if (!socket) return;
 
-    socket.on("appointment:status-updated", fetchAppointments);
+    const handleStatusUpdate = (payload) => {
+      if (payload?.reason === "schedule_removed" || payload?.reason === "schedule_changed") {
+        toast.error("An appointment was cancelled because the professor changed their schedule. Please book a new time.");
+      }
+      fetchAppointments();
+    };
+
+    socket.on("appointment:status-updated", handleStatusUpdate);
 
     return () => {
-      socket.off("appointment:status-updated", fetchAppointments);
+      socket.off("appointment:status-updated", handleStatusUpdate);
     };
   }, [fetchAppointments]);
 
@@ -243,15 +252,20 @@ export default function AppointmentStatusPage() {
 
   const generateBotResponse = () => "I can help you track your appointments. Click on any appointment card for details.";
 
-  const byStatus = (status) => appointments.filter((a) => a.status === status);
+  // Defaults to "This Week" across every tab -- the range control below lets
+  // a student switch to "This Month"/"All Time" to see everything else.
+  const rangeFilteredAppointments = filterByRange(appointments, allRange);
+  const byStatus = (status) => rangeFilteredAppointments.filter((a) => a.status === status);
   const tabLists = {
-    all:       appointments,
+    all:       rangeFilteredAppointments,
     pending:   byStatus("pending"),
     approved:  byStatus("approved"),
     completed: byStatus("completed"),
     rejected:  byStatus("rejected"),
     cancelled: byStatus("cancelled"),
   };
+
+  const RANGE_LABELS = { week: "This Week", month: "This Month", all: "All Time" };
 
   const TAB_ICON_MAP = {
     all:       LayoutList,
@@ -348,6 +362,42 @@ export default function AppointmentStatusPage() {
                   <div className="apst-tabs-list">
                     {TABS.map(({ key, label }) => {
                       const TabIcon = TAB_ICON_MAP[key];
+
+                      // The "All" tab doubles as the This Week/This Month/All
+                      // Time range control, governing every tab -- same
+                      // placement/pattern as prof-appointments.jsx's Appointment
+                      // Manager, so the two pages look and behave consistently.
+                      if (key === "all") {
+                        return (
+                          <div
+                            key={key}
+                            role="button"
+                            tabIndex={0}
+                            className={`apst-tab ${activeTab === key ? "active" : ""}`}
+                            onClick={() => setActiveTab("all")}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") setActiveTab("all");
+                            }}
+                          >
+                            {TabIcon && <TabIcon className="apst-tab-icon" />}
+                            <select
+                              className="apst-range-select"
+                              value={allRange}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                setAllRange(e.target.value);
+                                setActiveTab("all");
+                              }}
+                            >
+                              {Object.entries(RANGE_LABELS).map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                            <span className="apst-tab-count">{tabLists[key].length}</span>
+                          </div>
+                        );
+                      }
+
                       return (
                         <button
                           key={key}
