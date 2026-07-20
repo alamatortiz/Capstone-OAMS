@@ -101,7 +101,6 @@ interface ServiceType {
   id: string;
   name: string;
   description: string;
-  avgServiceTime: number;
   isCrossCollege: boolean;
   deptAbbrev: string;
   locationId: string | null;
@@ -192,7 +191,6 @@ const BLANK_DOC_FORM = {
 const BLANK_SERVICE_FORM = {
   name: '',
   description: '',
-  avgServiceTime: '',
   isCrossCollege: false,
   locationId: '',
   otherLocationName: '',
@@ -503,7 +501,6 @@ export default function AdminDataManagementScreen() {
     setServiceForm({
       name: s.name,
       description: s.description || '',
-      avgServiceTime: String(s.avgServiceTime),
       isCrossCollege: s.isCrossCollege,
       locationId: s.locationId ? String(s.locationId) : '',
       otherLocationName: '',
@@ -556,9 +553,9 @@ export default function AdminDataManagementScreen() {
     setServiceSteps((prev) => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, stepNumber: i + 1 })));
 
   const handleSaveService = async () => {
-    const { name, avgServiceTime, locationId, otherLocationName } = serviceForm;
-    if (!name || !avgServiceTime) {
-      Alert.alert('Missing information', 'Service name and average service time are required.');
+    const { name, locationId, otherLocationName } = serviceForm;
+    if (!name) {
+      Alert.alert('Missing information', 'Service name is required.');
       return;
     }
     if (locationId === '__other__' && !otherLocationName.trim()) {
@@ -577,7 +574,6 @@ export default function AdminDataManagementScreen() {
       const payload = {
         name,
         description: serviceForm.description,
-        avgServiceTime: parseInt(avgServiceTime, 10),
         isCrossCollege: serviceForm.isCrossCollege,
         locationId: finalLocationId,
       };
@@ -912,9 +908,6 @@ export default function AdminDataManagementScreen() {
                             )}
                           </View>
                           {!!s.description && <Text style={styles.itemDesc}>{s.description}</Text>}
-                          <View style={styles.itemMetaRow}>
-                            <Text style={styles.itemMetaText}>Avg. Service Time: {s.avgServiceTime} min</Text>
-                          </View>
                         </View>
                         <View style={styles.itemActionsRow}>
                           <Pressable
@@ -1228,17 +1221,6 @@ export default function AdminDataManagementScreen() {
                   multiline
                   value={serviceForm.description}
                   onChangeText={(v) => setServiceForm((p) => ({ ...p, description: v }))}
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Avg. Service Time (min) *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="e.g., 15"
-                  placeholderTextColor={theme.tertiary}
-                  keyboardType="numeric"
-                  value={serviceForm.avgServiceTime}
-                  onChangeText={(v) => setServiceForm((p) => ({ ...p, avgServiceTime: v }))}
                 />
               </View>
               <View style={styles.formGroup}>

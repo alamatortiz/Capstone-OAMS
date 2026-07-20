@@ -58,14 +58,7 @@ router.get(
              WHERE q5.slot_id = q.slot_id
                AND q5.status = 'completed'
            ) AS serviced_count,
-           (
-             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q6.called_at, q6.completed_at)))
-             FROM queues q6
-             WHERE q6.slot_id = q.slot_id
-               AND q6.status = 'completed'
-               AND q6.called_at IS NOT NULL
-               AND q6.completed_at IS NOT NULL
-           ) AS avg_service_minutes
+           qs.service_time_minutes AS avg_service_minutes
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -292,15 +285,22 @@ function classifyAnnouncement(question = "", answer = "") {
 }
 
 // GET /api/student/announcements
-// Returns every announcement, each tagged with its owning department.
-// Students filter by department on the frontend using departmentAbbrev,
-// with cross-college announcements always shown regardless of filter.
+// Returns only the student's own department's announcements, plus any
+// legacy announcements an admin marked cross-college before that option
+// was removed from the admin UI.
 router.get(
   "/announcements",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
+    const studentId = req.user.userId;
     try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
       const [rows] = await pool.query(
         `SELECT
            f.faq_id,
@@ -314,7 +314,9 @@ router.get(
            d.department_abbreviation
          FROM faqs f
          JOIN departments d ON f.department_id = d.department_id
+         WHERE f.department_id = ? OR f.is_cross_college = TRUE
          ORDER BY f.is_pinned DESC, f.created_at DESC`,
+        [studentDeptId],
       );
 
       const announcements = rows.map((row) => ({
@@ -722,6 +724,7 @@ router.get(
            qs.current_count,
            qs.status,
            qs.no_show_timeout_minutes,
+           qs.service_time_minutes,
            s.service_name,
            s.is_cross_college,
            s.description AS service_description,
@@ -764,7 +767,7 @@ router.get(
       const formatted = slots.map((slot) => {
         const waitingCount = slot.waiting_count || 0;
         const claimedCount = slot.claimed_count || 0;
-        const avgWaitMin = waitingCount * 5;
+        const avgWaitMin = waitingCount * slot.service_time_minutes;
         const deptAbbrev = slot.department_abbreviation;
         const serviceCode = slot.service_name
           .split(" ")[0]
@@ -797,9 +800,7 @@ router.get(
           waitingCount,
           currentlyServing,
           avgWaitTime:
-            waitingCount === 0
-              ? "No wait"
-              : `${avgWaitMin}-${avgWaitMin + 5} mins`,
+            waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
           voidTimeoutMinutes: slot.no_show_timeout_minutes,
         };
       });
@@ -875,14 +876,7 @@ router.get(
              WHERE q5.slot_id = q.slot_id
                AND q5.status = 'completed'
            ) AS serviced_count,
-           (
-             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q6.called_at, q6.completed_at)))
-             FROM queues q6
-             WHERE q6.slot_id = q.slot_id
-               AND q6.status = 'completed'
-               AND q6.called_at IS NOT NULL
-               AND q6.completed_at IS NOT NULL
-           ) AS avg_service_minutes
+           qs.service_time_minutes AS avg_service_minutes
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -1218,14 +1212,7 @@ router.post(
              SELECT COUNT(*) FROM queues q5
              WHERE q5.slot_id = q.slot_id AND q5.status = 'completed'
            ) AS serviced_count,
-           (
-             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q6.called_at, q6.completed_at)))
-             FROM queues q6
-             WHERE q6.slot_id = q.slot_id
-               AND q6.status = 'completed'
-               AND q6.called_at IS NOT NULL
-               AND q6.completed_at IS NOT NULL
-           ) AS avg_service_minutes
+           qs.service_time_minutes AS avg_service_minutes
          FROM queues q
          JOIN queue_slots qs ON q.slot_id = qs.slot_id
          JOIN services s ON q.service_id = s.service_id
@@ -1991,21 +1978,22 @@ router.get(
         for (const t of templates) {
           if (t.day_of_week !== weekday) continue;
 
-          // Skip windows that have already ended (only relevant for today).
-          // Anchored to +08:00 explicitly so this is correct regardless of
-          // the server process's own timezone, not just when TZ=Asia/Manila
-          // happens to be set (see adminRoutes.js's manilaMidnightUTC for
-          // the same pattern).
+          // Windows that have already ended (only relevant for today) and
+          // fully-booked windows are still returned -- flagged as isPast /
+          // isFull -- so the frontend can show them disabled instead of
+          // silently disappearing. Anchored to +08:00 explicitly so this is
+          // correct regardless of the server process's own timezone, not
+          // just when TZ=Asia/Manila happens to be set (see adminRoutes.js's
+          // manilaMidnightUTC for the same pattern).
+          let isPast = false;
           if (dateStr === todayStr) {
             const windowEnd = new Date(`${dateStr}T${t.end_time}+08:00`);
-            if (windowEnd <= now) continue;
+            isPast = windowEnd <= now;
           }
 
           const totalBooked = bookedMap[`${t.availability_id}_${dateStr}`] ?? 0;
           const spotsLeft = t.max_students != null ? t.max_students - totalBooked : null;
-
-          // Skip fully booked windows
-          if (t.max_students != null && totalBooked >= t.max_students) continue;
+          const isFull = t.max_students != null && totalBooked >= t.max_students;
 
           slots.push({
             availabilityId: t.availability_id,
@@ -2021,6 +2009,8 @@ router.get(
             maxStudents: t.max_students,
             totalBooked,
             spotsLeft,
+            isPast,
+            isFull,
             appointmentTypes: typeMap[t.availability_id] ?? [],
             professorAvailabilityStatus: t.availability_status,
           });
@@ -2331,6 +2321,7 @@ router.get(
            qs.current_count,
            qs.status,
            qs.no_show_timeout_minutes,
+           qs.service_time_minutes,
            (
              SELECT COUNT(*)
              FROM queues q
@@ -2403,7 +2394,7 @@ router.get(
         if (!slotByService.has(slot.service_id)) {
           const waitingCount = Number(slot.waiting_count) || 0;
           const claimedCount = Number(slot.claimed_count) || 0;
-          const avgWaitMin = waitingCount * 5;
+          const avgWaitMin = waitingCount * slot.service_time_minutes;
           slotByService.set(slot.service_id, {
             slotId: slot.slot_id,
             startTime: formatTime12h(slot.start_time),
@@ -2415,9 +2406,7 @@ router.get(
               slot.status === "open" && claimedCount < slot.max_capacity,
             status: slot.status,
             avgWaitTime:
-              waitingCount === 0
-                ? "No wait"
-                : `${avgWaitMin}–${avgWaitMin + 5} mins`,
+              waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
             currentlyServingNumber: slot.currently_serving_number ?? null,
             voidTimeoutMinutes: slot.no_show_timeout_minutes,
           });

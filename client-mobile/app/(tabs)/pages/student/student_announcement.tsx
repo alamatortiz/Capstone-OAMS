@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -128,8 +128,6 @@ export default function StudentAnnouncementScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterTabKey>('pinned');
-  const [selectedCollege, setSelectedCollege] = useState('all');
-  const [collegeModalVisible, setCollegeModalVisible] = useState(false);
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -220,23 +218,13 @@ export default function StudentAnnouncementScreen() {
     router.replace('/login');
   };
 
-  // College options derived from live data, same rule the web page uses:
-  // cross-college announcements stay visible no matter which college is picked.
-  const collegeOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    announcements.forEach((a) => {
-      if (!seen.has(a.departmentAbbrev)) seen.set(a.departmentAbbrev, a.college);
-    });
-    return [...seen.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [announcements]);
-
-  const matchesCollege = (a: Announcement) =>
-    selectedCollege === 'all' || a.departmentAbbrev === selectedCollege || a.isCrossCollege;
-
-  const pinnedAnnouncements = announcements.filter((a) => a.isPinned).filter(matchesCollege);
+  // The backend already scopes the list to the student's own department
+  // (plus any cross-college notices), so only the category tab filter is
+  // applied here -- mirrors stud-announcements.jsx (web).
+  const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
   const filteredAnnouncements = announcements.filter(
     (a) => selectedFilter === 'all' || a.category === selectedFilter,
-  ).filter(matchesCollege);
+  );
 
   const isPinnedTab = selectedFilter === 'pinned';
   const visibleList = isPinnedTab ? pinnedAnnouncements : filteredAnnouncements;
@@ -334,16 +322,6 @@ export default function StudentAnnouncementScreen() {
             })}
           </View>
 
-          {/* College Filter */}
-          <Pressable style={styles.collegeFilterBtn} onPress={() => setCollegeModalVisible(true)}>
-            <Text style={styles.collegeFilterText} numberOfLines={1}>
-              {selectedCollege === 'all'
-                ? 'All Colleges'
-                : collegeOptions.find(([abbrev]) => abbrev === selectedCollege)?.[1] ?? selectedCollege}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={theme.tertiary} />
-          </Pressable>
-
           {error && (
             <View style={styles.emptyCard}>
               <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
@@ -431,46 +409,6 @@ export default function StudentAnnouncementScreen() {
             </Pressable>
           </SafeAreaView>
           <Pressable style={styles.drawerBackdrop} onPress={() => setMenuOpen(false)} />
-        </View>
-      </Modal>
-
-      {/* College Filter Modal */}
-      <Modal
-        visible={collegeModalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setCollegeModalVisible(false)}
-      >
-        <View style={styles.logoutOverlay}>
-          <View style={styles.filterModalCard}>
-            <Text style={styles.logoutModalTitle}>Select College</Text>
-            <ScrollView style={styles.filterOptionsList}>
-              {[['all', 'All Colleges'] as [string, string], ...collegeOptions].map(([abbrev, name]) => {
-                const selected = abbrev === selectedCollege;
-                return (
-                  <Pressable
-                    key={abbrev}
-                    style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
-                    onPress={() => {
-                      setSelectedCollege(abbrev);
-                      setCollegeModalVisible(false);
-                    }}
-                  >
-                    <Text
-                      style={[styles.filterOptionText, selected && styles.filterOptionTextActive]}
-                      numberOfLines={2}
-                    >
-                      {name}
-                    </Text>
-                    {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Pressable style={styles.logoutCancelBtn} onPress={() => setCollegeModalVisible(false)}>
-              <Text style={styles.logoutCancelBtnText}>Close</Text>
-            </Pressable>
-          </View>
         </View>
       </Modal>
 
@@ -968,45 +906,6 @@ function createStyles(theme: ThemePalette) {
       fontSize: 14,
       fontWeight: '700',
       color: '#ffffff',
-    },
-
-    // Filter options modal
-    filterModalCard: {
-      width: '100%',
-      maxWidth: 340,
-      maxHeight: '70%',
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 20,
-      padding: 20,
-      alignItems: 'stretch',
-      gap: 12,
-    },
-    filterOptionsList: {
-      maxHeight: 320,
-    },
-    filterOptionRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 12,
-      paddingHorizontal: 12,
-      borderRadius: 10,
-      marginBottom: 2,
-    },
-    filterOptionRowActive: {
-      backgroundColor: 'rgba(22, 163, 74, 0.12)',
-    },
-    filterOptionText: {
-      fontSize: 13,
-      color: theme.text,
-      flex: 1,
-      paddingRight: 8,
-    },
-    filterOptionTextActive: {
-      color: theme.primary,
-      fontWeight: '700',
     },
   });
 }

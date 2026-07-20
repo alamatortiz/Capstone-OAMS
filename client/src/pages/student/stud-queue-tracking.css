@@ -742,24 +742,27 @@ body {
 
 .qt-history-header {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
   margin-bottom: 0.5rem;
 }
 
 .qt-history-service {
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 1.05rem;
   color: var(--text-primary);
   margin: 0;
   transition: color 0.3s ease;
 }
 
 .qt-history-college {
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
   color: var(--text-tertiary);
   margin: 0;
   margin-bottom: 0.375rem;
+  text-align: left;
   transition: color 0.3s ease;
 }
 
@@ -770,26 +773,6 @@ body {
   font-size: 0.75rem;
   color: var(--text-tertiary);
   transition: color 0.3s ease;
-}
-
-.qt-wait-time {
-  font-weight: 700;
-  color: var(--blue);
-}
-
-.qt-history-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-  flex-shrink: 0;
-  stroke: currentColor;
-}
-
-.qt-history-icon.completed {
-  color: var(--success);
-}
-
-.qt-history-icon.cancelled {
-  color: #ef4444;
 }
 
 /* ===== Analytics ===== */

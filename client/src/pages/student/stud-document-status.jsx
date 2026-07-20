@@ -7,7 +7,6 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Hash,
   MessageSquare,
 } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
@@ -206,38 +205,6 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
 
         {/* Sidebar */}
         <div className="dss-detail-sidebar">
-          {/* Tracking number card */}
-          <div className="dss-card">
-            <div className="dss-card-header">
-              <h3 className="dss-card-title">
-                <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
-                Tracking Number
-              </h3>
-            </div>
-            <div className="dss-card-content" style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  fontSize: "1.5rem",
-                  fontWeight: 800,
-                  color: "var(--primary-color)",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {doc.trackingNumber}
-              </div>
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "var(--text-tertiary)",
-                  marginTop: "0.25rem",
-                }}
-              >
-                {doc.college}
-              </div>
-            </div>
-          </div>
-
           {/* Cancel card (only for pending/processing) */}
           {canCancel && (
             <div className="dss-card dss-cancel-card">
@@ -512,13 +479,13 @@ export default function DocumentStatusPage() {
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>
                                 <p className="dss-list-college">{doc.college}</p>
-                                <p className="dss-list-tracking">
-                                  Tracking: <span>{doc.trackingNumber}</span>
-                                </p>
                               </div>
-                              <span className={`dss-badge ${statusMeta.cls}`}>
-                                {statusMeta.label}
-                              </span>
+                              <div className="dss-list-header-right">
+                                <span className="dss-tracking-pill">{doc.trackingNumber}</span>
+                                <span className={`dss-badge ${statusMeta.cls}`}>
+                                  {statusMeta.label}
+                                </span>
+                              </div>
                             </div>
                             <div className="dss-list-card-grid">
                               <div className="dss-list-card-field">
@@ -586,13 +553,13 @@ export default function DocumentStatusPage() {
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>
                                 <p className="dss-list-college">{doc.college}</p>
-                                <p className="dss-list-tracking">
-                                  Tracking: <span>{doc.trackingNumber}</span>
-                                </p>
                               </div>
-                              <span className={`dss-badge ${statusMeta.cls}`}>
-                                {statusMeta.label}
-                              </span>
+                              <div className="dss-list-header-right">
+                                <span className="dss-tracking-pill">{doc.trackingNumber}</span>
+                                <span className={`dss-badge ${statusMeta.cls}`}>
+                                  {statusMeta.label}
+                                </span>
+                              </div>
                             </div>
                             <div className="dss-list-card-grid">
                               <div className="dss-list-card-field">

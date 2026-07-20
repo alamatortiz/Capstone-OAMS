@@ -4,12 +4,11 @@
 // remain at or before it) -- that 0 must not be coerced back into "next in
 // line" the way a naive `|| 1` fallback would.
 //
-// `avgServiceMinutes` is the slot's own historical average (called_at ->
-// completed_at over its 'completed' entries), the same figure already shown
-// to admins in the queue-hosting monitor view -- using it here too keeps the
-// student-facing ETA from silently diverging from what the admin sees for
-// the same queue. Falls back to a flat 5 min/person guess only when there's
-// no history yet (a brand-new slot with zero completed entries).
+// `avgServiceMinutes` is the slot's own admin-configured service time
+// (queue_slots.service_time_minutes), the same figure shown to admins in the
+// queue-hosting monitor view -- using it here too keeps the student-facing
+// ETA from diverging from what the admin sees for the same queue. Falls back
+// to a flat 5 min/person guess only defensively, for pre-migration rows.
 function getQueueDisplayInfo({ status, rawPosition, arrivedAt = null, avgServiceMinutes = null }) {
   if (status === "serving") {
     return {

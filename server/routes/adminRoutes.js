@@ -280,14 +280,7 @@ router.get(
              ORDER BY q3b.called_at DESC
              LIMIT 1
            ) AS currently_serving_arrived_at,
-           (
-             SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, q4.called_at, q4.completed_at)))
-             FROM queues q4
-             WHERE q4.slot_id = qs.slot_id
-               AND q4.status = 'completed'
-               AND q4.called_at IS NOT NULL
-               AND q4.completed_at IS NOT NULL
-           ) AS avg_service_minutes
+           qs.service_time_minutes AS avg_service_minutes
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
@@ -350,7 +343,7 @@ router.get(
 );
 
 // POST /api/admin/queue-hosting
-// Body: { serviceId, maxCapacity, startTime, endTime }
+// Body: { serviceId, maxCapacity, startTime, endTime, serviceTimeMinutes }
 // Opens a new queue_slot for TODAY. serviceId is verified to belong
 // to the admin's own department — this is the actual enforcement
 // point that stops an admin from hosting another college's queue.
@@ -360,11 +353,11 @@ router.post(
   authorizeRoles("admin"),
   async (req, res) => {
     const adminId = req.user.userId;
-    const { serviceId, maxCapacity, startTime, endTime, noShowTimeoutMinutes } = req.body;
+    const { serviceId, maxCapacity, startTime, endTime, noShowTimeoutMinutes, serviceTimeMinutes } = req.body;
 
-    if (!serviceId || !maxCapacity || !startTime || !endTime) {
+    if (!serviceId || !maxCapacity || !startTime || !endTime || !serviceTimeMinutes) {
       return res.status(400).json({
-        error: "serviceId, maxCapacity, startTime, and endTime are required",
+        error: "serviceId, maxCapacity, startTime, endTime, and serviceTimeMinutes are required",
       });
     }
     const capacityNum = parseInt(maxCapacity, 10);
@@ -372,6 +365,12 @@ router.post(
       return res
         .status(400)
         .json({ error: "maxCapacity must be a positive number" });
+    }
+    const serviceTimeNum = parseInt(serviceTimeMinutes, 10);
+    if (!serviceTimeNum || serviceTimeNum <= 0) {
+      return res
+        .status(400)
+        .json({ error: "serviceTimeMinutes must be a positive number" });
     }
     if (startTime >= endTime) {
       return res
@@ -432,9 +431,9 @@ router.post(
 
       const [result] = await pool.query(
         `INSERT INTO queue_slots
-           (service_id, admin_id, slot_date, start_time, end_time, max_capacity, no_show_timeout_minutes, current_count, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'open')`,
-        [serviceId, adminId, getManilaDateString(), startTime, endTime, capacityNum, noShowTimeoutNum],
+           (service_id, admin_id, slot_date, start_time, end_time, max_capacity, no_show_timeout_minutes, service_time_minutes, current_count, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'open')`,
+        [serviceId, adminId, getManilaDateString(), startTime, endTime, capacityNum, noShowTimeoutNum, serviceTimeNum],
       );
 
       emitToDept(deptId, "queue:slot-opened", {
@@ -453,6 +452,7 @@ router.post(
           queueType: service.service_name,
           maxCapacity: capacityNum,
           noShowTimeoutMinutes: noShowTimeoutNum,
+          serviceTimeMinutes: serviceTimeNum,
           currentCount: 0,
           servedCount: 0,
           status: "open",
@@ -2053,7 +2053,6 @@ router.get(
 
       const [rows] = await pool.query(
         `SELECT s.service_id AS id, s.service_name AS name, s.description,
-                s.average_service_time AS avgServiceTime,
                 s.department_id, s.is_cross_college, s.location_id,
                 d.department_abbreviation AS deptAbbrev,
                 l.location_name AS locationName
@@ -2068,7 +2067,6 @@ router.get(
         id: r.id,
         name: r.name,
         description: r.description,
-        avgServiceTime: r.avgServiceTime,
         deptAbbrev: r.deptAbbrev,
         isCrossCollege: !!r.is_cross_college,
         locationId: r.location_id,
@@ -2082,27 +2080,27 @@ router.get(
 );
 
 // POST /api/admin/data-management/service-types
-// Body: { name, description, avgServiceTime, isCrossCollege }
+// Body: { name, description, isCrossCollege }
 router.post(
   "/data-management/service-types",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { name, description, avgServiceTime, isCrossCollege, locationId } = req.body;
-    if (!name || !avgServiceTime) {
-      return res.status(400).json({ error: "name and avgServiceTime are required" });
+    const { name, description, isCrossCollege, locationId } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "name is required" });
     }
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [result] = await pool.query(
-        `INSERT INTO services (service_name, description, department_id, is_cross_college, location_id, average_service_time)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [name, description || null, deptId, !!isCrossCollege, locationId || null, parseInt(avgServiceTime, 10)],
+        `INSERT INTO services (service_name, description, department_id, is_cross_college, location_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [name, description || null, deptId, !!isCrossCollege, locationId || null],
       );
       const newId = result.insertId;
-      await logAudit(req.user.userId, "CREATE", "services", newId, null, { name, avgServiceTime });
+      await logAudit(req.user.userId, "CREATE", "services", newId, null, { name });
       res.status(201).json({ message: "Service type created", id: newId });
     } catch (error) {
       console.error("Service type create error:", error);
@@ -2118,9 +2116,9 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, avgServiceTime, isCrossCollege, locationId } = req.body;
-    if (!name || !avgServiceTime) {
-      return res.status(400).json({ error: "name and avgServiceTime are required" });
+    const { name, description, isCrossCollege, locationId } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "name is required" });
     }
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
@@ -2133,9 +2131,9 @@ router.put(
       if (!old) return res.status(404).json({ error: "Service type not found" });
 
       await pool.query(
-        `UPDATE services SET service_name = ?, description = ?, average_service_time = ?,
+        `UPDATE services SET service_name = ?, description = ?,
          is_cross_college = ?, location_id = ? WHERE service_id = ?`,
-        [name, description || null, parseInt(avgServiceTime, 10), !!isCrossCollege, locationId || null, serviceId],
+        [name, description || null, !!isCrossCollege, locationId || null, serviceId],
       );
 
       await logAudit(req.user.userId, "UPDATE", "services", serviceId,
@@ -2440,7 +2438,7 @@ router.post(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { title, content, type = "general", isPinned = false, isCrossCollege = false } = req.body;
+    const { title, content, type = "general", isPinned = false } = req.body;
     if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({ error: "title and content are required" });
     }
@@ -2456,17 +2454,15 @@ router.post(
       );
       const createdBy = adminRow?.full_name || "Admin Office";
 
+      // Admins can only post to their own department -- cross-college
+      // broadcasting is not offered as a creation option.
       const [result] = await pool.query(
         `INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id, is_cross_college)
-         VALUES (?, ?, ?, 'active', ?, ?, ?, ?)`,
-        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId, isCrossCollege ? 1 : 0],
+         VALUES (?, ?, ?, 'active', ?, ?, ?, FALSE)`,
+        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId],
       );
 
-      if (isCrossCollege) {
-        emitToAll("announcement:changed", { faqId: result.insertId });
-      } else {
-        emitToDept(deptId, "announcement:changed", { faqId: result.insertId });
-      }
+      emitToDept(deptId, "announcement:changed", { faqId: result.insertId });
 
       res.status(201).json({
         announcement: {
@@ -2476,7 +2472,7 @@ router.post(
           type,
           status: "active",
           isPinned: !!isPinned,
-          isCrossCollege: !!isCrossCollege,
+          isCrossCollege: false,
           createdBy,
           date: new Date().toISOString(),
         },
@@ -2495,7 +2491,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const faqId = parseInt(req.params.id, 10);
-    const { title, content, type, isCrossCollege = false } = req.body;
+    const { title, content, type } = req.body;
     if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({ error: "title and content are required" });
     }
@@ -2509,15 +2505,14 @@ router.put(
         return res.status(403).json({ error: "Cannot edit announcements from another department" });
       }
 
+      // Editing always resets is_cross_college to FALSE -- cross-college
+      // broadcasting is not offered as an option going forward, even for
+      // announcements that were originally created with it set.
       await pool.query(
-        `UPDATE faqs SET question = ?, answer = ?, type = ?, is_cross_college = ? WHERE faq_id = ?`,
-        [title.trim(), content.trim(), type || "general", isCrossCollege ? 1 : 0, faqId],
+        `UPDATE faqs SET question = ?, answer = ?, type = ?, is_cross_college = FALSE WHERE faq_id = ?`,
+        [title.trim(), content.trim(), type || "general", faqId],
       );
-      if (isCrossCollege) {
-        emitToAll("announcement:changed", { faqId });
-      } else {
-        emitToDept(deptId, "announcement:changed", { faqId });
-      }
+      emitToDept(deptId, "announcement:changed", { faqId });
       res.json({ message: "Announcement updated" });
     } catch (error) {
       console.error("Announcement update error:", error);
@@ -2725,12 +2720,20 @@ router.get(
         serviceFilter ? [deptId, dateThreshold, serviceFilter] : [deptId, dateThreshold],
       );
 
+      // q.created_at is stored/returned as a UTC instant; HOUR() alone would
+      // bucket by UTC hour, not Manila hour, so shift it first. Shared by the
+      // per-service peak-hour loop below and the department-wide trends
+      // queries further down.
+      const fmtHour = (h) => {
+        const suffix = h >= 12 ? "PM" : "AM";
+        const h12 = h % 12 || 12;
+        return `${h12}:00 ${suffix}`;
+      };
+
       // Peak hour per service
       const peakMap = {};
       for (const row of rows) {
         const [peakRows] = await pool.query(
-          // q.created_at is stored/returned as a UTC instant; HOUR() alone
-          // would bucket by UTC hour, not Manila hour, so shift it first.
           `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr, COUNT(*) AS cnt
            FROM queues q
            WHERE q.service_id = ? AND q.created_at >= ?
@@ -2741,12 +2744,7 @@ router.get(
         );
         if (peakRows.length > 0) {
           const hr = peakRows[0].hr;
-          const fmt = (h) => {
-            const suffix = h >= 12 ? "PM" : "AM";
-            const h12 = h % 12 || 12;
-            return `${h12}:00 ${suffix}`;
-          };
-          peakMap[row.service_id] = `${fmt(hr)} - ${fmt(hr + 1)}`;
+          peakMap[row.service_id] = `${fmtHour(hr)} - ${fmtHour(hr + 1)}`;
         } else {
           peakMap[row.service_id] = "N/A";
         }
@@ -2795,7 +2793,112 @@ router.get(
       );
       const serviceTypes = ["All Services", ...serviceRows.map((s) => s.service_name)];
 
-      res.json({ performance, positiveInsights, improvementAreas, serviceTypes });
+      // ── Trends tab: department-wide (not per-service) stats, plus a
+      // period-over-period comparison against the immediately-preceding
+      // window of equal length (e.g. "This Week" compares to last week). ──
+      const now = new Date();
+      const periodLengthMs = now.getTime() - dateThreshold.getTime();
+      const previousPeriodEnd = dateThreshold;
+      const previousPeriodStart = new Date(dateThreshold.getTime() - periodLengthMs);
+
+      const serviceFilterClause = serviceFilter ? "AND s.service_name = ?" : "";
+
+      // Peak Activity Time: busiest hour department-wide, any queue-join
+      // regardless of status (mirrors the per-service peak-hour query above,
+      // just without the per-service GROUP BY/loop).
+      const [peakActivityRows] = await pool.query(
+        `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr, COUNT(*) AS cnt
+         FROM queues q
+         JOIN services s ON q.service_id = s.service_id
+         WHERE s.department_id = ? AND q.created_at >= ? ${serviceFilterClause}
+         GROUP BY hr
+         ORDER BY cnt DESC
+         LIMIT 1`,
+        serviceFilter ? [deptId, dateThreshold, serviceFilter] : [deptId, dateThreshold],
+      );
+      const peakActivityTime = peakActivityRows.length > 0
+        ? `${fmtHour(peakActivityRows[0].hr)} - ${fmtHour(peakActivityRows[0].hr + 1)}`
+        : "N/A";
+
+      // Best Service Time: hour with the lowest avg wait among completed
+      // tickets (the "shortest average wait times" hour of the day).
+      const [bestServiceRows] = await pool.query(
+        `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr,
+                AVG(TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at)) AS avg_wait_minutes
+         FROM queues q
+         JOIN services s ON q.service_id = s.service_id
+         WHERE q.status = 'completed' AND s.department_id = ? AND q.created_at >= ? ${serviceFilterClause}
+         GROUP BY hr
+         ORDER BY avg_wait_minutes ASC
+         LIMIT 1`,
+        serviceFilter ? [deptId, dateThreshold, serviceFilter] : [deptId, dateThreshold],
+      );
+      const bestServiceTime = bestServiceRows.length > 0
+        ? `${fmtHour(bestServiceRows[0].hr)} - ${fmtHour(bestServiceRows[0].hr + 1)}`
+        : "N/A";
+
+      // Department-wide current vs. previous period aggregates, for the
+      // "Weekly Comparison" style cards.
+      const fetchPeriodAgg = async (start, end) => {
+        const [[agg]] = await pool.query(
+          `SELECT COUNT(q.queue_id) AS students_served,
+                  AVG(TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at)) AS avg_wait_minutes
+           FROM queues q
+           JOIN services s ON q.service_id = s.service_id
+           WHERE q.status = 'completed' AND s.department_id = ?
+             AND q.created_at >= ? AND q.created_at < ?
+             ${serviceFilterClause}`,
+          serviceFilter ? [deptId, start, end, serviceFilter] : [deptId, start, end],
+        );
+        const avgWait = agg.avg_wait_minutes != null ? parseFloat(agg.avg_wait_minutes) : 0;
+        return {
+          studentsServed: agg.students_served || 0,
+          avgWaitMinutes: avgWait,
+          satisfaction: Math.min(100, Math.max(60, Math.round(100 - avgWait * 1.5))),
+        };
+      };
+      const [currentAgg, previousAgg] = await Promise.all([
+        fetchPeriodAgg(dateThreshold, now),
+        fetchPeriodAgg(previousPeriodStart, previousPeriodEnd),
+      ]);
+
+      // No prior-period data to compare against -- show "New" (a real
+      // current value with nothing to size it against) or "N/A" (nothing to
+      // show either way), rather than a division-by-zero/Infinity percentage,
+      // or (for satisfaction specifically) a misleading comparison against
+      // the synthetic formula's zero-wait/100%-satisfaction default.
+      const pctChange = (curr, prev, hasBaseline = prev !== 0) => {
+        if (!hasBaseline) return curr ? "New" : "N/A";
+        const pct = Math.round(((curr - prev) / prev) * 100);
+        return `${pct >= 0 ? "+" : ""}${pct}%`;
+      };
+
+      const trends = {
+        peakActivityTime,
+        bestServiceTime,
+        weeklyComparison: [
+          {
+            label: "Students Served",
+            value: String(currentAgg.studentsServed),
+            change: pctChange(currentAgg.studentsServed, previousAgg.studentsServed),
+            color: "#22c55e",
+          },
+          {
+            label: "Avg Wait Time",
+            value: currentAgg.avgWaitMinutes > 0 ? `${Math.round(currentAgg.avgWaitMinutes)} min` : "N/A",
+            change: pctChange(currentAgg.avgWaitMinutes, previousAgg.avgWaitMinutes),
+            color: "#3b82f6",
+          },
+          {
+            label: "Satisfaction Rate",
+            value: `${currentAgg.satisfaction}%`,
+            change: pctChange(currentAgg.satisfaction, previousAgg.satisfaction, previousAgg.studentsServed > 0),
+            color: "#22c55e",
+          },
+        ],
+      };
+
+      res.json({ performance, positiveInsights, improvementAreas, serviceTypes, trends });
     } catch (error) {
       console.error("Queue analytics error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });

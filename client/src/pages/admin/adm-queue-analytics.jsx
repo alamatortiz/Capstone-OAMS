@@ -170,7 +170,12 @@ export default function AdminQueueAnalytics() {
 
   // Analytics data from API
   const [serviceTypes, setServiceTypes] = useState(["All Services"]);
-  const [analyticsData, setAnalyticsData] = useState({ performance: [], positiveInsights: [], improvementAreas: [] });
+  const [analyticsData, setAnalyticsData] = useState({
+    performance: [],
+    positiveInsights: [],
+    improvementAreas: [],
+    trends: { peakActivityTime: "N/A", bestServiceTime: "N/A", weeklyComparison: [] },
+  });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   const fetchAnalytics = useCallback(async () => {
@@ -183,6 +188,7 @@ export default function AdminQueueAnalytics() {
         performance: res.data.performance ?? [],
         positiveInsights: res.data.positiveInsights ?? [],
         improvementAreas: res.data.improvementAreas ?? [],
+        trends: res.data.trends ?? { peakActivityTime: "N/A", bestServiceTime: "N/A", weeklyComparison: [] },
       });
       if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
     } catch (err) {
@@ -236,16 +242,31 @@ export default function AdminQueueAnalytics() {
 
   const generateBotResponse = (input) => {
     const i = input.toLowerCase();
+    const trends = analyticsData.trends;
+    const worstWait = performance.length > 0
+      ? [...performance].sort((a, b) => (parseInt(b.avgWait) || 0) - (parseInt(a.avgWait) || 0))[0]
+      : null;
+    const bestSatisfaction = performance.length > 0
+      ? [...performance].sort((a, b) => (b.satisfaction || 0) - (a.satisfaction || 0))[0]
+      : null;
     if (i.includes("wait"))
-      return "Average wait time today is 16 minutes, which is 3 minutes below average. CBAA Subject Enrollment has the highest at 22 minutes.";
+      return worstWait
+        ? `Average wait time for this period is ${avgWaitAll} minutes. ${worstWait.college} ${worstWait.service} has the highest at ${worstWait.avgWait}.`
+        : `Average wait time for this period is ${avgWaitAll} minutes.`;
     if (i.includes("satisfaction"))
-      return "Overall satisfaction is at 86%, a 5% improvement. CCS Subject Enrollment leads with 92%.";
+      return bestSatisfaction
+        ? `Overall satisfaction is at ${avgSatisfaction}%. ${bestSatisfaction.college} ${bestSatisfaction.service} leads with ${bestSatisfaction.satisfaction}%.`
+        : `Overall satisfaction is at ${avgSatisfaction}%.`;
     if (i.includes("peak"))
-      return "Peak hours are 9:00 AM - 11:00 AM across all services. Best service time is 1:00 PM - 3:00 PM.";
+      return `Peak hours are ${trends.peakActivityTime} across all services. Best service time is ${trends.bestServiceTime}.`;
     if (i.includes("queue") || i.includes("active"))
-      return "There are 12 active queues across all departments right now.";
-    if (i.includes("served") || i.includes("student"))
-      return "684 students have been served today, up 12% from yesterday.";
+      return `There are ${performance.length} service${performance.length === 1 ? "" : "s"} with activity this period.`;
+    if (i.includes("served") || i.includes("student")) {
+      const servedTrend = trends.weeklyComparison?.find((t) => t.label === "Students Served");
+      return servedTrend
+        ? `${servedTrend.value} students have been served this period, ${servedTrend.change} vs. the previous period.`
+        : `${totalServed} students have been served this period.`;
+    }
     return "I can help with wait times, satisfaction rates, peak hours, and queue performance. What would you like to know?";
   };
 
@@ -582,7 +603,7 @@ export default function AdminQueueAnalytics() {
                     className="aqa-trend-item-value"
                     style={{ color: "#3b82f6" }}
                   >
-                    9:00 AM - 11:00 AM
+                    {analyticsData.trends.peakActivityTime}
                   </p>
                   <p className="aqa-trend-item-note">
                     Highest queue volume period
@@ -594,7 +615,7 @@ export default function AdminQueueAnalytics() {
                     className="aqa-trend-item-value"
                     style={{ color: "#22c55e" }}
                   >
-                    1:00 PM - 3:00 PM
+                    {analyticsData.trends.bestServiceTime}
                   </p>
                   <p className="aqa-trend-item-note">
                     Shortest average wait times
@@ -602,41 +623,26 @@ export default function AdminQueueAnalytics() {
                 </div>
               </div>
               <div className="aqa-trend-card">
-                <p className="aqa-trend-title">Weekly Comparison</p>
-                <p className="aqa-trend-sub">Performance vs last week</p>
-                {[
-                  {
-                    label: "Students Served",
-                    value: "684",
-                    change: "+12%",
-                    color: "#22c55e",
-                  },
-                  {
-                    label: "Avg Wait Time",
-                    value: "16 min",
-                    change: "-15%",
-                    color: "#3b82f6",
-                  },
-                  {
-                    label: "Satisfaction Rate",
-                    value: "86%",
-                    change: "+5%",
-                    color: "#22c55e",
-                  },
-                ].map((row, idx) => (
-                  <div key={idx} className="aqa-weekly-row">
-                    <span className="aqa-weekly-label">{row.label}</span>
-                    <div className="aqa-weekly-right">
-                      <span
-                        className="aqa-weekly-value"
-                        style={{ color: row.color }}
-                      >
-                        {row.value}
-                      </span>
-                      <span className="aqa-weekly-change">{row.change}</span>
+                <p className="aqa-trend-title">Period Comparison</p>
+                <p className="aqa-trend-sub">Performance vs the previous {timePeriod.toLowerCase()}</p>
+                {analyticsData.trends.weeklyComparison.length > 0 ? (
+                  analyticsData.trends.weeklyComparison.map((row, idx) => (
+                    <div key={idx} className="aqa-weekly-row">
+                      <span className="aqa-weekly-label">{row.label}</span>
+                      <div className="aqa-weekly-right">
+                        <span
+                          className="aqa-weekly-value"
+                          style={{ color: row.color }}
+                        >
+                          {row.value}
+                        </span>
+                        <span className="aqa-weekly-change">{row.change}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="aqa-trend-sub">No data available for this period yet.</p>
+                )}
               </div>
             </div>
           )}

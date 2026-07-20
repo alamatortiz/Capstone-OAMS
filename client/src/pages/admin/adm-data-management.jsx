@@ -93,7 +93,6 @@ const emptyDocForm = () => ({
 const emptyServiceForm = () => ({
   name: "",
   description: "",
-  avgServiceTime: "",
   isCrossCollege: false,
   locationId: "",
   otherLocationName: "",
@@ -352,7 +351,6 @@ export default function AdminDataManagement() {
     setServiceForm({
       name: s.name,
       description: s.description || "",
-      avgServiceTime: String(s.avgServiceTime),
       isCrossCollege: !!s.isCrossCollege,
       locationId: s.locationId ? String(s.locationId) : "",
     });
@@ -410,9 +408,9 @@ export default function AdminDataManagement() {
   };
 
   const handleServiceSubmit = async () => {
-    const { name, avgServiceTime } = serviceForm;
-    if (!name || !avgServiceTime) {
-      toast.error("Service name and average service time are required.");
+    const { name } = serviceForm;
+    if (!name) {
+      toast.error("Service name is required.");
       return;
     }
     if (serviceForm.locationId === "__other__" && !serviceForm.otherLocationName.trim()) {
@@ -433,7 +431,6 @@ export default function AdminDataManagement() {
       const payload = {
         name: serviceForm.name,
         description: serviceForm.description,
-        avgServiceTime: parseInt(serviceForm.avgServiceTime, 10),
         isCrossCollege: serviceForm.isCrossCollege,
         locationId,
       };
@@ -758,17 +755,6 @@ export default function AdminDataManagement() {
                     />
                   </div>
                   <div className="adm-form-group">
-                    <label className="adm-form-label">Avg. Service Time (min) *</label>
-                    <input
-                      className="adm-form-input"
-                      type="number"
-                      min="1"
-                      placeholder="e.g., 15"
-                      value={serviceForm.avgServiceTime}
-                      onChange={(e) => setServiceForm((p) => ({ ...p, avgServiceTime: e.target.value }))}
-                    />
-                  </div>
-                  <div className="adm-form-group">
                     <label className="adm-form-label">Location</label>
                     <select
                       className="adm-form-select"
@@ -1084,9 +1070,6 @@ export default function AdminDataManagement() {
                           </div>
                         </div>
                         {s.description && <p className="adm-item-desc">{s.description}</p>}
-                        <div className="adm-item-meta">
-                          <span>Avg. Service Time: {s.avgServiceTime} min</span>
-                        </div>
                       </div>
                       <div className="adm-item-actions">
                         <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditServiceModal(s)} title="Edit">

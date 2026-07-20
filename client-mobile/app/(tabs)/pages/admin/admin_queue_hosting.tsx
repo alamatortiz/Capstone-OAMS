@@ -238,6 +238,7 @@ export default function AdminQueueHostingScreen() {
   const [serviceStart, setServiceStart] = useState('08:00');
   const [serviceEnd, setServiceEnd] = useState('17:00');
   const [noShowTimeout, setNoShowTimeout] = useState('15');
+  const [serviceTime, setServiceTime] = useState('15');
   const [formError, setFormError] = useState('');
 
   const resetForm = () => {
@@ -246,6 +247,7 @@ export default function AdminQueueHostingScreen() {
     setServiceStart('08:00');
     setServiceEnd('17:00');
     setNoShowTimeout('15');
+    setServiceTime('15');
     setFormError('');
   };
   const openModal = () => {
@@ -280,6 +282,11 @@ export default function AdminQueueHostingScreen() {
       setFormError('Please enter a valid no-show timeout in minutes');
       return;
     }
+    const serviceTimeNum = parseInt(serviceTime, 10);
+    if (!serviceTimeNum || serviceTimeNum <= 0) {
+      setFormError('Please enter a valid service time in minutes');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -289,6 +296,7 @@ export default function AdminQueueHostingScreen() {
         startTime: `${serviceStart}:00`,
         endTime: `${serviceEnd}:00`,
         noShowTimeoutMinutes: noShowTimeoutNum,
+        serviceTimeMinutes: serviceTimeNum,
       });
       Toast.show({ type: 'success', text1: 'Queue line opened successfully!' });
       closeModal();
@@ -810,12 +818,14 @@ export default function AdminQueueHostingScreen() {
         serviceStart={serviceStart}
         serviceEnd={serviceEnd}
         noShowTimeout={noShowTimeout}
+        serviceTime={serviceTime}
         formError={formError}
         onOpenServiceSelect={() => setSelectField('service')}
         onChangeCapacity={setMaxCapacity}
         onChangeStart={setServiceStart}
         onChangeEnd={setServiceEnd}
         onChangeNoShowTimeout={setNoShowTimeout}
+        onChangeServiceTime={setServiceTime}
         onClose={closeModal}
         onSubmit={handleOpenQueueSubmit}
         theme={theme}
@@ -947,12 +957,14 @@ function OpenQueueModal({
   serviceStart,
   serviceEnd,
   noShowTimeout,
+  serviceTime,
   formError,
   onOpenServiceSelect,
   onChangeCapacity,
   onChangeStart,
   onChangeEnd,
   onChangeNoShowTimeout,
+  onChangeServiceTime,
   onClose,
   onSubmit,
   theme,
@@ -967,12 +979,14 @@ function OpenQueueModal({
   serviceStart: string;
   serviceEnd: string;
   noShowTimeout: string;
+  serviceTime: string;
   formError: string;
   onOpenServiceSelect: () => void;
   onChangeCapacity: (v: string) => void;
   onChangeStart: (v: string) => void;
   onChangeEnd: (v: string) => void;
   onChangeNoShowTimeout: (v: string) => void;
+  onChangeServiceTime: (v: string) => void;
   onClose: () => void;
   onSubmit: () => void;
   theme: ThemePalette;
@@ -1028,6 +1042,22 @@ function OpenQueueModal({
                 value={maxCapacity}
                 onChangeText={onChangeCapacity}
               />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Service Time (minutes) *</Text>
+              <TextInput
+                style={styles.textInput}
+                keyboardType="number-pad"
+                placeholder="e.g., 15"
+                placeholderTextColor={theme.tertiary}
+                value={serviceTime}
+                onChangeText={onChangeServiceTime}
+              />
+              <Text style={styles.formHint}>
+                Estimated time to serve one student in this queue — used to calculate students&apos; wait-time
+                estimates.
+              </Text>
             </View>
 
             <View style={styles.formGroup}>

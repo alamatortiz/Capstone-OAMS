@@ -247,6 +247,7 @@ export default function AdminUserManagement() {
       message: <>{confirmSuspending ? "Suspend" : "Reactivate"} <strong>{confirmAction.user.name}</strong>'s account?</>,
       confirmText: confirmSuspending ? "Suspend" : "Reactivate",
       icon: confirmSuspending ? <BanIconSvg /> : <CheckCircleIconSvg />,
+      variant: confirmSuspending ? "danger" : "success",
     },
   }[confirmAction.type];
 
@@ -336,6 +337,7 @@ export default function AdminUserManagement() {
             message={confirmMeta?.message}
             icon={confirmMeta?.icon}
             confirmText={confirmMeta?.confirmText}
+            variant={confirmMeta?.variant ?? "danger"}
           />
 
           <ChatWidget

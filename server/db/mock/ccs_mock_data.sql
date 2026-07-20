@@ -374,15 +374,15 @@ INSERT INTO students (student_id, student_number, first_name, last_name, course,
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5 · SERVICES (queue only)
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO services (service_id, service_name, description, department_id, is_cross_college, location_id, average_service_time) VALUES
-(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001, FALSE, 1,    20),
-(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001, FALSE, 2,    15),
-(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, FALSE, 1,    10),
-(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, FALSE, 1,    15),
-(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, FALSE, 3,    10),
-(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, FALSE, 4,    30),
+INSERT INTO services (service_id, service_name, description, department_id, is_cross_college, location_id) VALUES
+(1, 'Enrollment Assistance',     'Help with enrollment and subject loading',        1001, FALSE, 1),
+(2, 'Grade Inquiry',             'Request for grade verification or correction',    1001, FALSE, 2),
+(3, 'Good Moral Certificate',    'Request for Good Moral Certificate',              1001, FALSE, 1),
+(4, 'Transcript of Records',     'Request for official Transcript of Records',      1001, FALSE, 1),
+(5, 'Certificate of Enrollment', 'Request for Certificate of Enrollment',           2001, FALSE, 3),
+(6, 'Clearance Processing',      'Process student clearance for graduation/leave',  3001, FALSE, 4),
 -- Hosted by CCS, but every other department's students can also join it.
-(7, 'General Inquiry Counter',   'Walk-in general inquiries available to all departments', 1001, TRUE, 10, 10);
+(7, 'General Inquiry Counter',   'Walk-in general inquiries available to all departments', 1001, TRUE, 10);
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5a-REQ · SERVICE REQUIREMENTS
@@ -508,12 +508,12 @@ INSERT INTO document_requirements (service_id, requirement_name, description, is
 -- clean local test baseline — uncomment to seed queues/appointments.
 -- ─────────────────────────────────────────────────────────────
 /*
-INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, no_show_timeout_minutes, status) VALUES
-(1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 15, 'open'),
-(2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 15, 'open'),
-(3, 3, 103, CURDATE(), '13:00:00', '17:00:00', 15,  0, 15, 'open'),
-(4, 4, 103, CURDATE(), '08:00:00', '12:00:00', 20,  0, 15, 'open'),
-(5, 1, 103, CURDATE(), '13:00:00', '17:00:00', 10,  0,  5, 'open');
+INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, no_show_timeout_minutes, service_time_minutes, status) VALUES
+(1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 15, 20, 'open'),
+(2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 15, 15, 'open'),
+(3, 3, 103, CURDATE(), '13:00:00', '17:00:00', 15,  0, 15, 10, 'open'),
+(4, 4, 103, CURDATE(), '08:00:00', '12:00:00', 20,  0, 15, 15, 'open'),
+(5, 1, 103, CURDATE(), '13:00:00', '17:00:00', 10,  0,  5, 20, 'open');
 
 
 -- ─────────────────────────────────────────────────────────────

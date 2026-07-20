@@ -400,10 +400,6 @@ export default function QueuePage() {
                     </div>
                     <div className="avail-services-hero-meta-row">
                       <div className="avail-services-service-hero-meta">
-                        <Clock className="avail-services-service-hero-icon" />
-                        <span>Avg. Wait: {selectedSlot.avgWaitTime}</span>
-                      </div>
-                      <div className="avail-services-service-hero-meta">
                         <Users className="avail-services-service-hero-icon" />
                         <span>{selectedSlot.waitingCount} currently waiting</span>
                       </div>
@@ -653,6 +649,26 @@ export default function QueuePage() {
                                   Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ""}
                                 </div>
                               )}
+                              {queue.slotStatus === "full" && (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    background: "rgba(59, 130, 246, 0.1)",
+                                    border: "1px solid rgba(59, 130, 246, 0.35)",
+                                    color: "#3b82f6",
+                                    borderRadius: "999px",
+                                    padding: "0.2rem 0.65rem",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 600,
+                                    margin: "0.5rem 0",
+                                  }}
+                                >
+                                  <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
+                                  Queue Full: No longer accepting students but students within the queue will still be served
+                                </div>
+                              )}
                               <div className="qp-stats-grid">
                                 <div className="qp-stat">
                                   <p className="qp-stat-label">Your Position</p>
@@ -800,7 +816,7 @@ export default function QueuePage() {
                                       <h3 className="qp-service-name">{slot.serviceName}</h3>
                                       <p className="qp-college-name">{slot.departmentName}</p>
                                     </div>
-                                    <span className={`queue-status-badge ${isPaused ? 'queue-status-badge--paused' : ''}`}>
+                                    <span className={`queue-status-badge ${isPaused ? 'queue-status-badge--paused' : atCapacity ? 'queue-status-badge--full' : ''}`}>
                                       {isPaused ? 'Paused' : outsideHours ? 'Closed' : atCapacity ? 'Full' : 'Open'}
                                     </span>
                                   </div>

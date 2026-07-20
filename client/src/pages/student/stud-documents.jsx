@@ -526,16 +526,16 @@ export default function DocumentsPage() {
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
                             <p className="doc-card-college">{doc.college}</p>
-                            <p className="doc-card-tracking">
-                              Tracking: <span>{doc.trackingNumber}</span>
-                            </p>
                           </div>
-                          <span
-                            className={`doc-badge ${getStatusColor(doc.status)}`}
-                          >
-                            {getStatusIcon(doc.status)}
-                            {doc.status}
-                          </span>
+                          <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
+                            <span
+                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                            >
+                              {getStatusIcon(doc.status)}
+                              {doc.status}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="doc-card-grid">
@@ -656,21 +656,23 @@ export default function DocumentsPage() {
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
-                            <p className="doc-card-college">{doc.college}</p>
-                            <p className="doc-card-tracking">
+                            <p className="doc-card-college">
+                              {doc.college} •{" "}
                               {formatManilaDate(doc.requestDate, {
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
-                              })}{" "}
-                              • {doc.trackingNumber}
+                              })}
                             </p>
                           </div>
-                          <span
-                            className={`doc-badge ${getStatusColor(doc.status)}`}
-                          >
-                            {doc.status}
-                          </span>
+                          <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
+                            <span
+                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                            >
+                              {doc.status}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ))}

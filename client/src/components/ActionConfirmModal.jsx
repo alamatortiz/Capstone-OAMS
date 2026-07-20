@@ -11,6 +11,7 @@ export default function ActionConfirmModal({
   confirmText = "Confirm",
   cancelText = "Cancel",
   confirmDisabled = false,
+  variant = "danger",
 }) {
   useLockBodyScroll(show);
 
@@ -19,7 +20,7 @@ export default function ActionConfirmModal({
   return (
     <div className="acm-overlay">
       <div className="acm-modal">
-        {icon && <div className="acm-icon">{icon}</div>}
+        {icon && <div className={`acm-icon acm-icon--${variant}`}>{icon}</div>}
         <h3 className="acm-title">{title}</h3>
         <div className="acm-message">{message}</div>
         <div className="acm-actions">
@@ -31,7 +32,7 @@ export default function ActionConfirmModal({
             {cancelText}
           </button>
           <button
-            className="acm-confirm"
+            className={`acm-confirm acm-confirm--${variant}`}
             onClick={onConfirm}
             disabled={confirmDisabled}
           >

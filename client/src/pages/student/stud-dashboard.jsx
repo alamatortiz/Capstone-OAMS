@@ -560,9 +560,6 @@ export default function StudentDashboard() {
           <section className="quick-actions-section">
             <div className="section-header">
               <h2>Quick Actions</h2>
-              <span className="section-count">
-                {quickActions.length} features available
-              </span>
             </div>
             <div className="quick-actions-grid">
               {quickActions.map((action, index) => (

@@ -171,7 +171,7 @@ const YES_NO_OPTIONS = [
   { value: 'true', label: 'Yes' },
 ];
 
-const EMPTY_FORM = { title: '', content: '', type: 'general' as AnnouncementType, isCrossCollege: false };
+const EMPTY_FORM = { title: '', content: '', type: 'general' as AnnouncementType };
 const EMPTY_CREATE_FORM = { ...EMPTY_FORM, isPinned: false };
 
 interface NavItem {
@@ -365,7 +365,7 @@ export default function AdminAnnouncementScreen() {
 
   const openEdit = (a: AnnouncementItem) => {
     setEditingAnnouncement(a);
-    setEditForm({ title: a.title, content: a.content, type: a.type, isCrossCollege: a.isCrossCollege });
+    setEditForm({ title: a.title, content: a.content, type: a.type });
   };
   const closeEdit = () => {
     setEditingAnnouncement(null);
@@ -382,12 +382,11 @@ export default function AdminAnnouncementScreen() {
         title: editForm.title,
         content: editForm.content,
         type: editForm.type,
-        isCrossCollege: editForm.isCrossCollege,
       });
       setAnnouncements((prev) =>
         prev.map((a) =>
           a.id === editingAnnouncement.id
-            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, isCrossCollege: editForm.isCrossCollege }
+            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, isCrossCollege: false }
             : a,
         ),
       );
@@ -416,7 +415,6 @@ export default function AdminAnnouncementScreen() {
         content: createForm.content,
         type: createForm.type,
         isPinned: createForm.isPinned,
-        isCrossCollege: createForm.isCrossCollege,
       });
       setAnnouncements((prev) => [data.announcement, ...prev]);
       closeCreate();
@@ -817,46 +815,25 @@ export default function AdminAnnouncementScreen() {
                   textAlignVertical="top"
                 />
               </View>
-              <View style={styles.formRow}>
-                <Pressable
-                  style={[styles.filterSelect, styles.formSelectHalf]}
-                  onPress={() =>
-                    setPicker({
-                      title: 'Select Type',
-                      options: TYPE_FORM_OPTIONS,
-                      currentValue: editForm.type,
-                      onSelect: (value) => {
-                        setEditForm({ ...editForm, type: value as AnnouncementType });
-                        setPicker(null);
-                      },
-                    })
-                  }
-                >
-                  <Text style={styles.filterSelectText} numberOfLines={1}>
-                    {TYPE_META[editForm.type].label}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color={theme.primary} />
-                </Pressable>
-                <Pressable
-                  style={[styles.filterSelect, styles.formSelectHalf]}
-                  onPress={() =>
-                    setPicker({
-                      title: 'Share with all colleges?',
-                      options: YES_NO_OPTIONS,
-                      currentValue: editForm.isCrossCollege ? 'true' : 'false',
-                      onSelect: (value) => {
-                        setEditForm({ ...editForm, isCrossCollege: value === 'true' });
-                        setPicker(null);
-                      },
-                    })
-                  }
-                >
-                  <Text style={styles.filterSelectText} numberOfLines={1}>
-                    {editForm.isCrossCollege ? 'Cross-College: Yes' : 'Cross-College: No'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color={theme.primary} />
-                </Pressable>
-              </View>
+              <Pressable
+                style={styles.filterSelect}
+                onPress={() =>
+                  setPicker({
+                    title: 'Select Type',
+                    options: TYPE_FORM_OPTIONS,
+                    currentValue: editForm.type,
+                    onSelect: (value) => {
+                      setEditForm({ ...editForm, type: value as AnnouncementType });
+                      setPicker(null);
+                    },
+                  })
+                }
+              >
+                <Text style={styles.filterSelectText} numberOfLines={1}>
+                  {TYPE_META[editForm.type].label}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+              </Pressable>
 
               <View style={styles.modalFooterRow}>
                 <Pressable style={styles.secondaryBtn} onPress={closeEdit}>
@@ -947,25 +924,6 @@ export default function AdminAnnouncementScreen() {
                   <Ionicons name="chevron-down" size={16} color={theme.primary} />
                 </Pressable>
               </View>
-              <Pressable
-                style={styles.filterSelect}
-                onPress={() =>
-                  setPicker({
-                    title: 'Share with all colleges?',
-                    options: YES_NO_OPTIONS,
-                    currentValue: createForm.isCrossCollege ? 'true' : 'false',
-                    onSelect: (value) => {
-                      setCreateForm({ ...createForm, isCrossCollege: value === 'true' });
-                      setPicker(null);
-                    },
-                  })
-                }
-              >
-                <Text style={styles.filterSelectText} numberOfLines={1}>
-                  {createForm.isCrossCollege ? 'Cross-College: Yes' : 'Cross-College: No'}
-                </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
-              </Pressable>
 
               <View style={styles.modalFooterRow}>
                 <Pressable style={styles.secondaryBtn} onPress={closeCreate}>

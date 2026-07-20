@@ -22,7 +22,7 @@
   border-radius: 16px;
   padding: 2rem 2rem 1.5rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   text-align: center;
   animation: qcm-slide-up 0.2s ease;
@@ -31,6 +31,18 @@
 @keyframes qcm-slide-up {
   from { transform: translateY(16px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
+}
+
+.qcm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  color: #3b82f6;
 }
 
 .qcm-title {
@@ -43,8 +55,9 @@
 .qcm-message {
   font-size: 0.875rem;
   color: var(--muted-foreground, #94a3b8);
-  margin: 0 0 1.25rem;
+  margin: 0 0 1.5rem;
   line-height: 1.5;
+  text-align: justify;
 }
 
 .qcm-textarea {

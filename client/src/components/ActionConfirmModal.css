@@ -37,12 +37,25 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 1rem;
+}
+
+.acm-icon--danger {
+  background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
+}
+
+.acm-icon--success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.acm-icon--neutral {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
 
 .acm-title {
@@ -57,6 +70,7 @@
   color: var(--muted-foreground, #94a3b8);
   margin: 0 0 1.5rem;
   line-height: 1.5;
+  text-align: justify;
 }
 
 .acm-actions {
@@ -92,7 +106,6 @@
   padding: 0.625rem 1rem;
   border-radius: 8px;
   border: none;
-  background: #ef4444;
   color: #fff;
   font-size: 0.875rem;
   font-weight: 600;
@@ -104,8 +117,28 @@
   transition: background 0.15s;
 }
 
-.acm-confirm:hover:not(:disabled) {
+.acm-confirm--danger {
+  background: #ef4444;
+}
+
+.acm-confirm--danger:hover:not(:disabled) {
   background: #dc2626;
+}
+
+.acm-confirm--success {
+  background: #22c55e;
+}
+
+.acm-confirm--success:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.acm-confirm--neutral {
+  background: #3b82f6;
+}
+
+.acm-confirm--neutral:hover:not(:disabled) {
+  background: #2563eb;
 }
 
 .acm-confirm:disabled {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Megaphone as LucideMegaphone } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../../utils/api";
@@ -6,7 +6,6 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
-import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
 
 import "./stud-announcements.css";
@@ -58,19 +57,6 @@ const ChevronLeftIcon = () => (
   </svg>
 );
 
-const ChevronDownIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-);
-
 const Loader2Icon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="12" y1="2" x2="12" y2="6"></line>
@@ -88,7 +74,6 @@ const Loader2Icon = () => (
 export default function AnnouncementsPage() {
   // ── UI State ──────────────────────────────────────────────────────────────
   const [selectedFilter, setSelectedFilter] = useState("pinned");
-  const [selectedCollege, setSelectedCollege] = useState("all");
 
   // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
   const [announcements, setAnnouncements] = useState([]);
@@ -146,54 +131,24 @@ export default function AnnouncementsPage() {
     { id: "general", label: "General" },
   ];
 
-  // ── College options derived from live data: each department that actually
-  //    has at least one announcement, keyed by abbreviation (e.g. "CCS").
-  //    Cross-college announcements still belong to one real department, so
-  //    they're a selectable filter like any other -- they also always
-  //    remain visible regardless of which college is selected (see
-  //    isCrossCollege check below), since they apply to every department. ──
-  const collegeOptions = useMemo(() => {
-    const seen = new Map();
-    announcements.forEach((a) => {
-      if (!seen.has(a.departmentAbbrev)) {
-        seen.set(a.departmentAbbrev, a.departmentName);
-      }
-    });
-    return [...seen.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([abbrev, name]) => ({ abbrev, name }));
-  }, [announcements]);
-
-  // ── Filtered announcements (category tab + department dropdown both apply).
-  //    Selecting a college (e.g. "CCS") shows that college's announcements
-  //    PLUS cross-college ones -- never hides cross-college notices. ───────
-  const pinnedAnnouncements = announcements
-    .filter((a) => a.isPinned)
-    .filter(
-      (a) =>
-        selectedCollege === "all" ||
-        a.departmentAbbrev === selectedCollege ||
-        a.isCrossCollege,
-    );
+  // ── Filtered announcements. The backend already scopes the list to the
+  //    student's own department (plus any cross-college notices), so only
+  //    the category tab filter is applied here. ─────────────────────────
+  const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
   // Pinned announcements are NOT excluded here -- they have their own
   // dedicated "Pinned" tab, but a pinned item matching the selected
   // category (or "All") should still appear in that tab too, rather than
   // only ever being visible under "Pinned".
-  const filteredAnnouncements = announcements
-    .filter((a) => selectedFilter === "all" || a.category === selectedFilter)
-    .filter(
-      (a) =>
-        selectedCollege === "all" ||
-        a.departmentAbbrev === selectedCollege ||
-        a.isCrossCollege,
-    );
+  const filteredAnnouncements = announcements.filter(
+    (a) => selectedFilter === "all" || a.category === selectedFilter,
+  );
 
   const generateBotResponse = (userInput) => {
     const lowerInput = userInput.toLowerCase();
     if (lowerInput.includes("announcement")) {
       const total = announcements.length;
       const pinned = pinnedAnnouncements.length;
-      return `There are currently ${total} announcements, with ${pinned} pinned as important. You can filter by category or college using the controls above!`;
+      return `There are currently ${total} announcements, with ${pinned} pinned as important. You can filter by category using the tabs above!`;
     } else if (lowerInput.includes("important")) {
       const importantCount = announcements.filter(
         (a) => a.category === "important",
@@ -209,7 +164,7 @@ export default function AnnouncementsPage() {
       lowerInput.includes("college") ||
       lowerInput.includes("department")
     ) {
-      return "Use the College dropdown to filter announcements down to a specific department, or leave it on 'All Colleges' to see everything.";
+      return "You're seeing announcements from your own department, plus any university-wide notices.";
     } else {
       return "I can help you find announcements, learn about upcoming events, deadlines, and more. What would you like to know?";
     }
@@ -276,7 +231,7 @@ export default function AnnouncementsPage() {
             </div>
           )}
 
-          {/* Tabs + College Filter */}
+          {/* Tabs */}
           <div className="ann-tabs-bar">
             <div className="ann-tabs-list">
               {filterTabs.map((tab) => (
@@ -288,22 +243,6 @@ export default function AnnouncementsPage() {
                   {tab.label}
                 </button>
               ))}
-            </div>
-            <div className="ann-college-wrapper">
-              <select
-                value={selectedCollege}
-                onChange={(e) => setSelectedCollege(e.target.value)}
-                aria-label="Filter by college"
-                className="ann-college-select"
-              >
-                <option value="all">All Colleges</option>
-                {collegeOptions.map((opt) => (
-                  <option key={opt.abbrev} value={opt.abbrev}>
-                    {formatCollegeLabel(opt.abbrev, opt.name)}
-                  </option>
-                ))}
-              </select>
-              <ChevronDownIcon />
             </div>
           </div>
 

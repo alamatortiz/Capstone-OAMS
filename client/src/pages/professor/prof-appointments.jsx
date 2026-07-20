@@ -73,6 +73,7 @@ const CONFIRM_META = {
     message: <>Approve the appointment request from <strong>{apt.studentName}</strong>?</>,
     confirmText: "Approve",
     icon: <CheckCircle2 style={{ width: 22, height: 22 }} />,
+    variant: "success",
   }),
   reject: (apt) => ({
     title: "Reject Appointment?",
@@ -85,6 +86,7 @@ const CONFIRM_META = {
     message: <>Mark the appointment with <strong>{apt.studentName}</strong> as completed?</>,
     confirmText: "Mark Complete",
     icon: <CheckCircle2 style={{ width: 22, height: 22 }} />,
+    variant: "success",
   }),
   cancel: (apt) => ({
     title: "Cancel Appointment?",
@@ -342,6 +344,7 @@ export default function ProfessorAppointmentsPage() {
             confirmText={confirmSaving ? "Please wait…" : confirmMeta?.confirmText}
             cancelText={confirmMeta?.cancelText}
             confirmDisabled={confirmSaving}
+            variant={confirmMeta?.variant ?? "danger"}
           />
         </>
       }

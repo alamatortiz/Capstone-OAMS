@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, FileText, XCircle, CheckCircle2, Hash, MessageSquare } from "lucide-react";
+import { ChevronLeft, FileText, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -235,37 +235,6 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "Docume
         </div>
 
         <div className="dss-detail-sidebar">
-          <div className="dss-card">
-            <div className="dss-card-header">
-              <h3 className="dss-card-title">
-                <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
-                Tracking Number
-              </h3>
-            </div>
-            <div className="dss-card-content" style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  fontSize: "1.5rem",
-                  fontWeight: 800,
-                  color: "var(--primary-color)",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {doc.trackingNumber}
-              </div>
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "var(--text-tertiary)",
-                  marginTop: "0.25rem",
-                }}
-              >
-                {doc.college}
-              </div>
-            </div>
-          </div>
-
           {canCancel && (
             <div className="dss-card dss-cancel-card">
               <div className="dss-card-header">
@@ -717,14 +686,14 @@ export default function ProfessorDocumentRequest() {
                           <div className="doc-card-title-section">
                             <h3>{req.type}</h3>
                             <p className="doc-card-college">{req.college}</p>
-                            <p className="doc-card-tracking">
-                              Tracking: <span>{req.trackingNumber}</span>
-                            </p>
                           </div>
-                          <span className={`doc-badge ${statusMeta.cls}`}>
-                            {getStatusIcon(req.status)}
-                            {statusMeta.label}
-                          </span>
+                          <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{req.trackingNumber}</span>
+                            <span className={`doc-badge ${statusMeta.cls}`}>
+                              {getStatusIcon(req.status)}
+                              {statusMeta.label}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="doc-card-grid">
@@ -808,15 +777,16 @@ export default function ProfessorDocumentRequest() {
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{req.type}</h3>
-                            <p className="doc-card-college">{req.college}</p>
-                            <p className="doc-card-tracking">
-                              {formatManilaDate(req.requestDate)}{" "}
-                              • {req.trackingNumber}
+                            <p className="doc-card-college">
+                              {req.college} • {formatManilaDate(req.requestDate)}
                             </p>
                           </div>
-                          <span className={`doc-badge ${statusMeta.cls}`}>
-                            {statusMeta.label}
-                          </span>
+                          <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{req.trackingNumber}</span>
+                            <span className={`doc-badge ${statusMeta.cls}`}>
+                              {statusMeta.label}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );

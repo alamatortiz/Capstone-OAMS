@@ -9,7 +9,6 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Hash,
   Activity,
   MapPin,
   FileText,
@@ -325,38 +324,6 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
 
         {/* Sidebar */}
         <div className="queue-detail-sidebar">
-          {/* Queue number */}
-          <div className="qss-card">
-            <div className="qss-card-header">
-              <h3 className="qss-card-title">
-                <Hash style={{ width: "1.25rem", height: "1.25rem" }} />
-                Queue Number
-              </h3>
-            </div>
-            <div className="qss-card-content" style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  fontSize: "1.5rem",
-                  fontWeight: 800,
-                  color: "var(--primary-color)",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {queue.queueNumberBadge}
-              </div>
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "var(--text-tertiary)",
-                  marginTop: "0.25rem",
-                }}
-              >
-                {queue.departmentAbbrev} • {queue.serviceName}
-              </div>
-            </div>
-          </div>
-
           {/* Service hours */}
           <div className="qss-card">
             <div className="qss-card-header">
@@ -719,7 +686,7 @@ export default function QueueStatusPage() {
                                   }}
                                 >
                                   <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
-                                  {queue.slotStatus === "full" ? "Full — still serving" : "Hours ended — still serving"}
+                                  {queue.slotStatus === "full" ? "Queue Full: No longer accepting students but students within the queue will still be served" : "Hours ended — still serving"}
                                 </div>
                               )}
                               <div className="qsl-stats-grid">

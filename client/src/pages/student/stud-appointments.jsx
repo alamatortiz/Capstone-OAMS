@@ -394,8 +394,10 @@ export default function AppointmentsPage() {
           {daySlots.map((slot) => {
             const isUnavailable = slot.professorAvailabilityStatus === "unavailable";
             const isAlreadyBooked = bookedSlotKeys.has(`${slot.availabilityId}_${slot.date}`);
+            const isPast = !!slot.isPast;
+            const isFull = !!slot.isFull;
             return (
-              <div key={slot.availabilityId} className={`slot-card${isUnavailable ? " slot-card--unavailable" : ""}`}>
+              <div key={slot.availabilityId} className={`slot-card${(isUnavailable || isPast || isFull) ? " slot-card--unavailable" : ""}`}>
                 <div className="slot-header">
                   <h4>{slot.professorName}</h4>
                   <span className="college-badge">{slot.college}</span>
@@ -405,7 +407,11 @@ export default function AppointmentsPage() {
                   <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
                   <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "spot" : "spots"} left` : "Unlimited"} {slot.maxStudents != null ? `(max ${slot.maxStudents})` : ""}</span></div>
                 </div>
-                {isUnavailable ? (
+                {isPast ? (
+                  <button className="book-btn book-btn--disabled" disabled>No Longer Available</button>
+                ) : isFull ? (
+                  <button className="book-btn book-btn--disabled" disabled>Fully Booked</button>
+                ) : isUnavailable ? (
                   <button className="book-btn book-btn--disabled" disabled>Currently Unavailable</button>
                 ) : isAlreadyBooked ? (
                   <button className="book-btn book-btn--disabled" disabled>Already Booked</button>

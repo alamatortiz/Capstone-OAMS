@@ -498,13 +498,10 @@ export default function AdminQueue() {
               </div>
               <div className="queue-stat-card">
                 <div className="queue-stat-label">Avg Service Time</div>
-                <div className="queue-stat-value" style={{ color: "#ef4444" }}>
+                <div className="queue-stat-value" style={{ color: "#3b82f6" }}>
                   {formatAvgService(monitoringQueue.avgServiceMinutes)}
                 </div>
-                <ClockIcon
-                  className="queue-stat-icon"
-                  style={{ color: "#ef4444" }}
-                />
+                <ClockIcon className="queue-stat-icon" />
               </div>
             </div>
 

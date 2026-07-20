@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HelpCircle } from "lucide-react";
 import "./QueueConcernModal.css";
 import useLockBodyScroll from "../hooks/useLockBodyScroll";
 
@@ -34,6 +35,9 @@ export default function QueueConcernModal({
   return (
     <div className="qcm-overlay">
       <div className="qcm-modal">
+        <div className="qcm-icon">
+          <HelpCircle width={22} height={22} />
+        </div>
         <h3 className="qcm-title">{title}</h3>
         {message && <div className="qcm-message">{message}</div>}
         <textarea

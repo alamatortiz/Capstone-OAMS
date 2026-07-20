@@ -494,21 +494,8 @@ export default function QueueTrackingPage() {
                                 ? `Completed: ${item.completedAt}`
                                 : `Ended: ${item.completedAt}`}
                             </span>
-                            {item.actualWaitTime !== "—" && (
-                              <>
-                                <span>•</span>
-                                <span className="qt-wait-time">
-                                  Wait: {item.actualWaitTime}
-                                </span>
-                              </>
-                            )}
                           </div>
                         </div>
-                        {item.status === "completed" ? (
-                          <CheckCircle2 className="qt-history-icon completed" />
-                        ) : (
-                          <XCircle className="qt-history-icon cancelled" />
-                        )}
                       </div>
                     ))}
                   </div>

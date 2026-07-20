@@ -137,6 +137,7 @@ export default function AdminQueueHosting() {
   const [serviceStart, setServiceStart] = useState("08:00");
   const [serviceEnd, setServiceEnd] = useState("17:00");
   const [noShowTimeout, setNoShowTimeout] = useState("15");
+  const [serviceTime, setServiceTime] = useState("15");
   // True only right after resetForm() auto-computes an end time that got
   // clamped to 23:59 instead of the full +240min window (see
   // addMinutesClampedToDay) — cleared as soon as the admin edits either time
@@ -168,6 +169,7 @@ export default function AdminQueueHosting() {
     setServiceStart(now);
     setServiceEnd(addMinutesClampedToDay(now, 240));
     setNoShowTimeout("15");
+    setServiceTime("15");
     setDefaultEndClamped(rawTargetMinutes > 23 * 60 + 59);
   };
   const openModal = () => {
@@ -202,6 +204,11 @@ export default function AdminQueueHosting() {
       toast.error("Please enter a valid no-show timeout in minutes");
       return;
     }
+    const serviceTimeNum = parseInt(serviceTime, 10);
+    if (!serviceTimeNum || serviceTimeNum <= 0) {
+      toast.error("Please enter a valid service time in minutes");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -211,6 +218,7 @@ export default function AdminQueueHosting() {
         startTime: `${serviceStart}:00`,
         endTime: `${serviceEnd}:00`,
         noShowTimeoutMinutes: noShowTimeoutNum,
+        serviceTimeMinutes: serviceTimeNum,
       });
       toast.success("Queue line opened successfully!");
       closeModal();
@@ -338,6 +346,24 @@ export default function AdminQueueHosting() {
                       value={maxCapacity}
                       onChange={(e) => setMaxCapacity(e.target.value)}
                     />
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      Service Time (minutes) *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 15"
+                      value={serviceTime}
+                      onChange={(e) => setServiceTime(e.target.value)}
+                    />
+                    <p className="aqh-modal-subtitle">
+                      Estimated time to serve one student in this queue — used to
+                      calculate students' wait-time estimates.
+                    </p>
                   </div>
 
                   <div className="aqh-form-group">

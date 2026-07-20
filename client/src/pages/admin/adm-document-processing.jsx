@@ -233,12 +233,14 @@ export default function AdminDocumentProcessing() {
       message: <>Start processing the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong>?</>,
       confirmText: "Start Processing",
       icon: <ClockIcon />,
+      variant: "success",
     },
     ready: {
       title: "Mark as Ready?",
       message: <>Mark the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong> as ready for pickup?</>,
       confirmText: "Mark as Ready",
       icon: <CheckCircleIcon />,
+      variant: "success",
     },
     rejected: {
       title: "Reject Request?",
@@ -251,6 +253,7 @@ export default function AdminDocumentProcessing() {
       message: <>Confirm that the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong> has been handed to the correct recipient, per office procedure?</>,
       confirmText: "Mark as Claimed",
       icon: <CheckCircleIcon />,
+      variant: "success",
     },
   }[confirmStatus];
 
@@ -411,6 +414,7 @@ export default function AdminDocumentProcessing() {
             icon={DOC_CONFIRM_META?.icon}
             confirmText={confirmSaving ? "Please wait…" : DOC_CONFIRM_META?.confirmText}
             confirmDisabled={confirmSaving}
+            variant={DOC_CONFIRM_META?.variant ?? "danger"}
           />
         </>
       }

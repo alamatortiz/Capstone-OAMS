@@ -559,7 +559,8 @@ body {
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.queue-status-badge--paused {
+.queue-status-badge--paused,
+.queue-status-badge--full {
   background: rgba(245, 158, 11, 0.15);
   color: #f59e0b;
   border: 1px solid rgba(245, 158, 11, 0.35);
@@ -682,13 +683,13 @@ body {
 }
 
 .detail-icon.time {
-  background: rgba(168, 85, 247, 0.15);
-  color: var(--purple);
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
 }
 
 .detail-icon.serving {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--success);
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
 }
 
 .detail-icon .icon {

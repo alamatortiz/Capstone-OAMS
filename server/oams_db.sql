@@ -138,7 +138,6 @@ CREATE TABLE services (
     department_id         INT          NOT NULL,   -- the owning/creating department, always real
     is_cross_college       BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = other departments' students can also use it
     location_id           INT          NULL,
-    average_service_time  INT          NOT NULL DEFAULT 15,
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
     FOREIGN KEY (location_id)   REFERENCES locations(location_id)     ON DELETE SET NULL
 );
@@ -215,6 +214,7 @@ CREATE TABLE queue_slots (
     max_capacity    INT          NOT NULL DEFAULT 20,
     current_count   INT          NOT NULL DEFAULT 0,
     no_show_timeout_minutes INT  NOT NULL DEFAULT 15,
+    service_time_minutes INT     NOT NULL DEFAULT 15, -- admin-configured est. time per student for this specific queue instance
     status          ENUM('open','paused','full','expired','completed','closed','cancelled') DEFAULT 'open',
     pause_reason    VARCHAR(255) NULL,
     close_reason    VARCHAR(255) NULL,
