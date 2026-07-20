@@ -101,9 +101,6 @@ const STATUS_META: Record<DocStatus, { label: string; icon: IoniconName; bg: str
   rejected: { label: 'rejected', icon: 'close-circle-outline', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
 };
 
-const toDateStr = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
 const formatDateLong = (dateString?: string) => {
   if (!dateString) return '—';
   return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });

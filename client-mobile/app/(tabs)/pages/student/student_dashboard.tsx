@@ -163,11 +163,6 @@ interface ActivityEntry {
   status: string;
 }
 
-interface QuickActionCounts {
-  pinnedAnnouncements: number;
-  totalFaculty: number;
-}
-
 interface OfficeHoursData {
   departmentName: string;
   departmentAbbrev: string;

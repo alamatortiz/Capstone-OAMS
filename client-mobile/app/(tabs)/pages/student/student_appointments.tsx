@@ -98,6 +98,8 @@ interface Slot {
   spotsLeft: number | null;
   maxStudents: number | null;
   professorAvailabilityStatus: 'available' | 'unavailable';
+  isPast?: boolean;
+  isFull?: boolean;
   appointmentTypes?: AppointmentType[];
 }
 
@@ -485,8 +487,10 @@ export default function StudentAppointmentsScreen() {
           {daySlots.map((slot) => {
             const isUnavailable = slot.professorAvailabilityStatus === 'unavailable';
             const isAlreadyBooked = bookedSlotKeys.has(`${slot.availabilityId}_${slot.date}`);
+            const isPast = !!slot.isPast;
+            const isFull = !!slot.isFull;
             return (
-              <View key={slot.availabilityId} style={[styles.slotCard, isUnavailable && styles.slotCardDisabled]}>
+              <View key={slot.availabilityId} style={[styles.slotCard, (isUnavailable || isPast || isFull) && styles.slotCardDisabled]}>
                 <View style={styles.slotHeaderRow}>
                   <Text style={styles.slotProfessorName}>{slot.professorName}</Text>
                   <View style={styles.collegeBadge}>
@@ -510,7 +514,15 @@ export default function StudentAppointmentsScreen() {
                     </Text>
                   </View>
                 </View>
-                {isUnavailable ? (
+                {isPast ? (
+                  <View style={[styles.bookBtn, styles.bookBtnDisabled]}>
+                    <Text style={styles.bookBtnTextDisabled}>No Longer Available</Text>
+                  </View>
+                ) : isFull ? (
+                  <View style={[styles.bookBtn, styles.bookBtnDisabled]}>
+                    <Text style={styles.bookBtnTextDisabled}>Fully Booked</Text>
+                  </View>
+                ) : isUnavailable ? (
                   <View style={[styles.bookBtn, styles.bookBtnDisabled]}>
                     <Text style={styles.bookBtnTextDisabled}>Currently Unavailable</Text>
                   </View>

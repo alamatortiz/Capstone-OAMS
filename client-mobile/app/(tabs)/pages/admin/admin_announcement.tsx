@@ -328,7 +328,7 @@ export default function AdminAnnouncementScreen() {
     try {
       const { data } = await api.patch(`/admin/announcements/${id}/pin`);
       setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, isPinned: data.isPinned } : a)));
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to update pin status.');
     }
   };
@@ -337,7 +337,7 @@ export default function AdminAnnouncementScreen() {
     try {
       await api.patch(`/admin/announcements/${id}/archive`);
       setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'archived' } : a)));
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to archive announcement.');
     }
   };
@@ -346,7 +346,7 @@ export default function AdminAnnouncementScreen() {
     try {
       await api.patch(`/admin/announcements/${id}/restore`);
       setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'active' } : a)));
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to restore announcement.');
     }
   };
@@ -356,7 +356,7 @@ export default function AdminAnnouncementScreen() {
     try {
       await api.delete(`/admin/announcements/${deleteId}`);
       setAnnouncements((prev) => prev.filter((a) => a.id !== deleteId));
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to delete announcement.');
     } finally {
       setDeleteId(null);
@@ -391,7 +391,7 @@ export default function AdminAnnouncementScreen() {
         ),
       );
       closeEdit();
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to update announcement.');
     }
   };
@@ -418,7 +418,7 @@ export default function AdminAnnouncementScreen() {
       });
       setAnnouncements((prev) => [data.announcement, ...prev]);
       closeCreate();
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to create announcement.');
     }
   };

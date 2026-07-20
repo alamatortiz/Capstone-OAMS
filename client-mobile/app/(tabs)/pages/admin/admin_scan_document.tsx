@@ -129,12 +129,6 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
 ];
 
-function formatDisplayDate(dateStr: string) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
 export default function AdminScanDocumentScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -297,7 +291,7 @@ export default function AdminScanDocumentScreen() {
     try {
       await api.patch(`/admin/document-processing/${scannedDoc.requestId}/status`, { status: 'claimed' });
       setScannedDoc((prev) => prev && { ...prev, documentStatus: 'claimed' });
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to mark document as claimed.');
     } finally {
       setClaiming(false);
@@ -330,7 +324,7 @@ export default function AdminScanDocumentScreen() {
         return;
       }
       await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: `${scannedDoc.trackingNumber}.txt` });
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to share document details.');
     }
   };

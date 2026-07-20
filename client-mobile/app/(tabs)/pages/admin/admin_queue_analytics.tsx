@@ -121,13 +121,20 @@ const TAB_META: Record<AnalyticsTab, { label: string; icon: IoniconName }> = {
   insights: { label: 'Insights', icon: 'warning-outline' },
 };
 
-// Weekly comparison numbers are fully static UI content in the web page too
-// (not derived from the filtered analytics data) — mirrored as-is.
-const WEEKLY_COMPARISON = [
-  { label: 'Students Served', value: '684', change: '+12%', color: '#22c55e' },
-  { label: 'Avg Wait Time', value: '16 min', change: '-15%', color: '#3b82f6' },
-  { label: 'Satisfaction Rate', value: '86%', change: '+5%', color: '#22c55e' },
-];
+interface WeeklyComparisonRow {
+  label: string;
+  value: string;
+  change: string;
+  color: string;
+}
+
+interface Trends {
+  peakActivityTime: string;
+  bestServiceTime: string;
+  weeklyComparison: WeeklyComparisonRow[];
+}
+
+const DEFAULT_TRENDS: Trends = { peakActivityTime: 'N/A', bestServiceTime: 'N/A', weeklyComparison: [] };
 
 interface NavItem {
   key: string;
@@ -158,6 +165,7 @@ export default function AdminQueueAnalyticsScreen() {
   const [positiveInsights, setPositiveInsights] = useState<Insight[]>([]);
   const [improvementAreas, setImprovementAreas] = useState<Insight[]>([]);
   const [serviceTypes, setServiceTypes] = useState<string[]>(['All Services']);
+  const [trends, setTrends] = useState<Trends>(DEFAULT_TRENDS);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -168,6 +176,7 @@ export default function AdminQueueAnalyticsScreen() {
       setPositiveInsights(res.data.positiveInsights ?? []);
       setImprovementAreas(res.data.improvementAreas ?? []);
       setServiceTypes(res.data.serviceTypes ?? ['All Services']);
+      setTrends(res.data.trends ?? DEFAULT_TRENDS);
     } catch (error) {
       console.error('Failed to fetch queue analytics:', error);
     }
@@ -475,32 +484,36 @@ export default function AdminQueueAnalyticsScreen() {
                 <Text style={styles.cardSubtitleText}>Queue activity over time</Text>
                 <View style={[styles.trendItem, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
                   <Text style={styles.trendItemLabel}>Peak Activity Time</Text>
-                  <Text style={[styles.trendItemValue, { color: '#3b82f6' }]}>9:00 AM - 11:00 AM</Text>
+                  <Text style={[styles.trendItemValue, { color: '#3b82f6' }]}>{trends.peakActivityTime}</Text>
                   <Text style={styles.trendItemNote}>Highest queue volume period</Text>
                 </View>
                 <View style={[styles.trendItem, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
                   <Text style={styles.trendItemLabel}>Best Service Time</Text>
-                  <Text style={[styles.trendItemValue, { color: '#22c55e' }]}>1:00 PM - 3:00 PM</Text>
+                  <Text style={[styles.trendItemValue, { color: '#22c55e' }]}>{trends.bestServiceTime}</Text>
                   <Text style={styles.trendItemNote}>Shortest average wait times</Text>
                 </View>
               </View>
 
               <View style={styles.card}>
-                <Text style={styles.cardTitleText}>Weekly Comparison</Text>
-                <Text style={styles.cardSubtitleText}>Performance vs last week</Text>
-                <View style={styles.weeklyList}>
-                  {WEEKLY_COMPARISON.map((row, idx) => (
-                    <View key={idx} style={styles.weeklyRow}>
-                      <Text style={styles.weeklyLabel}>{row.label}</Text>
-                      <View style={styles.weeklyRight}>
-                        <Text style={[styles.weeklyValue, { color: row.color }]}>{row.value}</Text>
-                        <View style={styles.weeklyChangePill}>
-                          <Text style={styles.weeklyChangeText}>{row.change}</Text>
+                <Text style={styles.cardTitleText}>Period Comparison</Text>
+                <Text style={styles.cardSubtitleText}>Performance vs the previous {timePeriod.toLowerCase()}</Text>
+                {trends.weeklyComparison.length === 0 ? (
+                  <Text style={styles.cardSubtitleText}>No data available for this period yet.</Text>
+                ) : (
+                  <View style={styles.weeklyList}>
+                    {trends.weeklyComparison.map((row, idx) => (
+                      <View key={idx} style={styles.weeklyRow}>
+                        <Text style={styles.weeklyLabel}>{row.label}</Text>
+                        <View style={styles.weeklyRight}>
+                          <Text style={[styles.weeklyValue, { color: row.color }]}>{row.value}</Text>
+                          <View style={styles.weeklyChangePill}>
+                            <Text style={styles.weeklyChangeText}>{row.change}</Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  ))}
-                </View>
+                    ))}
+                  </View>
+                )}
               </View>
             </>
           )}

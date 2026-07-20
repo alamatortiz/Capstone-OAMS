@@ -367,7 +367,7 @@ export default function AdminDocumentProcessingScreen() {
         ),
       );
       handleCloseDetails();
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to update document status.');
     } finally {
       setUpdating(false);
@@ -791,8 +791,12 @@ export default function AdminDocumentProcessingScreen() {
                 <Pressable style={styles.cancelBtn} onPress={() => setConfirmStatus(null)}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
-                <Pressable style={[styles.confirmBtn, { backgroundColor: activeConfirmMeta.color }]} onPress={runConfirmStatusChange}>
-                  <Text style={styles.confirmBtnText}>{activeConfirmMeta.confirmLabel}</Text>
+                <Pressable
+                  style={[styles.confirmBtn, { backgroundColor: activeConfirmMeta.color }, updating && { opacity: 0.6 }]}
+                  onPress={runConfirmStatusChange}
+                  disabled={updating}
+                >
+                  <Text style={styles.confirmBtnText}>{updating ? 'Updating…' : activeConfirmMeta.confirmLabel}</Text>
                 </Pressable>
               </View>
             </View>

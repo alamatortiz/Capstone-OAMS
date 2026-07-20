@@ -677,7 +677,7 @@ export default function AdminUserManagementScreen() {
                 <View style={[styles.formSelect, styles.formSelectDisabled]}>
                   <Text style={styles.formSelectText}>{ROLE_OPTIONS.find((r) => r.value === form.role)?.label}</Text>
                 </View>
-                <Text style={styles.formHint}>Role changes aren't supported — delete and recreate the account instead.</Text>
+                <Text style={styles.formHint}>Role changes aren&apos;t supported — delete and recreate the account instead.</Text>
               </View>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>College *</Text>

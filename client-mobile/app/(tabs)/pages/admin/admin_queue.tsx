@@ -105,23 +105,6 @@ interface QueueEntry {
   joinedAt: string;
 }
 
-interface QueueDetail {
-  id: string;
-  queueType: string;
-  status: QueueSlotStatus;
-  currentlyServingStudentNumber: string | null;
-  currentCount: number;
-  servedCount: number;
-  totalInQueue: number;
-  maxCapacity: number;
-  queueOccupancyPercent: number;
-  servicedPercent: number;
-  avgServiceMinutes: number | null;
-  location: string | null;
-  serviceHours: { start: string; end: string } | null;
-  entries: QueueEntry[];
-}
-
 interface NavItem {
   key: string;
   label: string;

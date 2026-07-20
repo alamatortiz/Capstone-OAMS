@@ -162,7 +162,7 @@ export default function ProfessorDocumentsScreen() {
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
-  const [typesLoading, setTypesLoading] = useState(false);
+  const [, setTypesLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState(emptyFormData);

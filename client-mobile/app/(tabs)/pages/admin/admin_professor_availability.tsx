@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -363,7 +362,7 @@ export default function AdminProfessorAvailabilityScreen() {
 
                     {f.todaySchedule.length > 0 && (
                       <View style={styles.scheduleSection}>
-                        <Text style={styles.scheduleLabel}>Today's Schedule</Text>
+                        <Text style={styles.scheduleLabel}>Today&apos;s Schedule</Text>
                         <View style={styles.scheduleGrid}>
                           {f.todaySchedule.map((slot, idx) => {
                             const slotTint = SLOT_TINTS[slot.status];

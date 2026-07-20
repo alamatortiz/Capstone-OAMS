@@ -88,19 +88,6 @@ function OamsLogo({
 // 'closed' means exclusively "an admin manually stopped this queue".
 type QueueStatus = 'open' | 'paused' | 'full' | 'expired' | 'completed' | 'closed';
 
-interface Queue {
-  id: string;
-  queueType: string;
-  department: string;
-  currentlyServingStudentNumber: string | null;
-  currentCount: number;
-  servedCount: number;
-  maxCapacity: number;
-  status: QueueStatus;
-  createdAt: string;
-  serviceHours: { start: string; end: string };
-}
-
 interface NavItem {
   key: string;
   label: string;

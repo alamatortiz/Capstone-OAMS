@@ -284,7 +284,7 @@ export default function ProfessorScheduleManagerScreen() {
         try {
           const { data } = await api.post('/faculty/locations', { name: trimmedLocation });
           setLocations((prev) => [...prev, data]);
-        } catch (err) {
+        } catch {
           // Non-fatal: the slot can still be saved with the typed location text.
         }
       }
@@ -485,7 +485,7 @@ export default function ProfessorScheduleManagerScreen() {
             <Text style={styles.sectionDesc}>Your recurring availability across the week</Text>
             {scheduledDays.length === 0 ? (
               <View style={styles.emptyUpcoming}>
-                <Text style={styles.emptyText}>No weekly availability set. Tap a day above or use "Add Time Slot" to get started.</Text>
+                <Text style={styles.emptyText}>No weekly availability set. Tap a day above or use &quot;Add Time Slot&quot; to get started.</Text>
               </View>
             ) : (
               <View style={{ gap: 10 }}>

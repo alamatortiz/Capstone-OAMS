@@ -104,17 +104,6 @@ interface ActiveQueueRecord {
   joinedAt: string;
 }
 
-interface HistoryRecord {
-  id: number;
-  service: string;
-  college: string;
-  queueNumber: string;
-  status: 'completed' | 'cancelled' | 'no_show';
-  joinedAt: string;
-  completedAt: string;
-  actualWaitTime: string;
-}
-
 interface NavItem {
   key: string;
   label: string;
