@@ -153,6 +153,8 @@ type ActivePicker = 'filterRole' | 'filterStatus' | 'formCollege' | 'formStatus'
 
 const BLANK_FORM = { name: '', email: '', role: 'student' as Role, college: '', employeeId: '', studentId: '', status: 'active' as Status };
 
+const PAGE_SIZE = 20;
+
 function formatDate(dateStr: string) {
   const d = new Date(dateStr.length <= 10 ? `${dateStr}T00:00:00` : dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
@@ -185,6 +187,7 @@ export default function AdminUserManagementScreen() {
   const [filterRole, setFilterRole] = useState<'all' | Role>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | Status>('all');
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [page, setPage] = useState(0);
 
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
@@ -352,6 +355,14 @@ export default function AdminUserManagementScreen() {
   const displayUsers = activeTab === 'students' ? studentUsers : activeTab === 'professors' ? professorUsers : activeTab === 'admins' ? adminUsers : filtered;
   const tabCounts: Record<TabKey, number> = { all: filtered.length, students: studentUsers.length, professors: professorUsers.length, admins: adminUsers.length };
   const activeTabMeta = TABS.find((t) => t.key === activeTab)!;
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, filterRole, filterStatus, activeTab]);
+
+  const totalPages = Math.max(1, Math.ceil(displayUsers.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedUsers = displayUsers.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   // ── Picker (status / college selects, shared by filters + form) ────────
   const pickerConfig = (() => {
@@ -527,7 +538,7 @@ export default function AdminUserManagementScreen() {
               </View>
             ) : (
               <View style={styles.cardsList}>
-                {displayUsers.map((u) => {
+                {pagedUsers.map((u) => {
                   const roleTint = ROLE_BADGE_TINTS[u.role];
                   const statusTint = STATUS_BADGE_TINTS[u.status];
                   return (
@@ -577,6 +588,34 @@ export default function AdminUserManagementScreen() {
                     </View>
                   );
                 })}
+
+                {totalPages > 1 && (
+                  <View style={styles.pagerRow}>
+                    <Pressable
+                      style={[styles.pagerBtn, safePage === 0 && styles.pagerBtnDisabled]}
+                      onPress={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={safePage === 0}
+                    >
+                      <Ionicons name="chevron-back" size={16} color={safePage === 0 ? theme.tertiary : theme.text} />
+                      <Text style={[styles.pagerBtnText, safePage === 0 && styles.pagerBtnTextDisabled]}>Prev</Text>
+                    </Pressable>
+                    <Text style={styles.pagerLabel}>
+                      Page {safePage + 1} of {totalPages}
+                    </Text>
+                    <Pressable
+                      style={[styles.pagerBtn, safePage >= totalPages - 1 && styles.pagerBtnDisabled]}
+                      onPress={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={safePage >= totalPages - 1}
+                    >
+                      <Text style={[styles.pagerBtnText, safePage >= totalPages - 1 && styles.pagerBtnTextDisabled]}>Next</Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={safePage >= totalPages - 1 ? theme.tertiary : theme.text}
+                      />
+                    </Pressable>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1002,6 +1041,30 @@ function createStyles(theme: ThemePalette) {
 
     // User cards
     cardsList: { gap: 12 },
+
+    // Pagination
+    pagerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 8,
+    },
+    pagerBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    pagerBtnDisabled: { opacity: 0.5 },
+    pagerBtnText: { fontSize: 13, fontWeight: '700', color: theme.text },
+    pagerBtnTextDisabled: { color: theme.tertiary },
+    pagerLabel: { fontSize: 12, fontWeight: '600', color: theme.subtext },
+
     emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 24 },
     emptyTitle: { fontSize: 13, color: theme.tertiary },
     userCard: {

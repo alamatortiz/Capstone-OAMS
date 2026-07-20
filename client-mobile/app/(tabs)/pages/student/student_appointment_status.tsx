@@ -137,6 +137,29 @@ const navItems: NavItem[] = [
 ];
 
 type TabKey = 'all' | BookingStatus;
+type RangeKey = 'week' | 'month' | 'all';
+
+const RANGE_LABELS: Record<RangeKey, string> = { week: 'This Week', month: 'This Month', all: 'All Time' };
+
+// Mirrors client/src/utils/dateRange.js — week starts on Sunday, matching
+// the appointment booking calendar elsewhere in the app.
+function filterByRange<T extends { date: string }>(items: T[], rangeKey: RangeKey): T[] {
+  if (rangeKey === 'all') return items;
+  const now = new Date();
+  let start: Date;
+  let end: Date;
+  if (rangeKey === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  } else {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+  }
+  return items.filter((item) => {
+    const d = new Date(`${item.date}T00:00:00`);
+    return d >= start && d <= end;
+  });
+}
 
 const TABS: { key: TabKey; label: string; icon: IoniconName }[] = [
   { key: 'all', label: 'All', icon: 'list-outline' },
@@ -177,6 +200,7 @@ export default function StudentAppointmentStatusScreen() {
   const params = useLocalSearchParams<{ appointmentId?: string }>();
   const [selectedId, setSelectedId] = useState<string | null>(params.appointmentId ?? null);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [allRange, setAllRange] = useState<RangeKey>('week');
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const router = useRouter();
@@ -255,9 +279,12 @@ export default function StudentAppointmentStatusScreen() {
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
   const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
-  const byStatus = (status: BookingStatus) => appointments.filter((a) => a.status === status);
+  // Defaults to "This Week" across every tab — the range control lets a
+  // student switch to "This Month"/"All Time" to see everything else.
+  const rangeFilteredAppointments = filterByRange(appointments, allRange);
+  const byStatus = (status: BookingStatus) => rangeFilteredAppointments.filter((a) => a.status === status);
   const tabLists: Record<TabKey, Appointment[]> = {
-    all: appointments,
+    all: rangeFilteredAppointments,
     pending: byStatus('pending'),
     approved: byStatus('approved'),
     completed: byStatus('completed'),
@@ -492,6 +519,24 @@ export default function StudentAppointmentStatusScreen() {
                   })}
                 </View>
               </ScrollView>
+
+              {/* Date range — governs every tab, defaults to This Week */}
+              <View style={styles.rangeRow}>
+                {(Object.keys(RANGE_LABELS) as RangeKey[]).map((key) => {
+                  const active = allRange === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      style={[styles.rangeChip, active && styles.rangeChipActive]}
+                      onPress={() => setAllRange(key)}
+                    >
+                      <Text style={[styles.rangeChipText, active && styles.rangeChipTextActive]}>
+                        {RANGE_LABELS[key]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
               {/* List */}
               {tabLists[activeTab].length > 0 ? (
@@ -775,6 +820,16 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 5, backgroundColor: 'rgba(168, 85, 247, 0.15)',
     },
     tabCountText: { fontSize: 10, fontWeight: '700', color: theme.purple },
+
+    // Date range chips
+    rangeRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    rangeChip: {
+      paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+    },
+    rangeChipActive: { backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: theme.purple },
+    rangeChipText: { fontSize: 12, fontWeight: '600', color: theme.subtext },
+    rangeChipTextActive: { color: theme.purple },
 
     // Empty state
     emptyCard: {

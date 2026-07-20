@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -152,9 +153,15 @@ export default function StudentDocumentsScreen() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ type: '', college: '', copies: '1', purpose: '' });
+  const [formData, setFormData] = useState({ type: '', college: '', copies: '1', purpose: '', neededBy: '' });
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
+  const [showNeededByPicker, setShowNeededByPicker] = useState(false);
+  const tomorrowDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d;
+  })();
 
   const fetchDocuments = useCallback(async () => {
     setDocsLoading(true);
@@ -226,7 +233,7 @@ export default function StudentDocumentsScreen() {
   const completedDocuments = documents.filter((doc) => doc.status === 'claimed' || doc.status === 'rejected');
 
   const openDialog = () => {
-    setFormData({ type: '', college: '', copies: '1', purpose: '' });
+    setFormData({ type: '', college: '', copies: '1', purpose: '', neededBy: '' });
     setDialogOpen(true);
   };
 
@@ -245,7 +252,7 @@ export default function StudentDocumentsScreen() {
         await fetchDocuments();
       }
       setDialogOpen(false);
-      setFormData({ type: '', college: '', copies: '1', purpose: '' });
+      setFormData({ type: '', college: '', copies: '1', purpose: '', neededBy: '' });
       Alert.alert('Success', 'Document request submitted successfully!');
     } catch (err: any) {
       console.error('Failed to submit document request:', err);
@@ -602,6 +609,29 @@ export default function StudentDocumentsScreen() {
                   numberOfLines={3}
                 />
               </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Needed By (optional)</Text>
+                <Pressable style={styles.formSelect} onPress={() => setShowNeededByPicker(true)}>
+                  <Text style={formData.neededBy ? styles.formSelectText : styles.formSelectPlaceholder}>
+                    {formData.neededBy || 'Select a date'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={16} color={theme.orange} />
+                </Pressable>
+                {showNeededByPicker && (
+                  <DateTimePicker
+                    value={formData.neededBy ? new Date(formData.neededBy) : tomorrowDate}
+                    mode="date"
+                    minimumDate={tomorrowDate}
+                    onChange={(event, selectedDate) => {
+                      setShowNeededByPicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setFormData((f) => ({ ...f, neededBy: selectedDate.toISOString().slice(0, 10) }));
+                      }
+                    }}
+                  />
+                )}
+              </View>
             </ScrollView>
             <View style={styles.dialogActions}>
               <Pressable style={styles.btnSecondary} onPress={() => setDialogOpen(false)} disabled={submitting}>
@@ -937,6 +967,7 @@ function createStyles(theme: ThemePalette) {
       borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background,
     },
     formSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+    formSelectPlaceholder: { fontSize: 13, color: theme.tertiary, flex: 1, marginRight: 8 },
     formInput: {
       backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 10,
       padding: 12, color: theme.text, fontSize: 13,

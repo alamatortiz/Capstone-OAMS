@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useQueue } from '@/context/QueueContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
@@ -208,6 +209,7 @@ export default function StudentDashboardScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
   const { user, token, logout } = useAuth();
+  const { getActiveQueues } = useQueue();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -350,6 +352,19 @@ export default function StudentDashboardScreen() {
   };
 
   const collegeLogo = collegeLogos[user?.departmentAbbrev ?? ''] ?? ccsLogo;
+
+  // Active Queue preview reads from QueueContext (same live source as
+  // student_queue_status.tsx) instead of dashStats.activeQueue, so it can
+  // show slotStatus/pauseReason and stays live via QueueContext's sockets
+  // instead of only refreshing on the dashboard's own poll.
+  const contextQueues: any[] = getActiveQueues();
+  const closestQueue = contextQueues.length > 0
+    ? [...contextQueues].sort((a: any, b: any) => {
+        if (a.status === 'serving' && b.status !== 'serving') return -1;
+        if (b.status === 'serving' && a.status !== 'serving') return 1;
+        return (a.position ?? Infinity) - (b.position ?? Infinity);
+      })[0]
+    : null;
 
   const activeQueueCount = dashStats?.stats?.activeQueueCount ?? 0;
   const queuePositionValue = dashLoading
@@ -541,16 +556,24 @@ export default function StudentDashboardScreen() {
                 <Text style={styles.cardTitleText}>Active Queue</Text>
               </View>
             </View>
-            {dashStats?.activeQueue ? (
+            {closestQueue ? (
               <View style={styles.emptyState}>
                 <Text style={styles.statValue}>
-                  {dashStats.activeQueue.status === 'serving'
-                    ? (dashStats.activeQueue.arrivedAt ? 'Being Served' : 'Called')
-                    : String(dashStats.activeQueue.position ?? 0)}
+                  {closestQueue.status === 'serving'
+                    ? (closestQueue.arrivedAt ? 'Being Served' : 'Called')
+                    : String(closestQueue.position ?? 0)}
                 </Text>
                 <Text style={styles.emptyText}>
-                  {dashStats.activeQueue.service} — {dashStats.activeQueue.college}
+                  {closestQueue.serviceName} — {closestQueue.departmentName}
                 </Text>
+                {closestQueue.slotStatus === 'paused' && (
+                  <View style={styles.pausedBadge}>
+                    <Ionicons name="alert-circle-outline" size={13} color="#f59e0b" />
+                    <Text style={styles.pausedBadgeText}>
+                      Paused{closestQueue.slotPauseReason ? `: ${closestQueue.slotPauseReason}` : ''}
+                    </Text>
+                  </View>
+                )}
               </View>
             ) : (
               <View style={styles.emptyState}>
@@ -1149,6 +1172,23 @@ function createStyles(theme: ThemePalette) {
     emptyText: {
       fontSize: 13,
       color: theme.subtext,
+    },
+    pausedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 4,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(245, 158, 11, 0.35)',
+    },
+    pausedBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#f59e0b',
     },
 
     // Announcements

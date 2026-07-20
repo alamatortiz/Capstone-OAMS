@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 
@@ -116,18 +118,6 @@ function fmt12(t: string) {
   const hour = parseInt(h, 10);
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
 }
-
-function buildTimeOptions() {
-  const options: string[] = [];
-  for (let mins = 6 * 60; mins <= 20 * 60 + 30; mins += 30) {
-    const h = String(Math.floor(mins / 60)).padStart(2, '0');
-    const m = String(mins % 60).padStart(2, '0');
-    options.push(`${h}:${m}`);
-  }
-  return options;
-}
-
-const TIME_OPTIONS = buildTimeOptions();
 
 export default function ProfessorScheduleManagerScreen() {
   const params = useLocalSearchParams<{ from?: string }>();
@@ -782,6 +772,20 @@ export default function ProfessorScheduleManagerScreen() {
 
 // ─────────────────────────── Shared sub-components ───────────────────────────
 
+function timeStringToDate(value: string): Date {
+  const d = new Date();
+  const [h, m] = value ? value.split(':').map(Number) : [8, 0];
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+function dateToTimeString(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// Free-entry time picker (native OS time picker via
+// @react-native-community/datetimepicker) instead of a fixed 30-minute-
+// increment list, so professors aren't blocked from setting e.g. 9:15.
 function TimePickerModal({
   visible,
   title,
@@ -797,28 +801,42 @@ function TimePickerModal({
   onClose: () => void;
   styles: ReturnType<typeof createStyles>;
 }) {
+  if (!visible) return null;
+
+  if (Platform.OS === 'android') {
+    // Android's native time picker is itself a dialog with no separate
+    // "open" state needed — it fires once and closes.
+    return (
+      <DateTimePicker
+        value={timeStringToDate(value)}
+        mode="time"
+        display="default"
+        onChange={(event, selectedDate) => {
+          if (event.type === 'set' && selectedDate) {
+            onSelect(dateToTimeString(selectedDate));
+          } else {
+            onClose();
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.pickerModalCard}>
           <Text style={styles.pickerModalTitle}>{title}</Text>
-          <ScrollView style={{ maxHeight: 320 }}>
-            {TIME_OPTIONS.map((t) => {
-              const selected = value === t;
-              return (
-                <Pressable
-                  key={t}
-                  style={[styles.pickerOption, selected && styles.pickerOptionActive]}
-                  onPress={() => onSelect(t)}
-                >
-                  <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>{fmt12(t)}</Text>
-                  {selected && <Ionicons name="checkmark" size={16} color="#a855f7" />}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <DateTimePicker
+            value={timeStringToDate(value)}
+            mode="time"
+            display="spinner"
+            onChange={(event, selectedDate) => {
+              if (selectedDate) onSelect(dateToTimeString(selectedDate));
+            }}
+          />
           <Pressable style={styles.pickerModalClose} onPress={onClose}>
-            <Text style={styles.pickerModalCloseText}>Close</Text>
+            <Text style={styles.pickerModalCloseText}>Done</Text>
           </Pressable>
         </View>
       </View>

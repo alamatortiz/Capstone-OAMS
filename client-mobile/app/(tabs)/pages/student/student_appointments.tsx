@@ -276,21 +276,25 @@ export default function StudentAppointmentsScreen() {
   }, [fetchSlots, fetchMyBookings]);
 
   // ── Live updates: refetch slots when capacity changes elsewhere (mirrors
-  // stud-appointments.jsx's "appointment:slot-updated"/"appointment:slot-removed").
-  // This is the browse/book screen -- refetches silently; status-change
-  // notifications belong to student_appointment_status.tsx. ──
+  // stud-appointments.jsx's "appointment:slot-updated"/"appointment:slot-removed"),
+  // and refetch "My Bookings" on a status change so it doesn't go stale until
+  // the student leaves and re-enters this screen. This is the browse/book
+  // screen -- refetches silently; status-change notifications belong to
+  // student_appointment_status.tsx. ──
   useEffect(() => {
     if (!user || !token) return;
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const events = ['appointment:slot-updated', 'appointment:slot-removed'];
-    events.forEach((event) => socket.on(event, fetchSlots));
+    const slotEvents = ['appointment:slot-updated', 'appointment:slot-removed'];
+    slotEvents.forEach((event) => socket.on(event, fetchSlots));
+    socket.on('appointment:status-updated', fetchMyBookings);
 
     return () => {
-      events.forEach((event) => socket.off(event, fetchSlots));
+      slotEvents.forEach((event) => socket.off(event, fetchSlots));
+      socket.off('appointment:status-updated', fetchMyBookings);
     };
-  }, [user, token, fetchSlots]);
+  }, [user, token, fetchSlots, fetchMyBookings]);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('slots');
   const [selectedCollege, setSelectedCollege] = useState('');
@@ -366,10 +370,9 @@ export default function StudentAppointmentsScreen() {
   }, [activeBookings]);
 
   const availableProfessors = useMemo(() => {
-    if (!selectedCollege) return [];
     const seen = new Set<string>();
     return slots
-      .filter((s) => s.college === selectedCollege)
+      .filter((s) => !selectedCollege || s.college === selectedCollege)
       .filter((s) => { if (seen.has(s.professorId)) return false; seen.add(s.professorId); return true; })
       .map((s) => ({ id: s.professorId, name: s.professorName }))
       .sort((a, b) => a.name.localeCompare(b.name));

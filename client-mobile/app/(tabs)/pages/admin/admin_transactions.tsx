@@ -149,6 +149,8 @@ const DATE_OPTIONS = [
   { value: 'all', label: 'All Time' },
 ];
 
+const PAGE_SIZE = 20;
+
 export default function AdminTransactionsScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -158,6 +160,7 @@ export default function AdminTransactionsScreen() {
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
   const [dateRange, setDateRange] = useState<DateFilter>('all');
   const [selectField, setSelectField] = useState<SelectField>(null);
+  const [page, setPage] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0 });
   const [loading, setLoading] = useState(true);
@@ -270,6 +273,14 @@ export default function AdminTransactionsScreen() {
       t.details.toLowerCase().includes(q);
     return matchesSearch;
   });
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, filterType, filterStatus, dateRange]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedTransactions = filteredTransactions.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   const STAT_TINTS = {
     total: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: theme.primary },
@@ -416,7 +427,7 @@ export default function AdminTransactionsScreen() {
             </View>
           ) : filteredTransactions.length > 0 ? (
             <View style={styles.txList}>
-              {filteredTransactions.map((t) => {
+              {pagedTransactions.map((t) => {
                 const typeMeta = TYPE_META[t.type];
                 const statusMeta = STATUS_META[t.status] ?? DEFAULT_STATUS_META;
                 return (
@@ -448,6 +459,34 @@ export default function AdminTransactionsScreen() {
                   </View>
                 );
               })}
+
+              {totalPages > 1 && (
+                <View style={styles.pagerRow}>
+                  <Pressable
+                    style={[styles.pagerBtn, safePage === 0 && styles.pagerBtnDisabled]}
+                    onPress={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={safePage === 0}
+                  >
+                    <Ionicons name="chevron-back" size={16} color={safePage === 0 ? theme.tertiary : theme.text} />
+                    <Text style={[styles.pagerBtnText, safePage === 0 && styles.pagerBtnTextDisabled]}>Prev</Text>
+                  </Pressable>
+                  <Text style={styles.pagerLabel}>
+                    Page {safePage + 1} of {totalPages}
+                  </Text>
+                  <Pressable
+                    style={[styles.pagerBtn, safePage >= totalPages - 1 && styles.pagerBtnDisabled]}
+                    onPress={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={safePage >= totalPages - 1}
+                  >
+                    <Text style={[styles.pagerBtnText, safePage >= totalPages - 1 && styles.pagerBtnTextDisabled]}>Next</Text>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={safePage >= totalPages - 1 ? theme.tertiary : theme.text}
+                    />
+                  </Pressable>
+                </View>
+              )}
             </View>
           ) : (
             <View style={styles.emptyCard}>
@@ -794,6 +833,29 @@ function createStyles(theme: ThemePalette) {
       borderTopColor: theme.border,
     },
     txMetaText: { fontSize: 11, color: theme.tertiary, fontWeight: '600' },
+
+    // Pagination
+    pagerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 8,
+    },
+    pagerBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    pagerBtnDisabled: { opacity: 0.5 },
+    pagerBtnText: { fontSize: 13, fontWeight: '700', color: theme.text },
+    pagerBtnTextDisabled: { color: theme.tertiary },
+    pagerLabel: { fontSize: 12, fontWeight: '600', color: theme.subtext },
 
     // Empty state
     emptyCard: {
