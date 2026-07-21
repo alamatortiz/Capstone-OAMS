@@ -88,6 +88,7 @@ const emptyDocForm = () => ({
   status: "active",
   isCrossCollege: false,
   recipientType: "students",
+  requiresCoding: false,
 });
 
 const emptyServiceForm = () => ({
@@ -250,6 +251,7 @@ export default function AdminDataManagement() {
       status: doc.status,
       isCrossCollege: !!doc.isCrossCollege,
       recipientType: doc.recipientType || "students",
+      requiresCoding: !!doc.requiresCoding,
     });
     setRequirements([]);
     setReqForm(emptyReqForm());
@@ -300,6 +302,7 @@ export default function AdminDataManagement() {
         status: docForm.status,
         isCrossCollege: docForm.isCrossCollege,
         recipientType: docForm.recipientType,
+        requiresCoding: docForm.requiresCoding,
         requirements: requirements.map((r) => ({
           name: r.name,
           description: r.description || "",
@@ -642,6 +645,19 @@ export default function AdminDataManagement() {
                         <option value="both">Both</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label className="adm-checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        checked={docForm.requiresCoding}
+                        onChange={(e) => setDocForm((p) => ({ ...p, requiresCoding: e.target.checked }))}
+                      />
+                      <span className="adm-checkbox-label">
+                        Requires an official code (dean-sanctioned) before release
+                      </span>
+                    </label>
                   </div>
 
                   {/* ── Document Requirements ── */}
@@ -1016,6 +1032,7 @@ export default function AdminDataManagement() {
                             <span className="adm-badge adm-badge-dept">{doc.deptAbbrev}</span>
                             {doc.isCrossCollege && <span className="adm-badge adm-badge-global">Cross-College</span>}
                             <span className="adm-badge adm-badge-recipient">{doc.recipientType || "students"}</span>
+                            {doc.requiresCoding && <span className="adm-badge adm-badge-global">Requires Coding</span>}
                             <span className={`adm-badge adm-badge-status-${doc.status}`}>{doc.status}</span>
                           </div>
                         </div>

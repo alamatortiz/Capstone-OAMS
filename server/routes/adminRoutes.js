@@ -1557,6 +1557,8 @@ router.get(
            dr.needed_by,
            dr.released_at,
            dr.claimed_at,
+           dr.official_code,
+           s.requires_coding,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number AS student_id,
            d.department_abbreviation AS college
@@ -1589,6 +1591,8 @@ router.get(
         neededBy: r.needed_by || null,
         releasedDate: r.released_at || null,
         claimedDate: r.claimed_at || null,
+        requiresCoding: !!r.requires_coding,
+        officialCode: r.official_code || null,
       }));
 
       res.json({ documents });
@@ -1625,6 +1629,8 @@ router.get(
            fdr.needed_by,
            fdr.released_at,
            fdr.claimed_at,
+           fdr.official_code,
+           s.requires_coding,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.employee_id AS faculty_employee_id,
            d.department_abbreviation AS college
@@ -1655,6 +1661,8 @@ router.get(
         neededBy: r.needed_by || null,
         releasedDate: r.released_at || null,
         claimedDate: r.claimed_at || null,
+        requiresCoding: !!r.requires_coding,
+        officialCode: r.official_code || null,
       }));
 
       res.json({ documents });
@@ -1665,6 +1673,30 @@ router.get(
   },
 );
 
+// Links an admin-assigned official_code to a request's generated_files row
+// so it becomes scannable/claimable through the existing scan-document flow.
+// Only called when the service actually requires_coding. Idempotent --
+// skips silently if a code is already linked for this request. Never
+// throws: a linking failure must not undo a status change that already
+// committed, so errors are only logged.
+async function linkOfficialCode(isFaculty, requestId, officialCode) {
+  try {
+    const linkColumn = isFaculty ? "faculty_request_id" : "request_id";
+    const [[existing]] = await pool.query(
+      `SELECT file_id FROM generated_files WHERE ${linkColumn} = ?`,
+      [requestId],
+    );
+    if (existing) return;
+
+    await pool.query(
+      `INSERT INTO generated_files (${linkColumn}, qr_code) VALUES (?, ?)`,
+      [requestId, officialCode],
+    );
+  } catch (err) {
+    console.error("Official code linking error (status change still applied):", err);
+  }
+}
+
 // PATCH /api/admin/faculty-document-processing/:requestId/status
 // Body: { status, notes }
 // Validates the request belongs to the admin's department before updating.
@@ -1674,7 +1706,7 @@ router.patch(
   authorizeRoles("admin"),
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
-    const { status, notes } = req.body;
+    const { status, notes, officialCode } = req.body;
     const adminId = req.user.userId;
 
     if (!DB_STATUS_MAP[status]) {
@@ -1689,7 +1721,7 @@ router.patch(
       }
 
       const [[request]] = await pool.query(
-        `SELECT fdr.request_id, fdr.status, fdr.faculty_id, s.department_id
+        `SELECT fdr.request_id, fdr.status, fdr.faculty_id, s.department_id, s.requires_coding
          FROM faculty_document_requests fdr
          JOIN document_services s ON fdr.service_id = s.service_id
          WHERE fdr.request_id = ?`,
@@ -1710,17 +1742,33 @@ router.patch(
         });
       }
 
+      const needsCode = dbStatus === "generated" && request.requires_coding;
+      const trimmedCode = typeof officialCode === "string" ? officialCode.trim() : "";
+      if (needsCode && !trimmedCode) {
+        return res.status(400).json({ error: "This document type requires an official code before it can be marked ready" });
+      }
+
       const timestampClause =
         dbStatus === "released" ? ", released_at = NOW()" :
         dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
+      const codeClause = needsCode ? ", official_code = ?" : "";
+
+      const values = [dbStatus];
+      if (notes !== undefined) values.push(notes);
+      if (needsCode) values.push(trimmedCode);
+      values.push(requestId);
 
       await pool.query(
-        `UPDATE faculty_document_requests SET status = ?${notesClause}${timestampClause} WHERE request_id = ?`,
-        notes !== undefined ? [dbStatus, notes, requestId] : [dbStatus, requestId],
+        `UPDATE faculty_document_requests SET status = ?${notesClause}${codeClause}${timestampClause} WHERE request_id = ?`,
+        values,
       );
 
       await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: dbStatus });
+
+      if (needsCode) {
+        await linkOfficialCode(true, requestId, trimmedCode);
+      }
 
       emitToUser(request.faculty_id, "document:status-updated", { requestId, status });
       createNotification(request.faculty_id, `Your document request is now ${status}.`);
@@ -1742,7 +1790,7 @@ router.patch(
   authorizeRoles("admin"),
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
-    const { status, notes } = req.body;
+    const { status, notes, officialCode } = req.body;
     const adminId = req.user.userId;
 
     if (!DB_STATUS_MAP[status]) {
@@ -1757,7 +1805,7 @@ router.patch(
       }
 
       const [[request]] = await pool.query(
-        `SELECT dr.request_id, dr.student_id, dr.status, s.department_id
+        `SELECT dr.request_id, dr.student_id, dr.status, s.department_id, s.requires_coding
          FROM document_requests dr
          JOIN document_services s ON dr.service_id = s.service_id
          WHERE dr.request_id = ?`,
@@ -1778,17 +1826,33 @@ router.patch(
         });
       }
 
+      const needsCode = dbStatus === "generated" && request.requires_coding;
+      const trimmedCode = typeof officialCode === "string" ? officialCode.trim() : "";
+      if (needsCode && !trimmedCode) {
+        return res.status(400).json({ error: "This document type requires an official code before it can be marked ready" });
+      }
+
       const timestampClause =
         dbStatus === "released" ? ", released_at = NOW()" :
         dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
+      const codeClause = needsCode ? ", official_code = ?" : "";
+
+      const values = [dbStatus];
+      if (notes !== undefined) values.push(notes);
+      if (needsCode) values.push(trimmedCode);
+      values.push(requestId);
 
       await pool.query(
-        `UPDATE document_requests SET status = ?${notesClause}${timestampClause} WHERE request_id = ?`,
-        notes !== undefined ? [dbStatus, notes, requestId] : [dbStatus, requestId],
+        `UPDATE document_requests SET status = ?${notesClause}${codeClause}${timestampClause} WHERE request_id = ?`,
+        values,
       );
 
       await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: dbStatus });
+
+      if (needsCode) {
+        await linkOfficialCode(false, requestId, trimmedCode);
+      }
 
       emitToUser(request.student_id, "document:status-updated", { requestId, status });
       createNotification(request.student_id, `Your document request is now ${status}.`);
@@ -1864,7 +1928,7 @@ router.get(
       let sql = `
         SELECT ds.service_id AS id, ds.service_name AS name, ds.description,
                ds.status, ds.fee, ds.processing_time, ds.department_id, ds.is_cross_college,
-               ds.recipient_type,
+               ds.recipient_type, ds.requires_coding,
                d.department_abbreviation AS dept_abbrev,
                (SELECT COUNT(*) FROM document_requirements dr WHERE dr.service_id = ds.service_id) AS req_count
         FROM document_services ds
@@ -1890,6 +1954,7 @@ router.get(
         requirementCount: r.req_count,
         isCrossCollege: !!r.is_cross_college,
         recipientType: r.recipient_type || "students",
+        requiresCoding: !!r.requires_coding,
       })) });
     } catch (error) {
       console.error("Document types fetch error:", error);
@@ -1935,7 +2000,7 @@ router.post(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requirements = [] } = req.body;
+    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requiresCoding, requirements = [] } = req.body;
     if (!name || !description || !processingTime || fee === undefined) {
       return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
     }
@@ -1946,9 +2011,9 @@ router.post(
       const effectiveRecipient = recipientType || "students";
 
       const [result] = await pool.query(
-        `INSERT INTO document_services (service_name, description, department_id, is_cross_college, status, fee, processing_time, recipient_type)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, deptId, !!isCrossCollege, status || "active", parseFloat(fee), processingTime, effectiveRecipient],
+        `INSERT INTO document_services (service_name, description, department_id, is_cross_college, status, fee, processing_time, recipient_type, requires_coding)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description, deptId, !!isCrossCollege, status || "active", parseFloat(fee), processingTime, effectiveRecipient, !!requiresCoding],
       );
       const newId = result.insertId;
 
@@ -1977,7 +2042,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requirements = [] } = req.body;
+    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requiresCoding, requirements = [] } = req.body;
     if (!name || !description || !processingTime || fee === undefined) {
       return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
     }
@@ -1996,8 +2061,8 @@ router.put(
 
       await pool.query(
         `UPDATE document_services SET service_name = ?, description = ?, status = ?, fee = ?, processing_time = ?,
-         is_cross_college = ?, recipient_type = ? WHERE service_id = ?`,
-        [name, description, status || "active", parseFloat(fee), processingTime, !!isCrossCollege, effectiveRecipient, serviceId],
+         is_cross_college = ?, recipient_type = ?, requires_coding = ? WHERE service_id = ?`,
+        [name, description, status || "active", parseFloat(fee), processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
       );
 
       // Replace requirements: delete all then re-insert
@@ -3195,6 +3260,7 @@ router.get(
         found: true,
         doc: {
           requestId: docRow.request_id,
+          qrCode: docRow.qr_code,
           trackingNumber: docRow.tracking_number,
           documentType: docRow.document_type,
           studentName: docRow.student_name,

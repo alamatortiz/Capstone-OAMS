@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import jsQR from "jsqr";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
@@ -65,19 +66,6 @@ const PrintIcon = () => (
     <rect x="6" y="14" width="12" height="8"></rect>
   </svg>
 );
-const DownloadIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    style={{ width: "1rem", height: "1rem" }}
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-    <polyline points="7 10 12 15 17 10"></polyline>
-    <line x1="12" y1="15" x2="12" y2="3"></line>
-  </svg>
-);
 const CheckCircleIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -106,6 +94,15 @@ export default function AdminScanDocument() {
   const [recentScans, setRecentScans] = useState([]);
   const [claiming, setClaiming] = useState(false);
 
+  // Live camera scanner refs -- video element the camera stream is attached
+  // to, an offscreen canvas used to sample frames for jsQR, the active
+  // MediaStream (so it can be stopped), and the requestAnimationFrame handle
+  // for the decode loop.
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const rafRef = useRef(null);
+
   // Load recent scans on mount
   useEffect(() => {
     if (!authUser) return;
@@ -114,15 +111,71 @@ export default function AdminScanDocument() {
       .catch((err) => console.error("Recent scans fetch error:", err));
   }, [authUser]);
 
+  // Stop the camera stream + decode loop on unmount, in case the admin
+  // navigates away mid-scan.
+  useEffect(() => stopScanning, []);
+
   const generateBotResponse = () =>
     "I can help with scanning documents and verifying QR codes. Enter a QR code manually below or use the scanner.";
 
-  const handleStartScanning = () => {
-    setScanning(true);
-    setTimeout(() => {
+  function stopScanning() {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    streamRef.current = null;
+  }
+
+  const tick = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      rafRef.current = requestAnimationFrame(tick);
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const result = jsQR(imageData.data, imageData.width, imageData.height);
+    if (result?.data) {
+      stopScanning();
       setScanning(false);
-      processCode("REQ-00002-QR");
-    }, 2500);
+      processCode(result.data);
+      return;
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
+  const handleStartScanning = async () => {
+    setErrorMsg("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      setScanning(true);
+      // Wait a tick for the <video> element to mount before attaching the stream.
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      });
+    } catch (err) {
+      console.error("Camera access error:", err);
+      setErrorMsg(
+        "Couldn't access the camera. Please allow camera permission, or enter the QR code manually below.",
+      );
+    }
+  };
+
+  const handleStopScanning = () => {
+    stopScanning();
+    setScanning(false);
   };
 
   const processCode = async (code) => {
@@ -165,7 +218,11 @@ export default function AdminScanDocument() {
     if (!verifiedDoc?.requestId) return;
     setClaiming(true);
     try {
-      await api.patch(`/admin/document-processing/${verifiedDoc.requestId}/status`, {
+      const endpoint =
+        verifiedDoc.requesterType === "faculty"
+          ? "faculty-document-processing"
+          : "document-processing";
+      await api.patch(`/admin/${endpoint}/${verifiedDoc.requestId}/status`, {
         status: "claimed",
       });
       toast.success("Document marked as claimed.");
@@ -175,11 +232,6 @@ export default function AdminScanDocument() {
     } finally {
       setClaiming(false);
     }
-  };
-
-  const handleQuickCode = (code) => {
-    setManualCode(code);
-    processCode(code);
   };
 
   return (
@@ -344,9 +396,6 @@ export default function AdminScanDocument() {
                   <button className="asd-btn-print" onClick={() => window.print()}>
                     <PrintIcon /> Print
                   </button>
-                  <button className="asd-btn-download">
-                    <DownloadIcon /> Download
-                  </button>
                   <button
                     className="asd-btn-close-modal"
                     onClick={() => setModalOpen(false)}
@@ -405,9 +454,18 @@ export default function AdminScanDocument() {
                   {scanning ? (
                     <div className="asd-scanner-active">
                       <div className="asd-scanner-frame asd-scanner-frame--scanning">
+                        <video
+                          ref={videoRef}
+                          className="asd-scanner-video"
+                          muted
+                          playsInline
+                        />
                         <div className="asd-scanner-line"></div>
                       </div>
-                      <p className="asd-scanner-hint">Scanning…</p>
+                      <canvas ref={canvasRef} style={{ display: "none" }} />
+                      <p className="asd-scanner-hint">
+                        Point the camera at a QR code…
+                      </p>
                     </div>
                   ) : (
                     <div className="asd-scanner-idle">
@@ -521,10 +579,9 @@ export default function AdminScanDocument() {
                 </div>
                 <button
                   className="asd-btn-scan"
-                  onClick={handleStartScanning}
-                  disabled={scanning}
+                  onClick={scanning ? handleStopScanning : handleStartScanning}
                 >
-                  {scanning ? "Scanning…" : "Start Scanning"}
+                  {scanning ? "Stop Scanning" : "Start Scanning"}
                 </button>
               </div>
 
@@ -557,21 +614,6 @@ export default function AdminScanDocument() {
                     </button>
                   </div>
                   {errorMsg && <p className="asd-error-msg">{errorMsg}</p>}
-                  <p className="asd-quick-label">Quick test codes:</p>
-                  <div className="asd-quick-codes">
-                    {[
-                      "REQ-00002-QR",
-                      "REQ-00005-QR",
-                    ].map((code) => (
-                      <button
-                        key={code}
-                        className="asd-quick-code-btn"
-                        onClick={() => handleQuickCode(code)}
-                      >
-                        {code}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>

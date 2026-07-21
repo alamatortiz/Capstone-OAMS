@@ -179,6 +179,16 @@
 
 .asd-scanner-frame--scanning {
   animation: asd-frame-pulse 1s ease-in-out infinite;
+  overflow: hidden;
+}
+
+.asd-scanner-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.25rem;
 }
 
 @keyframes asd-frame-pulse {

@@ -187,6 +187,7 @@ CREATE TABLE document_services (
     status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
     fee              DECIMAL(10,2) NOT NULL DEFAULT 0,
     processing_time  VARCHAR(100) NULL,
+    requires_coding  BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = office must assign an official (dean-sanctioned) code before release
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT
 );
 
@@ -348,21 +349,25 @@ CREATE TABLE document_requests (
     released_at             TIMESTAMP    NULL,
     claimed_at              TIMESTAMP    NULL,
     notes                   TEXT         NULL,
+    official_code           VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_document_requests_tracking (tracking_number)
 );
 
--- request_id is nullable because a generated file can belong to either a student
--- document_requests row OR a faculty_document_requests row (never both) -- see the
--- faculty_request_id column/FK/CHECK added via ALTER TABLE right after
--- faculty_document_requests is created below (forward reference, so it can't be inline here).
+-- request_id is nullable because a generated_files row can belong to either a
+-- student document_requests row OR a faculty_document_requests row (never both)
+-- -- see the faculty_request_id column/FK/CHECK added via ALTER TABLE right
+-- after faculty_document_requests is created below (forward reference, so it
+-- can't be inline here). file_name/file_path are nullable because this table
+-- no longer tracks an actual generated file -- it exists purely to link an
+-- admin-assigned official_code's QR value to a request for the scan/verify flow.
 CREATE TABLE generated_files (
     file_id         INT          AUTO_INCREMENT PRIMARY KEY,
     request_id      INT          NULL,
-    file_name       VARCHAR(255) NOT NULL,
-    file_path       VARCHAR(255) NOT NULL,
+    file_name       VARCHAR(255) NULL,
+    file_path       VARCHAR(255) NULL,
     qr_code         VARCHAR(255),
     generated_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (request_id) REFERENCES document_requests(request_id) ON DELETE CASCADE
@@ -473,6 +478,7 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     released_at          TIMESTAMP    NULL,
     claimed_at           TIMESTAMP    NULL,
     notes                TEXT         NULL,
+    official_code        VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
     created_at           TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),

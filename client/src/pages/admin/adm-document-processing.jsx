@@ -83,6 +83,7 @@ export default function AdminDocumentProcessing() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   useLockBodyScroll(showDetailsModal);
   const [processingNotes, setProcessingNotes] = useState("");
+  const [officialCode, setOfficialCode] = useState("");
 
   // ── Status-change confirmation ───────────────────────────────────────────
   const [confirmStatus, setConfirmStatus] = useState(null); // target status or null
@@ -193,20 +194,24 @@ export default function AdminDocumentProcessing() {
   const handleViewDetails = (doc) => {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes || "");
+    setOfficialCode(doc.officialCode || "");
     setShowDetailsModal(true);
   };
 
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedDocument) return;
+    const needsCode = newStatus === "ready" && selectedDocument.requiresCoding;
     try {
       await api.patch(`/admin/${sourceEndpoint}/${selectedDocument.id}/status`, {
         status: newStatus,
         notes: processingNotes,
+        ...(needsCode ? { officialCode } : {}),
       });
       toast.success(`Document marked as ${newStatus}`);
       setShowDetailsModal(false);
       setSelectedDocument(null);
       setProcessingNotes("");
+      setOfficialCode("");
       await fetchDocuments();
     } catch (err) {
       toast.error(err?.response?.data?.error || "Failed to update document status");
@@ -217,6 +222,18 @@ export default function AdminDocumentProcessing() {
     setShowDetailsModal(false);
     setSelectedDocument(null);
     setProcessingNotes("");
+    setOfficialCode("");
+  };
+
+  // "Mark as Ready" needs a non-blank official code first when the document
+  // type requires coding -- caught here before opening the generic confirm
+  // dialog, which has no room for inline field validation.
+  const handleMarkReadyClick = () => {
+    if (selectedDocument?.requiresCoding && !officialCode.trim()) {
+      toast.error("Enter the official code before marking this document ready.");
+      return;
+    }
+    setConfirmStatus("ready");
   };
 
   const runConfirmStatusChange = async () => {
@@ -355,7 +372,29 @@ export default function AdminDocumentProcessing() {
                         <p className="adp-modal-value">{formatManilaDate(selectedDocument.claimedDate)}</p>
                       </div>
                     )}
+                    {selectedDocument.officialCode && (
+                      <div className="adp-modal-field">
+                        <label className="adp-modal-label">Official Code</label>
+                        <p className="adp-modal-value">{selectedDocument.officialCode}</p>
+                      </div>
+                    )}
                   </div>
+
+                  {selectedDocument.status === "processing" && selectedDocument.requiresCoding && (
+                    <div className="adp-modal-notes-wrap">
+                      <label className="adp-modal-label" htmlFor="adp-official-code">
+                        Official Code <span style={{ color: "#dc2626" }}>*</span>
+                      </label>
+                      <input
+                        id="adp-official-code"
+                        type="text"
+                        className="adp-modal-textarea"
+                        placeholder="Enter the dean-sanctioned official code for this document"
+                        value={officialCode}
+                        onChange={(e) => setOfficialCode(e.target.value)}
+                      />
+                    </div>
+                  )}
 
                   <div className="adp-modal-notes-wrap">
                     <label className="adp-modal-label" htmlFor="adp-notes">Processing Notes</label>
@@ -376,7 +415,7 @@ export default function AdminDocumentProcessing() {
                       </button>
                     )}
                     {selectedDocument.status === "processing" && (
-                      <button className="adp-modal-btn adp-modal-btn--success" onClick={() => setConfirmStatus("ready")}>
+                      <button className="adp-modal-btn adp-modal-btn--success" onClick={handleMarkReadyClick}>
                         Mark as Ready
                       </button>
                     )}
