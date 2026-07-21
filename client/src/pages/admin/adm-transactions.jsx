@@ -517,6 +517,11 @@ export default function AdminTransaction() {
                             <span className="admin-transaction-item-student-id">
                               ({transaction.studentId})
                             </span>
+                            {transaction.requesterType === "faculty" && (
+                              <span className="admin-transaction-badge-faculty">
+                                Faculty
+                              </span>
+                            )}
                           </div>
                         </div>
 

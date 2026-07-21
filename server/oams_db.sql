@@ -354,9 +354,13 @@ CREATE TABLE document_requests (
     INDEX idx_document_requests_tracking (tracking_number)
 );
 
+-- request_id is nullable because a generated file can belong to either a student
+-- document_requests row OR a faculty_document_requests row (never both) -- see the
+-- faculty_request_id column/FK/CHECK added via ALTER TABLE right after
+-- faculty_document_requests is created below (forward reference, so it can't be inline here).
 CREATE TABLE generated_files (
     file_id         INT          AUTO_INCREMENT PRIMARY KEY,
-    request_id      INT          NOT NULL,
+    request_id      INT          NULL,
     file_name       VARCHAR(255) NOT NULL,
     file_path       VARCHAR(255) NOT NULL,
     qr_code         VARCHAR(255),
@@ -462,6 +466,7 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     service_id           INT          NOT NULL,
     request_type         VARCHAR(100) NOT NULL DEFAULT 'General',
     purpose              VARCHAR(255) NOT NULL,
+    copies               INT          NOT NULL DEFAULT 1,
     status               ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
     estimated_completion DATE         NULL,
     needed_by            DATE         NULL,
@@ -473,6 +478,16 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_faculty_doc_requests_faculty (faculty_id)
 );
+
+-- generated_files can belong to either a student or a faculty document request, never both.
+-- Added here via ALTER (not inline in the generated_files CREATE TABLE above) because
+-- faculty_document_requests has to exist first for the FK to be valid.
+ALTER TABLE generated_files
+    ADD COLUMN faculty_request_id INT NULL AFTER request_id,
+    ADD CONSTRAINT fk_generated_files_faculty_request
+        FOREIGN KEY (faculty_request_id) REFERENCES faculty_document_requests(request_id) ON DELETE CASCADE,
+    ADD CONSTRAINT chk_generated_files_one_parent
+        CHECK ((request_id IS NOT NULL AND faculty_request_id IS NULL) OR (request_id IS NULL AND faculty_request_id IS NOT NULL));
 
 -- ============================================================
 -- Schema definition ends here.
@@ -505,3 +520,16 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
 -- count was stowed inside the free-text `notes` field, which got silently wiped out the
 -- moment an admin's own note overwrote `notes` via any status update.
 -- ALTER TABLE document_requests ADD COLUMN copies INT NOT NULL DEFAULT 1 AFTER purpose;
+
+-- Brings faculty_document_requests to parity with document_requests: adds the same
+-- `copies` column, and lets generated_files/QR scanning attach to a faculty request the
+-- same way it already attaches to a student request (exactly one of request_id /
+-- faculty_request_id is ever set, enforced by the CHECK constraint).
+-- ALTER TABLE faculty_document_requests ADD COLUMN copies INT NOT NULL DEFAULT 1 AFTER purpose;
+-- ALTER TABLE generated_files MODIFY request_id INT NULL;
+-- ALTER TABLE generated_files
+--     ADD COLUMN faculty_request_id INT NULL AFTER request_id,
+--     ADD CONSTRAINT fk_generated_files_faculty_request
+--         FOREIGN KEY (faculty_request_id) REFERENCES faculty_document_requests(request_id) ON DELETE CASCADE,
+--     ADD CONSTRAINT chk_generated_files_one_parent
+--         CHECK ((request_id IS NOT NULL AND faculty_request_id IS NULL) OR (request_id IS NULL AND faculty_request_id IS NOT NULL));

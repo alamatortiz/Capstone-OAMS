@@ -1141,6 +1141,19 @@ body {
 .document-college.college-CAS  { color: #7f1d1d; }
 .document-college.college-CHAS { color: #22c55e; }
 
+.document-requester-badge {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.375rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 0.5px solid rgba(249, 115, 22, 0.3);
+  margin-left: 0.4rem;
+}
+
 .document-badge,
 .queue-badge {
   padding: 0.375rem 0.75rem;

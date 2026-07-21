@@ -50,14 +50,20 @@ router.get(
         [manilaToday, deptId, deptId],
       );
 
-      // 2. Pending documents (in this department's services)
+      // 2. Pending documents (student + faculty requests, in this department's services)
       const [[docRow]] = await pool.query(
-        `SELECT COUNT(*) AS pending_doc_count
-         FROM document_requests dr
-         JOIN document_services s ON dr.service_id = s.service_id
-         WHERE dr.status IN ('pending', 'processing')
-           AND (? IS NULL OR s.department_id = ?)`,
-        [deptId, deptId],
+        `SELECT
+           (SELECT COUNT(*) FROM document_requests dr
+              JOIN document_services s ON dr.service_id = s.service_id
+              WHERE dr.status IN ('pending', 'processing')
+                AND (? IS NULL OR s.department_id = ?))
+           +
+           (SELECT COUNT(*) FROM faculty_document_requests fdr
+              JOIN document_services s ON fdr.service_id = s.service_id
+              WHERE fdr.status IN ('pending', 'processing')
+                AND (? IS NULL OR s.department_id = ?))
+           AS pending_doc_count`,
+        [deptId, deptId, deptId, deptId],
       );
 
       // 3. Faculty available today -- shares the exact same schedule/toggle
@@ -76,24 +82,42 @@ router.get(
         [deptId],
       );
 
-      // 5. Pending documents list (latest 5 for the card)
+      // 5. Pending documents list (latest 5 for the card, student + faculty combined)
       const [pendingDocuments] = await pool.query(
-        `SELECT
-           dr.request_id,
-           dr.request_type,
-           dr.status,
-           dr.created_at,
-           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-           d.department_abbreviation AS college
-         FROM document_requests dr
-         JOIN students st ON dr.student_id = st.student_id
-         JOIN document_services s ON dr.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
-         WHERE dr.status IN ('pending', 'processing')
-           AND (? IS NULL OR s.department_id = ?)
-         ORDER BY dr.created_at DESC
+        `SELECT * FROM (
+           (SELECT
+              dr.request_id,
+              dr.request_type,
+              dr.status,
+              dr.created_at,
+              CONCAT(st.first_name, ' ', st.last_name) AS requester_name,
+              d.department_abbreviation AS college,
+              'student' AS requester_type
+            FROM document_requests dr
+            JOIN students st ON dr.student_id = st.student_id
+            JOIN document_services s ON dr.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
+            WHERE dr.status IN ('pending', 'processing')
+              AND (? IS NULL OR s.department_id = ?))
+           UNION ALL
+           (SELECT
+              fdr.request_id,
+              fdr.request_type,
+              fdr.status,
+              fdr.created_at,
+              CONCAT(f.first_name, ' ', f.last_name) AS requester_name,
+              d.department_abbreviation AS college,
+              'faculty' AS requester_type
+            FROM faculty_document_requests fdr
+            JOIN faculty f ON fdr.faculty_id = f.faculty_id
+            JOIN document_services s ON fdr.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
+            WHERE fdr.status IN ('pending', 'processing')
+              AND (? IS NULL OR s.department_id = ?))
+         ) AS combined
+         ORDER BY created_at DESC
          LIMIT 5`,
-        [deptId, deptId],
+        [deptId, deptId, deptId, deptId],
       );
 
       // 6. Hosted queues today (active slots with waiting counts)
@@ -136,9 +160,10 @@ router.get(
         },
         pendingDocuments: pendingDocuments.map((d) => ({
           id: d.request_id,
-          name: d.student_name,
+          name: d.requester_name,
           document: d.request_type,
           college: d.college,
+          requesterType: d.requester_type,
           date: new Date(d.created_at).toLocaleDateString("en-US", {
             timeZone: "Asia/Manila",
             month: "numeric",
@@ -1248,7 +1273,8 @@ router.get(
               COALESCE(CONCAT(adm.first_name, ' ', adm.last_name), s.service_name) AS processor,
               COALESCE(q.admin_reason, s.service_name) AS details,
               q.status AS raw_status,
-              COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time
+              COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time,
+              'student' AS requester_type
             FROM queues q
             JOIN services s ON q.service_id = s.service_id
             LEFT JOIN queue_slots qs ON q.slot_id = qs.slot_id
@@ -1276,7 +1302,8 @@ router.get(
               CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
               COALESCE(a.notes, 'No purpose specified') AS details,
               a.status AS raw_status,
-              a.created_at AS event_time
+              a.created_at AS event_time,
+              'student' AS requester_type
             FROM appointments a
             JOIN departments d ON a.department_id = d.department_id
             JOIN students st ON a.student_id = st.student_id
@@ -1309,11 +1336,46 @@ router.get(
               ) AS processor,
               dr.purpose AS details,
               dr.status AS raw_status,
-              dr.created_at AS event_time
+              dr.created_at AS event_time,
+              'student' AS requester_type
             FROM document_requests dr
             JOIN document_services s ON dr.service_id = s.service_id
             JOIN departments d ON s.department_id = d.department_id
             JOIN students st ON dr.student_id = st.student_id
+            WHERE s.department_id = ?
+          )
+          UNION ALL
+          (
+            SELECT
+              'document' AS type,
+              fdr.request_id AS id,
+              CASE fdr.status
+                WHEN 'claimed'    THEN 'Claimed Document Request'
+                WHEN 'released'   THEN 'Released Document Request'
+                WHEN 'generated'  THEN 'Generated Document'
+                WHEN 'processing' THEN 'Processing Document Request'
+                ELSE 'Pending Document Request'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(f.first_name, ' ', f.last_name) AS student_name,
+              f.employee_id AS student_id,
+              COALESCE(
+                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                 FROM audit_logs al
+                 JOIN administrators adm2 ON al.admin_id = adm2.admin_id
+                 WHERE al.target_table = 'faculty_document_requests' AND al.target_record_id = fdr.request_id
+                 ORDER BY al.created_at DESC LIMIT 1),
+                fdr.request_type
+              ) AS processor,
+              fdr.purpose AS details,
+              fdr.status AS raw_status,
+              fdr.created_at AS event_time,
+              'faculty' AS requester_type
+            FROM faculty_document_requests fdr
+            JOIN document_services s ON fdr.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
+            JOIN faculty f ON fdr.faculty_id = f.faculty_id
             WHERE s.department_id = ?
           )
         ) AS combined
@@ -1322,7 +1384,7 @@ router.get(
         LIMIT 200
       `;
 
-      const unionParams = [deptId, deptId, deptId];
+      const unionParams = [deptId, deptId, deptId, deptId];
       if (dateParam) unionParams.push(dateParam);
       const [rows] = await pool.query(unionSql, unionParams);
 
@@ -1358,6 +1420,7 @@ router.get(
         collegeAbbrev: r.college_abbrev,
         studentName: r.student_name,
         studentId: r.student_id,
+        requesterType: r.requester_type,
         processor: r.processor,
         details: r.details || "No additional details provided.",
         status: statusMap[r.raw_status] ?? r.raw_status,
@@ -1555,6 +1618,7 @@ router.get(
            fdr.tracking_number,
            fdr.request_type,
            fdr.purpose,
+           fdr.copies,
            fdr.status,
            fdr.notes,
            fdr.created_at,
@@ -1582,6 +1646,7 @@ router.get(
         college: r.college,
         documentType: r.request_type,
         purpose: r.purpose,
+        copies: r.copies,
         requestDate: r.created_at instanceof Date
           ? getManilaDateString(r.created_at)
           : String(r.created_at).split("T")[0],
@@ -3069,20 +3134,35 @@ router.get(
       );
       const scanLocation = deptRow?.department_abbreviation || "Admin Office";
 
+      // LEFT JOINs through both the student and faculty document tables --
+      // generated_files.request_id/faculty_request_id are mutually exclusive
+      // (enforced by a CHECK constraint), so exactly one side ever matches and
+      // COALESCE picks it. Response field names are kept as studentName/studentId
+      // for backward compatibility with the existing scan-document UI; requesterType
+      // is added alongside so a faculty-aware UI can be built later without another
+      // response-shape change.
       const [[docRow]] = await pool.query(
         `SELECT gf.file_id, gf.qr_code,
-           dr.request_id, dr.tracking_number, ds.service_name AS document_type,
-           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-           st.student_number AS student_id,
-           d.department_name AS college,
-           d.department_abbreviation AS dept_abbrev,
-           dr.status, dr.created_at AS issue_date,
-           dr.estimated_completion AS valid_until
+           COALESCE(dr.request_id, fdr.request_id) AS request_id,
+           COALESCE(dr.tracking_number, fdr.tracking_number) AS tracking_number,
+           COALESCE(ds.service_name, fds.service_name) AS document_type,
+           COALESCE(CONCAT(st.first_name, ' ', st.last_name), CONCAT(f.first_name, ' ', f.last_name)) AS student_name,
+           COALESCE(st.student_number, f.employee_id) AS student_id,
+           COALESCE(d.department_name, fd.department_name) AS college,
+           COALESCE(d.department_abbreviation, fd.department_abbreviation) AS dept_abbrev,
+           COALESCE(dr.status, fdr.status) AS status,
+           COALESCE(dr.created_at, fdr.created_at) AS issue_date,
+           COALESCE(dr.estimated_completion, fdr.estimated_completion) AS valid_until,
+           CASE WHEN dr.request_id IS NOT NULL THEN 'student' ELSE 'faculty' END AS requester_type
          FROM generated_files gf
-         JOIN document_requests dr ON gf.request_id = dr.request_id
-         JOIN students st           ON dr.student_id = st.student_id
-         JOIN document_services ds  ON dr.service_id = ds.service_id
-         JOIN departments d         ON ds.department_id = d.department_id
+         LEFT JOIN document_requests dr   ON gf.request_id = dr.request_id
+         LEFT JOIN students st            ON dr.student_id = st.student_id
+         LEFT JOIN document_services ds   ON dr.service_id = ds.service_id
+         LEFT JOIN departments d          ON ds.department_id = d.department_id
+         LEFT JOIN faculty_document_requests fdr ON gf.faculty_request_id = fdr.request_id
+         LEFT JOIN faculty f              ON fdr.faculty_id = f.faculty_id
+         LEFT JOIN document_services fds  ON fdr.service_id = fds.service_id
+         LEFT JOIN departments fd         ON fds.department_id = fd.department_id
          WHERE UPPER(gf.qr_code) = UPPER(?)`,
         [qrCode],
       );
@@ -3119,6 +3199,7 @@ router.get(
           documentType: docRow.document_type,
           studentName: docRow.student_name,
           studentId: docRow.student_id,
+          requesterType: docRow.requester_type,
           college: docRow.college,
           status: docStatus,
           documentStatus: docRow.status,
@@ -3144,16 +3225,23 @@ router.get(
   async (req, res) => {
     const adminUserId = req.user.userId;
     try {
+      // Same LEFT JOIN + COALESCE pattern as /scan-document/verify above, so a
+      // faculty-linked scan doesn't silently vanish from this list.
       const [rows] = await pool.query(
         `SELECT qtl.log_id, qtl.scan_time,
-           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-           ds.service_name AS doc_type,
-           dr.tracking_number, dr.status
+           COALESCE(CONCAT(st.first_name, ' ', st.last_name), CONCAT(f.first_name, ' ', f.last_name)) AS student_name,
+           COALESCE(ds.service_name, fds.service_name) AS doc_type,
+           COALESCE(dr.tracking_number, fdr.tracking_number) AS tracking_number,
+           COALESCE(dr.status, fdr.status) AS status,
+           CASE WHEN dr.request_id IS NOT NULL THEN 'student' ELSE 'faculty' END AS requester_type
          FROM qr_tracking_logs qtl
          JOIN generated_files gf ON qtl.file_id = gf.file_id
-         JOIN document_requests dr ON gf.request_id = dr.request_id
-         JOIN students st           ON dr.student_id = st.student_id
-         JOIN document_services ds  ON dr.service_id = ds.service_id
+         LEFT JOIN document_requests dr   ON gf.request_id = dr.request_id
+         LEFT JOIN students st            ON dr.student_id = st.student_id
+         LEFT JOIN document_services ds   ON dr.service_id = ds.service_id
+         LEFT JOIN faculty_document_requests fdr ON gf.faculty_request_id = fdr.request_id
+         LEFT JOIN faculty f              ON fdr.faculty_id = f.faculty_id
+         LEFT JOIN document_services fds  ON fdr.service_id = fds.service_id
          WHERE qtl.scanned_by = ?
          ORDER BY qtl.scan_time DESC
          LIMIT 10`,
@@ -3180,6 +3268,7 @@ router.get(
           tracking: r.tracking_number,
           time: formatRelative(r.scan_time),
           status: VALID_SCAN_STATUSES.includes(r.status) ? "valid" : "expired",
+          requesterType: r.requester_type,
         })),
       });
     } catch (error) {

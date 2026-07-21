@@ -657,6 +657,18 @@
   border: 0.5px solid rgba(16, 185, 129, 0.3);
 }
 
+.admin-transaction-badge-faculty {
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background-color: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 0.5px solid rgba(249, 115, 22, 0.3);
+}
+
 .admin-transaction-item-action {
   font-weight: 600;
   color: var(--text-primary);

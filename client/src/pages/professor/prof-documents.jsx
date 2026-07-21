@@ -100,8 +100,6 @@ function getStatusIcon(status) {
   }
 }
 
-const MIN_NEEDED_BY_DATE = getManilaTomorrowDateString();
-
 // ─── Document Detail View ──────────────────────────────────────────────────
 // Shown in place of the list when a card is clicked. Uses its own status/date
 // formatting (dss-* classes) rather than the list's doc-* ones, ported as-is
@@ -212,6 +210,10 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "Docume
                   <span className="dss-detail-value">{formatDetailDate(doc.estimatedCompletion)}</span>
                 </div>
               ) : null}
+              <div className="dss-detail-row">
+                <span className="dss-detail-label">Number of Copies</span>
+                <span className="dss-detail-value">{doc.copies ?? 1}</span>
+              </div>
               <div className="dss-detail-row" style={{ borderBottom: "none" }}>
                 <span className="dss-detail-label">Purpose</span>
                 <span className="dss-detail-value">{doc.purpose}</span>
@@ -289,6 +291,7 @@ export default function ProfessorDocumentRequest() {
     type: "",
     purpose: "",
     notes: "",
+    copies: "1",
     neededBy: "",
   });
 
@@ -326,6 +329,7 @@ export default function ProfessorDocumentRequest() {
           type: r.service_name,
           college: r.college,
           purpose: r.purpose,
+          copies: r.copies,
           requestDate: r.created_at,
           status: r.status,
           trackingNumber: r.tracking_number,
@@ -366,6 +370,7 @@ export default function ProfessorDocumentRequest() {
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSubmitRequest = async () => {
+    if (submitting) return;
     if (!formData.type || !formData.purpose) {
       toast.error("Please fill in all required fields");
       return;
@@ -379,11 +384,12 @@ export default function ProfessorDocumentRequest() {
         request_type: formData.type,
         purpose: formData.purpose,
         notes: formData.notes,
+        copies: formData.copies,
         needed_by: formData.neededBy || null,
       });
       await fetchRequests();
       setDialogOpen(false);
-      setFormData({ type: "", purpose: "", notes: "", neededBy: "" });
+      setFormData({ type: "", purpose: "", notes: "", copies: "1", neededBy: "" });
       toast.success("Document request submitted successfully!");
     } catch (err) {
       console.error("Failed to submit document request:", err);
@@ -531,11 +537,28 @@ export default function ProfessorDocumentRequest() {
                   </div>
 
                   <div className="doc-form-group">
+                    <label htmlFor="copies">Number of Copies</label>
+                    <input
+                      id="copies"
+                      type="number"
+                      min="1"
+                      max="20"
+                      step="1"
+                      value={formData.copies}
+                      onChange={(e) =>
+                        setFormData({ ...formData, copies: e.target.value })
+                      }
+                      className="doc-form-input"
+                      required
+                    />
+                  </div>
+
+                  <div className="doc-form-group">
                     <label htmlFor="neededBy">Needed By (optional)</label>
                     <input
                       id="neededBy"
                       type="date"
-                      min={MIN_NEEDED_BY_DATE}
+                      min={getManilaTomorrowDateString()}
                       value={formData.neededBy}
                       onChange={(e) =>
                         setFormData({ ...formData, neededBy: e.target.value })

@@ -434,7 +434,7 @@ router.get(
             ds.service_name AS description,
             fdr.status, fdr.created_at AS date, fdr.created_at,
             fdr.tracking_number AS trackingNumber,
-            fdr.purpose
+            fdr.purpose, fdr.copies
           FROM faculty_document_requests fdr
           JOIN document_services ds ON fdr.service_id = ds.service_id
           WHERE fdr.faculty_id = ?`;
@@ -1088,34 +1088,76 @@ router.get(
 );
 
 // POST /api/faculty/my-document-requests
+// Body: { service_id, request_type, purpose, notes, needed_by, copies }
 router.post(
   "/my-document-requests",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { service_id, request_type, purpose, notes, needed_by } = req.body;
+    const { service_id, request_type, purpose, notes, needed_by, copies } = req.body;
     if (!service_id || !purpose) return res.status(400).json({ message: "service_id and purpose are required" });
+    if (purpose.length > 255) {
+      return res.status(400).json({ message: "Purpose must be 255 characters or fewer" });
+    }
+
+    const copyCount = copies === undefined ? 1 : parseInt(copies, 10);
+    if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 20) {
+      return res.status(400).json({ message: "Number of copies must be a whole number between 1 and 20" });
+    }
+
+    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    if (needed_by && needed_by < tomorrow) {
+      return res.status(400).json({ message: "Needed-by date must be at least tomorrow" });
+    }
+
     try {
+      // Confirm service_id is a real, active service actually visible to this faculty
+      // member (own department, or cross-college) -- the client's dropdown already
+      // filters this way, but the server shouldn't just trust whatever id it's sent.
+      const [[fac]] = await pool.query(
+        `SELECT department_id FROM faculty WHERE faculty_id = ?`,
+        [facultyId]
+      );
+      const [[svc]] = await pool.query(
+        `SELECT service_id, department_id FROM document_services
+         WHERE service_id = ? AND status = 'active' AND recipient_type IN ('faculty','both')
+           AND (department_id = ? OR is_cross_college = TRUE)`,
+        [service_id, fac?.department_id]
+      );
+      if (!svc) {
+        return res.status(404).json({ message: "No matching service configuration found" });
+      }
+
+      // Guard against a double-click/double-tap firing this twice before the client's
+      // own disabled-button state catches up to the first request.
+      const [[recentDup]] = await pool.query(
+        `SELECT request_id FROM faculty_document_requests
+         WHERE faculty_id = ? AND service_id = ? AND purpose = ?
+           AND created_at >= NOW() - INTERVAL 10 SECOND
+         LIMIT 1`,
+        [facultyId, service_id, purpose]
+      );
+      if (recentDup) {
+        return res.status(409).json({ message: "This request was already submitted a moment ago" });
+      }
+
       const [result] = await pool.query(
-        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, notes, needed_by)
-         VALUES (?,?,?,?,?,?)`,
-        [facultyId, service_id, request_type ?? "General", purpose, notes ?? null, needed_by || null]
+        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, copies, notes, needed_by)
+         VALUES (?,?,?,?,?,?,?)`,
+        [facultyId, service_id, request_type ?? "General", purpose, copyCount, notes ?? null, needed_by || null]
       );
       const [[newRequest]] = await pool.query(
-        `SELECT request_id, tracking_number FROM faculty_document_requests WHERE request_id = ?`,
+        `SELECT request_id, tracking_number, copies FROM faculty_document_requests WHERE request_id = ?`,
         [result.insertId]
       );
 
-      const [[svc]] = await pool.query(
-        `SELECT department_id FROM document_services WHERE service_id = ?`,
-        [service_id]
-      );
-      emitToDept(svc?.department_id, "document:new-request", { requestId: newRequest.request_id });
+      emitToDept(svc.department_id, "document:new-request", { requestId: newRequest.request_id });
 
       res.status(201).json({
         request_id: newRequest.request_id,
         tracking_number: newRequest.tracking_number,
+        copies: newRequest.copies,
         message: "Request submitted",
       });
     } catch (err) {

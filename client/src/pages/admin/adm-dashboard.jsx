@@ -641,7 +641,12 @@ export default function AdminDashboard() {
                   pendingDocuments.map((doc) => (
                     <div key={doc.id} className="document-item">
                       <div className="document-info">
-                        <p className="document-name">{doc.name}</p>
+                        <p className="document-name">
+                          {doc.name}
+                          {doc.requesterType === "faculty" && (
+                            <span className="document-requester-badge">Faculty</span>
+                          )}
+                        </p>
                         <p className="document-type">{doc.document}</p>
                         <div className="document-meta-row">
                           <span
