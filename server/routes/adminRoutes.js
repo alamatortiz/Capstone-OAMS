@@ -392,9 +392,13 @@ router.post(
         .json({ error: "noShowTimeoutMinutes must be a positive number" });
     }
 
+    const conn = await pool.getConnection();
     try {
+      await conn.beginTransaction();
+
       const deptId = await getAdminDepartmentId(adminId);
       if (!deptId) {
+        await conn.rollback();
         return res
           .status(403)
           .json({ error: "Admin has no department assigned" });
@@ -402,21 +406,26 @@ router.post(
 
       // Hosting is restricted to the service's own owning department, even if
       // it's cross-college (is_cross_college only controls who can JOIN it).
-      const [[service]] = await pool.query(
+      // Locking this row means two near-simultaneous requests for the same
+      // service serialize here, closing the race that previously let both
+      // pass the overlap check below before either had committed its insert.
+      const [[service]] = await conn.query(
         `SELECT service_id, department_id, service_name
-         FROM services WHERE service_id = ?`,
+         FROM services WHERE service_id = ? FOR UPDATE`,
         [serviceId],
       );
       if (!service) {
+        await conn.rollback();
         return res.status(404).json({ error: "Service not found" });
       }
       if (service.department_id !== deptId) {
+        await conn.rollback();
         return res
           .status(403)
           .json({ error: "You can only host queues for your own department" });
       }
 
-      const [[overlap]] = await pool.query(
+      const [[overlap]] = await conn.query(
         `SELECT slot_id FROM queue_slots
          WHERE service_id = ? AND slot_date = ? AND status IN ('open', 'paused', 'full', 'expired')
            AND start_time < ? AND end_time > ?
@@ -424,17 +433,20 @@ router.post(
         [serviceId, getManilaDateString(), endTime, startTime],
       );
       if (overlap) {
+        await conn.rollback();
         return res.status(409).json({
           error: "This time window overlaps with an existing queue for this service",
         });
       }
 
-      const [result] = await pool.query(
+      const [result] = await conn.query(
         `INSERT INTO queue_slots
            (service_id, admin_id, slot_date, start_time, end_time, max_capacity, no_show_timeout_minutes, service_time_minutes, current_count, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'open')`,
         [serviceId, adminId, getManilaDateString(), startTime, endTime, capacityNum, noShowTimeoutNum, serviceTimeNum],
       );
+
+      await conn.commit();
 
       emitToDept(deptId, "queue:slot-opened", {
         slotId: result.insertId,
@@ -460,6 +472,7 @@ router.post(
         },
       });
     } catch (error) {
+      await conn.rollback();
       if (error.code === "ER_DUP_ENTRY") {
         return res.status(409).json({
           error: "A queue for this service and start time already exists today",
@@ -469,6 +482,8 @@ router.post(
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
@@ -2886,7 +2901,7 @@ router.get(
           {
             label: "Avg Wait Time",
             value: currentAgg.avgWaitMinutes > 0 ? `${Math.round(currentAgg.avgWaitMinutes)} min` : "N/A",
-            change: pctChange(currentAgg.avgWaitMinutes, previousAgg.avgWaitMinutes),
+            change: pctChange(currentAgg.avgWaitMinutes, previousAgg.avgWaitMinutes, previousAgg.studentsServed > 0),
             color: "#3b82f6",
           },
           {

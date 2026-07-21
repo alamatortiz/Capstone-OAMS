@@ -292,7 +292,7 @@ export default function ProfessorTransactionsPage() {
                       txn.trackingNumber && (
                         <div className="txn-item-student">
                           <FileTextIconSm />
-                          <span className="txn-item-student-name">{txn.trackingNumber}</span>
+                          <span className="txn-tracking-pill">{txn.trackingNumber}</span>
                         </div>
                       )
                     ) : (

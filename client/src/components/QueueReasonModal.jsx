@@ -54,7 +54,7 @@ export default function QueueReasonModal({
             {cancelText}
           </button>
           <button
-            className="acm-confirm"
+            className="acm-confirm acm-confirm--danger"
             onClick={handleConfirm}
             disabled={submitting || !trimmed}
           >

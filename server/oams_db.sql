@@ -257,7 +257,11 @@ CREATE TABLE queues (
     -- Defense-in-depth: queue numbers are generated app-side under a row
     -- lock on the owning slot (POST /queues/join), but nothing previously
     -- stopped a duplicate at the DB layer if that ever got bypassed.
-    UNIQUE KEY uq_queue_slot_number (slot_id, queue_number)
+    UNIQUE KEY uq_queue_slot_number (slot_id, queue_number),
+    -- Supports the per-service/date-range aggregate queries used by
+    -- GET /admin/queue-analytics (performance, peak-hour, and trend
+    -- comparisons all filter+group on this pair).
+    INDEX idx_queues_service_created (service_id, created_at)
 );
 
 -- Audit trail for all queue status transitions

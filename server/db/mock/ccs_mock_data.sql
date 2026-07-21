@@ -733,10 +733,10 @@ INSERT INTO faqs (faq_id, question, answer, type, status, created_by, is_pinned,
    'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
 (6, 'Enrollment period for AY 2026 - 2027 is now open.',
    CONCAT('All students must complete online enrollment via the OAMS portal by ', DATE_FORMAT(CURDATE() + INTERVAL 30 DAY, '%M %d, %Y'), '. Walk-in enrollment will not be accommodated after the deadline.'),
-   'important', 'active', 'CCS Admin Office', TRUE, 1001, TRUE),
+   'important', 'active', 'CCS Admin Office', TRUE, 1001, FALSE),
 (7, CONCAT('System maintenance scheduled for ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), '.'),
    CONCAT('OAMS will be unavailable from 12:00 AM to 4:00 AM on ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), ' for scheduled maintenance. Please plan your transactions accordingly.'),
-   'important', 'active', 'CCS Admin Office', TRUE, 1001, TRUE);
+   'important', 'active', 'CCS Admin Office', TRUE, 1001, FALSE);
 
 
 -- ─────────────────────────────────────────────────────────────

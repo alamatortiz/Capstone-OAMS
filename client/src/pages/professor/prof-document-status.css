@@ -391,24 +391,6 @@
   transition: color 0.3s ease;
 }
 
-.dss-list-tracking {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0;
-  transition: color 0.3s ease;
-}
-
-.dss-list-tracking span {
-  font-family: "Courier New", monospace;
-  font-weight: 700;
-  color: #f59e0b;
-  letter-spacing: 0.03em;
-}
-
-[data-theme="light"] .dss-list-tracking span {
-  color: #d97706;
-}
-
 /* ─── Count pill inside each tab ─────────────────────────────────────────── */
 .dss-tab-count {
   display: inline-flex;
