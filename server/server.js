@@ -6,7 +6,21 @@ const http = require("http");
 const app = express();
 const server = http.createServer(app);
 
-app.use(cors());
+const allowedOrigins = (process.env.CLIENT_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim());
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 // Routes
@@ -30,33 +44,3 @@ server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 startNoShowSweeper();
 startExpirySweeper();
-
-const pool = require("./db"); // your mysql2 pool connection
-
-// Get current count
-app.get("/api/counter", async (req, res) => {
-  try {
-    const [rows] = await pool.query(
-      "SELECT count_value FROM demo_counters WHERE counter_id = 1",
-    );
-    const count = rows.length ? rows[0].count_value : 0;
-    res.json({ count });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Increment count
-app.post("/api/counter/tap", async (req, res) => {
-  try {
-    await pool.query(
-      "UPDATE demo_counters SET count_value = count_value + 1 WHERE counter_id = 1",
-    );
-    const [rows] = await pool.query(
-      "SELECT count_value FROM demo_counters WHERE counter_id = 1",
-    );
-    res.json({ count: rows[0].count_value });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
