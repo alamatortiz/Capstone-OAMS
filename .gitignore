@@ -31,6 +31,9 @@ ios/
 .claude/
 AGENTS.md
 
+# thesis documents
+*.docx
+
 # OS file
 .DS_Store
 Thumbs.db
