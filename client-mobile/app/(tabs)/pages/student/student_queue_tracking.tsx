@@ -102,6 +102,7 @@ interface ActiveQueueRecord {
   servicedPercent: number;
   estimatedWait: string;
   joinedAt: string;
+  arrivedAt?: string | null;
 }
 
 interface NavItem {
@@ -167,6 +168,18 @@ export default function StudentQueueTrackingScreen() {
     }
     if (key === 'announcements') {
       router.push('/pages/student/student_announcement');
+      return;
+    }
+    if (key === 'appointments') {
+      router.push('/pages/student/student_appointments');
+      return;
+    }
+    if (key === 'documents') {
+      router.push('/pages/student/student_documents');
+      return;
+    }
+    if (key === 'transactions') {
+      router.push('/pages/student/student_transactions');
       return;
     }
     comingSoon();
@@ -376,7 +389,7 @@ export default function StudentQueueTrackingScreen() {
                             <Text style={styles.positionLabelText}>Your Position</Text>
                           </View>
                           <Text style={styles.positionNumber}>
-                            {queue.status === 'serving' ? 'Serving' : queue.position}
+                            {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
                           </Text>
                           {queue.status !== 'serving' && (
                             <Text style={styles.positionTotal}>of {queue.totalWaiting}</Text>

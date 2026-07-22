@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
+import QueueReasonModal from '@/components/QueueReasonModal';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -1097,69 +1098,6 @@ function OpenQueueModal({
               disabled={submitting}
             >
               <Text style={styles.formSubmitBtnText}>{submitting ? 'Opening...' : 'Open Queue Line'}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function QueueReasonModal({
-  visible,
-  title,
-  message,
-  confirmText,
-  confirmColor,
-  reason,
-  onChangeReason,
-  onCancel,
-  onConfirm,
-  theme,
-  styles,
-  submitting,
-}: {
-  visible: boolean;
-  title: string;
-  message: string;
-  confirmText: string;
-  confirmColor: string;
-  reason: string;
-  onChangeReason: (v: string) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-  theme: ThemePalette;
-  styles: ReturnType<typeof createStyles>;
-  submitting: boolean;
-}) {
-  return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.confirmModalCard}>
-          <View style={[styles.confirmIconCircle, { backgroundColor: `${confirmColor}26` }]}>
-            <Ionicons name="alert-circle-outline" size={26} color={confirmColor} />
-          </View>
-          <Text style={styles.confirmTitle}>{title}</Text>
-          <Text style={styles.confirmDescription}>{message}</Text>
-          <TextInput
-            style={styles.reasonInput}
-            placeholder="Reason (optional)"
-            placeholderTextColor={theme.tertiary}
-            value={reason}
-            onChangeText={onChangeReason}
-            multiline
-            editable={!submitting}
-          />
-          <View style={styles.confirmActionsRow}>
-            <Pressable style={styles.cancelBtn} onPress={onCancel} disabled={submitting}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.confirmBtn, { backgroundColor: confirmColor }, submitting && styles.formSubmitBtnDisabled]}
-              onPress={onConfirm}
-              disabled={submitting}
-            >
-              <Text style={styles.confirmBtnText}>{confirmText}</Text>
             </Pressable>
           </View>
         </View>

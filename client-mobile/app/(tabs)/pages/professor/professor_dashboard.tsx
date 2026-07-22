@@ -244,6 +244,10 @@ export default function ProfessorDashboardScreen() {
       router.push('/pages/professor/professor_documents_status');
       return;
     }
+    if (key === 'completed') {
+      router.push('/pages/professor/professor_transactions');
+      return;
+    }
     comingSoon();
   };
 

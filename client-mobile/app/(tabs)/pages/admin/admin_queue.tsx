@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
+import QueueReasonModal from '@/components/QueueReasonModal';
 import api from '@/utils/api';
 import { exportRowsAsCsv } from '@/utils/csvExport';
 
@@ -103,6 +104,7 @@ interface QueueEntry {
   concern: string;
   status: QueueEntryStatus;
   joinedAt: string;
+  arrivedAt: string | null;
 }
 
 interface NavItem {
@@ -171,16 +173,13 @@ function getQueueStatusLabel(status: QueueSlotStatus) {
   }
 }
 
-function getEntryStatusLabel(status: QueueEntryStatus) {
-  return status === 'no_show' ? 'No-Show' : status;
+function getEntryStatusLabel(status: QueueEntryStatus, arrivedAt?: string | null) {
+  if (status === 'no_show') return 'No-Show';
+  if (status === 'serving') return arrivedAt ? 'Being Served' : 'Called';
+  return status;
 }
 
 type FilterKind = 'collegeOverview' | 'serviceType' | null;
-type ConfirmKind = 'pause' | 'stop';
-interface ConfirmAction {
-  type: ConfirmKind;
-  queueId: string;
-}
 
 export default function AdminQueueScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -192,10 +191,27 @@ export default function AdminQueueScreen() {
   const [collegeOverviewFilter, setCollegeOverviewFilter] = useState('all');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { queues: queueDetails, fetchQueues } = useAdminQueueHosting();
+  const {
+    queues: queueDetails,
+    error: queueHostingError,
+    fetchQueues,
+    reasonModal,
+    setReasonModal,
+    reasonSubmitting,
+    handlePauseQueue,
+    handleCloseQueue,
+    handleReasonConfirm: handleReasonConfirmBase,
+  } = useAdminQueueHosting();
+  const [reasonText, setReasonText] = useState('');
+
+  // Skip requires a reason too (kept consistent with pause/close) -- reuses
+  // the same QueueReasonModal, keyed by a distinct 'skip' mode, mirroring
+  // web's adm-queue.jsx.
+  const [skipReasonModal, setSkipReasonModal] = useState(false);
+  const [skipSubmitting, setSkipSubmitting] = useState(false);
+  const [skipReasonText, setSkipReasonText] = useState('');
 
   const fetchEntries = useCallback(async (slotId: number) => {
     try {
@@ -333,6 +349,16 @@ export default function AdminQueueScreen() {
     }
   };
 
+  const handleMarkArrived = async (id: number) => {
+    try {
+      await api.patch(`/admin/queue-hosting/${id}/mark-arrived`);
+      await fetchQueues();
+      await fetchEntries(id);
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.response?.data?.error ?? 'Failed to mark student as arrived' });
+    }
+  };
+
   const handleMarkAsServed = async (id: number) => {
     try {
       await api.patch(`/admin/queue-hosting/${id}/serve`);
@@ -343,9 +369,9 @@ export default function AdminQueueScreen() {
     }
   };
 
-  const handleSkipStudent = async (id: number) => {
+  const handleSkipStudent = async (id: number, reason: string) => {
     try {
-      await api.patch(`/admin/queue-hosting/${id}/skip`, { reason: 'Did not respond when called' });
+      await api.patch(`/admin/queue-hosting/${id}/skip`, { reason });
       await fetchQueues();
       await fetchEntries(id);
     } catch (error: any) {
@@ -363,19 +389,24 @@ export default function AdminQueueScreen() {
     }
   };
 
-  const runConfirmAction = async () => {
-    if (!confirmAction) return;
-    const { type, queueId } = confirmAction;
+  // Pause/close + the reason-modal flow live in the shared hook above; this
+  // page only needs to additionally exit the monitor view once a close
+  // actually goes through (the queue it was showing no longer has an
+  // active/paused state to monitor).
+  const handleReasonConfirm = async () => {
+    const result = await handleReasonConfirmBase(reasonText);
+    setReasonText('');
+    if (result?.mode === 'close') setMonitoringQueueId(null);
+  };
+
+  const handleSkipConfirm = async (reason: string) => {
+    if (!monitoringQueue) return;
+    setSkipSubmitting(true);
     try {
-      await api.patch(`/admin/queue-hosting/${queueId}/${type === 'pause' ? 'pause' : 'close'}`, {
-        reason: type === 'pause' ? 'Paused by admin' : 'Stopped by admin',
-      });
-      Toast.show({ type: 'success', text1: type === 'pause' ? 'Queue paused' : 'Queue stopped' });
-      await fetchQueues();
-      setConfirmAction(null);
-      if (type === 'stop') setMonitoringQueueId(null);
-    } catch (error: any) {
-      Toast.show({ type: 'error', text1: error?.response?.data?.error ?? `Failed to ${type} queue` });
+      await handleSkipStudent(monitoringQueue.id, reason);
+      setSkipReasonModal(false);
+    } finally {
+      setSkipSubmitting(false);
     }
   };
 
@@ -397,22 +428,22 @@ export default function AdminQueueScreen() {
     setActiveFilter(null);
   };
 
-  const confirmModalCopy =
-    confirmAction?.type === 'pause'
+  const reasonCopy =
+    reasonModal?.mode === 'pause'
       ? {
-          title: 'Pause Queue?',
-          description: 'Students in this queue will see a paused status. You can resume it anytime.',
-          confirmLabel: 'Pause',
-          icon: 'alert-circle-outline' as IoniconName,
-          color: '#f59e0b',
+          title: 'Pause Queue',
+          message: monitoringQueue?.currentlyServingStudentNumber
+            ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
+            : "Students in this queue will see this reason while it's paused.",
+          confirmText: 'Pause',
+          confirmColor: '#f59e0b',
         }
       : {
-          title: 'Stop Queue?',
-          description:
-            'All students still waiting or being served will be removed from this queue and will see this. This cannot be undone.',
-          confirmLabel: 'Stop Queue',
-          icon: 'close-circle-outline' as IoniconName,
-          color: '#ef4444',
+          title: 'Stop Queue',
+          message:
+            'All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.',
+          confirmText: 'Stop Queue',
+          confirmColor: '#ef4444',
         };
 
   // ─────────────────────────── Monitor detail view ───────────────────────────
@@ -487,7 +518,12 @@ export default function AdminQueueScreen() {
 
             <View style={styles.statsGrid3}>
               <View style={styles.statCard3}>
-                <Text style={styles.statCard3Label}>Currently Serving</Text>
+                <Text style={styles.statCard3Label}>
+                  Currently Serving
+                  {monitoringQueue.currentlyServingStudentNumber
+                    ? ` (${monitoringQueue.currentlyServingArrivedAt ? 'Being Served' : 'Called'})`
+                    : ''}
+                </Text>
                 <Text style={styles.statCard3Value}>
                   {monitoringQueue.currentlyServingStudentNumber || '—'}
                 </Text>
@@ -557,11 +593,22 @@ export default function AdminQueueScreen() {
             {/* Queue Actions */}
             <View style={styles.card}>
               <Text style={styles.cardTitleText}>Queue Actions</Text>
+              {monitoringQueue.status === 'paused' && (
+                <View style={styles.statusNote}>
+                  <Text style={styles.statusNoteText}>
+                    Queue is paused — resume it before calling students.
+                  </Text>
+                </View>
+              )}
               <View style={styles.actionsGrid}>
                 <Pressable
                   style={[styles.actionBtn, styles.actionBtnPrimary]}
                   onPress={() => handleCallNext(monitoringQueue.id)}
-                  disabled={!!monitoringQueue.currentlyServingStudentNumber || monitoringQueue.currentCount === 0}
+                  disabled={
+                    !!monitoringQueue.currentlyServingStudentNumber ||
+                    monitoringQueue.currentCount === 0 ||
+                    monitoringQueue.status === 'paused'
+                  }
                 >
                   <Ionicons name="people-outline" size={16} color={theme.blue} />
                   <Text style={[styles.actionBtnText, { color: theme.blue }]}>Call Next</Text>
@@ -574,7 +621,7 @@ export default function AdminQueueScreen() {
                 ) : (
                   <Pressable
                     style={[styles.actionBtn, styles.actionBtnWarning]}
-                    onPress={() => setConfirmAction({ type: 'pause', queueId: monitoringQueue.id })}
+                    onPress={() => handlePauseQueue(monitoringQueue.id)}
                     disabled={monitoringQueue.status !== 'open'}
                   >
                     <Ionicons name="alert-circle-outline" size={16} color="#f59e0b" />
@@ -583,7 +630,7 @@ export default function AdminQueueScreen() {
                 )}
                 <Pressable
                   style={[styles.actionBtn, styles.actionBtnDanger]}
-                  onPress={() => setConfirmAction({ type: 'stop', queueId: monitoringQueue.id })}
+                  onPress={() => handleCloseQueue(monitoringQueue.id)}
                 >
                   <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
                   <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Stop Queue</Text>
@@ -604,7 +651,21 @@ export default function AdminQueueScreen() {
               <Text style={styles.servingName}>
                 {monitoringQueue.currentlyServingStudentNumber || 'No student is currently being served'}
               </Text>
-              <Text style={styles.servingLabel}>{monitoringQueue.queueType}</Text>
+              <Text style={styles.servingLabel}>
+                {monitoringQueue.queueType}
+                {monitoringQueue.currentlyServingStudentNumber
+                  ? ` • ${monitoringQueue.currentlyServingArrivedAt ? 'Being Served' : 'Called — awaiting arrival'}`
+                  : ''}
+              </Text>
+              {monitoringQueue.currentlyServingStudentNumber && !monitoringQueue.currentlyServingArrivedAt && (
+                <Pressable
+                  style={[styles.wideBtn, styles.wideBtnPrimary]}
+                  onPress={() => handleMarkArrived(monitoringQueue.id)}
+                >
+                  <Ionicons name="alert-circle-outline" size={16} color="#ffffff" />
+                  <Text style={styles.wideBtnText}>Mark Arrived</Text>
+                </Pressable>
+              )}
               <Pressable
                 style={[styles.wideBtn, styles.wideBtnSuccess]}
                 onPress={() => handleMarkAsServed(monitoringQueue.id)}
@@ -615,7 +676,7 @@ export default function AdminQueueScreen() {
               </Pressable>
               <Pressable
                 style={[styles.wideBtn, styles.wideBtnDanger]}
-                onPress={() => handleSkipStudent(monitoringQueue.id)}
+                onPress={() => setSkipReasonModal(true)}
                 disabled={!monitoringQueue.currentlyServingStudentNumber}
               >
                 <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
@@ -635,6 +696,7 @@ export default function AdminQueueScreen() {
                 <View style={styles.entriesList}>
                   {paginatedEntries.map((entry, index) => {
                     const tint = ENTRY_STATUS_TINTS[entry.status];
+                    const entryStatusLabel = getEntryStatusLabel(entry.status, entry.arrivedAt);
                     return (
                       <View
                         key={entry.queueNumber}
@@ -651,7 +713,7 @@ export default function AdminQueueScreen() {
                           <View style={{ alignItems: 'flex-end', gap: 6 }}>
                             <View style={[styles.entryStatusPill, { backgroundColor: tint.bg, borderColor: tint.border }]}>
                               <Text style={[styles.entryStatusText, { color: tint.color }]}>
-                                {getEntryStatusLabel(entry.status)}
+                                {entryStatusLabel}
                               </Text>
                             </View>
                             <Text style={styles.entryQueueNumber}>{entry.queueNumber}</Text>
@@ -746,13 +808,37 @@ export default function AdminQueueScreen() {
           adminDepartmentName={user?.departmentName ?? ''}
         />
 
-        <ConfirmActionModal
-          visible={!!confirmAction}
-          copy={confirmModalCopy}
-          onCancel={() => setConfirmAction(null)}
-          onConfirm={runConfirmAction}
+        <QueueReasonModal
+          visible={!!reasonModal}
+          title={reasonCopy.title}
+          message={reasonCopy.message}
+          confirmText={reasonSubmitting ? 'Submitting...' : reasonCopy.confirmText}
+          confirmColor={reasonCopy.confirmColor}
+          reason={reasonText}
+          onChangeReason={setReasonText}
+          onCancel={() => setReasonModal(null)}
+          onConfirm={handleReasonConfirm}
           theme={theme}
           styles={styles}
+          submitting={reasonSubmitting}
+        />
+
+        <QueueReasonModal
+          visible={skipReasonModal}
+          title="Skip Student"
+          message="This voids the currently-served student's ticket as a no-show. They'll see this reason. This cannot be undone."
+          confirmText={skipSubmitting ? 'Submitting...' : 'Skip Student'}
+          confirmColor="#ef4444"
+          reason={skipReasonText}
+          onChangeReason={setSkipReasonText}
+          onCancel={() => setSkipReasonModal(false)}
+          onConfirm={() => {
+            handleSkipConfirm(skipReasonText);
+            setSkipReasonText('');
+          }}
+          theme={theme}
+          styles={styles}
+          submitting={skipSubmitting}
         />
 
         <LogoutModal
@@ -898,6 +984,12 @@ export default function AdminQueueScreen() {
               })}
             </View>
           </View>
+
+          {queueHostingError && (
+            <View style={[styles.statusNote, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.25)' }]}>
+              <Text style={[styles.statusNoteText, { color: '#ef4444' }]}>{queueHostingError}</Text>
+            </View>
+          )}
 
           {/* Active Queue Details */}
           <View style={styles.card}>
@@ -1090,44 +1182,6 @@ function NavDrawer({
           </Pressable>
         </SafeAreaView>
         <Pressable style={styles.drawerBackdrop} onPress={onClose} />
-      </View>
-    </Modal>
-  );
-}
-
-function ConfirmActionModal({
-  visible,
-  copy,
-  onCancel,
-  onConfirm,
-  theme,
-  styles,
-}: {
-  visible: boolean;
-  copy: { title: string; description: string; confirmLabel: string; icon: IoniconName; color: string };
-  onCancel: () => void;
-  onConfirm: () => void;
-  theme: ThemePalette;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.confirmModalCard}>
-          <View style={[styles.confirmIconCircle, { backgroundColor: `${copy.color}26` }]}>
-            <Ionicons name={copy.icon} size={26} color={copy.color} />
-          </View>
-          <Text style={styles.confirmTitle}>{copy.title}</Text>
-          <Text style={styles.confirmDescription}>{copy.description}</Text>
-          <View style={styles.confirmActionsRow}>
-            <Pressable style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </Pressable>
-            <Pressable style={[styles.confirmBtn, { backgroundColor: copy.color }]} onPress={onConfirm}>
-              <Text style={styles.confirmBtnText}>{copy.confirmLabel}</Text>
-            </Pressable>
-          </View>
-        </View>
       </View>
     </Modal>
   );
@@ -1487,6 +1541,7 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 13,
       borderRadius: 12,
     },
+    wideBtnPrimary: { backgroundColor: '#3b82f6' },
     wideBtnSuccess: { backgroundColor: '#22c55e' },
     wideBtnDanger: { backgroundColor: '#ef4444' },
     wideBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
@@ -1633,6 +1688,20 @@ function createStyles(theme: ThemePalette) {
     confirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
     confirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
     confirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
     confirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
     cancelBtn: {
       flex: 1,

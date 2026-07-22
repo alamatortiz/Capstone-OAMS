@@ -108,6 +108,7 @@ interface QueueRecord {
   startTime: string;
   endTime: string;
   notes: string;
+  arrivedAt?: string | null;
 }
 
 interface NavItem {
@@ -132,6 +133,17 @@ const STATUS_META: Record<QueueStatus, { label: string; bg: string; border: stri
   cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
   no_show: { label: 'Marked as No-Show', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
 };
+
+// "serving" covers both "called, not yet arrived" and "being served" --
+// arrivedAt distinguishes them, mirroring web's getStatusMeta.
+function getStatusMeta(queue: QueueRecord) {
+  if (queue.status === 'serving') {
+    return queue.arrivedAt
+      ? { label: 'Being Served', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' }
+      : { label: 'Called — Please Proceed', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' };
+  }
+  return STATUS_META[queue.status];
+}
 
 export default function StudentQueueStatusScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -167,6 +179,18 @@ export default function StudentQueueStatusScreen() {
     }
     if (key === 'announcements') {
       router.push('/pages/student/student_announcement');
+      return;
+    }
+    if (key === 'appointments') {
+      router.push('/pages/student/student_appointments');
+      return;
+    }
+    if (key === 'documents') {
+      router.push('/pages/student/student_documents');
+      return;
+    }
+    if (key === 'transactions') {
+      router.push('/pages/student/student_transactions');
       return;
     }
     comingSoon();
@@ -341,7 +365,7 @@ export default function StudentQueueStatusScreen() {
                           <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Your Position</Text>
                             <Text style={styles.statValuePrimary}>
-                              {queue.status === 'serving' ? 'Serving' : queue.position}
+                              {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
                             </Text>
                           </View>
                           <View style={styles.statBox}>
@@ -590,7 +614,7 @@ function QueueDetail({
   onLeave: () => void;
   onEditNotes: () => void;
 }) {
-  const statusMeta = STATUS_META[queue.status];
+  const statusMeta = getStatusMeta(queue);
   const peopleAhead = Math.max(queue.position - 1, 0);
 
   return (
@@ -643,7 +667,9 @@ function QueueDetail({
         <View style={styles.turnBanner}>
           <Ionicons name="checkmark-circle-outline" size={22} color="#ffffff" />
           <Text style={styles.turnBannerText}>
-            Please proceed to the designated location — it&apos;s your turn!
+            {queue.arrivedAt
+              ? 'You are now being served.'
+              : "Please proceed to the designated location — it's your turn!"}
           </Text>
         </View>
       )}
@@ -692,14 +718,16 @@ function QueueDetail({
             {queue.status === 'serving' ? 'Status' : 'Number in Line'}
           </Text>
           <Text style={styles.positionNumber}>
-            {queue.status === 'serving' ? 'Serving' : queue.position}
+            {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
           </Text>
           {queue.status !== 'serving' && (
             <Text style={styles.positionTotal}>of {queue.totalWaiting} waiting</Text>
           )}
           <Text style={styles.positionMessage}>
             {queue.status === 'serving'
-              ? "You're being served now!"
+              ? queue.arrivedAt
+                ? "You're being served now!"
+                : "You've been called — please proceed!"
               : queue.position === 1
                 ? "You're next!"
                 : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`}

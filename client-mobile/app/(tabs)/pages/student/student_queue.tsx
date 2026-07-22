@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useQueue } from '@/context/QueueContext';
+import QueueConcernModal from '@/components/QueueConcernModal';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -111,6 +112,9 @@ export default function StudentQueueScreen() {
   const [selectedService, setSelectedService] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
   const [leaveTarget, setLeaveTarget] = useState<any | null>(null);
+  const [concernModal, setConcernModal] = useState<{ slotId: number; serviceName: string } | null>(null);
+  const [concernText, setConcernText] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
   const router = useRouter();
   const { user, logout } = useAuth();
   const { queues: myQueues, availableSlots, joinQueue, leaveQueue, isAlreadyInQueue: isSlotJoined } = useQueue();
@@ -177,12 +181,17 @@ export default function StudentQueueScreen() {
     router.replace('/login');
   };
 
-  const handleJoinQueue = async (slotId: number) => {
+  const handleJoinQueue = async (slotId: number, notes: string) => {
+    setIsJoining(true);
     try {
-      await joinQueue(slotId, undefined);
+      await joinQueue(slotId, notes);
+      setConcernModal(null);
+      setConcernText('');
       Alert.alert('Success', 'Successfully joined the queue!');
     } catch (error: any) {
       Alert.alert('Could not join queue', error?.message ?? 'Please try again.');
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -392,7 +401,20 @@ export default function StudentQueueScreen() {
             <View style={styles.queueList}>
               {filteredQueues.map((q: any) => {
                 const alreadyIn = isSlotJoined(q.slotId);
-                const canJoin = q.hasCapacity && !alreadyIn;
+                const isPaused = q.status === 'paused';
+                const atCapacity = !q.hasCapacity;
+                const outsideHours = !q.isWithinHours;
+                const canJoin = !alreadyIn && !isPaused && !outsideHours && !atCapacity;
+                const badgeLabel = isPaused ? 'Paused' : outsideHours ? 'Closed' : atCapacity ? 'Full' : 'Open';
+                const joinLabel = alreadyIn
+                  ? 'Already in Queue'
+                  : isPaused
+                    ? 'Queue Paused'
+                    : outsideHours
+                      ? 'Currently Closed'
+                      : atCapacity
+                        ? 'Queue Full'
+                        : 'Join Queue';
                 return (
                   <View key={q.slotId} style={styles.availableQueueCard}>
                     <View style={styles.availableQueueLeft}>
@@ -409,7 +431,7 @@ export default function StudentQueueScreen() {
                           <Text style={styles.collegeNameText}>{q.departmentName}</Text>
                         </View>
                         <View style={styles.statusBadge}>
-                          <Text style={styles.statusBadgeText}>{q.status === 'full' ? 'Full' : 'Open'}</Text>
+                          <Text style={styles.statusBadgeText}>{badgeLabel}</Text>
                         </View>
                       </View>
                     </View>
@@ -446,11 +468,11 @@ export default function StudentQueueScreen() {
 
                     <Pressable
                       style={[styles.joinBtn, !canJoin && styles.joinBtnDisabled]}
-                      onPress={() => handleJoinQueue(q.slotId)}
+                      onPress={() => setConcernModal({ slotId: q.slotId, serviceName: q.serviceName })}
                       disabled={!canJoin}
                     >
                       <Text style={[styles.joinBtnText, !canJoin && styles.joinBtnTextDisabled]}>
-                        {alreadyIn ? 'Already in Queue' : q.hasCapacity ? 'Join Queue' : 'Full'}
+                        {joinLabel}
                       </Text>
                     </Pressable>
                   </View>
@@ -521,6 +543,23 @@ export default function StudentQueueScreen() {
       </Modal>
 
       {/* Leave Queue Confirm Modal */}
+      <QueueConcernModal
+        visible={concernModal !== null}
+        serviceName={concernModal?.serviceName}
+        concern={concernText}
+        onChangeConcern={setConcernText}
+        onCancel={() => {
+          setConcernModal(null);
+          setConcernText('');
+        }}
+        onConfirm={() => {
+          if (concernModal) handleJoinQueue(concernModal.slotId, concernText.trim());
+        }}
+        submitting={isJoining}
+        theme={theme}
+        styles={styles}
+      />
+
       <Modal
         visible={leaveTarget !== null}
         animationType="fade"
@@ -1293,6 +1332,32 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: '#ef4444',
     },
     logoutConfirmBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
+    concernInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    concernConfirmBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#3b82f6',
+    },
+    concernConfirmBtnText: {
       fontSize: 14,
       fontWeight: '700',
       color: '#ffffff',
