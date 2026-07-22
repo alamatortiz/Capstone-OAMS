@@ -80,6 +80,7 @@ interface DocumentRequest {
   type: string;
   college: string;
   purpose: string;
+  copies?: number;
   requestDate: string;
   status: DocStatus;
   trackingNumber: string;
@@ -148,9 +149,10 @@ function buildNeededByOptions() {
 const NEEDED_BY_OPTIONS = buildNeededByOptions();
 const MIN_NEEDED_BY_DATE = getTomorrowDateString();
 
-const emptyFormData: { typeId: number | ''; purpose: string; notes: string; neededBy: string } = {
+const emptyFormData: { typeId: number | ''; purpose: string; copies: string; notes: string; neededBy: string } = {
   typeId: '',
   purpose: '',
+  copies: '1',
   notes: '',
   neededBy: '',
 };
@@ -214,6 +216,7 @@ export default function ProfessorDocumentsScreen() {
           type: r.service_name,
           college: r.college,
           purpose: r.purpose,
+          copies: r.copies,
           requestDate: r.created_at,
           status: r.status,
           trackingNumber: r.tracking_number,
@@ -292,6 +295,7 @@ export default function ProfessorDocumentsScreen() {
         service_id: selectedType.id,
         request_type: selectedType.name,
         purpose: formData.purpose.trim(),
+        copies: formData.copies,
         notes: formData.notes.trim(),
         needed_by: formData.neededBy || null,
       });
@@ -453,6 +457,10 @@ export default function ProfessorDocumentsScreen() {
                             <Text style={styles.docInfoDateValue}>{formatDate(req.neededBy)}</Text>
                           </View>
                         )}
+                        <View style={styles.docInfoField}>
+                          <Text style={styles.docInfoLabel}>Number of Copies</Text>
+                          <Text style={styles.docInfoDateValue}>{req.copies ?? 1}</Text>
+                        </View>
                         <View style={[styles.docInfoField, styles.docInfoFieldFull]}>
                           <Text style={styles.docInfoLabel}>Purpose</Text>
                           <Text style={styles.docInfoValue}>{req.purpose}</Text>
@@ -584,6 +592,17 @@ export default function ProfessorDocumentsScreen() {
                   onChangeText={(v) => setFormData((prev) => ({ ...prev, purpose: v }))}
                   multiline
                   numberOfLines={3}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Number of Copies</Text>
+                <TextInput
+                  style={styles.textArea}
+                  keyboardType="number-pad"
+                  value={formData.copies}
+                  onChangeText={(v) => setFormData((prev) => ({ ...prev, copies: v }))}
+                  placeholderTextColor={theme.tertiary}
                 />
               </View>
 

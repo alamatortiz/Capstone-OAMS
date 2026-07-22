@@ -86,6 +86,7 @@ interface DocumentType {
   status: DocStatus;
   isCrossCollege: boolean;
   recipientType: RecipientType;
+  requiresCoding: boolean;
   deptAbbrev: string;
   requirementCount: number;
 }
@@ -186,6 +187,7 @@ const BLANK_DOC_FORM = {
   status: 'active' as DocStatus,
   isCrossCollege: false,
   recipientType: 'students' as RecipientType,
+  requiresCoding: false,
 };
 
 const BLANK_SERVICE_FORM = {
@@ -413,6 +415,7 @@ export default function AdminDataManagementScreen() {
       status: doc.status,
       isCrossCollege: doc.isCrossCollege,
       recipientType: doc.recipientType,
+      requiresCoding: doc.requiresCoding,
     });
     setDocRequirements([]);
     setDocReqForm(BLANK_REQ_FORM);
@@ -461,6 +464,7 @@ export default function AdminDataManagementScreen() {
         status: docForm.status,
         isCrossCollege: docForm.isCrossCollege,
         recipientType: docForm.recipientType,
+        requiresCoding: docForm.requiresCoding,
         requirements: docRequirements.map((r) => ({
           name: r.name,
           description: r.description || '',
@@ -815,6 +819,11 @@ export default function AdminDataManagementScreen() {
                             <View style={styles.badgeRecipient}>
                               <Text style={styles.badgeRecipientText}>{doc.recipientType}</Text>
                             </View>
+                            {doc.requiresCoding && (
+                              <View style={styles.badgeGlobal}>
+                                <Text style={styles.badgeGlobalText}>Requires Coding</Text>
+                              </View>
+                            )}
                             <View style={doc.status === 'active' ? styles.badgeStatusActive : styles.badgeStatusInactive}>
                               <Text
                                 style={
@@ -1108,6 +1117,17 @@ export default function AdminDataManagementScreen() {
                   <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
                 </Pressable>
               </View>
+              <Pressable
+                style={styles.checkboxRow}
+                onPress={() => setDocForm((p) => ({ ...p, requiresCoding: !p.requiresCoding }))}
+              >
+                <Ionicons
+                  name={docForm.requiresCoding ? 'checkbox' : 'square-outline'}
+                  size={19}
+                  color={docForm.requiresCoding ? theme.primary : theme.tertiary}
+                />
+                <Text style={styles.checkboxLabel}>Requires an official code (dean-sanctioned) before release</Text>
+              </Pressable>
 
               {/* Requirements */}
               <View style={styles.reqSection}>

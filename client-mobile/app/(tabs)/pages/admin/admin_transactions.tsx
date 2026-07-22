@@ -83,6 +83,7 @@ interface Transaction {
   action: string;
   studentName: string;
   studentId: string;
+  requesterType?: 'student' | 'faculty';
   processor: string;
   details: string;
   status: TxStatus;
@@ -189,6 +190,7 @@ export default function AdminTransactionsScreen() {
           action: t.action,
           studentName: t.studentName,
           studentId: t.studentId,
+          requesterType: t.requesterType,
           processor: t.processor,
           details: t.details,
           status: t.status,
@@ -447,6 +449,11 @@ export default function AdminTransactionsScreen() {
                       <Ionicons name="person-outline" size={14} color={theme.tertiary} />
                       <Text style={styles.txStudentName}>{t.studentName}</Text>
                       <Text style={styles.txStudentId}>({t.studentId})</Text>
+                      {t.requesterType === 'faculty' && (
+                        <View style={styles.facultyBadge}>
+                          <Text style={styles.facultyBadgeText}>Faculty</Text>
+                        </View>
+                      )}
                     </View>
 
                     <Text style={styles.txDetails}>{t.details}</Text>
@@ -821,6 +828,15 @@ function createStyles(theme: ThemePalette) {
     txStudentRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
     txStudentName: { fontSize: 13, fontWeight: '600', color: theme.text },
     txStudentId: { fontSize: 12, color: theme.tertiary },
+    facultyBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      backgroundColor: 'rgba(139, 92, 246, 0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(139, 92, 246, 0.35)',
+    },
+    facultyBadgeText: { fontSize: 10, fontWeight: '700', color: '#8b5cf6' },
     txDetails: { fontSize: 13, color: theme.subtext, lineHeight: 18 },
     txProcessor: { fontSize: 11, color: theme.tertiary },
     txMetaRow: {

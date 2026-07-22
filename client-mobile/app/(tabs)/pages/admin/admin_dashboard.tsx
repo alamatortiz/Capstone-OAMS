@@ -157,6 +157,7 @@ interface PendingDocument {
   name: string;
   document: string;
   college: string;
+  requesterType?: 'student' | 'faculty';
   date: string;
   status: string;
 }
@@ -542,7 +543,14 @@ export default function AdminDashboardScreen() {
                 return (
                   <View key={doc.id} style={styles.documentItem}>
                     <View style={styles.documentInfo}>
-                      <Text style={styles.documentName}>{doc.name}</Text>
+                      <View style={styles.documentNameRow}>
+                        <Text style={styles.documentName}>{doc.name}</Text>
+                        {doc.requesterType === 'faculty' && (
+                          <View style={styles.facultyBadge}>
+                            <Text style={styles.facultyBadgeText}>Faculty</Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={styles.documentType}>{doc.document}</Text>
                       <View style={styles.documentMetaRow}>
                         <Text style={[styles.documentCollege, { color: COLLEGE_TEXT_COLORS[doc.college] }]}>
@@ -1147,6 +1155,24 @@ function createStyles(theme: ThemePalette) {
       fontSize: 13,
       fontWeight: '700',
       color: theme.text,
+    },
+    documentNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    facultyBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      backgroundColor: 'rgba(139, 92, 246, 0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(139, 92, 246, 0.35)',
+    },
+    facultyBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#8b5cf6',
     },
     documentType: {
       fontSize: 12,

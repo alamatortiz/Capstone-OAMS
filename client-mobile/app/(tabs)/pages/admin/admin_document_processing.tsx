@@ -99,6 +99,8 @@ interface DocumentRequest {
   notes: string;
   releasedDate: string | null;
   claimedDate: string | null;
+  requiresCoding?: boolean;
+  officialCode?: string | null;
 }
 
 interface NavItem {
@@ -169,6 +171,7 @@ export default function AdminDocumentProcessingScreen() {
   const [weekFilterModalVisible, setWeekFilterModalVisible] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<DocumentRequest | null>(null);
   const [processingNotes, setProcessingNotes] = useState('');
+  const [officialCode, setOfficialCode] = useState('');
   const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus | null>(null);
   const [updating, setUpdating] = useState(false);
   const router = useRouter();
@@ -336,11 +339,13 @@ export default function AdminDocumentProcessingScreen() {
   const handleViewDetails = (doc: DocumentRequest) => {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes);
+    setOfficialCode(doc.officialCode || '');
   };
 
   const handleCloseDetails = () => {
     setSelectedDocument(null);
     setProcessingNotes('');
+    setOfficialCode('');
   };
 
   const handleUpdateStatus = async (newStatus: DocumentStatus) => {
@@ -350,9 +355,14 @@ export default function AdminDocumentProcessingScreen() {
       selectedDocument.source === 'faculty'
         ? `/admin/faculty-document-processing/${selectedDocument.id}/status`
         : `/admin/document-processing/${selectedDocument.id}/status`;
+    const needsCode = newStatus === 'ready' && selectedDocument.requiresCoding;
     setUpdating(true);
     try {
-      await api.patch(endpoint, { status: newStatus, notes: processingNotes });
+      await api.patch(endpoint, {
+        status: newStatus,
+        notes: processingNotes,
+        ...(needsCode ? { officialCode } : {}),
+      });
       setDocuments((prev) =>
         prev.map((d) =>
           d.id === selectedDocument.id
@@ -362,6 +372,7 @@ export default function AdminDocumentProcessingScreen() {
                 notes: processingNotes,
                 releasedDate: newStatus === 'released' ? todayStr : d.releasedDate,
                 claimedDate: newStatus === 'claimed' ? todayStr : d.claimedDate,
+                officialCode: needsCode ? officialCode : d.officialCode,
               }
             : d,
         ),
@@ -378,6 +389,17 @@ export default function AdminDocumentProcessingScreen() {
     if (!confirmStatus) return;
     handleUpdateStatus(confirmStatus);
     setConfirmStatus(null);
+  };
+
+  // "Mark as Ready" needs a non-blank official code first when the document
+  // type requires coding — caught here before opening the generic confirm
+  // dialog, which has no room for inline field validation.
+  const handleMarkReadyClick = () => {
+    if (selectedDocument?.requiresCoding && !officialCode.trim()) {
+      Alert.alert('Missing information', 'Enter the official code before marking this document ready.');
+      return;
+    }
+    setConfirmStatus('ready');
   };
 
   const confirmMeta: Record<ConfirmStatus, { title: string; description: string; confirmLabel: string; icon: IoniconName; color: string }> | null =
@@ -723,7 +745,26 @@ export default function AdminDocumentProcessingScreen() {
                       <Text style={styles.detailsValue}>{formatDisplayDate(selectedDocument.claimedDate)}</Text>
                     </View>
                   )}
+                  {selectedDocument.officialCode && (
+                    <View style={styles.detailsField}>
+                      <Text style={styles.detailsLabel}>Official Code</Text>
+                      <Text style={styles.detailsValue}>{selectedDocument.officialCode}</Text>
+                    </View>
+                  )}
                 </View>
+
+                {selectedDocument.status === 'processing' && selectedDocument.requiresCoding && (
+                  <View style={styles.notesWrap}>
+                    <Text style={styles.detailsLabel}>Official Code *</Text>
+                    <TextInput
+                      style={styles.notesInput}
+                      placeholder="Enter the dean-sanctioned official code for this document"
+                      placeholderTextColor={theme.tertiary}
+                      value={officialCode}
+                      onChangeText={setOfficialCode}
+                    />
+                  </View>
+                )}
 
                 <View style={styles.notesWrap}>
                   <Text style={styles.detailsLabel}>Processing Notes</Text>
@@ -745,7 +786,7 @@ export default function AdminDocumentProcessingScreen() {
                     </Pressable>
                   )}
                   {selectedDocument.status === 'processing' && (
-                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnSuccess]} onPress={() => setConfirmStatus('ready')}>
+                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnSuccess]} onPress={handleMarkReadyClick}>
                       <Text style={styles.detailsActionBtnTextPrimary}>Mark as Ready</Text>
                     </Pressable>
                   )}

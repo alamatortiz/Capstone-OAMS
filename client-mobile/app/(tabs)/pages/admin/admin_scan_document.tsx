@@ -84,6 +84,7 @@ interface ScannedDocument {
   documentType: string;
   studentName: string;
   studentId: string;
+  requesterType?: 'student' | 'faculty';
   college: string;
   issueDate: string;
   validUntil: string;
@@ -289,7 +290,8 @@ export default function AdminScanDocumentScreen() {
     if (!scannedDoc?.requestId) return;
     setClaiming(true);
     try {
-      await api.patch(`/admin/document-processing/${scannedDoc.requestId}/status`, { status: 'claimed' });
+      const endpoint = scannedDoc.requesterType === 'faculty' ? 'faculty-document-processing' : 'document-processing';
+      await api.patch(`/admin/${endpoint}/${scannedDoc.requestId}/status`, { status: 'claimed' });
       setScannedDoc((prev) => prev && { ...prev, documentStatus: 'claimed' });
     } catch {
       Alert.alert('Error', 'Failed to mark document as claimed.');
