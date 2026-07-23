@@ -34,6 +34,9 @@ AGENTS.md
 # thesis documents
 *.docx
 
+# db certs (host-specific, kept local / uploaded as host secret files instead)
+*.pem
+
 # OS file
 .DS_Store
 Thumbs.db

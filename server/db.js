@@ -1,10 +1,20 @@
+const fs = require("fs");
 const mysql = require("mysql2/promise");
+
+// Aiven (and most managed MySQL hosts) require SSL; local Docker MySQL does
+// not use or need it. Only attach ssl when a CA cert path is actually given,
+// so this stays a no-op against docker-compose's local db service.
+const ssl = process.env.DB_SSL_CA_PATH
+  ? { ca: fs.readFileSync(process.env.DB_SSL_CA_PATH) }
+  : undefined;
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "Akosimatt123",
   database: process.env.DB_NAME || "oams_db",
+  ssl,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
