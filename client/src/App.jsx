@@ -19,10 +19,10 @@ import darkModeIcon from "./assets/darkmode_icon.png";
 import sunIcon from "./assets/sun_icon.png";
 import personsIcon from "./assets/persons_icon.png";
 import nextIcon from "./assets/next_icon.png";
-import queueIcon from "./assets/Queue_Management.png";
-import appointmentIcon from "./assets/Appointment_Management.png";
-import documentIcon from "./assets/Document_Processing.png";
-import transactionIcon from "./assets/Transaction_Tracking.png";
+import queueIcon from "./assets/queue_management.png";
+import appointmentIcon from "./assets/appointment_management.png";
+import documentIcon from "./assets/document_processing.png";
+import transactionIcon from "./assets/transaction_tracking.png";
 
 const colleges = [
   { logo: ccsLogo, name: "College of Computing Studies" },
