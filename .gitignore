@@ -37,6 +37,9 @@ AGENTS.md
 # db certs (host-specific, kept local / uploaded as host secret files instead)
 *.pem
 
+# firebase service account keys (uploaded to EAS credentials, never committed)
+*firebase-adminsdk*.json
+
 # OS file
 .DS_Store
 Thumbs.db

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "client-mobile",
+    "name": "OAMS",
     "slug": "client-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pnc.oams"
     },
     "android": {
+      "package": "com.pnc.oams",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +21,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -31,7 +37,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 320,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
@@ -45,11 +51,19 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan document QR codes."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-notifications",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "48def5ce-8755-4257-91ff-2187f8940f79"
+      }
     }
   }
 }

@@ -19,7 +19,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const topSegment = segments[0] as string | undefined;
+    // useSegments() includes route-group names (e.g. "(tabs)") as literal
+    // segments. login.tsx and pages/** live under app/(tabs)/, so their real
+    // top-level name is one index in from what it'd be without the group;
+    // unauthorized.tsx sits outside (tabs), so it stays at index 0.
+    const rawSegments = segments as string[];
+    const isTabsGroup = rawSegments[0] === '(tabs)';
+    const topSegment = isTabsGroup ? rawSegments[1] : rawSegments[0];
     const isPublicRoute = topSegment === undefined || PUBLIC_SEGMENTS.has(topSegment);
     if (isPublicRoute) return;
 
@@ -28,8 +34,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Protected routes are shaped "pages/<role>/<screen>".
-    const routeRole = segments[1];
+    // Protected routes are shaped "(tabs)/pages/<role>/<screen>".
+    const routeRole = isTabsGroup ? rawSegments[2] : rawSegments[1];
     if (routeRole !== getRouteRole(user.role)) {
       router.replace('/unauthorized');
     }
