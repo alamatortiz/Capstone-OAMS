@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const path = require("path");
+const fs = require("fs");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const pool = require("../db");
@@ -7,6 +9,7 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
+const { upload, UPLOAD_DIR } = require("../middleware/upload");
 const { emitToSlot, emitToDept, emitToUser, emitToAll } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
@@ -2548,6 +2551,7 @@ router.get(
         `SELECT f.faq_id, f.question AS title, f.answer AS content,
                 f.is_pinned AS isPinned, f.type, f.status, f.created_by AS createdBy,
                 f.department_id, f.is_cross_college, f.created_at,
+                f.attachment_filename, f.attachment_mime_type,
                 d.department_abbreviation
          FROM faqs f
          JOIN departments d ON f.department_id = d.department_id
@@ -2568,6 +2572,8 @@ router.get(
           date: r.created_at,
           college: r.department_abbreviation,
           isCrossCollege: !!r.is_cross_college,
+          hasAttachment: !!r.attachment_filename,
+          attachmentMimeType: r.attachment_mime_type || null,
         })),
       });
     } catch (error) {
@@ -2578,12 +2584,18 @@ router.get(
 );
 
 // POST /api/admin/announcements
+// multipart/form-data (attachment optional) -- text fields arrive as strings
+// on req.body the same way multer parses non-file fields, so isPinned needs
+// explicit boolean coercion here (it's no longer guaranteed a JS boolean the
+// way a JSON body would send it).
 router.post(
   "/announcements",
   authenticateToken,
   authorizeRoles("admin"),
+  upload.single("attachment"),
   async (req, res) => {
-    const { title, content, type = "general", isPinned = false } = req.body;
+    const { title, content, type = "general" } = req.body;
+    const isPinned = req.body.isPinned === true || req.body.isPinned === "true";
     if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({ error: "title and content are required" });
     }
@@ -2599,12 +2611,16 @@ router.post(
       );
       const createdBy = adminRow?.full_name || "Admin Office";
 
+      const attachmentFilename = req.file ? req.file.originalname : null;
+      const attachmentPath = req.file ? req.file.filename : null;
+      const attachmentMimeType = req.file ? req.file.mimetype : null;
+
       // Admins can only post to their own department -- cross-college
       // broadcasting is not offered as a creation option.
       const [result] = await pool.query(
-        `INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id, is_cross_college)
-         VALUES (?, ?, ?, 'active', ?, ?, ?, FALSE)`,
-        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId],
+        `INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id, is_cross_college, attachment_filename, attachment_path, attachment_mime_type)
+         VALUES (?, ?, ?, 'active', ?, ?, ?, FALSE, ?, ?, ?)`,
+        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId, attachmentFilename, attachmentPath, attachmentMimeType],
       );
 
       emitToDept(deptId, "announcement:changed", { faqId: result.insertId });
@@ -2620,6 +2636,8 @@ router.post(
           isCrossCollege: false,
           createdBy,
           date: new Date().toISOString(),
+          hasAttachment: !!attachmentFilename,
+          attachmentMimeType,
         },
       });
     } catch (error) {
@@ -2630,10 +2648,14 @@ router.post(
 );
 
 // PUT /api/admin/announcements/:id
+// multipart/form-data (attachment optional) -- a new file replaces any
+// existing one (old physical file deleted); no file means the existing
+// attachment, if any, is left untouched.
 router.put(
   "/announcements/:id",
   authenticateToken,
   authorizeRoles("admin"),
+  upload.single("attachment"),
   async (req, res) => {
     const faqId = parseInt(req.params.id, 10);
     const { title, content, type } = req.body;
@@ -2643,7 +2665,7 @@ router.put(
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id FROM faqs WHERE faq_id = ?`, [faqId],
+        `SELECT department_id, attachment_path FROM faqs WHERE faq_id = ?`, [faqId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
@@ -2653,10 +2675,24 @@ router.put(
       // Editing always resets is_cross_college to FALSE -- cross-college
       // broadcasting is not offered as an option going forward, even for
       // announcements that were originally created with it set.
+      const attachmentClause = req.file
+        ? ", attachment_filename = ?, attachment_path = ?, attachment_mime_type = ?"
+        : "";
+      const values = [title.trim(), content.trim(), type || "general"];
+      if (req.file) values.push(req.file.originalname, req.file.filename, req.file.mimetype);
+      values.push(faqId);
+
       await pool.query(
-        `UPDATE faqs SET question = ?, answer = ?, type = ?, is_cross_college = FALSE WHERE faq_id = ?`,
-        [title.trim(), content.trim(), type || "general", faqId],
+        `UPDATE faqs SET question = ?, answer = ?, type = ?, is_cross_college = FALSE${attachmentClause} WHERE faq_id = ?`,
+        values,
       );
+
+      if (req.file && row.attachment_path) {
+        fs.unlink(path.join(UPLOAD_DIR, row.attachment_path), (err) => {
+          if (err && err.code !== "ENOENT") console.error("Old attachment cleanup error:", err);
+        });
+      }
+
       emitToDept(deptId, "announcement:changed", { faqId });
       res.json({ message: "Announcement updated" });
     } catch (error) {
@@ -2770,7 +2806,7 @@ router.delete(
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
+        `SELECT department_id, is_cross_college, attachment_path FROM faqs WHERE faq_id = ?`,
         [faqId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
@@ -2778,6 +2814,11 @@ router.delete(
         return res.status(403).json({ error: "Cannot delete announcements from another department" });
       }
       await pool.query(`DELETE FROM faqs WHERE faq_id = ?`, [faqId]);
+      if (row.attachment_path) {
+        fs.unlink(path.join(UPLOAD_DIR, row.attachment_path), (err) => {
+          if (err && err.code !== "ENOENT") console.error("Attachment cleanup error:", err);
+        });
+      }
       if (row.is_cross_college) {
         emitToAll("announcement:changed", { faqId });
       } else {
@@ -2786,6 +2827,46 @@ router.delete(
       res.json({ message: "Announcement deleted" });
     } catch (error) {
       console.error("Announcement delete error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/admin/announcements/:id/attachment
+// Serves the announcement's attachment inline (image/PDF), scoped to the
+// admin's own department the same way edit/delete are. Resolves the stored
+// path against the fixed UPLOAD_DIR and rejects anything that would escape
+// it (defense in depth -- attachment_path is always a UUID we generated,
+// never client-controlled, but this matches the safety check used by the
+// equivalent, still-deferred student-upload feature spec'd separately).
+router.get(
+  "/announcements/:id/attachment",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const faqId = parseInt(req.params.id, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      const [[row]] = await pool.query(
+        `SELECT department_id, attachment_path, attachment_mime_type FROM faqs WHERE faq_id = ?`,
+        [faqId],
+      );
+      if (!row || !row.attachment_path) {
+        return res.status(404).json({ error: "No attachment found for this announcement" });
+      }
+      if (row.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot view attachments from another department" });
+      }
+
+      const resolvedPath = path.join(UPLOAD_DIR, row.attachment_path);
+      if (!resolvedPath.startsWith(UPLOAD_DIR)) {
+        return res.status(400).json({ error: "Invalid attachment path" });
+      }
+
+      res.type(row.attachment_mime_type || "application/octet-stream");
+      res.sendFile(resolvedPath);
+    } catch (error) {
+      console.error("Announcement attachment fetch error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
     }
   },

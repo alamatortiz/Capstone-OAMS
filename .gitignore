@@ -15,6 +15,9 @@ dist/
 build/  
 web-build/
 
+# uploaded user content (announcement attachments, etc.), never committed
+server/uploads/
+
 # expo
 .expo/
 .expo-shared/

@@ -7,6 +7,7 @@ import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 
 import "./stud-announcements.css";
 
@@ -57,6 +58,33 @@ const ChevronLeftIcon = () => (
   </svg>
 );
 
+const XIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+);
+
+const PaperclipIcon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+  </svg>
+);
+
+const FileIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+  </svg>
+);
+
 const Loader2Icon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="12" y1="2" x2="12" y2="6"></line>
@@ -74,6 +102,30 @@ const Loader2Icon = () => (
 export default function AnnouncementsPage() {
   // ── UI State ──────────────────────────────────────────────────────────────
   const [selectedFilter, setSelectedFilter] = useState("pinned");
+  const [viewingAnnouncement, setViewingAnnouncement] = useState(null);
+  useLockBodyScroll(!!viewingAnnouncement);
+  const [viewAttachmentUrl, setViewAttachmentUrl] = useState(null);
+
+  // Fetch the attachment (authenticated, so a plain <img src> won't work --
+  // the JWT only ever goes out via axios' Authorization header) once the
+  // detail modal opens on an announcement that has one.
+  useEffect(() => {
+    let url;
+    let cancelled = false;
+    if (viewingAnnouncement?.hasAttachment) {
+      api
+        .get(`/student/announcements/${viewingAnnouncement.id}/attachment`, { responseType: "blob" })
+        .then((res) => {
+          if (cancelled) return;
+          url = URL.createObjectURL(res.data);
+          setViewAttachmentUrl(url);
+        })
+        .catch(() => {});
+    } else {
+      setViewAttachmentUrl(null);
+    }
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [viewingAnnouncement?.id, viewingAnnouncement?.hasAttachment]);
 
   // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
   const [announcements, setAnnouncements] = useState([]);
@@ -199,10 +251,93 @@ export default function AnnouncementsPage() {
       outerClassName="ann-with-sidebar"
       mainClassName="ann-main"
       overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. Ask me about announcements or any college updates!"
-          getBotResponse={generateBotResponse}
-        />
+        <>
+          <ChatWidget
+            initialGreeting="Hello! 👋 I'm your OAMS Assistant. Ask me about announcements or any college updates!"
+            getBotResponse={generateBotResponse}
+          />
+
+          {viewingAnnouncement && (
+            <div
+              className="ann-detail-overlay"
+              onClick={() => setViewingAnnouncement(null)}
+            >
+              <div className="ann-detail-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="ann-detail-header">
+                  <div className="ann-detail-header-icon">
+                    {getAnnouncementIcon(viewingAnnouncement.category)}
+                  </div>
+                  <button
+                    className="ann-detail-close"
+                    onClick={() => setViewingAnnouncement(null)}
+                    aria-label="Close"
+                  >
+                    <XIcon />
+                  </button>
+                </div>
+
+                <h2 className="ann-detail-title">{viewingAnnouncement.title}</h2>
+
+                <div className="ann-detail-badges">
+                  <span className={`announcement-badge badge-${viewingAnnouncement.category}`}>
+                    {viewingAnnouncement.category.charAt(0).toUpperCase() +
+                      viewingAnnouncement.category.slice(1)}
+                  </span>
+                  {viewingAnnouncement.isPinned && (
+                    <span className="ann-detail-pinned-pill">
+                      <BellIcon /> Pinned
+                    </span>
+                  )}
+                  {viewingAnnouncement.isCrossCollege && (
+                    <span className="ann-detail-cross-college-pill">Cross-College</span>
+                  )}
+                </div>
+
+                <p className="ann-detail-content">{viewingAnnouncement.description}</p>
+
+                {viewingAnnouncement.hasAttachment && (
+                  <div className="ann-detail-attachment">
+                    {viewAttachmentUrl ? (
+                      viewingAnnouncement.attachmentMimeType?.startsWith("image/") ? (
+                        <img src={viewAttachmentUrl} alt="Announcement attachment" className="ann-detail-attachment-image" />
+                      ) : (
+                        <button
+                          type="button"
+                          className="ann-detail-attachment-btn"
+                          onClick={() => window.open(viewAttachmentUrl, "_blank")}
+                        >
+                          <FileIcon /> View Attachment
+                        </button>
+                      )
+                    ) : (
+                      <p className="ann-detail-attachment-loading">Loading attachment…</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="ann-detail-meta">
+                  <span className="announcement-college">{viewingAnnouncement.college}</span>
+                  <span className="announcement-date">
+                    {formatManilaDate(viewingAnnouncement.date, {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+
+                <div className="ann-detail-footer">
+                  <button
+                    className="ann-detail-close-btn"
+                    onClick={() => setViewingAnnouncement(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       }
     >
         <div className="announcements-page">
@@ -269,7 +404,16 @@ export default function AnnouncementsPage() {
                   {pinnedAnnouncements.map((announcement) => (
                     <div
                       key={announcement.id}
-                      className={`announcement-card ${getCategoryColor(announcement.category)}`}
+                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement.category)}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setViewingAnnouncement(announcement)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setViewingAnnouncement(announcement);
+                        }
+                      }}
                     >
                       <div className="announcement-header">
                         <div className="announcement-icon">
@@ -278,6 +422,9 @@ export default function AnnouncementsPage() {
                         <div className="announcement-content">
                           <h3 className="announcement-title">
                             {announcement.title}
+                            {announcement.hasAttachment && (
+                              <PaperclipIcon className="announcement-attachment-flag" />
+                            )}
                           </h3>
                           <p className="announcement-description">
                             {announcement.description}
@@ -328,7 +475,16 @@ export default function AnnouncementsPage() {
                   {filteredAnnouncements.map((announcement) => (
                     <div
                       key={announcement.id}
-                      className={`announcement-card ${getCategoryColor(announcement.category)}`}
+                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement.category)}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setViewingAnnouncement(announcement)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setViewingAnnouncement(announcement);
+                        }
+                      }}
                     >
                       <div className="announcement-header">
                         <div className="announcement-icon">
@@ -337,6 +493,9 @@ export default function AnnouncementsPage() {
                         <div className="announcement-content">
                           <h3 className="announcement-title">
                             {announcement.title}
+                            {announcement.hasAttachment && (
+                              <PaperclipIcon className="announcement-attachment-flag" />
+                            )}
                           </h3>
                           <p className="announcement-description">
                             {announcement.description}

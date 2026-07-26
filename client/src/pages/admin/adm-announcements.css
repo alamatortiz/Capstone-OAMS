@@ -507,6 +507,8 @@
   margin: 0 0 0.6rem 0;
   line-height: 1.5;
   text-align: left;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .ann-item-meta {
@@ -727,6 +729,70 @@
   }
 }
 
+/* ── Attachments ───────────────────────────────────────────────────────── */
+.ann-attachment-flag {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ann-file-input {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+.ann-attachment-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.ann-attachment-thumb {
+  max-width: 100%;
+  max-height: 10rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--card-border);
+  object-fit: cover;
+}
+
+.ann-attachment-filename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.ann-attachment-filename svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.ann-attachment-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.ann-attachment-view {
+  margin-top: 1rem;
+}
+
+.ann-attachment-image {
+  max-width: 100%;
+  max-height: 20rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--card-border);
+  margin-top: 0.4rem;
+}
+
 .ann-modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -855,6 +921,8 @@
   line-height: 1.6;
   white-space: pre-wrap;
   text-align: left;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .ann-view-grid {

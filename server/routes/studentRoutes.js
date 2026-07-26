@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const path = require("path");
 const pool = require("../db");
 const {
   authenticateToken,
@@ -11,6 +12,7 @@ const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
 const { STATUS_LABEL_MAP } = require("../utils/documentStatus");
 const { createNotification } = require("../utils/notifications");
+const { UPLOAD_DIR } = require("../middleware/upload");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -327,6 +329,8 @@ router.get(
            f.is_pinned,
            f.is_cross_college,
            f.created_at,
+           f.attachment_filename,
+           f.attachment_mime_type,
            d.department_id,
            d.department_name,
            d.department_abbreviation
@@ -349,6 +353,8 @@ router.get(
         departmentAbbrev: row.department_abbreviation,
         isCrossCollege: !!row.is_cross_college,
         college: `${row.department_name} (${row.department_abbreviation})`,
+        hasAttachment: !!row.attachment_filename,
+        attachmentMimeType: row.attachment_mime_type || null,
       }));
 
       res.json({ announcements });
@@ -357,6 +363,49 @@ router.get(
       res
         .status(500)
         .json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// GET /api/student/announcements/:id/attachment
+// Serves the announcement's attachment inline (image/PDF), visibility-scoped
+// exactly like the list route above (own department, or cross-college).
+router.get(
+  "/announcements/:id/attachment",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const faqId = parseInt(req.params.id, 10);
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
+      const [[row]] = await pool.query(
+        `SELECT department_id, is_cross_college, attachment_path, attachment_mime_type
+         FROM faqs WHERE faq_id = ?`,
+        [faqId],
+      );
+      if (!row || !row.attachment_path) {
+        return res.status(404).json({ error: "No attachment found for this announcement" });
+      }
+      if (row.department_id !== studentDeptId && !row.is_cross_college) {
+        return res.status(403).json({ error: "Cannot view this attachment" });
+      }
+
+      const resolvedPath = path.join(UPLOAD_DIR, row.attachment_path);
+      if (!resolvedPath.startsWith(UPLOAD_DIR)) {
+        return res.status(400).json({ error: "Invalid attachment path" });
+      }
+
+      res.type(row.attachment_mime_type || "application/octet-stream");
+      res.sendFile(resolvedPath);
+    } catch (error) {
+      console.error("Announcement attachment fetch error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
     }
   },
 );

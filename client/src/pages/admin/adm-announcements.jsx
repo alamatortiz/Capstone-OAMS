@@ -84,6 +84,17 @@ const CheckCircleIcon = (props) => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
+const PaperclipIcon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+  </svg>
+);
+const FileIcon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+  </svg>
+);
 // ── Static reference data ─────────────────────────────────────────────────────
 const TYPE_META = {
   important: { label: "Important", icon: AlertCircleIcon, iconClass: "ann-icon-important", badgeClass: "ann-badge-important" },
@@ -132,6 +143,73 @@ export default function AdminAnnouncements() {
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [deleteId, setDeleteId] = useState(null);
+
+  // ── Attachments (one per announcement, image or PDF) ──────────────────────
+  const [createAttachmentFile, setCreateAttachmentFile] = useState(null);
+  const [createPreviewUrl, setCreatePreviewUrl] = useState(null);
+  const [editAttachmentFile, setEditAttachmentFile] = useState(null);
+  const [editPreviewUrl, setEditPreviewUrl] = useState(null);
+  const [editExistingAttachmentUrl, setEditExistingAttachmentUrl] = useState(null);
+  const [viewAttachmentUrl, setViewAttachmentUrl] = useState(null);
+
+  const fetchAttachmentBlobUrl = async (id) => {
+    try {
+      const res = await api.get(`/admin/announcements/${id}/attachment`, { responseType: "blob" });
+      return URL.createObjectURL(res.data);
+    } catch {
+      return null;
+    }
+  };
+
+  // Preview for a newly-picked file in the Create modal (image only -- a
+  // picked PDF just shows its filename, no need for a blob URL).
+  useEffect(() => {
+    if (createAttachmentFile?.type.startsWith("image/")) {
+      const url = URL.createObjectURL(createAttachmentFile);
+      setCreatePreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setCreatePreviewUrl(null);
+  }, [createAttachmentFile]);
+
+  // Same, for a newly-picked replacement file in the Edit modal.
+  useEffect(() => {
+    if (editAttachmentFile?.type.startsWith("image/")) {
+      const url = URL.createObjectURL(editAttachmentFile);
+      setEditPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setEditPreviewUrl(null);
+  }, [editAttachmentFile]);
+
+  // The *existing* attachment already saved on the announcement being edited
+  // (fetched once when the Edit modal opens, not re-fetched on every keystroke).
+  useEffect(() => {
+    let url;
+    let cancelled = false;
+    if (editingAnnouncement?.hasAttachment) {
+      fetchAttachmentBlobUrl(editingAnnouncement.id).then((u) => {
+        if (!cancelled) { url = u; setEditExistingAttachmentUrl(u); }
+      });
+    } else {
+      setEditExistingAttachmentUrl(null);
+    }
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [editingAnnouncement?.id, editingAnnouncement?.hasAttachment]);
+
+  // The attachment shown in the read-only View modal.
+  useEffect(() => {
+    let url;
+    let cancelled = false;
+    if (viewingAnnouncement?.hasAttachment) {
+      fetchAttachmentBlobUrl(viewingAnnouncement.id).then((u) => {
+        if (!cancelled) { url = u; setViewAttachmentUrl(u); }
+      });
+    } else {
+      setViewAttachmentUrl(null);
+    }
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [viewingAnnouncement?.id, viewingAnnouncement?.hasAttachment]);
 
   const [toasts, setToasts] = useState([]);
   const showToast = (message, kind = "success") => {
@@ -235,8 +313,9 @@ export default function AdminAnnouncements() {
       type: announcement.type,
       isPinned: announcement.isPinned,
     });
+    setEditAttachmentFile(null);
   };
-  const closeEdit = () => { setEditingAnnouncement(null); setEditForm(EMPTY_FORM); };
+  const closeEdit = () => { setEditingAnnouncement(null); setEditForm(EMPTY_FORM); setEditAttachmentFile(null); };
 
   const saveEdit = async () => {
     if (!editForm.title.trim() || !editForm.content.trim()) {
@@ -244,15 +323,25 @@ export default function AdminAnnouncements() {
       return;
     }
     try {
-      await api.put(`/admin/announcements/${editingAnnouncement.id}`, {
-        title: editForm.title,
-        content: editForm.content,
-        type: editForm.type,
-      });
+      const formData = new FormData();
+      formData.append("title", editForm.title);
+      formData.append("content", editForm.content);
+      formData.append("type", editForm.type);
+      if (editAttachmentFile) formData.append("attachment", editAttachmentFile);
+      await api.put(`/admin/announcements/${editingAnnouncement.id}`, formData);
       setAnnouncements((prev) =>
         prev.map((a) =>
           a.id === editingAnnouncement.id
-            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, isCrossCollege: false }
+            ? {
+                ...a,
+                title: editForm.title,
+                content: editForm.content,
+                type: editForm.type,
+                isCrossCollege: false,
+                ...(editAttachmentFile
+                  ? { hasAttachment: true, attachmentMimeType: editAttachmentFile.type }
+                  : {}),
+              }
             : a,
         ),
       );
@@ -263,7 +352,7 @@ export default function AdminAnnouncements() {
     }
   };
 
-  const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_FORM); };
+  const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_FORM); setCreateAttachmentFile(null); };
 
   const saveCreate = async () => {
     if (!createForm.title.trim() || !createForm.content.trim()) {
@@ -271,12 +360,13 @@ export default function AdminAnnouncements() {
       return;
     }
     try {
-      const { data } = await api.post("/admin/announcements", {
-        title:    createForm.title,
-        content:  createForm.content,
-        type:     createForm.type,
-        isPinned: createForm.isPinned,
-      });
+      const formData = new FormData();
+      formData.append("title", createForm.title);
+      formData.append("content", createForm.content);
+      formData.append("type", createForm.type);
+      formData.append("isPinned", createForm.isPinned);
+      if (createAttachmentFile) formData.append("attachment", createAttachmentFile);
+      const { data } = await api.post("/admin/announcements", formData);
       setAnnouncements((prev) => [data.announcement, ...prev]);
       showToast("Announcement created successfully");
       closeCreate();
@@ -342,6 +432,27 @@ export default function AdminAnnouncements() {
                 <p className="ann-view-label">Content</p>
                 <div className="ann-view-block"><p>{viewingAnnouncement.content}</p></div>
 
+                {viewingAnnouncement.hasAttachment && (
+                  <div className="ann-attachment-view">
+                    <p className="ann-view-label">Attachment</p>
+                    {viewAttachmentUrl ? (
+                      viewingAnnouncement.attachmentMimeType?.startsWith("image/") ? (
+                        <img src={viewAttachmentUrl} alt="Announcement attachment" className="ann-attachment-image" />
+                      ) : (
+                        <button
+                          type="button"
+                          className="ann-btn-secondary"
+                          onClick={() => window.open(viewAttachmentUrl, "_blank")}
+                        >
+                          <FileIcon /> View Attachment
+                        </button>
+                      )
+                    ) : (
+                      <p className="ann-view-value">Loading attachment…</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="ann-view-grid">
                   <div>
                     <p className="ann-view-label">Created By</p>
@@ -403,6 +514,36 @@ export default function AdminAnnouncements() {
                   </div>
                 </div>
 
+                <div className="ann-field">
+                  <label htmlFor="edit-attachment">Attachment (optional)</label>
+                  {!editAttachmentFile && editExistingAttachmentUrl && (
+                    <div className="ann-attachment-preview">
+                      {editingAnnouncement.attachmentMimeType?.startsWith("image/") ? (
+                        <img src={editExistingAttachmentUrl} alt="Current attachment" className="ann-attachment-thumb" />
+                      ) : (
+                        <span className="ann-attachment-filename"><FileIcon /> Current attachment (PDF)</span>
+                      )}
+                      <span className="ann-attachment-hint">Choose a new file below to replace it</span>
+                    </div>
+                  )}
+                  <input
+                    id="edit-attachment"
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    className="ann-file-input"
+                    onChange={(e) => setEditAttachmentFile(e.target.files[0] || null)}
+                  />
+                  {editAttachmentFile && (
+                    <div className="ann-attachment-preview">
+                      {editPreviewUrl ? (
+                        <img src={editPreviewUrl} alt="New attachment preview" className="ann-attachment-thumb" />
+                      ) : (
+                        <span className="ann-attachment-filename"><FileIcon /> {editAttachmentFile.name}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="ann-modal-footer">
                   <button className="ann-btn-secondary" onClick={closeEdit}>Cancel</button>
                   <button className="ann-btn-primary" onClick={saveEdit}><CheckCircleIcon /> Save Changes</button>
@@ -448,6 +589,26 @@ export default function AdminAnnouncements() {
                       <option value="true">Yes</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="ann-field">
+                  <label htmlFor="create-attachment">Attachment (optional)</label>
+                  <input
+                    id="create-attachment"
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    className="ann-file-input"
+                    onChange={(e) => setCreateAttachmentFile(e.target.files[0] || null)}
+                  />
+                  {createAttachmentFile && (
+                    <div className="ann-attachment-preview">
+                      {createPreviewUrl ? (
+                        <img src={createPreviewUrl} alt="Attachment preview" className="ann-attachment-thumb" />
+                      ) : (
+                        <span className="ann-attachment-filename"><FileIcon /> {createAttachmentFile.name}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="ann-modal-footer">
@@ -576,6 +737,7 @@ export default function AdminAnnouncements() {
                             <div className="ann-item-title-row">
                               <h3 className="ann-item-title">{a.title}</h3>
                               {a.isPinned && <PinIcon className="ann-pin-flag" />}
+                              {a.hasAttachment && <PaperclipIcon className="ann-attachment-flag" title="Has attachment" />}
                             </div>
                             <span className={`ann-badge ${meta.badgeClass}`}>{meta.label}</span>
                             {a.isCrossCollege && <span className="ann-badge ann-badge-cross-college">Cross-College</span>}

@@ -396,6 +396,9 @@ CREATE TABLE faqs (
     is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
     department_id   INT          NOT NULL,   -- the posting department, always real
     is_cross_college BOOLEAN     NOT NULL DEFAULT FALSE, -- TRUE = visible to every department, not just the poster's
+    attachment_filename  VARCHAR(255) NULL, -- original filename, display only
+    attachment_path      VARCHAR(255) NULL, -- UUID-based name actually on disk, relative to server root
+    attachment_mime_type VARCHAR(100) NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
     INDEX idx_faqs_pinned_created (is_pinned, created_at)
