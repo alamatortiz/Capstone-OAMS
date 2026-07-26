@@ -512,6 +512,20 @@ html, body {
 .appt-btn:hover  { opacity: 0.88; }
 .appt-btn:active { transform: scale(0.97); }
 
+/* Disabled state must override the base cursor:pointer/hover rules above --
+   otherwise a disabled button (e.g. "Mark Complete" on a future-dated
+   appointment) is visually identical to an active one and clicking it just
+   silently does nothing with no feedback. pointer-events stays enabled
+   (not "none") so the title="..." tooltip explaining why still shows on hover. */
+.appt-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.appt-btn:disabled:hover {
+  opacity: 0.45;
+}
+
 .appt-btn .appt-icon-sm,
 .appt-btn svg {
   width: 1rem;
