@@ -148,9 +148,10 @@ const TimerIcon = () => (
 );
 const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
 
-const formatActivityStatus = (status) => {
+const formatActivityStatus = (status, type) => {
   if (!status) return "";
   if (status === "no_show") return "No Show";
+  if (type === "document" && status === "generated") return "Ready";
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
@@ -814,9 +815,13 @@ export default function StudentDashboard() {
                         <p className="activity-time">{activity.time}</p>
                       </div>
                       <span
-                        className={`activity-badge activity-status-${activity.status}`}
+                        className={`activity-badge ${
+                          activity.type === "document"
+                            ? `activity-status-doc-${activity.status}`
+                            : `activity-status-${activity.status}`
+                        }`}
                       >
-                        {formatActivityStatus(activity.status)}
+                        {formatActivityStatus(activity.status, activity.type)}
                       </span>
                     </div>
                   ))}

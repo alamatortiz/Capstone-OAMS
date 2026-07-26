@@ -1481,6 +1481,51 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
+/* Document-only activity badges, matching stud-documents/stud-document-status doc-badge palette.
+   Namespaced separately from the shared statuses above (activity-status-pending/-rejected/-generated)
+   so appointment/queue activity items are unaffected. */
+.activity-status-doc-pending {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  text-transform: uppercase;
+}
+
+.activity-status-doc-processing {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  text-transform: uppercase;
+}
+
+.activity-status-doc-generated {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  text-transform: uppercase;
+}
+
+.activity-status-doc-released {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  text-transform: uppercase;
+}
+
+.activity-status-doc-claimed {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  text-transform: uppercase;
+}
+
+.activity-status-doc-rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  text-transform: uppercase;
+}
+
 /* Light mode */
 [data-theme="light"] .activity-status-pending {
   background: rgba(217, 119, 6, 0.1);
@@ -1514,6 +1559,42 @@ body {
 }
 
 [data-theme="light"] .activity-status-rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+[data-theme="light"] .activity-status-doc-pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="light"] .activity-status-doc-processing {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .activity-status-doc-generated {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="light"] .activity-status-doc-released {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="light"] .activity-status-doc-claimed {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="light"] .activity-status-doc-rejected {
   background: rgba(220, 38, 38, 0.08);
   color: #991b1b;
   border-color: rgba(220, 38, 38, 0.2);

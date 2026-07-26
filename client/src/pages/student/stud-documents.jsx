@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
@@ -7,8 +7,9 @@ import ChatWidget from "../../components/ChatWidget";
 import { toast } from "sonner";
 import "./stud-documents.css";
 import api from "../../utils/api";
-import { formatManilaDate, getManilaTomorrowDateString } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime, getManilaTomorrowDateString } from "../../utils/dateTime";
 import { formatCollegeLabel } from "../../utils/formatCollege";
+import { connectSocket } from "../../utils/socket";
 
 import { ChevronLeft } from "lucide-react";
 
@@ -56,13 +57,6 @@ const DownloadIcon = () => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
     <polyline points="7 10 12 15 17 10"></polyline>
     <line x1="12" y1="15" x2="12" y2="3"></line>
-  </svg>
-);
-
-const ClockIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
 
@@ -131,23 +125,35 @@ export default function DocumentsPage() {
     fetchServiceTypes();
   }, []);
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        setDocsLoading(true);
-        const res = await api.get("/student/documents");
-        setDocuments(res.data.documents ?? []);
-        setDocsError(null);
-      } catch (err) {
-        console.error("Failed to fetch documents:", err);
-        setDocsError("Could not load your documents.");
-      } finally {
-        setDocsLoading(false);
-      }
-    };
-
-    fetchDocuments();
+  const fetchDocuments = useCallback(async () => {
+    try {
+      setDocsLoading(true);
+      const res = await api.get("/student/documents");
+      setDocuments(res.data.documents ?? []);
+      setDocsError(null);
+    } catch (err) {
+      console.error("Failed to fetch documents:", err);
+      setDocsError("Could not load your documents.");
+    } finally {
+      setDocsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  // Live updates: refetch when a document's status changes.
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    socket.on("document:status-updated", fetchDocuments);
+    return () => {
+      socket.off("document:status-updated", fetchDocuments);
+    };
+  }, [fetchDocuments]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSubmitRequest = async () => {
@@ -250,31 +256,11 @@ export default function DocumentsPage() {
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "pending":
-        return <ClockIcon />;
-      case "processing":
-        return <AlertCircleIcon />;
-      case "ready":
-        return <CheckCircleIcon />;
-      case "released":
-        return <CheckCircleIcon />;
-      case "claimed":
-        return <CheckCircleIcon />;
-      case "rejected":
-        return <XCircleIcon />;
-      default:
-        return <FileTextIcon />;
-    }
-  };
-
   const activeDocuments = documents.filter(
     (doc) => doc.status !== "claimed" && doc.status !== "rejected",
   );
-  const completedDocuments = documents.filter(
-    (doc) => doc.status === "claimed" || doc.status === "rejected",
-  );
+  const claimedDocuments = documents.filter((doc) => doc.status === "claimed");
+  const rejectedDocuments = documents.filter((doc) => doc.status === "rejected");
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -289,8 +275,7 @@ export default function DocumentsPage() {
               <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
                 <div className="doc-dialog-header">
                   <div>
-                    <h2>New Document Request</h2>
-                    <p>Submit a request for official documents</p>
+                    <h2>Request a Document</h2>
                   </div>
                   <button
                     className="doc-dialog-close"
@@ -331,29 +316,40 @@ export default function DocumentsPage() {
 
                   <div className="doc-form-group">
                     <label htmlFor="type">Document Type</label>
-                    <select
-                      id="type"
-                      value={formData.type}
-                      onChange={(e) =>
-                        setFormData({ ...formData, type: e.target.value })
-                      }
-                      className="doc-form-select"
-                      disabled={formOptionsLoading || !formData.college}
-                      required
-                    >
-                      <option value="">
-                        {!formData.college
-                          ? "Select a college first"
-                          : "Select document type"}
-                      </option>
-                      {(servicesByDepartmentId[
-                        collegesFromDB.find((c) => c.name === formData.college)?.id ?? -1
-                      ] ?? []).map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const availableTypes =
+                        servicesByDepartmentId[
+                          collegesFromDB.find((c) => c.name === formData.college)?.id ?? -1
+                        ] ?? [];
+                      const hasServicesForCollege = availableTypes.length > 0;
+                      return (
+                        <select
+                          id="type"
+                          value={formData.type}
+                          onChange={(e) =>
+                            setFormData({ ...formData, type: e.target.value })
+                          }
+                          className="doc-form-select"
+                          disabled={
+                            formOptionsLoading || !formData.college || !hasServicesForCollege
+                          }
+                          required
+                        >
+                          <option value="">
+                            {!formData.college
+                              ? "Select a college first"
+                              : !hasServicesForCollege
+                                ? "No Documents Available"
+                                : "Select document type"}
+                          </option>
+                          {availableTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                   </div>
 
                   <div className="doc-form-group">
@@ -374,7 +370,7 @@ export default function DocumentsPage() {
                   </div>
 
                   <div className="doc-form-group">
-                    <label htmlFor="neededBy">Needed By (optional)</label>
+                    <label htmlFor="neededBy">Date Needed (Optional)</label>
                     <input
                       id="neededBy"
                       type="date"
@@ -491,10 +487,16 @@ export default function DocumentsPage() {
                 <AlertCircleIcon /> Active Requests <span className="doc-tab-count">{activeDocuments.length}</span>
               </button>
               <button
-                className={`doc-tab ${activeTab === "completed" ? "active" : ""}`}
-                onClick={() => setActiveTab("completed")}
+                className={`doc-tab ${activeTab === "claimed" ? "active" : ""}`}
+                onClick={() => setActiveTab("claimed")}
               >
-                <CheckCircleIcon /> Completed <span className="doc-tab-count">{completedDocuments.length}</span>
+                <CheckCircleIcon /> Claimed <span className="doc-tab-count">{claimedDocuments.length}</span>
+              </button>
+              <button
+                className={`doc-tab ${activeTab === "rejected" ? "active" : ""}`}
+                onClick={() => setActiveTab("rejected")}
+              >
+                <XCircleIcon /> Rejected <span className="doc-tab-count">{rejectedDocuments.length}</span>
               </button>
             </div>
 
@@ -532,7 +534,6 @@ export default function DocumentsPage() {
                             <span
                               className={`doc-badge ${getStatusColor(doc.status)}`}
                             >
-                              {getStatusIcon(doc.status)}
                               {doc.status}
                             </span>
                           </div>
@@ -592,7 +593,7 @@ export default function DocumentsPage() {
 
                         {(doc.status === "ready" || doc.status === "released") && (
                           <button
-                            className="doc-card-claim-btn"
+                            className="doc-card-view-button"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate("/student/document-status", {
@@ -622,27 +623,92 @@ export default function DocumentsPage() {
                 ) : (
                   <div className="doc-empty-state">
                     <FileTextIcon />
-                    <h3>No active requests</h3>
-                    <p>Start by requesting a document</p>
+                    <h3>No Active Requests</h3>
+                    <p>You have no active document requests.</p>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Completed Tab */}
-            {activeTab === "completed" && (
+            {/* Claimed Tab */}
+            {activeTab === "claimed" && (
               <div className="doc-tab-content">
                 {docsLoading ? (
                   <div className="doc-empty-state">
                     <FileTextIcon />
                     <h3>Loading documents...</h3>
                   </div>
-                ) : completedDocuments.length > 0 ? (
+                ) : claimedDocuments.length > 0 ? (
                   <div className="doc-cards-grid">
-                    {completedDocuments.map((doc) => (
+                    {claimedDocuments.map((doc) => (
                       <div
                         key={doc.id}
-                        className="doc-card doc-card-completed"
+                        className="doc-card"
+                        style={{ cursor: "pointer" }}
+                        onClick={() =>
+                          navigate("/student/document-status", {
+                            state: { docId: doc.id, from: "documents" },
+                          })
+                        }
+                      >
+                        <div className="doc-card-header">
+                          <div className="doc-card-icon-wrap">
+                            <FileTextIcon />
+                          </div>
+                          <div className="doc-card-title-section">
+                            <h3>{doc.type}</h3>
+                            <p className="doc-card-college">{doc.college}</p>
+                            {doc.claimedDate && (
+                              <>
+                                <p className="doc-card-claimed-date">
+                                  {formatManilaDate(doc.claimedDate, {
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </p>
+                                <p className="doc-card-claimed-time">
+                                  {formatManilaTime(doc.claimedDate)}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                          <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
+                            <span
+                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                            >
+                              {doc.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="doc-empty-state">
+                    <CheckCircleIcon />
+                    <h3>No Completed Requests</h3>
+                    <p>You have no records of claimed documents.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Rejected Tab */}
+            {activeTab === "rejected" && (
+              <div className="doc-tab-content">
+                {docsLoading ? (
+                  <div className="doc-empty-state">
+                    <FileTextIcon />
+                    <h3>Loading documents...</h3>
+                  </div>
+                ) : rejectedDocuments.length > 0 ? (
+                  <div className="doc-cards-grid">
+                    {rejectedDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="doc-card"
                         style={{ cursor: "pointer" }}
                         onClick={() =>
                           navigate("/student/document-status", {
@@ -679,9 +745,9 @@ export default function DocumentsPage() {
                   </div>
                 ) : (
                   <div className="doc-empty-state">
-                    <CheckCircleIcon />
-                    <h3>No completed requests</h3>
-                    <p>Your completed and rejected requests will appear here</p>
+                    <XCircleIcon />
+                    <h3>No Rejected Requests</h3>
+                    <p>You have no rejected document requests.</p>
                   </div>
                 )}
               </div>

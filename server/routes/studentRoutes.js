@@ -591,6 +591,15 @@ router.get(
       );
       const studentDeptId = stu?.department_id ?? null;
 
+      // All colleges, regardless of whether they have any configured document
+      // types yet — lets the request form list every college and show
+      // "No Documents Available" for ones with none, instead of omitting them.
+      const [allDepartments] = await pool.query(
+        `SELECT department_id AS id, department_name AS name, department_abbreviation AS abbrev
+         FROM departments
+         ORDER BY department_name ASC`,
+      );
+
       const [rows] = await pool.query(
         `SELECT ds.service_id, ds.service_name, ds.department_id, ds.is_cross_college,
                 d.department_name, d.department_abbreviation
@@ -603,25 +612,17 @@ router.get(
         [studentDeptId],
       );
 
-      // Group by the service's real owning department.
-      const departmentMap = new Map();
+      // Group service names by their real owning department.
       const servicesByDepartmentId = {};
-
       for (const row of rows) {
-        const key = row.department_id;
-        if (!departmentMap.has(key)) {
-          departmentMap.set(key, {
-            id: key,
-            name: row.department_name,
-            abbrev: row.department_abbreviation,
-          });
-          servicesByDepartmentId[key] = [];
+        if (!servicesByDepartmentId[row.department_id]) {
+          servicesByDepartmentId[row.department_id] = [];
         }
-        servicesByDepartmentId[key].push(row.service_name);
+        servicesByDepartmentId[row.department_id].push(row.service_name);
       }
 
       res.json({
-        departments: [...departmentMap.values()],
+        departments: allDepartments,
         servicesByDepartmentId,
       });
     } catch (error) {
