@@ -377,13 +377,30 @@ export default function StudentDashboardScreen() {
     {
       key: 'appointments', title: 'Appointments',
       value: dashLoading ? '—' : String(dashStats?.stats?.appointments?.upcoming ?? 0),
-      description: dashLoading ? 'Loading...' : (dashStats?.stats?.appointments?.pending ?? 0) > 0 ? `${dashStats.stats.appointments.pending} pending approval` : 'No pending appointments',
+      description: (() => {
+        if (dashLoading) return 'Loading...';
+        const parts: string[] = [];
+        const pending = dashStats?.stats?.appointments?.pending ?? 0;
+        const approved = dashStats?.stats?.appointments?.approved ?? 0;
+        if (pending > 0) parts.push(`${pending} pending`);
+        if (approved > 0) parts.push(`${approved} approved`);
+        return parts.length ? parts.join(', ') : 'No pending appointments';
+      })(),
       icon: 'calendar-outline', tint: 'purple',
     },
     {
       key: 'documents', title: 'Documents',
       value: dashLoading ? '—' : String(dashStats?.stats?.documents?.total ?? 0),
-      description: dashLoading ? 'Loading...' : (dashStats?.stats?.documents?.pending ?? 0) > 0 ? `${dashStats.stats.documents.pending} need your attention` : 'No pending documents',
+      description: (() => {
+        if (dashLoading) return 'Loading...';
+        const parts: string[] = [];
+        const docs = dashStats?.stats?.documents ?? {};
+        if (docs.pendingOnly > 0) parts.push(`${docs.pendingOnly} pending`);
+        if (docs.processing > 0) parts.push(`${docs.processing} processing`);
+        if (docs.ready > 0) parts.push(`${docs.ready} ready`);
+        if (docs.released > 0) parts.push(`${docs.released} released`);
+        return parts.length ? parts.join(', ') : 'No pending documents';
+      })(),
       icon: 'document-text-outline', tint: 'orange',
     },
     {

@@ -16,7 +16,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import "./stud-document-status.css";
 
@@ -30,13 +30,13 @@ const CheckCircleIcon = () => (
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getStatusMeta = (status) => {
   switch (status) {
-    case "pending":    return { label: "Pending",          cls: "dss-badge-pending" };
-    case "processing": return { label: "Processing",       cls: "dss-badge-processing" };
-    case "ready":      return { label: "Ready for Pickup", cls: "dss-badge-ready" };
-    case "released":   return { label: "Released",         cls: "dss-badge-released" };
-    case "claimed":    return { label: "Claimed",          cls: "dss-badge-claimed" };
-    case "rejected":   return { label: "Rejected",         cls: "dss-badge-rejected" };
-    default:           return { label: status,             cls: "dss-badge-pending" };
+    case "pending":    return { label: "Pending",    cls: "dss-badge-pending" };
+    case "processing": return { label: "Processing", cls: "dss-badge-processing" };
+    case "ready":      return { label: "Ready",      cls: "dss-badge-ready" };
+    case "released":   return { label: "Released",   cls: "dss-badge-released" };
+    case "claimed":    return { label: "Claimed",    cls: "dss-badge-claimed" };
+    case "rejected":   return { label: "Rejected",   cls: "dss-badge-rejected" };
+    default:           return { label: status,       cls: "dss-badge-pending" };
   }
 };
 
@@ -115,7 +115,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
           }}
         >
           <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document is ready for pickup — please visit the registrar's office!
+          Your document is ready for pickup — please proceed to the designated location
         </div>
       )}
 
@@ -123,7 +123,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
       {doc.status === "released" && (
         <div
           style={{
-            background: "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+            background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
             borderRadius: "1rem",
             padding: "1rem 1.5rem",
             color: "white",
@@ -132,11 +132,11 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
             gap: "0.75rem",
             fontWeight: 700,
             fontSize: "1rem",
-            boxShadow: "0 8px 24px rgba(107,114,128,0.3)",
+            boxShadow: "0 8px 24px rgba(34,197,94,0.3)",
           }}
         >
           <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document has been released to the registrar's office — visit to complete pickup.
+          Your document has been released to the designated location — visit to complete pickup.
         </div>
       )}
 
@@ -157,25 +157,29 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
             </div>
             <div className="dss-card-content">
               <div className="dss-detail-row">
-                <span className="dss-detail-label">Request Date</span>
+                <span className="dss-detail-label">Date Requested</span>
                 <span className="dss-detail-value">{formatDate(doc.requestDate)}</span>
               </div>
-              {doc.status === "claimed" && doc.claimedDate ? (
-                <div className="dss-detail-row">
-                  <span className="dss-detail-label">Date Acquired</span>
-                  <span className="dss-detail-value">{formatDate(doc.claimedDate)}</span>
-                </div>
-              ) : doc.status === "released" && doc.releasedDate ? (
+              <div className="dss-detail-row">
+                <span className="dss-detail-label">Date Needed</span>
+                <span className="dss-detail-value">
+                  {doc.neededBy
+                    ? formatDate(doc.neededBy)
+                    : "No date requested for the document to be claimable."}
+                </span>
+              </div>
+              {doc.status === "released" && doc.releasedDate && (
                 <div className="dss-detail-row">
                   <span className="dss-detail-label">Date Released</span>
                   <span className="dss-detail-value">{formatDate(doc.releasedDate)}</span>
                 </div>
-              ) : doc.estimatedCompletion ? (
+              )}
+              {doc.status === "claimed" && doc.claimedDate && (
                 <div className="dss-detail-row">
-                  <span className="dss-detail-label">Estimated Completion</span>
-                  <span className="dss-detail-value">{formatDate(doc.estimatedCompletion)}</span>
+                  <span className="dss-detail-label">Date and Time Claimed</span>
+                  <span className="dss-detail-value">{formatManilaDateTime(doc.claimedDate)}</span>
                 </div>
-              ) : null}
+              )}
               <div className="dss-detail-row">
                 <span className="dss-detail-label">Number of Copies</span>
                 <span className="dss-detail-value">{doc.copies ?? 1}</span>
@@ -250,14 +254,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
             request — you will need to submit a new one if you change your mind.
           </>
         }
-        icon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="10" y1="13" x2="14" y2="17"></line>
-            <line x1="14" y1="13" x2="10" y2="17"></line>
-          </svg>
-        }
+        icon={<XCircle width={22} height={22} />}
         cancelText="Keep Request"
         confirmText={cancelling ? "Cancelling…" : "Cancel Request"}
         confirmDisabled={cancelling}
@@ -367,9 +364,8 @@ export default function DocumentStatusPage() {
   const activeDocuments = documents.filter(
     (d) => d.status !== "claimed" && d.status !== "rejected",
   );
-  const completedDocuments = documents.filter(
-    (d) => d.status === "claimed" || d.status === "rejected",
-  );
+  const claimedDocuments = documents.filter((d) => d.status === "claimed");
+  const rejectedDocuments = documents.filter((d) => d.status === "rejected");
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -452,11 +448,18 @@ export default function DocumentStatusPage() {
                     Active Requests <span className="dss-tab-count">{activeDocuments.length}</span>
                   </button>
                   <button
-                    className={`dss-tab ${activeTab === "completed" ? "active" : ""}`}
-                    onClick={() => setActiveTab("completed")}
+                    className={`dss-tab ${activeTab === "claimed" ? "active" : ""}`}
+                    onClick={() => setActiveTab("claimed")}
                   >
                     <CheckCircleIcon />
-                    Completed <span className="dss-tab-count">{completedDocuments.length}</span>
+                    Claimed <span className="dss-tab-count">{claimedDocuments.length}</span>
+                  </button>
+                  <button
+                    className={`dss-tab ${activeTab === "rejected" ? "active" : ""}`}
+                    onClick={() => setActiveTab("rejected")}
+                  >
+                    <XCircle />
+                    Rejected <span className="dss-tab-count">{rejectedDocuments.length}</span>
                   </button>
                 </div>
 
@@ -534,47 +537,41 @@ export default function DocumentStatusPage() {
                   </div>
                 )}
 
-                {/* Completed Tab */}
-                {activeTab === "completed" && (
+                {/* Claimed Tab */}
+                {activeTab === "claimed" && (
                   <div className="dss-list-container">
-                    {completedDocuments.length > 0 ? (
-                      completedDocuments.map((doc) => {
+                    {claimedDocuments.length > 0 ? (
+                      claimedDocuments.map((doc) => {
                         const statusMeta = getStatusMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
-                            className="dss-list-item dss-list-item-completed"
+                            className="dss-list-item"
                             onClick={() => { setDetailOpenedFromExternal(false); setSelectedDocId(doc.id); }}
                           >
                             <div className="dss-list-header">
                               <div className="dss-list-icon-wrap">
-                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "var(--text-tertiary)" }} />
+                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
                               </div>
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>
                                 <p className="dss-list-college">{doc.college}</p>
+                                {doc.claimedDate && (
+                                  <>
+                                    <p className="dss-list-claimed-date">
+                                      {formatDate(doc.claimedDate)}
+                                    </p>
+                                    <p className="dss-list-claimed-time">
+                                      {formatManilaTime(doc.claimedDate)}
+                                    </p>
+                                  </>
+                                )}
                               </div>
                               <div className="dss-list-header-right">
                                 <span className="dss-tracking-pill">{doc.trackingNumber}</span>
                                 <span className={`dss-badge ${statusMeta.cls}`}>
                                   {statusMeta.label}
                                 </span>
-                              </div>
-                            </div>
-                            <div className="dss-list-card-grid">
-                              <div className="dss-list-card-field">
-                                <label>Date Requested</label>
-                                <p>{formatDateShort(doc.requestDate)}</p>
-                              </div>
-                              {doc.claimedDate && (
-                                <div className="dss-list-card-field">
-                                  <label>Date Acquired</label>
-                                  <p>{formatDateShort(doc.claimedDate)}</p>
-                                </div>
-                              )}
-                              <div className="dss-list-card-field-full">
-                                <label>Purpose</label>
-                                <p>{doc.purpose}</p>
                               </div>
                             </div>
                           </div>
@@ -585,7 +582,51 @@ export default function DocumentStatusPage() {
                         <CheckCircle2 className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Completed Requests</h3>
                         <p className="dss-empty-text">
-                          Your completed and rejected requests will appear here.
+                          You have no records of claimed documents.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Rejected Tab */}
+                {activeTab === "rejected" && (
+                  <div className="dss-list-container">
+                    {rejectedDocuments.length > 0 ? (
+                      rejectedDocuments.map((doc) => {
+                        const statusMeta = getStatusMeta(doc.status);
+                        return (
+                          <div
+                            key={doc.id}
+                            className="dss-list-item"
+                            onClick={() => { setDetailOpenedFromExternal(false); setSelectedDocId(doc.id); }}
+                          >
+                            <div className="dss-list-header">
+                              <div className="dss-list-icon-wrap">
+                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
+                              </div>
+                              <div className="dss-list-title-section">
+                                <h3>{doc.type}</h3>
+                                <p className="dss-list-college">
+                                  {doc.college} • {formatDateShort(doc.requestDate)}
+                                </p>
+                              </div>
+                              <div className="dss-list-header-right">
+                                <span className="dss-tracking-pill">{doc.trackingNumber}</span>
+                                <span className={`dss-badge ${statusMeta.cls}`}>
+                                  {statusMeta.label}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="dss-empty-state">
+                        <XCircle className="dss-empty-icon" />
+                        <h3 className="dss-empty-title">No Rejected Requests</h3>
+                        <p className="dss-empty-text">
+                          You have no rejected document requests.
                         </p>
                       </div>
                     )}

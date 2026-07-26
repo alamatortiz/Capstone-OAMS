@@ -148,9 +148,10 @@ const TimerIcon = () => (
 );
 const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
 
-const formatActivityStatus = (status) => {
+const formatActivityStatus = (status, type) => {
   if (!status) return "";
   if (status === "no_show") return "No Show";
+  if (type === "document" && status === "generated") return "Ready";
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
@@ -366,8 +367,9 @@ export default function StudentDashboard() {
       value: queueLoading
         ? "—"
         : mostRecentQueue?.status === "serving"
-          ? (mostRecentQueue.arrivedAt ? "Being Served" : "Called")
+          ? (mostRecentQueue.arrivedAt ? <>Being<br />Served</> : "Called")
           : String(mostRecentQueue?.position ?? 0),
+      isStatusValue: !queueLoading && mostRecentQueue?.status === "serving",
       badge: queueLoading ? null : (mostRecentQueue?.queueNumberBadge ?? null),
       description: queueLoading
         ? "Loading..."
@@ -384,11 +386,15 @@ export default function StudentDashboard() {
       value: dashLoading
         ? "—"
         : String(dashStats?.stats?.appointments?.upcoming ?? 0),
-      description: dashLoading
-        ? "Loading..."
-        : dashStats?.stats?.appointments?.pending > 0
-          ? `${dashStats.stats.appointments.pending} pending approval`
-          : "No pending appointments",
+      description: (() => {
+        if (dashLoading) return "Loading...";
+        const parts = [];
+        const pending = dashStats?.stats?.appointments?.pending ?? 0;
+        const approved = dashStats?.stats?.appointments?.approved ?? 0;
+        if (pending > 0) parts.push(`${pending} pending`);
+        if (approved > 0) parts.push(`${approved} approved`);
+        return parts.length ? parts.join(", ") : "No pending appointments";
+      })(),
       icon: CalendarIcon,
       color: "text-purple-600",
       bgColor: "dash-bg-purple-50 dark:bg-purple-950",
@@ -399,11 +405,16 @@ export default function StudentDashboard() {
       value: dashLoading
         ? "—"
         : String(dashStats?.stats?.documents?.total ?? 0),
-      description: dashLoading
-        ? "Loading..."
-        : dashStats?.stats?.documents?.pending > 0
-          ? `${dashStats.stats.documents.pending} need your attention`
-          : "No pending documents",
+      description: (() => {
+        if (dashLoading) return "Loading...";
+        const parts = [];
+        const docs = dashStats?.stats?.documents ?? {};
+        if (docs.pendingOnly > 0) parts.push(`${docs.pendingOnly} pending`);
+        if (docs.processing > 0) parts.push(`${docs.processing} processing`);
+        if (docs.ready > 0) parts.push(`${docs.ready} ready`);
+        if (docs.released > 0) parts.push(`${docs.released} released`);
+        return parts.length ? parts.join(", ") : "No pending documents";
+      })(),
       icon: FileText,
       color: "text-orange-600",
       bgColor: "dash-bg-orange-50 dark:bg-orange-950",
@@ -424,7 +435,7 @@ export default function StudentDashboard() {
   const quickActions = [
     {
       title: "Announcements",
-      description: "Stay updated with the latest notices from all colleges.",
+      description: "Stay updated with the latest notices from your department.",
       icon: MegaphoneIcon,
       link: "/student/announcements",
       gradient: "from-violet-500 to-purple-600",
@@ -448,7 +459,7 @@ export default function StudentDashboard() {
     },
     {
       title: "Professor Schedules",
-      description: "Check faculty consultation hours and room availability.",
+      description: "Check professor consultation hours and availability across all departments.",
       icon: GraduationCapIcon,
       link: "/student/professor-schedules",
       gradient: "from-sky-500 to-blue-600",
@@ -540,7 +551,7 @@ export default function StudentDashboard() {
                     <stat.icon />
                   </div>
                   <p
-                    className={`dash-stat-value ${dashLoading ? "stat-loading" : ""}`}
+                    className={`dash-stat-value ${dashLoading ? "stat-loading" : ""} ${stat.isStatusValue ? "dash-stat-value-status" : ""}`}
                   >
                     {stat.value}
                   </p>
@@ -804,9 +815,13 @@ export default function StudentDashboard() {
                         <p className="activity-time">{activity.time}</p>
                       </div>
                       <span
-                        className={`activity-badge activity-status-${activity.status}`}
+                        className={`activity-badge ${
+                          activity.type === "document"
+                            ? `activity-status-doc-${activity.status}`
+                            : `activity-status-${activity.status}`
+                        }`}
                       >
-                        {formatActivityStatus(activity.status)}
+                        {formatActivityStatus(activity.status, activity.type)}
                       </span>
                     </div>
                   ))}

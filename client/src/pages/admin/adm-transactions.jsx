@@ -145,8 +145,9 @@ const STATUS_OPTIONS = [
   { value: "approved", label: "Approved" },
   { value: "pending", label: "Pending" },
   { value: "processing", label: "Processing" },
-  { value: "generated", label: "Ready for Pickup" },
+  { value: "generated", label: "Ready" },
   { value: "released", label: "Released" },
+  { value: "claimed", label: "Claimed" },
   { value: "rejected", label: "Rejected" },
   { value: "cancelled", label: "Cancelled" },
   { value: "no_show", label: "No Show" },
@@ -307,17 +308,25 @@ export default function AdminTransaction() {
     );
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, type) => {
+    const isDocument = type === "document";
     const statusConfig = {
       completed: { color: "admin-transaction-badge-completed", label: "Completed" },
       cancelled: { color: "admin-transaction-badge-cancelled", label: "Cancelled" },
       no_show: { color: "admin-transaction-badge-noshow", label: "No Show" },
       approved: { color: "admin-transaction-badge-approved", label: "Approved" },
-      rejected: { color: "admin-transaction-badge-rejected", label: "Rejected" },
-      pending: { color: "admin-transaction-badge-pending", label: "Pending" },
+      rejected: {
+        color: isDocument ? "admin-transaction-badge-doc-rejected" : "admin-transaction-badge-rejected",
+        label: "Rejected",
+      },
+      pending: {
+        color: isDocument ? "admin-transaction-badge-doc-pending" : "admin-transaction-badge-pending",
+        label: "Pending",
+      },
       processing: { color: "admin-transaction-badge-processing", label: "Processing" },
-      generated: { color: "admin-transaction-badge-generated", label: "Ready for Pickup" },
+      generated: { color: "admin-transaction-badge-generated", label: "Ready" },
       released: { color: "admin-transaction-badge-released", label: "Released" },
+      claimed: { color: "admin-transaction-badge-claimed", label: "Claimed" },
     };
     const config = statusConfig[status] || {
       color: "admin-transaction-badge-approved",
@@ -494,7 +503,7 @@ export default function AdminTransaction() {
                       <div className="admin-transaction-item-content">
                         <div className="admin-transaction-item-badges">
                           {getTypeBadge(transaction.type)}
-                          {getStatusBadge(transaction.status)}
+                          {getStatusBadge(transaction.status, transaction.type)}
                           <span className="admin-transaction-item-action">
                             {transaction.action}
                           </span>
