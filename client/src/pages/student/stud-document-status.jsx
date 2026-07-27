@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -192,24 +192,15 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
           </div>
 
           {/* Requirements card */}
-          <div className="dss-card">
+          <div className="dss-card dss-requirements-card">
             <div className="dss-card-header">
               <h3 className="dss-card-title">
-                <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem" }} />
+                <CheckCircle2 style={{ width: "1.375rem", height: "1.375rem" }} />
                 Requirements
               </h3>
+              <p className="dss-card-description">Documents and items you need to bring</p>
             </div>
             <div className="dss-card-content">
-              <p
-                style={{
-                  fontSize: "0.8rem",
-                  color: "var(--text-tertiary)",
-                  marginTop: 0,
-                  marginBottom: "0.75rem",
-                }}
-              >
-                Documents and items you need to bring
-              </p>
               {reqLoading ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-tertiary)", fontSize: "0.875rem" }}>
                   <Loader2 style={{ width: "1.125rem", height: "1.125rem", animation: "spin 1s linear infinite" }} />
@@ -358,15 +349,23 @@ export default function DocumentStatusPage() {
     if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
   }, [loading, selectedDocId, selectedDoc]);
 
+  // Mirrors `documents` for the catch block below, without making
+  // fetchDocuments depend on (and change identity with) the state itself.
+  const documentsRef = useRef(documents);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
+
   const fetchDocuments = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await api.get("/student/documents");
       setDocuments(res.data.documents ?? []);
       setError(null);
     } catch (err) {
       console.error("Failed to fetch documents:", err);
-      setError("Could not load your documents.");
+      if (documentsRef.current.length === 0) {
+        setError("Could not load your documents.");
+      } else {
+        toast.error("Could not refresh your documents.");
+      }
     } finally {
       setLoading(false);
     }
@@ -492,7 +491,7 @@ export default function DocumentStatusPage() {
               icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
               iconClassName="dss-title-icon"
               title="My Document Requests"
-              subtitle="Track your document requests"
+              subtitle="Track all of your document requests"
             />
 
             {/* Error */}
@@ -710,7 +709,7 @@ export default function DocumentStatusPage() {
                         <XCircle className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Rejected Requests</h3>
                         <p className="dss-empty-text">
-                          You have no rejected document requests.
+                          You have no records of rejected document requests.
                         </p>
                       </div>
                     )}

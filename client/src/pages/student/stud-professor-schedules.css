@@ -209,8 +209,8 @@ body {
 .department-card {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
+  gap: 1.15rem;
+  padding: 1.15rem 1.5rem;
   cursor: pointer;
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(168, 85, 247, 0.08) 100%);
   border: 1px solid rgba(168, 85, 247, 0.3);
@@ -238,8 +238,8 @@ body {
 
 /* Logo wrap */
 .card-logo-wrap {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3.15rem;
+  height: 3.15rem;
   flex-shrink: 0;
   border-radius: 0.625rem;
   background: rgba(255, 255, 255, 0.92);
@@ -272,7 +272,7 @@ body {
 }
 
 .psched-card-title {
-  font-size: 0.9rem;
+  font-size: 1.02rem;
   font-weight: 700;
   color: #a855f7;
   margin: 0;
@@ -286,7 +286,7 @@ body {
 }
 
 .card-abbrev {
-  font-size: 0.78rem;
+  font-size: 0.87rem;
   color: var(--text-tertiary);
   line-height: 1.4;
   transition: color 0.3s ease;
@@ -305,7 +305,7 @@ body {
   color: #a855f7;
   padding: 0.25rem 0.7rem;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
   border: 1px solid rgba(168, 85, 247, 0.25);
@@ -372,30 +372,11 @@ body {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
-.department-header-top {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-}
-
-.department-header-top svg {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
 .department-header-card h2 {
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
   line-height: 1.2;
-}
-
-.department-header-card p {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.9);
-  margin: 0;
-  text-align: left;
 }
 
 
@@ -448,6 +429,20 @@ body {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.professor-available-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success, #22c55e);
+  border: 1px solid rgba(34, 197, 94, 0.35);
 }
 
 .consultation-unavailable-notice {
@@ -686,13 +681,13 @@ body {
   }
 
   .department-card {
-    padding: 0.875rem 1rem;
-    gap: 0.875rem;
+    padding: 1rem 1.2rem;
+    gap: 1rem;
   }
 
   .card-logo-wrap {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.9rem;
+    height: 2.9rem;
   }
 
   .card-meta {

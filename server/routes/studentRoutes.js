@@ -1635,9 +1635,9 @@ router.get(
            f.specialization                        AS faculty_role,
            d.department_name                       AS college,
            d.department_abbreviation               AS college_abbrev,
-           fda.start_time                          AS window_start,
-           fda.end_time                            AS window_end,
-           fda.location,
+           COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
+           COALESCE(a.window_end_snapshot,   fda.end_time)   AS window_end,
+           COALESCE(a.location_snapshot,     fda.location)   AS location,
            s.service_name
          FROM appointments a
          JOIN faculty      f ON a.faculty_id    = f.faculty_id
@@ -1645,7 +1645,7 @@ router.get(
          LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
          LEFT JOIN appointment_services s ON a.service_id = s.service_id
          WHERE a.student_id = ?
-         ORDER BY a.appointment_date DESC, fda.start_time DESC`,
+         ORDER BY a.appointment_date DESC, COALESCE(a.window_start_snapshot, fda.start_time) DESC`,
         [studentId],
       );
 
@@ -2146,7 +2146,7 @@ router.post(
 
       // Lock the recurring template row to prevent race conditions
       const [[slot]] = await conn.query(
-        `SELECT availability_id, faculty_id, day_of_week, start_time, end_time, max_students
+        `SELECT availability_id, faculty_id, day_of_week, start_time, end_time, location, max_students
          FROM faculty_availability
          WHERE availability_id = ?
          FOR UPDATE`,
@@ -2260,28 +2260,45 @@ router.post(
         [studentId, slot.faculty_id, appointmentDate, appointmentTime],
       );
 
+      // Snapshot the template's current location/window onto the appointment
+      // itself, so this row's display data survives the professor later
+      // editing or deleting the template it was booked against.
       let appointmentId;
       if (staleRow) {
         await conn.query(
           `UPDATE appointments
              SET department_id = ?, service_id = ?, availability_id = ?,
+                 location_snapshot = ?, window_start_snapshot = ?, window_end_snapshot = ?,
                  status = 'pending', notes = ?, created_at = NOW()
            WHERE appointment_id = ?`,
-          [facultyRow.department_id, chosenServiceId, availabilityId, purpose?.trim() || null, staleRow.appointment_id],
+          [
+            facultyRow.department_id,
+            chosenServiceId,
+            availabilityId,
+            slot.location,
+            slot.start_time,
+            slot.end_time,
+            purpose?.trim() || null,
+            staleRow.appointment_id,
+          ],
         );
         appointmentId = staleRow.appointment_id;
       } else {
         const [result] = await conn.query(
           `INSERT INTO appointments
              (student_id, faculty_id, department_id, service_id, availability_id,
+              location_snapshot, window_start_snapshot, window_end_snapshot,
               appointment_date, appointment_time, status, notes, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
           [
             studentId,
             slot.faculty_id,
             facultyRow.department_id,
             chosenServiceId,
             availabilityId,
+            slot.location,
+            slot.start_time,
+            slot.end_time,
             appointmentDate,
             appointmentTime,
             purpose?.trim() || null,
@@ -2305,18 +2322,19 @@ router.post(
       });
       createNotification(slot.faculty_id, "A student booked an appointment with you.");
 
+      // Read the just-written snapshot directly off the appointment row --
+      // no join needed, since we populated it ourselves a moment ago.
       const [[newRow]] = await pool.query(
         `SELECT
            a.appointment_id, a.appointment_date, a.status, a.notes,
-           fa.start_time AS window_start, fa.end_time AS window_end,
+           a.window_start_snapshot AS window_start, a.window_end_snapshot AS window_end,
+           a.location_snapshot AS location,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.specialization AS faculty_role,
-           d.department_name AS college,
-           fa.location
+           d.department_name AS college
          FROM appointments a
          JOIN faculty f ON a.faculty_id = f.faculty_id
          JOIN departments d ON f.department_id = d.department_id
-         JOIN faculty_availability fa ON a.availability_id = fa.availability_id
          WHERE a.appointment_id = ?`,
         [appointmentId],
       );

@@ -176,10 +176,12 @@ export default function AdminQueueAnalytics() {
     improvementAreas: [],
     trends: { peakActivityTime: "N/A", bestServiceTime: "N/A", weeklyComparison: [] },
   });
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  // Starts true (not false) so the very first load still shows a loading
+  // state -- fetchAnalytics itself no longer re-arms this on later calls,
+  // so subsequent poll/socket/filter-driven refreshes update silently.
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   const fetchAnalytics = useCallback(async () => {
-    setAnalyticsLoading(true);
     try {
       const res = await api.get("/admin/queue-analytics", {
         params: { period: timePeriod, service: serviceType },

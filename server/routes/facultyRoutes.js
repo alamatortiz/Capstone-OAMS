@@ -256,8 +256,9 @@ router.get(
           a.status, a.notes, a.created_at,
           s.first_name, s.last_name, s.student_number, s.course,
           svc.service_name AS appointment_type,
-          fda.start_time AS window_start, fda.end_time AS window_end,
-          fda.location
+          COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
+          COALESCE(a.window_end_snapshot,   fda.end_time)   AS window_end,
+          COALESCE(a.location_snapshot,     fda.location)   AS location
         FROM appointments a
         JOIN students s ON a.student_id = s.student_id
         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id

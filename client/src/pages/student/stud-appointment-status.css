@@ -168,56 +168,11 @@
   color: #6d28d9;
 }
 
-/* ─── List Item Icon (purple bg, active items) ───────────────────────────── */
-.apst-list-icon-wrap {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.3s ease;
-  background: rgba(168, 85, 247, 0.12);
-  color: #a855f7;
-}
-
-[data-theme="light"] .apst-list-icon-wrap {
-  background: rgba(168, 85, 247, 0.08);
-  color: #9333ea;
-}
-
-/* ─── List Item Icon (completed/dim items) ───────────────────────────────── */
-.apst-list-icon-wrap-completed {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.3s ease;
-  background: rgba(107, 114, 128, 0.1);
-}
-
-[data-theme="light"] .apst-list-icon-wrap-completed {
-  background: rgba(249, 115, 22, 0.08);
-}
-
-/* ─── List Item Name (purple, overrides from document-status) ────────────── */
-.apst-list-name {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #a855f7;
-  margin: 0 0 0.25rem 0;
-  transition: color 0.3s ease;
-}
-
-[data-theme="light"] .apst-list-name {
-  color: #9333ea;
-}
-
 /* ─── Status Badges (appointment-specific) ───────────────────────────────── */
+/* Note: .apst-badge (base shape, below) is also duplicated into
+   AppointmentListItem.css for the shared card component -- kept here too
+   because AppointmentDetail (this file) renders its own apst-badge directly
+   and isn't part of that extraction. */
 .apst-badge-pending {
   background: rgba(251, 191, 36, 0.2);
   color: #fcd34d;
@@ -502,129 +457,14 @@
   height: 1.25rem;
 }
 
-/* ─── Appointment list item shell (self-contained, violet accent) ────────── */
-.apst-list-item {
-  background: var(--card);
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.apst-list-item:hover {
-  box-shadow: 0 12px 28px rgba(168, 85, 247, 0.15);
-  transform: translateY(-2px);
-  border-color: rgba(168, 85, 247, 0.4);
-}
-
-.apst-list-item-completed {
-  opacity: 0.72;
-  border-color: rgba(107, 114, 128, 0.25);
-}
-
-.apst-list-item-completed:hover {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  border-color: rgba(107, 114, 128, 0.3);
-}
-
-[data-theme="light"] .apst-list-item {
-  border-color: rgba(147, 51, 234, 0.18);
-}
-
-[data-theme="light"] .apst-list-item:hover {
-  box-shadow: 0 12px 28px rgba(147, 51, 234, 0.1);
-  border-color: rgba(147, 51, 234, 0.35);
-}
-
 /* ─── List layout (self-contained) ───────────────────────────────────────── */
+/* Note: the .apst-list-item card shell, header, icon-wraps, title/college
+   text, and card-grid fields all moved to AppointmentListItem.css -- this
+   page now renders that shared component instead of inline markup. */
 .apst-list-container {
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
-}
-
-.apst-list-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
-}
-
-.apst-list-title-section {
-  flex: 1;
-  text-align: left;
-}
-
-.apst-list-title-section h3 {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #a855f7;
-  margin: 0 0 0.25rem 0;
-  transition: color 0.3s ease;
-}
-
-[data-theme="light"] .apst-list-title-section h3 {
-  color: #9333ea;
-}
-
-.apst-list-card-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.apst-list-card-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  text-align: left;
-}
-
-.apst-list-card-field label,
-.apst-list-card-field-full label {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: color 0.3s ease;
-}
-
-.apst-list-card-field p {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #a855f7;
-  margin: 0;
-  line-height: 1.5;
-  transition: color 0.3s ease;
-}
-
-[data-theme="light"] .apst-list-card-field p {
-  color: #9333ea;
-}
-
-.apst-list-card-field-full {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  text-align: left;
-}
-
-.apst-list-card-field-full p {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.5;
-  transition: color 0.3s ease;
-}
-
-.apst-list-college {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0;
 }
 
 /* ─── Status badge base shape (self-contained; color modifiers above) ────── */
@@ -639,6 +479,8 @@
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
   transition: all 0.3s ease;
 }
 

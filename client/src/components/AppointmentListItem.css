@@ -1,0 +1,295 @@
+/* ===== Shared appointment card — used by stud-appointments.jsx (Active
+   Bookings tab) and stud-appointment-status.jsx (tab list). ===== */
+
+/* ─── Card shell ──────────────────────────────────────────────────────────── */
+.apst-list-item {
+  background: var(--card);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.apst-list-item--clickable {
+  cursor: pointer;
+}
+
+.apst-list-item--clickable:hover {
+  box-shadow: 0 12px 28px rgba(168, 85, 247, 0.15);
+  transform: translateY(-2px);
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.apst-list-item-completed {
+  opacity: 0.72;
+  border-color: rgba(107, 114, 128, 0.25);
+}
+
+.apst-list-item--clickable.apst-list-item-completed:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+[data-theme="light"] .apst-list-item {
+  border-color: rgba(147, 51, 234, 0.18);
+}
+
+[data-theme="light"] .apst-list-item--clickable:hover {
+  box-shadow: 0 12px 28px rgba(147, 51, 234, 0.1);
+  border-color: rgba(147, 51, 234, 0.35);
+}
+
+/* ─── Header row (icon, name, college, status badge) ─────────────────────── */
+.apst-list-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.apst-list-icon-wrap {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+[data-theme="light"] .apst-list-icon-wrap {
+  background: rgba(168, 85, 247, 0.08);
+  color: #9333ea;
+}
+
+.apst-list-icon-wrap-completed {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+  background: rgba(107, 114, 128, 0.1);
+}
+
+[data-theme="light"] .apst-list-icon-wrap-completed {
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.apst-list-title-section {
+  flex: 1;
+  text-align: left;
+}
+
+.apst-list-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #a855f7;
+  margin: 0 0 0.25rem 0;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .apst-list-name {
+  color: #9333ea;
+}
+
+.apst-list-college {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ─── Appointment type row (new) ──────────────────────────────────────────── */
+.apst-list-appt-type {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.apst-list-appt-type-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.apst-list-appt-type-value {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ─── Date/Time/Location/Purpose grid ─────────────────────────────────────── */
+.apst-list-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.apst-list-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.apst-list-card-field label,
+.apst-list-card-field-full label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.apst-list-card-field p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #a855f7;
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .apst-list-card-field p {
+  color: #9333ea;
+}
+
+.apst-list-card-field-full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.apst-list-card-field-full p {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+/* ─── Status badge — duplicated from stud-appointment-status.css, not moved:
+   AppointmentDetail in that file renders its own apst-badge directly and
+   isn't part of this extraction, so the original definition stays there too. */
+.apst-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
+}
+
+.apst-badge-pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.apst-badge-approved {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.apst-badge-completed {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.apst-badge-rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.apst-badge-cancelled {
+  background: rgba(107, 114, 128, 0.15);
+  color: #d1d5db;
+  border: 1px solid rgba(107, 114, 128, 0.35);
+}
+
+[data-theme="light"] .apst-badge-pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="light"] .apst-badge-approved {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="light"] .apst-badge-completed {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="light"] .apst-badge-rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+[data-theme="light"] .apst-badge-cancelled {
+  background: rgba(107, 114, 128, 0.08);
+  color: #374151;
+  border-color: rgba(107, 114, 128, 0.2);
+}
+
+/* ─── Cancel button (opt-in, stud-appointments.jsx's Active Bookings tab) ─── */
+.apst-list-cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.75rem;
+  padding: 0.625rem 1rem;
+  color: #ef4444;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.apst-list-cancel-btn:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.apst-list-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

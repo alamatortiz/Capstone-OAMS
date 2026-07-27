@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -19,6 +19,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import AppointmentListItem from "../../components/AppointmentListItem";
 import { formatManilaDate } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
@@ -67,7 +68,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
         icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
         iconClassName="apst-title-icon"
         title="Appointment Details"
-        subtitle="View the status of your appointment"
+        subtitle="Your appointment details and status"
       />
 
       {/* Hero */}
@@ -199,14 +200,25 @@ export default function AppointmentStatusPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [allRange, setAllRange] = useState("week");
 
+  // Mirrors `appointments` for the catch block below, without making
+  // fetchAppointments depend on (and change identity with) the state itself.
+  const appointmentsRef = useRef(appointments);
+  useEffect(() => { appointmentsRef.current = appointments; }, [appointments]);
+
   const fetchAppointments = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const { data } = await api.get("/student/appointments");
       setAppointments(data.appointments ?? []);
     } catch (err) {
-      setError("Could not load your appointments. Please try again.");
+      // Only take over the whole view with a blocking error on the true
+      // first load. A background refresh (poll/socket) failing shouldn't
+      // wipe out an already-good, visible list -- just note it quietly.
+      if (appointmentsRef.current.length === 0) {
+        setError("Could not load your appointments. Please try again.");
+      } else {
+        toast.error("Could not refresh your appointments.");
+      }
     } finally {
       setLoading(false);
     }
@@ -323,7 +335,7 @@ export default function AppointmentStatusPage() {
               icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
               iconClassName="apst-title-icon"
               title="My Appointments"
-              subtitle="Track and manage all your appointment bookings"
+              subtitle="Track all of your appointments"
             />
 
             {/* Professor Schedules card */}
@@ -415,48 +427,14 @@ export default function AppointmentStatusPage() {
 
                 <div className="apst-list-container">
                   {tabLists[activeTab].length > 0 ? (
-                    tabLists[activeTab].map((appt) => {
-                      const { label, cls } = getStatusMeta(appt.status);
-                      const isDim = appt.status === "completed" || appt.status === "rejected" || appt.status === "cancelled";
-                      return (
-                        <div
-                          key={appt.id}
-                          className={`apst-list-item ${isDim ? "apst-list-item-completed" : ""}`}
-                          onClick={() => setSelectedId(appt.id)}
-                        >
-                          <div className="apst-list-header">
-                            <div className={isDim ? "apst-list-icon-wrap-completed" : "apst-list-icon-wrap"}>
-                              <Calendar style={{ width: "1.5rem", height: "1.5rem", color: isDim ? "var(--text-tertiary)" : undefined }} />
-                            </div>
-                            <div className="apst-list-title-section">
-                              <h3 className="apst-list-name" style={isDim ? { color: "var(--text-tertiary)" } : undefined}>{appt.person}</h3>
-                              <p className="apst-list-college">{appt.college}</p>
-                            </div>
-                            <span className={`apst-badge ${cls}`}>{label}</span>
-                          </div>
-                          <div className="apst-list-card-grid">
-                            <div className="apst-list-card-field">
-                              <label>Date</label>
-                              <p>{formatDateShort(appt.date)}</p>
-                            </div>
-                            <div className="apst-list-card-field">
-                              <label>Time Slot</label>
-                              <p>{appt.windowStart && appt.windowEnd ? `${appt.windowStart} – ${appt.windowEnd}` : "—"}</p>
-                            </div>
-                            <div className="apst-list-card-field">
-                              <label>Location</label>
-                              <p>{appt.location}</p>
-                            </div>
-                            {appt.purpose && (
-                              <div className="apst-list-card-field-full">
-                                <label>Purpose</label>
-                                <p>{appt.purpose}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
+                    tabLists[activeTab].map((appt) => (
+                      <AppointmentListItem
+                        key={appt.id}
+                        appointment={appt}
+                        formatDate={formatDateShort}
+                        onClick={() => setSelectedId(appt.id)}
+                      />
+                    ))
                   ) : (
                     <div className="apst-empty-state">
                       <Calendar className="apst-empty-icon" />
@@ -464,9 +442,11 @@ export default function AppointmentStatusPage() {
                         {activeTab === "all" ? "No Appointments Yet" : `No ${TABS.find(t => t.key === activeTab)?.label} Appointments`}
                       </h3>
                       <p className="apst-empty-text">
-                        {activeTab === "all" || activeTab === "pending"
-                          ? "Book an appointment to get started."
-                          : `You have no ${activeTab} appointments.`}
+                        {activeTab === "all"
+                          ? "You have no appointments."
+                          : activeTab === "pending"
+                            ? "You have no records of pending appointments."
+                            : `You have no records of ${activeTab} appointments.`}
                       </p>
                       {(activeTab === "all" || activeTab === "pending") && (
                         <button

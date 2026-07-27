@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -215,8 +216,14 @@ export default function StudentAppointmentsScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
+  // Mirrors the latest data for the catch blocks below, without making the
+  // fetch callbacks depend on (and change identity with) the state itself.
+  const slotsRef = useRef(slots);
+  useEffect(() => { slotsRef.current = slots; }, [slots]);
+  const bookingsRef = useRef(bookings);
+  useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
+
   const fetchSlots = useCallback(async () => {
-    setSlotsLoading(true);
     try {
       const { data } = await api.get('/student/appointments/available-slots');
       setSlots(
@@ -238,14 +245,20 @@ export default function StudentAppointmentsScreen() {
       setSlotsError(null);
     } catch (err) {
       console.error('Failed to fetch available slots:', err);
-      setSlotsError('Could not load available slots. Please try again.');
+      // Only take over the whole tab with a blocking error on the true first
+      // load -- a background poll/socket refresh failing shouldn't wipe out
+      // an already-good, visible list.
+      if (slotsRef.current.length === 0) {
+        setSlotsError('Could not load available slots. Please try again.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh available slots.' });
+      }
     } finally {
       setSlotsLoading(false);
     }
   }, []);
 
   const fetchMyBookings = useCallback(async () => {
-    setBookingsLoading(true);
     try {
       const { data } = await api.get('/student/appointments');
       setBookings(
@@ -266,7 +279,11 @@ export default function StudentAppointmentsScreen() {
       setBookingsError(null);
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
-      setBookingsError('Could not load your bookings. Please try again.');
+      if (bookingsRef.current.length === 0) {
+        setBookingsError('Could not load your bookings. Please try again.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh your bookings.' });
+      }
     } finally {
       setBookingsLoading(false);
     }
@@ -482,7 +499,10 @@ export default function StudentAppointmentsScreen() {
           <Ionicons name="calendar-outline" size={18} color={theme.purple} />
           <Text style={styles.dateHeaderText}>{formatDate(date)}</Text>
         </View>
-        <Text style={styles.dateCount}>{daySlots.length} slots available</Text>
+        <View style={styles.slotCountBadge}>
+          <Ionicons name="calendar-outline" size={12} color={theme.purple} />
+          <Text style={styles.slotCountBadgeText}>{daySlots.length} Slots</Text>
+        </View>
         <View style={styles.slotsList}>
           {daySlots.map((slot) => {
             const isUnavailable = slot.professorAvailabilityStatus === 'unavailable';
@@ -1293,6 +1313,12 @@ function createStyles(theme: ThemePalette) {
     dateHeaderTextDisabled: { fontSize: 15, fontWeight: '700', color: theme.tertiary },
     dateCount: { fontSize: 12, color: theme.tertiary },
     dateCountDisabled: { fontSize: 12, color: theme.tertiary, fontStyle: 'italic' },
+    slotCountBadge: {
+      flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+      backgroundColor: 'rgba(168, 85, 247, 0.12)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.25)',
+      borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10,
+    },
+    slotCountBadgeText: { fontSize: 11, fontWeight: '700', color: theme.purple, textTransform: 'uppercase', letterSpacing: 0.4 },
 
     // Slot cards
     slotsList: { gap: 12 },

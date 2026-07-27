@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
@@ -94,14 +95,22 @@ export default function AdminAppointment() {
     pending: appointments.filter((a) => a.status === "pending").length,
   };
 
+  // Mirrors `appointments` for the catch block below, without making
+  // fetchAppointments depend on (and change identity with) the state itself.
+  const appointmentsRef = useRef(appointments);
+  useEffect(() => { appointmentsRef.current = appointments; }, [appointments]);
+
   const fetchAppointments = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await api.get("/admin/appointments");
       setAppointments(res.data.appointments ?? []);
     } catch (err) {
       console.error("Failed to fetch appointments:", err);
-      setError("Could not load appointments.");
+      if (appointmentsRef.current.length === 0) {
+        setError("Could not load appointments.");
+      } else {
+        toast.error("Could not refresh appointments.");
+      }
     } finally {
       setLoading(false);
     }

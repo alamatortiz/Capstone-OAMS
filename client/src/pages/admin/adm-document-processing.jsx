@@ -73,7 +73,9 @@ export default function AdminDocumentProcessing() {
   // ── Document processing state ─────────────────────────────────────────────
   const [source, setSource] = useState("student");
   const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Starts true (not false) so the very first load still shows a loading
+  // state -- fetchDocuments itself no longer re-arms this on later calls.
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   // Default to "all" since This Week/Next Week/This Month all hide requests
@@ -94,7 +96,6 @@ export default function AdminDocumentProcessing() {
   // ── Effects ───────────────────────────────────────────────────────────────
   const fetchDocuments = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await api.get(`/admin/${sourceEndpoint}`);
       setDocuments(res.data.documents ?? []);
     } catch (err) {

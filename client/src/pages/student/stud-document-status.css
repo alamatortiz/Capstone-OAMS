@@ -661,6 +661,40 @@
   padding: 1.25rem;
 }
 
+/* ─── Requirements card shell (scoped match of stud-queue's avail-services-details-card, orange) ─────────────────────────── */
+.dss-requirements-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  border-radius: 1rem;
+}
+
+.dss-requirements-card .dss-card-header {
+  display: block;
+  padding: 1.375rem;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.dss-requirements-card .dss-card-title {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  gap: 0.625rem;
+  margin-bottom: 0.625rem;
+  letter-spacing: -0.25px;
+}
+
+.dss-requirements-card .dss-card-description {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
+  font-weight: 500;
+}
+
+.dss-requirements-card .dss-card-content {
+  padding: 1.375rem;
+}
+
 /* ─── Requirements card content ───────────────────────────────────────────── */
 .dss-requirements-list {
   list-style: none;
@@ -715,9 +749,9 @@
 }
 
 .dss-requirement-name-row .dss-requirement-badge.is-mandatory {
-  background: rgba(249, 115, 22, 0.18);
-  color: #fb923c;
-  border: 1px solid rgba(249, 115, 22, 0.4);
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
 }
 
 .dss-requirement-name-row .dss-requirement-badge.is-optional {
@@ -727,9 +761,7 @@
 }
 
 [data-theme="light"] .dss-requirement-name-row .dss-requirement-badge.is-mandatory {
-  background: rgba(234, 88, 12, 0.1);
-  color: #9a3412;
-  border-color: rgba(234, 88, 12, 0.3);
+  color: #ea580c;
 }
 
 /* ─── Cancel card (self-contained copy of queue-status's cancel card) ────── */

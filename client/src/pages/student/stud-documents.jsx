@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
@@ -125,15 +125,23 @@ export default function DocumentsPage() {
     fetchServiceTypes();
   }, []);
 
+  // Mirrors `documents` for the catch block below, without making
+  // fetchDocuments depend on (and change identity with) the state itself.
+  const documentsRef = useRef(documents);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
+
   const fetchDocuments = useCallback(async () => {
     try {
-      setDocsLoading(true);
       const res = await api.get("/student/documents");
       setDocuments(res.data.documents ?? []);
       setDocsError(null);
     } catch (err) {
       console.error("Failed to fetch documents:", err);
-      setDocsError("Could not load your documents.");
+      if (documentsRef.current.length === 0) {
+        setDocsError("Could not load your documents.");
+      } else {
+        toast.error("Could not refresh your documents.");
+      }
     } finally {
       setDocsLoading(false);
     }
@@ -773,7 +781,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <XCircleIcon />
                     <h3>No Rejected Requests</h3>
-                    <p>You have no rejected document requests.</p>
+                    <p>You have no records of rejected document requests.</p>
                   </div>
                 )}
               </div>

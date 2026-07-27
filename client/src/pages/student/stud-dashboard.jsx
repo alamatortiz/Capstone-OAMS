@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { FileText, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
@@ -193,15 +194,25 @@ export default function StudentDashboard() {
   const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
   const [officeHoursError, setOfficeHoursError] = useState(null);
 
+  // Mirror the latest data for the catch blocks below, without making the
+  // fetch callbacks depend on (and change identity with) the state itself.
+  const dashStatsRef = useRef(dashStats);
+  useEffect(() => { dashStatsRef.current = dashStats; }, [dashStats]);
+  const announcementsRef = useRef(announcements);
+  useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
+
   // ── Fetch dashboard stats from backend ───────────────────────────────────
   const fetchStats = useCallback(async () => {
     try {
-      setDashLoading(true);
       const res = await api.get("/student/dashboard-stats");
       setDashStats(res.data);
     } catch (err) {
       console.error("Failed to fetch dashboard stats:", err);
-      setDashError("Could not load dashboard data.");
+      if (!dashStatsRef.current) {
+        setDashError("Could not load dashboard data.");
+      } else {
+        toast.error("Could not refresh dashboard data.");
+      }
     } finally {
       setDashLoading(false);
     }
@@ -214,12 +225,15 @@ export default function StudentDashboard() {
   // ── Fetch announcements from backend ──────────────────────────────────────
   const fetchAnnouncements = useCallback(async () => {
     try {
-      setAnnouncementsLoading(true);
       const res = await api.get("/student/announcements");
       setAnnouncements(res.data?.announcements ?? []);
     } catch (err) {
       console.error("Failed to fetch announcements:", err);
-      setAnnouncementsError("Could not load announcements.");
+      if (announcementsRef.current.length === 0) {
+        setAnnouncementsError("Could not load announcements.");
+      } else {
+        toast.error("Could not refresh announcements.");
+      }
     } finally {
       setAnnouncementsLoading(false);
     }

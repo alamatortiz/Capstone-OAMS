@@ -862,7 +862,7 @@ function createStyles(theme: ThemePalette) {
     listItemCollege: { fontSize: 12, color: theme.tertiary },
 
     statusBadge: { borderWidth: 1, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, alignSelf: 'flex-start' },
-    statusBadgeText: { fontSize: 11, fontWeight: '700' },
+    statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
 
     listItemGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     listItemField: { width: '47%', gap: 3 },

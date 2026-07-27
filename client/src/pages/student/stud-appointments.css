@@ -508,11 +508,33 @@ body {
 .date-count { font-size: 0.875rem; color: var(--text-tertiary); margin: 0 0 1rem; transition: color 0.3s ease; }
 .date-count--disabled { font-style: italic; }
 
-/* ===== Week Sections (This Week / Next Week) ===== */
-.week-section { display: flex; flex-direction: column; gap: 1.5rem; }
-.week-section + .week-section { margin-top: 0.5rem; padding-top: 1.5rem; border-top: 1px solid var(--card-border); }
+.slot-count-badge {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.3rem 0.75rem; margin: 0 0 1rem;
+  border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.4px;
+  background: rgba(168, 85, 247, 0.12); color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+[data-theme="light"] .slot-count-badge { background: rgba(147,51,234,0.08); color: #7e22ce; border-color: rgba(147,51,234,0.2); }
+
+/* ===== Week Sections (This Week / Next Week) — boxed cards with a clear
+   divider between each day within them ===== */
+.week-section {
+  display: flex; flex-direction: column; gap: 1.5rem;
+  background: var(--dark-bg);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+.week-section + .week-section { margin-top: 0; padding-top: 1.25rem; border-top: none; }
 
 .week-section-header { width: 100%; }
+
+.slots-date-group + .slots-date-group {
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(168, 85, 247, 0.15);
+}
 
 .slots-date-group--disabled { opacity: 0.55; }
 .slots-date-group--disabled .date-header h3 { color: var(--text-tertiary); }
@@ -524,7 +546,7 @@ body {
   background: var(--dark-bg);
   border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 1rem;
-  padding: 1.25rem;
+  padding: 1.4rem;
   transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
@@ -542,7 +564,7 @@ body {
 .slot-card--unavailable:hover { box-shadow: none; transform: none; border-color: var(--card-border); }
 
 .slot-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
-.slot-header h4 { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0; flex: 1; transition: color 0.3s ease; }
+.slot-header h4 { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 0; flex: 1; transition: color 0.3s ease; }
 
 .college-badge {
   background: rgba(168, 85, 247, 0.15);
@@ -562,7 +584,7 @@ body {
 
 .slot-details { display: flex; flex-direction: column; gap: 0.5rem; }
 
-.slot-detail { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-tertiary); transition: color 0.3s ease; }
+.slot-detail { display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; color: var(--text-tertiary); transition: color 0.3s ease; }
 .slot-detail .appointment-icon { width: 1.25rem; height: 1.25rem; color: #a855f7; flex-shrink: 0; background: none; border: none; border-radius: 0; }
 .slot-detail .appointment-icon:hover { background: none; border-color: transparent; }
 
@@ -603,110 +625,15 @@ body {
   gap: 1rem;
 }
 
-.ab-status-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.625rem;
-  background: rgba(168, 85, 247, 0.12);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  color: #a855f7;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-}
-
-.ab-status-link:hover { background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.5); }
-
-[data-theme="light"] .ab-status-link { background: rgba(147,51,234,0.08); border-color: rgba(147,51,234,0.25); color: #9333ea; }
-[data-theme="light"] .ab-status-link:hover { background: rgba(147,51,234,0.15); border-color: rgba(147,51,234,0.4); }
-
 .bookings-header h2 { font-size: 1.125rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem; transition: color 0.3s ease; text-align: left; }
 .bookings-header p { font-size: 0.875rem; color: var(--text-tertiary); margin: 0; transition: color 0.3s ease; text-align: left; }
 
 .bookings-list { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
 
-.booking-card {
-  background: var(--dark-bg);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  padding: 1.25rem;
-  transition: all 0.3s ease;
-  text-align: left;
-}
-
-.booking-card:hover { box-shadow: 0 8px 20px rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.3); }
-
-.booking-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
-.booking-header h4 { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0; flex: 1; transition: color 0.3s ease; }
-.booking-details { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
-.booking-detail { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-tertiary); transition: color 0.3s ease; }
-.booking-detail .appointment-icon { width: 1.25rem; height: 1.25rem; color: #a855f7; flex-shrink: 0; background: none; border: none; border-radius: 0; }
-.booking-detail .appointment-icon:hover { background: none; border-color: transparent; }
-
-.purpose-box {
-  background: rgba(168, 85, 247, 0.08);
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  border-radius: 0.75rem;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  text-align: left;
-}
-
-.purpose-label { font-size: 0.75rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.3px; }
-.purpose-text { font-size: 0.875rem; color: var(--text-primary); line-height: 1.5; transition: color 0.3s ease; }
-
-.booking-appt-type {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
-}
-.booking-appt-type-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-}
-.booking-appt-type-value {
-  display: inline-block;
-  padding: 0.15rem 0.6rem;
-  background: rgba(168, 85, 247, 0.12);
-  color: #a855f7;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.cancel-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-  background: transparent;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 0.75rem;
-  padding: 0.625rem 1rem;
-  color: #ef4444;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.cancel-btn:hover { background-color: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.5); }
-.cancel-btn .appointment-icon { width: 1rem; height: 1rem; }
+/* Individual booking cards now render via the shared AppointmentListItem
+   component (client/src/components/AppointmentListItem.css) instead of the
+   bespoke .booking-card/.booking-detail/.purpose-box/.cancel-btn markup that
+   used to live here. */
 
 /* ===== Dialog ===== */
 .dialog-overlay {

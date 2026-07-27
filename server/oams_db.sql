@@ -315,6 +315,9 @@ CREATE TABLE appointments (
     department_id       INT          NOT NULL,
     service_id          INT          NULL,   -- FK to appointment_services (the chosen appointment type)
     availability_id     INT          NULL,   -- FK to faculty_availability; the recurring template this was booked against
+    location_snapshot     VARCHAR(150) NULL, -- location captured at booking time, immune to the template being edited/deleted later
+    window_start_snapshot TIME         NULL, -- consultation window captured at booking time (same reason)
+    window_end_snapshot   TIME         NULL,
     appointment_date    DATE         NOT NULL,
     appointment_time    TIME         NOT NULL,
     status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',

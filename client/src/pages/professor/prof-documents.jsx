@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, FileText, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
@@ -319,9 +319,13 @@ export default function ProfessorDocumentRequest() {
     fetchDocumentTypes();
   }, []);
 
+  // Mirrors `requests` for the catch block below, without making
+  // fetchRequests depend on (and change identity with) the state itself.
+  const requestsRef = useRef(requests);
+  useEffect(() => { requestsRef.current = requests; }, [requests]);
+
   const fetchRequests = useCallback(async () => {
     try {
-      setRequestsLoading(true);
       const res = await api.get("/faculty/my-document-requests");
       setRequests(
         res.data.map((r) => ({
@@ -343,7 +347,11 @@ export default function ProfessorDocumentRequest() {
       setRequestsError(null);
     } catch (err) {
       console.error("Failed to fetch document requests:", err);
-      setRequestsError("Could not load your document requests.");
+      if (requestsRef.current.length === 0) {
+        setRequestsError("Could not load your document requests.");
+      } else {
+        toast.error("Could not refresh your document requests.");
+      }
     } finally {
       setRequestsLoading(false);
     }

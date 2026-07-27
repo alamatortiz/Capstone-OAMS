@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "./adm-dashboard.css";
@@ -256,14 +257,22 @@ export default function AdminDashboard() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
 
+  // Mirrors `dashStats` for the catch block below, without making fetchStats
+  // depend on (and change identity with) the state itself.
+  const dashStatsRef = useRef(dashStats);
+  useEffect(() => { dashStatsRef.current = dashStats; }, [dashStats]);
+
   const fetchStats = useCallback(async () => {
     try {
-      setDashLoading(true);
       const res = await api.get("/admin/dashboard-stats");
       setDashStats(res.data);
     } catch (err) {
       console.error("Failed to fetch admin dashboard stats:", err);
-      setDashError("Could not load dashboard data.");
+      if (!dashStatsRef.current) {
+        setDashError("Could not load dashboard data.");
+      } else {
+        toast.error("Could not refresh dashboard data.");
+      }
     } finally {
       setDashLoading(false);
     }

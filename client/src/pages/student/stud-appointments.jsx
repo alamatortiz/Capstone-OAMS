@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import AppointmentListItem from "../../components/AppointmentListItem";
 import { Link } from "react-router-dom";
 import "./stud-appointments.css";
 import api from "../../utils/api";
@@ -14,7 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
-import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -89,25 +90,6 @@ const Loader2Icon = () => (
   </svg>
 );
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-const STATUS_STYLES = {
-  pending:   { bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.4)", color: "#f59e0b" },
-  approved:  { bg: "rgba(59, 130, 246, 0.15)",  border: "rgba(59, 130, 246, 0.4)",  color: "#3b82f6" },
-  completed: { bg: "rgba(34, 197, 94, 0.15)",   border: "rgba(34, 197, 94, 0.4)",   color: "#22c55e" },
-  rejected:  { bg: "rgba(239, 68, 68, 0.15)",   border: "rgba(239, 68, 68, 0.4)",   color: "#ef4444" },
-  cancelled: { bg: "rgba(148, 163, 184, 0.15)", border: "rgba(148, 163, 184, 0.4)", color: "#94a3b8" },
-};
-
-const StatusBadge = ({ status }) => {
-  const s = STATUS_STYLES[status] ?? STATUS_STYLES.pending;
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", padding: "0.25rem 0.7rem", borderRadius: "999px", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", background: s.bg, border: `1px solid ${s.border}`, color: s.color }}>
-      <span style={{ width: "0.4rem", height: "0.4rem", borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-      {status}
-    </span>
-  );
-};
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentsPage() {
   const { user } = useAuth();
@@ -149,23 +131,42 @@ export default function AppointmentsPage() {
     }
   }, [user?.departmentAbbrev, hasUserSetCollege]);
 
+  // Mirror the latest data for the catch blocks below, without making the
+  // fetch callbacks depend on (and change identity with) the state itself --
+  // that would reset the 15s poll effect's interval on every successful tick.
+  const slotsRef = useRef(slots);
+  useEffect(() => { slotsRef.current = slots; }, [slots]);
+  const myBookingsRef = useRef(myBookings);
+  useEffect(() => { myBookingsRef.current = myBookings; }, [myBookings]);
+
   const fetchSlots = useCallback(async () => {
-    setSlotsLoading(true); setSlotsError(null);
+    setSlotsError(null);
     try {
       const { data } = await api.get("/student/appointments/available-slots");
       setSlots(data.slots ?? []);
     } catch (err) {
-      setSlotsError("Could not load available slots. Please try again.");
+      // Only take over the whole tab with a blocking error on the true first
+      // load -- a background poll/socket refresh failing shouldn't wipe out
+      // an already-good, visible list.
+      if (slotsRef.current.length === 0) {
+        setSlotsError("Could not load available slots. Please try again.");
+      } else {
+        toast.error("Could not refresh available slots.");
+      }
     } finally { setSlotsLoading(false); }
   }, []);
 
   const fetchMyBookings = useCallback(async () => {
-    setBookingsLoading(true); setBookingsError(null);
+    setBookingsError(null);
     try {
       const { data } = await api.get("/student/appointments");
       setMyBookings(data.appointments ?? []);
     } catch (err) {
-      setBookingsError("Could not load your bookings. Please try again.");
+      if (myBookingsRef.current.length === 0) {
+        setBookingsError("Could not load your bookings. Please try again.");
+      } else {
+        toast.error("Could not refresh your bookings.");
+      }
     } finally { setBookingsLoading(false); }
   }, []);
 
@@ -389,7 +390,10 @@ export default function AppointmentsPage() {
           <Calendar style={{ width: "1.5rem", height: "1.5rem", color: "#a855f7" }} />
           <h3>{formatDate(date)}</h3>
         </div>
-        <p className="date-count">{daySlots.length} slots available</p>
+        <span className="slot-count-badge">
+          <CalendarDays style={{ width: "0.85rem", height: "0.85rem" }} />
+          {daySlots.length} Slots
+        </span>
         <div className="slots-grid">
           {daySlots.map((slot) => {
             const isUnavailable = slot.professorAvailabilityStatus === "unavailable";
@@ -508,7 +512,7 @@ export default function AppointmentsPage() {
             icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
             iconClassName="ab-title-icon"
             title="Appointments"
-            subtitle="Schedule consultations with professors"
+            subtitle="Schedule appointments with professors and view available slots"
           />
 
           {/* Professor Schedules card */}
@@ -588,7 +592,7 @@ export default function AppointmentsPage() {
                 <span className="ab-tab-count">{slotsLoading ? "—" : visibleSlots.length}</span>
               </button>
               <button type="button" className={`ab-tab ${activeTab === "bookings" ? "active" : ""}`} onClick={() => setActiveTab("bookings")}>
-                <ClipboardList className="ab-tab-icon" /> My Bookings
+                <ClipboardList className="ab-tab-icon" /> Active Bookings
                 <span className="ab-tab-count">{bookingsLoading ? "—" : activeBookings.length}</span>
               </button>
             </div>
@@ -602,7 +606,7 @@ export default function AppointmentsPage() {
               ) : slotsError ? (
                 <div className="appt-empty-state"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
               ) : availableSlots.length === 0 ? (
-                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published consultation hours yet"}</p></div>
+                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published their consultation hours yet."}</p></div>
               ) : selectedDate ? (
                 <div className="slots-list">
                   <div className="week-section">
@@ -631,56 +635,35 @@ export default function AppointmentsPage() {
             </div>
           )}
 
-          {/* My Bookings */}
+          {/* Active Bookings */}
           {activeTab === "bookings" && (
             <div className="bookings-container">
               <div className="bookings-header">
                 <div><h2>My Appointments</h2><p>Your scheduled consultations</p></div>
-                <Link to="/student/appointment-status" className="ab-status-link">View All Status →</Link>
               </div>
               {bookingsLoading ? (
                 <div className="appt-empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
               ) : bookingsError ? (
                 <div className="appt-empty-state"><CheckCircleIcon /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
               ) : activeBookings.length === 0 ? (
-                <div className="appt-empty-state"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>Browse available slots to schedule your first consultation</p></div>
+                <div className="appt-empty-state"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>You have no active appointments.</p></div>
               ) : (
                 <div className="bookings-list">
                   {bookingsByStatus.map(([status, bookings]) => (
                     <div key={status} className="slots-date-group">
-                      <div className="date-header" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <StatusBadge status={status} />
+                      <div className="date-header">
                         <h3 style={{ margin: 0 }}>{STATUS_LABELS[status]}</h3>
                       </div>
                       <p className="date-count">{bookings.length} {bookings.length === 1 ? "appointment" : "appointments"}</p>
                       {bookings.map((booking) => (
-                        <div key={booking.id} className="booking-card" style={{ marginBottom: "0.75rem" }}>
-                          <div className="booking-header">
-                            <h4>{booking.person}</h4>
-                            <span className="college-badge">{booking.college}</span>
-                          </div>
-                          {booking.appointmentType && (
-                            <div className="booking-appt-type">
-                              <span className="booking-appt-type-label">Type:</span>
-                              <span className="booking-appt-type-value">{booking.appointmentType}</span>
-                            </div>
-                          )}
-                          <div className="booking-details">
-                            <div className="booking-detail"><Calendar style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatDate(booking.date)}</span></div>
-                            <div className="booking-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.windowStart && booking.windowEnd ? `${booking.windowStart} – ${booking.windowEnd}` : "—"}</span></div>
-                            <div className="booking-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{booking.location}</span></div>
-                          </div>
-                          {booking.purpose && (
-                            <div className="purpose-box">
-                              <span className="purpose-label">Purpose:</span>
-                              <span className="purpose-text">{booking.purpose}</span>
-                            </div>
-                          )}
-                          {(status === "pending" || status === "approved") && (
-                            <button className="cancel-btn" onClick={() => setCancelConfirmId(booking.id)} disabled={cancellingId === booking.id}>
-                              <XCircle style={{ width: "1.3rem", height: "1.3rem", color: "#ef4444", flexShrink: 0 }} />{cancellingId === booking.id ? "Cancelling…" : "Cancel"}
-                            </button>
-                          )}
+                        <div key={booking.id} style={{ marginBottom: "0.75rem" }}>
+                          <AppointmentListItem
+                            appointment={booking}
+                            formatDate={formatDate}
+                            showCancelButton
+                            onCancel={(id) => setCancelConfirmId(id)}
+                            isCancelling={cancellingId === booking.id}
+                          />
                         </div>
                       ))}
                     </div>

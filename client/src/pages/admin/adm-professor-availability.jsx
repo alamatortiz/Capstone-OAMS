@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-professor-availability.css";
@@ -60,15 +61,23 @@ export default function AdminProfessorAvailability() {
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Mirrors `faculty` for the catch block below, without making fetchFaculty
+  // depend on (and change identity with) the state itself.
+  const facultyRef = useRef(faculty);
+  useEffect(() => { facultyRef.current = faculty; }, [faculty]);
+
   const fetchFaculty = useCallback(async () => {
     try {
-      setLoading(true);
       setError(null);
       const res = await api.get("/admin/faculty-availability");
       setFaculty(res.data.faculty || []);
     } catch (err) {
       console.error("Failed to fetch faculty availability:", err);
-      setError("Failed to load faculty data. Please try again.");
+      if (facultyRef.current.length === 0) {
+        setError("Failed to load faculty data. Please try again.");
+      } else {
+        toast.error("Could not refresh faculty availability.");
+      }
     } finally {
       setLoading(false);
     }

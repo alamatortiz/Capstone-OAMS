@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";
@@ -145,16 +146,24 @@ export default function TransactionsPage() {
     },
   ];
 
+  // Mirrors `transactions` for the catch block below, without making
+  // fetchTransactions depend on (and change identity with) the state itself.
+  const transactionsRef = useRef(transactions);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   const fetchTransactions = useCallback(async () => {
     try {
-      setTxLoading(true);
       const res = await api.get("/student/transactions");
       setTransactions(res.data.transactions ?? []);
       setTxError(null);
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
-      setTxError("Could not load your transaction history.");
+      if (transactionsRef.current.length === 0) {
+        setTxError("Could not load your transaction history.");
+      } else {
+        toast.error("Could not refresh your transaction history.");
+      }
     } finally {
       setTxLoading(false);
     }

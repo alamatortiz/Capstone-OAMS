@@ -319,10 +319,7 @@ export default function ProfessorSchedule() {
                       />
                     </div>
                     <div>
-                      <div className="department-header-top">
-                        <h2>{selectedDepartment.departmentName}</h2>
-                      </div>
-                      <p>Faculty consultation schedules and availability</p>
+                      <h2>{selectedDepartment.departmentName}</h2>
                     </div>
                   </div>
                 </div>
@@ -350,9 +347,13 @@ export default function ProfessorSchedule() {
                           <div className="professor-info">
                             <div className="professor-name-row">
                               <h3 className="professor-name">{professor.name}</h3>
-                              {isUnavailable && (
+                              {isUnavailable ? (
                                 <span className="professor-unavailable-badge">
                                   Unavailable
+                                </span>
+                              ) : (
+                                <span className="professor-available-badge">
+                                  Available
                                 </span>
                               )}
                             </div>

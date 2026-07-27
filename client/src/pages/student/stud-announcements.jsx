@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Megaphone as LucideMegaphone } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -132,15 +133,23 @@ export default function AnnouncementsPage() {
   const [annLoading, setAnnLoading] = useState(true);
   const [annError, setAnnError] = useState(null);
 
+  // Mirrors `announcements` for the catch block below, without making
+  // fetchAnnouncements depend on (and change identity with) the state itself.
+  const announcementsRef = useRef(announcements);
+  useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
+
   const fetchAnnouncements = useCallback(async () => {
-    setAnnLoading(true);
     setAnnError(null);
     try {
       const { data } = await api.get("/student/announcements");
       setAnnouncements(data.announcements ?? []);
     } catch (err) {
       console.error("Fetch announcements error:", err);
-      setAnnError("Could not load announcements. Please try again.");
+      if (announcementsRef.current.length === 0) {
+        setAnnError("Could not load announcements. Please try again.");
+      } else {
+        toast.error("Could not refresh announcements.");
+      }
     } finally {
       setAnnLoading(false);
     }
