@@ -1988,7 +1988,11 @@ router.get(
          FROM document_requirements WHERE service_id = ? ORDER BY requirement_id ASC`,
         [serviceId],
       );
-      res.json({ requirements: rows });
+      // mysql2 returns TINYINT(1)/BOOLEAN columns as a raw 0/1 Number, not a
+      // JS boolean -- the client compares this with `=== false` / `!== false`,
+      // which never matches a Number, so this cast is required or every
+      // optional requirement silently becomes "mandatory" on the next save.
+      res.json({ requirements: rows.map((r) => ({ ...r, isMandatory: !!r.isMandatory })) });
     } catch (error) {
       console.error("Requirements fetch error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
@@ -2350,7 +2354,7 @@ router.get(
          FROM service_requirements WHERE service_id = ? ORDER BY requirement_id ASC`,
         [serviceId],
       );
-      res.json({ requirements: rows });
+      res.json({ requirements: rows.map((r) => ({ ...r, isMandatory: !!r.isMandatory })) });
     } catch (error) {
       console.error("Service requirements fetch error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });

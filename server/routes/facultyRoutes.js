@@ -1044,12 +1044,16 @@ router.get(
       let requirementsMap = {};
       if (serviceIds.length > 0) {
         const [reqRows] = await pool.query(
-          "SELECT service_id, requirement_name FROM document_requirements WHERE service_id IN (?) ORDER BY is_mandatory DESC, requirement_id ASC",
+          "SELECT service_id, requirement_name, description, is_mandatory FROM document_requirements WHERE service_id IN (?) ORDER BY is_mandatory DESC, requirement_id ASC",
           [serviceIds]
         );
         for (const req of reqRows) {
           if (!requirementsMap[req.service_id]) requirementsMap[req.service_id] = [];
-          requirementsMap[req.service_id].push(req.requirement_name);
+          requirementsMap[req.service_id].push({
+            name: req.requirement_name,
+            description: req.description,
+            isMandatory: !!req.is_mandatory,
+          });
         }
       }
 

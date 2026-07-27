@@ -651,7 +651,7 @@ router.get(
 
       const [rows] = await pool.query(
         `SELECT ds.service_id, ds.service_name, ds.department_id, ds.is_cross_college,
-                d.department_name, d.department_abbreviation
+                ds.processing_time, d.department_name, d.department_abbreviation
          FROM document_services ds
          JOIN departments d ON ds.department_id = d.department_id
          WHERE (ds.department_id = ? OR ds.is_cross_college = TRUE)
@@ -661,13 +661,35 @@ router.get(
         [studentDeptId],
       );
 
-      // Group service names by their real owning department.
+      const serviceIds = rows.map((r) => r.service_id);
+      const requirementsMap = {};
+      if (serviceIds.length > 0) {
+        const [reqRows] = await pool.query(
+          `SELECT service_id, requirement_name, description, is_mandatory
+           FROM document_requirements WHERE service_id IN (?) ORDER BY is_mandatory DESC, requirement_id ASC`,
+          [serviceIds],
+        );
+        for (const req of reqRows) {
+          if (!requirementsMap[req.service_id]) requirementsMap[req.service_id] = [];
+          requirementsMap[req.service_id].push({
+            name: req.requirement_name,
+            description: req.description,
+            isMandatory: !!req.is_mandatory,
+          });
+        }
+      }
+
+      // Group services by their real owning department.
       const servicesByDepartmentId = {};
       for (const row of rows) {
         if (!servicesByDepartmentId[row.department_id]) {
           servicesByDepartmentId[row.department_id] = [];
         }
-        servicesByDepartmentId[row.department_id].push(row.service_name);
+        servicesByDepartmentId[row.department_id].push({
+          name: row.service_name,
+          processingTime: row.processing_time,
+          requirements: requirementsMap[row.service_id] ?? [],
+        });
       }
 
       res.json({

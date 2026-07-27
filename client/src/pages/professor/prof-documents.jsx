@@ -511,13 +511,28 @@ export default function ProfessorDocumentRequest() {
 
                   {selectedType && (
                     <div className="doc-form-hint">
-                      <p>
-                        <strong>Processing Time:</strong> {selectedType.processingTime}
+                      <p className="doc-hint-processing">
+                        <strong>Processing Time:</strong> {selectedType.processingTime || "TBD"}
                       </p>
                       {selectedType.requirements.length > 0 && (
-                        <p>
-                          <strong>Requirements:</strong> {selectedType.requirements.join(", ")}
-                        </p>
+                        <div className="doc-hint-requirements">
+                          <strong>Requirements:</strong>
+                          <ul className="doc-requirements-list">
+                            {selectedType.requirements.map((req, i) => (
+                              <li key={i}>
+                                <div className="doc-req-row">
+                                  <span className="doc-req-name">{req.name}</span>
+                                  <span
+                                    className={`doc-req-tag ${req.isMandatory ? "doc-req-tag-required" : "doc-req-tag-optional"}`}
+                                  >
+                                    {req.isMandatory ? "Required" : "Optional"}
+                                  </span>
+                                </div>
+                                {req.description && <p className="doc-req-desc">{req.description}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
                     </div>
                   )}

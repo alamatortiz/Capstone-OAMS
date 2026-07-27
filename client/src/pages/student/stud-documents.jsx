@@ -262,6 +262,13 @@ export default function DocumentsPage() {
   const claimedDocuments = documents.filter((doc) => doc.status === "claimed");
   const rejectedDocuments = documents.filter((doc) => doc.status === "rejected");
 
+  const availableTypes =
+    servicesByDepartmentId[
+      collegesFromDB.find((c) => c.name === formData.college)?.id ?? -1
+    ] ?? [];
+  const hasServicesForCollege = availableTypes.length > 0;
+  const selectedTypeDetails = availableTypes.find((t) => t.name === formData.type);
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
@@ -316,41 +323,60 @@ export default function DocumentsPage() {
 
                   <div className="doc-form-group">
                     <label htmlFor="type">Document Type</label>
-                    {(() => {
-                      const availableTypes =
-                        servicesByDepartmentId[
-                          collegesFromDB.find((c) => c.name === formData.college)?.id ?? -1
-                        ] ?? [];
-                      const hasServicesForCollege = availableTypes.length > 0;
-                      return (
-                        <select
-                          id="type"
-                          value={formData.type}
-                          onChange={(e) =>
-                            setFormData({ ...formData, type: e.target.value })
-                          }
-                          className="doc-form-select"
-                          disabled={
-                            formOptionsLoading || !formData.college || !hasServicesForCollege
-                          }
-                          required
-                        >
-                          <option value="">
-                            {!formData.college
-                              ? "Select a college first"
-                              : !hasServicesForCollege
-                                ? "No Documents Available"
-                                : "Select document type"}
-                          </option>
-                          {availableTypes.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                    <select
+                      id="type"
+                      value={formData.type}
+                      onChange={(e) =>
+                        setFormData({ ...formData, type: e.target.value })
+                      }
+                      className="doc-form-select"
+                      disabled={
+                        formOptionsLoading || !formData.college || !hasServicesForCollege
+                      }
+                      required
+                    >
+                      <option value="">
+                        {!formData.college
+                          ? "Select a college first"
+                          : !hasServicesForCollege
+                            ? "No Documents Available"
+                            : "Select document type"}
+                      </option>
+                      {availableTypes.map((type) => (
+                        <option key={type.name} value={type.name}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {selectedTypeDetails && (
+                    <div className="doc-form-hint">
+                      <p className="doc-hint-processing">
+                        <strong>Processing Time:</strong> {selectedTypeDetails.processingTime || "TBD"}
+                      </p>
+                      {selectedTypeDetails.requirements.length > 0 && (
+                        <div className="doc-hint-requirements">
+                          <strong>Requirements:</strong>
+                          <ul className="doc-requirements-list">
+                            {selectedTypeDetails.requirements.map((req, i) => (
+                              <li key={i}>
+                                <div className="doc-req-row">
+                                  <span className="doc-req-name">{req.name}</span>
+                                  <span
+                                    className={`doc-req-tag ${req.isMandatory ? "doc-req-tag-required" : "doc-req-tag-optional"}`}
+                                  >
+                                    {req.isMandatory ? "Required" : "Optional"}
+                                  </span>
+                                </div>
+                                {req.description && <p className="doc-req-desc">{req.description}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="doc-form-group">
                     <label htmlFor="copies">Number of Copies</label>

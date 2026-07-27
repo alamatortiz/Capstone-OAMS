@@ -620,6 +620,11 @@ html, body {
   transition: color 0.3s ease;
 }
 
+.adm-checkbox-inline {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 /* ===== Scrollbar for modal ===== */
 .adm-modal::-webkit-scrollbar {
   width: 0.375rem;

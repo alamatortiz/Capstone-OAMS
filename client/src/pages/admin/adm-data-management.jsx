@@ -286,6 +286,10 @@ export default function AdminDataManagement() {
     setRequirements((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const updateRequirementMandatory = (index, isMandatory) => {
+    setRequirements((prev) => prev.map((r, i) => (i === index ? { ...r, isMandatory } : r)));
+  };
+
   const handleDocSubmit = async () => {
     const { name, description, processingTime, fee } = docForm;
     if (!name || !description || !processingTime || !fee) {
@@ -676,12 +680,14 @@ export default function AdminDataManagement() {
                             <div className="adm-req-item-main">
                               <div className="adm-req-item-top">
                                 <span className="adm-req-item-name">{req.name}</span>
-                                {(req.isMandatory !== false) && (
-                                  <span className="adm-badge adm-badge-mandatory">Required</span>
-                                )}
-                                {req.isMandatory === false && (
-                                  <span className="adm-badge adm-badge-optional">Optional</span>
-                                )}
+                                <label className="adm-checkbox-wrapper adm-checkbox-inline">
+                                  <input
+                                    type="checkbox"
+                                    checked={req.isMandatory !== false}
+                                    onChange={(e) => updateRequirementMandatory(idx, e.target.checked)}
+                                  />
+                                  <span className="adm-checkbox-label">Mandatory</span>
+                                </label>
                               </div>
                               {req.description && <p className="adm-req-item-desc">{req.description}</p>}
                             </div>
