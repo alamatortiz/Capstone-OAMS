@@ -77,7 +77,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
         icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
         iconClassName="dss-title-icon"
         title="Document Details"
-        subtitle="Track your document request status"
+        subtitle="Your document request details and status"
       />
 
       {/* Hero */}
@@ -408,7 +408,7 @@ export default function DocumentStatusPage() {
               icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
               iconClassName="dss-title-icon"
               title="My Document Requests"
-              subtitle="Track and manage all your document requests"
+              subtitle="Track your document requests"
             />
 
             {/* Error */}

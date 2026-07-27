@@ -394,7 +394,11 @@ export default function QueueTrackingPage() {
 
                           {/* Stats */}
                           <div className="qt-queue-stats-grid">
-                            <div className="qt-stat-box">
+                            <div
+                              className={`qt-stat-box${
+                                queue.status === "serving" ? " qt-stat-box--serving" : ""
+                              }`}
+                            >
                               <p className="qt-stat-label">Estimated Wait</p>
                               <p className="qt-stat-value">
                                 {queue.estimatedWait}

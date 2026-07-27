@@ -673,7 +673,13 @@ export default function StudentDashboard() {
                       <p className="stat-num">{mostRecentQueue.totalWaiting}</p>
                       <p className="dash-stat-label">Waiting</p>
                     </div>
-                    <div className="dash-queue-stat">
+                    <div
+                      className={`dash-queue-stat${
+                        mostRecentQueue.status === "serving"
+                          ? " dash-queue-stat--serving"
+                          : ""
+                      }`}
+                    >
                       <p className="stat-num-sm">
                         {mostRecentQueue.estimatedWaitTime}
                       </p>

@@ -682,7 +682,11 @@ export default function QueuePage() {
                                   <p className="qp-stat-label">Total Waiting</p>
                                   <p className="qp-stat-value">{queue.totalWaiting}</p>
                                 </div>
-                                <div className="qp-stat">
+                                <div
+                                  className={`qp-stat${
+                                    queue.status === 'serving' ? ' qp-stat--serving' : ''
+                                  }`}
+                                >
                                   <p className="qp-stat-label">Est. Wait Time</p>
                                   <p className="qp-stat-value-sm">{queue.estimatedWait}</p>
                                 </div>

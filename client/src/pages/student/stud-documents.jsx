@@ -467,7 +467,7 @@ export default function DocumentsPage() {
             icon={<FileTextIcon />}
             iconClassName="doc-title-icon"
             title="Document Requests"
-            subtitle="Request and track your documents"
+            subtitle="Request documents and track their status"
           />
 
           <button

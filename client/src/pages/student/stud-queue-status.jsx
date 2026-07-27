@@ -702,7 +702,11 @@ export default function QueueStatusPage() {
                                   <p className="qsl-stat-label">Total Waiting</p>
                                   <p className="qsl-stat-value">{queue.totalWaiting}</p>
                                 </div>
-                                <div className="qsl-stat">
+                                <div
+                                  className={`qsl-stat${
+                                    queue.status === "serving" ? " qsl-stat--serving" : ""
+                                  }`}
+                                >
                                   <p className="qsl-stat-label">Est. Wait Time</p>
                                   <p className="qsl-stat-value-sm">{queue.estimatedWait}</p>
                                 </div>

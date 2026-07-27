@@ -629,6 +629,10 @@ body {
   transition: color 0.3s ease;
 }
 
+.qp-stat--serving .qp-stat-value-sm {
+  font-size: 1.05rem;
+}
+
 .qp-stat-value-sm {
   font-size: 1rem;
   font-weight: 700;

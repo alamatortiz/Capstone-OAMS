@@ -813,6 +813,10 @@ body {
   transition: color 0.3s ease;
 }
 
+.qsl-stat--serving .qsl-stat-value-sm {
+  font-size: 1.05rem;
+}
+
 .qsl-stat-value-sm {
   font-size: 1rem;
   font-weight: 700;

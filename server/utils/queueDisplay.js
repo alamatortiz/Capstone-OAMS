@@ -14,8 +14,8 @@ function getQueueDisplayInfo({ status, rawPosition, arrivedAt = null, avgService
     return {
       position: null,
       estimatedWait: arrivedAt
-        ? "You are now being served"
-        : "Please proceed to the designated location",
+        ? "None, wait for the process to finish"
+        : "None, proceed to the designated location",
     };
   }
   const position = rawPosition ?? 1;
