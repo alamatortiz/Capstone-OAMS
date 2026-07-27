@@ -185,7 +185,6 @@ CREATE TABLE document_services (
     is_cross_college BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = other departments' students/faculty can also use it
     recipient_type   ENUM('students','faculty','both') NOT NULL DEFAULT 'students',
     status           ENUM('active','inactive') NOT NULL DEFAULT 'active',
-    fee              DECIMAL(10,2) NOT NULL DEFAULT 0,
     processing_time  VARCHAR(100) NULL,
     requires_coding  BOOLEAN      NOT NULL DEFAULT FALSE, -- TRUE = office must assign an official (dean-sanctioned) code before release
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT

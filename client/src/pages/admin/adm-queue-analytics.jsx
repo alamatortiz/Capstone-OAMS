@@ -548,7 +548,7 @@ export default function AdminQueueAnalytics() {
                       <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>No data available for this period.</p>
                     ) : positiveInsights.map((item, idx) => (
                       <div
-                        key={idx}
+                        key={`${item.title}-${item.desc}`}
                         className="aqa-insight-item aqa-insight-green"
                       >
                         <p className="aqa-insight-title">{item.title}</p>
@@ -578,7 +578,7 @@ export default function AdminQueueAnalytics() {
                       <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>No improvement areas detected.</p>
                     ) : improvementAreas.map((item, idx) => (
                       <div
-                        key={idx}
+                        key={`${item.title}-${item.desc}`}
                         className="aqa-insight-item aqa-insight-orange"
                       >
                         <p className="aqa-insight-title">{item.title}</p>
@@ -627,7 +627,7 @@ export default function AdminQueueAnalytics() {
                 <p className="aqa-trend-sub">Performance vs the previous {timePeriod.toLowerCase()}</p>
                 {analyticsData.trends.weeklyComparison.length > 0 ? (
                   analyticsData.trends.weeklyComparison.map((row, idx) => (
-                    <div key={idx} className="aqa-weekly-row">
+                    <div key={row.label} className="aqa-weekly-row">
                       <span className="aqa-weekly-label">{row.label}</span>
                       <div className="aqa-weekly-right">
                         <span
@@ -661,7 +661,7 @@ export default function AdminQueueAnalytics() {
                   <p style={{ color: "var(--text-secondary)", padding: "1rem" }}>No completed queue data for this period.</p>
                 ) : null}
                 {performance.map((item, idx) => (
-                  <div key={idx} className="aqa-perf-card">
+                  <div key={`${item.service}-${item.college}`} className="aqa-perf-card">
                     <div className="aqa-perf-card-header">
                       <span className="aqa-perf-service">{item.service}</span>
                       <span className="aqa-perf-college">{item.college}</span>

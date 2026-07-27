@@ -59,7 +59,7 @@ const formatDateShort = (dateStr) => {
 };
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Documents" }) {
+function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Documents", requirements, reqLoading }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const statusMeta = getStatusMeta(doc.status);
   const canCancel = doc.status === "pending" || doc.status === "processing";
@@ -191,6 +191,59 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
             </div>
           </div>
 
+          {/* Requirements card */}
+          <div className="dss-card">
+            <div className="dss-card-header">
+              <h3 className="dss-card-title">
+                <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem" }} />
+                Requirements
+              </h3>
+            </div>
+            <div className="dss-card-content">
+              <p
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--text-tertiary)",
+                  marginTop: 0,
+                  marginBottom: "0.75rem",
+                }}
+              >
+                Documents and items you need to bring
+              </p>
+              {reqLoading ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-tertiary)", fontSize: "0.875rem" }}>
+                  <Loader2 style={{ width: "1.125rem", height: "1.125rem", animation: "spin 1s linear infinite" }} />
+                  Loading requirements…
+                </div>
+              ) : requirements.length > 0 ? (
+                <ul className="dss-requirements-list">
+                  {requirements.map((req, i) => (
+                    <li key={req.name} className="dss-requirement-item">
+                      <CheckCircle2 className="dss-requirement-icon" />
+                      <div>
+                        <div className="dss-requirement-name-row">
+                          <span>{req.name}</span>
+                          <span className={`dss-requirement-badge ${req.isMandatory ? "is-mandatory" : "is-optional"}`}>
+                            {req.isMandatory ? "Required" : "Optional"}
+                          </span>
+                        </div>
+                        {req.description && (
+                          <p style={{ fontSize: "0.75rem", opacity: 0.65, marginTop: "2px" }}>
+                            {req.description}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ fontSize: "0.9rem", color: "var(--text-tertiary)", margin: 0 }}>
+                  No specific requirements have been defined for this service yet. Contact the office for details.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Notes card */}
           {doc.notes && (
             <div className="dss-card">
@@ -282,10 +335,24 @@ export default function DocumentStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [servicesByDepartmentId, setServicesByDepartmentId] = useState({});
+  const [reqLoading, setReqLoading] = useState(true);
 
   const selectedDoc = selectedDocId
     ? (documents.find((d) => d.id === selectedDocId) ?? null)
     : null;
+
+  // Requirements for the selected document's type, looked up by name against
+  // the same service-types catalog stud-documents.jsx uses (no stable service
+  // id is exposed on either payload, so name is the shared key).
+  const getDocRequirements = useCallback(
+    (typeName) => {
+      const allTypes = Object.values(servicesByDepartmentId).flat();
+      return allTypes.find((t) => t.name === typeName)?.requirements ?? [];
+    },
+    [servicesByDepartmentId],
+  );
+  const selectedDocRequirements = selectedDoc ? getDocRequirements(selectedDoc.type) : [];
 
   useEffect(() => {
     if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
@@ -308,6 +375,21 @@ export default function DocumentStatusPage() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      setReqLoading(true);
+      try {
+        const res = await api.get("/student/documents/service-types");
+        setServicesByDepartmentId(res.data.servicesByDepartmentId ?? {});
+      } catch (err) {
+        console.error("Failed to fetch document service types:", err);
+      } finally {
+        setReqLoading(false);
+      }
+    };
+    fetchServiceTypes();
+  }, []);
 
   // ── Live updates: refetch when a document's status changes ────────────────
   useEffect(() => {
@@ -391,6 +473,8 @@ export default function DocumentStatusPage() {
             }
             onCancel={handleCancel}
             cancelling={cancelling}
+            requirements={selectedDocRequirements}
+            reqLoading={reqLoading}
           />
         ) : (
           <div className="dss-status-container">

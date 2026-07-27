@@ -642,7 +642,7 @@ export default function AdminScanDocument() {
                 </div>
                 <div className="asd-recent-list">
                   {recentScans.map((scan, i) => (
-                    <div key={i} className="asd-recent-item">
+                    <div key={scan.tracking} className="asd-recent-item">
                       <div className="asd-recent-info">
                         <div className="asd-recent-top">
                           <span className="asd-recent-name">{scan.name}</span>

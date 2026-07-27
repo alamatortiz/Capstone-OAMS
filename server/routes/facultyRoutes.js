@@ -1036,7 +1036,7 @@ router.get(
         [facultyId]
       );
       const [rows] = await pool.query(
-        "SELECT * FROM document_services WHERE (department_id = ? OR is_cross_college = TRUE) AND recipient_type IN ('faculty', 'both') AND status = 'active' ORDER BY service_name",
+        "SELECT service_id, service_name, description, department_id, is_cross_college, recipient_type, status, processing_time, requires_coding FROM document_services WHERE (department_id = ? OR is_cross_college = TRUE) AND recipient_type IN ('faculty', 'both') AND status = 'active' ORDER BY service_name",
         [fac.department_id]
       );
 

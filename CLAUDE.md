@@ -7,7 +7,7 @@
 | Layer | Technology |
 |---|---|
 | Web Frontend | React.js + Vite |
-| Mobile App | React Native + Expo (not started yet) |
+| Mobile App | React Native + Expo (actively developed, near feature parity with web) |
 | Backend | Node.js + Express.js |
 | Database | MySQL 8.0 (via Docker) |
 | Auth | JWT or session-based + external university identity microservice |
@@ -19,7 +19,7 @@
 ```
 CAPSTONE-OAMS/
 ├── client/           # React + Vite web frontend
-├── client-mobile/    # React Native + Expo — NOT started yet, ignore unless asked
+├── client-mobile/    # React Native + Expo — actively developed, consumes the same server/ API as client/
 ├── server/           # Node.js + Express backend
 ├── docker-compose.yml
 └── package.json
@@ -43,7 +43,7 @@ Always look for ways to reduce redundancy. If two files do the same thing, flag 
 `AuthContext.tsx`, `ProtectedRoute.tsx`, `authMiddleware.js` are critical. Any change near these files must be explicitly reasoned and discussed before implementing.
 
 ## Rule 5: Scope awareness
-- `client-mobile/` is out of scope until web parity is reached — do not generate mobile code unless explicitly asked
+- `client-mobile/` is a real, actively developed React Native/Expo app (student/professor/admin screens for queueing, documents, appointments, announcements, QR scanning) with near feature parity to the web client, consuming the same `server/` API and MySQL database — do not assume it's a stub or unstarted
 - AI/chatbot layer does not exist yet — do not fabricate integration code for it
 - Mock data is CCS-scoped (`ccs_mock_data.sql`) — do not assume all 6 colleges are wired up
 

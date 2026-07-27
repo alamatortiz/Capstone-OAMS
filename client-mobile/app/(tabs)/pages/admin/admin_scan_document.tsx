@@ -455,7 +455,7 @@ export default function AdminScanDocumentScreen() {
               {recentScans.map((scan, i) => {
                 const tint = STATUS_TINTS[scan.status === 'valid' ? 'VALID' : 'EXPIRED'];
                 return (
-                  <View key={`${scan.trackingNumber}-${i}`} style={styles.recentItem}>
+                  <View key={scan.trackingNumber} style={styles.recentItem}>
                     <View style={styles.recentTopRow}>
                       <Text style={styles.recentName} numberOfLines={1}>{scan.studentName}</Text>
                       <View style={[styles.statusBadge, { backgroundColor: tint.bg, borderColor: tint.border }]}>

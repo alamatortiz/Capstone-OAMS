@@ -661,6 +661,77 @@
   padding: 1.25rem;
 }
 
+/* ─── Requirements card content ───────────────────────────────────────────── */
+.dss-requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.dss-requirement-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  text-align: left;
+}
+
+.dss-requirement-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #f97316;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  stroke: currentColor;
+}
+
+.dss-requirement-item span {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.dss-requirement-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dss-requirement-name-row .dss-requirement-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.dss-requirement-name-row .dss-requirement-badge.is-mandatory {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.4);
+}
+
+.dss-requirement-name-row .dss-requirement-badge.is-optional {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+[data-theme="light"] .dss-requirement-name-row .dss-requirement-badge.is-mandatory {
+  background: rgba(234, 88, 12, 0.1);
+  color: #9a3412;
+  border-color: rgba(234, 88, 12, 0.3);
+}
+
 /* ─── Cancel card (self-contained copy of queue-status's cancel card) ────── */
 .dss-cancel-card {
   border: 1px solid rgba(239, 68, 68, 0.2);

@@ -84,7 +84,6 @@ const emptyDocForm = () => ({
   name: "",
   description: "",
   processingTime: "",
-  fee: "",
   status: "active",
   isCrossCollege: false,
   recipientType: "students",
@@ -247,7 +246,6 @@ export default function AdminDataManagement() {
       name: doc.name,
       description: doc.description,
       processingTime: doc.processingTime,
-      fee: String(doc.fee),
       status: doc.status,
       isCrossCollege: !!doc.isCrossCollege,
       recipientType: doc.recipientType || "students",
@@ -291,8 +289,8 @@ export default function AdminDataManagement() {
   };
 
   const handleDocSubmit = async () => {
-    const { name, description, processingTime, fee } = docForm;
-    if (!name || !description || !processingTime || !fee) {
+    const { name, description, processingTime } = docForm;
+    if (!name || !description || !processingTime) {
       toast.error("Please fill in all required fields.");
       return;
     }
@@ -302,7 +300,6 @@ export default function AdminDataManagement() {
         name,
         description,
         processingTime,
-        fee: parseFloat(fee),
         status: docForm.status,
         isCrossCollege: docForm.isCrossCollege,
         recipientType: docForm.recipientType,
@@ -533,7 +530,6 @@ export default function AdminDataManagement() {
       const parts = [];
       if (o.name !== n.name) parts.push(`name: "${o.name}" → "${n.name}"`);
       if (o.status !== n.status) parts.push(`status: ${o.status} → ${n.status}`);
-      if (o.fee !== n.fee) parts.push(`fee: ${o.fee} → ${n.fee}`);
       return parts.length ? parts.join(", ") : "Updated record";
     }
     if (log.action === "DELETE" && log.oldValues) {
@@ -590,28 +586,14 @@ export default function AdminDataManagement() {
                       onChange={(e) => setDocForm((p) => ({ ...p, description: e.target.value }))}
                     />
                   </div>
-                  <div className="adm-form-grid-2">
-                    <div className="adm-form-group">
-                      <label className="adm-form-label">Processing Time *</label>
-                      <input
-                        className="adm-form-input"
-                        placeholder="e.g., 3-5 business days"
-                        value={docForm.processingTime}
-                        onChange={(e) => setDocForm((p) => ({ ...p, processingTime: e.target.value }))}
-                      />
-                    </div>
-                    <div className="adm-form-group">
-                      <label className="adm-form-label">Fee (PHP) *</label>
-                      <input
-                        className="adm-form-input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="e.g., 100"
-                        value={docForm.fee}
-                        onChange={(e) => setDocForm((p) => ({ ...p, fee: e.target.value }))}
-                      />
-                    </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">Processing Time *</label>
+                    <input
+                      className="adm-form-input"
+                      placeholder="e.g., 3-5 business days"
+                      value={docForm.processingTime}
+                      onChange={(e) => setDocForm((p) => ({ ...p, processingTime: e.target.value }))}
+                    />
                   </div>
                   <div className="adm-form-group">
                     <label className="adm-form-label">Status *</label>
@@ -1003,7 +985,7 @@ export default function AdminDataManagement() {
                 <div className="adm-card-header">
                   <div>
                     <h2 className="adm-card-title">Document Type Management</h2>
-                    <p className="adm-card-desc">Configure available document types, fees, and requirements for {user?.departmentAbbrev}</p>
+                    <p className="adm-card-desc">Configure available document types and requirements for {user?.departmentAbbrev}</p>
                   </div>
                   <button className="adm-btn-primary" onClick={openAddDocModal}>
                     <PlusIcon />
@@ -1045,7 +1027,6 @@ export default function AdminDataManagement() {
                         <p className="adm-item-desc">{doc.description}</p>
                         <div className="adm-item-meta">
                           <span>Processing: {doc.processingTime || "—"}</span>
-                          <span>Fee: ₱{doc.fee.toFixed(2)}</span>
                           <span>{doc.requirementCount} requirement{doc.requirementCount !== 1 ? "s" : ""}</span>
                         </div>
                       </div>

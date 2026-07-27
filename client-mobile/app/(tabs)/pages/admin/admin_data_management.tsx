@@ -82,7 +82,6 @@ interface DocumentType {
   name: string;
   description: string;
   processingTime: string;
-  fee: number;
   status: DocStatus;
   isCrossCollege: boolean;
   recipientType: RecipientType;
@@ -183,7 +182,6 @@ const BLANK_DOC_FORM = {
   name: '',
   description: '',
   processingTime: '',
-  fee: '',
   status: 'active' as DocStatus,
   isCrossCollege: false,
   recipientType: 'students' as RecipientType,
@@ -229,7 +227,6 @@ function formatChangeSummary(log: AuditLog) {
     const parts: string[] = [];
     if (o.name !== n.name) parts.push(`name: "${o.name}" -> "${n.name}"`);
     if (o.status !== n.status) parts.push(`status: ${o.status} -> ${n.status}`);
-    if (o.fee !== n.fee) parts.push(`fee: ${o.fee} -> ${n.fee}`);
     return parts.length ? parts.join(', ') : 'Updated record';
   }
   if (log.action === 'DELETE' && log.oldValues) {
@@ -411,7 +408,6 @@ export default function AdminDataManagementScreen() {
       name: doc.name,
       description: doc.description,
       processingTime: doc.processingTime,
-      fee: String(doc.fee),
       status: doc.status,
       isCrossCollege: doc.isCrossCollege,
       recipientType: doc.recipientType,
@@ -449,8 +445,8 @@ export default function AdminDataManagementScreen() {
   const removeDocRequirement = (idx: number) => setDocRequirements((prev) => prev.filter((_, i) => i !== idx));
 
   const handleSaveDocument = async () => {
-    const { name, description, processingTime, fee } = docForm;
-    if (!name || !description || !processingTime || !fee) {
+    const { name, description, processingTime } = docForm;
+    if (!name || !description || !processingTime) {
       Alert.alert('Missing information', 'Please fill in all required fields.');
       return;
     }
@@ -460,7 +456,6 @@ export default function AdminDataManagementScreen() {
         name,
         description,
         processingTime,
-        fee: parseFloat(fee),
         status: docForm.status,
         isCrossCollege: docForm.isCrossCollege,
         recipientType: docForm.recipientType,
@@ -757,7 +752,7 @@ export default function AdminDataManagementScreen() {
               <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardTitleText}>Document Type Management</Text>
                 <Text style={styles.cardSubtitleText}>
-                  Configure available document types, fees, and requirements for {adminDepartmentAbbrev}
+                  Configure available document types and requirements for {adminDepartmentAbbrev}
                 </Text>
               </View>
               <Pressable onPress={openAddDocModal}>
@@ -837,7 +832,6 @@ export default function AdminDataManagementScreen() {
                           <Text style={styles.itemDesc}>{doc.description}</Text>
                           <View style={styles.itemMetaRow}>
                             <Text style={styles.itemMetaText}>Processing: {doc.processingTime}</Text>
-                            <Text style={styles.itemMetaText}>Fee: ₱{doc.fee.toFixed(2)}</Text>
                             <Text style={styles.itemMetaText}>
                               {doc.requirementCount} requirement{doc.requirementCount !== 1 ? 's' : ''}
                             </Text>
@@ -1077,17 +1071,6 @@ export default function AdminDataManagementScreen() {
                   placeholderTextColor={theme.tertiary}
                   value={docForm.processingTime}
                   onChangeText={(v) => setDocForm((p) => ({ ...p, processingTime: v }))}
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Fee (PHP) *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="e.g., 100"
-                  placeholderTextColor={theme.tertiary}
-                  keyboardType="numeric"
-                  value={docForm.fee}
-                  onChangeText={(v) => setDocForm((p) => ({ ...p, fee: v }))}
                 />
               </View>
               <View style={styles.formGroup}>

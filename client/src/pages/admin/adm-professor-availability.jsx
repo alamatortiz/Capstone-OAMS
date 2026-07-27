@@ -222,7 +222,7 @@ export default function AdminProfessorAvailability() {
                     <p className="apa-schedule-label">Today's Schedule</p>
                     <div className="apa-schedule-grid">
                       {f.todaySchedule.map((slot, idx) => (
-                        <div key={idx} className={getSlotClass(slot.status)}>
+                        <div key={`${slot.time}-${slot.activity}`} className={getSlotClass(slot.status)}>
                           <div className="apa-slot-time-row">
                             <ClockIcon className="apa-slot-icon" />
                             <span className="apa-slot-time">{slot.time}</span>

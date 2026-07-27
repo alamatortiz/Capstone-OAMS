@@ -1930,7 +1930,7 @@ router.get(
       const { status } = req.query;
       let sql = `
         SELECT ds.service_id AS id, ds.service_name AS name, ds.description,
-               ds.status, ds.fee, ds.processing_time, ds.department_id, ds.is_cross_college,
+               ds.status, ds.processing_time, ds.department_id, ds.is_cross_college,
                ds.recipient_type, ds.requires_coding,
                d.department_abbreviation AS dept_abbrev,
                (SELECT COUNT(*) FROM document_requirements dr WHERE dr.service_id = ds.service_id) AS req_count
@@ -1951,7 +1951,6 @@ router.get(
         name: r.name,
         description: r.description,
         status: r.status,
-        fee: parseFloat(r.fee) || 0,
         processingTime: r.processing_time || "",
         deptAbbrev: r.dept_abbrev,
         requirementCount: r.req_count,
@@ -2001,15 +2000,15 @@ router.get(
 );
 
 // POST /api/admin/data-management/document-types
-// Body: { name, description, processingTime, fee, status, isCrossCollege, recipientType, requirements[] }
+// Body: { name, description, processingTime, status, isCrossCollege, recipientType, requirements[] }
 router.post(
   "/data-management/document-types",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requiresCoding, requirements = [] } = req.body;
-    if (!name || !description || !processingTime || fee === undefined) {
-      return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
+    const { name, description, processingTime, status, isCrossCollege, recipientType, requiresCoding, requirements = [] } = req.body;
+    if (!name || !description || !processingTime) {
+      return res.status(400).json({ error: "name, description, and processingTime are required" });
     }
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
@@ -2018,9 +2017,9 @@ router.post(
       const effectiveRecipient = recipientType || "students";
 
       const [result] = await pool.query(
-        `INSERT INTO document_services (service_name, description, department_id, is_cross_college, status, fee, processing_time, recipient_type, requires_coding)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, deptId, !!isCrossCollege, status || "active", parseFloat(fee), processingTime, effectiveRecipient, !!requiresCoding],
+        `INSERT INTO document_services (service_name, description, department_id, is_cross_college, status, processing_time, recipient_type, requires_coding)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description, deptId, !!isCrossCollege, status || "active", processingTime, effectiveRecipient, !!requiresCoding],
       );
       const newId = result.insertId;
 
@@ -2032,7 +2031,7 @@ router.post(
         );
       }
 
-      await logAudit(req.user.userId, "CREATE", "document_services", newId, null, { name, status: status || "active", fee, processingTime });
+      await logAudit(req.user.userId, "CREATE", "document_services", newId, null, { name, status: status || "active", processingTime });
       res.status(201).json({ message: "Document type created", id: newId });
     } catch (error) {
       console.error("Document type create error:", error);
@@ -2042,23 +2041,23 @@ router.post(
 );
 
 // PUT /api/admin/data-management/document-types/:id
-// Body: { name, description, processingTime, fee, status, scope, recipientType, requirements[] }
+// Body: { name, description, processingTime, status, scope, recipientType, requirements[] }
 router.put(
   "/data-management/document-types/:id",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, processingTime, fee, status, isCrossCollege, recipientType, requiresCoding, requirements = [] } = req.body;
-    if (!name || !description || !processingTime || fee === undefined) {
-      return res.status(400).json({ error: "name, description, processingTime, and fee are required" });
+    const { name, description, processingTime, status, isCrossCollege, recipientType, requiresCoding, requirements = [] } = req.body;
+    if (!name || !description || !processingTime) {
+      return res.status(400).json({ error: "name, description, and processingTime are required" });
     }
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[old]] = await pool.query(
-        `SELECT service_name, status, fee, processing_time FROM document_services
+        `SELECT service_name, status, processing_time FROM document_services
          WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
@@ -2067,9 +2066,9 @@ router.put(
       const effectiveRecipient = recipientType || "students";
 
       await pool.query(
-        `UPDATE document_services SET service_name = ?, description = ?, status = ?, fee = ?, processing_time = ?,
+        `UPDATE document_services SET service_name = ?, description = ?, status = ?, processing_time = ?,
          is_cross_college = ?, recipient_type = ?, requires_coding = ? WHERE service_id = ?`,
-        [name, description, status || "active", parseFloat(fee), processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
+        [name, description, status || "active", processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
       );
 
       // Replace requirements: delete all then re-insert
@@ -2083,8 +2082,8 @@ router.put(
       }
 
       await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
-        { name: old.service_name, status: old.status, fee: old.fee, processingTime: old.processing_time },
-        { name, status, fee, processingTime },
+        { name: old.service_name, status: old.status, processingTime: old.processing_time },
+        { name, status, processingTime },
       );
       res.json({ message: "Document type updated" });
     } catch (error) {

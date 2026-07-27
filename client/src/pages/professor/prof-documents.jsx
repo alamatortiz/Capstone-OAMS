@@ -519,7 +519,7 @@ export default function ProfessorDocumentRequest() {
                           <strong>Requirements:</strong>
                           <ul className="doc-requirements-list">
                             {selectedType.requirements.map((req, i) => (
-                              <li key={i}>
+                              <li key={req.name}>
                                 <div className="doc-req-row">
                                   <span className="doc-req-name">{req.name}</span>
                                   <span

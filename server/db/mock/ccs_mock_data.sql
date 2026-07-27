@@ -458,313 +458,48 @@ INSERT INTO service_procedure_steps (service_id, step_number, step_title, descri
 (6, 5, 'Submit completed clearance',        'Submit the fully signed clearance form to the registrar to finalize the process');
 
 -- ─────────────────────────────────────────────────────────────
--- SECTION 5b · APPOINTMENT SERVICES (created by faculty)
--- Each row is a service type a faculty member offers for appointments.
--- Commented out for a clean local test baseline — uncomment to seed.
--- ─────────────────────────────────────────────────────────────
-/*
-INSERT INTO appointment_services (service_id, service_name, description, faculty_id) VALUES
-(1, 'Web Development Consultation',  'Frontend/backend web development guidance',    102),
-(2, 'Mobile App Consultation',       'Mobile application development advice',        102),
-(3, 'Database Design Review',        'Database schema and query optimization',       106),
-(4, 'Backend Architecture Review',   'Server-side architecture guidance',            107),
-(5, 'Software Engineering Consult',  'SDLC and software design principles',          110),
-(6, 'Network Security Consultation', 'Cybersecurity and network security guidance',  111);
-*/
-
--- ─────────────────────────────────────────────────────────────
 -- SECTION 5c · DOCUMENT SERVICES
 -- ─────────────────────────────────────────────────────────────
 -- recipient_type: 'students' | 'faculty' | 'both'
 -- Hosted by one department, is_cross_college marks which ones every other department can also request.
-INSERT INTO document_services (service_id, service_name, description, department_id, is_cross_college, recipient_type, status, fee, processing_time) VALUES
-(1, 'Good Moral Certificate',       'Request for Good Moral Certificate',              1001, FALSE, 'students', 'active',  75.00, '2-3 business days'),
-(2, 'Transcript of Records',        'Request for official Transcript of Records',      1001, FALSE, 'students', 'active', 150.00, '5-7 business days'),
-(3, 'Certificate of Enrollment',    'Request for Certificate of Enrollment',           2001, FALSE, 'students', 'active',  50.00, '1-2 business days'),
-(4, 'Clearance Processing',         'Process student clearance for graduation/leave',  3001, FALSE, 'students', 'active',   0.00, '3-5 business days'),
-(5, 'Certificate of Employment',    'Official certificate of employment for faculty',  1001, TRUE,  'faculty',  'active',   0.00, '2-3 business days');
+INSERT INTO document_services (service_id, service_name, description, department_id, is_cross_college, recipient_type, status, processing_time) VALUES
+(1, 'Good Moral Certificate',       'Request for Good Moral Certificate',              1001, FALSE, 'students', 'active', '2-3 business days'),
+(2, 'Transcript of Records',        'Request for official Transcript of Records',      1001, FALSE, 'students', 'active', '5-7 business days'),
+(3, 'Certificate of Enrollment',    'Request for Certificate of Enrollment',           2001, FALSE, 'students', 'active', '1-2 business days'),
+(4, 'Clearance Processing',         'Process student clearance for graduation/leave',  3001, FALSE, 'students', 'active', '3-5 business days'),
+(5, 'Certificate of Employment',    'Official certificate of employment for faculty',  1001, TRUE,  'faculty',  'active', '2-3 business days');
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 5c-REQ · DOCUMENT REQUIREMENTS
 -- Documents/items required for document (non-queue) service requests.
--- Only service_id 5 is queried today (GET /api/faculty/document-services).
+-- Queried by GET /api/student/documents/service-types and
+-- GET /api/faculty/document-services for their respective service_ids.
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES
+-- Good Moral Certificate (service_id 1, students)
+(1, 'Valid Student ID',           'Current school year student ID',                                    TRUE),
+(1, 'Student Affairs Clearance',  'Clearance slip confirming no pending accountabilities',             TRUE),
+-- Transcript of Records (service_id 2, students)
+(2, 'Completed TOR Request Form', 'Request form filled out in full',                                   TRUE),
+(2, 'Registrar Clearance',        'Clearance confirming no outstanding academic holds',                TRUE),
+(2, 'Official Receipt',           'Payment receipt from the cashier for the TOR processing fee',       TRUE),
+-- Certificate of Enrollment (service_id 3, students)
+(3, 'Valid Student ID',           'Current school year student ID',                                    TRUE),
+(3, 'Current Registration Form',  'Certificate of Registration for the current semester',              TRUE),
+-- Clearance Processing (service_id 4, students)
+(4, 'Library Clearance',          'Sign-off from the library confirming no unreturned items or fines', TRUE),
+(4, 'Accounting Clearance',       'Sign-off from accounting confirming no outstanding balances',       TRUE),
+(4, 'Department Clearance',       'Sign-off from the student''s home department',                      TRUE),
 -- Certificate of Employment (service_id 5, faculty-only)
-(5, 'Completed COE Request Form', 'Certificate of Employment request form filled out in full', TRUE),
-(5, 'Valid Employee ID',          'Current school year faculty/employee ID',                    TRUE);
+(5, 'Completed COE Request Form', 'Certificate of Employment request form filled out in full',         TRUE),
+(5, 'Valid Employee ID',          'Current school year faculty/employee ID',                            TRUE);
 
 
 -- ─────────────────────────────────────────────────────────────
--- SECTION 6 · QUEUE SLOTS (open slots for today)
--- current_count reflects the number of active (waiting) entries
--- in Section 7 for each slot:
---   Slot 1: queue_numbers 1–11 = 11 waiting entries → current_count 11
---   Slot 2: queue_number 5    =  1 waiting entry    → current_count  1
---   Slot 3: queue_number 3 (completed, not active)  → current_count  0
---   Slot 4: queue_number 11 (completed, not active) → current_count  0
---   Slot 5: no-show sweeper demo, 5-minute custom timeout (see Section 7)
--- Sections 6, 7, 14, 14D, and 8 below are commented out together for a
--- clean local test baseline — uncomment to seed queues/appointments.
--- ─────────────────────────────────────────────────────────────
-/*
-INSERT INTO queue_slots (slot_id, service_id, admin_id, slot_date, start_time, end_time, max_capacity, current_count, no_show_timeout_minutes, service_time_minutes, status) VALUES
-(1, 1, 103, CURDATE(), '08:00:00', '12:00:00', 30, 11, 15, 20, 'open'),
-(2, 2, 103, CURDATE(), '08:00:00', '17:00:00', 20,  1, 15, 15, 'open'),
-(3, 3, 103, CURDATE(), '13:00:00', '17:00:00', 15,  0, 15, 10, 'open'),
-(4, 4, 103, CURDATE(), '08:00:00', '12:00:00', 20,  0, 15, 15, 'open'),
-(5, 1, 103, CURDATE(), '13:00:00', '17:00:00', 10,  0,  5, 20, 'open');
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 7 · QUEUES
--- Student 101 (Alvin Matthew Ortiz)  : queue_number 8  in slot 1 (waiting)
---                                      + 2 completed entries in slots 3 & 4
--- Student 104 (Luiz Gabriel Rosales) : queue_number 11 in slot 1 (waiting)
---                                      + queue_number 5 in slot 2 (waiting)
--- Students 105, 108, 109 fill positions 1–7 and 9–10 in slot 1
--- Slot 5 demonstrates the automatic no-show voiding sweeper
--- (server/jobs/queueNoShowSweeper.js) against its 5-minute custom timeout:
---   Student 108 was called 10 min ago (past the 5-min timeout) -> auto-voided
---                                       to 'no_show' within 30s of server start
---   Student 109 was called 2 min ago (still within timeout)    -> stays 'serving'
--- ─────────────────────────────────────────────────────────────
-
--- Student 101: 1 active + 2 historical completed
-INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at, called_at, completed_at) VALUES
-(1, 101, 1, 1,  8,  'waiting',   NOW() - INTERVAL 20 MINUTE, NULL, NULL),
-(2, 101, 3, 3,  3,  'completed', NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY + INTERVAL 30 MINUTE, NOW() - INTERVAL 3 DAY + INTERVAL 45 MINUTE),
-(3, 101, 4, 4, 11,  'completed', NOW() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY + INTERVAL 20 MINUTE, NOW() - INTERVAL 7 DAY + INTERVAL 40 MINUTE);
-
--- Student 104: 2 active
-INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
-(4, 104, 1, 1, 11, 'waiting', NOW() - INTERVAL  5 MINUTE),
-(5, 104, 2, 2,  5, 'waiting', NOW() - INTERVAL 10 MINUTE);
-
--- Filler entries for slot 1 positions 1–7 and 9–10 (queue position math correctness)
-INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at) VALUES
-(10, 105, 1, 1,  1, 'waiting', NOW() - INTERVAL 60 MINUTE),
-(11, 108, 1, 1,  2, 'waiting', NOW() - INTERVAL 55 MINUTE),
-(12, 109, 1, 1,  3, 'waiting', NOW() - INTERVAL 50 MINUTE),
-(13, 105, 1, 1,  4, 'waiting', NOW() - INTERVAL 45 MINUTE),
-(14, 108, 1, 1,  5, 'waiting', NOW() - INTERVAL 40 MINUTE),
-(15, 109, 1, 1,  6, 'waiting', NOW() - INTERVAL 35 MINUTE),
-(16, 105, 1, 1,  7, 'waiting', NOW() - INTERVAL 30 MINUTE),
--- position 8 = student 101 (queue_id 1 above)
-(17, 108, 1, 1,  9, 'waiting', NOW() - INTERVAL 15 MINUTE),
-(18, 109, 1, 1, 10, 'waiting', NOW() - INTERVAL 12 MINUTE);
--- position 11 = student 104 (queue_id 4 above)
-
--- Slot 5: no-show sweeper demo (queue_ids 6–9 intentionally skipped, reserved for future test cases)
-INSERT INTO queues (queue_id, student_id, service_id, slot_id, queue_number, status, created_at, called_at) VALUES
-(19, 108, 1, 5, 1, 'serving', NOW() - INTERVAL 12 MINUTE, NOW() - INTERVAL 10 MINUTE),
-(20, 109, 1, 5, 2, 'serving', NOW() - INTERVAL  3 MINUTE, NOW() - INTERVAL  2 MINUTE);
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 14 · FACULTY AVAILABILITY (recurring weekly consultation hours)
--- Moved before SECTION 8 so appointments.availability_id (FK to this
--- table) can reference these rows without disabling FK checks.
--- Insertion order determines auto-increment IDs (used in Section 14D and 8):
---   102 Ogalesco   : IDs 1–4
---   106 Bicua      : IDs 5–8
---   107 Tan        : IDs 9–12
---   110 Villanueva : IDs 13–15
---   111 Dela Cruz  : IDs 16–17
--- ─────────────────────────────────────────────────────────────
-INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES
--- 102 Patrick Ogalesco: max 5 students
-(102, 'Monday',    '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
-(102, 'Monday',    '14:00:00', '17:00:00', 'CCS Faculty Room 201', 5),
-(102, 'Wednesday', '09:00:00', '12:00:00', 'CCS Faculty Room 201', 5),
-(102, 'Friday',    '13:00:00', '16:00:00', 'CCS Faculty Room 201', 5),
--- 106 Marvin Bicua: indefinite capacity
-(106, 'Tuesday',   '10:00:00', '12:00:00', 'CCS Faculty Room 203', NULL),
-(106, 'Tuesday',   '14:00:00', '17:00:00', 'CCS Faculty Room 203', NULL),
-(106, 'Thursday',  '09:00:00', '11:00:00', 'CCS Faculty Room 203', NULL),
-(106, 'Thursday',  '13:00:00', '16:00:00', 'CCS Faculty Room 203', NULL),
--- 107 Janus Raymond Tan: max 3 students
-(107, 'Monday',    '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
-(107, 'Wednesday', '10:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
-(107, 'Wednesday', '14:00:00', '16:00:00', 'CCS Dean\'s Office', 3),
-(107, 'Friday',    '09:00:00', '12:00:00', 'CCS Dean\'s Office', 3),
--- 110 Lena Villanueva: max 5 students
-(110, 'Monday',    '13:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
-(110, 'Wednesday', '10:00:00', '12:00:00', 'CCS Faculty Room 105', 5),
-(110, 'Friday',    '14:00:00', '17:00:00', 'CCS Faculty Room 105', 5),
--- 111 Marco Dela Cruz: indefinite capacity
-(111, 'Tuesday',   '08:00:00', '12:00:00', 'CCS Faculty Room 401', NULL),
-(111, 'Thursday',  '13:00:00', '17:00:00', 'CCS Faculty Room 401', NULL);
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 14D · WEEKLY AVAILABILITY SERVICES
--- Links appointment_services types to recurring weekly slots.
--- IDs reference Section 14 insertion order above.
--- ─────────────────────────────────────────────────────────────
-INSERT INTO faculty_availability_services (availability_id, service_id) VALUES
--- Prof 102 (Ogalesco): Web Dev (1) + Mobile App (2) on all slots
-(1,1), (1,2), (2,1), (2,2), (3,1), (3,2), (4,1), (4,2),
--- Prof 106 (Bicua): DB Design (3) on all slots
-(5,3), (6,3), (7,3), (8,3),
--- Prof 107 (Tan): Backend Architecture (4) on all slots
-(9,4), (10,4), (11,4), (12,4),
--- Prof 110 (Villanueva): Software Engineering (5) on all slots
-(13,5), (14,5), (15,5),
--- Prof 111 (Dela Cruz): Network Security (6) on all slots
-(16,6), (17,6);
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 8 · APPOINTMENTS
--- appointment_time stores the availability window's start_time.
--- availability_id references Section 14 (faculty_availability) recurring
--- template IDs — one template now maps to many possible calendar dates, so
--- appointment_date is computed as the next real-world occurrence of that
--- template's day_of_week (via CURDATE() + days-until-next-weekday), keeping
--- this file weekday-consistent no matter what day it's actually seeded on.
--- Past completed appointments use availability_id NULL (pre-system booking).
--- service_id: FK to appointment_services (must match the faculty's linked types).
--- ─────────────────────────────────────────────────────────────
-INSERT INTO appointments (appointment_id, student_id, faculty_id, department_id, service_id, availability_id, appointment_date, appointment_time, status, notes, created_at) VALUES
-
--- ── Student 101 · Alvin Matthew Ortiz (2300544) ──────────────────────────────
--- Upcoming approved: Prof Ogalesco · Wednesday AM template (ID 3 · 09:00–12:00)
-(1, 101, 102, 1001, 1,  3,    CURDATE() + INTERVAL ((2 - WEEKDAY(CURDATE()) + 7) % 7) DAY,       '09:00:00', 'approved',  'Thesis consultation on web development',     NOW() - INTERVAL 1 DAY),
--- Upcoming pending: Prof Tan · Wednesday AM template, next week (ID 10 · 10:00–12:00)
-(2, 101, 107, 1001, 4,  10,   CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '10:00:00', 'pending',   'Backend architecture for capstone project',  NOW() - INTERVAL 2 HOUR),
--- Past completed: pre-system booking (no availability slot)
-(3, 101, 107, 1001, 4,  NULL, CURDATE() - INTERVAL 5 DAY,                                        '09:00:00', 'completed', 'Project review',                             NOW() - INTERVAL 6 DAY),
-
--- ── Student 104 · Luiz Gabriel Rosales (2302494) ─────────────────────────────
--- Upcoming pending: Prof Ogalesco · Wednesday AM template, next week (ID 3 · 09:00–12:00)
-(4, 104, 102, 1001, 2,  3,    CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '09:00:00', 'pending',   'Mobile app academic advising',               NOW() - INTERVAL 3 HOUR),
--- Upcoming pending: Prof Dela Cruz · Tuesday AM template (ID 16 · 08:00–12:00)
-(5, 104, 111, 1001, 6,  16,   CURDATE() + INTERVAL ((1 - WEEKDAY(CURDATE()) + 7) % 7) DAY,       '08:00:00', 'pending',   'Network security thesis consultation',        NOW() - INTERVAL 1 HOUR),
--- Past completed: pre-system booking (no availability slot)
-(6, 104, 106, 1001, 3,  NULL, CURDATE() - INTERVAL 3 DAY,                                        '13:00:00', 'completed', 'Database lab consultation',                   NOW() - INTERVAL 4 DAY),
-
--- ── Filler · other students in the upcoming Monday templates (realistic occupancy) ──
--- Template 1  (102 · Monday AM · max 5): 2 of 5 spots taken
-(7,  105, 102, 1001, 1,  1,  CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '09:00:00', 'approved', 'Web dev thesis discussion',    NOW() - INTERVAL 4 HOUR),
-(8,  108, 102, 1001, 2,  1,  CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '09:00:00', 'pending',  'Mobile app project inquiry',   NOW() - INTERVAL 2 HOUR),
--- Template 9  (107 · Monday AM · max 3): 1 of 3 spots taken
-(9,  109, 107, 1001, 4,  9,  CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '10:00:00', 'approved', 'Capstone backend review',      NOW() - INTERVAL 5 HOUR),
--- Template 13 (110 · Monday PM · max 5): 1 of 5 spots taken
-(10, 105, 110, 1001, 5,  13, CURDATE() + INTERVAL ((0 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '13:00:00', 'pending',  'SDLC consultation for thesis', NOW() - INTERVAL 3 HOUR);
-*/
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 9 · DOCUMENT REQUESTS
--- Commented out for a clean local test baseline — uncomment to seed.
--- ─────────────────────────────────────────────────────────────
-/*
-INSERT INTO document_requests (request_id, student_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
--- Student 101: 1 processing, 1 released
-(1,  101, 1, 'Good Moral Certificate',    'Local Doc Req 1', 'processing', CURDATE() + INTERVAL 2 DAY, NULL,                        'Document Test 1', NOW() - INTERVAL 3 DAY),
-(2,  101, 2, 'Transcript of Records',     'Local Doc Req 2', 'released',   CURDATE() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY,  'Document Test 2', NOW() - INTERVAL 14 DAY),
--- Student 104: 2 pending, 1 released
-(3,  104, 1, 'Good Moral Certificate',    'Local Doc Req 3', 'pending',    CURDATE() + INTERVAL 3 DAY, NULL,                        'Document Test 3', NOW() - INTERVAL 1 DAY),
-(4,  104, 2, 'Transcript of Records',     'Local Doc Req 4', 'pending',    CURDATE() + INTERVAL 6 DAY, NULL,                        'Document Test 4', NOW() - INTERVAL 2 DAY),
-(5,  104, 1, 'Good Moral Certificate',    'Local Doc Req 5', 'released',   CURDATE() - INTERVAL 5 DAY, NOW() - INTERVAL 5 DAY,  'Document Test 5', NOW() - INTERVAL 10 DAY);
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 9b · GENERATED FILES & QR TRACKING
--- generated_files for released documents (request_id 2 and 5)
--- qr_tracking_logs seeded with 3 historical scans by admin (user_id 103)
--- ─────────────────────────────────────────────────────────────
-INSERT INTO generated_files (file_id, request_id, file_name, file_path, qr_code, generated_at) VALUES
-(1, 2, 'TOR-2100001.pdf', '/files/TOR-2100001.pdf', 'REQ-00002-QR', NOW() - INTERVAL 12 DAY),
-(2, 5, 'GMC-2100065.pdf', '/files/GMC-2100065.pdf', 'REQ-00005-QR', NOW() - INTERVAL 8 DAY);
-
-INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time) VALUES
-(1, 103, 'CCS Office', NOW() - INTERVAL 2 MINUTE),
-(2, 103, 'CCS Office', NOW() - INTERVAL 1 HOUR),
-(1, 103, 'CCS Office', NOW() - INTERVAL 1 DAY);
-*/
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 9c · SYSTEM SETTINGS (Pinnacle Sync config)
+-- SECTION 6 · SYSTEM SETTINGS (Pinnacle Sync config)
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('pinnacle_api_url',       'https://pinnacle-api.pnc.edu.ph/v1', 'PinnaCle API base URL'),
 ('pinnacle_api_key',       '',                                    'PinnaCle API authentication key'),
 ('pinnacle_sync_interval', '60',                                  'Auto-sync interval in minutes'),
-('pinnacle_sync_enabled',  'false',                               'Whether auto-sync is active');
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 9d · FACULTY DOCUMENT REQUESTS (faculty requesting their own documents)
--- All reference the faculty-only "Certificate of Employment" service (service_id 5).
--- Commented out for a clean local test baseline — uncomment to seed.
--- ─────────────────────────────────────────────────────────────
-/*
-INSERT INTO faculty_document_requests (request_id, tracking_number, faculty_id, service_id, request_type, purpose, status, estimated_completion, released_at, notes, created_at) VALUES
-(1, 'FDR-00001', 102, 5, 'Certificate of Employment', 'Bank loan requirement', 'released',   CURDATE() - INTERVAL 4 DAY, NOW() - INTERVAL 4 DAY, 'Faculty Doc Req 1', NOW() - INTERVAL 9 DAY),
-(2, 'FDR-00002', 106, 5, 'Certificate of Employment', 'Visa application',      'processing', CURDATE() + INTERVAL 2 DAY, NULL,                    'Faculty Doc Req 2', NOW() - INTERVAL 2 DAY),
-(3, 'FDR-00003', 110, 5, 'Certificate of Employment', 'HR records update',     'pending',    CURDATE() + INTERVAL 3 DAY, NULL,                    'Faculty Doc Req 3', NOW() - INTERVAL 1 DAY);
-*/
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 10 · FAQS / ANNOUNCEMENTS
--- Used by the admin dashboard announcements card.
--- department_id NULL = global/cross-department announcement.
--- Sections 10, 11, 12, and 13 below are commented out together for a
--- clean local test baseline — uncomment to seed. Runs to end of file.
--- ─────────────────────────────────────────────────────────────
-/*
-INSERT INTO faqs (faq_id, question, answer, type, status, created_by, is_pinned, department_id, is_cross_college) VALUES
-(1, 'How do I request a Good Moral Certificate?',
-   'Submit a document request through the OAMS portal under Document Requests. Processing takes 3 - 5 business days. Claim your document at the CCS office upon notification.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
-(2, 'How do I book a consultation with my professor?',
-   'Go to Appointments in your student dashboard, select your professor, choose an available time slot, and submit your request. You will be notified once the professor approves.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
-(3, 'How does the online queue work?',
-   'Join a queue from the Queue section of your dashboard. You will receive a queue number and can monitor your position in real time. Proceed to the office when you are called.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
-(4, 'What documents are required for enrollment assistance?',
-   'Bring your registration form, previous grades, and any outstanding clearance slips. Visit the CCS office or join the Enrollment Assistance queue online.',
-   'reminder', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
-(5, 'What are the CCS office hours?',
-   'The CCS office is open Monday to Friday, 8:00 AM to 5:00 PM. Queue slots are available from 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM.',
-   'general', 'active', 'CCS Admin Office', FALSE, 1001, FALSE),
-(6, 'Enrollment period for AY 2026 - 2027 is now open.',
-   CONCAT('All students must complete online enrollment via the OAMS portal by ', DATE_FORMAT(CURDATE() + INTERVAL 30 DAY, '%M %d, %Y'), '. Walk-in enrollment will not be accommodated after the deadline.'),
-   'important', 'active', 'CCS Admin Office', TRUE, 1001, FALSE),
-(7, CONCAT('System maintenance scheduled for ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), '.'),
-   CONCAT('OAMS will be unavailable from 12:00 AM to 4:00 AM on ', DATE_FORMAT(CURDATE() + INTERVAL 10 DAY, '%M %d, %Y'), ' for scheduled maintenance. Please plan your transactions accordingly.'),
-   'important', 'active', 'CCS Admin Office', TRUE, 1001, FALSE);
-
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 12 · NOTIFICATIONS
--- Sample notifications for named students and the admin.
--- ─────────────────────────────────────────────────────────────
-INSERT INTO notifications (user_id, message, is_read, created_at) VALUES
--- Student 101 (Alvin Matthew Ortiz · 2300544)
--- Dates below match appointment_id 1 and 2 (Section 8) exactly, computed the same way.
-(101, CONCAT('Your appointment with Prof. Ogalesco on ', DATE_FORMAT(CURDATE() + INTERVAL ((2 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '%M %d'), ' (9:00 AM - 12:00 PM) has been approved.'), FALSE, NOW() - INTERVAL 1 DAY),
-(101, CONCAT('Your appointment request with Prof. Tan on ', DATE_FORMAT(CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '%M %d'), ' (10:00 AM - 12:00 PM) is pending approval.'), FALSE, NOW() - INTERVAL 2 HOUR),
-(101, 'Your Good Moral Certificate request is now being processed.',                                                                      FALSE, NOW() - INTERVAL 3 DAY),
-(101, 'Your Transcript of Records is ready for pickup at the CCS office.',                                                                TRUE,  NOW() - INTERVAL 14 DAY),
--- Student 104 (Luiz Gabriel Rosales · 2302494)
--- Dates below match appointment_id 4 and 5 (Section 8) exactly, computed the same way.
-(104, CONCAT('Your appointment request with Prof. Ogalesco on ', DATE_FORMAT(CURDATE() + INTERVAL (((2 - WEEKDAY(CURDATE()) + 7) % 7) + 7) DAY, '%M %d'), ' (9:00 AM - 12:00 PM) is pending approval.'), FALSE, NOW() - INTERVAL 3 HOUR),
-(104, CONCAT('Your appointment request with Prof. Dela Cruz on ', DATE_FORMAT(CURDATE() + INTERVAL ((1 - WEEKDAY(CURDATE()) + 7) % 7) DAY, '%M %d'), ' (8:00 AM - 12:00 PM) is pending approval.'), FALSE, NOW() - INTERVAL 1 HOUR),
-(104, 'Your Good Moral Certificate request has been received and is pending review.',                                                     FALSE, NOW() - INTERVAL 1 DAY),
--- Admin 103
-(103, 'New document request submitted by Alvin Matthew Ortiz (Good Moral Certificate).',                                                 TRUE,  NOW() - INTERVAL 3 DAY),
-(103, 'New document request submitted by Luiz Gabriel Rosales (Transcript of Records).',                                                 TRUE,  NOW() - INTERVAL 2 DAY);
-
--- ─────────────────────────────────────────────────────────────
--- SECTION 13 · FACULTY POSITIONS (update existing rows)
--- ─────────────────────────────────────────────────────────────
-UPDATE faculty SET position = 'Department Chair'    WHERE faculty_id = 102;
-UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 106;
-UPDATE faculty SET position = 'Program Coordinator'  WHERE faculty_id = 107;
-UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 110;
-UPDATE faculty SET position = 'Faculty Member'       WHERE faculty_id = 111;
-*/
+('pinnacle_sync_enabled',  'false',                               'Whether auto-sync is active');
