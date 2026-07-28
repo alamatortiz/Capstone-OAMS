@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
+import Toast from 'react-native-toast-message';
 import {
   Alert,
   Image,
@@ -18,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -144,13 +146,18 @@ export default function StudentProfessorSchedulesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
   const from = Array.isArray(params.from) ? params.from[0] : params.from;
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
+  // Mirrors `departments` for the catch block below, without making
+  // fetchSchedules depend on (and change identity with) the state itself.
+  const departmentsRef = useRef(departments);
+  useEffect(() => { departmentsRef.current = departments; }, [departments]);
+
   const fetchSchedules = useCallback(async () => {
-    setLoading(true);
+    setLoadError(null);
     try {
       const { data } = await api.get('/student/professor-schedules');
       setDepartments(
@@ -169,10 +176,13 @@ export default function StudentProfessorSchedulesScreen() {
           })),
         })),
       );
-      setLoadError(null);
     } catch (err) {
       console.error('Fetch professor schedules error:', err);
-      setLoadError('Could not load professor schedules. Please try again.');
+      if (departmentsRef.current.length === 0) {
+        setLoadError('Could not load professor schedules. Please try again.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh professor schedules.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -180,6 +190,28 @@ export default function StudentProfessorSchedulesScreen() {
 
   useEffect(() => {
     fetchSchedules();
+  }, [fetchSchedules]);
+
+  // ── Live updates: refetch when a professor toggles Available/Unavailable ──
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    socket.on('faculty:availability-status-changed', fetchSchedules);
+    return () => {
+      socket.off('faculty:availability-status-changed', fetchSchedules);
+    };
+  }, [user, token, fetchSchedules]);
+
+  // Fallback poll: a student browsing a professor from another college is in
+  // their own department's socket room, not the professor's, so
+  // faculty:availability-status-changed events for that professor never
+  // reach them -- this keeps availability status from drifting stale.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchSchedules();
+    }, 45000);
+    return () => clearInterval(interval);
   }, [fetchSchedules]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);

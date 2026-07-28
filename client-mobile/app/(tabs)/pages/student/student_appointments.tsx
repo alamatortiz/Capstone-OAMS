@@ -140,10 +140,6 @@ function buildTwoWeekDates() {
   return { thisWeek: buildWeek(0), nextWeek: buildWeek(1) };
 }
 
-const STATUS_ORDER: BookingStatus[] = ['pending', 'approved', 'completed', 'rejected', 'cancelled'];
-const STATUS_LABELS: Record<BookingStatus, string> = {
-  pending: 'Pending Approval', approved: 'Approved', completed: 'Completed', rejected: 'Rejected', cancelled: 'Cancelled',
-};
 const STATUS_STYLES: Record<BookingStatus, { bg: string; border: string; color: string }> = {
   pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
   approved: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
@@ -381,12 +377,12 @@ export default function StudentAppointmentsScreen() {
       .map((b) => `${b.availabilityId}_${b.date}`),
   ), [bookings]);
 
-  const bookingsByStatus = useMemo(() => {
-    const grouped: Partial<Record<BookingStatus, Booking[]>> = {};
-    activeBookings.forEach((b) => { (grouped[b.status] ||= []).push(b); });
-    Object.values(grouped).forEach((list) => list?.sort((a, b) => a.date.localeCompare(b.date)));
-    return STATUS_ORDER.filter((s) => grouped[s]?.length).map((s) => [s, grouped[s] as Booking[]] as const);
-  }, [activeBookings]);
+  const sortedActiveBookings = useMemo(
+    () => [...activeBookings].sort((a, b) => a.date.localeCompare(b.date)),
+    [activeBookings],
+  );
+
+  const cancelTarget = bookings.find((b) => b.id === cancelConfirmId) ?? null;
 
   const availableProfessors = useMemo(() => {
     const seen = new Set<string>();
@@ -780,68 +776,57 @@ export default function StudentAppointmentsScreen() {
                   <Text style={styles.emptyDescription}>Browse available slots to schedule your first consultation</Text>
                 </View>
               ) : (
-                bookingsByStatus.map(([status, list]) => {
-                  const s = STATUS_STYLES[status];
+                sortedActiveBookings.map((booking) => {
+                  const s = STATUS_STYLES[booking.status];
                   return (
-                    <View key={status} style={styles.statusGroup}>
-                      <View style={styles.statusGroupHeader}>
-                        <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
-                          <View style={[styles.statusDot, { backgroundColor: s.color }]} />
-                          <Text style={[styles.statusBadgeText, { color: s.color }]}>{status}</Text>
+                    <View key={booking.id} style={styles.bookingCard}>
+                      <View style={styles.bookingHeaderRow}>
+                        <Text style={styles.bookingPersonName}>{booking.person}</Text>
+                        <View style={styles.collegeBadge}>
+                          <Text style={styles.collegeBadgeText}>{collegeLabel(booking.college)}</Text>
                         </View>
-                        <Text style={styles.statusGroupTitle}>{STATUS_LABELS[status]}</Text>
                       </View>
-                      <Text style={styles.dateCount}>{list.length} {list.length === 1 ? 'appointment' : 'appointments'}</Text>
-
-                      {list.map((booking) => (
-                        <View key={booking.id} style={styles.bookingCard}>
-                          <View style={styles.bookingHeaderRow}>
-                            <Text style={styles.bookingPersonName}>{booking.person}</Text>
-                            <View style={styles.collegeBadge}>
-                              <Text style={styles.collegeBadgeText}>{collegeLabel(booking.college)}</Text>
-                            </View>
-                          </View>
-                          {booking.appointmentType && (
-                            <View style={styles.apptTypeRow}>
-                              <Text style={styles.apptTypeLabel}>Type:</Text>
-                              <View style={styles.apptTypePill}><Text style={styles.apptTypePillText}>{booking.appointmentType}</Text></View>
-                            </View>
-                          )}
-                          <View style={styles.slotDetails}>
-                            <View style={styles.slotDetailRow}>
-                              <Ionicons name="calendar-outline" size={15} color={theme.purple} />
-                              <Text style={styles.slotDetailText}>{formatDate(booking.date)}</Text>
-                            </View>
-                            <View style={styles.slotDetailRow}>
-                              <Ionicons name="time-outline" size={15} color={theme.purple} />
-                              <Text style={styles.slotDetailText}>
-                                {booking.windowStart && booking.windowEnd
-                                  ? `${formatTime(booking.windowStart)} – ${formatTime(booking.windowEnd)}` : '—'}
-                              </Text>
-                            </View>
-                            <View style={styles.slotDetailRow}>
-                              <Ionicons name="location-outline" size={15} color={theme.purple} />
-                              <Text style={styles.slotDetailText}>{booking.location}</Text>
-                            </View>
-                          </View>
-                          {booking.purpose ? (
-                            <View style={styles.purposeBox}>
-                              <Text style={styles.purposeLabel}>Purpose:</Text>
-                              <Text style={styles.purposeText}>{booking.purpose}</Text>
-                            </View>
-                          ) : null}
-                          {(status === 'pending' || status === 'approved') && (
-                            <Pressable
-                              style={styles.cancelBtn}
-                              onPress={() => setCancelConfirmId(booking.id)}
-                              disabled={cancellingId === booking.id}
-                            >
-                              <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
-                              <Text style={styles.cancelBtnText}>{cancellingId === booking.id ? 'Cancelling…' : 'Cancel'}</Text>
-                            </Pressable>
-                          )}
+                      <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border, alignSelf: 'flex-start' }]}>
+                        <View style={[styles.statusDot, { backgroundColor: s.color }]} />
+                        <Text style={[styles.statusBadgeText, { color: s.color }]}>{booking.status}</Text>
+                      </View>
+                      {booking.appointmentType && (
+                        <View style={styles.apptTypeRow}>
+                          <Text style={styles.apptTypeLabel}>Type:</Text>
+                          <View style={styles.apptTypePill}><Text style={styles.apptTypePillText}>{booking.appointmentType}</Text></View>
                         </View>
-                      ))}
+                      )}
+                      <View style={styles.slotDetails}>
+                        <View style={styles.slotDetailRow}>
+                          <Ionicons name="calendar-outline" size={15} color={theme.purple} />
+                          <Text style={styles.slotDetailText}>{formatDate(booking.date)}</Text>
+                        </View>
+                        <View style={styles.slotDetailRow}>
+                          <Ionicons name="time-outline" size={15} color={theme.purple} />
+                          <Text style={styles.slotDetailText}>
+                            {booking.windowStart && booking.windowEnd
+                              ? `${formatTime(booking.windowStart)} – ${formatTime(booking.windowEnd)}` : '—'}
+                          </Text>
+                        </View>
+                        <View style={styles.slotDetailRow}>
+                          <Ionicons name="location-outline" size={15} color={theme.purple} />
+                          <Text style={styles.slotDetailText}>{booking.location}</Text>
+                        </View>
+                      </View>
+                      {booking.purpose ? (
+                        <View style={styles.purposeBox}>
+                          <Text style={styles.purposeLabel}>Purpose:</Text>
+                          <Text style={styles.purposeText}>{booking.purpose}</Text>
+                        </View>
+                      ) : null}
+                      <Pressable
+                        style={styles.cancelBtn}
+                        onPress={() => setCancelConfirmId(booking.id)}
+                        disabled={cancellingId === booking.id}
+                      >
+                        <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+                        <Text style={styles.cancelBtnText}>{cancellingId === booking.id ? 'Cancelling…' : 'Cancel'}</Text>
+                      </Pressable>
                     </View>
                   );
                 })
@@ -980,15 +965,17 @@ export default function StudentAppointmentsScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Appointment?</Text>
             <Text style={styles.logoutModalDescription}>
-              Are you sure you want to cancel this appointment? This action cannot be undone.
+              You are about to cancel your appointment with <Text style={{ fontWeight: '700' }}>{cancelTarget?.person}</Text>
+              {cancelTarget ? <> on <Text style={{ fontWeight: '700' }}>{formatDate(cancelTarget.date)}</Text></> : null}. This will
+              permanently remove it — you&apos;ll need to book a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
-              <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelConfirmId(null)}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelConfirmId(null)} disabled={cancellingId !== null}>
                 <Text style={styles.logoutCancelBtnText}>Keep Appointment</Text>
               </Pressable>
-              <Pressable style={styles.logoutConfirmBtn} onPress={doCancel}>
+              <Pressable style={styles.logoutConfirmBtn} onPress={doCancel} disabled={cancellingId !== null}>
                 <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
-                <Text style={styles.logoutConfirmBtnText}>Cancel Appointment</Text>
+                <Text style={styles.logoutConfirmBtnText}>{cancellingId !== null ? 'Cancelling…' : 'Cancel Appointment'}</Text>
               </Pressable>
             </View>
           </View>
