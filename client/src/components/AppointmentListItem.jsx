@@ -24,27 +24,19 @@ export default function AppointmentListItem({
     label: appointment.status,
     cls: "apst-badge-pending",
   };
-  const isDim =
-    appointment.status === "completed" ||
-    appointment.status === "rejected" ||
-    appointment.status === "cancelled";
   const canCancel = appointment.status === "pending" || appointment.status === "approved";
 
   return (
     <div
-      className={`apst-list-item ${onClick ? "apst-list-item--clickable" : ""} ${isDim ? "apst-list-item-completed" : ""}`}
+      className={`apst-list-item ${onClick ? "apst-list-item--clickable" : ""}`}
       onClick={onClick}
     >
       <div className="apst-list-header">
-        <div className={isDim ? "apst-list-icon-wrap-completed" : "apst-list-icon-wrap"}>
-          <Calendar
-            style={{ width: "1.5rem", height: "1.5rem", color: isDim ? "var(--text-tertiary)" : undefined }}
-          />
+        <div className="apst-list-icon-wrap">
+          <Calendar style={{ width: "1.5rem", height: "1.5rem" }} />
         </div>
         <div className="apst-list-title-section">
-          <h3 className="apst-list-name" style={isDim ? { color: "var(--text-tertiary)" } : undefined}>
-            {appointment.person}
-          </h3>
+          <h3 className="apst-list-name">{appointment.person}</h3>
           <p className="apst-list-college">{appointment.college}</p>
         </div>
         <span className={`apst-badge ${cls}`}>{label}</span>

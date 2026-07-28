@@ -1,12 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
-import { ChevronLeft, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { ChevronLeft, GraduationCap as LucideGraduationCap, AlertCircle } from "lucide-react";
 
 import { Link, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import ChatWidget from "../../components/ChatWidget";
+import { connectSocket } from "../../utils/socket";
+import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 
 import "./stud-professor-schedules.css";
 
@@ -100,20 +103,6 @@ const Loader2Icon = () => (
     <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
   </svg>
 );
-const AlertCircleIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>
-);
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ProfessorSchedule() {
   const location = useLocation();
@@ -128,24 +117,64 @@ export default function ProfessorSchedule() {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  // Tracks the Manila calendar date so the next-occurrence day math below
+  // recomputes if a student leaves this tab open across a midnight rollover.
+  const [todayAnchor, setTodayAnchor] = useState(() => getManilaDateString());
 
-  const fetchSchedules = async () => {
-    setLoading(true);
+  // Mirrors `departments` for the catch block below, without making
+  // fetchSchedules depend on (and change identity with) the state itself.
+  const departmentsRef = useRef(departments);
+  useEffect(() => { departmentsRef.current = departments; }, [departments]);
+
+  const fetchSchedules = useCallback(async () => {
     setLoadError(null);
     try {
       const { data } = await api.get("/student/professor-schedules");
       setDepartments(data.departments ?? []);
     } catch (err) {
       console.error("Fetch professor schedules error:", err);
-      setLoadError("Could not load professor schedules. Please try again.");
+      if (departmentsRef.current.length === 0) {
+        setLoadError("Could not load professor schedules. Please try again.");
+      } else {
+        toast.error("Could not refresh professor schedules.");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchSchedules();
-  }, []);
+  }, [fetchSchedules]);
+
+  // ── Live updates: refetch when a professor toggles Available/Unavailable ──
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on("faculty:availability-status-changed", fetchSchedules);
+
+    return () => {
+      socket.off("faculty:availability-status-changed", fetchSchedules);
+    };
+  }, [fetchSchedules]);
+
+  // Fallback poll: a student browsing a professor from another college is in
+  // their own department's socket room, not the professor's, so
+  // faculty:availability-status-changed events for that professor never
+  // reach them -- this keeps availability status from drifting stale.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      fetchSchedules();
+      const nowStr = getManilaDateString();
+      setTodayAnchor((prev) => (prev === nowStr ? prev : nowStr));
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchSchedules]);
 
   // The department currently selected, derived from live data
   const selectedDepartment = useMemo(
@@ -203,6 +232,18 @@ export default function ProfessorSchedule() {
       .map((day) => ({ day, schedules: groupedByDay[day] }));
   };
 
+  // The next upcoming calendar date for a given weekday name, anchored to
+  // Manila "today" -- never a date that's already passed (if today IS that
+  // weekday, returns today's date).
+  const DAY_ORDER_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const nextOccurrenceDateStr = (dayName, anchorStr) => {
+    const [y, m, d] = anchorStr.split("-").map(Number);
+    const anchor = new Date(y, m - 1, d);
+    const diff = (DAY_ORDER_FULL.indexOf(dayName) - anchor.getDay() + 7) % 7;
+    anchor.setDate(anchor.getDate() + diff);
+    return `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`;
+  };
+
   return (
     <StudentPageShell
       outerClassName="psched-with-sidebar"
@@ -246,7 +287,7 @@ export default function ProfessorSchedule() {
           {/* Error state */}
           {!loading && loadError && (
             <div className="empty-state">
-              <AlertCircleIcon />
+              <AlertCircle />
               <p>{loadError}</p>
               <button
                 className="breadcrumb-link"
@@ -263,7 +304,7 @@ export default function ProfessorSchedule() {
             <div className="departments-grid">
               {departments.length === 0 ? (
                 <div className="empty-state">
-                  <AlertCircleIcon />
+                  <AlertCircle />
                   <p>No faculty schedules are available yet.</p>
                 </div>
               ) : (
@@ -328,7 +369,7 @@ export default function ProfessorSchedule() {
                 <div className="professors-list">
                   {selectedDepartment.faculty.length === 0 ? (
                     <div className="empty-state">
-                      <AlertCircleIcon />
+                      <AlertCircle />
                       <p>No faculty members found for this department.</p>
                     </div>
                   ) : (
@@ -374,7 +415,7 @@ export default function ProfessorSchedule() {
                           </h4>
                           {isUnavailable ? (
                             <div className="consultation-unavailable-notice">
-                              <AlertCircleIcon />
+                              <AlertCircle />
                               <p>
                                 This professor is currently unavailable and is
                                 not accepting consultations right now.
@@ -392,6 +433,9 @@ export default function ProfessorSchedule() {
                                     <div className="day-header">
                                       <CalendarIcon />
                                       <span className="day-name">{day}</span>
+                                      <span className="day-date">
+                                        {formatManilaDate(nextOccurrenceDateStr(day, todayAnchor), { month: "short", day: "numeric" })}
+                                      </span>
                                     </div>
                                     <div className="day-slots">
                                       {schedules.map((schedule, idx) => (

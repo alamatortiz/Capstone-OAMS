@@ -15,7 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
-import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -276,6 +276,13 @@ export default function AppointmentsPage() {
 
   const activeBookings = myBookings.filter((b) => b.status === "pending" || b.status === "approved");
 
+  const sortedActiveBookings = useMemo(
+    () => [...activeBookings].sort((a, b) => a.date.localeCompare(b.date)),
+    [activeBookings],
+  );
+
+  const cancelTarget = myBookings.find((b) => b.id === cancelConfirmId) ?? null;
+
   // Mirrors the server-side dup guard in POST /appointments/book-slot, which
   // blocks rebooking the same (availabilityId, date) pair unless the prior
   // booking was cancelled or rejected.
@@ -284,15 +291,6 @@ export default function AppointmentsPage() {
       .filter((b) => b.status !== "cancelled" && b.status !== "rejected")
       .map((b) => `${b.availabilityId}_${b.date}`)
   ), [myBookings]);
-
-  const STATUS_ORDER = ["pending", "approved", "completed", "rejected", "cancelled"];
-  const STATUS_LABELS = { pending: "Pending Approval", approved: "Approved", completed: "Completed", rejected: "Rejected", cancelled: "Cancelled" };
-
-  const bookingsByStatus = useMemo(() => {
-    const grouped = activeBookings.reduce((acc, b) => { (acc[b.status] ||= []).push(b); return acc; }, {});
-    Object.values(grouped).forEach((list) => list.sort((a, b) => a.date.localeCompare(b.date)));
-    return STATUS_ORDER.filter((s) => grouped[s]?.length).map((s) => [s, grouped[s]]);
-  }, [activeBookings]);
 
   const availableProfessors = useMemo(() => {
     const seen = new Set();
@@ -491,10 +489,15 @@ export default function AppointmentsPage() {
             onCancel={() => setCancelConfirmId(null)}
             onConfirm={doCancel}
             title="Cancel Appointment?"
-            message="Are you sure you want to cancel this appointment? This action cannot be undone."
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="10" y1="14" x2="14" y2="18"></line><line x1="14" y1="14" x2="10" y2="18"></line></svg>}
+            message={
+              <>
+                You are about to cancel your appointment with <strong>{cancelTarget?.person}</strong> on{" "}
+                <strong>{cancelTarget ? formatDate(cancelTarget.date) : ""}</strong>. This will permanently remove it — you'll need to book a new one if you change your mind.
+              </>
+            }
+            icon={<XCircle width={22} height={22} />}
             cancelText="Keep Appointment"
-            confirmText="Cancel Appointment"
+            confirmText={cancellingId !== null ? "Cancelling…" : "Cancel Appointment"}
             confirmDisabled={cancellingId !== null}
           />
         </>
@@ -608,16 +611,14 @@ export default function AppointmentsPage() {
               ) : availableSlots.length === 0 ? (
                 <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published their consultation hours yet."}</p></div>
               ) : selectedDate ? (
-                <div className="slots-list">
-                  <div className="week-section">
-                    <div className="week-section-header">
-                      <span className={`appointment-booking-badge ${weekInfo(selectedDate).key}`}>{weekInfo(selectedDate).label}</span>
-                    </div>
-                    {renderDateGroup(selectedDate)}
+                <div className="week-section">
+                  <div className="week-section-header">
+                    <span className={`appointment-booking-badge ${weekInfo(selectedDate).key}`}>{weekInfo(selectedDate).label}</span>
                   </div>
+                  {renderDateGroup(selectedDate)}
                 </div>
               ) : (
-                <div className="slots-list">
+                <>
                   <div className="week-section">
                     <div className="week-section-header">
                       <span className="appointment-booking-badge this-week">This Week</span>
@@ -630,17 +631,14 @@ export default function AppointmentsPage() {
                     </div>
                     {twoWeekDates.nextWeek.map(renderDateGroup)}
                   </div>
-                </div>
+                </>
               )}
             </div>
           )}
 
           {/* Active Bookings */}
           {activeTab === "bookings" && (
-            <div className="bookings-container">
-              <div className="bookings-header">
-                <div><h2>My Appointments</h2><p>Your scheduled consultations</p></div>
-              </div>
+            <>
               {bookingsLoading ? (
                 <div className="appt-empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
               ) : bookingsError ? (
@@ -649,28 +647,20 @@ export default function AppointmentsPage() {
                 <div className="appt-empty-state"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>You have no active appointments.</p></div>
               ) : (
                 <div className="bookings-list">
-                  {bookingsByStatus.map(([status, bookings]) => (
-                    <div key={status} className="slots-date-group">
-                      <div className="date-header">
-                        <h3 style={{ margin: 0 }}>{STATUS_LABELS[status]}</h3>
-                      </div>
-                      <p className="date-count">{bookings.length} {bookings.length === 1 ? "appointment" : "appointments"}</p>
-                      {bookings.map((booking) => (
-                        <div key={booking.id} style={{ marginBottom: "0.75rem" }}>
-                          <AppointmentListItem
-                            appointment={booking}
-                            formatDate={formatDate}
-                            showCancelButton
-                            onCancel={(id) => setCancelConfirmId(id)}
-                            isCancelling={cancellingId === booking.id}
-                          />
-                        </div>
-                      ))}
+                  {sortedActiveBookings.map((booking) => (
+                    <div key={booking.id} style={{ marginBottom: "0.75rem" }}>
+                      <AppointmentListItem
+                        appointment={booking}
+                        formatDate={formatDate}
+                        showCancelButton
+                        onCancel={(id) => setCancelConfirmId(id)}
+                        isCancelling={cancellingId === booking.id}
+                      />
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
     </StudentPageShell>

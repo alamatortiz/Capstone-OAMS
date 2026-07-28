@@ -72,6 +72,7 @@ export default function ProfessorScheduleManager() {
   const [addLocation, setAddLocation] = useState("");
   const [showOtherLocation, setShowOtherLocation] = useState(false);
   const [addMaxStudents, setAddMaxStudents] = useState("");
+  const [editingCurrentMaxBooked, setEditingCurrentMaxBooked] = useState(0); // students already booked (future dates) for the slot being edited
   const [addApptTypes, setAddApptTypes] = useState([]);   // string[]
   const [addApptInput, setAddApptInput] = useState("");   // current tag input value
   const [addSaving, setAddSaving] = useState(false);
@@ -121,6 +122,7 @@ export default function ProfessorScheduleManager() {
     setAddMaxStudents("");
     setAddApptTypes([]);
     setAddApptInput("");
+    setEditingCurrentMaxBooked(0);
     setShowAddSlot(true);
   };
 
@@ -135,6 +137,7 @@ export default function ProfessorScheduleManager() {
     setAddMaxStudents(slot.max_students != null ? String(slot.max_students) : "");
     setAddApptTypes((slot.appointmentTypes ?? []).map((t) => t.name));
     setAddApptInput("");
+    setEditingCurrentMaxBooked(slot.currentMaxBooked ?? 0);
     setShowAddSlot(true);
   };
 
@@ -178,6 +181,10 @@ export default function ProfessorScheduleManager() {
     const maxStu = parseInt(addMaxStudents, 10);
     if (isNaN(maxStu) || maxStu < 1) {
       toast.error("Max students must be a positive number");
+      return;
+    }
+    if (editingId && maxStu < editingCurrentMaxBooked) {
+      toast.error(`Cannot set max students below ${editingCurrentMaxBooked} — that many students are already booked on a future date.`);
       return;
     }
 
@@ -517,6 +524,11 @@ export default function ProfessorScheduleManager() {
                   onChange={(e) => setAddMaxStudents(e.target.value)}
                 />
                 <p className="sa-field-hint">Students are assigned slots in order of booking (first come, first served).</p>
+                {editingId && editingCurrentMaxBooked > 0 && (
+                  <p className="sa-field-hint" style={{ color: "#f59e0b" }}>
+                    {editingCurrentMaxBooked} student{editingCurrentMaxBooked === 1 ? "" : "s"} already booked on a future date — max can't go below this.
+                  </p>
+                )}
               </div>
               <div className="sa-form-group">
                 <label>Appointment Types <span style={{ fontWeight: 400, color: "var(--text-tertiary)", fontSize: "0.78rem" }}>(optional · press Enter to add)</span></label>

@@ -192,13 +192,12 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
           </div>
 
           {/* Requirements card */}
-          <div className="dss-card dss-requirements-card">
+          <div className="dss-card">
             <div className="dss-card-header">
               <h3 className="dss-card-title">
                 <CheckCircle2 style={{ width: "1.375rem", height: "1.375rem" }} />
                 Requirements
               </h3>
-              <p className="dss-card-description">Documents and items you need to bring</p>
             </div>
             <div className="dss-card-content">
               {reqLoading ? (

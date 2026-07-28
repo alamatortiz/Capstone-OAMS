@@ -209,8 +209,8 @@ body {
 .department-card {
   display: flex;
   align-items: center;
-  gap: 1.15rem;
-  padding: 1.15rem 1.5rem;
+  gap: 1.3rem;
+  padding: 1.3rem 1.7rem;
   cursor: pointer;
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(168, 85, 247, 0.08) 100%);
   border: 1px solid rgba(168, 85, 247, 0.3);
@@ -238,8 +238,8 @@ body {
 
 /* Logo wrap */
 .card-logo-wrap {
-  width: 3.15rem;
-  height: 3.15rem;
+  width: 3.6rem;
+  height: 3.6rem;
   flex-shrink: 0;
   border-radius: 0.625rem;
   background: rgba(255, 255, 255, 0.92);
@@ -272,7 +272,7 @@ body {
 }
 
 .psched-card-title {
-  font-size: 1.02rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #a855f7;
   margin: 0;
@@ -286,7 +286,7 @@ body {
 }
 
 .card-abbrev {
-  font-size: 0.87rem;
+  font-size: 0.95rem;
   color: var(--text-tertiary);
   line-height: 1.4;
   transition: color 0.3s ease;
@@ -305,7 +305,7 @@ body {
   color: #a855f7;
   padding: 0.25rem 0.7rem;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   font-weight: 600;
   white-space: nowrap;
   border: 1px solid rgba(168, 85, 247, 0.25);
@@ -373,7 +373,7 @@ body {
 }
 
 .department-header-card h2 {
-  font-size: 1.5rem;
+  font-size: 1.9rem;
   font-weight: 700;
   margin: 0;
   line-height: 1.2;
@@ -609,6 +609,13 @@ body {
   transition: color 0.3s ease;
 }
 
+.day-date {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-left: 0.25rem;
+}
+
 .day-slots {
   display: flex;
   flex-direction: column;
@@ -681,13 +688,13 @@ body {
   }
 
   .department-card {
-    padding: 1rem 1.2rem;
-    gap: 1rem;
+    padding: 1.15rem 1.35rem;
+    gap: 1.15rem;
   }
 
   .card-logo-wrap {
-    width: 2.9rem;
-    height: 2.9rem;
+    width: 3.2rem;
+    height: 3.2rem;
   }
 
   .card-meta {

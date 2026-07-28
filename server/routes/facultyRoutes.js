@@ -175,10 +175,18 @@ router.patch(
       return res.status(400).json({ message: "status must be 'available' or 'unavailable'" });
     }
     try {
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId],
+      );
       await pool.query(
         "UPDATE faculty SET availability_status = ? WHERE faculty_id = ?",
         [status, facultyId],
       );
+      emitToDept(fac?.department_id, "faculty:availability-status-changed", {
+        facultyId: Number(facultyId),
+        availabilityStatus: status,
+      });
       res.json({ message: "Availability status updated", availabilityStatus: status });
     } catch (err) {
       console.error("PATCH /availability-status error:", err);
@@ -564,7 +572,28 @@ router.get(
       for (const s of svcRows) {
         (svcMap[s.availability_id] ||= []).push({ id: s.service_id, name: s.service_name });
       }
-      const result = rows.map((r) => ({ ...r, appointmentTypes: svcMap[r.availability_id] ?? [] }));
+
+      // Current worst-case (highest-booked) future date per template, so the
+      // edit UI can warn before the professor tries to set max_students too low.
+      const todayStr = getManilaDateString();
+      const [bookingCounts] = await pool.query(
+        `SELECT availability_id, appointment_date, COUNT(*) AS booked
+         FROM appointments
+         WHERE availability_id IN (?) AND appointment_date >= ?
+           AND status NOT IN ('cancelled', 'rejected')
+         GROUP BY availability_id, appointment_date`,
+        [ids, todayStr],
+      );
+      const maxBookedMap = {};
+      for (const b of bookingCounts) {
+        if ((maxBookedMap[b.availability_id] ?? 0) < b.booked) maxBookedMap[b.availability_id] = b.booked;
+      }
+
+      const result = rows.map((r) => ({
+        ...r,
+        appointmentTypes: svcMap[r.availability_id] ?? [],
+        currentMaxBooked: maxBookedMap[r.availability_id] ?? 0,
+      }));
       res.json(result);
     } catch (err) {
       console.error("GET /availability error:", err);
@@ -771,6 +800,33 @@ router.patch(
            WHERE appointment_id IN (?)`,
           [noLongerFits.map((b) => b.appointment_id)],
         );
+      }
+
+      // Never let max_students drop below the number of students already
+      // booked into a future date for this template -- otherwise a student
+      // can be left "in" the appointment list with no slot to be approved
+      // into. Runs after the noLongerFits cancellation above so bookings
+      // being cancelled by this same edit don't count against the new cap.
+      if (maxStu !== undefined) {
+        const todayStr = getManilaDateString();
+        const [[worst]] = await conn.query(
+          `SELECT appointment_date, COUNT(*) AS booked
+           FROM appointments
+           WHERE availability_id = ? AND appointment_date >= ?
+             AND status NOT IN ('cancelled', 'rejected')
+           GROUP BY appointment_date
+           ORDER BY booked DESC LIMIT 1`,
+          [id, todayStr],
+        );
+        if (worst && maxStu < worst.booked) {
+          await conn.rollback();
+          const dateStr = worst.appointment_date instanceof Date
+            ? getManilaDateString(worst.appointment_date)
+            : String(worst.appointment_date).split("T")[0];
+          return res.status(409).json({
+            message: `Cannot set max students to ${maxStu} — ${worst.booked} students are already booked on ${dateStr}.`,
+          });
+        }
       }
 
       const [result] = await conn.query(

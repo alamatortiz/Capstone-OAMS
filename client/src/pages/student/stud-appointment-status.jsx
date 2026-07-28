@@ -95,7 +95,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
             <div className="apst-card-header">
               <h3 className="apst-card-title">
                 <Calendar style={{ width: "1.25rem", height: "1.25rem" }} />
-                Appointment Information
+                Appointment Details
               </h3>
             </div>
             <div className="apst-card-content">
@@ -103,6 +103,12 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
                 <p className="apst-detail-label">Professor</p>
                 <p className="apst-detail-value">{appt.person}</p>
               </div>
+              {appt.appointmentType && (
+                <div className="apst-detail-row">
+                  <p className="apst-detail-label">Appointment Type</p>
+                  <p className="apst-detail-value">{appt.appointmentType}</p>
+                </div>
+              )}
               <div className="apst-detail-row">
                 <p className="apst-detail-label">College / Department</p>
                 <p className="apst-detail-value">{appt.college}</p>
@@ -177,8 +183,13 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
         onCancel={() => setShowCancelDialog(false)}
         onConfirm={() => { setShowCancelDialog(false); onCancel(appt.id); }}
         title="Cancel Appointment?"
-        message="Are you sure you want to cancel this appointment? This action cannot be undone."
-        icon={<Calendar style={{ width: "22px", height: "22px" }} />}
+        message={
+          <>
+            You are about to cancel your appointment with <strong>{appt.person}</strong> on{" "}
+            <strong>{formatDate(appt.date)}</strong>. This will permanently remove it — you'll need to book a new one if you change your mind.
+          </>
+        }
+        icon={<XCircle width={22} height={22} />}
         cancelText="Keep Appointment"
         confirmText="Cancel Appointment"
       />
@@ -246,6 +257,16 @@ export default function AppointmentStatusPage() {
     return () => {
       socket.off("appointment:status-updated", handleStatusUpdate);
     };
+  }, [fetchAppointments]);
+
+  // Fallback poll: a missed/reconnecting socket event shouldn't leave this
+  // page stale until the next manual reload.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      fetchAppointments();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [fetchAppointments]);
 
   const handleCancel = async (id) => {

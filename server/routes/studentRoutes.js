@@ -2082,7 +2082,7 @@ router.get(
           }
 
           const totalBooked = bookedMap[`${t.availability_id}_${dateStr}`] ?? 0;
-          const spotsLeft = t.max_students != null ? t.max_students - totalBooked : null;
+          const spotsLeft = t.max_students != null ? Math.max(0, t.max_students - totalBooked) : null;
           const isFull = t.max_students != null && totalBooked >= t.max_students;
 
           slots.push({
