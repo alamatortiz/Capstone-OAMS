@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ImageSourcePropType,
@@ -101,6 +102,18 @@ interface DocumentRecord {
   releasedDate?: string;
 }
 
+interface DocumentRequirement {
+  name: string;
+  description?: string;
+  isMandatory: boolean;
+}
+
+interface DocumentTypeOption {
+  name: string;
+  processingTime?: string;
+  requirements: DocumentRequirement[];
+}
+
 interface NavItem {
   key: string;
   label: string;
@@ -149,6 +162,8 @@ export default function StudentDocumentStatusScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, DocumentTypeOption[]>>({});
+  const [reqLoading, setReqLoading] = useState(true);
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -172,6 +187,24 @@ export default function StudentDocumentStatusScreen() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  // Requirements for the selected document's type, looked up by name against
+  // the same service-types catalog student_documents.tsx uses (no stable
+  // service id is exposed on either payload, so name is the shared key).
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      setReqLoading(true);
+      try {
+        const { data } = await api.get('/student/documents/service-types');
+        setServicesByDepartmentId(data.servicesByDepartmentId ?? {});
+      } catch (err) {
+        console.error('Failed to fetch document service types:', err);
+      } finally {
+        setReqLoading(false);
+      }
+    };
+    fetchServiceTypes();
+  }, []);
 
   // ── Live updates: refetch + notify when a document's status changes
   // (mirrors stud-document-status.jsx's "document:status-updated"). This is
@@ -213,6 +246,9 @@ export default function StudentDocumentStatusScreen() {
 
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) ?? null : null;
   const collegeLogoFor = (abbrev?: string) => (abbrev ? collegeLogos[abbrev] : undefined) ?? ccsLogo;
+  const selectedDocRequirements: DocumentRequirement[] = selectedDoc
+    ? (Object.values(servicesByDepartmentId).flat().find((t) => t.name === selectedDoc.type)?.requirements ?? [])
+    : [];
 
   const activeDocuments = documents.filter((d) => d.status !== 'claimed' && d.status !== 'rejected');
   const completedDocuments = documents.filter((d) => d.status === 'claimed' || d.status === 'rejected');
@@ -264,6 +300,8 @@ export default function StudentDocumentStatusScreen() {
               collegeLogoFor={collegeLogoFor}
               onBack={() => setSelectedDocId(null)}
               onCancel={() => setShowCancelDialog(true)}
+              requirements={selectedDocRequirements}
+              reqLoading={reqLoading}
             />
           ) : (
             <>
@@ -535,6 +573,8 @@ function DocumentDetail({
   collegeLogoFor,
   onBack,
   onCancel,
+  requirements,
+  reqLoading,
 }: {
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
@@ -542,6 +582,8 @@ function DocumentDetail({
   collegeLogoFor: (abbrev?: string) => ImageSourcePropType;
   onBack: () => void;
   onCancel: () => void;
+  requirements: DocumentRequirement[];
+  reqLoading: boolean;
 }) {
   const meta = STATUS_META[doc.status];
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
@@ -643,6 +685,46 @@ function DocumentDetail({
           <Text style={styles.detailLabel}>Purpose</Text>
           <Text style={styles.detailValue}>{doc.purpose}</Text>
         </View>
+      </View>
+
+      {/* Requirements */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="checkmark-circle-outline" size={18} color={theme.orange} />
+            <Text style={styles.cardTitleText}>Requirements</Text>
+          </View>
+        </View>
+        <Text style={styles.reqSubtext}>Documents and items you need to bring</Text>
+        {reqLoading ? (
+          <View style={styles.reqLoadingRow}>
+            <ActivityIndicator size="small" color={theme.orange} />
+            <Text style={styles.reqSubtext}>Loading requirements…</Text>
+          </View>
+        ) : requirements.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            {requirements.map((req) => (
+              <View key={req.name} style={styles.reqItemRow}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={theme.orange} style={{ marginTop: 1 }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={styles.hintRequirementNameRow}>
+                    <Text style={styles.bodyText}>{req.name}</Text>
+                    <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                      <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                        {req.isMandatory ? 'Required' : 'Optional'}
+                      </Text>
+                    </View>
+                  </View>
+                  {req.description && <Text style={styles.reqDescText}>{req.description}</Text>}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.reqSubtext}>
+            No specific requirements have been defined for this service yet. Contact the office for details.
+          </Text>
+        )}
       </View>
 
       {/* Notes */}
@@ -887,6 +969,22 @@ function createStyles(theme: ThemePalette) {
     detailValue: { fontSize: 14, color: theme.text, lineHeight: 20 },
 
     bodyText: { fontSize: 13, color: theme.subtext, lineHeight: 20 },
+
+    reqSubtext: { fontSize: 12, color: theme.tertiary, marginTop: 4, marginBottom: 4 },
+    reqLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    reqItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    reqDescText: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    hintRequirementNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
 
     trackingBig: { fontSize: 22, fontWeight: '800', color: theme.orange, fontFamily: 'monospace', letterSpacing: 1 },
     trackingCaption: { fontSize: 11, color: theme.tertiary, marginTop: 4 },

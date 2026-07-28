@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -169,8 +170,12 @@ export default function ProfessorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Mirrors `dashData` for the catch block below, without making fetchStats
+  // depend on (and change identity with) the state itself.
+  const dashDataRef = useRef(dashData);
+  useEffect(() => { dashDataRef.current = dashData; }, [dashData]);
+
   const fetchStats = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const { data } = await api.get('/faculty/dashboard-stats');
@@ -178,7 +183,11 @@ export default function ProfessorDashboardScreen() {
       setIsAvailable((data.availabilityStatus ?? 'available') === 'available');
     } catch (err) {
       console.error('Fetch dashboard stats error:', err);
-      setError('Could not load dashboard data.');
+      if (!dashDataRef.current) {
+        setError('Could not load dashboard data.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh dashboard data.' });
+      }
     } finally {
       setLoading(false);
     }

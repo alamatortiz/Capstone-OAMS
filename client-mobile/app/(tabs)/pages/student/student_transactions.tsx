@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Image,
@@ -147,15 +148,23 @@ export default function StudentTransactionsScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
+  // Mirrors `transactions` for the catch block below, without making
+  // fetchTransactions depend on (and change identity with) the state itself.
+  const transactionsRef = useRef(transactions);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+
   const fetchTransactions = useCallback(async () => {
-    setTxLoading(true);
     try {
       const { data } = await api.get('/student/transactions');
       setTransactions(data.transactions ?? []);
       setTxError(null);
     } catch (err) {
       console.error('Failed to fetch transactions:', err);
-      setTxError('Could not load your transaction history.');
+      if (transactionsRef.current.length === 0) {
+        setTxError('Could not load your transaction history.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
+      }
     } finally {
       setTxLoading(false);
     }

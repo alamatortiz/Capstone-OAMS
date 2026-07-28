@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -92,6 +93,18 @@ interface CollegeOption {
   abbrev: string;
 }
 
+interface DocumentRequirement {
+  name: string;
+  description?: string;
+  isMandatory: boolean;
+}
+
+interface DocumentTypeOption {
+  name: string;
+  processingTime?: string;
+  requirements: DocumentRequirement[];
+}
+
 const STATUS_META: Record<DocStatus, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
   pending: { label: 'pending', icon: 'time-outline', bg: 'rgba(251, 191, 36, 0.15)', border: 'rgba(251, 191, 36, 0.35)', color: '#f59e0b' },
   processing: { label: 'processing', icon: 'alert-circle-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
@@ -145,7 +158,7 @@ export default function StudentDocumentsScreen() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('active');
 
   const [collegesFromDB, setCollegesFromDB] = useState<CollegeOption[]>([]);
-  const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, string[]>>({});
+  const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, DocumentTypeOption[]>>({});
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -160,15 +173,23 @@ export default function StudentDocumentsScreen() {
     return d;
   })();
 
+  // Mirrors `documents` for the catch block below, without making
+  // fetchDocuments depend on (and change identity with) the state itself.
+  const documentsRef = useRef(documents);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
+
   const fetchDocuments = useCallback(async () => {
-    setDocsLoading(true);
     try {
       const { data } = await api.get('/student/documents');
       setDocuments(data.documents ?? []);
       setDocsError(null);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
-      setDocsError('Could not load your documents.');
+      if (documentsRef.current.length === 0) {
+        setDocsError('Could not load your documents.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh your documents.' });
+      }
     } finally {
       setDocsLoading(false);
     }
@@ -277,11 +298,13 @@ export default function StudentDocumentsScreen() {
   };
 
   const selectedCollegeId = collegesFromDB.find((c) => c.name === formData.college)?.id;
+  const availableTypes = selectedCollegeId != null ? servicesByDepartmentId[selectedCollegeId] ?? [] : [];
   const selectOptions = selectField === 'college'
     ? collegesFromDB.map((c) => ({ value: c.name, label: `${c.name} (${c.abbrev})` }))
-    : (selectedCollegeId != null ? servicesByDepartmentId[selectedCollegeId] ?? [] : []).map((type) => ({ value: type, label: type }));
+    : availableTypes.map((type) => ({ value: type.name, label: type.name }));
   const selectTitle = selectField === 'college' ? 'Select College' : 'Select Document Type';
   const selectCurrentValue = selectField === 'college' ? formData.college : formData.type;
+  const selectedTypeDetails = availableTypes.find((t) => t.name === formData.type);
 
   const chooseOption = (value: string) => {
     if (selectField === 'college') setFormData((f) => ({ ...f, college: value, type: '' }));
@@ -582,6 +605,33 @@ export default function StudentDocumentsScreen() {
                   <Ionicons name="chevron-down" size={16} color={theme.orange} />
                 </Pressable>
               </View>
+
+              {selectedTypeDetails && (
+                <View style={styles.hintBox}>
+                  <Text style={styles.hintText}>
+                    <Text style={styles.hintBold}>Processing Time: </Text>
+                    {selectedTypeDetails.processingTime || 'TBD'}
+                  </Text>
+                  {selectedTypeDetails.requirements.length > 0 && (
+                    <View style={styles.hintRequirements}>
+                      <Text style={[styles.hintText, styles.hintBold]}>Requirements:</Text>
+                      {selectedTypeDetails.requirements.map((req) => (
+                        <View key={req.name} style={styles.hintRequirementRow}>
+                          <View style={styles.hintRequirementNameRow}>
+                            <Text style={styles.hintText}>{req.name}</Text>
+                            <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                              <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                                {req.isMandatory ? 'Required' : 'Optional'}
+                              </Text>
+                            </View>
+                          </View>
+                          {req.description && <Text style={styles.hintRequirementDesc}>{req.description}</Text>}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Number of Copies</Text>
@@ -942,6 +992,27 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.08)',
     },
     drawerLogoutText: { fontSize: 14, fontWeight: '700', color: '#ef4444' },
+
+    hintBox: {
+      backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 10,
+      padding: 12, gap: 6, marginBottom: 16,
+    },
+    hintText: { fontSize: 12.5, color: theme.subtext, lineHeight: 18 },
+    hintBold: { fontWeight: '700', color: theme.text },
+    hintRequirements: { gap: 6, marginTop: 2 },
+    hintRequirementRow: { gap: 2 },
+    hintRequirementNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    hintRequirementDesc: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
 
     // Request dialog
     dialogOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 20 },

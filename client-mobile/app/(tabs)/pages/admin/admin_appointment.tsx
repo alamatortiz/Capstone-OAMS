@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
+import Toast from 'react-native-toast-message';
 import {
   ActivityIndicator,
   Alert,
@@ -153,15 +154,23 @@ export default function AdminAppointmentScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
+  // Mirrors `appointments` for the catch block below, without making
+  // fetchAppointments depend on (and change identity with) the state itself.
+  const appointmentsRef = useRef(appointments);
+  useEffect(() => { appointmentsRef.current = appointments; }, [appointments]);
+
   const fetchAppointments = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const { data } = await api.get('/admin/appointments');
       setAppointments(data.appointments ?? []);
     } catch (err) {
       console.error('Failed to load appointments:', err);
-      setError('Failed to load appointments.');
+      if (appointmentsRef.current.length === 0) {
+        setError('Failed to load appointments.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh appointments.' });
+      }
     } finally {
       setLoading(false);
     }

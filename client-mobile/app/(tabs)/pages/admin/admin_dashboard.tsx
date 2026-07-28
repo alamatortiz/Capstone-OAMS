@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
+import Toast from 'react-native-toast-message';
 import {
   Alert,
   Image,
@@ -202,15 +203,23 @@ export default function AdminDashboardScreen() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState<string | null>(null);
 
+  // Mirrors `dashStats` for the catch block below, without making fetchStats
+  // depend on (and change identity with) the state itself.
+  const dashStatsRef = useRef(dashStats);
+  useEffect(() => { dashStatsRef.current = dashStats; }, [dashStats]);
+
   const fetchStats = useCallback(async () => {
     try {
-      setDashLoading(true);
       const res = await api.get('/admin/dashboard-stats');
       setDashStats(res.data);
       setDashError(null);
     } catch (err) {
       console.error('Failed to fetch admin dashboard stats:', err);
-      setDashError('Could not load dashboard data.');
+      if (!dashStatsRef.current) {
+        setDashError('Could not load dashboard data.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh dashboard data.' });
+      }
     } finally {
       setDashLoading(false);
     }

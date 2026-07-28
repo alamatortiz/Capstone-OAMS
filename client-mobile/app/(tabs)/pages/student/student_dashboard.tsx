@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -221,29 +222,42 @@ export default function StudentDashboardScreen() {
   const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
   const [officeHoursError, setOfficeHoursError] = useState<string | null>(null);
 
+  // Mirror the latest data for the catch blocks below, without making the
+  // fetch callbacks depend on (and change identity with) the state itself.
+  const dashStatsRef = useRef(dashStats);
+  useEffect(() => { dashStatsRef.current = dashStats; }, [dashStats]);
+  const announcementsRef = useRef(announcements);
+  useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
+
   const fetchStats = useCallback(async () => {
-    setDashLoading(true);
     try {
       const { data } = await api.get('/student/dashboard-stats');
       setDashStats(data);
       setDashError(null);
     } catch (err) {
       console.error('Failed to fetch dashboard stats:', err);
-      setDashError('Could not load dashboard data.');
+      if (!dashStatsRef.current) {
+        setDashError('Could not load dashboard data.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh dashboard data.' });
+      }
     } finally {
       setDashLoading(false);
     }
   }, []);
 
   const fetchAnnouncements = useCallback(async () => {
-    setAnnouncementsLoading(true);
     try {
       const { data } = await api.get('/student/announcements');
       setAnnouncements(data?.announcements ?? []);
       setAnnouncementsError(null);
     } catch (err) {
       console.error('Failed to fetch announcements:', err);
-      setAnnouncementsError('Could not load announcements.');
+      if (announcementsRef.current.length === 0) {
+        setAnnouncementsError('Could not load announcements.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
+      }
     } finally {
       setAnnouncementsLoading(false);
     }

@@ -185,7 +185,6 @@ export default function AdminDocumentProcessingScreen() {
   const styles = createStyles(theme);
 
   const fetchDocuments = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const [studentRes, facultyRes] = await Promise.all([

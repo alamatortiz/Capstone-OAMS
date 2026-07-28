@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -206,8 +207,12 @@ export default function ProfessorDocumentsScreen() {
     fetchTypes();
   }, []);
 
+  // Mirrors `requests` for the catch block below, without making
+  // fetchRequests depend on (and change identity with) the state itself.
+  const requestsRef = useRef(requests);
+  useEffect(() => { requestsRef.current = requests; }, [requests]);
+
   const fetchRequests = useCallback(async () => {
-    setRequestsLoading(true);
     try {
       const { data } = await api.get('/faculty/my-document-requests');
       setRequests(
@@ -227,7 +232,11 @@ export default function ProfessorDocumentsScreen() {
       );
     } catch (err) {
       console.error('Fetch document requests error:', err);
-      Alert.alert('Error', 'Could not load your document requests.');
+      if (requestsRef.current.length === 0) {
+        Alert.alert('Error', 'Could not load your document requests.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh your document requests.' });
+      }
     } finally {
       setRequestsLoading(false);
     }

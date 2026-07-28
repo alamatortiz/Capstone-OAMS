@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -135,15 +136,23 @@ export default function StudentAnnouncementScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Mirrors `announcements` for the catch block below, without making
+  // fetchAnnouncements depend on (and change identity with) the state itself.
+  const announcementsRef = useRef(announcements);
+  useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
+
   const fetchAnnouncements = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const { data } = await api.get('/student/announcements');
       setAnnouncements(data.announcements ?? []);
     } catch (err) {
       console.error('Fetch announcements error:', err);
-      setError('Could not load announcements. Please try again.');
+      if (announcementsRef.current.length === 0) {
+        setError('Could not load announcements. Please try again.');
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
+      }
     } finally {
       setLoading(false);
     }
