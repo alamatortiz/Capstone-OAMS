@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import "./prof-dashboard.css";
 import "./prof-appointments.css";
@@ -303,37 +302,12 @@ export default function ProfessorAppointmentsPage() {
 
   const confirmMeta = confirmAction ? CONFIRM_META[confirmAction.type](confirmAction.apt) : null;
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    const pending = appointments.filter((a) => a.status === "pending").length;
-    const approved = appointments.filter((a) => a.status === "approved").length;
-    const today = getManilaDateString();
-    const todayCount = appointments.filter(
-      (a) =>
-        a.date?.slice(0, 10) === today &&
-        ["pending", "approved"].includes(a.status),
-    ).length;
-    if (i.includes("appointment"))
-      return `You have ${pending} pending and ${approved} approved appointments.`;
-    if (i.includes("pending"))
-      return `There are ${pending} pending appointments awaiting your action.`;
-    if (i.includes("approved"))
-      return `You have ${approved} approved appointments.`;
-    if (i.includes("today"))
-      return `You have ${todayCount} appointments today.`;
-    return "I can help you manage appointments, check statuses, and more. What do you need?";
-  };
-
   return (
     <ProfessorPageShell
       outerClassName="dashboard-with-sidebar"
       mainClassName="dashboard-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-            getBotResponse={generateBotResponse}
-          />
           <ActionConfirmModal
             show={!!confirmAction}
             onCancel={() => setConfirmAction(null)}

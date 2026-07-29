@@ -5,7 +5,6 @@ import "./adm-document-processing.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
@@ -180,18 +179,6 @@ export default function AdminDocumentProcessing() {
       : baseFiltered.filter((doc) => doc.status === activeTab);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    const count = (status) => documents.filter((d) => d.status === status).length;
-    if (i.includes("pending")) return `There are ${count("pending")} pending documents awaiting processing.`;
-    if (i.includes("processing")) return `${count("processing")} document(s) are currently being processed.`;
-    if (i.includes("ready")) return `${count("ready")} document(s) are ready for student pickup.`;
-    if (i.includes("released")) return `${count("released")} document(s) have been released, awaiting pickup confirmation.`;
-    if (i.includes("claimed")) return `${count("claimed")} document request(s) have been claimed.`;
-    if (i.includes("search") || i.includes("find")) return "Use the search bar to look up by tracking number, student name, or student ID.";
-    return "I can help you with document processing. Ask about pending, processing, ready, released, or claimed documents!";
-  };
-
   const handleViewDetails = (doc) => {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes || "");
@@ -295,11 +282,6 @@ export default function AdminDocumentProcessing() {
       mainClassName="adp-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-            getBotResponse={generateBotResponse}
-          />
-
           {/* ── Details Modal ────────────────────────────────────────────────────── */}
           {showDetailsModal && selectedDocument && (
             <div className="adp-modal-backdrop" onClick={handleCloseModal}>

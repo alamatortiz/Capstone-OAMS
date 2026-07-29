@@ -5,7 +5,6 @@ import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-scan-document.css";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
@@ -114,9 +113,6 @@ export default function AdminScanDocument() {
   // Stop the camera stream + decode loop on unmount, in case the admin
   // navigates away mid-scan.
   useEffect(() => stopScanning, []);
-
-  const generateBotResponse = () =>
-    "I can help with scanning documents and verifying QR codes. Enter a QR code manually below or use the scanner.";
 
   function stopScanning() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -415,10 +411,6 @@ export default function AdminScanDocument() {
             </div>
           )}
 
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-            getBotResponse={generateBotResponse}
-          />
         </>
       }
     >

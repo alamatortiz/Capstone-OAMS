@@ -15,7 +15,6 @@ import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import "./stud-document-status.css";
@@ -419,28 +418,6 @@ export default function DocumentStatusPage() {
     }
   };
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    const pending = documents.filter((d) => d.status === "pending").length;
-    const ready = documents.filter((d) => d.status === "ready").length;
-    if (i.includes("status") || i.includes("document")) {
-      return pending > 0
-        ? `You have ${pending} pending request(s) and ${ready} ready for pickup.`
-        : ready > 0
-          ? `You have ${ready} document(s) ready for pickup!`
-          : "All your document requests have been completed.";
-    }
-    if (i.includes("cancel")) {
-      return "Click on a pending or processing request, then use the 'Cancel Request' button to cancel it.";
-    }
-    if (i.includes("ready") || i.includes("pickup")) {
-      return ready > 0
-        ? `You have ${ready} document(s) ready for pickup. Please visit the registrar's office.`
-        : "None of your documents are ready for pickup yet.";
-    }
-    return "I can help with document statuses. Try: 'What documents are ready?' or 'How many pending requests?'";
-  };
-
   const activeDocuments = documents.filter(
     (d) => d.status !== "claimed" && d.status !== "rejected",
   );
@@ -452,13 +429,6 @@ export default function DocumentStatusPage() {
     <StudentPageShell
       outerClassName="dss-with-sidebar"
       mainClassName="dss-main doc-status-page"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your document requests?"
-          getBotResponse={generateBotResponse}
-          sendButtonAriaLabel="Send"
-        />
-      }
     >
         {selectedDoc ? (
           <DocumentDetail

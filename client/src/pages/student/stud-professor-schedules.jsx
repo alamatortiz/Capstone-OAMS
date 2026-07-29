@@ -7,7 +7,6 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import { connectSocket } from "../../utils/socket";
 import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 
@@ -193,23 +192,6 @@ export default function ProfessorSchedule() {
     setSelectedDeptId(null);
   };
 
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-    if (
-      lowerInput.includes("schedule") ||
-      lowerInput.includes("professor") ||
-      lowerInput.includes("faculty")
-    ) {
-      return "You're currently viewing faculty consultation schedules. Each professor has multiple consultation hours throughout the week. Click on any department to see available professors and their availability.";
-    } else if (lowerInput.includes("appointment")) {
-      return "To book an appointment with a professor, check their consultation hours and visit the Appointment Booking section. You can schedule a meeting during their available times.";
-    } else if (lowerInput.includes("help") || lowerInput.includes("service")) {
-      return "I can help you with professor schedules, faculty information, consultation hours, and appointment booking. What would you like to know?";
-    } else {
-      return "That's a great question! For more detailed assistance, please visit the respective section or contact your college office.";
-    }
-  };
-
   // Groups a faculty member's flat availability[] into day-ordered buckets
   const getDaySchedules = (professor) => {
     const dayOrder = [
@@ -248,12 +230,6 @@ export default function ProfessorSchedule() {
     <StudentPageShell
       outerClassName="psched-with-sidebar"
       mainClassName="psched-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="professor-schedule-page">
           {/* Header */}

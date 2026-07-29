@@ -10,7 +10,6 @@ import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import { useQueue } from '../../contexts/QueueContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import { formatCollegeLabel } from '../../utils/formatCollege';
@@ -264,38 +263,12 @@ export default function QueuePage() {
 
   const [leaveConfirmQueue, setLeaveConfirmQueue] = useState(null);
 
-  const generateBotResponse = (userInput) => {
-    const lower = userInput.toLowerCase();
-    if (lower.includes('queue') || lower.includes('position')) {
-      if (queues.length === 0) return "You don't have any active queues. Would you like to join one?";
-      const positionText = queues[0].status === 'serving'
-        ? (queues[0].arrivedAt ? 'You are currently being served' : 'You have been called — please proceed to the counter')
-        : `Your first queue position is ${queues[0].position}`;
-      return `You have ${queues.length} active queue${queues.length > 1 ? 's' : ''}. ${positionText}. Est. wait: ${queues[0].estimatedWait}`;
-    }
-    if (lower.includes('wait') || lower.includes('time')) {
-      return queues.length > 0
-        ? `Your estimated wait time is ${queues[0].estimatedWait}. Currently ${queues[0].totalWaiting} people are waiting.`
-        : 'Join a queue to see your estimated wait time!';
-    }
-    if (lower.includes('service') || lower.includes('available')) {
-      return `There are ${availableSlots.length} open queue${availableSlots.length !== 1 ? 's' : ''} available today. Use the filters to find what you need.`;
-    }
-    return "I can help you with queue information, wait times, and available services. What would you like to know?";
-  };
-
   return (
     <StudentPageShell
       outerClassName="qpage-with-sidebar"
       mainClassName="qpage-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your queue today?"
-            getBotResponse={generateBotResponse}
-            shrinkIconOnMobile={false}
-            customScrollbar={false}
-          />
           <ActionConfirmModal
             show={leaveConfirmQueue !== null}
             onCancel={() => setLeaveConfirmQueue(null)}

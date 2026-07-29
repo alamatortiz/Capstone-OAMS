@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import Pagination from "../../components/Pagination";
@@ -251,21 +250,6 @@ export default function AdminTransaction() {
   }, [authUser, token, fetchTransactions]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("transaction") || i.includes("log"))
-      return "The transaction log shows all activity in your department. You can filter by type, status, and date range.";
-    if (i.includes("queue"))
-      return "Queue transactions show completed, cancelled, and pending queue services in your department.";
-    if (i.includes("appointment"))
-      return "Appointment transactions track scheduled, approved, and rejected appointments in your department.";
-    if (i.includes("document"))
-      return "Document request transactions show approved, rejected, and pending document requests from students.";
-    if (i.includes("export") || i.includes("download"))
-      return "You can export transaction reports using the 'Export Report' button. Select your date range and filters first.";
-    return "I can help you search, filter, and analyze transaction logs. What would you like to know?";
-  };
-
   // ── Statistics (computed server-side over the admin's full department) ───
   const stats = txnStats;
 
@@ -343,12 +327,6 @@ export default function AdminTransaction() {
     <AdminPageShell
       outerClassName="admin-transaction-with-sidebar"
       mainClassName="admin-transaction-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with transactions today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="admin-transaction-container">
           <PageHeader

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
@@ -140,9 +139,6 @@ export default function ProfessorTransactionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, token]);
 
-  const generateBotResponse = () =>
-    "I can help you with appointment management, student requests, and document reviews. What do you need?";
-
   // ── Derived stats ─────────────────────────────────────────────────────────
   const stats = {
     total: transactions.length,
@@ -158,12 +154,6 @@ export default function ProfessorTransactionsPage() {
     <ProfessorPageShell
       outerClassName="dashboard-with-sidebar"
       mainClassName="dashboard-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="transactions-page">
 

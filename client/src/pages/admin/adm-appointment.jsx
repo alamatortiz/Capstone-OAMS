@@ -6,7 +6,6 @@ import { ChevronLeft } from "lucide-react";
 import "./adm-appointment.css";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import { COLLEGES } from "../../data/colleges";
 import { formatManilaDate } from "../../utils/dateTime";
@@ -135,19 +134,6 @@ export default function AdminAppointment() {
       events.forEach((event) => socket.off(event, fetchAppointments));
     };
   }, [authUser, fetchAppointments]);
-
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("appointment"))
-      return `There are ${stats.total} total appointments. ${stats.pending} are pending approval.`;
-    if (i.includes("pending"))
-      return `You have ${stats.pending} pending appointments waiting for your action.`;
-    if (i.includes("student"))
-      return "You can search appointments by student name or ID using the search bar at the top.";
-    if (i.includes("filter") || i.includes("college"))
-      return "Use the college dropdown to filter appointments by department.";
-    return "I can help with appointment management, filtering, and scheduling. What would you like to do?";
-  };
 
   const searchFiltered = searchQuery
     ? appointments.filter((a) => {
@@ -287,11 +273,6 @@ export default function AdminAppointment() {
       mainClassName="admin-appointment-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-            getBotResponse={generateBotResponse}
-          />
-
           {selectedAppointment && (
             <div className="admin-appointment-modal-overlay">
               <div

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -197,42 +196,6 @@ export default function TransactionsPage() {
     return () => clearInterval(interval);
   }, [fetchTransactions]);
 
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-    if (lowerInput.includes("completed") || lowerInput.includes("status")) {
-      const completedCount = transactions.filter(
-        (t) => t.status === "completed",
-      ).length;
-      return `You have ${completedCount} completed transactions. Would you like to see more details?`;
-    } else if (lowerInput.includes("ongoing")) {
-      const ongoingCount = transactions.filter(
-        (t) => t.status === "ongoing",
-      ).length;
-      return `You currently have ${ongoingCount} ongoing transactions. Check back soon for updates!`;
-    } else if (lowerInput.includes("queue")) {
-      const queueCount = transactions.filter((t) => t.type === "queue").length;
-      return `You have ${queueCount} queue-related transactions in your history.`;
-    } else if (
-      lowerInput.includes("appointment") ||
-      lowerInput.includes("meeting")
-    ) {
-      const appointmentCount = transactions.filter(
-        (t) => t.type === "appointment",
-      ).length;
-      return `You have ${appointmentCount} appointment transactions recorded.`;
-    } else if (
-      lowerInput.includes("document") ||
-      lowerInput.includes("certificate")
-    ) {
-      const documentCount = transactions.filter(
-        (t) => t.type === "document",
-      ).length;
-      return `You have ${documentCount} document-related transactions.`;
-    } else {
-      return "I can help you search through your transactions. Try asking about specific types like queues, appointments, or documents!";
-    }
-  };
-
   const getTypeIcon = (type) => {
     switch (type) {
       case "queue":
@@ -277,12 +240,6 @@ export default function TransactionsPage() {
     <StudentPageShell
       outerClassName="transactions-with-sidebar"
       mainClassName="transactions-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with your transactions?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="transactions-container">
           {/* Header */}

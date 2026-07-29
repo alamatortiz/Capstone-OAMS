@@ -7,7 +7,6 @@ import "./adm-data-management.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
@@ -219,17 +218,6 @@ export default function AdminDataManagement() {
   useEffect(() => {
     if (activeTab === "audit") fetchAuditLogs(auditActionFilter);
   }, [activeTab, auditActionFilter, fetchAuditLogs]);
-
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("document") || i.includes("certificate"))
-      return "Manage document types and their requirements in the Document Settings tab.";
-    if (i.includes("service") || i.includes("queue"))
-      return "Configure queue services — name and average service time — in Service Settings.";
-    if (i.includes("audit") || i.includes("log"))
-      return "The Audit Logs tab shows all CREATE, UPDATE, DELETE, and other admin actions. Filter by action type.";
-    return "I can help with document settings, service configuration, and audit logs. What do you need?";
-  };
 
   // ── Handlers: Document Types ───────────────────────────────
   const openAddDocModal = () => {
@@ -546,11 +534,6 @@ export default function AdminDataManagement() {
       mainClassName="admin-dashboard-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting="Hello! I'm your OAMS Assistant. Need help with Data Management?"
-            getBotResponse={generateBotResponse}
-          />
-
           {/* ── Document Type Modal ── */}
           {showDocModal && (
             <div className="adm-modal-overlay">

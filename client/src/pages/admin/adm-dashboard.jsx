@@ -8,7 +8,6 @@ import deleteIcon from "../../assets/delete_icon.png";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 
 // ── Icons (all unchanged from original) ──────────────────────────────────────
 const ClockIcon = () => (
@@ -365,19 +364,6 @@ export default function AdminDashboard() {
   const facultyAvailability = dashStats?.facultyAvailability ?? [];
   const announcements = dashStats?.announcements ?? [];
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("user") || i.includes("account"))
-      return "You can manage user accounts from the Admin Management section (User Management).";
-    if (i.includes("document") || i.includes("approval"))
-      return `There are ${s?.pendingDocuments ?? 0} documents pending processing. Check the Pending Documents section.`;
-    if (i.includes("queue") || i.includes("waiting"))
-      return `There are ${s?.activeQueues ?? 0} active queues right now. Use the Queue section to manage them.`;
-    if (i.includes("announcement"))
-      return "Use Announcement Management to create and manage announcements.";
-    return "I can help with user management, document approvals, queue hosting, and announcements. What are you working on?";
-  };
-
   // ── Handler for clicking stat cards ────────────────────────────────────────
   const handleStatCardClick = (statTitle) => {
     if (statTitle === "Active Queues") {
@@ -401,12 +387,6 @@ export default function AdminDashboard() {
     <AdminPageShell
       outerClassName="admin-dashboard-with-sidebar"
       mainClassName="admin-dashboard-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="admin-dashboard">
           {dashError && <div className="dash-error-banner">{dashError}</div>}

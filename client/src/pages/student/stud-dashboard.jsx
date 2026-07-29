@@ -6,8 +6,6 @@ import { useAuth } from "../../context/AuthContext";
 import { useQueue } from "../../contexts/QueueContext";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
-import ChatWidget from "../../components/ChatWidget";
-
 import { Link } from "react-router-dom";
 import { getCollegeLogo } from "../../data/collegeLogo";
 
@@ -485,40 +483,11 @@ export default function StudentDashboard() {
   const recentActivity = dashStats?.recentActivity ?? [];
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-    if (lowerInput.includes("queue") || lowerInput.includes("position")) {
-      if (!mostRecentQueue) return "You don't have any active queues. Would you like to join one?";
-      const positionText = mostRecentQueue.status === "serving"
-        ? (mostRecentQueue.arrivedAt ? "currently being served" : "called — please proceed to the counter")
-        : `at position ${mostRecentQueue.position}`;
-      return `You're ${positionText} in the ${mostRecentQueue.service} queue. Estimated wait: ${mostRecentQueue.estimatedWaitTime}.`;
-    } else if (lowerInput.includes("appointment")) {
-      const count = dashStats?.stats?.appointments?.upcoming ?? 0;
-      return `You have ${count} upcoming appointment${count !== 1 ? "s" : ""} this week. Visit the Appointments section for details.`;
-    } else if (lowerInput.includes("document")) {
-      const total = dashStats?.stats?.documents?.total ?? 0;
-      const pending = dashStats?.stats?.documents?.pending ?? 0;
-      return `You have ${total} document${total !== 1 ? "s" : ""} on file${pending > 0 ? `, with ${pending} needing your attention` : ""}.`;
-    } else if (lowerInput.includes("service") || lowerInput.includes("help")) {
-      return "I can help you with queue information, appointments, documents, announcements, and more. What would you like to know?";
-    } else {
-      return "That's a great question! For more detailed assistance, please visit the respective section or contact your college office.";
-    }
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
       outerClassName="dash-with-sidebar"
       mainClassName="dash-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-          getBotResponse={generateBotResponse}
-          accent="dark"
-        />
-      }
     >
         <div className="student-dashboard">
           {/* Error banner */}

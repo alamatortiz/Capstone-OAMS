@@ -1,7 +1,7 @@
 import AdminSidebar from "./AdminSidebar";
 
 /**
- * `overlay` (not `children`) is where ChatWidget/modals go — they must stay siblings
+ * `overlay` (not `children`) is where modals go — they must stay siblings
  * of <main>, not descendants, because some pages' main class sets `transform`, which
  * would break position:fixed for anything nested inside it.
  */

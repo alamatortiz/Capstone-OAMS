@@ -5,7 +5,6 @@ import { ChevronLeft } from "lucide-react";
 import "./adm-professor-availability.css";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import { connectSocket } from "../../utils/socket";
 
@@ -103,19 +102,6 @@ export default function AdminProfessorAvailability() {
     };
   }, [fetchFaculty]);
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("available"))
-      return `There are currently ${faculty.filter((f) => f.status === "available").length} faculty members available.`;
-    if (i.includes("busy"))
-      return `${faculty.filter((f) => f.status === "busy").length} faculty members are busy right now.`;
-    if (i.includes("leave") || i.includes("unavailable"))
-      return `${faculty.filter((f) => f.status === "unavailable").length} faculty members are unavailable today.`;
-    if (i.includes("total"))
-      return `There are ${faculty.length} faculty members in your department.`;
-    return "I can help you check who's available, busy, or on leave. What do you need?";
-  };
-
   const filteredFaculty = faculty.filter((f) =>
     statusFilter === "all" || f.status === statusFilter
   );
@@ -135,12 +121,6 @@ export default function AdminProfessorAvailability() {
     <AdminPageShell
       outerClassName="apa-dashboard-with-sidebar"
       mainClassName="apa-dashboard-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! I'm your OAMS Assistant. How can I help you check faculty availability today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="apa-page-container">
           <PageHeader

@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-queue-analytics.css";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
@@ -242,36 +241,6 @@ export default function AdminQueueAnalytics() {
     return () => document.removeEventListener("click", handler);
   }, []);
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    const trends = analyticsData.trends;
-    const worstWait = performance.length > 0
-      ? [...performance].sort((a, b) => (parseInt(b.avgWait) || 0) - (parseInt(a.avgWait) || 0))[0]
-      : null;
-    const bestSatisfaction = performance.length > 0
-      ? [...performance].sort((a, b) => (b.satisfaction || 0) - (a.satisfaction || 0))[0]
-      : null;
-    if (i.includes("wait"))
-      return worstWait
-        ? `Average wait time for this period is ${avgWaitAll} minutes. ${worstWait.college} ${worstWait.service} has the highest at ${worstWait.avgWait}.`
-        : `Average wait time for this period is ${avgWaitAll} minutes.`;
-    if (i.includes("satisfaction"))
-      return bestSatisfaction
-        ? `Overall satisfaction is at ${avgSatisfaction}%. ${bestSatisfaction.college} ${bestSatisfaction.service} leads with ${bestSatisfaction.satisfaction}%.`
-        : `Overall satisfaction is at ${avgSatisfaction}%.`;
-    if (i.includes("peak"))
-      return `Peak hours are ${trends.peakActivityTime} across all services. Best service time is ${trends.bestServiceTime}.`;
-    if (i.includes("queue") || i.includes("active"))
-      return `There are ${performance.length} service${performance.length === 1 ? "" : "s"} with activity this period.`;
-    if (i.includes("served") || i.includes("student")) {
-      const servedTrend = trends.weeklyComparison?.find((t) => t.label === "Students Served");
-      return servedTrend
-        ? `${servedTrend.value} students have been served this period, ${servedTrend.change} vs. the previous period.`
-        : `${totalServed} students have been served this period.`;
-    }
-    return "I can help with wait times, satisfaction rates, peak hours, and queue performance. What would you like to know?";
-  };
-
   const performance = analyticsData.performance;
   const positiveInsights = analyticsData.positiveInsights;
   const improvementAreas = analyticsData.improvementAreas;
@@ -301,12 +270,6 @@ export default function AdminQueueAnalytics() {
     <AdminPageShell
       outerClassName="aqa-layout"
       mainClassName="aqa-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue analytics today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="aqa-content">
           <PageHeader

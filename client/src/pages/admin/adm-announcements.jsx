@@ -7,7 +7,6 @@ import "./adm-announcements.css";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
@@ -118,17 +117,6 @@ export default function AdminAnnouncements() {
   const user = authUser
     ? { ...authUser, college: authUser.departmentName ?? "N/A College", departmentAbbrev: authUser.departmentAbbrev ?? "CCS" }
     : { name: "Admin", college: "", departmentAbbrev: "CCS" };
-
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("pin")) return "Use the Pin button on any active announcement to keep it at the top, or Unpin to remove it.";
-    if (i.includes("archive")) return "Archiving moves an announcement out of the active list. You can restore it anytime from the Archived tab.";
-    if (i.includes("delete")) return "Deleting an archived announcement removes it permanently — this can't be undone.";
-    if (i.includes("filter") || i.includes("college") || i.includes("type"))
-      return "Use the search bar and the Type dropdown above the list to narrow down announcements.";
-    if (i.includes("create") || i.includes("new")) return "Click 'New Announcement' at the top right to publish a new one.";
-    return "I can help with creating, pinning, filtering, archiving, or deleting announcements. What do you need?";
-  };
 
   // ── Announcements state ────────────────────────────────────────────────────
   const [announcements, setAnnouncements] = useState([]);
@@ -391,11 +379,6 @@ export default function AdminAnnouncements() {
               </div>
             ))}
           </div>
-
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. Ask me about announcements, pinning, or filters."
-            getBotResponse={generateBotResponse}
-          />
 
           {/* View Modal */}
           {viewingAnnouncement && (

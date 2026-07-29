@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import "./prof-dashboard.css";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
@@ -235,29 +234,10 @@ export default function ProfessorDashboard() {
   ];
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("appointment"))
-      return `You have ${s?.pendingAppointments ?? 0} pending appointments, with ${s?.todayAppointments ?? 0} scheduled for today.`;
-    if (i.includes("student"))
-      return `You have ${s?.pendingAppointments ?? 0} pending appointments from students.`;
-    if (i.includes("document"))
-      return `You have ${s?.documentsToReview ?? 0} pending document requests.`;
-    if (i.includes("schedule") || i.includes("office hours"))
-      return "Your office hours are Monday to Friday, 8:00 AM - 5:00 PM, and Saturday 8:00 AM - 12:00 PM.";
-    return "I can help you with appointment management and document reviews. What do you need?";
-  };
-
   return (
     <ProfessorPageShell
       outerClassName="dashboard-with-sidebar"
       mainClassName="dashboard-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="professor-dashboard">
           {dashError && <div className="dash-error-banner">{dashError}</div>}

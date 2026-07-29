@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import "./prof-dashboard.css";
 import "./prof-schedule-manager.css";
@@ -271,9 +270,6 @@ export default function ProfessorScheduleManager() {
 
   // ── Weekly schedule summary (days with slots, in week order) ────────────────
   const scheduledDays = DAYS.filter((d) => (slotsByDay[d] ?? []).length > 0);
-
-  const generateBotResponse = () =>
-    "Click any day in the weekly overview to add time slots for that day. This schedule repeats every week until you change it.";
 
   const selectedSlots = selectedDay ? (slotsByDay[selectedDay] ?? []) : [];
 
@@ -586,11 +582,6 @@ export default function ProfessorScheduleManager() {
         confirmDisabled={deleteSaving}
       />
 
-      {/* AI Chatbot */}
-      <ChatWidget
-        initialGreeting="Hello! I'm your OAMS Assistant. How can I help with your schedule?"
-        getBotResponse={generateBotResponse}
-      />
     </div>
   );
 }

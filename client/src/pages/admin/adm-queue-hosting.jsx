@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { formatManilaDateTime, getManilaTimeString, addMinutesClampedToDay, formatTimeString } from "../../utils/dateTime";
@@ -144,21 +143,6 @@ export default function AdminQueueHosting() {
   // field themselves, since past that point it's their explicit choice.
   const [defaultEndClamped, setDefaultEndClamped] = useState(false);
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("open") || i.includes("new queue") || i.includes("host"))
-      return 'Click "Open Queue Line" at the top of the page to launch a new queue for a service in your department.';
-    if (i.includes("pause"))
-      return "Use the Pause button on an active queue's card to stop new students from joining.";
-    if (i.includes("resume"))
-      return "Resume a paused queue from the Paused Queue Lines section to start accepting students again.";
-    if (i.includes("close"))
-      return "Closing a queue permanently ends it for today. You'll be asked to confirm before it closes.";
-    if (i.includes("capacity"))
-      return "Capacity shows how many students are currently waiting relative to the queue's maximum.";
-    return `I can help with opening, pausing, resuming, and closing queue lines for ${user.departmentAbbrev}. What do you need?`;
-  };
-
   // ── Modal handlers ─────────────────────────────────────────────────────────
   const resetForm = () => {
     setServiceId("");
@@ -266,11 +250,6 @@ export default function AdminQueueHosting() {
       mainClassName="aqh-dashboard-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting={`Hello! 👋 I'm your OAMS Assistant. How can I help you host queues for ${user.departmentAbbrev} today?`}
-            getBotResponse={generateBotResponse}
-          />
-
           <QueueReasonModal
             show={!!reasonModal}
             title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}

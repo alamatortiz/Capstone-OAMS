@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
@@ -232,24 +231,6 @@ export default function AdminQueue() {
   const monitoringQueue =
     queueDetails.find((q) => q.id === monitoringQueueId) || null;
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("queue") || i.includes("waiting"))
-      return `Currently managing ${systemStats.totalQueues} active queue line(s) with ${systemStats.totalWaiting} students waiting.`;
-    if (i.includes("busy") || i.includes("status")) {
-      const busiest = Math.max(
-        0,
-        ...queueDetails.map((q) => q.currentCount || 0),
-      );
-      return `Your busiest queue line right now has ${busiest} students waiting.`;
-    }
-    if (i.includes("average") || i.includes("wait"))
-      return `The average service time across your queue lines is ${systemStats.avgWaitTime}.`;
-    if (i.includes("monitor"))
-      return "Click the Monitor button on any queue detail to track it in real-time and receive live updates.";
-    return "I can help you with queue monitoring, wait time analysis, and department statistics. What would you like to know?";
-  };
-
   // Today's open/paused queue lines, plus 'full'/'expired' lines — those are
   // closed to new joins but still have unserved students by construction
   // (they settle into 'completed' once the last one is served/left/voided).
@@ -392,11 +373,6 @@ export default function AdminQueue() {
         mainClassName="admin-queue-main"
         overlay={
           <>
-            <ChatWidget
-              initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue management today?"
-              getBotResponse={generateBotResponse}
-            />
-
             <QueueReasonModal
               show={!!reasonModal}
               title={reasonModal?.mode === "pause" ? "Pause Queue" : "Stop Queue"}
@@ -823,12 +799,6 @@ export default function AdminQueue() {
     <AdminPageShell
       outerClassName="admin-queue-with-sidebar"
       mainClassName="admin-queue-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with queue management today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="queue-page-container">
           <PageHeader

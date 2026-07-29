@@ -20,7 +20,6 @@ import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -509,38 +508,11 @@ export default function QueueStatusPage() {
     }
   };
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    const q = selectedQueue ?? queues[0];
-    if (i.includes("position") || i.includes("queue")) {
-      if (!q) return "You have no active queues right now.";
-      const positionText = q.status === "serving" ? "You're currently being served" : `You're at position ${q.position} of ${q.totalWaiting}`;
-      return `${positionText} in the ${q.serviceName} queue. Estimated wait: ${q.estimatedWait}.`;
-    }
-    if (i.includes("wait") || i.includes("time")) {
-      return q
-        ? `Estimated wait: ${q.estimatedWait}. You joined at ${q.joinedAt}.`
-        : "Join a queue to see your wait time.";
-    }
-    if (i.includes("cancel") || i.includes("leave")) {
-      return "Use the 'Leave Queue' button on the queue detail view to exit a queue.";
-    }
-    return "I can help with your queue position, wait time, or concern notes. What would you like to know?";
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
       outerClassName="qstatus-with-sidebar"
       mainClassName="qstatus-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you track your queue?"
-          getBotResponse={generateBotResponse}
-          sendButtonAriaLabel="Send"
-          shrinkIconOnMobile={false}
-        />
-      }
     >
         {selectedQueue ? (
           <QueueDetail

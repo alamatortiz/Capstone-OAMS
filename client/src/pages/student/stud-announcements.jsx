@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import { formatManilaDate } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
@@ -204,33 +203,6 @@ export default function AnnouncementsPage() {
     (a) => selectedFilter === "all" || a.category === selectedFilter,
   );
 
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-    if (lowerInput.includes("announcement")) {
-      const total = announcements.length;
-      const pinned = pinnedAnnouncements.length;
-      return `There are currently ${total} announcements, with ${pinned} pinned as important. You can filter by category using the tabs above!`;
-    } else if (lowerInput.includes("important")) {
-      const importantCount = announcements.filter(
-        (a) => a.category === "important",
-      ).length;
-      return `Important announcements are marked with red badges. We have ${importantCount} important announcement(s) currently visible. Check them out to stay updated!`;
-    } else if (
-      lowerInput.includes("event") ||
-      lowerInput.includes("activity")
-    ) {
-      const events = announcements.filter((a) => a.category === "event");
-      return `There are ${events.length} upcoming events. Click on 'Events' tab to see all of them!`;
-    } else if (
-      lowerInput.includes("college") ||
-      lowerInput.includes("department")
-    ) {
-      return "You're seeing announcements from your own department, plus any university-wide notices.";
-    } else {
-      return "I can help you find announcements, learn about upcoming events, deadlines, and more. What would you like to know?";
-    }
-  };
-
   const getCategoryColor = (category) => {
     const colors = {
       important: "announcement-important",
@@ -261,11 +233,6 @@ export default function AnnouncementsPage() {
       mainClassName="ann-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. Ask me about announcements or any college updates!"
-            getBotResponse={generateBotResponse}
-          />
-
           {viewingAnnouncement && (
             <div
               className="ann-detail-overlay"

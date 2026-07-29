@@ -18,7 +18,6 @@ import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import AppointmentListItem from "../../components/AppointmentListItem";
 import { formatManilaDate } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
@@ -283,8 +282,6 @@ export default function AppointmentStatusPage() {
     }
   };
 
-  const generateBotResponse = () => "I can help you track your appointments. Click on any appointment card for details.";
-
   // Defaults to "This Week" across every tab -- the range control below lets
   // a student switch to "This Month"/"All Time" to see everything else.
   const rangeFilteredAppointments = filterByRange(appointments, allRange);
@@ -324,13 +321,6 @@ export default function AppointmentStatusPage() {
     <StudentPageShell
       outerClassName="apst-with-sidebar"
       mainClassName="apst-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! I can help you with your appointments."
-          getBotResponse={generateBotResponse}
-          sendButtonAriaLabel="Send"
-        />
-      }
     >
         {selectedAppt ? (
           <AppointmentDetail

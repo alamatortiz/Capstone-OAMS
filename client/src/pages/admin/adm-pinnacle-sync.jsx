@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-pinnacle-sync.css";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import api from "../../utils/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -179,9 +178,6 @@ export default function AdminPinnacleSync() {
     load();
   }, [authUser]);
 
-  const generateBotResponse = () =>
-    "I can help with PinnaCle sync configuration, user management, and data synchronization. What do you need?";
-
   const handleSaveConfiguration = async () => {
     try {
       await api.post("/admin/pinnacle-sync/config", { apiUrl, apiKey, syncInterval, syncEnabled });
@@ -228,12 +224,6 @@ export default function AdminPinnacleSync() {
     <AdminPageShell
       outerClassName="admin-dashboard-with-sidebar"
       mainClassName="admin-dashboard-main"
-      overlay={
-        <ChatWidget
-          initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-          getBotResponse={generateBotResponse}
-        />
-      }
     >
         <div className="aps-page">
           <div className="aps-header-block">

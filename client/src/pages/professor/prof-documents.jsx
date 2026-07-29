@@ -4,7 +4,6 @@ import { ChevronLeft, FileText, XCircle, CheckCircle2, MessageSquare } from "luc
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import { toast } from "sonner";
 import { formatManilaDate, getManilaTomorrowDateString } from "../../utils/dateTime";
 import "./prof-dashboard.css";
@@ -422,43 +421,6 @@ export default function ProfessorDocumentRequest() {
     }
   };
 
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-    const activeCount = requests.filter(
-      (r) => r.status !== "claimed" && r.status !== "rejected",
-    ).length;
-    const readyCount = requests.filter((r) => r.status === "generated").length;
-    const pendingCount = requests.filter((r) => r.status === "pending").length;
-
-    if (lowerInput.includes("document") || lowerInput.includes("tracking")) {
-      return pendingCount > 0
-        ? `You have ${pendingCount} pending document request(s). You currently have ${activeCount} active request(s). If you need help, tell me the document type or tracking number.`
-        : readyCount > 0
-          ? `You have ${readyCount} document(s) ready for pickup. Tell me which one you're looking for and I can guide you.`
-          : `Right now you have no pending requests. You have ${activeCount} active request(s). Want to request a new document?`;
-    }
-
-    if (
-      lowerInput.includes("status") ||
-      lowerInput.includes("where") ||
-      lowerInput.includes("progress")
-    ) {
-      return activeCount > 0
-        ? `You have ${activeCount} active request(s). Use the list to check each document's current status.`
-        : 'You have no active requests right now. You can request a document using the "Request Document" button.';
-    }
-
-    if (
-      lowerInput.includes("request") ||
-      lowerInput.includes("apply") ||
-      lowerInput.includes("new")
-    ) {
-      return 'To request a document, click "Request Document", choose the document type, then enter the purpose. Want help choosing what to request?';
-    }
-
-    return 'I can help with document requests, tracking, and statuses. Try asking: "What is my document status?" or "How do I request a document?"';
-  };
-
   const activeRequests = requests.filter(
     (r) => r.status !== "claimed" && r.status !== "rejected",
   );
@@ -651,11 +613,6 @@ export default function ProfessorDocumentRequest() {
             confirmDisabled={!!cancellingId}
           />
 
-          {/* AI Chatbot Widget */}
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you with document requests?"
-            getBotResponse={generateBotResponse}
-          />
         </>
       }
     >

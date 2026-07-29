@@ -3,7 +3,6 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import AppointmentListItem from "../../components/AppointmentListItem";
 import { Link } from "react-router-dom";
 import "./stud-appointments.css";
@@ -318,15 +317,6 @@ export default function AppointmentsPage() {
     label: formatCollegeLabel(c.abbreviation, c.name),
   }));
 
-  const generateBotResponse = (userInput) => {
-    const lowerInput = userInput.toLowerCase();
-    if (lowerInput.includes("slot") || lowerInput.includes("available")) return `We have ${visibleSlots.length} available slots this week and next week. Filter by professor, college, or date to find the perfect time!`;
-    if (lowerInput.includes("book") || lowerInput.includes("appointment")) return "Select a slot from the available slots section and provide your consultation purpose.";
-    if (lowerInput.includes("professor")) return `There are ${new Set(visibleSlots.map((s) => s.professorId)).size} professors with available consultation slots.`;
-    if (lowerInput.includes("cancel")) return "Go to your bookings and click the cancel button on the appointment you want to remove.";
-    return "I can help you with booking appointments, finding slots, or managing your consultations. What would you like to know?";
-  };
-
   const handleBookSlot = async () => {
     if (!selectedSlot || submitting) return;
     if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
@@ -481,8 +471,6 @@ export default function AppointmentsPage() {
               </div>
             </div>
           )}
-
-          <ChatWidget initialGreeting="Hello! I can help you find and book appointments. Just ask!" getBotResponse={generateBotResponse} />
 
           <ActionConfirmModal
             show={cancelConfirmId !== null}

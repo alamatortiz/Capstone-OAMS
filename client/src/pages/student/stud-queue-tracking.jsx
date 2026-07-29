@@ -7,7 +7,6 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
-import ChatWidget from "../../components/ChatWidget";
 import "./stud-queue-tracking.css";
 
 import {
@@ -115,19 +114,6 @@ export default function QueueTrackingPage() {
     }
   };
 
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("queue") || i.includes("position"))
-      return activeQueues.length > 0
-        ? `You have ${activeQueues.length} active queue(s). Check the Active tab for details.`
-        : "You don't have any active queues right now. Join one from the Queue page.";
-    if (i.includes("history"))
-      return `You have ${queueHistory.length} past queue record(s) in your history.`;
-    if (i.includes("analytics") || i.includes("stats"))
-      return `You've joined ${totalJoined} queue(s) total, completed ${totalCompleted}, with a ${successRate}% success rate.`;
-    return "I can help with your active queues, history, and analytics. What would you like to know?";
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
@@ -135,11 +121,6 @@ export default function QueueTrackingPage() {
       mainClassName="qtrack-main"
       overlay={
         <>
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-            getBotResponse={generateBotResponse}
-            sendButtonAriaLabel="Send"
-          />
           <ActionConfirmModal
             show={leaveConfirmQueue !== null}
             onCancel={() => setLeaveConfirmQueue(null)}

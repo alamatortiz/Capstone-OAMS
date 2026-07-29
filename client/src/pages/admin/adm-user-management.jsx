@@ -4,7 +4,6 @@ import { ChevronLeft } from "lucide-react";
 import "./adm-user-management.css";
 import { toast } from "sonner";
 import AdminPageShell from "../../components/AdminPageShell";
-import ChatWidget from "../../components/ChatWidget";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
@@ -119,15 +118,6 @@ export default function AdminUserManagement() {
   const PAGE_SIZE = 20;
 
   // ── Handlers: chat ───────────────────────────────────────────────────────────
-  const generateBotResponse = (input) => {
-    const i = input.toLowerCase();
-    if (i.includes("student"))   return `There are ${users.filter(u => u.role === "student").length} student accounts in the system.`;
-    if (i.includes("professor") || i.includes("faculty")) return `There are ${users.filter(u => u.role === "professor").length} professor accounts.`;
-    if (i.includes("suspend"))   return `There are ${users.filter(u => u.status === "suspended").length} suspended accounts. Edit a user to reactivate.`;
-    if (i.includes("user") || i.includes("account")) return "Accounts are synced in via Pinnacle Sync. Click the edit icon to modify a user, or the ban icon to suspend an account.";
-    return "I can help with user accounts, filtering, and password resets. What do you need?";
-  };
-
   // ── Handlers: CRUD ───────────────────────────────────────────────────────────
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -338,11 +328,6 @@ export default function AdminUserManagement() {
             icon={confirmMeta?.icon}
             confirmText={confirmMeta?.confirmText}
             variant={confirmMeta?.variant ?? "danger"}
-          />
-
-          <ChatWidget
-            initialGreeting="Hello! 👋 I'm your OAMS Assistant. How can I help you today?"
-            getBotResponse={generateBotResponse}
           />
         </>
       }
