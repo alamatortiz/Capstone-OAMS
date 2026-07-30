@@ -714,7 +714,7 @@ body {
   border-radius: 0.375rem;
   font-size: 0.65rem;
   font-weight: 700;
-  text-transform: capitalize;
+  text-transform: uppercase;
   white-space: nowrap;
   transition: all 0.3s ease;
 }
