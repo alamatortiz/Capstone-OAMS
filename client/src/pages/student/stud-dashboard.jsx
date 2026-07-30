@@ -723,7 +723,7 @@ export default function StudentDashboard() {
                     <Link
                       key={ann.id}
                       to="/student/announcements"
-                      className={`pinned-announcement-card pinned-announcement-${ann.category || "general"}`}
+                      className="pinned-announcement-card pinned-announcement-pinned"
                     >
                       <div className="pinned-announcement-icon">
                         {getAnnouncementIcon(ann.category)}
@@ -732,11 +732,6 @@ export default function StudentDashboard() {
                         <p className="pinned-announcement-title">
                           {ann.title}
                         </p>
-                        {ann.description && (
-                          <p className="pinned-announcement-description">
-                            {ann.description}
-                          </p>
-                        )}
                         <div className="pinned-announcement-meta">
                           <span className="pinned-announcement-college">
                             {ann.college}
@@ -749,10 +744,13 @@ export default function StudentDashboard() {
                             })}
                           </span>
                         </div>
+                        {ann.description && (
+                          <p className="pinned-announcement-description">
+                            {ann.description}
+                          </p>
+                        )}
                       </div>
-                      <span
-                        className={`pinned-announcement-badge pinned-badge-${ann.category || "general"}`}
-                      >
+                      <span className="pinned-announcement-badge pinned-badge-pinned">
                         {ann.category
                           ? ann.category.charAt(0).toUpperCase() +
                             ann.category.slice(1)

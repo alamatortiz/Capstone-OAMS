@@ -84,8 +84,8 @@ interface AnnouncementItem {
   status: AnnouncementStatus;
 }
 
-// Mirrors admin-announcements.css badge/icon colors (important=red, event=blue,
-// reminder=amber, general=gray — this admin page never uses the student side's purple).
+// Mirrors admin-announcements.css badge/icon colors (important=red, event=orange,
+// reminder=blue, general=gray; pinned announcements override all of these to green).
 const TYPE_META: Record<
   AnnouncementType,
   {
@@ -112,22 +112,22 @@ const TYPE_META: Record<
   event: {
     label: 'Event',
     icon: 'calendar-outline',
+    iconBg: 'rgba(249, 115, 22, 0.15)',
+    iconColor: '#f97316',
+    badgeBg: 'rgba(249, 115, 22, 0.15)',
+    badgeBorder: 'rgba(249, 115, 22, 0.35)',
+    badgeColor: '#f97316',
+    gradient: ['#f97316', '#ea580c'],
+  },
+  reminder: {
+    label: 'Reminder',
+    icon: 'notifications-outline',
     iconBg: 'rgba(59, 130, 246, 0.15)',
     iconColor: '#3b82f6',
     badgeBg: 'rgba(59, 130, 246, 0.15)',
     badgeBorder: 'rgba(59, 130, 246, 0.35)',
     badgeColor: '#3b82f6',
     gradient: ['#3b82f6', '#2563eb'],
-  },
-  reminder: {
-    label: 'Reminder',
-    icon: 'notifications-outline',
-    iconBg: 'rgba(245, 158, 11, 0.15)',
-    iconColor: '#f59e0b',
-    badgeBg: 'rgba(245, 158, 11, 0.15)',
-    badgeBorder: 'rgba(245, 158, 11, 0.35)',
-    badgeColor: '#f59e0b',
-    gradient: ['#f59e0b', '#d97706'],
   },
   general: {
     label: 'General',
@@ -139,6 +139,17 @@ const TYPE_META: Record<
     badgeColor: '#94a3b8',
     gradient: ['#94a3b8', '#64748b'],
   },
+};
+
+// Applied instead of TYPE_META when an announcement is pinned -- pinned
+// status takes visual priority over type.
+const PINNED_META = {
+  iconBg: 'rgba(34, 197, 94, 0.15)',
+  iconColor: '#22c55e',
+  badgeBg: 'rgba(34, 197, 94, 0.15)',
+  badgeBorder: 'rgba(34, 197, 94, 0.35)',
+  badgeColor: '#22c55e',
+  gradient: ['#22c55e', '#16a34a'] as const,
 };
 
 type TypeFilter = 'all' | AnnouncementType;
@@ -562,7 +573,7 @@ export default function AdminAnnouncementScreen() {
           ) : (
             <View style={styles.list}>
               {list.map((a) => {
-                const meta = TYPE_META[a.type];
+                const meta = a.isPinned ? { ...TYPE_META[a.type], ...PINNED_META } : TYPE_META[a.type];
                 return (
                   <View key={a.id} style={[styles.itemCard, a.isPinned && styles.itemCardPinned]}>
                     <View style={styles.itemTop}>
@@ -700,12 +711,12 @@ export default function AdminAnnouncementScreen() {
                       style={[
                         styles.badge,
                         {
-                          backgroundColor: TYPE_META[viewingAnnouncement.type].badgeBg,
-                          borderColor: TYPE_META[viewingAnnouncement.type].badgeBorder,
+                          backgroundColor: viewingAnnouncement.isPinned ? PINNED_META.badgeBg : TYPE_META[viewingAnnouncement.type].badgeBg,
+                          borderColor: viewingAnnouncement.isPinned ? PINNED_META.badgeBorder : TYPE_META[viewingAnnouncement.type].badgeBorder,
                         },
                       ]}
                     >
-                      <Text style={[styles.badgeText, { color: TYPE_META[viewingAnnouncement.type].badgeColor }]}>
+                      <Text style={[styles.badgeText, { color: viewingAnnouncement.isPinned ? PINNED_META.badgeColor : TYPE_META[viewingAnnouncement.type].badgeColor }]}>
                         {TYPE_META[viewingAnnouncement.type].label}
                       </Text>
                     </View>

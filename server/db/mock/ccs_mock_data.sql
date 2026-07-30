@@ -43,7 +43,7 @@ TRUNCATE TABLE faculty_availability;
 TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
 TRUNCATE TABLE locations;
-TRUNCATE TABLE faqs;
+TRUNCATE TABLE announcements;
 TRUNCATE TABLE login_logs;
 TRUNCATE TABLE user_sessions;
 TRUNCATE TABLE students;
@@ -502,4 +502,5 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('pinnacle_api_url',       'https://pinnacle-api.pnc.edu.ph/v1', 'PinnaCle API base URL'),
 ('pinnacle_api_key',       '',                                    'PinnaCle API authentication key'),
 ('pinnacle_sync_interval', '60',                                  'Auto-sync interval in minutes'),
-('pinnacle_sync_enabled',  'false',                               'Whether auto-sync is active');
+('pinnacle_sync_enabled',  'false',                               'Whether auto-sync is active');
+

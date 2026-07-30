@@ -75,9 +75,18 @@ const CATEGORY_STYLE: Record<
   { icon: IoniconName; gradient: readonly [string, string]; badgeBg: string; badgeBorder: string; badgeColor: string }
 > = {
   important: { icon: 'alert-circle-outline', gradient: ['#ef4444', '#dc2626'], badgeBg: 'rgba(239, 68, 68, 0.15)', badgeBorder: 'rgba(239, 68, 68, 0.3)', badgeColor: '#ef4444' },
-  event: { icon: 'calendar-outline', gradient: ['#3b82f6', '#2563eb'], badgeBg: 'rgba(59, 130, 246, 0.15)', badgeBorder: 'rgba(59, 130, 246, 0.3)', badgeColor: '#3b82f6' },
-  reminder: { icon: 'notifications-outline', gradient: ['#f59e0b', '#d97706'], badgeBg: 'rgba(245, 158, 11, 0.15)', badgeBorder: 'rgba(245, 158, 11, 0.3)', badgeColor: '#f59e0b' },
-  general: { icon: 'information-circle-outline', gradient: ['#8b5cf6', '#7c3aed'], badgeBg: 'rgba(139, 92, 246, 0.15)', badgeBorder: 'rgba(139, 92, 246, 0.3)', badgeColor: '#8b5cf6' },
+  event: { icon: 'calendar-outline', gradient: ['#f97316', '#ea580c'], badgeBg: 'rgba(249, 115, 22, 0.15)', badgeBorder: 'rgba(249, 115, 22, 0.3)', badgeColor: '#f97316' },
+  reminder: { icon: 'notifications-outline', gradient: ['#3b82f6', '#2563eb'], badgeBg: 'rgba(59, 130, 246, 0.15)', badgeBorder: 'rgba(59, 130, 246, 0.3)', badgeColor: '#3b82f6' },
+  general: { icon: 'information-circle-outline', gradient: ['#94a3b8', '#64748b'], badgeBg: 'rgba(148, 163, 184, 0.15)', badgeBorder: 'rgba(148, 163, 184, 0.3)', badgeColor: '#94a3b8' },
+};
+
+// Applied instead of CATEGORY_STYLE when an announcement is pinned -- pinned
+// status takes visual priority over category.
+const PINNED_STYLE = {
+  gradient: ['#22c55e', '#16a34a'] as const,
+  badgeBg: 'rgba(34, 197, 94, 0.15)',
+  badgeBorder: 'rgba(34, 197, 94, 0.3)',
+  badgeColor: '#22c55e',
 };
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -244,7 +253,9 @@ export default function StudentAnnouncementScreen() {
       : `${capitalize(selectedFilter)} Announcements`;
 
   const renderCard = (announcement: Announcement) => {
-    const style = CATEGORY_STYLE[announcement.category];
+    const style = announcement.isPinned
+      ? { ...CATEGORY_STYLE[announcement.category], ...PINNED_STYLE }
+      : CATEGORY_STYLE[announcement.category];
     return (
       <View key={announcement.id} style={styles.card}>
         <View style={styles.cardHeaderRow}>

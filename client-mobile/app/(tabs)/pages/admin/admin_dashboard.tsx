@@ -125,9 +125,10 @@ const quickActions: ToolItem[] = [
 
 const ANNOUNCEMENT_TAG_TINTS: Record<string, { bg: string; border: string; color: string }> = {
   important: { bg: 'rgba(239, 68, 68, 0.2)', border: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' },
-  reminder: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
-  event: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
-  general: { bg: 'rgba(139, 92, 246, 0.2)', border: 'rgba(139, 92, 246, 0.4)', color: '#8b5cf6' },
+  event: { bg: 'rgba(249, 115, 22, 0.2)', border: 'rgba(249, 115, 22, 0.4)', color: '#f97316' },
+  reminder: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
+  general: { bg: 'rgba(148, 163, 184, 0.2)', border: 'rgba(148, 163, 184, 0.4)', color: '#94a3b8' },
+  pinned: { bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' },
 };
 
 interface AnnouncementItem {
@@ -500,7 +501,7 @@ export default function AdminDashboardScreen() {
             </View>
             <View style={styles.announcementsList}>
               {announcements.map((ann) => {
-                const tint = ANNOUNCEMENT_TAG_TINTS[ann.tag] ?? ANNOUNCEMENT_TAG_TINTS.general;
+                const tint = ann.isPinned ? ANNOUNCEMENT_TAG_TINTS.pinned : (ANNOUNCEMENT_TAG_TINTS[ann.tag] ?? ANNOUNCEMENT_TAG_TINTS.general);
                 return (
                   <View key={ann.id} style={styles.announcementItem}>
                     <View style={styles.announcementBody}>

@@ -531,7 +531,7 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          {/* Announcement Management (live from faqs table) */}
+          {/* Announcement Management */}
           <section className="announcement-management-section">
             <div className="section-header-admin">
               <div className="section-title-admin">
@@ -566,7 +566,7 @@ export default function AdminDashboard() {
                       </p>
                       <div className="announcement-important-date">
                         <span
-                          className={`announcement-tag tag-${ann.tag || "general"}`}
+                          className={`announcement-tag tag-${ann.isPinned ? "pinned" : ann.tag || "general"}`}
                         >
                           {ann.tag || "general"}
                         </span>

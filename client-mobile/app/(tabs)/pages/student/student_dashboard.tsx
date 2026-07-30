@@ -116,11 +116,14 @@ interface QuickAction {
   gradient: readonly [string, string];
 }
 
+// This widget only ever shows pinned announcements (see pinnedPreview below),
+// so every entry gets the green "pinned" treatment -- only the icon shape and
+// label still vary by category.
 const ANNOUNCEMENT_META = {
-  important: { icon: 'alert-circle-outline' as IoniconName, iconBg: ['#ef4444', '#dc2626'] as const, badgeBg: 'rgba(239, 68, 68, 0.15)', badgeBorder: 'rgba(239, 68, 68, 0.3)', badgeColor: '#ef4444', label: 'Important' },
-  event: { icon: 'calendar-outline' as IoniconName, iconBg: ['#3b82f6', '#2563eb'] as const, badgeBg: 'rgba(59, 130, 246, 0.15)', badgeBorder: 'rgba(59, 130, 246, 0.3)', badgeColor: '#3b82f6', label: 'Event' },
-  reminder: { icon: 'notifications-outline' as IoniconName, iconBg: ['#f59e0b', '#d97706'] as const, badgeBg: 'rgba(245, 158, 11, 0.15)', badgeBorder: 'rgba(245, 158, 11, 0.3)', badgeColor: '#f59e0b', label: 'Reminder' },
-  general: { icon: 'alert-circle-outline' as IoniconName, iconBg: ['#8b5cf6', '#7c3aed'] as const, badgeBg: 'rgba(139, 92, 246, 0.15)', badgeBorder: 'rgba(139, 92, 246, 0.3)', badgeColor: '#8b5cf6', label: 'Notice' },
+  important: { icon: 'alert-circle-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Important' },
+  event: { icon: 'calendar-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Event' },
+  reminder: { icon: 'notifications-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Reminder' },
+  general: { icon: 'alert-circle-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Notice' },
 } as const;
 
 interface Announcement {

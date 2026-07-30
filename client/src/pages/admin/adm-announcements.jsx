@@ -400,7 +400,7 @@ export default function AdminAnnouncements() {
                     <div className="ann-view-banner-date"><CalendarIcon />{formatDate(viewingAnnouncement.date)}</div>
                   </div>
                   <div className="ann-view-banner-badges">
-                    <span className={`ann-badge ${TYPE_META[viewingAnnouncement.type].badgeClass}`}>
+                    <span className={`ann-badge ${viewingAnnouncement.isPinned ? "ann-badge-pinned" : TYPE_META[viewingAnnouncement.type].badgeClass}`}>
                       {TYPE_META[viewingAnnouncement.type].label}
                     </span>
                     {viewingAnnouncement.isPinned && (
@@ -708,7 +708,10 @@ export default function AdminAnnouncements() {
                   </div>
                 ) : (
                   list.map((a) => {
-                    const meta = TYPE_META[a.type] || TYPE_META.general;
+                    const typeMeta = TYPE_META[a.type] || TYPE_META.general;
+                    const meta = a.isPinned
+                      ? { ...typeMeta, iconClass: "ann-icon-pinned", badgeClass: "ann-badge-pinned" }
+                      : typeMeta;
                     const TypeIcon = meta.icon;
                     return (
                       <div key={a.id} className={`ann-item ${a.isPinned ? "ann-item-pinned" : ""}`}>

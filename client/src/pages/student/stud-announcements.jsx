@@ -203,14 +203,15 @@ export default function AnnouncementsPage() {
     (a) => selectedFilter === "all" || a.category === selectedFilter,
   );
 
-  const getCategoryColor = (category) => {
+  const getCategoryColor = (announcement) => {
+    if (announcement.isPinned) return "announcement-pinned";
     const colors = {
       important: "announcement-important",
       event: "announcement-event",
       reminder: "announcement-reminder",
       general: "announcement-general",
     };
-    return colors[category] || colors.general;
+    return colors[announcement.category] || colors.general;
   };
 
   const getAnnouncementIcon = (category) => {
@@ -255,13 +256,13 @@ export default function AnnouncementsPage() {
                 <h2 className="ann-detail-title">{viewingAnnouncement.title}</h2>
 
                 <div className="ann-detail-badges">
-                  <span className={`announcement-badge badge-${viewingAnnouncement.category}`}>
+                  <span className={`announcement-badge ${viewingAnnouncement.isPinned ? "badge-pinned" : `badge-${viewingAnnouncement.category}`}`}>
                     {viewingAnnouncement.category.charAt(0).toUpperCase() +
                       viewingAnnouncement.category.slice(1)}
                   </span>
                   {viewingAnnouncement.isPinned && (
                     <span className="ann-detail-pinned-pill">
-                      <BellIcon /> Pinned
+                      <MegaphoneIcon /> Pinned
                     </span>
                   )}
                   {viewingAnnouncement.isCrossCollege && (
@@ -327,7 +328,7 @@ export default function AnnouncementsPage() {
             }
             icon={<MegaphoneIcon />}
             title="Announcements"
-            subtitle="Stay updated with the latest notices"
+            subtitle="Stay updated with the latest notices from your department"
           />
 
           {/* Error banner */}
@@ -380,7 +381,7 @@ export default function AnnouncementsPage() {
                   {pinnedAnnouncements.map((announcement) => (
                     <div
                       key={announcement.id}
-                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement.category)}`}
+                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement)}`}
                       role="button"
                       tabIndex={0}
                       onClick={() => setViewingAnnouncement(announcement)}
@@ -402,9 +403,6 @@ export default function AnnouncementsPage() {
                               <PaperclipIcon className="announcement-attachment-flag" />
                             )}
                           </h3>
-                          <p className="announcement-description">
-                            {announcement.description}
-                          </p>
                           <div className="announcement-meta">
                             <span className="announcement-college">
                               {announcement.college}
@@ -417,9 +415,12 @@ export default function AnnouncementsPage() {
                               })}
                             </span>
                           </div>
+                          <p className="announcement-description">
+                            {announcement.description}
+                          </p>
                         </div>
                         <span
-                          className={`announcement-badge badge-${announcement.category}`}
+                          className={`announcement-badge ${announcement.isPinned ? "badge-pinned" : `badge-${announcement.category}`}`}
                         >
                           {announcement.category.charAt(0).toUpperCase() +
                             announcement.category.slice(1)}
@@ -451,7 +452,7 @@ export default function AnnouncementsPage() {
                   {filteredAnnouncements.map((announcement) => (
                     <div
                       key={announcement.id}
-                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement.category)}`}
+                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement)}`}
                       role="button"
                       tabIndex={0}
                       onClick={() => setViewingAnnouncement(announcement)}
@@ -473,9 +474,6 @@ export default function AnnouncementsPage() {
                               <PaperclipIcon className="announcement-attachment-flag" />
                             )}
                           </h3>
-                          <p className="announcement-description">
-                            {announcement.description}
-                          </p>
                           <div className="announcement-meta">
                             <span className="announcement-college">
                               {announcement.college}
@@ -488,9 +486,12 @@ export default function AnnouncementsPage() {
                               })}
                             </span>
                           </div>
+                          <p className="announcement-description">
+                            {announcement.description}
+                          </p>
                         </div>
                         <span
-                          className={`announcement-badge badge-${announcement.category}`}
+                          className={`announcement-badge ${announcement.isPinned ? "badge-pinned" : `badge-${announcement.category}`}`}
                         >
                           {announcement.category.charAt(0).toUpperCase() +
                             announcement.category.slice(1)}

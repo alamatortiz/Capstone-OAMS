@@ -77,10 +77,10 @@ router.get(
         (f) => f.status !== "unavailable",
       ).length;
 
-      // 4. Announcements (faqs table, scoped to department)
+      // 4. Announcements (scoped to department)
       const [[annRow]] = await pool.query(
         `SELECT COUNT(*) AS announcement_count
-         FROM faqs
+         FROM announcements
          WHERE department_id = ?`,
         [deptId],
       );
@@ -144,10 +144,10 @@ router.get(
         [manilaToday, deptId],
       );
 
-      // 8. Announcements list (faqs table)
+      // 8. Announcements list
       const [announcements] = await pool.query(
-        `SELECT faq_id, question AS title, answer AS description, type, is_pinned, created_at
-         FROM faqs
+        `SELECT announcement_id, title, content AS description, type, is_pinned, created_at
+         FROM announcements
          WHERE department_id = ?
          ORDER BY is_pinned DESC, created_at DESC
          LIMIT 5`,
@@ -190,7 +190,7 @@ router.get(
           time: f.currentActivity ?? f.nextAvailableSlot,
         })),
         announcements: announcements.map((a) => ({
-          id: a.faq_id,
+          id: a.announcement_id,
           title: a.title,
           description: a.description,
           tag: a.type || "general",
@@ -2537,7 +2537,6 @@ router.get(
 
 // ─────────────────────────────────────────────────────────────
 // ANNOUNCEMENTS — full CRUD, scoped to the admin's own department
-// Maps to the `faqs` table (question=title, answer=content).
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/announcements
@@ -2551,21 +2550,21 @@ router.get(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [rows] = await pool.query(
-        `SELECT f.faq_id, f.question AS title, f.answer AS content,
-                f.is_pinned AS isPinned, f.type, f.status, f.created_by AS createdBy,
-                f.department_id, f.is_cross_college, f.created_at,
-                f.attachment_filename, f.attachment_mime_type,
+        `SELECT a.announcement_id, a.title, a.content,
+                a.is_pinned AS isPinned, a.type, a.status, a.created_by AS createdBy,
+                a.department_id, a.is_cross_college, a.created_at,
+                a.attachment_filename, a.attachment_mime_type,
                 d.department_abbreviation
-         FROM faqs f
-         JOIN departments d ON f.department_id = d.department_id
-         WHERE f.department_id = ?
-         ORDER BY f.is_pinned DESC, f.created_at DESC`,
+         FROM announcements a
+         JOIN departments d ON a.department_id = d.department_id
+         WHERE a.department_id = ?
+         ORDER BY a.is_pinned DESC, a.created_at DESC`,
         [deptId],
       );
 
       res.json({
         announcements: rows.map((r) => ({
-          id: String(r.faq_id),
+          id: String(r.announcement_id),
           title: r.title,
           content: r.content,
           isPinned: !!r.isPinned,
@@ -2621,12 +2620,12 @@ router.post(
       // Admins can only post to their own department -- cross-college
       // broadcasting is not offered as a creation option.
       const [result] = await pool.query(
-        `INSERT INTO faqs (question, answer, type, status, created_by, is_pinned, department_id, is_cross_college, attachment_filename, attachment_path, attachment_mime_type)
+        `INSERT INTO announcements (title, content, type, status, created_by, is_pinned, department_id, is_cross_college, attachment_filename, attachment_path, attachment_mime_type)
          VALUES (?, ?, ?, 'active', ?, ?, ?, FALSE, ?, ?, ?)`,
         [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId, attachmentFilename, attachmentPath, attachmentMimeType],
       );
 
-      emitToDept(deptId, "announcement:changed", { faqId: result.insertId });
+      emitToDept(deptId, "announcement:changed", { announcementId: result.insertId });
 
       res.status(201).json({
         announcement: {
@@ -2660,7 +2659,7 @@ router.put(
   authorizeRoles("admin"),
   upload.single("attachment"),
   async (req, res) => {
-    const faqId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(req.params.id, 10);
     const { title, content, type } = req.body;
     if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({ error: "title and content are required" });
@@ -2668,7 +2667,7 @@ router.put(
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id, attachment_path FROM faqs WHERE faq_id = ?`, [faqId],
+        `SELECT department_id, attachment_path FROM announcements WHERE announcement_id = ?`, [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
@@ -2683,10 +2682,10 @@ router.put(
         : "";
       const values = [title.trim(), content.trim(), type || "general"];
       if (req.file) values.push(req.file.originalname, req.file.filename, req.file.mimetype);
-      values.push(faqId);
+      values.push(announcementId);
 
       await pool.query(
-        `UPDATE faqs SET question = ?, answer = ?, type = ?, is_cross_college = FALSE${attachmentClause} WHERE faq_id = ?`,
+        `UPDATE announcements SET title = ?, content = ?, type = ?, is_cross_college = FALSE${attachmentClause} WHERE announcement_id = ?`,
         values,
       );
 
@@ -2696,7 +2695,7 @@ router.put(
         });
       }
 
-      emitToDept(deptId, "announcement:changed", { faqId });
+      emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement updated" });
     } catch (error) {
       console.error("Announcement update error:", error);
@@ -2711,23 +2710,23 @@ router.patch(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const faqId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT is_pinned, department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
-        [faqId],
+        `SELECT is_pinned, department_id, is_cross_college FROM announcements WHERE announcement_id = ?`,
+        [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
       const newPinned = row.is_pinned ? 0 : 1;
-      await pool.query(`UPDATE faqs SET is_pinned = ? WHERE faq_id = ?`, [newPinned, faqId]);
+      await pool.query(`UPDATE announcements SET is_pinned = ? WHERE announcement_id = ?`, [newPinned, announcementId]);
       if (row.is_cross_college) {
-        emitToAll("announcement:changed", { faqId });
+        emitToAll("announcement:changed", { announcementId });
       } else {
-        emitToDept(deptId, "announcement:changed", { faqId });
+        emitToDept(deptId, "announcement:changed", { announcementId });
       }
       res.json({ isPinned: !!newPinned });
     } catch (error) {
@@ -2743,22 +2742,22 @@ router.patch(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const faqId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
-        [faqId],
+        `SELECT department_id, is_cross_college FROM announcements WHERE announcement_id = ?`,
+        [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
-      await pool.query(`UPDATE faqs SET status = 'archived' WHERE faq_id = ?`, [faqId]);
+      await pool.query(`UPDATE announcements SET status = 'archived' WHERE announcement_id = ?`, [announcementId]);
       if (row.is_cross_college) {
-        emitToAll("announcement:changed", { faqId });
+        emitToAll("announcement:changed", { announcementId });
       } else {
-        emitToDept(deptId, "announcement:changed", { faqId });
+        emitToDept(deptId, "announcement:changed", { announcementId });
       }
       res.json({ message: "Announcement archived" });
     } catch (error) {
@@ -2774,22 +2773,22 @@ router.patch(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const faqId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college FROM faqs WHERE faq_id = ?`,
-        [faqId],
+        `SELECT department_id, is_cross_college FROM announcements WHERE announcement_id = ?`,
+        [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
-      await pool.query(`UPDATE faqs SET status = 'active' WHERE faq_id = ?`, [faqId]);
+      await pool.query(`UPDATE announcements SET status = 'active' WHERE announcement_id = ?`, [announcementId]);
       if (row.is_cross_college) {
-        emitToAll("announcement:changed", { faqId });
+        emitToAll("announcement:changed", { announcementId });
       } else {
-        emitToDept(deptId, "announcement:changed", { faqId });
+        emitToDept(deptId, "announcement:changed", { announcementId });
       }
       res.json({ message: "Announcement restored" });
     } catch (error) {
@@ -2805,27 +2804,27 @@ router.delete(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const faqId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college, attachment_path FROM faqs WHERE faq_id = ?`,
-        [faqId],
+        `SELECT department_id, is_cross_college, attachment_path FROM announcements WHERE announcement_id = ?`,
+        [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot delete announcements from another department" });
       }
-      await pool.query(`DELETE FROM faqs WHERE faq_id = ?`, [faqId]);
+      await pool.query(`DELETE FROM announcements WHERE announcement_id = ?`, [announcementId]);
       if (row.attachment_path) {
         fs.unlink(path.join(UPLOAD_DIR, row.attachment_path), (err) => {
           if (err && err.code !== "ENOENT") console.error("Attachment cleanup error:", err);
         });
       }
       if (row.is_cross_college) {
-        emitToAll("announcement:changed", { faqId });
+        emitToAll("announcement:changed", { announcementId });
       } else {
-        emitToDept(deptId, "announcement:changed", { faqId });
+        emitToDept(deptId, "announcement:changed", { announcementId });
       }
       res.json({ message: "Announcement deleted" });
     } catch (error) {
@@ -2847,12 +2846,12 @@ router.get(
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
-    const faqId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id, attachment_path, attachment_mime_type FROM faqs WHERE faq_id = ?`,
-        [faqId],
+        `SELECT department_id, attachment_path, attachment_mime_type FROM announcements WHERE announcement_id = ?`,
+        [announcementId],
       );
       if (!row || !row.attachment_path) {
         return res.status(404).json({ error: "No attachment found for this announcement" });

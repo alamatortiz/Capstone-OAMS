@@ -272,8 +272,8 @@ router.get(
 // requiring admins to pick a category when creating a notice.
 // This is intentionally simple -- swap for a stored column later
 // if admins need to override the auto-detected category.
-function classifyAnnouncement(question = "", answer = "") {
-  const text = `${question} ${answer}`.toLowerCase();
+function classifyAnnouncement(title = "", content = "") {
+  const text = `${title} ${content}`.toLowerCase();
 
   if (
     text.includes("deadline") ||
@@ -323,29 +323,29 @@ router.get(
 
       const [rows] = await pool.query(
         `SELECT
-           f.faq_id,
-           f.question,
-           f.answer,
-           f.is_pinned,
-           f.is_cross_college,
-           f.created_at,
-           f.attachment_filename,
-           f.attachment_mime_type,
+           a.announcement_id,
+           a.title,
+           a.content,
+           a.is_pinned,
+           a.is_cross_college,
+           a.created_at,
+           a.attachment_filename,
+           a.attachment_mime_type,
            d.department_id,
            d.department_name,
            d.department_abbreviation
-         FROM faqs f
-         JOIN departments d ON f.department_id = d.department_id
-         WHERE f.department_id = ? OR f.is_cross_college = TRUE
-         ORDER BY f.is_pinned DESC, f.created_at DESC`,
+         FROM announcements a
+         JOIN departments d ON a.department_id = d.department_id
+         WHERE a.department_id = ? OR a.is_cross_college = TRUE
+         ORDER BY a.is_pinned DESC, a.created_at DESC`,
         [studentDeptId],
       );
 
       const announcements = rows.map((row) => ({
-        id: String(row.faq_id),
-        title: row.question,
-        description: row.answer,
-        category: classifyAnnouncement(row.question, row.answer),
+        id: String(row.announcement_id),
+        title: row.title,
+        description: row.content,
+        category: classifyAnnouncement(row.title, row.content),
         isPinned: !!row.is_pinned,
         date: row.created_at,
         departmentId: row.department_id,
@@ -376,7 +376,7 @@ router.get(
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const faqId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(req.params.id, 10);
     try {
       const [[stu]] = await pool.query(
         `SELECT department_id FROM students WHERE student_id = ?`,
@@ -386,8 +386,8 @@ router.get(
 
       const [[row]] = await pool.query(
         `SELECT department_id, is_cross_college, attachment_path, attachment_mime_type
-         FROM faqs WHERE faq_id = ?`,
-        [faqId],
+         FROM announcements WHERE announcement_id = ?`,
+        [announcementId],
       );
       if (!row || !row.attachment_path) {
         return res.status(404).json({ error: "No attachment found for this announcement" });

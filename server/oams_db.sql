@@ -407,12 +407,12 @@ CREATE TABLE qr_tracking_logs (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- 11. FAQ
+-- 11. ANNOUNCEMENTS
 -- ─────────────────────────────────────────────────────────────
-CREATE TABLE faqs (
-    faq_id          INT          AUTO_INCREMENT PRIMARY KEY,
-    question        TEXT         NOT NULL,
-    answer          TEXT         NOT NULL,
+CREATE TABLE announcements (
+    announcement_id  INT          AUTO_INCREMENT PRIMARY KEY,
+    title           TEXT         NOT NULL,
+    content         TEXT         NOT NULL,
     type            ENUM('important','event','reminder','general') NOT NULL DEFAULT 'general',
     status          ENUM('active','archived')                      NOT NULL DEFAULT 'active',
     created_by      VARCHAR(255) NULL,
@@ -424,7 +424,7 @@ CREATE TABLE faqs (
     attachment_mime_type VARCHAR(100) NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
-    INDEX idx_faqs_pinned_created (is_pinned, created_at)
+    INDEX idx_announcements_pinned_created (is_pinned, created_at)
 );
 
 -- ─────────────────────────────────────────────────────────────
