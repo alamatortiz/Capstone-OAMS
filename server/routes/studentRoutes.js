@@ -2245,67 +2245,39 @@ router.post(
       // Store the window's start_time as appointment_time for reference
       const appointmentTime = String(slot.start_time).slice(0, 8);
 
-      // A prior cancelled/rejected booking for this exact
-      // (student, faculty, date, time) combination collides with the DB's
-      // uq_appointment_slot unique key on a fresh INSERT, even though it's
-      // an entirely ordinary workflow to cancel then rebook the same slot.
-      // Reactivate that row instead of inserting a new one -- the unique
-      // constraint itself stays untouched, so real double-booking is still
-      // prevented.
-      const [[staleRow]] = await conn.query(
-        `SELECT appointment_id FROM appointments
-         WHERE student_id = ? AND faculty_id = ? AND appointment_date = ? AND appointment_time = ?
-           AND status IN ('cancelled', 'rejected')
-         LIMIT 1`,
-        [studentId, slot.faculty_id, appointmentDate, appointmentTime],
-      );
-
       // Snapshot the template's current location/window onto the appointment
       // itself, so this row's display data survives the professor later
       // editing or deleting the template it was booked against.
-      let appointmentId;
-      if (staleRow) {
-        await conn.query(
-          `UPDATE appointments
-             SET department_id = ?, service_id = ?, availability_id = ?,
-                 location_snapshot = ?, window_start_snapshot = ?, window_end_snapshot = ?,
-                 status = 'pending', notes = ?, created_at = NOW()
-           WHERE appointment_id = ?`,
-          [
-            facultyRow.department_id,
-            chosenServiceId,
-            availabilityId,
-            slot.location,
-            slot.start_time,
-            slot.end_time,
-            purpose?.trim() || null,
-            staleRow.appointment_id,
-          ],
-        );
-        appointmentId = staleRow.appointment_id;
-      } else {
-        const [result] = await conn.query(
-          `INSERT INTO appointments
-             (student_id, faculty_id, department_id, service_id, availability_id,
-              location_snapshot, window_start_snapshot, window_end_snapshot,
-              appointment_date, appointment_time, status, notes, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
-          [
-            studentId,
-            slot.faculty_id,
-            facultyRow.department_id,
-            chosenServiceId,
-            availabilityId,
-            slot.location,
-            slot.start_time,
-            slot.end_time,
-            appointmentDate,
-            appointmentTime,
-            purpose?.trim() || null,
-          ],
-        );
-        appointmentId = result.insertId;
-      }
+      //
+      // Always insert a fresh row, even if a cancelled/rejected row already
+      // exists for this exact (student, faculty, date, time) -- that prior
+      // row is left untouched, permanently, as an honest history entry.
+      // Nothing here dodges the DB's uniqueness rule: uq_active_booking (see
+      // oams_db.sql) is scoped to non-cancelled/non-rejected rows only, so it
+      // never collides with that history -- only with a second genuinely
+      // active booking for the same slot, which the dup-guard above should
+      // already have caught (see the catch block below for the backstop).
+      const [result] = await conn.query(
+        `INSERT INTO appointments
+           (student_id, faculty_id, department_id, service_id, availability_id,
+            location_snapshot, window_start_snapshot, window_end_snapshot,
+            appointment_date, appointment_time, status, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
+        [
+          studentId,
+          slot.faculty_id,
+          facultyRow.department_id,
+          chosenServiceId,
+          availabilityId,
+          slot.location,
+          slot.start_time,
+          slot.end_time,
+          appointmentDate,
+          appointmentTime,
+          purpose?.trim() || null,
+        ],
+      );
+      const appointmentId = result.insertId;
 
       await conn.commit();
 
@@ -2357,6 +2329,14 @@ router.post(
       });
     } catch (error) {
       await conn.rollback();
+      // Backstop for uq_active_booking (see oams_db.sql): the dup-guard above
+      // should already prevent this in every normal case, but if a genuine
+      // race slips past it, surface a clean 409 instead of a 500.
+      if (error.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({
+          error: "You already have an active booking for this date and time.",
+        });
+      }
       console.error("Book slot error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
     } finally {

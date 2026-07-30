@@ -201,6 +201,7 @@ export default function AppointmentStatusPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const navState = location.state ?? {};
+  const fromBookings = navState.fromBookings ?? false;
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -325,8 +326,8 @@ export default function AppointmentStatusPage() {
         {selectedAppt ? (
           <AppointmentDetail
             appt={selectedAppt}
-            backLabel="My Appointments"
-            onBack={() => setSelectedId(null)}
+            backLabel={fromBookings ? "Appointments" : "My Appointments"}
+            onBack={() => fromBookings ? navigate("/student/appointments", { state: { activeTab: "bookings" } }) : setSelectedId(null)}
             onCancel={handleCancel}
             cancelling={cancelling}
           />
@@ -360,7 +361,7 @@ export default function AppointmentStatusPage() {
               </div>
               <div className="apst-prof-sched-card-text">
                 <span className="apst-prof-sched-card-title">Professor Schedules</span>
-                <span className="apst-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
+                <span className="apst-prof-sched-card-subtitle">Check professor consultation hours and availability across all departments</span>
               </div>
               <ChevronRight style={{ width: "1.375rem", height: "1.375rem", color: "#a855f7", opacity: 0.7, flexShrink: 0 }} />
             </Link>

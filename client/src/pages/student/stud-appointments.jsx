@@ -4,7 +4,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import AppointmentListItem from "../../components/AppointmentListItem";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import "./stud-appointments.css";
 import api from "../../utils/api";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
@@ -92,6 +92,8 @@ const Loader2Icon = () => (
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [slots, setSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
   const [slotsError, setSlotsError] = useState(null);
@@ -110,7 +112,9 @@ export default function AppointmentsPage() {
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [purpose, setPurpose] = useState("");
-  const [activeTab, setActiveTab] = useState("slots");
+  const [activeTab, setActiveTab] = useState(
+    location.state?.activeTab === "bookings" ? "bookings" : "slots",
+  );
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const [year, month] = getManilaDateString().split("-").map(Number);
     return { year, month };
@@ -517,7 +521,7 @@ export default function AppointmentsPage() {
             </div>
             <div className="ab-prof-sched-card-text">
               <span className="ab-prof-sched-card-title">Professor Schedules</span>
-              <span className="ab-prof-sched-card-subtitle">Browse when your professors are available before booking</span>
+              <span className="ab-prof-sched-card-subtitle">Check professor consultation hours and availability across all departments</span>
             </div>
             <ChevronRightIcon />
           </Link>
@@ -628,23 +632,23 @@ export default function AppointmentsPage() {
           {activeTab === "bookings" && (
             <>
               {bookingsLoading ? (
-                <div className="appt-empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
+                <div className="appt-empty-state appt-empty-state--card"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
               ) : bookingsError ? (
-                <div className="appt-empty-state"><CheckCircleIcon /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
+                <div className="appt-empty-state appt-empty-state--card"><CheckCircleIcon /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
               ) : activeBookings.length === 0 ? (
-                <div className="appt-empty-state"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>You have no active appointments.</p></div>
+                <div className="appt-empty-state appt-empty-state--card"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>You have no active appointments.</p></div>
               ) : (
                 <div className="bookings-list">
                   {sortedActiveBookings.map((booking) => (
-                    <div key={booking.id} style={{ marginBottom: "0.75rem" }}>
-                      <AppointmentListItem
-                        appointment={booking}
-                        formatDate={formatDate}
-                        showCancelButton
-                        onCancel={(id) => setCancelConfirmId(id)}
-                        isCancelling={cancellingId === booking.id}
-                      />
-                    </div>
+                    <AppointmentListItem
+                      key={booking.id}
+                      appointment={booking}
+                      formatDate={formatDate}
+                      onClick={() => navigate("/student/appointment-status", { state: { appointmentId: booking.id, fromBookings: true } })}
+                      showCancelButton
+                      onCancel={(id) => setCancelConfirmId(id)}
+                      isCancelling={cancellingId === booking.id}
+                    />
                   ))}
                 </div>
               )}

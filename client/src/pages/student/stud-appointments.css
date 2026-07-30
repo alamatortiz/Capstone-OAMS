@@ -624,7 +624,24 @@ body {
 }
 
 /* ===== Active Bookings — flat list, no card/header wrapper ===== */
-.bookings-list { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+/* No padding here -- matches .doc-cards-grid's (stud-documents.css) and
+   .queues-list's (stud-queue.css) gap-only pattern. Cards already supply
+   their own padding; adding it here too would double-inset them. */
+.bookings-list { display: flex; flex-direction: column; gap: 1rem; }
+
+/* Active Bookings has no wrapping card of its own (unlike .slots-container
+   for Available Slots above), so its loading/error/no-bookings states need
+   their own chrome -- added via this modifier instead of on the bare
+   .appt-empty-state class, so Available Slots' identical states (already
+   inside .slots-container's card) don't end up double-carded. Values match
+   .slots-container exactly (not the sibling page's .apst-empty-state), so
+   both tabs' empty states look identical within this page. */
+.appt-empty-state--card {
+  background: var(--card-bg);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+}
 
 /* Individual booking cards now render via the shared AppointmentListItem
    component (client/src/components/AppointmentListItem.css) instead of the

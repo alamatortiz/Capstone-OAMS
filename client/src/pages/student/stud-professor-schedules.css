@@ -347,7 +347,7 @@ body {
 
 .department-header-content {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 1.25rem;
 }
 

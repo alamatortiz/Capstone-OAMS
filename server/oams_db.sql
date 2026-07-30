@@ -324,13 +324,34 @@ CREATE TABLE appointments (
     cancelled_by        ENUM('student','faculty','system') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
     notes               TEXT,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Computed from this row's own columns; NULL whenever status is
+    -- cancelled/rejected, so any number of cancelled/rejected rows can share
+    -- the same student/faculty/date/time -- only a genuinely ACTIVE duplicate
+    -- collides via uq_active_booking below. MySQL has no native partial/
+    -- filtered unique index, so this generated column is the standard
+    -- workaround. STORED (not VIRTUAL) so the unique index has a real
+    -- materialized value to check.
+    active_booking_key VARCHAR(80) GENERATED ALWAYS AS (
+        CASE WHEN status NOT IN ('cancelled', 'rejected')
+             THEN CONCAT(student_id, '_', faculty_id, '_', appointment_date, '_', appointment_time)
+             ELSE NULL END
+    ) STORED,
     FOREIGN KEY (student_id)      REFERENCES students(student_id),
     FOREIGN KEY (faculty_id)      REFERENCES faculty(faculty_id),
     FOREIGN KEY (department_id)   REFERENCES departments(department_id),
     FOREIGN KEY (service_id)      REFERENCES appointment_services(service_id)     ON DELETE SET NULL,
     FOREIGN KEY (availability_id) REFERENCES faculty_availability(availability_id) ON DELETE SET NULL,
-    -- prevents duplicate bookings for the same student/faculty/date/time
-    UNIQUE KEY uq_appointment_slot (student_id, faculty_id, appointment_date, appointment_time),
+    -- Targets ACTIVE bookings only (see active_booking_key above), so a
+    -- student cancelling then rebooking the same slot can always insert a
+    -- fresh row -- a second genuinely active booking for the same slot still
+    -- collides, as a defense-in-depth backstop behind the application-level
+    -- guard in POST /appointments/book-slot.
+    UNIQUE KEY uq_active_booking (active_booking_key),
+    -- student_id's FK needs its own supporting index now that
+    -- uq_appointment_slot (which used to cover it as a leftmost column) is
+    -- gone; faculty_id/service_id/availability_id already get one
+    -- automatically from their own FK definitions above.
+    INDEX idx_appointments_student (student_id),
     INDEX idx_appointments_dept_service (department_id, service_id)
 );
 
