@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -102,7 +105,15 @@ interface Announcement {
   departmentAbbrev: string;
   departmentName: string;
   isCrossCollege: boolean;
+  hasAttachment?: boolean;
+  attachmentMimeType?: string | null;
 }
+
+const MIME_EXT: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+};
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -143,6 +154,7 @@ export default function StudentAnnouncementScreen() {
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Mirrors `announcements` for the catch block below, without making
@@ -193,6 +205,31 @@ export default function StudentAnnouncementScreen() {
   const styles = createStyles(theme);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
+
+  const viewAttachment = async (announcement: Announcement) => {
+    if (downloadingId) return;
+    setDownloadingId(announcement.id);
+    try {
+      const ext = MIME_EXT[announcement.attachmentMimeType ?? ''] ?? '';
+      const uri = `${FileSystem.cacheDirectory}announcement-${announcement.id}${ext}`;
+      await FileSystem.downloadAsync(
+        `${api.defaults.baseURL}/student/announcements/${announcement.id}/attachment`,
+        uri,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: announcement.attachmentMimeType ?? undefined });
+    } catch (err) {
+      console.error('Failed to download attachment:', err);
+      Alert.alert('Error', 'Could not open the attachment.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
@@ -276,6 +313,22 @@ export default function StudentAnnouncementScreen() {
               <Text style={styles.cardMetaText}>{announcement.college}</Text>
               <Text style={styles.cardMetaText}>{formatDate(announcement.date)}</Text>
             </View>
+            {announcement.hasAttachment && (
+              <Pressable
+                style={styles.attachmentRow}
+                onPress={() => viewAttachment(announcement)}
+                disabled={downloadingId === announcement.id}
+              >
+                {downloadingId === announcement.id ? (
+                  <ActivityIndicator size="small" color={theme.subtext} />
+                ) : (
+                  <Ionicons name="attach-outline" size={14} color={theme.subtext} />
+                )}
+                <Text style={styles.attachmentRowText}>
+                  {downloadingId === announcement.id ? 'Opening…' : 'View Attachment'}
+                </Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </View>
@@ -710,6 +763,23 @@ function createStyles(theme: ThemePalette) {
     cardMetaText: {
       fontSize: 12,
       color: theme.tertiary,
+    },
+    attachmentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 8,
+      alignSelf: 'flex-start',
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      paddingVertical: 4,
+      paddingHorizontal: 9,
+    },
+    attachmentRowText: {
+      fontSize: 11.5,
+      fontWeight: '600',
+      color: theme.subtext,
     },
 
     badge: {

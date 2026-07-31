@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -190,6 +190,7 @@ export default function StudentAppointmentsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
+  const params = useLocalSearchParams<{ activeTab?: string }>();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -311,7 +312,7 @@ export default function StudentAppointmentsScreen() {
     };
   }, [user, token, fetchSlots, fetchMyBookings]);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('slots');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(params.activeTab === 'bookings' ? 'bookings' : 'slots');
   const [selectedCollege, setSelectedCollege] = useState('');
   const [hasUserSetCollege, setHasUserSetCollege] = useState(false);
   const [selectedProfessorId, setSelectedProfessorId] = useState('');
@@ -779,7 +780,16 @@ export default function StudentAppointmentsScreen() {
                 sortedActiveBookings.map((booking) => {
                   const s = STATUS_STYLES[booking.status];
                   return (
-                    <View key={booking.id} style={styles.bookingCard}>
+                    <Pressable
+                      key={booking.id}
+                      style={styles.bookingCard}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/pages/student/student_appointment_status',
+                          params: { appointmentId: booking.id, fromBookings: 'true' },
+                        })
+                      }
+                    >
                       <View style={styles.bookingHeaderRow}>
                         <Text style={styles.bookingPersonName}>{booking.person}</Text>
                         <View style={styles.collegeBadge}>
@@ -827,7 +837,7 @@ export default function StudentAppointmentsScreen() {
                         <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
                         <Text style={styles.cancelBtnText}>{cancellingId === booking.id ? 'Cancelling…' : 'Cancel'}</Text>
                       </Pressable>
-                    </View>
+                    </Pressable>
                   );
                 })
               )}

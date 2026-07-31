@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 
@@ -82,6 +83,8 @@ interface AnnouncementItem {
   isCrossCollege: boolean;
   createdBy: string;
   status: AnnouncementStatus;
+  hasAttachment?: boolean;
+  attachmentMimeType?: string | null;
 }
 
 // Mirrors admin-announcements.css badge/icon colors (important=red, event=orange,
@@ -237,8 +240,10 @@ export default function AdminAnnouncementScreen() {
   const [viewingAnnouncement, setViewingAnnouncement] = useState<AnnouncementItem | null>(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState<AnnouncementItem | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
+  const [editAttachment, setEditAttachment] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
+  const [createAttachment, setCreateAttachment] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetchAnnouncements = useCallback(async () => {
@@ -374,13 +379,24 @@ export default function AdminAnnouncementScreen() {
     }
   };
 
+  const pickAttachment = async (onPicked: (asset: DocumentPicker.DocumentPickerAsset) => void) => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/jpeg', 'image/png'],
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      onPicked(result.assets[0]);
+    }
+  };
+
   const openEdit = (a: AnnouncementItem) => {
     setEditingAnnouncement(a);
     setEditForm({ title: a.title, content: a.content, type: a.type });
+    setEditAttachment(null);
   };
   const closeEdit = () => {
     setEditingAnnouncement(null);
     setEditForm(EMPTY_FORM);
+    setEditAttachment(null);
   };
   const saveEdit = async () => {
     if (!editForm.title.trim() || !editForm.content.trim()) {
@@ -389,15 +405,38 @@ export default function AdminAnnouncementScreen() {
     }
     if (!editingAnnouncement) return;
     try {
-      await api.put(`/admin/announcements/${editingAnnouncement.id}`, {
-        title: editForm.title,
-        content: editForm.content,
-        type: editForm.type,
-      });
+      if (editAttachment) {
+        const formData = new FormData();
+        formData.append('title', editForm.title);
+        formData.append('content', editForm.content);
+        formData.append('type', editForm.type);
+        formData.append('attachment', {
+          uri: editAttachment.uri,
+          name: editAttachment.name,
+          type: editAttachment.mimeType ?? 'application/octet-stream',
+        } as any);
+        await api.put(`/admin/announcements/${editingAnnouncement.id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        await api.put(`/admin/announcements/${editingAnnouncement.id}`, {
+          title: editForm.title,
+          content: editForm.content,
+          type: editForm.type,
+        });
+      }
       setAnnouncements((prev) =>
         prev.map((a) =>
           a.id === editingAnnouncement.id
-            ? { ...a, title: editForm.title, content: editForm.content, type: editForm.type, isCrossCollege: false }
+            ? {
+                ...a,
+                title: editForm.title,
+                content: editForm.content,
+                type: editForm.type,
+                isCrossCollege: false,
+                hasAttachment: editAttachment ? true : a.hasAttachment,
+                attachmentMimeType: editAttachment ? (editAttachment.mimeType ?? null) : a.attachmentMimeType,
+              }
             : a,
         ),
       );
@@ -409,11 +448,13 @@ export default function AdminAnnouncementScreen() {
 
   const openCreate = () => {
     setCreateForm(EMPTY_CREATE_FORM);
+    setCreateAttachment(null);
     setIsCreating(true);
   };
   const closeCreate = () => {
     setIsCreating(false);
     setCreateForm(EMPTY_CREATE_FORM);
+    setCreateAttachment(null);
   };
   const saveCreate = async () => {
     if (!createForm.title.trim() || !createForm.content.trim()) {
@@ -421,12 +462,29 @@ export default function AdminAnnouncementScreen() {
       return;
     }
     try {
-      const { data } = await api.post('/admin/announcements', {
-        title: createForm.title,
-        content: createForm.content,
-        type: createForm.type,
-        isPinned: createForm.isPinned,
-      });
+      let data;
+      if (createAttachment) {
+        const formData = new FormData();
+        formData.append('title', createForm.title);
+        formData.append('content', createForm.content);
+        formData.append('type', createForm.type);
+        formData.append('isPinned', String(createForm.isPinned));
+        formData.append('attachment', {
+          uri: createAttachment.uri,
+          name: createAttachment.name,
+          type: createAttachment.mimeType ?? 'application/octet-stream',
+        } as any);
+        ({ data } = await api.post('/admin/announcements', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }));
+      } else {
+        ({ data } = await api.post('/admin/announcements', {
+          title: createForm.title,
+          content: createForm.content,
+          type: createForm.type,
+          isPinned: createForm.isPinned,
+        }));
+      }
       setAnnouncements((prev) => [data.announcement, ...prev]);
       closeCreate();
     } catch {
@@ -592,6 +650,12 @@ export default function AdminAnnouncementScreen() {
                           {a.isCrossCollege && (
                             <View style={styles.crossBadge}>
                               <Text style={styles.crossBadgeText}>Cross-College</Text>
+                            </View>
+                          )}
+                          {a.hasAttachment && (
+                            <View style={[styles.crossBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                              <Ionicons name="attach-outline" size={11} color={theme.primary} />
+                              <Text style={styles.crossBadgeText}>Attachment</Text>
                             </View>
                           )}
                         </View>
@@ -846,6 +910,25 @@ export default function AdminAnnouncementScreen() {
                 <Ionicons name="chevron-down" size={16} color={theme.primary} />
               </Pressable>
 
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Attach File (optional)</Text>
+                <Pressable style={styles.filterSelect} onPress={() => pickAttachment(setEditAttachment)}>
+                  <Text style={styles.filterSelectText} numberOfLines={1}>
+                    {editAttachment
+                      ? editAttachment.name
+                      : editingAnnouncement?.hasAttachment
+                        ? 'Replace existing attachment'
+                        : 'Attach a PDF, JPG, or PNG'}
+                  </Text>
+                  <Ionicons name="attach-outline" size={16} color={theme.primary} />
+                </Pressable>
+                {editAttachment && (
+                  <Pressable onPress={() => setEditAttachment(null)}>
+                    <Text style={[styles.filterSelectText, { color: '#ef4444', marginTop: 4 }]}>Remove selected file</Text>
+                  </Pressable>
+                )}
+              </View>
+
               <View style={styles.modalFooterRow}>
                 <Pressable style={styles.secondaryBtn} onPress={closeEdit}>
                   <Text style={styles.secondaryBtnText}>Cancel</Text>
@@ -934,6 +1017,21 @@ export default function AdminAnnouncementScreen() {
                   </Text>
                   <Ionicons name="chevron-down" size={16} color={theme.primary} />
                 </Pressable>
+              </View>
+
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Attach File (optional)</Text>
+                <Pressable style={styles.filterSelect} onPress={() => pickAttachment(setCreateAttachment)}>
+                  <Text style={styles.filterSelectText} numberOfLines={1}>
+                    {createAttachment ? createAttachment.name : 'Attach a PDF, JPG, or PNG'}
+                  </Text>
+                  <Ionicons name="attach-outline" size={16} color={theme.primary} />
+                </Pressable>
+                {createAttachment && (
+                  <Pressable onPress={() => setCreateAttachment(null)}>
+                    <Text style={[styles.filterSelectText, { color: '#ef4444', marginTop: 4 }]}>Remove selected file</Text>
+                  </Pressable>
+                )}
               </View>
 
               <View style={styles.modalFooterRow}>

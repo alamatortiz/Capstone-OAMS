@@ -197,7 +197,7 @@ export default function StudentAppointmentStatusScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const params = useLocalSearchParams<{ appointmentId?: string }>();
+  const params = useLocalSearchParams<{ appointmentId?: string; fromBookings?: string }>();
   const [selectedId, setSelectedId] = useState<string | null>(params.appointmentId ?? null);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [allRange, setAllRange] = useState<RangeKey>('week');
@@ -340,7 +340,15 @@ export default function StudentAppointmentStatusScreen() {
           {selectedAppt ? (
             // ─── Detail View ───
             <>
-              <Pressable style={styles.breadcrumb} onPress={() => setSelectedId(null)} hitSlop={8}>
+              <Pressable
+                style={styles.breadcrumb}
+                onPress={() =>
+                  params.fromBookings === 'true'
+                    ? router.push({ pathname: '/pages/student/student_appointments', params: { activeTab: 'bookings' } })
+                    : setSelectedId(null)
+                }
+                hitSlop={8}
+              >
                 <Ionicons name="chevron-back" size={18} color={theme.subtext} />
                 <Text style={styles.breadcrumbText}>My Appointments</Text>
               </Pressable>
