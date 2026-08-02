@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import jsQR from "jsqr";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileText } from "lucide-react";
 import "./adm-scan-document.css";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -26,18 +26,6 @@ const CloseIcon = () => (
 const QRScanIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
     <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 17h2v2h-2zM19 13h2v2h-2z" />
-  </svg>
-);
-const FileEntryIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    style={{ width: "1.2rem", height: "1.2rem" }}
-  >
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
 );
 const EyeIcon = () => (
@@ -580,7 +568,7 @@ export default function AdminScanDocument() {
               {/* Manual QR Code Entry */}
               <div className="asd-card">
                 <div className="asd-card-header">
-                  <FileEntryIcon />
+                  <FileText style={{ width: "1.2rem", height: "1.2rem" }} />
                   <div>
                     <h2 className="asd-card-title">Manual QR Code Entry</h2>
                     <p className="asd-card-subtitle">

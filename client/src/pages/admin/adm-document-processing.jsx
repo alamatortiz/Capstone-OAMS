@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileText } from "lucide-react";
 import "./adm-document-processing.css";
 import api from "../../utils/api";
 import { toast } from "sonner";
@@ -16,12 +16,6 @@ const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-const FileTextIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
   </svg>
 );
 const ClockIcon = () => (
@@ -445,7 +439,7 @@ export default function AdminDocumentProcessing() {
         <div className="adp-content">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
-            icon={<FileTextIcon className="adp-icon-lg" />}
+            icon={<FileText className="adp-icon-lg" />}
             iconClassName="adp-title-icon"
             title="Document Processing"
             subtitle="Process and manage document requests"
@@ -526,7 +520,7 @@ export default function AdminDocumentProcessing() {
               </div>
             ) : filteredDocuments.length === 0 ? (
               <div className="adp-empty-state">
-                <div className="adp-empty-icon"><FileTextIcon /></div>
+                <div className="adp-empty-icon"><FileText /></div>
                 <h3 className="adp-empty-title">No documents found</h3>
                 <p className="adp-empty-desc">Try adjusting your search or filters</p>
               </div>
@@ -539,7 +533,7 @@ export default function AdminDocumentProcessing() {
                   <div key={doc.id} className="adp-doc-card">
                     <div className="adp-doc-card-inner">
                       <div className="adp-doc-file-icon">
-                        <FileTextIcon />
+                        <FileText />
                       </div>
                       <div className="adp-doc-info">
                         <div className="adp-doc-header-row">

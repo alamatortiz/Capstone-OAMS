@@ -249,7 +249,7 @@ export default function ProfessorSchedule() {
             }
             icon={<GraduationCapIcon />}
             title="Professor Schedules"
-            subtitle="View faculty consultation hours and availability"
+            subtitle="Check professor consultation hours and availability across all departments"
           />
 
           {/* Loading state */}

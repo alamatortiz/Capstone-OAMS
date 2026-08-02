@@ -20,15 +20,6 @@ const CloseIcon = () => (
   </svg>
 );
 
-const FileTextIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="12" y1="13" x2="12" y2="17"></line>
-    <line x1="9" y1="15" x2="15" y2="15"></line>
-  </svg>
-);
-
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -98,7 +89,7 @@ function getStatusIcon(status) {
     case "cancelled":
       return <XCircleIcon />;
     default:
-      return <FileTextIcon />;
+      return <FileText />;
   }
 }
 
@@ -641,7 +632,7 @@ export default function ProfessorDocumentRequest() {
               <ChevronLeft className="breadcrumb-icon" /> Home
             </Link>
           }
-          icon={<FileTextIcon />}
+          icon={<FileText />}
           iconClassName="doc-title-icon"
           title="Document Requests"
           subtitle="Request official documents and track your submissions"
@@ -676,7 +667,7 @@ export default function ProfessorDocumentRequest() {
             <div className="doc-tab-content">
               {requestsLoading ? (
                 <div className="doc-empty-state">
-                  <FileTextIcon />
+                  <FileText />
                   <h3>Loading requests...</h3>
                 </div>
               ) : activeRequests.length > 0 ? (
@@ -692,7 +683,7 @@ export default function ProfessorDocumentRequest() {
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
-                            <FileTextIcon />
+                            <FileText />
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{req.type}</h3>
@@ -760,7 +751,7 @@ export default function ProfessorDocumentRequest() {
                 </div>
               ) : (
                 <div className="doc-empty-state">
-                  <FileTextIcon />
+                  <FileText />
                   <h3>No active requests</h3>
                   <p>Start by requesting a document</p>
                 </div>
@@ -784,7 +775,7 @@ export default function ProfessorDocumentRequest() {
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
-                            <FileTextIcon />
+                            <FileText />
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{req.type}</h3>

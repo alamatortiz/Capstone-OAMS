@@ -22,6 +22,23 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+// ─── Icons (matching stud-transactions.jsx's Total/Completed stat icons) ──────
+const ClipboardListIcon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    <line x1="8" y1="11" x2="16" y2="11"></line>
+    <line x1="8" y1="15" x2="12" y2="15"></line>
+  </svg>
+);
+
+const CheckCircleIcon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+  </svg>
+);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getStatusColor = (status) => {
   switch (status) {
@@ -175,14 +192,14 @@ export default function QueueTrackingPage() {
             }
             icon={<Activity className="icon" />}
             title="Queue Tracking"
-            subtitle="Monitor your active queues, review history, and view your stats"
+            subtitle="View detailed analytics and history of all your queue activities"
           />
 
           {/* Metrics Strip */}
           <div className="qt-metrics-grid">
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-joined">
-                <Target className="qt-icon-sm" />
+                <ClipboardListIcon className="qt-icon-sm" />
               </div>
               <p className="qt-metric-label">Total Joined</p>
               <p className="qt-metric-value qt-metric-value-joined">
@@ -191,7 +208,7 @@ export default function QueueTrackingPage() {
             </div>
             <div className="qt-metric-card">
               <div className="qt-metric-icon qt-metric-icon-completed">
-                <CheckCircle2 className="qt-icon-sm" />
+                <CheckCircleIcon className="qt-icon-sm" />
               </div>
               <p className="qt-metric-label">Completed</p>
               <p className="qt-metric-value qt-metric-value-completed">
@@ -253,8 +270,7 @@ export default function QueueTrackingPage() {
                     <Users className="qt-empty-icon" />
                     <h3 className="qt-empty-title">No Active Queues</h3>
                     <p className="qt-empty-description">
-                      You're not currently in any queues. Browse available
-                      queues to join one.
+                      You are not participating in any active queues.
                     </p>
                     <Link
                       to="/student/queue"
@@ -447,10 +463,9 @@ export default function QueueTrackingPage() {
                 ) : queueHistory.length === 0 ? (
                   <div className="qt-empty-state">
                     <History className="qt-empty-icon" />
-                    <h3 className="qt-empty-title">No Queue History Yet</h3>
+                    <h3 className="qt-empty-title">No Queue History Records</h3>
                     <p className="qt-empty-description">
-                      Your completed and cancelled queues will appear here once
-                      you start using the service.
+                      No queueing records yet.
                     </p>
                   </div>
                 ) : (

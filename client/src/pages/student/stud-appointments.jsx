@@ -636,7 +636,7 @@ export default function AppointmentsPage() {
               ) : bookingsError ? (
                 <div className="appt-empty-state appt-empty-state--card"><CheckCircleIcon /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
               ) : activeBookings.length === 0 ? (
-                <div className="appt-empty-state appt-empty-state--card"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>You have no active appointments.</p></div>
+                <div className="appt-empty-state appt-empty-state--card"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>You have no active appointments yet.</p></div>
               ) : (
                 <div className="bookings-list">
                   {sortedActiveBookings.map((booking) => (

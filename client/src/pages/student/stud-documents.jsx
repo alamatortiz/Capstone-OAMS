@@ -10,7 +10,7 @@ import { formatManilaDate, formatManilaTime, getManilaTomorrowDateString } from 
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
 
-import { ChevronLeft, XCircle } from "lucide-react";
+import { ChevronLeft, XCircle, FileText } from "lucide-react";
 
 // ─── Document Object Structure (JSDoc) ────────────────────────────────────
 /**
@@ -32,15 +32,6 @@ const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-
-const FileTextIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="12" y1="13" x2="12" y2="17"></line>
-    <line x1="9" y1="15" x2="15" y2="15"></line>
   </svg>
 );
 
@@ -457,7 +448,7 @@ export default function DocumentsPage() {
                 <ChevronLeft className="breadcrumb-icon" /> Home
               </Link>
             }
-            icon={<FileTextIcon />}
+            icon={<FileText />}
             iconClassName="doc-title-icon"
             title="Document Requests"
             subtitle="Request documents and track their status"
@@ -504,7 +495,7 @@ export default function DocumentsPage() {
               <div className="doc-tab-content">
                 {docsLoading ? (
                   <div className="doc-empty-state">
-                    <FileTextIcon />
+                    <FileText />
                     <h3>Loading documents...</h3>
                   </div>
                 ) : activeDocuments.length > 0 ? (
@@ -522,7 +513,7 @@ export default function DocumentsPage() {
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
-                            <FileTextIcon />
+                            <FileText />
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
@@ -621,7 +612,7 @@ export default function DocumentsPage() {
                   </div>
                 ) : (
                   <div className="doc-empty-state">
-                    <FileTextIcon />
+                    <FileText />
                     <h3>No Active Requests</h3>
                     <p>You have no active document requests.</p>
                   </div>
@@ -634,7 +625,7 @@ export default function DocumentsPage() {
               <div className="doc-tab-content">
                 {docsLoading ? (
                   <div className="doc-empty-state">
-                    <FileTextIcon />
+                    <FileText />
                     <h3>Loading documents...</h3>
                   </div>
                 ) : claimedDocuments.length > 0 ? (
@@ -652,7 +643,7 @@ export default function DocumentsPage() {
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
-                            <FileTextIcon />
+                            <FileText />
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
@@ -699,7 +690,7 @@ export default function DocumentsPage() {
               <div className="doc-tab-content">
                 {docsLoading ? (
                   <div className="doc-empty-state">
-                    <FileTextIcon />
+                    <FileText />
                     <h3>Loading documents...</h3>
                   </div>
                 ) : rejectedDocuments.length > 0 ? (
@@ -717,7 +708,7 @@ export default function DocumentsPage() {
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
-                            <FileTextIcon />
+                            <FileText />
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
@@ -757,7 +748,7 @@ export default function DocumentsPage() {
               <div className="doc-tab-content">
                 {docsLoading ? (
                   <div className="doc-empty-state">
-                    <FileTextIcon />
+                    <FileText />
                     <h3>Loading documents...</h3>
                   </div>
                 ) : cancelledDocuments.length > 0 ? (
@@ -775,7 +766,7 @@ export default function DocumentsPage() {
                       >
                         <div className="doc-card-header">
                           <div className="doc-card-icon-wrap">
-                            <FileTextIcon />
+                            <FileText />
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>

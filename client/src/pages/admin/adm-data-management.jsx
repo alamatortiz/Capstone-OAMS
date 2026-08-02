@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileText } from "lucide-react";
 import "./adm-dashboard.css";
 import "./adm-data-management.css";
 import { toast } from "sonner";
@@ -22,14 +22,6 @@ const DatabaseIcon = () => (
     <ellipse cx="12" cy="5" rx="9" ry="3" />
     <path d="M21 5v6c0 1.66-4.03 3-9 3S3 12.66 3 11V5" />
     <path d="M21 11v6c0 1.66-4.03 3-9 3S3 18.66 3 17v-6" />
-  </svg>
-);
-const FileTypeIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="9" y1="13" x2="15" y2="13" />
-    <line x1="9" y1="17" x2="15" y2="17" />
   </svg>
 );
 const ServiceClockIcon = () => (
@@ -943,7 +935,7 @@ export default function AdminDataManagement() {
                 className={`adm-tab-btn ${activeTab === "documents" ? "adm-tab-active" : ""}`}
                 onClick={() => setActiveTab("documents")}
               >
-                <span className="adm-tab-icon"><FileTypeIcon /></span>
+                <span className="adm-tab-icon"><FileText /></span>
                 Document Settings
               </button>
               <button

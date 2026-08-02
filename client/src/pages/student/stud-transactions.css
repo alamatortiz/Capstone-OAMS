@@ -254,25 +254,28 @@ body {
   stroke: currentColor;
 }
 
-.tx-bg-blue-50 {
+/* Selectors combine .stat-icon-box + variant class so specificity beats the
+   base ".transactions-container .stat-icon-box { border: ... transparent }"
+   rule above -- otherwise the border-color below never actually renders. */
+.transactions-container .stat-icon-box.tx-bg-blue-50 {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
   border-color: rgba(59, 130, 246, 0.2);
   color: var(--blue);
 }
 
-.tx-bg-green-50 {
+.transactions-container .stat-icon-box.tx-bg-green-50 {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
   border-color: rgba(16, 185, 129, 0.2);
   color: var(--success);
 }
 
-.tx-bg-orange-50 {
+.transactions-container .stat-icon-box.tx-bg-orange-50 {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
   border-color: rgba(245, 158, 11, 0.2);
   color: var(--warning);
 }
 
-.tx-bg-purple-50 {
+.transactions-container .stat-icon-box.tx-bg-purple-50 {
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
   border-color: rgba(34, 197, 94, 0.2);
   color: var(--primary-color);

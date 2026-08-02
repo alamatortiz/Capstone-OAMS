@@ -451,11 +451,11 @@ export default function AppointmentStatusPage() {
                     <div className="apst-empty-state">
                       <Calendar className="apst-empty-icon" />
                       <h3 className="apst-empty-title">
-                        {activeTab === "all" ? "No Appointments Yet" : `No ${TABS.find(t => t.key === activeTab)?.label} Appointments`}
+                        {activeTab === "all" ? "No Appointments Booked" : `No ${TABS.find(t => t.key === activeTab)?.label} Appointments`}
                       </h3>
                       <p className="apst-empty-text">
                         {activeTab === "all"
-                          ? "You have no appointments."
+                          ? "You have no active appointments yet."
                           : activeTab === "pending"
                             ? "You have no records of pending appointments."
                             : `You have no records of ${activeTab} appointments.`}

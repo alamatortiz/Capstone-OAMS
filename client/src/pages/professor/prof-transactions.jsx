@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileText } from "lucide-react";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import "./prof-dashboard.css";
@@ -41,12 +41,6 @@ const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="11" cy="11" r="8" />
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-const FileTextIconSm = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
   </svg>
 );
 
@@ -185,7 +179,7 @@ export default function ProfessorTransactionsPage() {
               <p className="txn-stat-value txn-val-green">{stats.appointments}</p>
             </div>
             <div className="txn-stat-card">
-              <div className="txn-stat-icon-box txn-icon-box-orange"><FileTextIconSm /></div>
+              <div className="txn-stat-icon-box txn-icon-box-orange"><FileText /></div>
               <p className="txn-stat-label">Documents</p>
               <p className="txn-stat-value txn-val-orange">{stats.documents}</p>
             </div>
@@ -268,7 +262,7 @@ export default function ProfessorTransactionsPage() {
                 <div key={`${txn.type}-${txn.id}`} className={`txn-item txn-type-${txn.type}`}>
                   <div className="txn-item-icon">
                     <span className={`txn-icon-wrap txn-icon-${txn.type}`}>
-                      {txn.type === "queue" ? <UserIcon /> : txn.type === "appointment" ? <CalendarSmIcon /> : <FileTextIconSm />}
+                      {txn.type === "queue" ? <UserIcon /> : txn.type === "appointment" ? <CalendarSmIcon /> : <FileText />}
                     </span>
                   </div>
                   <div className="txn-item-content">
@@ -282,7 +276,7 @@ export default function ProfessorTransactionsPage() {
                     {txn.type === "document" ? (
                       txn.trackingNumber && (
                         <div className="txn-item-student">
-                          <FileTextIconSm />
+                          <FileText />
                           <span className="txn-tracking-pill">{txn.trackingNumber}</span>
                         </div>
                       )

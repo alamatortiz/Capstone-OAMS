@@ -10,6 +10,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
+import { QueueIconNav } from "../../components/StudentSidebar";
 import { useQueue } from '../../contexts/QueueContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import { formatCollegeLabel } from '../../utils/formatCollege';
@@ -346,7 +347,7 @@ export default function QueuePage() {
               </div>
               <div className="qp-tracking-link-btn-text">
                 <span className="qp-tracking-link-btn-title">Queue Tracking</span>
-                <span className="qp-tracking-link-btn-subtitle">Monitor your active queue positions in real-time</span>
+                <span className="qp-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities.</span>
               </div>
               <svg className="qp-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"></polyline>
@@ -562,7 +563,7 @@ export default function QueuePage() {
                       className={`qp-tab ${activeTab === 'active' ? 'active' : ''}`}
                       onClick={() => setActiveTab('active')}
                     >
-                      <Clock className="qp-tab-icon" /> My Active Queues
+                      <Clock className="qp-tab-icon" /> Active Queues
                       <span className="qp-tab-count">{queues.length}</span>
                     </button>
                   </div>
@@ -714,7 +715,7 @@ export default function QueuePage() {
                       <AlertCircle className="no-queues-icon" />
                       <h3 className="no-queues-title">No Active Queues</h3>
                       <p className="no-queues-description">
-                        You're not currently in any queues. Browse available queues to join one.
+                        You are not participating in any active queues.
                       </p>
                     </div>
                   )}
@@ -873,12 +874,14 @@ export default function QueuePage() {
                     </div>
                   ) : (
                     <div className="no-queues-card">
-                      <AlertCircle className="no-queues-icon" />
-                      <h3 className="no-queues-title">No queues found</h3>
+                      <div className="no-queues-icon">
+                        <QueueIconNav />
+                      </div>
+                      <h3 className="no-queues-title">No Open Queues</h3>
                       <p className="no-queues-description">
                         {(selectedCollege !== 'all' || selectedService !== 'all')
                           ? 'Try adjusting your filters.'
-                          : 'No queues are open today. Check back later.'}
+                          : 'There are no open queues yet.'}
                       </p>
                     </div>
                   )}

@@ -3,7 +3,6 @@ import StudentPageShell from "../../components/StudentPageShell";
 import {
   QueueIconNav,
   CalendarIconNav,
-  DocumentIconNav,
 } from "../../components/StudentSidebar";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
@@ -15,7 +14,7 @@ import api from "../../utils/api";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileText } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
 const ClipboardListIcon = () => (
@@ -223,7 +222,7 @@ export default function TransactionsPage() {
       case "appointment":
         return <CalendarIconNav />;
       case "document":
-        return <DocumentIconNav />;
+        return <FileText />;
       default:
         return <AlertCircleIcon />;
     }
@@ -362,9 +361,9 @@ export default function TransactionsPage() {
               </div>
             ) : filteredTransactions.length === 0 ? (
               <div className="tx-empty-state">
-                <SearchIcon />
-                <h3>No transactions found</h3>
-                <p>Try adjusting your search or filters</p>
+                <ClipboardListIcon />
+                <h3>No Transactions Found</h3>
+                <p>You have no transaction records yet.</p>
               </div>
             ) : (
               filteredTransactions.map((transaction) => (

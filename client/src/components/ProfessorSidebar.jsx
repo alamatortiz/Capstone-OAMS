@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { FileText as LucideFileText } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
@@ -30,14 +31,7 @@ const CalendarIconNav = () => (
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
-const DocumentIconNav = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="12" y1="13" x2="12" y2="17"></line>
-    <line x1="9" y1="15" x2="15" y2="15"></line>
-  </svg>
-);
+const FileTextNavIcon = () => <LucideFileText />;
 const HistoryIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
@@ -94,7 +88,7 @@ const MoonIcon = () => (
 const navItems = [
   { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
   { icon: CalendarIconNav, label: "Appointments", path: "/professor/appointments" },
-  { icon: DocumentIconNav, label: "Documents", path: "/professor/document-request" },
+  { icon: FileTextNavIcon, label: "Documents", path: "/professor/document-request" },
   { icon: HistoryIconNav, label: "Transactions", path: "/professor/transactions" },
 ];
 

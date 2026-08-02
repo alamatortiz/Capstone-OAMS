@@ -235,6 +235,16 @@ export default function AnnouncementsPage() {
     }
   };
 
+  // ── Per-tab empty state copy ────────────────────────────────────────────
+  const emptyStateCopy = {
+    all: { title: "No Announcements Found", description: "There are no announcements yet." },
+    important: { title: "No Important Announcements Found", description: "There are no important announcements yet." },
+    event: { title: "No Event Announcements Found", description: "There are no event announcements yet." },
+    reminder: { title: "No Reminder Announcements Found", description: "There are no reminder announcements yet." },
+    general: { title: "No General Announcements Found", description: "There are no general announcements yet." },
+  };
+  const currentEmptyState = emptyStateCopy[selectedFilter] ?? emptyStateCopy.all;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <StudentPageShell
@@ -365,9 +375,9 @@ export default function AnnouncementsPage() {
             <section className="announcements-section">
               {pinnedAnnouncements.length === 0 ? (
                 <div className="ann-empty-state">
-                  <BellIcon />
+                  <MegaphoneIcon />
                   <h3>No Pinned Announcements</h3>
-                  <p>Announcements marked as important will appear here.</p>
+                  <p>There are no pinned announcements yet.</p>
                 </div>
               ) : (
                 <div className="announcements-list">
@@ -429,9 +439,9 @@ export default function AnnouncementsPage() {
             <section className="announcements-section">
               {filteredAnnouncements.length === 0 ? (
                 <div className="ann-empty-state">
-                  <BellIcon />
-                  <h3>No Announcements Found</h3>
-                  <p>Try adjusting your filters to see more results.</p>
+                  <MegaphoneIcon />
+                  <h3>{currentEmptyState.title}</h3>
+                  <p>{currentEmptyState.description}</p>
                 </div>
               ) : (
                 <div className="announcements-list">

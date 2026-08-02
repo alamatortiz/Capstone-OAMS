@@ -547,7 +547,7 @@ export default function QueueStatusPage() {
               }
               icon={<Clock className="icon" />}
               title="My Queue Status"
-              subtitle="View and manage your active queues"
+              subtitle="Track all the queues you are in"
             />
 
             {!fromTracking && (
@@ -561,7 +561,7 @@ export default function QueueStatusPage() {
                 </div>
                 <div className="qsl-tracking-link-btn-text">
                   <span className="qsl-tracking-link-btn-title">Queue Tracking</span>
-                  <span className="qsl-tracking-link-btn-subtitle">Monitor your active queue positions in real-time</span>
+                  <span className="qsl-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities.</span>
                 </div>
                 <svg className="qsl-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="9 18 15 12 9 6"></polyline>
@@ -706,8 +706,7 @@ export default function QueueStatusPage() {
                     <Users className="queue-empty-icon" />
                     <h3 className="queue-empty-title">No Active Queues</h3>
                     <p className="queue-empty-text">
-                      You're not currently in any queues. Browse available
-                      queues to join one.
+                      You are not participating in any active queues.
                     </p>
                     <button
                       onClick={() => navigate("/student/queue")}
