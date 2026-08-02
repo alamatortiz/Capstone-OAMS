@@ -10,7 +10,7 @@ import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDateTime } from "../../utils/dateTime";
 
 // ── Page-only icons ───────────────────────────────────────────────────────────
 const PlusIconSmall = () => (
@@ -104,11 +104,24 @@ const TYPE_META = {
 
 const EMPTY_FORM = { title: "", content: "", type: "general", isPinned: false };
 
-const formatDate = (iso) => {
+// Mirrors the server's limits (server/middleware/upload.js) -- purely
+// advisory here for the running-total UI, the server stays authoritative.
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+const ATTACHMENT_ACCEPT =
+  ".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip";
+const formatBytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+
+// Single line whose label reflects whether this announcement has ever been
+// edited/restored (isReposted, set server-side) -- "Posted" the first time,
+// "Reposted" from then on.
+const formatPostedLabel = (announcement) => {
+  const label = announcement.isReposted ? "Reposted" : "Posted";
   try {
-    return formatManilaDate(iso, { month: "long", day: "numeric", year: "numeric" });
+    return `${label}: ${formatManilaDateTime(announcement.date, { month: "long" })}`;
   } catch {
-    return iso;
+    return `${label}: ${announcement.date}`;
   }
 };
 
@@ -132,72 +145,9 @@ export default function AdminAnnouncements() {
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [deleteId, setDeleteId] = useState(null);
 
-  // ── Attachments (one per announcement, image or PDF) ──────────────────────
-  const [createAttachmentFile, setCreateAttachmentFile] = useState(null);
-  const [createPreviewUrl, setCreatePreviewUrl] = useState(null);
-  const [editAttachmentFile, setEditAttachmentFile] = useState(null);
-  const [editPreviewUrl, setEditPreviewUrl] = useState(null);
-  const [editExistingAttachmentUrl, setEditExistingAttachmentUrl] = useState(null);
-  const [viewAttachmentUrl, setViewAttachmentUrl] = useState(null);
-
-  const fetchAttachmentBlobUrl = async (id) => {
-    try {
-      const res = await api.get(`/admin/announcements/${id}/attachment`, { responseType: "blob" });
-      return URL.createObjectURL(res.data);
-    } catch {
-      return null;
-    }
-  };
-
-  // Preview for a newly-picked file in the Create modal (image only -- a
-  // picked PDF just shows its filename, no need for a blob URL).
-  useEffect(() => {
-    if (createAttachmentFile?.type.startsWith("image/")) {
-      const url = URL.createObjectURL(createAttachmentFile);
-      setCreatePreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setCreatePreviewUrl(null);
-  }, [createAttachmentFile]);
-
-  // Same, for a newly-picked replacement file in the Edit modal.
-  useEffect(() => {
-    if (editAttachmentFile?.type.startsWith("image/")) {
-      const url = URL.createObjectURL(editAttachmentFile);
-      setEditPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setEditPreviewUrl(null);
-  }, [editAttachmentFile]);
-
-  // The *existing* attachment already saved on the announcement being edited
-  // (fetched once when the Edit modal opens, not re-fetched on every keystroke).
-  useEffect(() => {
-    let url;
-    let cancelled = false;
-    if (editingAnnouncement?.hasAttachment) {
-      fetchAttachmentBlobUrl(editingAnnouncement.id).then((u) => {
-        if (!cancelled) { url = u; setEditExistingAttachmentUrl(u); }
-      });
-    } else {
-      setEditExistingAttachmentUrl(null);
-    }
-    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [editingAnnouncement?.id, editingAnnouncement?.hasAttachment]);
-
-  // The attachment shown in the read-only View modal.
-  useEffect(() => {
-    let url;
-    let cancelled = false;
-    if (viewingAnnouncement?.hasAttachment) {
-      fetchAttachmentBlobUrl(viewingAnnouncement.id).then((u) => {
-        if (!cancelled) { url = u; setViewAttachmentUrl(u); }
-      });
-    } else {
-      setViewAttachmentUrl(null);
-    }
-    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [viewingAnnouncement?.id, viewingAnnouncement?.hasAttachment]);
+  // ── Attachments (up to MAX_FILES per announcement, each ≤ MAX_FILE_BYTES) ──
+  const [createFiles, setCreateFiles] = useState([]); // { id, file }[] queued for the Create modal
+  const [editFiles, setEditFiles] = useState([]); // { id, file }[] queued to add to editingAnnouncement.attachments
 
   const [toasts, setToasts] = useState([]);
   const showToast = (message, kind = "success") => {
@@ -205,6 +155,91 @@ export default function AdminAnnouncements() {
     setToasts((prev) => [...prev, { id, message, kind }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
   };
+
+  // Fetches one attachment's bytes on demand and opens/downloads it -- used
+  // by both the View modal and the Edit modal's existing-attachments list.
+  const openAttachment = async (announcementId, attachment) => {
+    try {
+      const res = await api.get(
+        `/admin/announcements/${announcementId}/attachments/${attachment.id}`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(res.data);
+      if (attachment.mimeType?.startsWith("image/") || attachment.mimeType === "application/pdf") {
+        window.open(url, "_blank");
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = attachment.filename;
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      showToast("Failed to load attachment", "error");
+    }
+  };
+
+  const removeExistingAttachment = async (announcementId, attachmentId) => {
+    try {
+      await api.delete(`/admin/announcements/${announcementId}/attachments/${attachmentId}`);
+      const strip = (list) => (list || []).filter((att) => att.id !== attachmentId);
+      setAnnouncements((prev) =>
+        prev.map((a) => (a.id === announcementId ? { ...a, attachments: strip(a.attachments) } : a)),
+      );
+      setEditingAnnouncement((prev) =>
+        prev && prev.id === announcementId ? { ...prev, attachments: strip(prev.attachments) } : prev,
+      );
+      setViewingAnnouncement((prev) =>
+        prev && prev.id === announcementId ? { ...prev, attachments: strip(prev.attachments) } : prev,
+      );
+      showToast("Attachment removed");
+    } catch (err) {
+      showToast(err.response?.data?.error || "Failed to remove attachment", "error");
+    }
+  };
+
+  // Accepts as many of the newly-picked files as still fit under MAX_FILES /
+  // MAX_TOTAL_BYTES (given what's already saved + already queued), rejecting
+  // anything individually over MAX_FILE_BYTES outright -- and reports back
+  // how many were skipped and why, so the caller can toast immediately
+  // instead of only failing at Save.
+  const queueFiles = (fileList, existingQueued, existingSavedCount, existingSavedBytes, setQueued) => {
+    const incoming = Array.from(fileList || []);
+    const accepted = [];
+    let count = existingSavedCount + existingQueued.length;
+    let bytes = existingSavedBytes + existingQueued.reduce((sum, f) => sum + f.file.size, 0);
+    let tooLarge = 0;
+    let overBudget = 0;
+    for (const file of incoming) {
+      if (file.size > MAX_FILE_BYTES) {
+        tooLarge += 1;
+        continue;
+      }
+      if (count + 1 > MAX_FILES || bytes + file.size > MAX_TOTAL_BYTES) {
+        overBudget += 1;
+        continue;
+      }
+      accepted.push({ id: Date.now() + Math.random(), file });
+      count += 1;
+      bytes += file.size;
+    }
+    if (accepted.length > 0) setQueued((prev) => [...prev, ...accepted]);
+    if (tooLarge > 0) {
+      showToast(`${tooLarge} file(s) skipped — each file must be ${formatBytes(MAX_FILE_BYTES)} or smaller`, "error");
+    }
+    if (overBudget > 0) {
+      showToast(`${overBudget} file(s) skipped — attachment limit reached`, "error");
+    }
+  };
+
+  const addCreateFiles = (fileList) => queueFiles(fileList, createFiles, 0, 0, setCreateFiles);
+  const removeCreateFile = (id) => setCreateFiles((prev) => prev.filter((f) => f.id !== id));
+  const addEditFiles = (fileList) => {
+    const existingAttachments = editingAnnouncement?.attachments || [];
+    const existingBytes = existingAttachments.reduce((sum, a) => sum + (a.size || 0), 0);
+    queueFiles(fileList, editFiles, existingAttachments.length, existingBytes, setEditFiles);
+  };
+  const removeEditFile = (id) => setEditFiles((prev) => prev.filter((f) => f.id !== id));
 
   // ── Fetch from API ─────────────────────────────────────────────────────────
   const fetchAnnouncements = async () => {
@@ -273,8 +308,13 @@ export default function AdminAnnouncements() {
 
   const handleRestore = async (id) => {
     try {
-      await api.patch(`/admin/announcements/${id}/restore`);
-      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: "active" } : a)));
+      const { data } = await api.patch(`/admin/announcements/${id}/restore`);
+      // Restoring counts as a repost too -- same resurface-to-front
+      // treatment as saveEdit, for the same reason.
+      setAnnouncements((prev) => {
+        const restored = { ...prev.find((a) => a.id === id), status: "active", date: data.date, isReposted: data.isReposted };
+        return [restored, ...prev.filter((a) => a.id !== id)];
+      });
       showToast("Announcement restored");
     } catch {
       showToast("Failed to restore announcement", "error");
@@ -301,9 +341,9 @@ export default function AdminAnnouncements() {
       type: announcement.type,
       isPinned: announcement.isPinned,
     });
-    setEditAttachmentFile(null);
+    setEditFiles([]);
   };
-  const closeEdit = () => { setEditingAnnouncement(null); setEditForm(EMPTY_FORM); setEditAttachmentFile(null); };
+  const closeEdit = () => { setEditingAnnouncement(null); setEditForm(EMPTY_FORM); setEditFiles([]); };
 
   const saveEdit = async () => {
     if (!editForm.title.trim() || !editForm.content.trim()) {
@@ -315,32 +355,33 @@ export default function AdminAnnouncements() {
       formData.append("title", editForm.title);
       formData.append("content", editForm.content);
       formData.append("type", editForm.type);
-      if (editAttachmentFile) formData.append("attachment", editAttachmentFile);
-      await api.put(`/admin/announcements/${editingAnnouncement.id}`, formData);
-      setAnnouncements((prev) =>
-        prev.map((a) =>
-          a.id === editingAnnouncement.id
-            ? {
-                ...a,
-                title: editForm.title,
-                content: editForm.content,
-                type: editForm.type,
-                isCrossCollege: false,
-                ...(editAttachmentFile
-                  ? { hasAttachment: true, attachmentMimeType: editAttachmentFile.type }
-                  : {}),
-              }
-            : a,
-        ),
-      );
+      editFiles.forEach((f) => formData.append("attachments", f.file));
+      const { data } = await api.put(`/admin/announcements/${editingAnnouncement.id}`, formData);
+      // An edit is a repost -- move the edited item to the front of the
+      // array (getFiltered's stable pinned-sort still correctly keeps any
+      // actually-pinned items above it) instead of patching it in place, so
+      // it visibly resurfaces the same way the server's own updated_at-based
+      // ordering would show it on a fresh fetch.
+      setAnnouncements((prev) => {
+        const updated = {
+          ...prev.find((a) => a.id === editingAnnouncement.id),
+          title: editForm.title,
+          content: editForm.content,
+          type: editForm.type,
+          date: data.date,
+          isReposted: data.isReposted,
+          attachments: data.attachments,
+        };
+        return [updated, ...prev.filter((a) => a.id !== editingAnnouncement.id)];
+      });
       showToast("Announcement updated successfully");
       closeEdit();
-    } catch {
-      showToast("Failed to update announcement", "error");
+    } catch (err) {
+      showToast(err.response?.data?.error || "Failed to update announcement", "error");
     }
   };
 
-  const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_FORM); setCreateAttachmentFile(null); };
+  const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_FORM); setCreateFiles([]); };
 
   const saveCreate = async () => {
     if (!createForm.title.trim() || !createForm.content.trim()) {
@@ -353,17 +394,27 @@ export default function AdminAnnouncements() {
       formData.append("content", createForm.content);
       formData.append("type", createForm.type);
       formData.append("isPinned", createForm.isPinned);
-      if (createAttachmentFile) formData.append("attachment", createAttachmentFile);
+      createFiles.forEach((f) => formData.append("attachments", f.file));
       const { data } = await api.post("/admin/announcements", formData);
       setAnnouncements((prev) => [data.announcement, ...prev]);
       showToast("Announcement created successfully");
       closeCreate();
-    } catch {
-      showToast("Failed to create announcement", "error");
+    } catch (err) {
+      showToast(err.response?.data?.error || "Failed to create announcement", "error");
     }
   };
 
   const list = getFiltered(activeTab);
+
+  const createTotalBytes = createFiles.reduce((sum, f) => sum + f.file.size, 0);
+  const createAtLimit = createFiles.length >= MAX_FILES || createTotalBytes >= MAX_TOTAL_BYTES;
+
+  const editExistingAttachments = editingAnnouncement?.attachments || [];
+  const editExistingBytes = editExistingAttachments.reduce((sum, a) => sum + (a.size || 0), 0);
+  const editNewBytes = editFiles.reduce((sum, f) => sum + f.file.size, 0);
+  const editTotalCount = editExistingAttachments.length + editFiles.length;
+  const editTotalBytes = editExistingBytes + editNewBytes;
+  const editAtLimit = editTotalCount >= MAX_FILES || editTotalBytes >= MAX_TOTAL_BYTES;
 
   return (
     <AdminPageShell
@@ -397,7 +448,7 @@ export default function AdminAnnouncements() {
                 <div className="ann-view-banner">
                   <div>
                     <h2>{viewingAnnouncement.title}</h2>
-                    <div className="ann-view-banner-date"><CalendarIcon />{formatDate(viewingAnnouncement.date)}</div>
+                    <div className="ann-view-banner-date"><CalendarIcon />{formatPostedLabel(viewingAnnouncement)}</div>
                   </div>
                   <div className="ann-view-banner-badges">
                     <span className={`ann-badge ${viewingAnnouncement.isPinned ? "ann-badge-pinned" : TYPE_META[viewingAnnouncement.type].badgeClass}`}>
@@ -406,33 +457,27 @@ export default function AdminAnnouncements() {
                     {viewingAnnouncement.isPinned && (
                       <span className="ann-pinned-pill"><PinIcon /> Pinned</span>
                     )}
-                    {viewingAnnouncement.isCrossCollege && (
-                      <span className="ann-badge ann-badge-cross-college">Cross-College</span>
-                    )}
                   </div>
                 </div>
 
                 <p className="ann-view-label">Content</p>
                 <div className="ann-view-block"><p>{viewingAnnouncement.content}</p></div>
 
-                {viewingAnnouncement.hasAttachment && (
+                {viewingAnnouncement.attachments?.length > 0 && (
                   <div className="ann-attachment-view">
-                    <p className="ann-view-label">Attachment</p>
-                    {viewAttachmentUrl ? (
-                      viewingAnnouncement.attachmentMimeType?.startsWith("image/") ? (
-                        <img src={viewAttachmentUrl} alt="Announcement attachment" className="ann-attachment-image" />
-                      ) : (
+                    <p className="ann-view-label">Attachments ({viewingAnnouncement.attachments.length})</p>
+                    <div className="ann-attachment-list">
+                      {viewingAnnouncement.attachments.map((att) => (
                         <button
+                          key={att.id}
                           type="button"
                           className="ann-btn-secondary"
-                          onClick={() => window.open(viewAttachmentUrl, "_blank")}
+                          onClick={() => openAttachment(viewingAnnouncement.id, att)}
                         >
-                          <FileIcon /> View Attachment
+                          <FileIcon /> {att.filename}
                         </button>
-                      )
-                    ) : (
-                      <p className="ann-view-value">Loading attachment…</p>
-                    )}
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -448,10 +493,6 @@ export default function AdminAnnouncements() {
                         {viewingAnnouncement.status}
                       </span>
                     </p>
-                  </div>
-                  <div>
-                    <p className="ann-view-label">Published Date</p>
-                    <p className="ann-view-value">{formatDate(viewingAnnouncement.date)}</p>
                   </div>
                 </div>
 
@@ -498,33 +539,66 @@ export default function AdminAnnouncements() {
                 </div>
 
                 <div className="ann-field">
-                  <label htmlFor="edit-attachment">Attachment (optional)</label>
-                  {!editAttachmentFile && editExistingAttachmentUrl && (
-                    <div className="ann-attachment-preview">
-                      {editingAnnouncement.attachmentMimeType?.startsWith("image/") ? (
-                        <img src={editExistingAttachmentUrl} alt="Current attachment" className="ann-attachment-thumb" />
-                      ) : (
-                        <span className="ann-attachment-filename"><FileIcon /> Current attachment (PDF)</span>
-                      )}
-                      <span className="ann-attachment-hint">Choose a new file below to replace it</span>
+                  <label htmlFor="edit-attachment">
+                    Attachments{" "}
+                    <span className="ann-attachment-budget">
+                      ({editTotalCount}/{MAX_FILES} files, {formatBytes(editTotalBytes)}/{formatBytes(MAX_TOTAL_BYTES)})
+                    </span>
+                  </label>
+                  <p className="ann-attachment-hint">Each file up to {formatBytes(MAX_FILE_BYTES)}.</p>
+
+                  {editExistingAttachments.length > 0 && (
+                    <div className="ann-attachment-list">
+                      {editExistingAttachments.map((att) => (
+                        <div key={att.id} className="ann-attachment-chip">
+                          <button
+                            type="button"
+                            className="ann-attachment-filename"
+                            onClick={() => openAttachment(editingAnnouncement.id, att)}
+                          >
+                            <FileIcon /> {att.filename}
+                          </button>
+                          <button
+                            type="button"
+                            className="ann-attachment-remove"
+                            aria-label={`Remove ${att.filename}`}
+                            onClick={() => removeExistingAttachment(editingAnnouncement.id, att.id)}
+                          >
+                            <XIcon />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
+
+                  {editFiles.length > 0 && (
+                    <div className="ann-attachment-list">
+                      {editFiles.map((f) => (
+                        <div key={f.id} className="ann-attachment-chip">
+                          <span className="ann-attachment-filename"><FileIcon /> {f.file.name}</span>
+                          <button
+                            type="button"
+                            className="ann-attachment-remove"
+                            aria-label={`Remove ${f.file.name}`}
+                            onClick={() => removeEditFile(f.id)}
+                          >
+                            <XIcon />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <input
                     id="edit-attachment"
                     type="file"
-                    accept="image/jpeg,image/png,application/pdf"
+                    multiple
+                    accept={ATTACHMENT_ACCEPT}
                     className="ann-file-input"
-                    onChange={(e) => setEditAttachmentFile(e.target.files[0] || null)}
+                    disabled={editAtLimit}
+                    onChange={(e) => { addEditFiles(e.target.files); e.target.value = ""; }}
                   />
-                  {editAttachmentFile && (
-                    <div className="ann-attachment-preview">
-                      {editPreviewUrl ? (
-                        <img src={editPreviewUrl} alt="New attachment preview" className="ann-attachment-thumb" />
-                      ) : (
-                        <span className="ann-attachment-filename"><FileIcon /> {editAttachmentFile.name}</span>
-                      )}
-                    </div>
-                  )}
+                  {editAtLimit && <span className="ann-attachment-hint">Attachment limit reached</span>}
                 </div>
 
                 <div className="ann-modal-footer">
@@ -575,23 +649,42 @@ export default function AdminAnnouncements() {
                 </div>
 
                 <div className="ann-field">
-                  <label htmlFor="create-attachment">Attachment (optional)</label>
+                  <label htmlFor="create-attachment">
+                    Attachments (optional){" "}
+                    <span className="ann-attachment-budget">
+                      ({createFiles.length}/{MAX_FILES} files, {formatBytes(createTotalBytes)}/{formatBytes(MAX_TOTAL_BYTES)})
+                    </span>
+                  </label>
+                  <p className="ann-attachment-hint">Each file up to {formatBytes(MAX_FILE_BYTES)}.</p>
+
+                  {createFiles.length > 0 && (
+                    <div className="ann-attachment-list">
+                      {createFiles.map((f) => (
+                        <div key={f.id} className="ann-attachment-chip">
+                          <span className="ann-attachment-filename"><FileIcon /> {f.file.name}</span>
+                          <button
+                            type="button"
+                            className="ann-attachment-remove"
+                            aria-label={`Remove ${f.file.name}`}
+                            onClick={() => removeCreateFile(f.id)}
+                          >
+                            <XIcon />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <input
                     id="create-attachment"
                     type="file"
-                    accept="image/jpeg,image/png,application/pdf"
+                    multiple
+                    accept={ATTACHMENT_ACCEPT}
                     className="ann-file-input"
-                    onChange={(e) => setCreateAttachmentFile(e.target.files[0] || null)}
+                    disabled={createAtLimit}
+                    onChange={(e) => { addCreateFiles(e.target.files); e.target.value = ""; }}
                   />
-                  {createAttachmentFile && (
-                    <div className="ann-attachment-preview">
-                      {createPreviewUrl ? (
-                        <img src={createPreviewUrl} alt="Attachment preview" className="ann-attachment-thumb" />
-                      ) : (
-                        <span className="ann-attachment-filename"><FileIcon /> {createAttachmentFile.name}</span>
-                      )}
-                    </div>
-                  )}
+                  {createAtLimit && <span className="ann-attachment-hint">Attachment limit reached</span>}
                 </div>
 
                 <div className="ann-modal-footer">
@@ -723,14 +816,13 @@ export default function AdminAnnouncements() {
                             <div className="ann-item-title-row">
                               <h3 className="ann-item-title">{a.title}</h3>
                               {a.isPinned && <PinIcon className="ann-pin-flag" />}
-                              {a.hasAttachment && <PaperclipIcon className="ann-attachment-flag" title="Has attachment" />}
+                              {a.attachments?.length > 0 && <PaperclipIcon className="ann-attachment-flag" title="Has attachment" />}
                             </div>
                             <span className={`ann-badge ${meta.badgeClass}`}>{meta.label}</span>
-                            {a.isCrossCollege && <span className="ann-badge ann-badge-cross-college">Cross-College</span>}
                           </div>
                           <p className="ann-item-desc">{a.content}</p>
                           <div className="ann-item-meta">
-                            <span><CalendarIcon />{formatDate(a.date)}</span>
+                            <span><CalendarIcon />{formatPostedLabel(a)}</span>
                             <span>•</span>
                             <span>By: {a.createdBy || "Admin Office"}</span>
                           </div>

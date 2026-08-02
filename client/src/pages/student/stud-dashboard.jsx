@@ -11,7 +11,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 
 import "./stud-dashboard.css";
 import api from "../../utils/api";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 
 // ─── Dashboard Content Icons ──────────────────────────────────────────────────
@@ -737,11 +737,7 @@ export default function StudentDashboard() {
                             {ann.college}
                           </span>
                           <span className="pinned-announcement-date">
-                            {formatManilaDate(ann.date, {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
+                            {formatManilaDateTime(ann.date)}
                           </span>
                         </div>
                         {ann.description && (

@@ -13,6 +13,7 @@ const { getQueueDisplayInfo } = require("../utils/queueDisplay");
 const { STATUS_LABEL_MAP } = require("../utils/documentStatus");
 const { createNotification } = require("../utils/notifications");
 const { UPLOAD_DIR } = require("../middleware/upload");
+const { getAttachmentsMap, isPathInsideUploadDir } = require("../utils/announcementAttachments");
 
 // GET /api/student/dashboard-stats
 router.get(
@@ -267,47 +268,8 @@ router.get(
 // ANNOUNCEMENTS ENDPOINT
 // ─────────────────────────────────────────────────────────────
 
-// Lightweight keyword classifier so the UI's existing category
-// tabs (important/event/reminder/general) keep working without
-// requiring admins to pick a category when creating a notice.
-// This is intentionally simple -- swap for a stored column later
-// if admins need to override the auto-detected category.
-function classifyAnnouncement(title = "", content = "") {
-  const text = `${title} ${content}`.toLowerCase();
-
-  if (
-    text.includes("deadline") ||
-    text.includes("maintenance") ||
-    text.includes("must") ||
-    text.includes("required") ||
-    text.includes("suspension")
-  ) {
-    return "important";
-  }
-  if (
-    text.includes("fair") ||
-    text.includes("symposium") ||
-    text.includes("week") ||
-    text.includes("orientation") ||
-    text.includes("defense")
-  ) {
-    return "event";
-  }
-  if (
-    text.includes("reminder") ||
-    text.includes("don't forget") ||
-    text.includes("clearance") ||
-    text.includes("schedule")
-  ) {
-    return "reminder";
-  }
-  return "general";
-}
-
 // GET /api/student/announcements
-// Returns only the student's own department's announcements, plus any
-// legacy announcements an admin marked cross-college before that option
-// was removed from the admin UI.
+// Returns only the student's own department's announcements.
 router.get(
   "/announcements",
   authenticateToken,
@@ -326,35 +288,35 @@ router.get(
            a.announcement_id,
            a.title,
            a.content,
+           a.type,
            a.is_pinned,
-           a.is_cross_college,
            a.created_at,
-           a.attachment_filename,
-           a.attachment_mime_type,
+           a.updated_at,
            d.department_id,
            d.department_name,
            d.department_abbreviation
          FROM announcements a
          JOIN departments d ON a.department_id = d.department_id
-         WHERE a.department_id = ? OR a.is_cross_college = TRUE
-         ORDER BY a.is_pinned DESC, a.created_at DESC`,
+         WHERE a.department_id = ? AND a.status = 'active'
+         ORDER BY a.is_pinned DESC, a.updated_at DESC`,
         [studentDeptId],
       );
+
+      const attachmentsMap = await getAttachmentsMap(rows.map((row) => row.announcement_id));
 
       const announcements = rows.map((row) => ({
         id: String(row.announcement_id),
         title: row.title,
         description: row.content,
-        category: classifyAnnouncement(row.title, row.content),
+        category: row.type,
         isPinned: !!row.is_pinned,
-        date: row.created_at,
+        date: row.updated_at,
+        isReposted: new Date(row.updated_at).getTime() !== new Date(row.created_at).getTime(),
         departmentId: row.department_id,
         departmentName: row.department_name,
         departmentAbbrev: row.department_abbreviation,
-        isCrossCollege: !!row.is_cross_college,
         college: `${row.department_name} (${row.department_abbreviation})`,
-        hasAttachment: !!row.attachment_filename,
-        attachmentMimeType: row.attachment_mime_type || null,
+        attachments: attachmentsMap[row.announcement_id] || [],
       }));
 
       res.json({ announcements });
@@ -367,16 +329,17 @@ router.get(
   },
 );
 
-// GET /api/student/announcements/:id/attachment
-// Serves the announcement's attachment inline (image/PDF), visibility-scoped
-// exactly like the list route above (own department, or cross-college).
+// GET /api/student/announcements/:id/attachments/:attachmentId
+// Serves one specific attachment inline (image/PDF/etc.), visibility-scoped
+// exactly like the list route above (own department only).
 router.get(
-  "/announcements/:id/attachment",
+  "/announcements/:id/attachments/:attachmentId",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
     const announcementId = parseInt(req.params.id, 10);
+    const attachmentId = parseInt(req.params.attachmentId, 10);
     try {
       const [[stu]] = await pool.query(
         `SELECT department_id FROM students WHERE student_id = ?`,
@@ -385,23 +348,25 @@ router.get(
       const studentDeptId = stu?.department_id ?? null;
 
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college, attachment_path, attachment_mime_type
-         FROM announcements WHERE announcement_id = ?`,
-        [announcementId],
+        `SELECT a.department_id, aa.file_path, aa.mime_type
+         FROM announcement_attachments aa
+         JOIN announcements a ON a.announcement_id = aa.announcement_id
+         WHERE aa.attachment_id = ? AND aa.announcement_id = ?`,
+        [attachmentId, announcementId],
       );
-      if (!row || !row.attachment_path) {
-        return res.status(404).json({ error: "No attachment found for this announcement" });
+      if (!row) {
+        return res.status(404).json({ error: "Attachment not found" });
       }
-      if (row.department_id !== studentDeptId && !row.is_cross_college) {
+      if (row.department_id !== studentDeptId) {
         return res.status(403).json({ error: "Cannot view this attachment" });
       }
 
-      const resolvedPath = path.join(UPLOAD_DIR, row.attachment_path);
-      if (!resolvedPath.startsWith(UPLOAD_DIR)) {
+      const resolvedPath = path.join(UPLOAD_DIR, row.file_path);
+      if (!isPathInsideUploadDir(resolvedPath)) {
         return res.status(400).json({ error: "Invalid attachment path" });
       }
 
-      res.type(row.attachment_mime_type || "application/octet-stream");
+      res.type(row.mime_type || "application/octet-stream");
       res.sendFile(resolvedPath);
     } catch (error) {
       console.error("Announcement attachment fetch error:", error);

@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
+const multer = require("multer");
 const app = express();
 const server = http.createServer(app);
 
@@ -36,6 +37,25 @@ app.use("/api/auth", authRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/admin", adminRoutes);
+
+// Surfaces multer upload failures (file too large, too many files, or an
+// unsupported type from upload.js's fileFilter) as a clear 400 instead of
+// falling through to Express's generic 500/HTML error page.
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "Each file must be 10MB or smaller" });
+    }
+    if (err.code === "LIMIT_FILE_COUNT") {
+      return res.status(400).json({ error: "You can attach up to 5 files" });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+  if (err && err.message === "That file type isn't supported") {
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
+});
 
 initSocketServer(server);
 

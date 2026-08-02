@@ -73,6 +73,13 @@ function OamsLogo({
 type AnnouncementType = 'important' | 'event' | 'reminder' | 'general';
 type AnnouncementStatus = 'active' | 'archived';
 
+interface AnnouncementAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 interface AnnouncementItem {
   id: string;
   title: string;
@@ -80,12 +87,34 @@ interface AnnouncementItem {
   type: AnnouncementType;
   date: string;
   isPinned: boolean;
-  isCrossCollege: boolean;
+  isReposted: boolean;
   createdBy: string;
   status: AnnouncementStatus;
-  hasAttachment?: boolean;
-  attachmentMimeType?: string | null;
+  attachments: AnnouncementAttachment[];
 }
+
+// Mirrors server/middleware/upload.js's allow-list. Mobile still only picks
+// one file at a time (no multi-select picker UI here), but that single file
+// goes through the same multi-file-capable backend correctly.
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+const ATTACHMENT_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+];
 
 // Mirrors admin-announcements.css badge/icon colors (important=red, event=orange,
 // reminder=blue, general=gray; pinned announcements override all of these to green).
@@ -187,6 +216,23 @@ const YES_NO_OPTIONS = [
 
 const EMPTY_FORM = { title: '', content: '', type: 'general' as AnnouncementType };
 const EMPTY_CREATE_FORM = { ...EMPTY_FORM, isPinned: false };
+
+// Single line whose label reflects whether this announcement has ever been
+// edited/restored (isReposted, set server-side) -- "Posted" the first time,
+// "Reposted" from then on. Matches the web admin/student pages' convention.
+const formatPostedLabel = (announcement: { date: string; isReposted: boolean }) => {
+  const label = announcement.isReposted ? 'Reposted' : 'Posted';
+  const formatted = new Date(announcement.date).toLocaleString('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${label}: ${formatted}`;
+};
 
 interface NavItem {
   key: string;
@@ -360,8 +406,13 @@ export default function AdminAnnouncementScreen() {
 
   const restoreAnnouncement = async (id: string) => {
     try {
-      await api.patch(`/admin/announcements/${id}/restore`);
-      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'active' } : a)));
+      const { data } = await api.patch(`/admin/announcements/${id}/restore`);
+      // Restoring counts as a repost -- move it to the front of the list,
+      // matching the web admin page's same treatment.
+      setAnnouncements((prev) => {
+        const restored = { ...prev.find((a) => a.id === id)!, status: 'active' as const, date: data.date, isReposted: data.isReposted };
+        return [restored, ...prev.filter((a) => a.id !== id)];
+      });
     } catch {
       Alert.alert('Error', 'Failed to restore announcement.');
     }
@@ -379,12 +430,41 @@ export default function AdminAnnouncementScreen() {
     }
   };
 
-  const pickAttachment = async (onPicked: (asset: DocumentPicker.DocumentPickerAsset) => void) => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['application/pdf', 'image/jpeg', 'image/png'],
-    });
-    if (!result.canceled && result.assets?.[0]) {
-      onPicked(result.assets[0]);
+  const pickAttachment = async (
+    onPicked: (asset: DocumentPicker.DocumentPickerAsset) => void,
+    existingCount = 0,
+    existingBytes = 0,
+  ) => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ATTACHMENT_TYPES });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    if (asset.size != null && asset.size > MAX_FILE_BYTES) {
+      Alert.alert('File too large', 'Each file must be 10MB or smaller.');
+      return;
+    }
+    if (existingCount + 1 > MAX_FILES) {
+      Alert.alert('Attachment limit reached', `You can attach up to ${MAX_FILES} files.`);
+      return;
+    }
+    if (asset.size != null && existingBytes + asset.size > MAX_TOTAL_BYTES) {
+      Alert.alert('Attachment limit reached', 'Adding this file would exceed the combined size limit.');
+      return;
+    }
+    onPicked(asset);
+  };
+
+  const removeAttachment = async (announcementId: string, attachmentId: string) => {
+    try {
+      await api.delete(`/admin/announcements/${announcementId}/attachments/${attachmentId}`);
+      const strip = (list?: AnnouncementAttachment[]) => (list ?? []).filter((att) => att.id !== attachmentId);
+      setAnnouncements((prev) =>
+        prev.map((a) => (a.id === announcementId ? { ...a, attachments: strip(a.attachments) } : a)),
+      );
+      setEditingAnnouncement((prev) =>
+        prev && prev.id === announcementId ? { ...prev, attachments: strip(prev.attachments) } : prev,
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to remove attachment.');
     }
   };
 
@@ -405,44 +485,45 @@ export default function AdminAnnouncementScreen() {
     }
     if (!editingAnnouncement) return;
     try {
+      let data: any;
       if (editAttachment) {
         const formData = new FormData();
         formData.append('title', editForm.title);
         formData.append('content', editForm.content);
         formData.append('type', editForm.type);
-        formData.append('attachment', {
+        formData.append('attachments', {
           uri: editAttachment.uri,
           name: editAttachment.name,
           type: editAttachment.mimeType ?? 'application/octet-stream',
         } as any);
-        await api.put(`/admin/announcements/${editingAnnouncement.id}`, formData, {
+        ({ data } = await api.put(`/admin/announcements/${editingAnnouncement.id}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        }));
       } else {
-        await api.put(`/admin/announcements/${editingAnnouncement.id}`, {
+        ({ data } = await api.put(`/admin/announcements/${editingAnnouncement.id}`, {
           title: editForm.title,
           content: editForm.content,
           type: editForm.type,
-        });
+        }));
       }
-      setAnnouncements((prev) =>
-        prev.map((a) =>
-          a.id === editingAnnouncement.id
-            ? {
-                ...a,
-                title: editForm.title,
-                content: editForm.content,
-                type: editForm.type,
-                isCrossCollege: false,
-                hasAttachment: editAttachment ? true : a.hasAttachment,
-                attachmentMimeType: editAttachment ? (editAttachment.mimeType ?? null) : a.attachmentMimeType,
-              }
-            : a,
-        ),
-      );
+      // An edit is a repost -- move it to the front of the list, matching
+      // the web admin page's same treatment.
+      setAnnouncements((prev) => {
+        const existing = prev.find((a) => a.id === editingAnnouncement.id)!;
+        const updated = {
+          ...existing,
+          title: editForm.title,
+          content: editForm.content,
+          type: editForm.type,
+          date: data?.date,
+          isReposted: data?.isReposted,
+          attachments: data?.attachments ?? existing.attachments,
+        };
+        return [updated, ...prev.filter((a) => a.id !== editingAnnouncement.id)];
+      });
       closeEdit();
-    } catch {
-      Alert.alert('Error', 'Failed to update announcement.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to update announcement.');
     }
   };
 
@@ -469,7 +550,7 @@ export default function AdminAnnouncementScreen() {
         formData.append('content', createForm.content);
         formData.append('type', createForm.type);
         formData.append('isPinned', String(createForm.isPinned));
-        formData.append('attachment', {
+        formData.append('attachments', {
           uri: createAttachment.uri,
           name: createAttachment.name,
           type: createAttachment.mimeType ?? 'application/octet-stream',
@@ -487,8 +568,8 @@ export default function AdminAnnouncementScreen() {
       }
       setAnnouncements((prev) => [data.announcement, ...prev]);
       closeCreate();
-    } catch {
-      Alert.alert('Error', 'Failed to create announcement.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to create announcement.');
     }
   };
 
@@ -647,15 +728,12 @@ export default function AdminAnnouncementScreen() {
                           <View style={[styles.badge, { backgroundColor: meta.badgeBg, borderColor: meta.badgeBorder }]}>
                             <Text style={[styles.badgeText, { color: meta.badgeColor }]}>{meta.label}</Text>
                           </View>
-                          {a.isCrossCollege && (
-                            <View style={styles.crossBadge}>
-                              <Text style={styles.crossBadgeText}>Cross-College</Text>
-                            </View>
-                          )}
-                          {a.hasAttachment && (
-                            <View style={[styles.crossBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                          {a.attachments?.length > 0 && (
+                            <View style={[styles.countBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                               <Ionicons name="attach-outline" size={11} color={theme.primary} />
-                              <Text style={styles.crossBadgeText}>Attachment</Text>
+                              <Text style={styles.countBadgeText}>
+                                {a.attachments.length > 1 ? `${a.attachments.length} Attachments` : 'Attachment'}
+                              </Text>
                             </View>
                           )}
                         </View>
@@ -668,7 +746,7 @@ export default function AdminAnnouncementScreen() {
 
                     <View style={styles.itemMetaRow}>
                       <Ionicons name="calendar-outline" size={12} color={theme.tertiary} />
-                      <Text style={styles.itemMetaText}>{a.date}</Text>
+                      <Text style={styles.itemMetaText}>{formatPostedLabel(a)}</Text>
                       <Text style={styles.itemMetaText}>•</Text>
                       <Text style={styles.itemMetaText}>By: {a.createdBy}</Text>
                     </View>
@@ -768,7 +846,7 @@ export default function AdminAnnouncementScreen() {
                   <Text style={styles.viewBannerTitle}>{viewingAnnouncement.title}</Text>
                   <View style={styles.viewBannerDateRow}>
                     <Ionicons name="calendar-outline" size={13} color="#ffffff" />
-                    <Text style={styles.viewBannerDate}>{viewingAnnouncement.date}</Text>
+                    <Text style={styles.viewBannerDate}>{formatPostedLabel(viewingAnnouncement)}</Text>
                   </View>
                   <View style={styles.viewBannerBadges}>
                     <View
@@ -787,11 +865,6 @@ export default function AdminAnnouncementScreen() {
                     {viewingAnnouncement.isPinned && (
                       <View style={styles.pinnedPill}>
                         <Text style={styles.pinnedPillText}>📌 Pinned</Text>
-                      </View>
-                    )}
-                    {viewingAnnouncement.isCrossCollege && (
-                      <View style={styles.crossBadgeLight}>
-                        <Text style={styles.crossBadgeLightText}>Cross-College</Text>
                       </View>
                     )}
                   </View>
@@ -911,14 +984,29 @@ export default function AdminAnnouncementScreen() {
               </Pressable>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Attach File (optional)</Text>
-                <Pressable style={styles.filterSelect} onPress={() => pickAttachment(setEditAttachment)}>
+                <Text style={styles.formLabel}>
+                  Attachments ({editingAnnouncement?.attachments?.length ?? 0}/{MAX_FILES})
+                </Text>
+                {editingAnnouncement?.attachments?.map((att) => (
+                  <View key={att.id} style={[styles.filterSelect, { marginBottom: 8 }]}>
+                    <Text style={styles.filterSelectText} numberOfLines={1}>{att.filename}</Text>
+                    <Pressable onPress={() => removeAttachment(editingAnnouncement.id, att.id)} hitSlop={8}>
+                      <Ionicons name="close" size={16} color="#ef4444" />
+                    </Pressable>
+                  </View>
+                ))}
+                <Pressable
+                  style={styles.filterSelect}
+                  onPress={() =>
+                    pickAttachment(
+                      setEditAttachment,
+                      editingAnnouncement?.attachments?.length ?? 0,
+                      (editingAnnouncement?.attachments ?? []).reduce((sum, a) => sum + a.size, 0),
+                    )
+                  }
+                >
                   <Text style={styles.filterSelectText} numberOfLines={1}>
-                    {editAttachment
-                      ? editAttachment.name
-                      : editingAnnouncement?.hasAttachment
-                        ? 'Replace existing attachment'
-                        : 'Attach a PDF, JPG, or PNG'}
+                    {editAttachment ? editAttachment.name : 'Attach a file'}
                   </Text>
                   <Ionicons name="attach-outline" size={16} color={theme.primary} />
                 </Pressable>
@@ -1023,7 +1111,7 @@ export default function AdminAnnouncementScreen() {
                 <Text style={styles.formLabel}>Attach File (optional)</Text>
                 <Pressable style={styles.filterSelect} onPress={() => pickAttachment(setCreateAttachment)}>
                   <Text style={styles.filterSelectText} numberOfLines={1}>
-                    {createAttachment ? createAttachment.name : 'Attach a PDF, JPG, or PNG'}
+                    {createAttachment ? createAttachment.name : 'Attach a file'}
                   </Text>
                   <Ionicons name="attach-outline" size={16} color={theme.primary} />
                 </Pressable>
@@ -1411,7 +1499,7 @@ function createStyles(theme: ThemePalette) {
     itemBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     badge: { borderWidth: 1, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 9 },
     badgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
-    crossBadge: {
+    countBadge: {
       borderWidth: 1,
       borderRadius: 8,
       paddingVertical: 4,
@@ -1419,7 +1507,7 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: 'rgba(34, 197, 94, 0.15)',
       borderColor: 'rgba(34, 197, 94, 0.35)',
     },
-    crossBadgeText: { fontSize: 10, fontWeight: '700', color: theme.primary },
+    countBadgeText: { fontSize: 10, fontWeight: '700', color: theme.primary },
     itemDesc: { fontSize: 13, color: theme.subtext, lineHeight: 19 },
     itemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
     itemMetaText: { fontSize: 11, color: theme.tertiary },
@@ -1571,15 +1659,6 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 9,
     },
     pinnedPillText: { fontSize: 10, fontWeight: '700', color: '#ffffff' },
-    crossBadgeLight: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.35)',
-      borderRadius: 8,
-      paddingVertical: 4,
-      paddingHorizontal: 9,
-    },
-    crossBadgeLightText: { fontSize: 10, fontWeight: '700', color: '#ffffff' },
     viewBlock: { backgroundColor: theme.background, borderRadius: 12, padding: 12, marginTop: 6, marginBottom: 16 },
     viewBlockText: { fontSize: 13, color: theme.text, lineHeight: 20 },
     viewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16 },

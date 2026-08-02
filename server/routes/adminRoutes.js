@@ -9,8 +9,16 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
-const { upload, UPLOAD_DIR } = require("../middleware/upload");
-const { emitToSlot, emitToDept, emitToUser, emitToAll } = require("../sockets");
+const { upload, UPLOAD_DIR, MAX_FILES } = require("../middleware/upload");
+const {
+  getAttachmentsMap,
+  getAttachments,
+  insertAttachments,
+  validateBudget,
+  deleteFiles,
+  isPathInsideUploadDir,
+} = require("../utils/announcementAttachments");
+const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
@@ -146,10 +154,10 @@ router.get(
 
       // 8. Announcements list
       const [announcements] = await pool.query(
-        `SELECT announcement_id, title, content AS description, type, is_pinned, created_at
+        `SELECT announcement_id, title, content AS description, type, is_pinned, created_at, updated_at
          FROM announcements
          WHERE department_id = ?
-         ORDER BY is_pinned DESC, created_at DESC
+         ORDER BY is_pinned DESC, updated_at DESC
          LIMIT 5`,
         [deptId],
       );
@@ -195,11 +203,15 @@ router.get(
           description: a.description,
           tag: a.type || "general",
           isPinned: a.is_pinned === 1,
-          date: new Date(a.created_at).toLocaleDateString("en-US", {
+          isReposted: new Date(a.updated_at).getTime() !== new Date(a.created_at).getTime(),
+          date: new Date(a.updated_at).toLocaleString("en-US", {
             timeZone: "Asia/Manila",
             month: "numeric",
             day: "numeric",
             year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
           }),
         })),
       });
@@ -2552,15 +2564,16 @@ router.get(
       const [rows] = await pool.query(
         `SELECT a.announcement_id, a.title, a.content,
                 a.is_pinned AS isPinned, a.type, a.status, a.created_by AS createdBy,
-                a.department_id, a.is_cross_college, a.created_at,
-                a.attachment_filename, a.attachment_mime_type,
+                a.department_id, a.created_at, a.updated_at,
                 d.department_abbreviation
          FROM announcements a
          JOIN departments d ON a.department_id = d.department_id
          WHERE a.department_id = ?
-         ORDER BY a.is_pinned DESC, a.created_at DESC`,
+         ORDER BY a.is_pinned DESC, a.updated_at DESC`,
         [deptId],
       );
+
+      const attachmentsMap = await getAttachmentsMap(rows.map((r) => r.announcement_id));
 
       res.json({
         announcements: rows.map((r) => ({
@@ -2571,11 +2584,10 @@ router.get(
           type: r.type || "general",
           status: r.status || "active",
           createdBy: r.createdBy || "Admin Office",
-          date: r.created_at,
+          date: r.updated_at,
+          isReposted: new Date(r.updated_at).getTime() !== new Date(r.created_at).getTime(),
           college: r.department_abbreviation,
-          isCrossCollege: !!r.is_cross_college,
-          hasAttachment: !!r.attachment_filename,
-          attachmentMimeType: r.attachment_mime_type || null,
+          attachments: attachmentsMap[r.announcement_id] || [],
         })),
       });
     } catch (error) {
@@ -2586,26 +2598,43 @@ router.get(
 );
 
 // POST /api/admin/announcements
-// multipart/form-data (attachment optional) -- text fields arrive as strings
-// on req.body the same way multer parses non-file fields, so isPinned needs
-// explicit boolean coercion here (it's no longer guaranteed a JS boolean the
-// way a JSON body would send it).
+// multipart/form-data ("attachments" field, up to MAX_FILES, optional) --
+// text fields arrive as strings on req.body the same way multer parses
+// non-file fields, so isPinned needs explicit boolean coercion here (it's no
+// longer guaranteed a JS boolean the way a JSON body would send it).
 router.post(
   "/announcements",
   authenticateToken,
   authorizeRoles("admin"),
-  upload.single("attachment"),
+  upload.array("attachments", MAX_FILES),
   async (req, res) => {
     const { title, content, type = "general" } = req.body;
     const isPinned = req.body.isPinned === true || req.body.isPinned === "true";
     if (!title?.trim() || !content?.trim()) {
+      deleteFiles(req.files);
       return res.status(400).json({ error: "title and content are required" });
     }
-    try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+    const budgetError = validateBudget(req.files || []);
+    if (budgetError) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: budgetError });
+    }
 
-      const [[adminRow]] = await pool.query(
+    // Title/content/type INSERT and the attachment rows must succeed or fail
+    // together -- otherwise a failure partway through leaves either a
+    // permanent announcement with no attachments, or (on retry) a duplicate.
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        await conn.rollback();
+        deleteFiles(req.files);
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[adminRow]] = await conn.query(
         `SELECT CONCAT(first_name, ' ', last_name) AS full_name
          FROM administrators
          WHERE admin_id = ?`,
@@ -2613,18 +2642,16 @@ router.post(
       );
       const createdBy = adminRow?.full_name || "Admin Office";
 
-      const attachmentFilename = req.file ? req.file.originalname : null;
-      const attachmentPath = req.file ? req.file.filename : null;
-      const attachmentMimeType = req.file ? req.file.mimetype : null;
-
-      // Admins can only post to their own department -- cross-college
-      // broadcasting is not offered as a creation option.
-      const [result] = await pool.query(
-        `INSERT INTO announcements (title, content, type, status, created_by, is_pinned, department_id, is_cross_college, attachment_filename, attachment_path, attachment_mime_type)
-         VALUES (?, ?, ?, 'active', ?, ?, ?, FALSE, ?, ?, ?)`,
-        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId, attachmentFilename, attachmentPath, attachmentMimeType],
+      const [result] = await conn.query(
+        `INSERT INTO announcements (title, content, type, status, created_by, is_pinned, department_id)
+         VALUES (?, ?, ?, 'active', ?, ?, ?)`,
+        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId],
       );
+      await insertAttachments(result.insertId, req.files, conn);
 
+      await conn.commit();
+
+      const attachments = await getAttachments(result.insertId);
       emitToDept(deptId, "announcement:changed", { announcementId: result.insertId });
 
       res.status(201).json({
@@ -2635,70 +2662,143 @@ router.post(
           type,
           status: "active",
           isPinned: !!isPinned,
-          isCrossCollege: false,
+          isReposted: false,
           createdBy,
           date: new Date().toISOString(),
-          hasAttachment: !!attachmentFilename,
-          attachmentMimeType,
+          attachments,
         },
       });
     } catch (error) {
+      await conn.rollback();
+      deleteFiles(req.files);
       console.error("Announcement create error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
     }
   },
 );
 
 // PUT /api/admin/announcements/:id
-// multipart/form-data (attachment optional) -- a new file replaces any
-// existing one (old physical file deleted); no file means the existing
-// attachment, if any, is left untouched.
+// multipart/form-data ("attachments" field, optional) -- new files are added
+// alongside whatever attachments already exist (removal is a separate call,
+// DELETE .../attachments/:attachmentId), so long as the combined result
+// still fits the shared MAX_FILES / MAX_TOTAL_BYTES budget.
 router.put(
   "/announcements/:id",
   authenticateToken,
   authorizeRoles("admin"),
-  upload.single("attachment"),
+  upload.array("attachments", MAX_FILES),
   async (req, res) => {
     const announcementId = parseInt(req.params.id, 10);
     const { title, content, type } = req.body;
     if (!title?.trim() || !content?.trim()) {
+      deleteFiles(req.files);
       return res.status(400).json({ error: "title and content are required" });
     }
+
+    const conn = await pool.getConnection();
     try {
+      await conn.beginTransaction();
+
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[row]] = await pool.query(
-        `SELECT department_id, attachment_path FROM announcements WHERE announcement_id = ?`, [announcementId],
+      if (!deptId) {
+        await conn.rollback();
+        deleteFiles(req.files);
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[row]] = await conn.query(
+        `SELECT department_id FROM announcements WHERE announcement_id = ?`, [announcementId],
       );
-      if (!row) return res.status(404).json({ error: "Announcement not found" });
+      if (!row) {
+        await conn.rollback();
+        deleteFiles(req.files);
+        return res.status(404).json({ error: "Announcement not found" });
+      }
       if (row.department_id !== deptId) {
+        await conn.rollback();
+        deleteFiles(req.files);
         return res.status(403).json({ error: "Cannot edit announcements from another department" });
       }
 
-      // Editing always resets is_cross_college to FALSE -- cross-college
-      // broadcasting is not offered as an option going forward, even for
-      // announcements that were originally created with it set.
-      const attachmentClause = req.file
-        ? ", attachment_filename = ?, attachment_path = ?, attachment_mime_type = ?"
-        : "";
-      const values = [title.trim(), content.trim(), type || "general"];
-      if (req.file) values.push(req.file.originalname, req.file.filename, req.file.mimetype);
-      values.push(announcementId);
-
-      await pool.query(
-        `UPDATE announcements SET title = ?, content = ?, type = ?, is_cross_college = FALSE${attachmentClause} WHERE announcement_id = ?`,
-        values,
-      );
-
-      if (req.file && row.attachment_path) {
-        fs.unlink(path.join(UPLOAD_DIR, row.attachment_path), (err) => {
-          if (err && err.code !== "ENOENT") console.error("Old attachment cleanup error:", err);
-        });
+      if (req.files && req.files.length > 0) {
+        const [[existing]] = await conn.query(
+          `SELECT COUNT(*) AS count, COALESCE(SUM(file_size), 0) AS bytes
+           FROM announcement_attachments WHERE announcement_id = ?`,
+          [announcementId],
+        );
+        const budgetError = validateBudget(req.files, existing.count, existing.bytes);
+        if (budgetError) {
+          await conn.rollback();
+          deleteFiles(req.files);
+          return res.status(400).json({ error: budgetError });
+        }
       }
 
+      // An actual content edit counts as a repost -- explicitly bumping
+      // updated_at (rather than an ON UPDATE CURRENT_TIMESTAMP column
+      // default) keeps pin/archive/restore's own UPDATEs from accidentally
+      // triggering the same effect when they touch this row for unrelated
+      // reasons.
+      await conn.query(
+        `UPDATE announcements SET title = ?, content = ?, type = ?, updated_at = CURRENT_TIMESTAMP WHERE announcement_id = ?`,
+        [title.trim(), content.trim(), type || "general", announcementId],
+      );
+
+      if (req.files && req.files.length > 0) {
+        await insertAttachments(announcementId, req.files, conn);
+      }
+
+      await conn.commit();
+
       emitToDept(deptId, "announcement:changed", { announcementId });
-      res.json({ message: "Announcement updated" });
+      const attachments = await getAttachments(announcementId);
+      res.json({ message: "Announcement updated", date: new Date().toISOString(), isReposted: true, attachments });
     } catch (error) {
+      await conn.rollback();
+      deleteFiles(req.files);
       console.error("Announcement update error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// DELETE /api/admin/announcements/:id/attachments/:attachmentId
+// Removes a single attachment without touching the rest of the announcement.
+router.delete(
+  "/announcements/:id/attachments/:attachmentId",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const announcementId = parseInt(req.params.id, 10);
+    const attachmentId = parseInt(req.params.attachmentId, 10);
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+      const [[row]] = await pool.query(
+        `SELECT a.department_id, aa.file_path
+         FROM announcement_attachments aa
+         JOIN announcements a ON a.announcement_id = aa.announcement_id
+         WHERE aa.attachment_id = ? AND aa.announcement_id = ?`,
+        [attachmentId, announcementId],
+      );
+      if (!row) return res.status(404).json({ error: "Attachment not found" });
+      if (row.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot modify announcements from another department" });
+      }
+
+      await pool.query(`DELETE FROM announcement_attachments WHERE attachment_id = ?`, [attachmentId]);
+      fs.unlink(path.join(UPLOAD_DIR, row.file_path), (err) => {
+        if (err && err.code !== "ENOENT") console.error("Attachment cleanup error:", err);
+      });
+
+      emitToDept(deptId, "announcement:changed", { announcementId });
+      res.json({ message: "Attachment removed" });
+    } catch (error) {
+      console.error("Announcement attachment delete error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
     }
   },
@@ -2713,8 +2813,9 @@ router.patch(
     const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
       const [[row]] = await pool.query(
-        `SELECT is_pinned, department_id, is_cross_college FROM announcements WHERE announcement_id = ?`,
+        `SELECT is_pinned, department_id FROM announcements WHERE announcement_id = ?`,
         [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
@@ -2723,11 +2824,7 @@ router.patch(
       }
       const newPinned = row.is_pinned ? 0 : 1;
       await pool.query(`UPDATE announcements SET is_pinned = ? WHERE announcement_id = ?`, [newPinned, announcementId]);
-      if (row.is_cross_college) {
-        emitToAll("announcement:changed", { announcementId });
-      } else {
-        emitToDept(deptId, "announcement:changed", { announcementId });
-      }
+      emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ isPinned: !!newPinned });
     } catch (error) {
       console.error("Announcement pin toggle error:", error);
@@ -2745,20 +2842,19 @@ router.patch(
     const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college FROM announcements WHERE announcement_id = ?`,
+        `SELECT department_id FROM announcements WHERE announcement_id = ?`,
         [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
+      // Archiving intentionally does NOT bump updated_at -- it's about to
+      // disappear from students' feeds, not resurface as a repost.
       await pool.query(`UPDATE announcements SET status = 'archived' WHERE announcement_id = ?`, [announcementId]);
-      if (row.is_cross_college) {
-        emitToAll("announcement:changed", { announcementId });
-      } else {
-        emitToDept(deptId, "announcement:changed", { announcementId });
-      }
+      emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement archived" });
     } catch (error) {
       console.error("Announcement archive error:", error);
@@ -2776,21 +2872,20 @@ router.patch(
     const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college FROM announcements WHERE announcement_id = ?`,
+        `SELECT department_id FROM announcements WHERE announcement_id = ?`,
         [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot modify announcements from another department" });
       }
-      await pool.query(`UPDATE announcements SET status = 'active' WHERE announcement_id = ?`, [announcementId]);
-      if (row.is_cross_college) {
-        emitToAll("announcement:changed", { announcementId });
-      } else {
-        emitToDept(deptId, "announcement:changed", { announcementId });
-      }
-      res.json({ message: "Announcement restored" });
+      // Restoring bumps updated_at -- bringing an archived announcement back
+      // into view counts as a repost, same as an actual content edit.
+      await pool.query(`UPDATE announcements SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE announcement_id = ?`, [announcementId]);
+      emitToDept(deptId, "announcement:changed", { announcementId });
+      res.json({ message: "Announcement restored", date: new Date().toISOString(), isReposted: true });
     } catch (error) {
       console.error("Announcement restore error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
@@ -2807,25 +2902,28 @@ router.delete(
     const announcementId = parseInt(req.params.id, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
       const [[row]] = await pool.query(
-        `SELECT department_id, is_cross_college, attachment_path FROM announcements WHERE announcement_id = ?`,
+        `SELECT department_id FROM announcements WHERE announcement_id = ?`,
         [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot delete announcements from another department" });
       }
+      const [attachments] = await pool.query(
+        `SELECT file_path FROM announcement_attachments WHERE announcement_id = ?`,
+        [announcementId],
+      );
+      // ON DELETE CASCADE removes the announcement_attachments rows; the
+      // physical files still need explicit cleanup below.
       await pool.query(`DELETE FROM announcements WHERE announcement_id = ?`, [announcementId]);
-      if (row.attachment_path) {
-        fs.unlink(path.join(UPLOAD_DIR, row.attachment_path), (err) => {
+      attachments.forEach((a) => {
+        fs.unlink(path.join(UPLOAD_DIR, a.file_path), (err) => {
           if (err && err.code !== "ENOENT") console.error("Attachment cleanup error:", err);
         });
-      }
-      if (row.is_cross_college) {
-        emitToAll("announcement:changed", { announcementId });
-      } else {
-        emitToDept(deptId, "announcement:changed", { announcementId });
-      }
+      });
+      emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement deleted" });
     } catch (error) {
       console.error("Announcement delete error:", error);
@@ -2834,38 +2932,41 @@ router.delete(
   },
 );
 
-// GET /api/admin/announcements/:id/attachment
-// Serves the announcement's attachment inline (image/PDF), scoped to the
+// GET /api/admin/announcements/:id/attachments/:attachmentId
+// Serves one specific attachment inline (image/PDF/etc.), scoped to the
 // admin's own department the same way edit/delete are. Resolves the stored
 // path against the fixed UPLOAD_DIR and rejects anything that would escape
-// it (defense in depth -- attachment_path is always a UUID we generated,
-// never client-controlled, but this matches the safety check used by the
-// equivalent, still-deferred student-upload feature spec'd separately).
+// it (defense in depth -- file_path is always a UUID we generated, never
+// client-controlled).
 router.get(
-  "/announcements/:id/attachment",
+  "/announcements/:id/attachments/:attachmentId",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
     const announcementId = parseInt(req.params.id, 10);
+    const attachmentId = parseInt(req.params.attachmentId, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       const [[row]] = await pool.query(
-        `SELECT department_id, attachment_path, attachment_mime_type FROM announcements WHERE announcement_id = ?`,
-        [announcementId],
+        `SELECT a.department_id, aa.file_path, aa.mime_type
+         FROM announcement_attachments aa
+         JOIN announcements a ON a.announcement_id = aa.announcement_id
+         WHERE aa.attachment_id = ? AND aa.announcement_id = ?`,
+        [attachmentId, announcementId],
       );
-      if (!row || !row.attachment_path) {
-        return res.status(404).json({ error: "No attachment found for this announcement" });
+      if (!row) {
+        return res.status(404).json({ error: "Attachment not found" });
       }
       if (row.department_id !== deptId) {
         return res.status(403).json({ error: "Cannot view attachments from another department" });
       }
 
-      const resolvedPath = path.join(UPLOAD_DIR, row.attachment_path);
-      if (!resolvedPath.startsWith(UPLOAD_DIR)) {
+      const resolvedPath = path.join(UPLOAD_DIR, row.file_path);
+      if (!isPathInsideUploadDir(resolvedPath)) {
         return res.status(400).json({ error: "Invalid attachment path" });
       }
 
-      res.type(row.attachment_mime_type || "application/octet-stream");
+      res.type(row.mime_type || "application/octet-stream");
       res.sendFile(resolvedPath);
     } catch (error) {
       console.error("Announcement attachment fetch error:", error);

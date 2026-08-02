@@ -43,6 +43,7 @@ TRUNCATE TABLE faculty_availability;
 TRUNCATE TABLE document_services;
 TRUNCATE TABLE services;
 TRUNCATE TABLE locations;
+TRUNCATE TABLE announcement_attachments;
 TRUNCATE TABLE announcements;
 TRUNCATE TABLE login_logs;
 TRUNCATE TABLE user_sessions;
@@ -503,4 +504,57 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('pinnacle_api_key',       '',                                    'PinnaCle API authentication key'),
 ('pinnacle_sync_interval', '60',                                  'Auto-sync interval in minutes'),
 ('pinnacle_sync_enabled',  'false',                               'Whether auto-sync is active');
+
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 7 · SAMPLE ANNOUNCEMENTS (for UI evaluation)
+-- One of each category (general/important/event/reminder), plus pinned
+-- combos. department_id 1001 = CCS.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO announcements (title, content, type, is_pinned, department_id, created_by) VALUES
+('Library Extended Hours for Midterms',
+ 'The CCS library will stay open until 9:00 PM on weekdays for the rest of the term to give everyone more room to study.',
+ 'general', FALSE, 1001, 'Admin Superuser'),
+('Enrollment Deadline Extended',
+ 'Late enrollment for the current semester has been extended by one week. Visit the registrar window before the new cutoff.',
+ 'important', TRUE, 1001, 'Admin Superuser'),
+('IT Week 2026 Kickoff',
+ 'Join us for IT Week 2026! A full week of tech talks, competitions, and department activities starts Monday.',
+ 'event', FALSE, 1001, 'Admin Superuser'),
+('Reminder: Submit Clearance Forms',
+ 'A quick reminder to submit your clearance forms to the department office before the end of the month.',
+ 'reminder', FALSE, 1001, 'Admin Superuser'),
+('University-Wide Job Fair',
+ 'PNC is hosting a university-wide job fair open to students from every college. Bring your resume!',
+ 'event', FALSE, 1001, 'Admin Superuser'),
+('System Maintenance Notice',
+ 'The student portal will undergo scheduled maintenance this weekend and may be intermittently unavailable.',
+ 'important', TRUE, 1001, 'Admin Superuser');
+
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 8 · SAMPLE TRANSACTIONS (for UI evaluation)
+-- 3 per type (queue/appointment/document), one per UI status
+-- (ongoing/completed/cancelled). All under student_id 104 (Luiz Gabriel
+-- Rosales, student_number 2302494, CCS) so one login surfaces every variant.
+-- ─────────────────────────────────────────────────────────────
+
+-- Queue entries -- slot_id NULL is allowed (not tied to a live queue slot)
+INSERT INTO queues (student_id, service_id, queue_number, status, admin_reason) VALUES
+(104, 1, 1, 'waiting',   NULL),                    -- ongoing
+(104, 2, 2, 'completed', NULL),                    -- completed
+(104, 3, 3, 'cancelled', 'Office closed early');    -- cancelled -> "Queue Stopped" title
+
+-- Appointments -- service_id/availability_id left NULL (no appointment_services seeded)
+INSERT INTO appointments (student_id, faculty_id, department_id, appointment_date, appointment_time, status) VALUES
+(104, 102, 1001, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '10:00:00', 'pending'),    -- ongoing
+(104, 106, 1001, DATE_SUB(CURDATE(), INTERVAL 3 DAY), '14:00:00', 'completed'),  -- completed
+(104, 107, 1001, DATE_ADD(CURDATE(), INTERVAL 2 DAY), '09:00:00', 'rejected');   -- cancelled
+
+-- Document requests -- tracking_number is auto-assigned by the
+-- ts_auto_tracking_number trigger, so it's omitted here.
+INSERT INTO document_requests (student_id, service_id, request_type, purpose, status) VALUES
+(104, 1, 'Good Moral Certificate', 'For scholarship application', 'processing'), -- ongoing
+(104, 2, 'Transcript of Records',  'For further studies',         'claimed'),    -- completed
+(104, 1, 'Good Moral Certificate', 'For employment',               'rejected');  -- cancelled
 

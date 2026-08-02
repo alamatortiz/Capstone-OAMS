@@ -107,16 +107,10 @@ function emitToUser(userId, event, payload) {
   io.to(userRoom(userId)).emit(event, payload);
 }
 
-function emitToAll(event, payload) {
-  if (!io) return;
-  io.emit(event, payload);
-}
-
 module.exports = {
   initSocketServer,
   getIo,
   emitToSlot,
   emitToDept,
   emitToUser,
-  emitToAll,
 };

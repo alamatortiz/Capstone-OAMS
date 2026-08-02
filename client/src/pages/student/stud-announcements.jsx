@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 
@@ -98,34 +98,42 @@ const Loader2Icon = () => (
   </svg>
 );
 
+// Single line whose label reflects whether this announcement has ever been
+// edited/restored (isReposted, set server-side) -- "Posted" the first time,
+// "Reposted" from then on.
+const formatPostedLabel = (announcement, monthFormat = "long") =>
+  `${announcement.isReposted ? "Reposted" : "Posted"}: ${formatManilaDateTime(announcement.date, { month: monthFormat })}`;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AnnouncementsPage() {
   // ── UI State ──────────────────────────────────────────────────────────────
   const [selectedFilter, setSelectedFilter] = useState("pinned");
   const [viewingAnnouncement, setViewingAnnouncement] = useState(null);
   useLockBodyScroll(!!viewingAnnouncement);
-  const [viewAttachmentUrl, setViewAttachmentUrl] = useState(null);
 
-  // Fetch the attachment (authenticated, so a plain <img src> won't work --
-  // the JWT only ever goes out via axios' Authorization header) once the
-  // detail modal opens on an announcement that has one.
-  useEffect(() => {
-    let url;
-    let cancelled = false;
-    if (viewingAnnouncement?.hasAttachment) {
-      api
-        .get(`/student/announcements/${viewingAnnouncement.id}/attachment`, { responseType: "blob" })
-        .then((res) => {
-          if (cancelled) return;
-          url = URL.createObjectURL(res.data);
-          setViewAttachmentUrl(url);
-        })
-        .catch(() => {});
-    } else {
-      setViewAttachmentUrl(null);
+  // Fetches one attachment's bytes on demand (authenticated, so a plain
+  // <img src> won't work -- the JWT only ever goes out via axios'
+  // Authorization header) and opens/downloads it.
+  const openAttachment = async (announcementId, attachment) => {
+    try {
+      const res = await api.get(
+        `/student/announcements/${announcementId}/attachments/${attachment.id}`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(res.data);
+      if (attachment.mimeType?.startsWith("image/") || attachment.mimeType === "application/pdf") {
+        window.open(url, "_blank");
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = attachment.filename;
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      toast.error("Could not load attachment.");
     }
-    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [viewingAnnouncement?.id, viewingAnnouncement?.hasAttachment]);
+  };
 
   // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
   const [announcements, setAnnouncements] = useState([]);
@@ -265,42 +273,28 @@ export default function AnnouncementsPage() {
                       <MegaphoneIcon /> Pinned
                     </span>
                   )}
-                  {viewingAnnouncement.isCrossCollege && (
-                    <span className="ann-detail-cross-college-pill">Cross-College</span>
-                  )}
                 </div>
 
                 <p className="ann-detail-content">{viewingAnnouncement.description}</p>
 
-                {viewingAnnouncement.hasAttachment && (
+                {viewingAnnouncement.attachments?.length > 0 && (
                   <div className="ann-detail-attachment">
-                    {viewAttachmentUrl ? (
-                      viewingAnnouncement.attachmentMimeType?.startsWith("image/") ? (
-                        <img src={viewAttachmentUrl} alt="Announcement attachment" className="ann-detail-attachment-image" />
-                      ) : (
-                        <button
-                          type="button"
-                          className="ann-detail-attachment-btn"
-                          onClick={() => window.open(viewAttachmentUrl, "_blank")}
-                        >
-                          <FileIcon /> View Attachment
-                        </button>
-                      )
-                    ) : (
-                      <p className="ann-detail-attachment-loading">Loading attachment…</p>
-                    )}
+                    {viewingAnnouncement.attachments.map((att) => (
+                      <button
+                        key={att.id}
+                        type="button"
+                        className="ann-detail-attachment-btn"
+                        onClick={() => openAttachment(viewingAnnouncement.id, att)}
+                      >
+                        <FileIcon /> {att.filename}
+                      </button>
+                    ))}
                   </div>
                 )}
 
                 <div className="ann-detail-meta">
                   <span className="announcement-college">{viewingAnnouncement.college}</span>
-                  <span className="announcement-date">
-                    {formatManilaDate(viewingAnnouncement.date, {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </span>
+                  <span className="announcement-date">{formatPostedLabel(viewingAnnouncement)}</span>
                 </div>
 
                 <div className="ann-detail-footer">
@@ -399,7 +393,7 @@ export default function AnnouncementsPage() {
                         <div className="announcement-content">
                           <h3 className="announcement-title">
                             {announcement.title}
-                            {announcement.hasAttachment && (
+                            {announcement.attachments?.length > 0 && (
                               <PaperclipIcon className="announcement-attachment-flag" />
                             )}
                           </h3>
@@ -408,11 +402,7 @@ export default function AnnouncementsPage() {
                               {announcement.college}
                             </span>
                             <span className="announcement-date">
-                              {formatManilaDate(announcement.date, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
+                              {formatPostedLabel(announcement, "short")}
                             </span>
                           </div>
                           <p className="announcement-description">
@@ -470,7 +460,7 @@ export default function AnnouncementsPage() {
                         <div className="announcement-content">
                           <h3 className="announcement-title">
                             {announcement.title}
-                            {announcement.hasAttachment && (
+                            {announcement.attachments?.length > 0 && (
                               <PaperclipIcon className="announcement-attachment-flag" />
                             )}
                           </h3>
@@ -479,11 +469,7 @@ export default function AnnouncementsPage() {
                               {announcement.college}
                             </span>
                             <span className="announcement-date">
-                              {formatManilaDate(announcement.date, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
+                              {formatPostedLabel(announcement, "short")}
                             </span>
                           </div>
                           <p className="announcement-description">

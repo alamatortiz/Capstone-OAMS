@@ -94,6 +94,13 @@ const PINNED_STYLE = {
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
+interface AnnouncementAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 interface Announcement {
   id: string;
   title: string;
@@ -102,21 +109,28 @@ interface Announcement {
   category: AnnouncementCategory;
   date: string;
   isPinned: boolean;
+  isReposted: boolean;
   departmentAbbrev: string;
   departmentName: string;
-  isCrossCollege: boolean;
-  hasAttachment?: boolean;
-  attachmentMimeType?: string | null;
+  attachments: AnnouncementAttachment[];
 }
 
-const MIME_EXT: Record<string, string> = {
-  'application/pdf': '.pdf',
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
+// Single line whose label reflects whether this announcement has ever been
+// edited/restored (isReposted, set server-side) -- "Posted" the first time,
+// "Reposted" from then on. Matches the web student page's convention.
+const formatPostedLabel = (announcement: { date: string; isReposted: boolean }) => {
+  const label = announcement.isReposted ? 'Reposted' : 'Posted';
+  const formatted = new Date(announcement.date).toLocaleString('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${label}: ${formatted}`;
 };
-
-const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
 type FilterTabKey = 'pinned' | 'all' | AnnouncementCategory;
 
@@ -206,14 +220,14 @@ export default function StudentAnnouncementScreen() {
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
-  const viewAttachment = async (announcement: Announcement) => {
+  const viewAttachment = async (announcement: Announcement, attachment: AnnouncementAttachment) => {
     if (downloadingId) return;
-    setDownloadingId(announcement.id);
+    setDownloadingId(attachment.id);
     try {
-      const ext = MIME_EXT[announcement.attachmentMimeType ?? ''] ?? '';
-      const uri = `${FileSystem.cacheDirectory}announcement-${announcement.id}${ext}`;
+      const safeName = attachment.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uri = `${FileSystem.cacheDirectory}announcement-${announcement.id}-${attachment.id}-${safeName}`;
       await FileSystem.downloadAsync(
-        `${api.defaults.baseURL}/student/announcements/${announcement.id}/attachment`,
+        `${api.defaults.baseURL}/student/announcements/${announcement.id}/attachments/${attachment.id}`,
         uri,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -222,7 +236,7 @@ export default function StudentAnnouncementScreen() {
         Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: announcement.attachmentMimeType ?? undefined });
+      await Sharing.shareAsync(uri, { mimeType: attachment.mimeType ?? undefined });
     } catch (err) {
       console.error('Failed to download attachment:', err);
       Alert.alert('Error', 'Could not open the attachment.');
@@ -311,23 +325,28 @@ export default function StudentAnnouncementScreen() {
             <Text style={styles.cardDescription}>{announcement.description}</Text>
             <View style={styles.cardMeta}>
               <Text style={styles.cardMetaText}>{announcement.college}</Text>
-              <Text style={styles.cardMetaText}>{formatDate(announcement.date)}</Text>
+              <Text style={styles.cardMetaText}>{formatPostedLabel(announcement)}</Text>
             </View>
-            {announcement.hasAttachment && (
-              <Pressable
-                style={styles.attachmentRow}
-                onPress={() => viewAttachment(announcement)}
-                disabled={downloadingId === announcement.id}
-              >
-                {downloadingId === announcement.id ? (
-                  <ActivityIndicator size="small" color={theme.subtext} />
-                ) : (
-                  <Ionicons name="attach-outline" size={14} color={theme.subtext} />
-                )}
-                <Text style={styles.attachmentRowText}>
-                  {downloadingId === announcement.id ? 'Opening…' : 'View Attachment'}
-                </Text>
-              </Pressable>
+            {announcement.attachments?.length > 0 && (
+              <View style={styles.attachmentList}>
+                {announcement.attachments.map((att) => (
+                  <Pressable
+                    key={att.id}
+                    style={styles.attachmentRow}
+                    onPress={() => viewAttachment(announcement, att)}
+                    disabled={downloadingId === att.id}
+                  >
+                    {downloadingId === att.id ? (
+                      <ActivityIndicator size="small" color={theme.subtext} />
+                    ) : (
+                      <Ionicons name="attach-outline" size={14} color={theme.subtext} />
+                    )}
+                    <Text style={styles.attachmentRowText} numberOfLines={1}>
+                      {downloadingId === att.id ? 'Opening…' : att.filename}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             )}
           </View>
         </View>
@@ -764,12 +783,17 @@ function createStyles(theme: ThemePalette) {
       fontSize: 12,
       color: theme.tertiary,
     },
+    attachmentList: {
+      gap: 6,
+      marginTop: 8,
+      alignItems: 'flex-start',
+    },
     attachmentRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
-      marginTop: 8,
       alignSelf: 'flex-start',
+      maxWidth: '100%',
       borderWidth: 1,
       borderColor: theme.border,
       borderRadius: 8,
@@ -780,6 +804,7 @@ function createStyles(theme: ThemePalette) {
       fontSize: 11.5,
       fontWeight: '600',
       color: theme.subtext,
+      flexShrink: 1,
     },
 
     badge: {

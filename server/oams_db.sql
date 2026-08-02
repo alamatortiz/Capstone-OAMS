@@ -418,13 +418,28 @@ CREATE TABLE announcements (
     created_by      VARCHAR(255) NULL,
     is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
     department_id   INT          NOT NULL,   -- the posting department, always real
-    is_cross_college BOOLEAN     NOT NULL DEFAULT FALSE, -- TRUE = visible to every department, not just the poster's
-    attachment_filename  VARCHAR(255) NULL, -- original filename, display only
-    attachment_path      VARCHAR(255) NULL, -- UUID-based name actually on disk, relative to server root
-    attachment_mime_type VARCHAR(100) NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Deliberately NOT "ON UPDATE CURRENT_TIMESTAMP" -- pin/archive/restore all
+    -- run their own UPDATE against this row and must NOT bump this column, only
+    -- an actual content edit (or a restore, treated as a repost) should. Those
+    -- specific handlers set this explicitly in their own UPDATE statement.
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
-    INDEX idx_announcements_pinned_created (is_pinned, created_at)
+    INDEX idx_announcements_pinned_updated (is_pinned, updated_at)
+);
+
+-- Up to 5 files per announcement, sharing a combined 50MB budget enforced
+-- app-side (multer only enforces per-file size + file count natively).
+CREATE TABLE announcement_attachments (
+    attachment_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    announcement_id INT          NOT NULL,
+    filename        VARCHAR(255) NOT NULL, -- original filename, display only
+    file_path       VARCHAR(255) NOT NULL, -- UUID-based name actually on disk, relative to server root
+    mime_type       VARCHAR(100) NOT NULL,
+    file_size       INT          NOT NULL, -- bytes; used for the shared-budget check and UI totals
+    uploaded_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (announcement_id) REFERENCES announcements(announcement_id) ON DELETE CASCADE,
+    INDEX idx_announcement_attachments_announcement (announcement_id)
 );
 
 -- ─────────────────────────────────────────────────────────────

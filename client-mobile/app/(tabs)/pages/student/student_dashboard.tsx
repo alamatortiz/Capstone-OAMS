@@ -655,7 +655,15 @@ export default function StudentDashboardScreen() {
                           <View style={styles.announcementMeta}>
                             <Text style={styles.announcementMetaText}>{ann.college}</Text>
                             <Text style={styles.announcementMetaText}>
-                              {new Date(ann.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {new Date(ann.date).toLocaleString('en-US', {
+                                timeZone: 'Asia/Manila',
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                              })}
                             </Text>
                           </View>
                         </View>
