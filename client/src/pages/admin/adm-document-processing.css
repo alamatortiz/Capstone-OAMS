@@ -398,6 +398,7 @@ html, body {
 .adp-badge-released    { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 0.5px solid rgba(34, 197, 94, 0.35); }
 .adp-badge-claimed     { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 0.5px solid rgba(34, 197, 94, 0.35); }
 .adp-badge-rejected    { background: rgba(239, 68, 68, 0.15);  color: #fca5a5; border: 0.5px solid rgba(239, 68, 68, 0.3); }
+.adp-badge-cancelled   { background: rgba(107, 114, 128, 0.15); color: #9ca3af; border: 0.5px solid rgba(107, 114, 128, 0.3); }
 
 [data-theme="light"] .adp-badge-pending    { background: rgba(217, 119, 6, 0.1); color: #92400e; border-color: rgba(217, 119, 6, 0.3); }
 [data-theme="light"] .adp-badge-processing { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; border-color: rgba(37, 99, 235, 0.25); }
@@ -405,6 +406,7 @@ html, body {
 [data-theme="light"] .adp-badge-released    { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
 [data-theme="light"] .adp-badge-claimed     { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
 [data-theme="light"] .adp-badge-rejected    { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .adp-badge-cancelled   { background: rgba(75, 85, 99, 0.1); color: #374151; border-color: rgba(75, 85, 99, 0.25); }
 
 .adp-doc-date {
   font-size: 0.75rem;

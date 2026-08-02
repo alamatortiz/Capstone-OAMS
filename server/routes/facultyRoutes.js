@@ -422,7 +422,7 @@ router.get(
             CONCAT(s.first_name,' ',s.last_name) AS studentName,
             s.student_number AS studentId,
             COALESCE(svc.service_name, a.notes, 'Consultation') AS description,
-            a.status, a.appointment_date AS date, a.created_at
+            a.status, a.appointment_date AS date, a.updated_at AS event_time
           FROM appointments a
           JOIN students s ON a.student_id = s.student_id
           LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
@@ -441,7 +441,7 @@ router.get(
           SELECT
             fdr.request_id AS id, 'document' AS type,
             ds.service_name AS description,
-            fdr.status, fdr.created_at AS date, fdr.created_at,
+            fdr.status, fdr.updated_at AS date, fdr.updated_at AS event_time,
             fdr.tracking_number AS trackingNumber,
             fdr.purpose, fdr.copies
           FROM faculty_document_requests fdr
@@ -454,7 +454,7 @@ router.get(
         rows = rows.concat(docs);
       }
 
-      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      rows.sort((a, b) => new Date(b.event_time) - new Date(a.event_time));
       res.json(rows);
     } catch (err) {
       console.error("GET /transactions error:", err);
@@ -1229,7 +1229,10 @@ router.post(
 );
 
 // DELETE /api/faculty/my-document-requests/:requestId
-// Cancels (removes) a pending or processing document request owned by the faculty member.
+// Cancels a pending or processing document request owned by the faculty member.
+// Soft-cancel (status = 'cancelled'), not a real delete, so it stays visible
+// in the faculty member's transaction history the same way a cancelled queue
+// ticket or appointment does.
 router.delete(
   "/my-document-requests/:requestId",
   authenticateToken,
@@ -1276,13 +1279,14 @@ router.delete(
       }
 
       await conn.query(
-        `DELETE FROM faculty_document_requests WHERE request_id = ?`,
+        `UPDATE faculty_document_requests SET status = 'cancelled' WHERE request_id = ?`,
         [requestId]
       );
 
       await conn.commit();
 
-      emitToDept(request.department_id, "document:cancelled", { requestId });
+      emitToUser(facultyId, "document:cancelled", { requestId, facultyId });
+      emitToDept(request.department_id, "document:cancelled", { requestId, facultyId });
 
       res.json({
         message: "Document request cancelled successfully",

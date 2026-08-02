@@ -74,7 +74,7 @@ function OamsLogo({
 // notes, estimated_completion, needed_by) — this screen ports the actual wired
 // prof-documents.jsx/.css 1:1: Request Document dialog (type/purpose/needed-by/
 // notes), Active/Completed tabs, and the Cancel Request confirm flow. ───
-type DocStatus = 'pending' | 'processing' | 'generated' | 'released' | 'claimed' | 'rejected';
+type DocStatus = 'pending' | 'processing' | 'generated' | 'released' | 'claimed' | 'rejected' | 'cancelled';
 
 interface DocumentRequest {
   id: string;
@@ -117,6 +117,7 @@ const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string
   released: { label: 'Released', bg: 'rgba(107, 114, 128, 0.18)', border: 'rgba(107, 114, 128, 0.35)', color: '#d1d5db', icon: 'checkmark-circle-outline' },
   claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.35)', color: '#34d399', icon: 'checkmark-circle-outline' },
   rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.35)', color: '#fca5a5', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', bg: 'rgba(107, 114, 128, 0.18)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af', icon: 'close-circle-outline' },
 };
 
 const TABS = ['active', 'completed'] as const;
@@ -324,7 +325,9 @@ export default function ProfessorDocumentsScreen() {
     setCancellingId(cancelTarget.id);
     try {
       await api.delete(`/faculty/my-document-requests/${cancelTarget.id}`);
-      setRequests((prev) => prev.filter((r) => r.id !== cancelTarget.id));
+      setRequests((prev) =>
+        prev.map((r) => (r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r)),
+      );
       setCancelTarget(null);
     } catch (err: any) {
       console.error('Cancel document request error:', err);
@@ -334,8 +337,12 @@ export default function ProfessorDocumentsScreen() {
     }
   };
 
-  const activeRequests = requests.filter((r) => r.status !== 'claimed' && r.status !== 'rejected');
-  const completedRequests = requests.filter((r) => r.status === 'claimed' || r.status === 'rejected');
+  const activeRequests = requests.filter(
+    (r) => r.status !== 'claimed' && r.status !== 'rejected' && r.status !== 'cancelled',
+  );
+  const completedRequests = requests.filter(
+    (r) => r.status === 'claimed' || r.status === 'rejected' || r.status === 'cancelled',
+  );
 
   return (
     <View style={styles.root}>
@@ -734,8 +741,8 @@ export default function ProfessorDocumentsScreen() {
             <Text style={styles.confirmTitle}>Cancel Request?</Text>
             <Text style={styles.confirmDescription}>
               You are about to cancel your request for{' '}
-              <Text style={{ fontWeight: '700', color: theme.text }}>{cancelTarget?.type}</Text>. This will
-              permanently remove your request — you will need to resubmit if you change your mind.
+              <Text style={{ fontWeight: '700', color: theme.text }}>{cancelTarget?.type}</Text>. It will
+              move to your Completed requests — you're welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.confirmActionsRow}>
               <Pressable style={styles.cancelBtn} onPress={() => setCancelTarget(null)}>

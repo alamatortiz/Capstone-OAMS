@@ -242,6 +242,7 @@ export default function AdminTransaction() {
       "queue:student-left",
       "appointment:status-updated",
       "document:status-updated",
+      "document:cancelled",
     ];
     events.forEach((event) => socket.on(event, fetchTransactions));
     return () => {

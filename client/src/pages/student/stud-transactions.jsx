@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import StudentPageShell from "../../components/StudentPageShell";
+import {
+  QueueIconNav,
+  CalendarIconNav,
+  DocumentIconNav,
+} from "../../components/StudentSidebar";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import { Link } from "react-router-dom";
@@ -9,6 +14,7 @@ import "./stud-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
 import { ChevronLeft } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
@@ -18,12 +24,6 @@ const ClipboardListIcon = () => (
     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
     <line x1="8" y1="11" x2="16" y2="11"></line>
     <line x1="8" y1="15" x2="12" y2="15"></line>
-  </svg>
-);
-
-const TrendingUpIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
   </svg>
 );
 
@@ -84,15 +84,10 @@ const CalendarIcon = () => (
   </svg>
 );
 
-const FileTextIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-  </svg>
-);
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
+  const { user } = useAuth();
+
   // ── Transaction data state ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -172,7 +167,21 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  // ── Live updates: refetch when a document or appointment status changes ───
+  // Queue events (and document:cancelled) are broadcast department-wide, not
+  // just to the affected student, so they're checked against this student's
+  // own ID before refetching — otherwise this page would refetch every time
+  // ANY student in the department got called/served/etc.
+  const handleOwnQueueEvent = useCallback(
+    (payload) => {
+      if (Number(payload?.studentId) === Number(user?.userId)) {
+        fetchTransactions();
+      }
+    },
+    [fetchTransactions, user?.userId],
+  );
+
+  // ── Live updates: refetch when a document/appointment status changes, or
+  // one of this student's own queue events fires ─────────────────────────
   useEffect(() => {
     const token = sessionStorage.getItem("oams_token");
     if (!token) return;
@@ -180,13 +189,24 @@ export default function TransactionsPage() {
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const events = ["document:status-updated", "appointment:status-updated"];
-    events.forEach((event) => socket.on(event, fetchTransactions));
+    const ownEvents = ["document:status-updated", "appointment:status-updated"];
+    const deptWideEvents = [
+      "queue:called",
+      "queue:served",
+      "queue:no-show",
+      "queue:student-joined",
+      "queue:student-left",
+      "document:cancelled",
+    ];
+
+    ownEvents.forEach((event) => socket.on(event, fetchTransactions));
+    deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
 
     return () => {
-      events.forEach((event) => socket.off(event, fetchTransactions));
+      ownEvents.forEach((event) => socket.off(event, fetchTransactions));
+      deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
     };
-  }, [fetchTransactions]);
+  }, [fetchTransactions, handleOwnQueueEvent]);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
@@ -199,11 +219,11 @@ export default function TransactionsPage() {
   const getTypeIcon = (type) => {
     switch (type) {
       case "queue":
-        return <ClockIcon />;
+        return <QueueIconNav />;
       case "appointment":
-        return <CalendarIcon />;
+        return <CalendarIconNav />;
       case "document":
-        return <FileTextIcon />;
+        return <DocumentIconNav />;
       default:
         return <AlertCircleIcon />;
     }

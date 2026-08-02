@@ -529,6 +529,7 @@ router.post(
       const [[recentDup]] = await pool.query(
         `SELECT request_id FROM document_requests
          WHERE student_id = ? AND service_id = ? AND purpose = ?
+           AND status != 'cancelled'
            AND created_at >= NOW() - INTERVAL 10 SECOND
          LIMIT 1`,
         [studentId, serviceId, purpose],
@@ -671,7 +672,10 @@ router.get(
 );
 
 // DELETE /api/student/documents/:requestId
-// Cancels (removes) a pending or processing document request owned by the student.
+// Cancels a pending or processing document request owned by the student.
+// Soft-cancel (status = 'cancelled'), not a real delete, so it stays visible
+// in the student's transaction history the same way a cancelled queue ticket
+// or appointment does.
 router.delete(
   "/documents/:requestId",
   authenticateToken,
@@ -718,13 +722,14 @@ router.delete(
       }
 
       await conn.query(
-        `DELETE FROM document_requests WHERE request_id = ?`,
+        `UPDATE document_requests SET status = 'cancelled' WHERE request_id = ?`,
         [requestId],
       );
 
       await conn.commit();
 
-      emitToDept(request.department_id, "document:cancelled", { requestId });
+      emitToUser(studentId, "document:cancelled", { requestId, studentId });
+      emitToDept(request.department_id, "document:cancelled", { requestId, studentId });
 
       res.json({
         message: "Document request cancelled successfully",
@@ -1846,7 +1851,7 @@ router.get(
              d.department_name AS college,
              q.status AS raw_status,
              COALESCE(q.admin_reason, q.notes) AS details,
-             q.created_at AS event_time
+             q.updated_at AS event_time
            FROM queues q
            JOIN services s ON q.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id
@@ -1861,7 +1866,7 @@ router.get(
              d.department_name AS college,
              a.status AS raw_status,
              a.notes AS details,
-             a.created_at AS event_time
+             a.updated_at AS event_time
            FROM appointments a
            JOIN faculty f ON a.faculty_id = f.faculty_id
            JOIN departments d ON f.department_id = d.department_id
@@ -1876,7 +1881,7 @@ router.get(
              d.department_name AS college,
              dr.status AS raw_status,
              dr.purpose AS details,
-             dr.created_at AS event_time
+             dr.updated_at AS event_time
            FROM document_requests dr
            JOIN document_services s ON dr.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id

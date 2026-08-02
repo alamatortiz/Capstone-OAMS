@@ -84,7 +84,7 @@ function OamsLogo({
   );
 }
 
-type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected';
+type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled';
 
 interface DocumentRecord {
   id: string;
@@ -136,6 +136,7 @@ const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string
   released: { label: 'Released', bg: 'rgba(156, 163, 175, 0.15)', border: 'rgba(156, 163, 175, 0.35)', color: '#9ca3af' },
   claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
   rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
+  cancelled: { label: 'Cancelled', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' },
 };
 
 const formatDateLong = (dateString?: string) => {
@@ -250,15 +251,21 @@ export default function StudentDocumentStatusScreen() {
     ? (Object.values(servicesByDepartmentId).flat().find((t) => t.name === selectedDoc.type)?.requirements ?? [])
     : [];
 
-  const activeDocuments = documents.filter((d) => d.status !== 'claimed' && d.status !== 'rejected');
-  const completedDocuments = documents.filter((d) => d.status === 'claimed' || d.status === 'rejected');
+  const activeDocuments = documents.filter(
+    (d) => d.status !== 'claimed' && d.status !== 'rejected' && d.status !== 'cancelled',
+  );
+  const completedDocuments = documents.filter(
+    (d) => d.status === 'claimed' || d.status === 'rejected' || d.status === 'cancelled',
+  );
 
   const confirmCancelRequest = async () => {
     if (!selectedDoc) return;
     setCancelling(true);
     try {
       await api.delete(`/student/documents/${selectedDoc.id}`);
-      setDocuments((prev) => prev.filter((d) => d.id !== selectedDoc.id));
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === selectedDoc.id ? { ...d, status: 'cancelled' } : d)),
+      );
       setShowCancelDialog(false);
       setSelectedDocId(null);
       Alert.alert('Request cancelled', 'Your document request has been cancelled.');
@@ -463,8 +470,8 @@ export default function StudentDocumentStatusScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
-              You are about to cancel your request for {selectedDoc?.type}. This will permanently remove your
-              request — you will need to submit a new one if you change your mind.
+              You are about to cancel your request for {selectedDoc?.type}. It will move to your Completed
+              requests — you're welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
               <Pressable style={styles.logoutCancelBtn} onPress={() => setShowCancelDialog(false)}>
@@ -764,7 +771,7 @@ function DocumentDetail({
             </View>
           </View>
           <Text style={styles.cancelDescription}>
-            Cancelling will permanently remove this request. You&apos;ll need to resubmit if you change your mind.
+            Cancelling will move this request to your Completed requests. You&apos;re welcome to submit a new one if you change your mind.
           </Text>
           <Pressable style={styles.cancelBtn} onPress={onCancel}>
             <Text style={styles.cancelBtnText}>Cancel Request</Text>

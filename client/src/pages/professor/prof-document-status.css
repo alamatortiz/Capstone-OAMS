@@ -175,6 +175,12 @@
   border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
+.dss-badge-cancelled {
+  background: rgba(107, 114, 128, 0.18);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.35);
+}
+
 [data-theme="light"] .dss-badge-pending {
   background: rgba(217, 119, 6, 0.1);
   color: #92400e;
@@ -204,6 +210,11 @@
   background: rgba(220, 38, 38, 0.08);
   color: #991b1b;
   border-color: rgba(220, 38, 38, 0.2);
+}
+[data-theme="light"] .dss-badge-cancelled {
+  background: rgba(75, 85, 99, 0.1);
+  color: #374151;
+  border-color: rgba(75, 85, 99, 0.25);
 }
 
 /* ─── Detail Grid ────────────────────────────────────────────────────────── */

@@ -174,21 +174,46 @@ export default function StudentTransactionsScreen() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  // ── Live updates: refetch when a document or appointment status changes
-  // (mirrors stud-transactions.jsx). Transactions are a historical log, not
-  // worth interrupting the user for -- refetch silently, no notification. ──
+  // Queue events (and document:cancelled) are broadcast department-wide, not
+  // just to the affected student, so they're checked against this student's
+  // own ID before refetching — otherwise this page would refetch every time
+  // ANY student in the department got called/served/etc.
+  const handleOwnQueueEvent = useCallback(
+    (payload: { studentId?: number | string }) => {
+      if (Number(payload?.studentId) === Number(user?.userId)) {
+        fetchTransactions();
+      }
+    },
+    [fetchTransactions, user?.userId],
+  );
+
+  // ── Live updates: refetch when a document/appointment status changes, or
+  // one of this student's own queue events fires (mirrors stud-transactions.jsx).
+  // Transactions are a historical log, not worth interrupting the user for --
+  // refetch silently, no notification. ──
   useEffect(() => {
     if (!user || !token) return;
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const events = ['document:status-updated', 'appointment:status-updated'];
-    events.forEach((event) => socket.on(event, fetchTransactions));
+    const ownEvents = ['document:status-updated', 'appointment:status-updated'];
+    const deptWideEvents = [
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+      'queue:student-joined',
+      'queue:student-left',
+      'document:cancelled',
+    ];
+
+    ownEvents.forEach((event) => socket.on(event, fetchTransactions));
+    deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
 
     return () => {
-      events.forEach((event) => socket.off(event, fetchTransactions));
+      ownEvents.forEach((event) => socket.off(event, fetchTransactions));
+      deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
     };
-  }, [user, token, fetchTransactions]);
+  }, [user, token, fetchTransactions, handleOwnQueueEvent]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/student/student_dashboard');

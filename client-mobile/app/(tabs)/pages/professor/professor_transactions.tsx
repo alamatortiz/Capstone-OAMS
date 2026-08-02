@@ -221,6 +221,7 @@ export default function ProfessorTransactionsScreen() {
     const events = [
       'appointment:status-updated',
       'document:status-updated',
+      'document:cancelled',
       'queue:called',
       'queue:served',
       'queue:no-show',

@@ -69,7 +69,7 @@ function OamsLogo({
   );
 }
 
-type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected';
+type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled';
 
 interface DocumentRequest {
   id: string;
@@ -112,6 +112,7 @@ const STATUS_META: Record<DocStatus, { label: string; icon: IoniconName; bg: str
   released: { label: 'released', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
   claimed: { label: 'claimed', icon: 'checkmark-circle-outline', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' },
   rejected: { label: 'rejected', icon: 'close-circle-outline', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
+  cancelled: { label: 'cancelled', icon: 'close-circle-outline', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' },
 };
 
 const formatDateLong = (dateString?: string) => {
@@ -247,8 +248,12 @@ export default function StudentDocumentsScreen() {
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
   const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
-  const activeDocuments = documents.filter((doc) => doc.status !== 'claimed' && doc.status !== 'rejected');
-  const completedDocuments = documents.filter((doc) => doc.status === 'claimed' || doc.status === 'rejected');
+  const activeDocuments = documents.filter(
+    (doc) => doc.status !== 'claimed' && doc.status !== 'rejected' && doc.status !== 'cancelled',
+  );
+  const completedDocuments = documents.filter(
+    (doc) => doc.status === 'claimed' || doc.status === 'rejected' || doc.status === 'cancelled',
+  );
 
   const openDialog = () => {
     setFormData({ type: '', college: '', copies: '1', purpose: '', neededBy: '' });
@@ -286,7 +291,9 @@ export default function StudentDocumentsScreen() {
     setCancellingId(target.id);
     try {
       await api.delete(`/student/documents/${target.id}`);
-      setDocuments((prev) => prev.filter((d) => d.id !== target.id));
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === target.id ? { ...d, status: 'cancelled' } : d)),
+      );
       setCancelTarget(null);
       Alert.alert('Cancelled', 'Document request cancelled.');
     } catch (err: any) {
@@ -730,8 +737,8 @@ export default function StudentDocumentsScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
-              You are about to cancel your request for {cancelTarget?.type}. This will permanently remove your
-              request — you will need to resubmit if you change your mind.
+              You are about to cancel your request for {cancelTarget?.type}. It will move to your Completed
+              requests — you're welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
               <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelTarget(null)}>

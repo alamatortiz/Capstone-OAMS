@@ -237,6 +237,10 @@ CREATE TABLE queues (
     queue_number    INT          NOT NULL,
     status          ENUM('waiting','serving','completed','cancelled','no_show') DEFAULT 'waiting',
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row (status, notes, etc). Lets the
+    -- transactions feeds (GET .../transactions) sort by "most recently
+    -- modified" instead of only "most recently created".
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     called_at       TIMESTAMP    NULL,
     -- Set when an admin confirms a called ('serving') student has physically
     -- shown up, distinct from called_at. Stops the no-show sweeper's timeout
@@ -324,6 +328,11 @@ CREATE TABLE appointments (
     cancelled_by        ENUM('student','faculty','system') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
     notes               TEXT,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row. Lets the transactions feeds
+    -- sort by "most recently modified" -- appointments otherwise have no
+    -- other timestamp column, so without this an approved/completed
+    -- appointment would forever sort/display by its original booking time.
+    updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     -- Computed from this row's own columns; NULL whenever status is
     -- cancelled/rejected, so any number of cancelled/rejected rows can share
     -- the same student/faculty/date/time -- only a genuinely ACTIVE duplicate
@@ -366,7 +375,10 @@ CREATE TABLE document_requests (
     request_type            VARCHAR(100) NOT NULL,
     purpose                 VARCHAR(255) NOT NULL,
     copies                  INT          NOT NULL DEFAULT 1,
-    status                  ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
+    -- 'cancelled' = student voluntarily withdrew the request while it was
+    -- still pending/processing. Kept as a status (not a DELETE) so it stays
+    -- visible in transaction history, same as queues/appointments.
+    status                  ENUM('pending','processing','generated','released','claimed','rejected','cancelled') DEFAULT 'pending',
     estimated_completion    DATE         NULL,
     needed_by               DATE         NULL,
     released_at             TIMESTAMP    NULL,
@@ -374,6 +386,10 @@ CREATE TABLE document_requests (
     notes                   TEXT         NULL,
     official_code           VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row (status, notes, etc). Lets the
+    -- transactions feeds sort by "most recently modified" instead of only
+    -- "most recently created".
+    updated_at              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_document_requests_tracking (tracking_number)
@@ -513,7 +529,10 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     request_type         VARCHAR(100) NOT NULL DEFAULT 'General',
     purpose              VARCHAR(255) NOT NULL,
     copies               INT          NOT NULL DEFAULT 1,
-    status               ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
+    -- 'cancelled' = faculty voluntarily withdrew the request while it was
+    -- still pending/processing. Kept as a status (not a DELETE) so it stays
+    -- visible in transaction history, same as queues/appointments.
+    status               ENUM('pending','processing','generated','released','claimed','rejected','cancelled') DEFAULT 'pending',
     estimated_completion DATE         NULL,
     needed_by            DATE         NULL,
     released_at          TIMESTAMP    NULL,
@@ -521,6 +540,9 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     notes                TEXT         NULL,
     official_code        VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
     created_at           TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    -- Auto-touched on any change to this row. Lets the transactions feeds
+    -- sort by "most recently modified" instead of only "most recently created".
+    updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_faculty_doc_requests_faculty (faculty_id)
@@ -542,41 +564,3 @@ ALTER TABLE generated_files
 --   server/db/mock/ccs_mock_data.sql
 -- Run this file first, then ccs_mock_data.sql.
 -- ============================================================
-
--- ─────────────────────────────────────────────────────────────
--- MIGRATION: Run against existing databases (do not re-run on fresh installs)
--- ─────────────────────────────────────────────────────────────
--- ALTER TABLE faculty_date_availability DROP COLUMN slot_duration_minutes;
-
--- Adds a real, distinct "claimed" status for document requests, separate from "released".
--- "released" = document is at the pickup counter, not yet confirmed handed to the recipient.
--- "claimed"   = confirmed handed to the correct recipient (identity verified by existing
---               office procedures, not tracked by OAMS itself).
--- ALTER TABLE document_requests
---     MODIFY status ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
---     ADD COLUMN claimed_at TIMESTAMP NULL AFTER released_at;
--- ALTER TABLE faculty_document_requests
---     MODIFY status ENUM('pending','processing','generated','released','claimed','rejected') DEFAULT 'pending',
---     ADD COLUMN claimed_at TIMESTAMP NULL AFTER released_at;
--- -- Backfill: pre-existing "released" documents have no reliable record of whether they were
--- -- actually picked up, so treat them all as claimed to avoid a false "awaiting pickup" backlog.
--- UPDATE document_requests SET status = 'claimed' WHERE status = 'released';
--- UPDATE faculty_document_requests SET status = 'claimed' WHERE status = 'released';
-
--- Adds a dedicated `copies` column to document_requests. Previously the requested copy
--- count was stowed inside the free-text `notes` field, which got silently wiped out the
--- moment an admin's own note overwrote `notes` via any status update.
--- ALTER TABLE document_requests ADD COLUMN copies INT NOT NULL DEFAULT 1 AFTER purpose;
-
--- Brings faculty_document_requests to parity with document_requests: adds the same
--- `copies` column, and lets generated_files/QR scanning attach to a faculty request the
--- same way it already attaches to a student request (exactly one of request_id /
--- faculty_request_id is ever set, enforced by the CHECK constraint).
--- ALTER TABLE faculty_document_requests ADD COLUMN copies INT NOT NULL DEFAULT 1 AFTER purpose;
--- ALTER TABLE generated_files MODIFY request_id INT NULL;
--- ALTER TABLE generated_files
---     ADD COLUMN faculty_request_id INT NULL AFTER request_id,
---     ADD CONSTRAINT fk_generated_files_faculty_request
---         FOREIGN KEY (faculty_request_id) REFERENCES faculty_document_requests(request_id) ON DELETE CASCADE,
---     ADD CONSTRAINT chk_generated_files_one_parent
---         CHECK ((request_id IS NOT NULL AND faculty_request_id IS NULL) OR (request_id IS NULL AND faculty_request_id IS NOT NULL));

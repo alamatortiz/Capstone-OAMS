@@ -128,6 +128,7 @@ export default function ProfessorTransactionsPage() {
     const events = [
       "appointment:status-updated",
       "document:status-updated",
+      "document:cancelled",
       "queue:called",
       "queue:served",
       "queue:no-show",

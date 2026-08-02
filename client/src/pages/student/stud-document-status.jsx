@@ -35,6 +35,7 @@ const getStatusMeta = (status) => {
     case "released":   return { label: "Released",   cls: "dss-badge-released" };
     case "claimed":    return { label: "Claimed",    cls: "dss-badge-claimed" };
     case "rejected":   return { label: "Rejected",   cls: "dss-badge-rejected" };
+    case "cancelled":  return { label: "Cancelled",  cls: "dss-badge-cancelled" };
     default:           return { label: status,       cls: "dss-badge-pending" };
   }
 };
@@ -268,8 +269,9 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
                     marginBottom: "0.75rem",
                   }}
                 >
-                  Cancelling will permanently remove this request. You'll need
-                  to resubmit if you change your mind.
+                  Cancelling will move this request to your Cancelled
+                  requests. You're welcome to submit a new one if you change
+                  your mind.
                 </p>
                 <button
                   className="dss-cancel-btn"
@@ -292,8 +294,8 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
         message={
           <>
             You are about to cancel your request for{" "}
-            <strong>{doc.type}</strong>. This will permanently remove your
-            request — you will need to submit a new one if you change your mind.
+            <strong>{doc.type}</strong>. It will move to your Cancelled
+            requests — you're welcome to submit a new one if you change your mind.
           </>
         }
         icon={<XCircle width={22} height={22} />}
@@ -408,7 +410,9 @@ export default function DocumentStatusPage() {
     setCancelling(true);
     try {
       await api.delete(`/student/documents/${docId}`);
-      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === docId ? { ...d, status: "cancelled" } : d)),
+      );
       toast.success("Document request cancelled.");
       setSelectedDocId(null);
     } catch (err) {
@@ -419,10 +423,11 @@ export default function DocumentStatusPage() {
   };
 
   const activeDocuments = documents.filter(
-    (d) => d.status !== "claimed" && d.status !== "rejected",
+    (d) => d.status !== "claimed" && d.status !== "rejected" && d.status !== "cancelled",
   );
   const claimedDocuments = documents.filter((d) => d.status === "claimed");
   const rejectedDocuments = documents.filter((d) => d.status === "rejected");
+  const cancelledDocuments = documents.filter((d) => d.status === "cancelled");
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -512,6 +517,13 @@ export default function DocumentStatusPage() {
                   >
                     <XCircle />
                     Rejected <span className="dss-tab-count">{rejectedDocuments.length}</span>
+                  </button>
+                  <button
+                    className={`dss-tab ${activeTab === "cancelled" ? "active" : ""}`}
+                    onClick={() => setActiveTab("cancelled")}
+                  >
+                    <XCircle />
+                    Cancelled <span className="dss-tab-count">{cancelledDocuments.length}</span>
                   </button>
                 </div>
 
@@ -679,6 +691,50 @@ export default function DocumentStatusPage() {
                         <h3 className="dss-empty-title">No Rejected Requests</h3>
                         <p className="dss-empty-text">
                           You have no records of rejected document requests.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cancelled Tab */}
+                {activeTab === "cancelled" && (
+                  <div className="dss-list-container">
+                    {cancelledDocuments.length > 0 ? (
+                      cancelledDocuments.map((doc) => {
+                        const statusMeta = getStatusMeta(doc.status);
+                        return (
+                          <div
+                            key={doc.id}
+                            className="dss-list-item"
+                            onClick={() => { setDetailOpenedFromExternal(false); setSelectedDocId(doc.id); }}
+                          >
+                            <div className="dss-list-header">
+                              <div className="dss-list-icon-wrap">
+                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
+                              </div>
+                              <div className="dss-list-title-section">
+                                <h3>{doc.type}</h3>
+                                <p className="dss-list-college">
+                                  {doc.college} • {formatDateShort(doc.requestDate)}
+                                </p>
+                              </div>
+                              <div className="dss-list-header-right">
+                                <span className="dss-tracking-pill">{doc.trackingNumber}</span>
+                                <span className={`dss-badge ${statusMeta.cls}`}>
+                                  {statusMeta.label}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="dss-empty-state">
+                        <XCircle className="dss-empty-icon" />
+                        <h3 className="dss-empty-title">No Cancelled Requests</h3>
+                        <p className="dss-empty-text">
+                          You have no records of cancelled document requests.
                         </p>
                       </div>
                     )}

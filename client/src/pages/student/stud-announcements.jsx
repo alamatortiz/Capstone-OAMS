@@ -200,8 +200,8 @@ export default function AnnouncementsPage() {
   ];
 
   // ── Filtered announcements. The backend already scopes the list to the
-  //    student's own department (plus any cross-college notices), so only
-  //    the category tab filter is applied here. ─────────────────────────
+  //    student's own department, so only the category tab filter is
+  //    applied here. ──────────────────────────────────────────────────
   const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
   // Pinned announcements are NOT excluded here -- they have their own
   // dedicated "Pinned" tab, but a pinned item matching the selected
@@ -249,7 +249,7 @@ export default function AnnouncementsPage() {
             >
               <div className="ann-detail-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="ann-detail-header">
-                  <div className="ann-detail-header-icon">
+                  <div className={`ann-detail-header-icon ${getCategoryColor(viewingAnnouncement)}`}>
                     {getAnnouncementIcon(viewingAnnouncement.category)}
                   </div>
                   <button
@@ -363,7 +363,6 @@ export default function AnnouncementsPage() {
           {/* Pinned Tab Content */}
           {!annLoading && selectedFilter === "pinned" && (
             <section className="announcements-section">
-              <h2 className="ann-section-title">Pinned Announcements</h2>
               {pinnedAnnouncements.length === 0 ? (
                 <div className="ann-empty-state">
                   <BellIcon />
@@ -391,19 +390,21 @@ export default function AnnouncementsPage() {
                           {getAnnouncementIcon(announcement.category)}
                         </div>
                         <div className="announcement-content">
-                          <h3 className="announcement-title">
-                            {announcement.title}
-                            {announcement.attachments?.length > 0 && (
-                              <PaperclipIcon className="announcement-attachment-flag" />
-                            )}
-                          </h3>
-                          <div className="announcement-meta">
-                            <span className="announcement-college">
-                              {announcement.college}
-                            </span>
-                            <span className="announcement-date">
-                              {formatPostedLabel(announcement, "short")}
-                            </span>
+                          <div className="announcement-title-group">
+                            <h3 className="announcement-title">
+                              {announcement.title}
+                              {announcement.attachments?.length > 0 && (
+                                <PaperclipIcon className="announcement-attachment-flag" />
+                              )}
+                            </h3>
+                            <div className="announcement-meta">
+                              <span className="announcement-college">
+                                {announcement.college}
+                              </span>
+                              <span className="announcement-date">
+                                {formatPostedLabel(announcement, "short")}
+                              </span>
+                            </div>
                           </div>
                           <p className="announcement-description">
                             {announcement.description}
@@ -426,11 +427,6 @@ export default function AnnouncementsPage() {
           {/* All / Category Tab Content */}
           {!annLoading && selectedFilter !== "pinned" && (
             <section className="announcements-section">
-              <h2 className="ann-section-title">
-                {selectedFilter === "all"
-                  ? "All Announcements"
-                  : `${selectedFilter.charAt(0).toUpperCase() + selectedFilter.slice(1)} Announcements`}
-              </h2>
               {filteredAnnouncements.length === 0 ? (
                 <div className="ann-empty-state">
                   <BellIcon />
@@ -458,19 +454,21 @@ export default function AnnouncementsPage() {
                           {getAnnouncementIcon(announcement.category)}
                         </div>
                         <div className="announcement-content">
-                          <h3 className="announcement-title">
-                            {announcement.title}
-                            {announcement.attachments?.length > 0 && (
-                              <PaperclipIcon className="announcement-attachment-flag" />
-                            )}
-                          </h3>
-                          <div className="announcement-meta">
-                            <span className="announcement-college">
-                              {announcement.college}
-                            </span>
-                            <span className="announcement-date">
-                              {formatPostedLabel(announcement, "short")}
-                            </span>
+                          <div className="announcement-title-group">
+                            <h3 className="announcement-title">
+                              {announcement.title}
+                              {announcement.attachments?.length > 0 && (
+                                <PaperclipIcon className="announcement-attachment-flag" />
+                              )}
+                            </h3>
+                            <div className="announcement-meta">
+                              <span className="announcement-college">
+                                {announcement.college}
+                              </span>
+                              <span className="announcement-date">
+                                {formatPostedLabel(announcement, "short")}
+                              </span>
+                            </div>
                           </div>
                           <p className="announcement-description">
                             {announcement.description}

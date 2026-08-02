@@ -270,11 +270,12 @@ export default function AdminDocumentProcessing() {
       case "released":    return { label: "Released",   cls: "adp-badge-released",  Icon: CheckCircleIcon };
       case "claimed":     return { label: "Claimed",    cls: "adp-badge-claimed",   Icon: CheckCircleIcon };
       case "rejected":    return { label: "Rejected",   cls: "adp-badge-rejected",   Icon: XCircleIcon };
+      case "cancelled":   return { label: "Cancelled",  cls: "adp-badge-cancelled",  Icon: XCircleIcon };
       default:            return { label: status,       cls: "",                     Icon: ClockIcon };
     }
   };
 
-  const TABS = ["all", "pending", "processing", "ready", "released", "claimed", "rejected"];
+  const TABS = ["all", "pending", "processing", "ready", "released", "claimed", "rejected", "cancelled"];
 
   return (
     <AdminPageShell
@@ -532,7 +533,7 @@ export default function AdminDocumentProcessing() {
             ) : (
               filteredDocuments.map((doc) => {
                 const { label, cls, Icon } = getStatusMeta(doc.status);
-                const doneStatuses = ["claimed", "rejected"];
+                const doneStatuses = ["claimed", "rejected", "cancelled"];
                 const isOverdue = doc.neededBy && !doneStatuses.includes(doc.status) && doc.neededBy < getManilaDateString();
                 return (
                   <div key={doc.id} className="adp-doc-card">

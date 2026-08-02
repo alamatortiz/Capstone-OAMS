@@ -20,6 +20,7 @@ const STATUS_LABEL_MAP = {
   released: "released",
   claimed: "claimed",
   rejected: "rejected",
+  cancelled: "cancelled",
 };
 
 // Statuses a scanned document is still considered authentic/issuable under.

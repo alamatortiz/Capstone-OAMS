@@ -737,6 +737,12 @@ body {
   border: 0.5px solid rgba(239, 68, 68, 0.3);
 }
 
+.tx-badge-default {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border: 0.5px solid rgba(107, 114, 128, 0.3);
+}
+
 .transaction-college {
   font-size: 0.875rem;
   color: var(--text-tertiary);

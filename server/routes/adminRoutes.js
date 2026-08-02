@@ -89,7 +89,7 @@ router.get(
       const [[annRow]] = await pool.query(
         `SELECT COUNT(*) AS announcement_count
          FROM announcements
-         WHERE department_id = ?`,
+         WHERE department_id = ? AND status = 'active'`,
         [deptId],
       );
 
@@ -156,7 +156,7 @@ router.get(
       const [announcements] = await pool.query(
         `SELECT announcement_id, title, content AS description, type, is_pinned, created_at, updated_at
          FROM announcements
-         WHERE department_id = ?
+         WHERE department_id = ? AND status = 'active'
          ORDER BY is_pinned DESC, updated_at DESC
          LIMIT 5`,
         [deptId],
@@ -852,6 +852,12 @@ router.patch(
         return res.status(409).json({ error: "That student's status just changed — try again." });
       }
 
+      await conn.query(
+        `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+         VALUES (?, 'waiting', 'serving', ?, 'Called by admin', NOW())`,
+        [next.queue_id, req.user.userId],
+      );
+
       await conn.commit();
 
       const calledPayload = {
@@ -935,6 +941,14 @@ router.patch(
         return res.status(409).json({ error: "That student's status just changed — try again." });
       }
 
+      // Not a status transition (status stays 'serving') -- logged anyway so
+      // the arrival milestone shows up in the queue's audit trail.
+      await conn.query(
+        `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+         VALUES (?, 'serving', 'serving', ?, 'Marked as arrived by admin', NOW())`,
+        [serving.queue_id, req.user.userId],
+      );
+
       await conn.commit();
 
       const arrivedPayload = { slotId, queueId: serving.queue_id, studentId: serving.student_id };
@@ -1005,6 +1019,12 @@ router.patch(
         await conn.rollback();
         return res.status(409).json({ error: "That student's status just changed — try again." });
       }
+
+      await conn.query(
+        `INSERT INTO queue_status_logs (queue_id, old_status, new_status, changed_by, notes, created_at)
+         VALUES (?, 'serving', 'completed', ?, 'Marked as served by admin', NOW())`,
+        [serving.queue_id, req.user.userId],
+      );
 
       // Marking someone served never frees a capacity seat, but it can be
       // the last unserved entry in a 'full'/'expired' slot -- settle it,
@@ -1288,7 +1308,7 @@ router.get(
               COALESCE(CONCAT(adm.first_name, ' ', adm.last_name), s.service_name) AS processor,
               COALESCE(q.admin_reason, s.service_name) AS details,
               q.status AS raw_status,
-              COALESCE(q.completed_at, q.cancelled_at, q.called_at, q.created_at) AS event_time,
+              q.updated_at AS event_time,
               'student' AS requester_type
             FROM queues q
             JOIN services s ON q.service_id = s.service_id
@@ -1317,7 +1337,7 @@ router.get(
               CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
               COALESCE(a.notes, 'No purpose specified') AS details,
               a.status AS raw_status,
-              a.created_at AS event_time,
+              a.updated_at AS event_time,
               'student' AS requester_type
             FROM appointments a
             JOIN departments d ON a.department_id = d.department_id
@@ -1335,6 +1355,7 @@ router.get(
                 WHEN 'released'   THEN 'Released Document Request'
                 WHEN 'generated'  THEN 'Generated Document'
                 WHEN 'processing' THEN 'Processing Document Request'
+                WHEN 'cancelled'  THEN 'Cancelled Document Request'
                 ELSE 'Pending Document Request'
               END AS action,
               d.department_name AS college,
@@ -1351,7 +1372,7 @@ router.get(
               ) AS processor,
               dr.purpose AS details,
               dr.status AS raw_status,
-              dr.created_at AS event_time,
+              dr.updated_at AS event_time,
               'student' AS requester_type
             FROM document_requests dr
             JOIN document_services s ON dr.service_id = s.service_id
@@ -1369,6 +1390,7 @@ router.get(
                 WHEN 'released'   THEN 'Released Document Request'
                 WHEN 'generated'  THEN 'Generated Document'
                 WHEN 'processing' THEN 'Processing Document Request'
+                WHEN 'cancelled'  THEN 'Cancelled Document Request'
                 ELSE 'Pending Document Request'
               END AS action,
               d.department_name AS college,
@@ -1385,7 +1407,7 @@ router.get(
               ) AS processor,
               fdr.purpose AS details,
               fdr.status AS raw_status,
-              fdr.created_at AS event_time,
+              fdr.updated_at AS event_time,
               'faculty' AS requester_type
             FROM faculty_document_requests fdr
             JOIN document_services s ON fdr.service_id = s.service_id
@@ -1750,6 +1772,16 @@ router.patch(
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
 
+      // Once a request reaches a terminal state, nothing should move it
+      // again -- most importantly 'cancelled', since that's set by the
+      // faculty member themselves and an admin resuming it behind their
+      // back would be surprising. (claimed/rejected are also final.)
+      if (["claimed", "rejected", "cancelled"].includes(request.status)) {
+        return res.status(409).json({
+          error: "This request is already finalized and can no longer be updated",
+        });
+      }
+
       const requiredPrior = REQUIRED_PRIOR_STATUS[dbStatus];
       if (requiredPrior && request.status !== requiredPrior) {
         return res.status(409).json({
@@ -1832,6 +1864,16 @@ router.patch(
       }
       if (request.department_id !== deptId) {
         return res.status(403).json({ error: "You can only update documents for your own department" });
+      }
+
+      // Once a request reaches a terminal state, nothing should move it
+      // again -- most importantly 'cancelled', since that's set by the
+      // student themselves and an admin resuming it behind their back would
+      // be surprising. (claimed/rejected are also final.)
+      if (["claimed", "rejected", "cancelled"].includes(request.status)) {
+        return res.status(409).json({
+          error: "This request is already finalized and can no longer be updated",
+        });
       }
 
       const requiredPrior = REQUIRED_PRIOR_STATUS[dbStatus];

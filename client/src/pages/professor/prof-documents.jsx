@@ -74,6 +74,7 @@ const STATUS_META = {
   released:   { cls: "doc-badge-released",   label: "Released" },
   claimed:    { cls: "doc-badge-claimed",    label: "Claimed" },
   rejected:   { cls: "doc-badge-rejected",   label: "Rejected" },
+  cancelled:  { cls: "doc-badge-cancelled",  label: "Cancelled" },
 };
 
 function getStatusMeta(status) {
@@ -94,6 +95,8 @@ function getStatusIcon(status) {
       return <CheckCircleIcon />;
     case "rejected":
       return <XCircleIcon />;
+    case "cancelled":
+      return <XCircleIcon />;
     default:
       return <FileTextIcon />;
   }
@@ -111,6 +114,7 @@ function getDetailStatusMeta(status) {
     case "released":   return { label: "Released",         cls: "dss-badge-released" };
     case "claimed":    return { label: "Claimed",          cls: "dss-badge-claimed" };
     case "rejected":   return { label: "Rejected",         cls: "dss-badge-rejected" };
+    case "cancelled":  return { label: "Cancelled",        cls: "dss-badge-cancelled" };
     default:           return { label: status,             cls: "dss-badge-pending" };
   }
 }
@@ -252,8 +256,9 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "Docume
                     marginBottom: "0.75rem",
                   }}
                 >
-                  Cancelling will permanently remove this request. You'll need
-                  to resubmit if you change your mind.
+                  Cancelling will move this request to your Completed
+                  requests. You're welcome to submit a new one if you change
+                  your mind.
                 </p>
                 <button
                   className="dss-cancel-btn"
@@ -410,7 +415,9 @@ export default function ProfessorDocumentRequest() {
     setCancellingId(requestId);
     try {
       await api.delete(`/faculty/my-document-requests/${requestId}`);
-      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: "cancelled" } : r)),
+      );
       setCancelTarget(null);
       toast.success("Document request cancelled.");
     } catch (err) {
@@ -422,10 +429,10 @@ export default function ProfessorDocumentRequest() {
   };
 
   const activeRequests = requests.filter(
-    (r) => r.status !== "claimed" && r.status !== "rejected",
+    (r) => r.status !== "claimed" && r.status !== "rejected" && r.status !== "cancelled",
   );
   const completedRequests = requests.filter(
-    (r) => r.status === "claimed" || r.status === "rejected",
+    (r) => r.status === "claimed" || r.status === "rejected" || r.status === "cancelled",
   );
 
   const selectedType = documentTypes.find((d) => d.name === formData.type);
@@ -596,8 +603,9 @@ export default function ProfessorDocumentRequest() {
             message={
               <>
                 You are about to cancel your request for{" "}
-                <strong>{cancelTarget?.type}</strong>. This will permanently remove
-                your request — you will need to resubmit if you change your mind.
+                <strong>{cancelTarget?.type}</strong>. It will move to your
+                Completed requests — you're welcome to submit a new one if you
+                change your mind.
               </>
             }
             icon={

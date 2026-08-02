@@ -80,7 +80,7 @@ function OamsLogo({
 // requesterIdLabel/Value, neededBy, releasedDate, claimedDate, etc.) —
 // faculty requests have no "copies" column, so it isn't rendered for them. ───
 type RequestSource = 'student' | 'faculty';
-type DocumentStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected';
+type DocumentStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled';
 
 interface DocumentRequest {
   id: string;
@@ -122,7 +122,7 @@ const SOURCES: { id: RequestSource; label: string }[] = [
   { id: 'faculty', label: 'Faculty' },
 ];
 
-const TABS = ['all', 'pending', 'processing', 'ready', 'released', 'claimed', 'rejected'] as const;
+const TABS = ['all', 'pending', 'processing', 'ready', 'released', 'claimed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
 
 type WeekFilter = 'this-week' | 'next-week' | 'this-month' | 'all';
@@ -140,9 +140,10 @@ const STATUS_TINTS: Record<DocumentStatus, { bg: string; border: string; color: 
   released: { bg: 'rgba(100, 116, 139, 0.15)', border: 'rgba(100, 116, 139, 0.35)', color: '#94a3b8', icon: 'checkmark-circle-outline' },
   claimed: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
   rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af', icon: 'close-circle-outline' },
 };
 
-const DONE_STATUSES: DocumentStatus[] = ['claimed', 'rejected'];
+const DONE_STATUSES: DocumentStatus[] = ['claimed', 'rejected', 'cancelled'];
 
 function toDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -331,6 +332,7 @@ export default function AdminDocumentProcessingScreen() {
     released: baseFiltered.filter((d) => d.status === 'released').length,
     claimed: baseFiltered.filter((d) => d.status === 'claimed').length,
     rejected: baseFiltered.filter((d) => d.status === 'rejected').length,
+    cancelled: baseFiltered.filter((d) => d.status === 'cancelled').length,
   };
 
   const visibleDocuments = activeTab === 'all' ? baseFiltered : baseFiltered.filter((d) => d.status === activeTab);

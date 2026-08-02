@@ -20,7 +20,7 @@ import { ChevronLeft, XCircle } from "lucide-react";
  * @property {string} college
  * @property {string} requestDate
  * @property {string} purpose
- * @property {'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected'} status
+ * @property {'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled'} status
  * @property {string} trackingNumber
  * @property {string} [notes]
  * @property {string} [estimatedCompletion]
@@ -194,7 +194,9 @@ export default function DocumentsPage() {
     setCancellingId(docId);
     try {
       await api.delete(`/student/documents/${docId}`);
-      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === docId ? { ...d, status: "cancelled" } : d)),
+      );
       setCancelTarget(null);
       toast.success("Document request cancelled.");
     } catch (err) {
@@ -221,16 +223,22 @@ export default function DocumentsPage() {
         return "doc-badge-claimed";
       case "rejected":
         return "doc-badge-rejected";
+      case "cancelled":
+        return "doc-badge-cancelled";
       default:
         return "doc-badge-pending";
     }
   };
 
   const activeDocuments = documents.filter(
-    (doc) => doc.status !== "claimed" && doc.status !== "rejected",
+    (doc) =>
+      doc.status !== "claimed" &&
+      doc.status !== "rejected" &&
+      doc.status !== "cancelled",
   );
   const claimedDocuments = documents.filter((doc) => doc.status === "claimed");
   const rejectedDocuments = documents.filter((doc) => doc.status === "rejected");
+  const cancelledDocuments = documents.filter((doc) => doc.status === "cancelled");
 
   const availableTypes =
     servicesByDepartmentId[
@@ -426,8 +434,9 @@ export default function DocumentsPage() {
             message={
               <>
                 You are about to cancel your request for{" "}
-                <strong>{cancelTarget?.type}</strong>. This will permanently remove
-                your request — you will need to resubmit if you change your mind.
+                <strong>{cancelTarget?.type}</strong>. It will move to your
+                Cancelled requests — you're welcome to submit a new request
+                anytime if you change your mind.
               </>
             }
             icon={<XCircle width={22} height={22} />}
@@ -481,6 +490,12 @@ export default function DocumentsPage() {
                 onClick={() => setActiveTab("rejected")}
               >
                 <XCircleIcon /> Rejected <span className="doc-tab-count">{rejectedDocuments.length}</span>
+              </button>
+              <button
+                className={`doc-tab ${activeTab === "cancelled" ? "active" : ""}`}
+                onClick={() => setActiveTab("cancelled")}
+              >
+                <XCircleIcon /> Cancelled <span className="doc-tab-count">{cancelledDocuments.length}</span>
               </button>
             </div>
 
@@ -732,6 +747,64 @@ export default function DocumentsPage() {
                     <XCircleIcon />
                     <h3>No Rejected Requests</h3>
                     <p>You have no records of rejected document requests.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Cancelled Tab */}
+            {activeTab === "cancelled" && (
+              <div className="doc-tab-content">
+                {docsLoading ? (
+                  <div className="doc-empty-state">
+                    <FileTextIcon />
+                    <h3>Loading documents...</h3>
+                  </div>
+                ) : cancelledDocuments.length > 0 ? (
+                  <div className="doc-cards-grid">
+                    {cancelledDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="doc-card"
+                        style={{ cursor: "pointer" }}
+                        onClick={() =>
+                          navigate("/student/document-status", {
+                            state: { docId: doc.id, from: "documents" },
+                          })
+                        }
+                      >
+                        <div className="doc-card-header">
+                          <div className="doc-card-icon-wrap">
+                            <FileTextIcon />
+                          </div>
+                          <div className="doc-card-title-section">
+                            <h3>{doc.type}</h3>
+                            <p className="doc-card-college">
+                              {doc.college} •{" "}
+                              {formatManilaDate(doc.requestDate, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                          <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
+                            <span
+                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                            >
+                              {doc.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="doc-empty-state">
+                    <XCircleIcon />
+                    <h3>No Cancelled Requests</h3>
+                    <p>You have no records of cancelled document requests.</p>
                   </div>
                 )}
               </div>
