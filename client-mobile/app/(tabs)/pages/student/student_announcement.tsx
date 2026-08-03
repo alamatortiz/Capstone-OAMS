@@ -226,11 +226,19 @@ export default function StudentAnnouncementScreen() {
     try {
       const safeName = attachment.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
       const uri = `${FileSystem.cacheDirectory}announcement-${announcement.id}-${attachment.id}-${safeName}`;
-      await FileSystem.downloadAsync(
+      const result = await FileSystem.downloadAsync(
         `${api.defaults.baseURL}/student/announcements/${announcement.id}/attachments/${attachment.id}`,
         uri,
         { headers: { Authorization: `Bearer ${token}` } },
       );
+      // downloadAsync only rejects on a true network failure -- a 404/403
+      // response still "succeeds" and writes the error JSON body to disk, so
+      // the status has to be checked explicitly before treating it as a file.
+      if (result.status < 200 || result.status >= 300) {
+        await FileSystem.deleteAsync(result.uri, { idempotent: true });
+        Alert.alert('Error', 'Could not open the attachment.');
+        return;
+      }
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
         Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');

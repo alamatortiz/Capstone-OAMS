@@ -73,14 +73,6 @@ interface College {
   name: string;
 }
 
-const COLLEGES: College[] = [
-  { abbrev: 'CCS', name: 'College of Computing Studies' },
-  { abbrev: 'CBAA', name: 'College of Business, Accountancy and Administration' },
-  { abbrev: 'COED', name: 'College of Education' },
-  { abbrev: 'COE', name: 'College of Engineering' },
-  { abbrev: 'CAS', name: 'College of Arts and Sciences' },
-  { abbrev: 'CHAS', name: 'College of Health and Allied Sciences' },
-];
 
 interface AppointmentType {
   id: string;
@@ -204,6 +196,7 @@ export default function StudentAppointmentsScreen() {
 
   const { user, token, logout } = useAuth();
 
+  const [collegeOptions, setCollegeOptions] = useState<College[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
   const [slotsError, setSlotsError] = useState<string | null>(null);
@@ -290,6 +283,26 @@ export default function StudentAppointmentsScreen() {
     fetchSlots();
     fetchMyBookings();
   }, [fetchSlots, fetchMyBookings]);
+
+  // College filter options are sourced live from the departments that
+  // actually have faculty (same endpoint student_professor_schedules.tsx
+  // uses), instead of a static list, so a newly added college shows up here too.
+  useEffect(() => {
+    const fetchCollegeOptions = async () => {
+      try {
+        const { data } = await api.get('/student/professor-schedules');
+        setCollegeOptions(
+          (data.departments ?? []).map((d: any) => ({
+            abbrev: d.departmentAbbrev,
+            name: d.departmentName,
+          })),
+        );
+      } catch (err) {
+        console.error('Failed to fetch college options:', err);
+      }
+    };
+    fetchCollegeOptions();
+  }, []);
 
   // ── Live updates: refetch slots when capacity changes elsewhere (mirrors
   // stud-appointments.jsx's "appointment:slot-updated"/"appointment:slot-removed"),
@@ -413,12 +426,12 @@ export default function StudentAppointmentsScreen() {
     ? { key: 'this-week', label: 'This Week' }
     : { key: 'next-week', label: 'Next Week' });
 
-  const collegeOptions = COLLEGES.map((c) => ({ value: c.abbrev, label: c.name }));
+  const collegeFilterOptions = collegeOptions.map((c) => ({ value: c.abbrev, label: c.name }));
   const professorOptions = [
     { value: '', label: availableProfessors.length === 0 ? 'No professors available' : 'All Professors' },
     ...availableProfessors.map((p) => ({ value: p.id, label: p.name })),
   ];
-  const filterOptions = activeFilter === 'college' ? collegeOptions : professorOptions;
+  const filterOptions = activeFilter === 'college' ? collegeFilterOptions : professorOptions;
   const filterTitle = activeFilter === 'college' ? 'Select College' : 'Select Professor';
   const filterCurrentValue = activeFilter === 'college' ? selectedCollege : selectedProfessorId;
 
@@ -473,7 +486,7 @@ export default function StudentAppointmentsScreen() {
     }
   };
 
-  const collegeLabel = (abbrev: string) => COLLEGES.find((c) => c.abbrev === abbrev)?.abbrev ?? abbrev;
+  const collegeLabel = (abbrev: string) => collegeOptions.find((c) => c.abbrev === abbrev)?.abbrev ?? abbrev;
 
   const renderDateGroup = (date: string) => {
     const daySlots = slotsByDate[date] ?? [];
@@ -628,7 +641,7 @@ export default function StudentAppointmentsScreen() {
               <Text style={styles.filterLabel}>College</Text>
               <Pressable style={styles.filterSelect} onPress={() => setActiveFilter('college')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>
-                  {COLLEGES.find((c) => c.abbrev === selectedCollege)?.name ?? 'Select college'}
+                  {collegeOptions.find((c) => c.abbrev === selectedCollege)?.name ?? 'Select college'}
                 </Text>
                 <Ionicons name="chevron-down" size={16} color={theme.purple} />
               </Pressable>

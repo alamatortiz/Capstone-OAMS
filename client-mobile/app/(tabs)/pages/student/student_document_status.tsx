@@ -227,6 +227,14 @@ export default function StudentDocumentStatusScreen() {
     };
   }, [user, token, fetchDocuments]);
 
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDocuments();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchDocuments]);
+
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
   const goToDashboard = () => router.push('/pages/student/student_dashboard');
@@ -471,7 +479,7 @@ export default function StudentDocumentStatusScreen() {
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
               You are about to cancel your request for {selectedDoc?.type}. It will move to your Completed
-              requests — you're welcome to submit a new one if you change your mind.
+              requests — you&apos;re welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
               <Pressable style={styles.logoutCancelBtn} onPress={() => setShowCancelDialog(false)}>

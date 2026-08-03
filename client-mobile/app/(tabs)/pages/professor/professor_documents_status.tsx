@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  ImageSourcePropType,
   Modal,
   Pressable,
   ScrollView,
@@ -24,8 +26,35 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
+const ccsLogo = require('@/assets/CCS.png');
+const cbaaLogo = require('@/assets/CBAA.png');
+const coedLogo = require('@/assets/COED.png');
+const coeLogo = require('@/assets/COE.png');
+const casLogo = require('@/assets/CAS.png');
+const chasLogo = require('@/assets/CHAS.png');
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+// Matches web's getCollegeLogo() -- resolves by full department name (the
+// only college field this endpoint returns), falling back to a substring
+// match against the college's abbreviation embedded in the name, and to the
+// PNC logo for anything unrecognized.
+function collegeLogoForName(collegeName?: string): ImageSourcePropType {
+  const name = (collegeName ?? '').toUpperCase();
+  if (name.includes('COMPUTING')) return ccsLogo;
+  if (name.includes('BUSINESS')) return cbaaLogo;
+  if (name.includes('EDUCATION')) return coedLogo;
+  if (name.includes('ENGINEERING')) return coeLogo;
+  if (name.includes('HEALTH')) return chasLogo;
+  if (name.includes('ARTS')) return casLogo;
+  if (name.includes('CCS')) return ccsLogo;
+  if (name.includes('CBAA')) return cbaaLogo;
+  if (name.includes('COED')) return coedLogo;
+  if (name.includes('COE')) return coeLogo;
+  if (name.includes('CHAS')) return chasLogo;
+  if (name.includes('CAS')) return casLogo;
+  return pncLogo;
+}
 
 function OamsLogo({
   style,
@@ -82,13 +111,26 @@ interface DocumentRecord {
   type: string;
   college: string;
   purpose: string;
+  copies?: number;
   requestDate: string;
   status: DocStatus;
   trackingNumber: string;
   notes?: string;
   estimatedCompletion?: string;
+  neededBy?: string;
   releasedDate?: string;
   claimedDate?: string;
+}
+
+interface DocumentRequirement {
+  name: string;
+  description?: string;
+  isMandatory: boolean;
+}
+
+interface DocumentTypeOption {
+  name: string;
+  requirements: DocumentRequirement[];
 }
 
 interface NavItem {
@@ -128,7 +170,27 @@ const formatDateShort = (dateStr?: string) => {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-type TabKey = 'active' | 'completed';
+const formatDateTime = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+};
+
+const formatTimeOnly = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+type TabKey = 'active' | 'claimed' | 'rejected' | 'cancelled';
+const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
+  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
+  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+};
 
 export default function ProfessorDocumentsStatusScreen() {
   const params = useLocalSearchParams<{ docId?: string; from?: string }>();
@@ -146,6 +208,8 @@ export default function ProfessorDocumentsStatusScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
+  const [reqLoading, setReqLoading] = useState(true);
   const { user, logout, token } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
@@ -166,11 +230,13 @@ export default function ProfessorDocumentsStatusScreen() {
           type: r.service_name,
           college: r.college,
           purpose: r.purpose,
+          copies: r.copies,
           requestDate: r.created_at,
           status: r.status,
           trackingNumber: r.tracking_number,
           notes: r.notes || undefined,
           estimatedCompletion: r.estimated_completion || undefined,
+          neededBy: r.needed_by || undefined,
           releasedDate: r.released_at || undefined,
           claimedDate: r.claimed_at || undefined,
         })),
@@ -185,6 +251,37 @@ export default function ProfessorDocumentsStatusScreen() {
 
   useEffect(() => {
     fetchDocuments();
+  }, [fetchDocuments]);
+
+  // Requirements for the selected document's type, looked up by name against
+  // the same document-services catalog professor_documents.tsx uses (no
+  // stable service id is exposed on either payload, so name is the shared key).
+  useEffect(() => {
+    const fetchDocumentTypes = async () => {
+      setReqLoading(true);
+      try {
+        const { data } = await api.get('/faculty/document-services');
+        setDocumentTypes(
+          (data ?? []).map((s: any) => ({
+            name: s.service_name,
+            requirements: s.requirements ?? [],
+          })),
+        );
+      } catch (err) {
+        console.error('Fetch document service types error:', err);
+      } finally {
+        setReqLoading(false);
+      }
+    };
+    fetchDocumentTypes();
+  }, []);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDocuments();
+    }, 45000);
+    return () => clearInterval(interval);
   }, [fetchDocuments]);
 
   useEffect(() => {
@@ -217,12 +314,24 @@ export default function ProfessorDocumentsStatusScreen() {
 
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) ?? null : null;
 
+  const getDocRequirements = useCallback(
+    (typeName: string) => documentTypes.find((t) => t.name === typeName)?.requirements ?? [],
+    [documentTypes],
+  );
+  const selectedDocRequirements = selectedDoc ? getDocRequirements(selectedDoc.type) : [];
+
   const activeDocuments = documents.filter(
     (d) => d.status !== 'claimed' && d.status !== 'rejected' && d.status !== 'cancelled',
   );
-  const completedDocuments = documents.filter(
-    (d) => d.status === 'claimed' || d.status === 'rejected' || d.status === 'cancelled',
-  );
+  const claimedDocuments = documents.filter((d) => d.status === 'claimed');
+  const rejectedDocuments = documents.filter((d) => d.status === 'rejected');
+  const cancelledDocuments = documents.filter((d) => d.status === 'cancelled');
+  const tabCounts: Record<TabKey, number> = {
+    active: activeDocuments.length,
+    claimed: claimedDocuments.length,
+    rejected: rejectedDocuments.length,
+    cancelled: cancelledDocuments.length,
+  };
 
   const openDocument = (id: string) => {
     setDetailOpenedFromExternal(false);
@@ -285,6 +394,8 @@ export default function ProfessorDocumentsStatusScreen() {
               backLabel={detailOpenedFromExternal ? 'Document Requests' : 'All Requests'}
               onBack={backFromDetail}
               onCancel={() => setShowCancelDialog(true)}
+              requirements={selectedDocRequirements}
+              reqLoading={reqLoading}
             />
           ) : (
             <>
@@ -312,18 +423,18 @@ export default function ProfessorDocumentsStatusScreen() {
               </View>
 
               {/* Tabs */}
-              <View style={styles.tabsRow}>
-                <Pressable style={[styles.tab, activeTab === 'active' && styles.tabActive]} onPress={() => setActiveTab('active')}>
-                  <Ionicons name="alert-circle-outline" size={15} color={activeTab === 'active' ? theme.orange : theme.subtext} />
-                  <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>Active Requests</Text>
-                  <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{activeDocuments.length}</Text></View>
-                </Pressable>
-                <Pressable style={[styles.tab, activeTab === 'completed' && styles.tabActive]} onPress={() => setActiveTab('completed')}>
-                  <Ionicons name="checkmark-circle-outline" size={15} color={activeTab === 'completed' ? theme.orange : theme.subtext} />
-                  <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive]}>Completed</Text>
-                  <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{completedDocuments.length}</Text></View>
-                </Pressable>
-              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsRow} contentContainerStyle={{ gap: 8 }}>
+                {(Object.keys(TAB_META) as TabKey[]).map((tab) => {
+                  const active = activeTab === tab;
+                  return (
+                    <Pressable key={tab} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab)}>
+                      <Ionicons name={TAB_META[tab].icon} size={15} color={active ? theme.orange : theme.subtext} />
+                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_META[tab].label}</Text>
+                      <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabCounts[tab]}</Text></View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
               {/* Active Tab */}
               {activeTab === 'active' && (
@@ -339,7 +450,7 @@ export default function ProfessorDocumentsStatusScreen() {
                         theme={theme}
                         styles={styles}
                         doc={doc}
-                        completed={false}
+                        variant="active"
                         onPress={() => openDocument(doc.id)}
                       />
                     ))}
@@ -356,17 +467,21 @@ export default function ProfessorDocumentsStatusScreen() {
                 )
               )}
 
-              {/* Completed Tab */}
-              {activeTab === 'completed' && (
-                completedDocuments.length > 0 ? (
+              {/* Claimed Tab */}
+              {activeTab === 'claimed' && (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : claimedDocuments.length > 0 ? (
                   <View style={styles.docsList}>
-                    {completedDocuments.map((doc) => (
+                    {claimedDocuments.map((doc) => (
                       <DocumentListItem
                         key={doc.id}
                         theme={theme}
                         styles={styles}
                         doc={doc}
-                        completed
+                        variant="claimed"
                         onPress={() => openDocument(doc.id)}
                       />
                     ))}
@@ -375,7 +490,63 @@ export default function ProfessorDocumentsStatusScreen() {
                   <View style={styles.emptyCard}>
                     <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
                     <Text style={styles.emptyTitle}>No Completed Requests</Text>
-                    <Text style={styles.emptyDescription}>Your released and rejected requests will appear here.</Text>
+                    <Text style={styles.emptyDescription}>You have no records of claimed documents.</Text>
+                  </View>
+                )
+              )}
+
+              {/* Rejected Tab */}
+              {activeTab === 'rejected' && (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : rejectedDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {rejectedDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        styles={styles}
+                        doc={doc}
+                        variant="rejected"
+                        onPress={() => openDocument(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Rejected Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no records of rejected document requests.</Text>
+                  </View>
+                )
+              )}
+
+              {/* Cancelled Tab */}
+              {activeTab === 'cancelled' && (
+                loading ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDescription}>Loading requests…</Text>
+                  </View>
+                ) : cancelledDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {cancelledDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        styles={styles}
+                        doc={doc}
+                        variant="cancelled"
+                        onPress={() => openDocument(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no records of cancelled document requests.</Text>
                   </View>
                 )
               )}
@@ -438,8 +609,8 @@ export default function ProfessorDocumentsStatusScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
-              You are about to cancel your request for {selectedDoc?.type}. It will move to your Completed
-              requests — you're welcome to submit a new one if you change your mind.
+              You are about to cancel your request for {selectedDoc?.type}. It will move to your Cancelled
+              requests — you&apos;re welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
               <Pressable style={styles.logoutCancelBtn} onPress={() => setShowCancelDialog(false)}>
@@ -486,16 +657,17 @@ function DocumentListItem({
   theme,
   styles,
   doc,
-  completed,
+  variant,
   onPress,
 }: {
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
   doc: DocumentRecord;
-  completed: boolean;
+  variant: TabKey;
   onPress: () => void;
 }) {
   const meta = STATUS_META[doc.status];
+  const completed = variant !== 'active';
   return (
     <Pressable style={[styles.listCard, completed && styles.listCardCompleted]} onPress={onPress}>
       <View style={styles.listCardHeader}>
@@ -504,7 +676,23 @@ function DocumentListItem({
         </View>
         <View style={styles.listTitleSection}>
           <Text style={styles.listTitle}>{doc.type}</Text>
-          <Text style={styles.listCollege}>{doc.college}</Text>
+          {variant === 'claimed' ? (
+            <>
+              <Text style={styles.listCollege}>{doc.college}</Text>
+              {doc.claimedDate && (
+                <>
+                  <Text style={styles.listClaimedDate}>{formatDate(doc.claimedDate)}</Text>
+                  <Text style={styles.listClaimedTime}>{formatTimeOnly(doc.claimedDate)}</Text>
+                </>
+              )}
+            </>
+          ) : variant === 'rejected' || variant === 'cancelled' ? (
+            <Text style={styles.listCollege}>
+              {doc.college} • {formatDateShort(doc.requestDate)}
+            </Text>
+          ) : (
+            <Text style={styles.listCollege}>{doc.college}</Text>
+          )}
           <Text style={styles.listTracking}>
             Tracking: <Text style={styles.listTrackingValue}>{doc.trackingNumber}</Text>
           </Text>
@@ -514,28 +702,24 @@ function DocumentListItem({
         </View>
       </View>
 
-      <View style={styles.listFieldsGrid}>
-        <View style={styles.listField}>
-          <Text style={styles.listFieldLabel}>{completed ? 'Date Requested' : 'Request Date'}</Text>
-          <Text style={styles.listFieldValue}>{formatDateShort(doc.requestDate)}</Text>
-        </View>
-        {!completed && doc.estimatedCompletion && (
+      {variant === 'active' && (
+        <View style={styles.listFieldsGrid}>
           <View style={styles.listField}>
-            <Text style={styles.listFieldLabel}>Est. Completion</Text>
-            <Text style={styles.listFieldValue}>{formatDateShort(doc.estimatedCompletion)}</Text>
+            <Text style={styles.listFieldLabel}>Request Date</Text>
+            <Text style={styles.listFieldValue}>{formatDateShort(doc.requestDate)}</Text>
           </View>
-        )}
-        {completed && doc.releasedDate && (
-          <View style={styles.listField}>
-            <Text style={styles.listFieldLabel}>Date Released</Text>
-            <Text style={styles.listFieldValue}>{formatDateShort(doc.releasedDate)}</Text>
+          {doc.estimatedCompletion && (
+            <View style={styles.listField}>
+              <Text style={styles.listFieldLabel}>Est. Completion</Text>
+              <Text style={styles.listFieldValue}>{formatDateShort(doc.estimatedCompletion)}</Text>
+            </View>
+          )}
+          <View style={styles.listFieldFull}>
+            <Text style={styles.listFieldLabel}>Purpose</Text>
+            <Text style={styles.listFieldValueMuted} numberOfLines={2}>{doc.purpose}</Text>
           </View>
-        )}
-        <View style={styles.listFieldFull}>
-          <Text style={styles.listFieldLabel}>Purpose</Text>
-          <Text style={styles.listFieldValueMuted} numberOfLines={2}>{doc.purpose}</Text>
         </View>
-      </View>
+      )}
     </Pressable>
   );
 }
@@ -548,6 +732,8 @@ function DocumentDetail({
   backLabel,
   onBack,
   onCancel,
+  requirements,
+  reqLoading,
 }: {
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
@@ -555,6 +741,8 @@ function DocumentDetail({
   backLabel: string;
   onBack: () => void;
   onCancel: () => void;
+  requirements: DocumentRequirement[];
+  reqLoading: boolean;
 }) {
   const meta = STATUS_META[doc.status];
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
@@ -582,7 +770,7 @@ function DocumentDetail({
       <LinearGradient colors={['#f97316', '#ea580c']} style={styles.heroCard}>
         <View style={styles.heroTopRow}>
           <View style={styles.heroLogoBox}>
-            <Ionicons name="document-text-outline" size={30} color="#ffffff" />
+            <Image source={collegeLogoForName(doc.college)} style={styles.heroLogoImg} resizeMode="contain" />
           </View>
           <View style={styles.heroTextWrap}>
             <Text style={styles.heroDocName}>{doc.type}</Text>
@@ -606,6 +794,16 @@ function DocumentDetail({
         </View>
       )}
 
+      {/* Released alert */}
+      {doc.status === 'released' && (
+        <View style={styles.readyBanner}>
+          <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
+          <Text style={styles.readyBannerText}>
+            Your document has been released to the HR/Records office — visit to complete pickup.
+          </Text>
+        </View>
+      )}
+
       {/* Request details */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
@@ -619,20 +817,32 @@ function DocumentDetail({
         </View>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Request Date</Text>
+          <Text style={styles.detailLabel}>Date Requested</Text>
           <Text style={styles.detailValue}>{formatDate(doc.requestDate)}</Text>
         </View>
-        {doc.status === 'claimed' && doc.claimedDate ? (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date Claimed</Text>
-            <Text style={styles.detailValue}>{formatDate(doc.claimedDate)}</Text>
-          </View>
-        ) : doc.status === 'released' && doc.releasedDate ? (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Date Needed</Text>
+          <Text style={styles.detailValue}>
+            {doc.neededBy ? formatDate(doc.neededBy) : 'No date requested for the document to be claimable.'}
+          </Text>
+        </View>
+        {doc.status === 'released' && doc.releasedDate && (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date Released</Text>
             <Text style={styles.detailValue}>{formatDate(doc.releasedDate)}</Text>
           </View>
-        ) : doc.estimatedCompletion ? (
+        )}
+        {doc.status === 'claimed' && doc.claimedDate && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Date and Time Claimed</Text>
+            <Text style={styles.detailValue}>{formatDateTime(doc.claimedDate)}</Text>
+          </View>
+        )}
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Number of Copies</Text>
+          <Text style={styles.detailValue}>{doc.copies ?? 1}</Text>
+        </View>
+        {doc.estimatedCompletion ? (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Estimated Completion</Text>
             <Text style={styles.detailValue}>{formatDate(doc.estimatedCompletion)}</Text>
@@ -642,6 +852,45 @@ function DocumentDetail({
           <Text style={styles.detailLabel}>Purpose</Text>
           <Text style={styles.detailValue}>{doc.purpose}</Text>
         </View>
+      </View>
+
+      {/* Requirements */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="checkmark-circle-outline" size={18} color={theme.orange} />
+            <Text style={styles.cardTitleText}>Requirements</Text>
+          </View>
+        </View>
+        {reqLoading ? (
+          <View style={styles.reqLoadingRow}>
+            <ActivityIndicator size="small" color={theme.orange} />
+            <Text style={styles.reqSubtext}>Loading requirements…</Text>
+          </View>
+        ) : requirements.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            {requirements.map((req) => (
+              <View key={req.name} style={styles.reqItemRow}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={theme.orange} style={{ marginTop: 1 }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={styles.reqNameRow}>
+                    <Text style={styles.bodyText}>{req.name}</Text>
+                    <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                      <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                        {req.isMandatory ? 'Required' : 'Optional'}
+                      </Text>
+                    </View>
+                  </View>
+                  {req.description && <Text style={styles.reqDescText}>{req.description}</Text>}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.reqSubtext}>
+            No specific requirements have been defined for this service yet. Contact the office for details.
+          </Text>
+        )}
       </View>
 
       {/* Notes */}
@@ -681,7 +930,7 @@ function DocumentDetail({
             </View>
           </View>
           <Text style={styles.cancelDescription}>
-            Cancelling will move this request to your Completed requests. You&apos;re welcome to submit a new one if you change your mind.
+            Cancelling will move this request to your Cancelled requests. You&apos;re welcome to submit a new one if you change your mind.
           </Text>
           <Pressable style={styles.cancelBtn} onPress={onCancel}>
             <Text style={styles.cancelBtnText}>Cancel Request</Text>
@@ -812,6 +1061,8 @@ function createStyles(theme: ThemePalette) {
     listTitleSection: { flex: 1, gap: 2 },
     listTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
     listCollege: { fontSize: 12, color: theme.tertiary },
+    listClaimedDate: { fontSize: 12, color: theme.tertiary, marginTop: 2 },
+    listClaimedTime: { fontSize: 11, color: theme.tertiary },
     listTracking: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
     listTrackingValue: { fontFamily: 'monospace', fontWeight: '700', color: theme.orange, letterSpacing: 0.3 },
 
@@ -835,6 +1086,7 @@ function createStyles(theme: ThemePalette) {
       borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0,
     },
+    heroLogoImg: { width: 34, height: 34 },
     heroTextWrap: { flex: 1, gap: 3 },
     heroDocName: { fontSize: 16, fontWeight: '800', color: '#ffffff' },
     heroCollegeName: { fontSize: 12, color: 'rgba(255,255,255,0.9)' },
@@ -866,6 +1118,22 @@ function createStyles(theme: ThemePalette) {
     detailValue: { fontSize: 14, color: theme.text, lineHeight: 20 },
 
     bodyText: { fontSize: 13, color: theme.subtext, lineHeight: 20 },
+
+    reqSubtext: { fontSize: 12, color: theme.tertiary, marginTop: 4 },
+    reqLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    reqItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    reqNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    reqDescText: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
 
     trackingBig: { fontSize: 22, fontWeight: '800', color: theme.orange, fontFamily: 'monospace', letterSpacing: 1 },
     trackingCaption: { fontSize: 11, color: theme.tertiary, marginTop: 4 },

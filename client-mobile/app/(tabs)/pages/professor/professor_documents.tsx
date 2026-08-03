@@ -120,8 +120,14 @@ const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string
   cancelled: { label: 'Cancelled', bg: 'rgba(107, 114, 128, 0.18)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af', icon: 'close-circle-outline' },
 };
 
-const TABS = ['active', 'completed'] as const;
+const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
+const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
+  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
+  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+};
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return '';
@@ -258,6 +264,14 @@ export default function ProfessorDocumentsScreen() {
     };
   }, [user, token, fetchRequests]);
 
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchRequests();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchRequests]);
+
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
 
   const handleNavPress = (key: string) => {
@@ -340,9 +354,15 @@ export default function ProfessorDocumentsScreen() {
   const activeRequests = requests.filter(
     (r) => r.status !== 'claimed' && r.status !== 'rejected' && r.status !== 'cancelled',
   );
-  const completedRequests = requests.filter(
-    (r) => r.status === 'claimed' || r.status === 'rejected' || r.status === 'cancelled',
-  );
+  const claimedRequests = requests.filter((r) => r.status === 'claimed');
+  const rejectedRequests = requests.filter((r) => r.status === 'rejected');
+  const cancelledRequests = requests.filter((r) => r.status === 'cancelled');
+  const tabCounts: Record<TabKey, number> = {
+    active: activeRequests.length,
+    claimed: claimedRequests.length,
+    rejected: rejectedRequests.length,
+    cancelled: cancelledRequests.length,
+  };
 
   return (
     <View style={styles.root}>
@@ -391,10 +411,15 @@ export default function ProfessorDocumentsScreen() {
           </Pressable>
 
           {/* Tabs */}
-          <View style={styles.tabsList}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsList}
+            contentContainerStyle={{ gap: 6 }}
+          >
             {TABS.map((tab) => {
               const active = activeTab === tab;
-              const count = tab === 'active' ? activeRequests.length : completedRequests.length;
+              const count = tabCounts[tab];
               return (
                 <Pressable
                   key={tab}
@@ -402,12 +427,12 @@ export default function ProfessorDocumentsScreen() {
                   onPress={() => setActiveTab(tab)}
                 >
                   <Ionicons
-                    name={tab === 'active' ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                    name={TAB_META[tab].icon}
                     size={14}
                     color={active ? '#f97316' : theme.subtext}
                   />
                   <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
-                    {tab === 'active' ? 'Active Requests' : 'Completed'}
+                    {TAB_META[tab].label}
                   </Text>
                   <View style={[styles.tabCount, active && styles.tabCountActive]}>
                     <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>{count}</Text>
@@ -415,7 +440,7 @@ export default function ProfessorDocumentsScreen() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           {/* Active Tab */}
           {activeTab === 'active' && (
@@ -490,8 +515,30 @@ export default function ProfessorDocumentsScreen() {
                         </View>
                       )}
 
+                      {(req.status === 'generated' || req.status === 'released') && (
+                        <Pressable
+                          style={styles.viewPickupBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            router.push({
+                              pathname: '/pages/professor/professor_documents_status',
+                              params: { docId: req.id, from: 'document-request' },
+                            });
+                          }}
+                        >
+                          <Ionicons name="download-outline" size={16} color="#ffffff" />
+                          <Text style={styles.viewPickupBtnText}>View Pickup Details</Text>
+                        </Pressable>
+                      )}
+
                       {(req.status === 'pending' || req.status === 'processing') && (
-                        <Pressable style={styles.cancelBtnFull} onPress={() => setCancelTarget(req)}>
+                        <Pressable
+                          style={styles.cancelBtnFull}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setCancelTarget(req);
+                          }}
+                        >
                           <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
                           <Text style={styles.cancelBtnFullText}>Cancel Request</Text>
                         </Pressable>
@@ -509,11 +556,64 @@ export default function ProfessorDocumentsScreen() {
             )
           )}
 
-          {/* Completed Tab */}
-          {activeTab === 'completed' && (
-            completedRequests.length > 0 ? (
+          {/* Claimed Tab */}
+          {activeTab === 'claimed' && (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : claimedRequests.length > 0 ? (
               <View style={styles.docList}>
-                {completedRequests.map((req) => {
+                {claimedRequests.map((req) => {
+                  const meta = STATUS_META[req.status];
+                  return (
+                    <Pressable
+                      key={req.id}
+                      style={[styles.docCard, styles.docCardCompleted]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/pages/professor/professor_documents_status',
+                          params: { docId: req.id, from: 'document-request' },
+                        })
+                      }
+                    >
+                      <View style={styles.docCardHeaderRow}>
+                        <View style={styles.docIconWrap}>
+                          <Ionicons name="document-text-outline" size={20} color="#f97316" />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.docTypeText}>{req.type}</Text>
+                          <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <Text style={styles.docTrackingText}>{req.trackingNumber}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                          <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No Completed Requests</Text>
+                <Text style={styles.emptyText}>You have no records of claimed documents.</Text>
+              </View>
+            )
+          )}
+
+          {/* Rejected Tab */}
+          {activeTab === 'rejected' && (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : rejectedRequests.length > 0 ? (
+              <View style={styles.docList}>
+                {rejectedRequests.map((req) => {
                   const meta = STATUS_META[req.status];
                   return (
                     <Pressable
@@ -547,9 +647,59 @@ export default function ProfessorDocumentsScreen() {
               </View>
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
-                <Text style={styles.emptyTitle}>No completed requests</Text>
-                <Text style={styles.emptyText}>Your released and rejected requests will appear here</Text>
+                <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No Rejected Requests</Text>
+                <Text style={styles.emptyText}>You have no records of rejected document requests.</Text>
+              </View>
+            )
+          )}
+
+          {/* Cancelled Tab */}
+          {activeTab === 'cancelled' && (
+            requestsLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading requests...</Text>
+              </View>
+            ) : cancelledRequests.length > 0 ? (
+              <View style={styles.docList}>
+                {cancelledRequests.map((req) => {
+                  const meta = STATUS_META[req.status];
+                  return (
+                    <Pressable
+                      key={req.id}
+                      style={[styles.docCard, styles.docCardCompleted]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/pages/professor/professor_documents_status',
+                          params: { docId: req.id, from: 'document-request' },
+                        })
+                      }
+                    >
+                      <View style={styles.docCardHeaderRow}>
+                        <View style={styles.docIconWrap}>
+                          <Ionicons name="document-text-outline" size={20} color="#f97316" />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.docTypeText}>{req.type}</Text>
+                          <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <Text style={styles.docTrackingText}>
+                            {formatDate(req.requestDate)} · {req.trackingNumber}
+                          </Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                          <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
+                <Text style={styles.emptyText}>You have no records of cancelled document requests.</Text>
               </View>
             )
           )}
@@ -599,19 +749,6 @@ export default function ProfessorDocumentsScreen() {
               )}
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Purpose</Text>
-                <TextInput
-                  style={styles.textArea}
-                  placeholder="e.g., Bank loan application, Visa application"
-                  placeholderTextColor={theme.tertiary}
-                  value={formData.purpose}
-                  onChangeText={(v) => setFormData((prev) => ({ ...prev, purpose: v }))}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Number of Copies</Text>
                 <TextInput
                   style={styles.textArea}
@@ -630,6 +767,20 @@ export default function ProfessorDocumentsScreen() {
                   </Text>
                   <Ionicons name="calendar-outline" size={16} color={theme.subtext} />
                 </Pressable>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Purpose</Text>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="e.g., Bank loan application, Visa application"
+                  placeholderTextColor={theme.tertiary}
+                  value={formData.purpose}
+                  onChangeText={(v) => setFormData((prev) => ({ ...prev, purpose: v }))}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={255}
+                />
               </View>
 
               <View style={styles.formGroup}>
@@ -742,7 +893,7 @@ export default function ProfessorDocumentsScreen() {
             <Text style={styles.confirmDescription}>
               You are about to cancel your request for{' '}
               <Text style={{ fontWeight: '700', color: theme.text }}>{cancelTarget?.type}</Text>. It will
-              move to your Completed requests — you're welcome to submit a new one if you change your mind.
+              move to your Cancelled requests — you&apos;re welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.confirmActionsRow}>
               <Pressable style={styles.cancelBtn} onPress={() => setCancelTarget(null)}>
@@ -1093,6 +1244,17 @@ function createStyles(theme: ThemePalette) {
       borderColor: 'rgba(239, 68, 68, 0.35)',
     },
     cancelBtnFullText: { fontSize: 13.5, fontWeight: '700', color: '#ef4444' },
+
+    viewPickupBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: '#16a34a',
+    },
+    viewPickupBtnText: { fontSize: 13.5, fontWeight: '700', color: '#ffffff' },
 
     // Request dialog
     modalOverlay: {

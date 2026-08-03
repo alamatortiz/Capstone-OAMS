@@ -109,7 +109,7 @@ interface QuickAction {
 }
 
 const quickActions: QuickAction[] = [
-  { key: 'document-request', title: 'Document Request', description: 'Submit or track document requests', icon: 'create-outline', badge: 'Documents', gradient: ['#f97316', '#ea580c'] },
+  { key: 'document-request', title: 'Document Request', description: 'Submit a new document request', icon: 'create-outline', badge: 'Documents', gradient: ['#f97316', '#ea580c'] },
   { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your consultation hours', icon: 'time-outline', badge: 'Schedule', gradient: ['#a855f7', '#9333ea'] },
 ];
 

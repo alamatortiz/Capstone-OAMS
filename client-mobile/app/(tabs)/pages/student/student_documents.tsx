@@ -217,6 +217,14 @@ export default function StudentDocumentsScreen() {
     };
   }, [user, token, fetchDocuments]);
 
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDocuments();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchDocuments]);
+
   useEffect(() => {
     const fetchServiceTypes = async () => {
       try {
@@ -738,7 +746,7 @@ export default function StudentDocumentsScreen() {
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
               You are about to cancel your request for {cancelTarget?.type}. It will move to your Completed
-              requests — you're welcome to submit a new one if you change your mind.
+              requests — you&apos;re welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
               <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelTarget(null)}>

@@ -105,7 +105,17 @@ export default function LoginScreen() {
     try {
       const authedUser = await login(email, password);
       const routeRole = getRouteRole(authedUser.role);
-      router.replace(`/pages/${routeRole}/${routeRole}_dashboard` as any);
+      switch (routeRole) {
+        case 'student':
+          router.replace('/pages/student/student_dashboard');
+          break;
+        case 'professor':
+          router.replace('/pages/professor/professor_dashboard');
+          break;
+        case 'admin':
+          router.replace('/pages/admin/admin_dashboard');
+          break;
+      }
     } catch (error: any) {
       Alert.alert(
         'Sign in failed',

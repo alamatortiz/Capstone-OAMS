@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ImageSourcePropType,
@@ -19,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useQueue } from '@/context/QueueContext';
+import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -109,6 +111,32 @@ interface QueueRecord {
   endTime: string;
   notes: string;
   arrivedAt?: string | null;
+}
+
+interface ServiceRequirement {
+  id: number;
+  name: string;
+  description?: string;
+  isMandatory: boolean;
+}
+
+interface ServiceProcedureStep {
+  id: number;
+  stepNumber: number;
+  title: string;
+  description?: string;
+}
+
+interface ServiceInfo {
+  serviceName: string;
+  requirements: ServiceRequirement[];
+  procedureSteps: ServiceProcedureStep[];
+}
+
+interface DepartmentServices {
+  departmentAbbrev?: string;
+  departmentName?: string;
+  services: ServiceInfo[];
 }
 
 interface NavItem {
@@ -617,6 +645,51 @@ function QueueDetail({
   const statusMeta = getStatusMeta(queue);
   const peopleAhead = Math.max(queue.position - 1, 0);
 
+  // ── Requirements / Procedure lookup (same fetch-and-match-by-name pattern
+  // as web's QueueDetail) ────────────────────────────────────────────────
+  const [servicesData, setServicesData] = useState<DepartmentServices[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      setServicesLoading(true);
+      try {
+        const { data } = await api.get('/student/services/by-department');
+        setServicesData(data.departments ?? []);
+      } catch (err) {
+        console.error('Fetch services error:', err);
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  const findService = (serviceName: string) => {
+    const matchesName = (s: ServiceInfo) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase();
+
+    // Prefer the queue's own department first -- a same-named service in a
+    // different college (e.g. two colleges both offering "Certification
+    // Request") would otherwise resolve to whichever department the backend
+    // happens to sort first, showing the wrong college's requirements.
+    const ownDept = servicesData.find(
+      (dept) =>
+        (queue.departmentAbbrev && dept.departmentAbbrev === queue.departmentAbbrev) ||
+        (queue.departmentName && dept.departmentName === queue.departmentName),
+    );
+    const ownMatch = ownDept?.services?.find(matchesName);
+    if (ownMatch) return ownMatch;
+
+    for (const dept of servicesData) {
+      const svc = dept.services?.find(matchesName);
+      if (svc) return svc;
+    }
+    return null;
+  };
+  const serviceRequirements = findService(queue.serviceName)?.requirements ?? [];
+  const procedureSteps = findService(queue.serviceName)?.procedureSteps ?? [];
+  const isServiceKnown = !!findService(queue.serviceName);
+
   return (
     <>
       {/* Breadcrumb */}
@@ -769,6 +842,79 @@ function QueueDetail({
           <Text style={styles.bodyText}>{queue.description}</Text>
         </View>
       ) : null}
+
+      {/* Requirements */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="checkmark-circle-outline" size={18} color={theme.blue} />
+            <Text style={styles.cardTitleText}>Requirements</Text>
+          </View>
+        </View>
+        {serviceRequirements.length === 0 && servicesLoading && !isServiceKnown ? (
+          <View style={styles.reqLoadingRow}>
+            <ActivityIndicator size="small" color={theme.blue} />
+            <Text style={styles.reqSubtext}>Loading requirements…</Text>
+          </View>
+        ) : serviceRequirements.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            {serviceRequirements.map((req) => (
+              <View key={req.id} style={styles.reqItemRow}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={theme.blue} style={{ marginTop: 1 }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={styles.reqNameRow}>
+                    <Text style={styles.bodyText}>{req.name}</Text>
+                    <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                      <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                        {req.isMandatory ? 'Required' : 'Optional'}
+                      </Text>
+                    </View>
+                  </View>
+                  {req.description && <Text style={styles.reqDescText}>{req.description}</Text>}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.reqSubtext}>
+            No specific requirements have been defined for this service yet. Contact the office for details.
+          </Text>
+        )}
+      </View>
+
+      {/* Procedure */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="help-circle-outline" size={18} color={theme.blue} />
+            <Text style={styles.cardTitleText}>Procedure</Text>
+          </View>
+        </View>
+        {procedureSteps.length === 0 && servicesLoading && !isServiceKnown ? (
+          <View style={styles.reqLoadingRow}>
+            <ActivityIndicator size="small" color={theme.blue} />
+            <Text style={styles.reqSubtext}>Loading procedure…</Text>
+          </View>
+        ) : procedureSteps.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            {procedureSteps.map((step) => (
+              <View key={step.id} style={styles.reqItemRow}>
+                <View style={styles.procedureNumberCircle}>
+                  <Text style={styles.procedureNumberText}>{step.stepNumber}</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.bodyText}>{step.title}</Text>
+                  {step.description && <Text style={styles.reqDescText}>{step.description}</Text>}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.reqSubtext}>
+            No procedure steps have been defined for this service yet. Contact the office for details.
+          </Text>
+        )}
+      </View>
 
       {/* Concern / notes */}
       <View style={styles.card}>
@@ -1393,6 +1539,27 @@ function createStyles(theme: ThemePalette) {
       color: theme.subtext,
       lineHeight: 20,
     },
+
+    reqSubtext: { fontSize: 12, color: theme.tertiary, marginTop: 4 },
+    reqLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    reqItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    reqNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    reqDescText: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
+    procedureNumberCircle: {
+      width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: theme.blue,
+    },
+    procedureNumberText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
 
     // Queue number
     queueNumberText: {

@@ -136,29 +136,66 @@ export default function StudentTransactionsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
+  // Debounce the search box so every keystroke doesn't trigger a refetch.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   // Mirrors `transactions` for the catch block below, without making
   // fetchTransactions depend on (and change identity with) the state itself.
   const transactionsRef = useRef(transactions);
   useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
 
-  const fetchTransactions = useCallback(async () => {
+  // Guards against out-of-order responses: e.g. tapping "Load More" and then
+  // changing a filter before that request resolves would otherwise let the
+  // stale "Load More" page land after the fresh filtered list and get
+  // appended onto it. Each call captures the current token; a response is
+  // only applied if its token is still the latest by the time it resolves.
+  const requestIdRef = useRef(0);
+
+  // Search/type/status filtering happens server-side (so it considers the
+  // student's whole history, not just whatever page is currently loaded).
+  // Any change to those filters — including the ones baked into this
+  // callback's identity below — resets back to the first page; only
+  // "Load More" advances the offset.
+  const fetchTransactions = useCallback(async (offset = 0) => {
+    const requestId = ++requestIdRef.current;
     try {
-      const { data } = await api.get('/student/transactions');
-      setTransactions(data.transactions ?? []);
+      if (offset > 0) setLoadingMore(true);
+      const { data } = await api.get('/student/transactions', {
+        params: {
+          search: debouncedSearch || undefined,
+          type: filterType !== 'all' ? filterType : undefined,
+          status: filterStatus !== 'all' ? filterStatus : undefined,
+          limit: 20,
+          offset,
+        },
+      });
+      if (requestId !== requestIdRef.current) return;
+      const newTransactions: Transaction[] = data.transactions ?? [];
+      setTransactions((prev) => (offset > 0 ? [...prev, ...newTransactions] : newTransactions));
+      setHasMore(!!data.hasMore);
+      if (data.stats) setTxStats(data.stats);
       setTxError(null);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Failed to fetch transactions:', err);
       if (transactionsRef.current.length === 0) {
         setTxError('Could not load your transaction history.');
@@ -166,13 +203,21 @@ export default function StudentTransactionsScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
       }
     } finally {
-      setTxLoading(false);
+      if (requestId === requestIdRef.current) {
+        setTxLoading(false);
+        setLoadingMore(false);
+      }
     }
-  }, []);
+  }, [debouncedSearch, filterType, filterStatus]);
 
   useEffect(() => {
-    fetchTransactions();
+    fetchTransactions(0);
   }, [fetchTransactions]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    fetchTransactions(transactions.length);
+  };
 
   // Queue events (and document:cancelled) are broadcast department-wide, not
   // just to the affected student, so they're checked against this student's
@@ -181,7 +226,7 @@ export default function StudentTransactionsScreen() {
   const handleOwnQueueEvent = useCallback(
     (payload: { studentId?: number | string }) => {
       if (Number(payload?.studentId) === Number(user?.userId)) {
-        fetchTransactions();
+        fetchTransactions(0);
       }
     },
     [fetchTransactions, user?.userId],
@@ -196,6 +241,7 @@ export default function StudentTransactionsScreen() {
     const socket = connectSocket(token);
     if (!socket) return;
 
+    const refetchFirstPage = () => fetchTransactions(0);
     const ownEvents = ['document:status-updated', 'appointment:status-updated'];
     const deptWideEvents = [
       'queue:called',
@@ -206,14 +252,22 @@ export default function StudentTransactionsScreen() {
       'document:cancelled',
     ];
 
-    ownEvents.forEach((event) => socket.on(event, fetchTransactions));
+    ownEvents.forEach((event) => socket.on(event, refetchFirstPage));
     deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
 
     return () => {
-      ownEvents.forEach((event) => socket.off(event, fetchTransactions));
+      ownEvents.forEach((event) => socket.off(event, refetchFirstPage));
       deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
     };
   }, [user, token, fetchTransactions, handleOwnQueueEvent]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchTransactions(0);
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchTransactions]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/student/student_dashboard');
@@ -231,20 +285,13 @@ export default function StudentTransactionsScreen() {
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
   const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
-  const filteredTransactions = transactions.filter((t) => {
-    const q = searchQuery.trim().toLowerCase();
-    const matchesSearch = !q || t.title.toLowerCase().includes(q) || t.details.toLowerCase().includes(q);
-    const matchesType = filterType === 'all' || t.type === filterType;
-    const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
-    return matchesSearch && matchesType && matchesStatus;
-  });
-
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  // Search/type/status filtering already happened server-side, so `transactions`
+  // is the page to render as-is.
   const stats: { key: string; label: string; value: number; icon: IoniconName; color: string; bg: string; border: string }[] = [
-    { key: 'total', label: 'Total', value: transactions.length, icon: 'list-outline', color: theme.blue, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)' },
-    { key: 'completed', label: 'Completed', value: transactions.filter((t) => t.status === 'completed').length, icon: 'checkmark-circle-outline', color: theme.success, bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)' },
-    { key: 'ongoing', label: 'Ongoing', value: transactions.filter((t) => t.status === 'ongoing').length, icon: 'time-outline', color: theme.orange, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' },
-    { key: 'month', label: 'This Month', value: transactions.filter((t) => t.date.slice(0, 7) === currentMonth).length, icon: 'calendar-outline', color: theme.purple, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)' },
+    { key: 'total', label: 'Total', value: txStats.total, icon: 'list-outline', color: theme.blue, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)' },
+    { key: 'completed', label: 'Completed', value: txStats.completed, icon: 'checkmark-circle-outline', color: theme.success, bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)' },
+    { key: 'ongoing', label: 'Ongoing', value: txStats.ongoing, icon: 'time-outline', color: theme.orange, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' },
+    { key: 'month', label: 'This Month', value: txStats.thisMonth, icon: 'calendar-outline', color: theme.purple, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)' },
   ];
 
   const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
@@ -357,13 +404,13 @@ export default function StudentTransactionsScreen() {
               <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>Could not load transactions</Text>
               <Text style={styles.emptyDescription}>{txError}</Text>
-              <Pressable style={styles.filterSelect} onPress={fetchTransactions}>
+              <Pressable style={styles.filterSelect} onPress={() => fetchTransactions(0)}>
                 <Text style={styles.filterSelectText}>Retry</Text>
               </Pressable>
             </View>
-          ) : filteredTransactions.length > 0 ? (
+          ) : transactions.length > 0 ? (
             <View style={styles.txList}>
-              {filteredTransactions.map((t) => {
+              {transactions.map((t) => {
                 const typeMeta = TYPE_META[t.type];
                 const statusMeta = STATUS_META[t.status];
                 return (
@@ -408,6 +455,12 @@ export default function StudentTransactionsScreen() {
               <Text style={styles.emptyTitle}>No transactions found</Text>
               <Text style={styles.emptyDescription}>Try adjusting your search or filters</Text>
             </View>
+          )}
+
+          {!txLoading && !txError && hasMore && (
+            <Pressable style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+              <Text style={styles.loadMoreBtnText}>{loadingMore ? 'Loading…' : 'Load More'}</Text>
+            </Pressable>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -695,6 +748,17 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: theme.background,
     },
     filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+
+    loadMoreBtn: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 13,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    loadMoreBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
 
     // Transaction list
     txList: { gap: 12 },
