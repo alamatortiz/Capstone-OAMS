@@ -12,6 +12,7 @@ import {
   Activity,
   MapPin,
   FileText,
+  HelpCircle,
 } from "lucide-react";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
@@ -20,6 +21,7 @@ import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
+import api from "../../utils/api";
 import "./stud-queue-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,8 +31,8 @@ const getStatusMeta = (queue) => {
   switch (queue.status) {
     case "serving":
       return queue.arrivedAt
-        ? { label: "Being Served", cls: "queue-status-serving", color: "#22c55e" }
-        : { label: "Called — Please Proceed", cls: "queue-status-serving", color: "#22c55e" };
+        ? { label: "Servicing", cls: "queue-status-serving", color: "#22c55e" }
+        : { label: "Called", cls: "queue-status-serving", color: "#22c55e" };
     case "completed":
       return { label: "Completed", cls: "queue-status-completed", color: "#6b7280" };
     case "cancelled":
@@ -51,6 +53,53 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
 
   const statusMeta = getStatusMeta(queue);
   const peopleAhead = Math.max(queue.position - 1, 0);
+
+  // ── Requirements / Procedure lookup (same fetch-and-match-by-name pattern
+  // as stud-queue.jsx's join-flow detail view) ────────────────────────────
+  const [servicesData, setServicesData] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      setServicesLoading(true);
+      try {
+        const { data } = await api.get('/student/services/by-department');
+        setServicesData(data.departments ?? []);
+      } catch (err) {
+        console.error('Fetch services error:', err);
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  const isServiceKnown = (serviceName) =>
+    servicesData.some((dept) =>
+      dept.services?.some(
+        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
+      ),
+    );
+
+  const getServiceRequirements = (serviceName) => {
+    for (const dept of servicesData) {
+      const svc = dept.services?.find(
+        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
+      );
+      if (svc?.requirements?.length) return svc.requirements;
+    }
+    return [];
+  };
+
+  const getProcedureSteps = (serviceName) => {
+    for (const dept of servicesData) {
+      const svc = dept.services?.find(
+        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
+      );
+      if (svc?.procedureSteps?.length) return svc.procedureSteps;
+    }
+    return [];
+  };
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
@@ -77,7 +126,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
         }
         icon={<Clock className="icon" />}
         title="Queue Details"
-        subtitle="View your position and estimated wait time"
+        subtitle="Your queue details and status"
       />
 
       {/* Hero */}
@@ -129,8 +178,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }}
           />
           {queue.arrivedAt
-            ? "You are now being served."
-            : "Please proceed to the designated location — it's your turn!"}
+            ? "Service being processed"
+            : "It's your turn — please proceed to the designated location"}
         </div>
       )}
 
@@ -291,6 +340,99 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
               </div>
             </div>
           )}
+
+          {/* Requirements card */}
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem" }} />
+                Requirements
+              </h3>
+            </div>
+            <div className="qss-card-content">
+              {(() => {
+                const reqs = getServiceRequirements(queue.serviceName);
+                if (reqs.length === 0 && servicesLoading && !isServiceKnown(queue.serviceName)) {
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                      <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
+                      Loading requirements…
+                    </div>
+                  );
+                }
+                return reqs.length > 0 ? (
+                  <ul className="qss-requirements-list">
+                    {reqs.map((req) => (
+                      <li key={req.id} className="qss-requirement-item">
+                        <CheckCircle2 className="qss-requirement-icon" />
+                        <div>
+                          <div className="qss-requirement-name-row">
+                            <span>{req.name}</span>
+                            <span className={`qss-requirement-badge ${req.isMandatory ? 'is-mandatory' : 'is-optional'}`}>
+                              {req.isMandatory ? 'Required' : 'Optional'}
+                            </span>
+                          </div>
+                          {req.description && (
+                            <p style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: '2px' }}>
+                              {req.description}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                    No specific requirements have been defined for this service yet. Contact the office for details.
+                  </p>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Procedure card */}
+          <div className="qss-card">
+            <div className="qss-card-header">
+              <h3 className="qss-card-title">
+                <HelpCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                Procedure
+              </h3>
+            </div>
+            <div className="qss-card-content">
+              {(() => {
+                const steps = getProcedureSteps(queue.serviceName);
+                if (steps.length === 0 && servicesLoading && !isServiceKnown(queue.serviceName)) {
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                      <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
+                      Loading procedure…
+                    </div>
+                  );
+                }
+                return steps.length > 0 ? (
+                  <ol className="qss-procedure-list">
+                    {steps.map((step) => (
+                      <li key={step.id} className="qss-procedure-item">
+                        <span className="qss-procedure-number">{step.stepNumber}</span>
+                        <div>
+                          <span className="qss-procedure-title">{step.title}</span>
+                          {step.description && (
+                            <p style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: '2px' }}>
+                              {step.description}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                    No procedure steps have been defined for this service yet. Contact the office for details.
+                  </p>
+                );
+              })()}
+            </div>
+          </div>
 
           {/* Notes / concern card */}
           <div className="qss-card">
@@ -561,7 +703,7 @@ export default function QueueStatusPage() {
                 </div>
                 <div className="qsl-tracking-link-btn-text">
                   <span className="qsl-tracking-link-btn-title">Queue Tracking</span>
-                  <span className="qsl-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities.</span>
+                  <span className="qsl-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities</span>
                 </div>
                 <svg className="qsl-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="9 18 15 12 9 6"></polyline>

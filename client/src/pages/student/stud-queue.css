@@ -929,13 +929,12 @@ body {
   display: block !important;
 }
 
-/* Hover/focus border colors must beat the anti-bleed !important border above */
-.queue-page .filters-card .filter-select:hover {
-  border-color: rgba(59, 130, 246, 0.3) !important;
-}
-
+/* Focus border color must beat the anti-bleed !important border above.
+   No :hover rule here by design -- the highlight only shows on focus/click. */
 .queue-page .filters-card .filter-select:focus {
+  outline: none;
   border-color: var(--blue) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .queue-page .filters-card .filters-header {
@@ -967,19 +966,8 @@ body {
   stroke-width: 2;
 }
 
-.queue-page .filter-select:hover {
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-.queue-page .filter-select:hover + .filter-chevron,
 .queue-page .filter-select:focus + .filter-chevron {
   color: var(--blue);
-}
-
-.queue-page .filter-select:focus {
-  outline: none;
-  border-color: var(--blue);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .queue-page .filter-select option {
@@ -991,10 +979,6 @@ body {
   background: #f8fafc;
   border-color: #e2e8f0;
   color: #1e293b;
-}
-
-[data-theme="light"] .queue-page .filter-select:focus {
-  border-color: var(--blue);
 }
 
 [data-theme="light"] .queue-page .filter-select option {
@@ -1306,47 +1290,44 @@ body {
 .avail-services-details-card {
   background: var(--card-bg);
   border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 1rem;
+  border-radius: 1.125rem;
   overflow: hidden;
   text-align: left;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .avail-services-details-card-header {
-  padding: 1.375rem;
-  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
-  background: rgba(59, 130, 246, 0.05);
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
 }
 
 .avail-services-details-card-title {
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  font-size: 1.0625rem;
-  font-weight: 800;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--text-primary);
   margin: 0;
-  margin-bottom: 0.625rem;
   transition: color 0.3s ease;
-  letter-spacing: -0.25px;
 }
 
 .avail-services-details-card-icon {
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.25rem;
+  height: 1.25rem;
   color: var(--blue);
   stroke: currentColor;
 }
 
-.avail-services-details-card-description {
-  font-size: 0.8125rem;
-  color: var(--text-tertiary);
+.avail-services-details-card-text {
+  color: var(--text-secondary);
+  line-height: 1.6;
   margin: 0;
   transition: color 0.3s ease;
-  font-weight: 500;
 }
 
 .avail-services-details-card-content {
-  padding: 1.375rem;
+  padding: 1.25rem;
 }
 
 .avail-services-requirements-list {

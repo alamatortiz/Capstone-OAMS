@@ -243,10 +243,8 @@ body {
   stroke-width: 2;
 }
 
-.appointment-content .filter-select:hover + .filter-chevron,
 .appointment-content .filter-select:focus + .filter-chevron { color: #a855f7; }
 
-[data-theme="light"] .appointment-content .filter-select:hover + .filter-chevron,
 [data-theme="light"] .appointment-content .filter-select:focus + .filter-chevron { color: #9333ea; }
 
 .search-input-wrapper { position: relative; display: flex; align-items: center; }
@@ -280,9 +278,6 @@ body {
   outline: none;
   transition: all 0.2s ease;
 }
-
-.appointment-content .filter-select:hover,
-.appointment-content .filter-input:hover { border-color: rgba(168, 85, 247, 0.3); }
 
 .appointment-content .filter-select:focus,
 .appointment-content .filter-input:focus { border-color: #a855f7; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.1); }

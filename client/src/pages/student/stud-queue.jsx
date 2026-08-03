@@ -347,7 +347,7 @@ export default function QueuePage() {
               </div>
               <div className="qp-tracking-link-btn-text">
                 <span className="qp-tracking-link-btn-title">Queue Tracking</span>
-                <span className="qp-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities.</span>
+                <span className="qp-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities</span>
               </div>
               <svg className="qp-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"></polyline>
@@ -426,7 +426,7 @@ export default function QueuePage() {
                     </h3>
                   </div>
                   <div className="avail-services-details-card-content">
-                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.6 }}>
+                    <p className="avail-services-details-card-text">
                       {selectedSlot.description}
                     </p>
                   </div>
@@ -441,9 +441,6 @@ export default function QueuePage() {
                     <h3 className="avail-services-details-card-title">
                       <CheckCircle2 className="avail-services-details-card-icon" /> Requirements
                     </h3>
-                    <p className="avail-services-details-card-description">
-                      Documents and items you need to bring
-                    </p>
                   </div>
                   <div className="avail-services-details-card-content">
                     {(() => {
@@ -492,9 +489,6 @@ export default function QueuePage() {
                     <h3 className="avail-services-details-card-title">
                       <HelpCircle className="avail-services-details-card-icon" /> Procedure
                     </h3>
-                    <p className="avail-services-details-card-description">
-                      Step-by-step process
-                    </p>
                   </div>
                   <div className="avail-services-details-card-content">
                     {(() => {
@@ -555,7 +549,7 @@ export default function QueuePage() {
                       className={`qp-tab ${activeTab === 'available' ? 'active' : ''}`}
                       onClick={() => setActiveTab('available')}
                     >
-                      <Users className="qp-tab-icon" /> Available Queues
+                      <Users className="qp-tab-icon" /> Active Queues
                       <span className="qp-tab-count">{filteredSlots.length}</span>
                     </button>
                     <button
@@ -563,7 +557,7 @@ export default function QueuePage() {
                       className={`qp-tab ${activeTab === 'active' ? 'active' : ''}`}
                       onClick={() => setActiveTab('active')}
                     >
-                      <Clock className="qp-tab-icon" /> Active Queues
+                      <Clock className="qp-tab-icon" /> Participating Queues
                       <span className="qp-tab-count">{queues.length}</span>
                     </button>
                   </div>
@@ -712,7 +706,7 @@ export default function QueuePage() {
                     </div>
                   ) : (
                     <div className="no-queues-card">
-                      <AlertCircle className="no-queues-icon" />
+                      <CheckCircle2 className="no-queues-icon" />
                       <h3 className="no-queues-title">No Active Queues</h3>
                       <p className="no-queues-description">
                         You are not participating in any active queues.
@@ -877,7 +871,7 @@ export default function QueuePage() {
                       <div className="no-queues-icon">
                         <QueueIconNav />
                       </div>
-                      <h3 className="no-queues-title">No Open Queues</h3>
+                      <h3 className="no-queues-title">No Active Queues</h3>
                       <p className="no-queues-description">
                         {(selectedCollege !== 'all' || selectedService !== 'all')
                           ? 'Try adjusting your filters.'

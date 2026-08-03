@@ -7,6 +7,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
+import { formatManilaDate } from "../../utils/dateTime";
 import "./stud-queue-tracking.css";
 
 import {
@@ -20,6 +21,8 @@ import {
   Loader2,
   ChevronLeft,
   AlertCircle,
+  Calendar,
+  Clock,
 } from "lucide-react";
 
 // ─── Icons (matching stud-transactions.jsx's Total/Completed stat icons) ──────
@@ -330,7 +333,7 @@ export default function QueueTrackingPage() {
                                 className={`qt-status-badge ${getStatusColor(queue.status)}`}
                               >
                                 {queue.status === "serving"
-                                  ? (queue.arrivedAt ? "Being Served" : "Called — Please Proceed")
+                                  ? (queue.arrivedAt ? "Servicing" : "Called")
                                   : getStatusLabel(queue.status)}
                               </span>
                               <span className="qt-number-badge">
@@ -473,27 +476,41 @@ export default function QueueTrackingPage() {
                     {queueHistory.map((item) => (
                       <div key={item.id} className="qt-history-item">
                         <div className="qt-history-content">
-                          <div className="qt-history-header">
-                            <h4 className="qt-history-service">
-                              {item.service}
-                            </h4>
+                          <h4 className="qt-history-service">
+                            {item.service}
+                          </h4>
+                          <div className="qt-history-badges">
                             <span
                               className={`qt-status-badge ${getStatusColor(item.status)}`}
                             >
                               {getStatusLabel(item.status)}
                             </span>
-                          </div>
-                          <p className="qt-history-college">
-                            {item.college} • {item.queueNumber}
-                          </p>
-                          <div className="qt-history-meta">
-                            <span>Joined: {item.joinedAt}</span>
-                            <span>•</span>
-                            <span>
-                              {item.status === "completed"
-                                ? `Completed: ${item.completedAt}`
-                                : `Ended: ${item.completedAt}`}
+                            <span className="qt-history-number-badge">
+                              {item.queueNumber}
                             </span>
+                          </div>
+                          <p className="qt-history-college">{item.college}</p>
+                          <p className="qt-history-details">
+                            <strong>Waited</strong> {item.actualWaitTime}
+                          </p>
+                        </div>
+
+                        <div className="qt-history-meta">
+                          <div className="qt-history-date">
+                            <Calendar />
+                            {formatManilaDate(item.date, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </div>
+                          <div className="qt-history-time">
+                            <Clock />
+                            Joined {item.joinedAt}
+                          </div>
+                          <div className="qt-history-time">
+                            <Clock />
+                            {item.status === "completed" ? "Completed" : "Ended"} {item.completedAt}
                           </div>
                         </div>
                       </div>

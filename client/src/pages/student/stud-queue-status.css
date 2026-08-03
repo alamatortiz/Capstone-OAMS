@@ -499,6 +499,113 @@ body {
   padding: 1.25rem;
 }
 
+/* ===== Requirements / Procedure (ported from stud-queue.css's
+   avail-services-requirement-*/procedure-* — same values, kept
+   self-contained to this file rather than importing cross-page) ===== */
+.qss-requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.qss-requirement-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  text-align: left;
+}
+
+.qss-requirement-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--blue);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  stroke: currentColor;
+}
+
+.qss-requirement-item span {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.qss-requirement-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.qss-requirement-name-row .qss-requirement-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.qss-requirement-name-row .qss-requirement-badge.is-mandatory {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--blue);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.qss-requirement-name-row .qss-requirement-badge.is-optional {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.qss-procedure-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.qss-procedure-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  text-align: left;
+}
+
+.qss-procedure-number {
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 50%;
+  background: var(--blue);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.qss-procedure-item .qss-procedure-title {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+  padding-top: 0.1875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 /* ===== Queue Placement ===== */
 .queue-placement-center {
   display: flex;
@@ -652,7 +759,8 @@ body {
   border-radius: 0.5rem;
   font-weight: 700;
   font-size: 0.85rem;
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   flex-shrink: 0;
   white-space: nowrap;
   transition: all 0.3s ease;

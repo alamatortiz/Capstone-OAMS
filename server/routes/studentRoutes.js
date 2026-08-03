@@ -1069,6 +1069,9 @@ router.get(
           college: row.department_name,
           queueNumber: `${deptAbbrev}-${serviceCode}-${String(row.queue_number).padStart(3, "0")}`,
           status: row.status,
+          date: new Date(row.created_at).toLocaleDateString("en-CA", {
+            timeZone: "Asia/Manila",
+          }),
           joinedAt: new Date(row.created_at).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
