@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import StudentPageShell from "../../components/StudentPageShell";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
@@ -11,7 +12,6 @@ import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { toast } from "sonner";
 import CalendarGrid from "../../components/CalendarGrid";
 import { useAuth } from "../../context/AuthContext";
-import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
 import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
@@ -91,7 +91,7 @@ const Loader2Icon = () => (
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentsPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [slots, setSlots] = useState([]);
@@ -104,6 +104,7 @@ export default function AppointmentsPage() {
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
   const [selectedApptType, setSelectedApptType] = useState("");
+  const [collegeOptions, setCollegeOptions] = useState([]);
 
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedCollege, setSelectedCollege] = useState("");
@@ -112,6 +113,7 @@ export default function AppointmentsPage() {
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [purpose, setPurpose] = useState("");
+  useLockBodyScroll(showBookDialog && !!selectedSlot);
   const [activeTab, setActiveTab] = useState(
     location.state?.activeTab === "bookings" ? "bookings" : "slots",
   );
@@ -175,9 +177,23 @@ export default function AppointmentsPage() {
 
   useEffect(() => { fetchSlots(); fetchMyBookings(); }, [fetchSlots, fetchMyBookings]);
 
+  // College filter options are sourced live from the departments that
+  // actually have faculty (same endpoint stud-professor-schedules.jsx uses),
+  // instead of a static list, so a newly added college shows up here too.
+  useEffect(() => {
+    const fetchCollegeOptions = async () => {
+      try {
+        const { data } = await api.get("/student/professor-schedules");
+        setCollegeOptions(data.departments ?? []);
+      } catch (err) {
+        console.error("Failed to fetch college options:", err);
+      }
+    };
+    fetchCollegeOptions();
+  }, []);
+
   // ── Live updates: refetch slots when capacity changes elsewhere ───────────
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
@@ -189,13 +205,12 @@ export default function AppointmentsPage() {
     return () => {
       events.forEach((event) => socket.off(event, fetchSlots));
     };
-  }, [fetchSlots]);
+  }, [fetchSlots, token]);
 
   // ── Live updates: refetch "My Bookings" when one of this student's own
   // appointments changes status (approval, rejection, or an auto-cancel from
   // the professor editing/removing their schedule) ──────────────────────────
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
@@ -213,7 +228,7 @@ export default function AppointmentsPage() {
     return () => {
       socket.off("appointment:status-updated", handleStatusUpdate);
     };
-  }, [fetchMyBookings]);
+  }, [fetchMyBookings, token]);
 
   // Fallback poll: a student browsing a professor from another college is
   // in their own department's socket room, not the professor's, so
@@ -316,10 +331,16 @@ export default function AppointmentsPage() {
     return result;
   }, [slots, selectedProfessorId, calendarMonth, twoWeekDateSet]);
 
-  const colleges = COLLEGES.map((c) => ({
-    value: c.abbreviation,
-    label: formatCollegeLabel(c.abbreviation, c.name),
+  const colleges = collegeOptions.map((d) => ({
+    value: d.departmentAbbrev,
+    label: formatCollegeLabel(d.departmentAbbrev, d.departmentName),
   }));
+
+  const closeBookDialog = () => {
+    setShowBookDialog(false);
+    setSelectedApptType("");
+    setPurpose("");
+  };
 
   const handleBookSlot = async () => {
     if (!selectedSlot || submitting) return;
@@ -430,11 +451,11 @@ export default function AppointmentsPage() {
         <>
           {/* Book Appointment Dialog */}
           {showBookDialog && selectedSlot && (
-            <div className="dialog-overlay">
+            <div className="dialog-overlay" onClick={closeBookDialog}>
               <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
                 <div className="dialog-header">
                   <h3>Confirm Appointment</h3>
-                  <button className="dialog-close" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); setPurpose(""); }} disabled={submitting}><CloseIcon /></button>
+                  <button className="dialog-close" onClick={closeBookDialog} disabled={submitting}><CloseIcon /></button>
                 </div>
                 <div className="dialog-body">
                   <div className="slot-summary">
@@ -468,7 +489,7 @@ export default function AppointmentsPage() {
                     <textarea id="purpose" placeholder="e.g., Thesis consultation, Grade inquiry, Academic advising..." value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} className="textarea"></textarea>
                   </div>
                   <div className="dialog-actions">
-                    <button className="btn-secondary" onClick={() => { setShowBookDialog(false); setSelectedApptType(""); setPurpose(""); }} disabled={submitting}>Cancel</button>
+                    <button className="btn-secondary" onClick={closeBookDialog} disabled={submitting}>Cancel</button>
                     <button className="btn-primary" onClick={handleBookSlot} disabled={submitting}>{submitting ? "Booking…" : "Confirm Booking"}</button>
                   </div>
                 </div>

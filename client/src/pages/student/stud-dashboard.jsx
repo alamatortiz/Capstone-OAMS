@@ -494,12 +494,7 @@ export default function StudentDashboard() {
               <p className="banner-greeting">Good day!</p>
               <div className="banner-title-row">
                 <img
-                  src={
-                    new URL(
-                      `../../assets/${user?.departmentAbbrev || "CCS"}.png`,
-                      import.meta.url,
-                    ).href
-                  }
+                  src={getCollegeLogo(user?.college)}
                   alt="College Logo"
                   className="banner-ccs-logo"
                 />

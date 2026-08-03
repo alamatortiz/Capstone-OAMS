@@ -17,6 +17,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
 import "./stud-document-status.css";
 
 const CheckCircleIcon = () => (
@@ -311,6 +312,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
 export default function DocumentStatusPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { token } = useAuth();
 
   const navState = location.state ?? {};
 
@@ -392,7 +394,6 @@ export default function DocumentStatusPage() {
 
   // ── Live updates: refetch when a document's status changes ────────────────
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
@@ -403,6 +404,14 @@ export default function DocumentStatusPage() {
     return () => {
       socket.off("document:status-updated", fetchDocuments);
     };
+  }, [fetchDocuments, token]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchDocuments();
+    }, 45000);
+    return () => clearInterval(interval);
   }, [fetchDocuments]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────

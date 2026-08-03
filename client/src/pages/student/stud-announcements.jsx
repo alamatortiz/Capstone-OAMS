@@ -7,6 +7,7 @@ import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import { formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 
 import "./stud-announcements.css";
@@ -106,6 +107,7 @@ const formatPostedLabel = (announcement, monthFormat = "long") =>
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AnnouncementsPage() {
+  const { token } = useAuth();
   // ── UI State ──────────────────────────────────────────────────────────────
   const [selectedFilter, setSelectedFilter] = useState("pinned");
   const [viewingAnnouncement, setViewingAnnouncement] = useState(null);
@@ -168,7 +170,6 @@ export default function AnnouncementsPage() {
 
   // ── Live updates: refetch when an admin posts/edits/removes an announcement ──
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
@@ -179,7 +180,7 @@ export default function AnnouncementsPage() {
     return () => {
       socket.off("announcement:changed", fetchAnnouncements);
     };
-  }, [fetchAnnouncements]);
+  }, [fetchAnnouncements, token]);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
@@ -275,8 +276,10 @@ export default function AnnouncementsPage() {
 
                 <div className="ann-detail-badges">
                   <span className={`announcement-badge ${viewingAnnouncement.isPinned ? "badge-pinned" : `badge-${viewingAnnouncement.category}`}`}>
-                    {viewingAnnouncement.category.charAt(0).toUpperCase() +
-                      viewingAnnouncement.category.slice(1)}
+                    {viewingAnnouncement.category
+                      ? viewingAnnouncement.category.charAt(0).toUpperCase() +
+                        viewingAnnouncement.category.slice(1)
+                      : "Notice"}
                   </span>
                   {viewingAnnouncement.isPinned && (
                     <span className="ann-detail-pinned-pill">
@@ -423,8 +426,10 @@ export default function AnnouncementsPage() {
                         <span
                           className={`announcement-badge ${announcement.isPinned ? "badge-pinned" : `badge-${announcement.category}`}`}
                         >
-                          {announcement.category.charAt(0).toUpperCase() +
-                            announcement.category.slice(1)}
+                          {announcement.category
+                            ? announcement.category.charAt(0).toUpperCase() +
+                              announcement.category.slice(1)
+                            : "Notice"}
                         </span>
                       </div>
                     </div>
@@ -487,8 +492,10 @@ export default function AnnouncementsPage() {
                         <span
                           className={`announcement-badge ${announcement.isPinned ? "badge-pinned" : `badge-${announcement.category}`}`}
                         >
-                          {announcement.category.charAt(0).toUpperCase() +
-                            announcement.category.slice(1)}
+                          {announcement.category
+                            ? announcement.category.charAt(0).toUpperCase() +
+                              announcement.category.slice(1)
+                            : "Notice"}
                         </span>
                       </div>
                     </div>

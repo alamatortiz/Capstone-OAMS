@@ -643,12 +643,6 @@ body {
 }
 
 
-.qt-stat-subtext {
-  font-size: 0.7rem;
-  color: var(--text-tertiary);
-  transition: color 0.3s ease;
-}
-
 /* ===== Queue Actions ===== */
 .qt-queue-actions {
   display: flex;

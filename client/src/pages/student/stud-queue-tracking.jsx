@@ -17,7 +17,6 @@ import {
   Activity,
   BarChart3,
   History,
-  Target,
   Loader2,
   ChevronLeft,
   AlertCircle,

@@ -549,7 +549,7 @@ export default function QueuePage() {
                       className={`qp-tab ${activeTab === 'available' ? 'active' : ''}`}
                       onClick={() => setActiveTab('available')}
                     >
-                      <Users className="qp-tab-icon" /> Active Queues
+                      <Users className="qp-tab-icon" /> Queues
                       <span className="qp-tab-count">{filteredSlots.length}</span>
                     </button>
                     <button
@@ -707,7 +707,7 @@ export default function QueuePage() {
                   ) : (
                     <div className="no-queues-card">
                       <CheckCircle2 className="no-queues-icon" />
-                      <h3 className="no-queues-title">No Active Queues</h3>
+                      <h3 className="no-queues-title">Not Participating in Any Queues</h3>
                       <p className="no-queues-description">
                         You are not participating in any active queues.
                       </p>

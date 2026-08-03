@@ -15,6 +15,16 @@ const { createNotification } = require("../utils/notifications");
 const { UPLOAD_DIR } = require("../middleware/upload");
 const { getAttachmentsMap, isPathInsideUploadDir } = require("../utils/announcementAttachments");
 
+// Logs the real error server-side (unchanged from before) but only ever
+// sends a generic, safe message to the client under the `error` key --
+// every student-facing catch block reads `err.response.data.error`, so
+// raw internal error text (e.g. SQL details) previously shipped to the
+// browser via a `dev_error` field that nothing actually read.
+function sendServerError(res, error, label) {
+  console.error(`${label}:`, error);
+  res.status(500).json({ error: "Something went wrong. Please try again." });
+}
+
 // GET /api/student/dashboard-stats
 router.get(
   "/dashboard-stats",
@@ -256,10 +266,7 @@ router.get(
         })),
       });
     } catch (error) {
-      console.error("Dashboard stats error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Dashboard stats error");
     }
   },
 );
@@ -321,10 +328,7 @@ router.get(
 
       res.json({ announcements });
     } catch (error) {
-      console.error("Fetch announcements error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Fetch announcements error");
     }
   },
 );
@@ -340,6 +344,9 @@ router.get(
     const studentId = req.user.userId;
     const announcementId = parseInt(req.params.id, 10);
     const attachmentId = parseInt(req.params.attachmentId, 10);
+    if (isNaN(announcementId) || isNaN(attachmentId)) {
+      return res.status(400).json({ error: "Invalid announcement or attachment id" });
+    }
     try {
       const [[stu]] = await pool.query(
         `SELECT department_id FROM students WHERE student_id = ?`,
@@ -369,8 +376,7 @@ router.get(
       res.type(row.mime_type || "application/octet-stream");
       res.sendFile(resolvedPath);
     } catch (error) {
-      console.error("Announcement attachment fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement attachment fetch error");
     }
   },
 );
@@ -429,10 +435,7 @@ router.get(
 
       res.json({ documents });
     } catch (error) {
-      console.error("Get documents error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Get documents error");
     }
   },
 );
@@ -582,10 +585,7 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Create document request error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Create document request error");
     }
   },
 );
@@ -663,10 +663,7 @@ router.get(
         servicesByDepartmentId,
       });
     } catch (error) {
-      console.error("Document service types error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Document service types error");
     }
   },
 );
@@ -737,10 +734,7 @@ router.delete(
       });
     } catch (error) {
       await conn.rollback();
-      console.error("Cancel document request error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Cancel document request error");
     } finally {
       conn.release();
     }
@@ -867,10 +861,7 @@ router.get(
 
       res.json({ slots: formatted });
     } catch (error) {
-      console.error("Available queues error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Available queues error");
     }
   },
 );
@@ -1011,10 +1002,7 @@ router.get(
 
       res.json({ queues: formatted });
     } catch (error) {
-      console.error("Active queues error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Active queues error");
     }
   },
 );
@@ -1090,10 +1078,7 @@ router.get(
 
       res.json({ history: formatted });
     } catch (error) {
-      console.error("Queue history error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Queue history error");
     }
   },
 );
@@ -1111,6 +1096,11 @@ router.post(
 
     if (!slotId) {
       return res.status(400).json({ error: "slotId is required" });
+    }
+    if (trimmedNotes.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Notes must be 255 characters or fewer" });
     }
 
     const conn = await pool.getConnection();
@@ -1363,10 +1353,7 @@ router.post(
       });
     } catch (error) {
       await conn.rollback();
-      console.error("Join queue error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Join queue error");
     } finally {
       conn.release();
     }
@@ -1480,10 +1467,7 @@ router.post(
       res.json({ message: "Successfully left the queue", queueId });
     } catch (error) {
       await conn.rollback();
-      console.error("Leave queue error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Leave queue error");
     } finally {
       conn.release();
     }
@@ -1516,10 +1500,7 @@ router.get(
         totalQueuesCancelled: counts.total_cancelled || 0,
       });
     } catch (error) {
-      console.error("Queue metrics error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Queue metrics error");
     }
   },
 );
@@ -1540,43 +1521,64 @@ router.patch(
       return res.status(400).json({ error: "Invalid queueId" });
     }
 
+    const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
+    if (trimmedNotes.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Notes must be 255 characters or fewer" });
+    }
+
+    const conn = await pool.getConnection();
     try {
-      const [[entry]] = await pool.query(
-        `SELECT queue_id, student_id, slot_id, status FROM queues WHERE queue_id = ?`,
+      await conn.beginTransaction();
+
+      const [[entry]] = await conn.query(
+        `SELECT queue_id, student_id, slot_id, status FROM queues WHERE queue_id = ? FOR UPDATE`,
         [queueId],
       );
 
       if (!entry) {
+        await conn.rollback();
         return res.status(404).json({ error: "Queue entry not found" });
       }
       if (entry.student_id !== studentId) {
+        await conn.rollback();
         return res
           .status(403)
           .json({ error: "You can only edit your own queue entry" });
       }
+      if (entry.status !== "waiting" && entry.status !== "serving") {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Queue is already ${entry.status}`,
+        });
+      }
 
-      await pool.query(`UPDATE queues SET notes = ? WHERE queue_id = ?`, [
-        notes ?? null,
+      await conn.query(`UPDATE queues SET notes = ? WHERE queue_id = ?`, [
+        trimmedNotes || null,
         queueId,
       ]);
 
-      const [[deptRow]] = await pool.query(
+      const [[deptRow]] = await conn.query(
         `SELECT s.department_id
          FROM queue_slots qs JOIN services s ON qs.service_id = s.service_id
          WHERE qs.slot_id = ?`,
         [entry.slot_id],
       );
+
+      await conn.commit();
+
       emitToDept(deptRow?.department_id, "queue:notes-updated", {
         queueId,
-        notes: notes ?? null,
+        notes: trimmedNotes || null,
       });
 
-      res.json({ message: "Updated", queueId, notes: notes ?? null });
+      res.json({ message: "Updated", queueId, notes: trimmedNotes || null });
     } catch (error) {
-      console.error("Update queue notes error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      await conn.rollback();
+      sendServerError(res, error, "Update queue notes error");
+    } finally {
+      conn.release();
     }
   },
 );
@@ -1647,10 +1649,7 @@ router.get(
 
       res.json({ appointments: formatted });
     } catch (error) {
-      console.error("Fetch appointments error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Fetch appointments error");
     }
   },
 );
@@ -1726,10 +1725,7 @@ router.delete(
       });
     } catch (error) {
       await conn.rollback();
-      console.error("Cancel appointment error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Cancel appointment error");
     } finally {
       conn.release();
     }
@@ -1827,10 +1823,7 @@ router.get(
 
       res.json({ departments: result });
     } catch (error) {
-      console.error("Professor schedules error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Professor schedules error");
     }
   },
 );
@@ -1844,78 +1837,120 @@ router.get(
   async (req, res) => {
     const studentId = req.user.userId;
 
+    // Maps raw per-table statuses -> the 3 badge states the UI understands.
+    // Deliberately a coarser, differently-shaped mapping than admin's
+    // equivalent map in adminRoutes.js's GET /transactions (which keeps
+    // granular per-status labels for its filter dropdown) -- the two
+    // aren't meant to agree, since they serve different audiences/UIs, so
+    // don't merge them into one shared map.
+    const STATUS_MAP = {
+      waiting: "ongoing",
+      serving: "ongoing",
+      completed: "completed",
+      cancelled: "cancelled",
+      no_show: "cancelled",
+      pending: "ongoing",
+      approved: "ongoing",
+      rejected: "cancelled",
+      processing: "ongoing",
+      generated: "ongoing",
+      released: "ongoing",
+      claimed: "completed",
+    };
+    const STATUS_GROUPS = { completed: [], ongoing: [], cancelled: [] };
+    for (const [raw, mapped] of Object.entries(STATUS_MAP)) {
+      STATUS_GROUPS[mapped].push(raw);
+    }
+
+    const { search, type, status } = req.query;
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    // Each branch is only ever filtered by student_id -- type/status/search
+    // are applied once, on the unioned result, so they consider the
+    // student's whole history rather than one branch at a time.
+    const unionSql = `
+      (
+        SELECT
+          'queue' AS type,
+          q.queue_id AS id,
+          IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', s.service_name)) AS title,
+          d.department_name AS college,
+          q.status AS raw_status,
+          COALESCE(q.admin_reason, q.notes) AS details,
+          q.updated_at AS event_time
+        FROM queues q
+        JOIN services s ON q.service_id = s.service_id
+        JOIN departments d ON s.department_id = d.department_id
+        WHERE q.student_id = ?
+      )
+      UNION ALL
+      (
+        SELECT
+          'appointment' AS type,
+          a.appointment_id AS id,
+          CONCAT('Appointment with ', CONCAT(f.first_name, ' ', f.last_name)) AS title,
+          d.department_name AS college,
+          a.status AS raw_status,
+          a.notes AS details,
+          a.updated_at AS event_time
+        FROM appointments a
+        JOIN faculty f ON a.faculty_id = f.faculty_id
+        JOIN departments d ON f.department_id = d.department_id
+        WHERE a.student_id = ?
+      )
+      UNION ALL
+      (
+        SELECT
+          'document' AS type,
+          dr.request_id AS id,
+          CONCAT(dr.request_type, ' Request') AS title,
+          d.department_name AS college,
+          dr.status AS raw_status,
+          dr.purpose AS details,
+          dr.updated_at AS event_time
+        FROM document_requests dr
+        JOIN document_services s ON dr.service_id = s.service_id
+        JOIN departments d ON s.department_id = d.department_id
+        WHERE dr.student_id = ?
+      )
+    `;
+
     try {
+      const filterClauses = [];
+      const filterParams = [];
+      if (type && ["queue", "appointment", "document"].includes(type)) {
+        filterClauses.push("type = ?");
+        filterParams.push(type);
+      }
+      if (status && STATUS_GROUPS[status]?.length) {
+        filterClauses.push("raw_status IN (?)");
+        filterParams.push(STATUS_GROUPS[status]);
+      }
+      const trimmedSearch = typeof search === "string" ? search.trim() : "";
+      if (trimmedSearch) {
+        filterClauses.push("(title LIKE ? OR details LIKE ?)");
+        const likeTerm = `%${trimmedSearch}%`;
+        filterParams.push(likeTerm, likeTerm);
+      }
+      const whereClause = filterClauses.length
+        ? `WHERE ${filterClauses.join(" AND ")}`
+        : "";
+
+      // Request one extra row so `hasMore` can be derived without a second
+      // COUNT query -- trimmed off before the response is built.
       const [rows] = await pool.query(
-        `(
-           SELECT
-             'queue' AS type,
-             q.queue_id AS id,
-             IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', s.service_name)) AS title,
-             d.department_name AS college,
-             q.status AS raw_status,
-             COALESCE(q.admin_reason, q.notes) AS details,
-             q.updated_at AS event_time
-           FROM queues q
-           JOIN services s ON q.service_id = s.service_id
-           JOIN departments d ON s.department_id = d.department_id
-           WHERE q.student_id = ?
-         )
-         UNION ALL
-         (
-           SELECT
-             'appointment' AS type,
-             a.appointment_id AS id,
-             CONCAT('Appointment with ', CONCAT(f.first_name, ' ', f.last_name)) AS title,
-             d.department_name AS college,
-             a.status AS raw_status,
-             a.notes AS details,
-             a.updated_at AS event_time
-           FROM appointments a
-           JOIN faculty f ON a.faculty_id = f.faculty_id
-           JOIN departments d ON f.department_id = d.department_id
-           WHERE a.student_id = ?
-         )
-         UNION ALL
-         (
-           SELECT
-             'document' AS type,
-             dr.request_id AS id,
-             CONCAT(dr.request_type, ' Request') AS title,
-             d.department_name AS college,
-             dr.status AS raw_status,
-             dr.purpose AS details,
-             dr.updated_at AS event_time
-           FROM document_requests dr
-           JOIN document_services s ON dr.service_id = s.service_id
-           JOIN departments d ON s.department_id = d.department_id
-           WHERE dr.student_id = ?
-         )
-         ORDER BY event_time DESC`,
-        [studentId, studentId, studentId],
+        `SELECT * FROM (${unionSql}) AS combined
+         ${whereClause}
+         ORDER BY event_time DESC
+         LIMIT ? OFFSET ?`,
+        [studentId, studentId, studentId, ...filterParams, limit + 1, offset],
       );
 
-      // Map raw DB statuses -> the 3 badge states the UI understands. This is
-      // deliberately a coarser, differently-shaped mapping than admin's
-      // equivalent map in adminRoutes.js's GET /transactions (which keeps
-      // granular per-status labels for its filter dropdown) -- the two
-      // aren't meant to agree, since they serve different audiences/UIs, so
-      // don't merge them into one shared map.
-      const statusMap = {
-        waiting: "ongoing",
-        serving: "ongoing",
-        completed: "completed",
-        cancelled: "cancelled",
-        no_show: "cancelled",
-        pending: "ongoing",
-        approved: "ongoing",
-        rejected: "cancelled",
-        processing: "ongoing",
-        generated: "ongoing",
-        released: "ongoing",
-        claimed: "completed",
-      };
+      const hasMore = rows.length > limit;
+      const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
-      const transactions = rows.map((row) => {
+      const transactions = pageRows.map((row) => {
         const eventDate = new Date(row.event_time);
         return {
           id: `${row.type}-${row.id}`,
@@ -1931,17 +1966,54 @@ router.get(
             hour12: true,
             timeZone: "Asia/Manila",
           }),
-          status: statusMap[row.raw_status] ?? "ongoing",
+          status: STATUS_MAP[row.raw_status] ?? "ongoing",
           details: row.details || "No additional details provided.",
         };
       });
 
-      res.json({ transactions });
+      // Stats are always computed over the student's FULL history,
+      // ignoring search/type/status/pagination, so the stat tiles never
+      // show a partial count for whatever page happens to be loaded.
+      const [manilaYear, manilaMonth] = getManilaDateString()
+        .split("-")
+        .map(Number);
+      const monthStartUTC = new Date(
+        `${manilaYear}-${String(manilaMonth).padStart(2, "0")}-01T00:00:00+08:00`,
+      );
+
+      // Placeholder order must match how they appear in the final SQL
+      // string: the SELECT-clause `?`s come before the FROM-clause's
+      // (unionSql's per-branch student_id `?`s), since unionSql is
+      // interpolated after this SELECT list.
+      const [[statsRow]] = await pool.query(
+        `SELECT
+           COUNT(*) AS total,
+           SUM(raw_status IN (?)) AS completed,
+           SUM(raw_status IN (?)) AS ongoing,
+           SUM(event_time >= ?) AS thisMonth
+         FROM (${unionSql}) AS combined`,
+        [
+          STATUS_GROUPS.completed,
+          STATUS_GROUPS.ongoing,
+          monthStartUTC,
+          studentId,
+          studentId,
+          studentId,
+        ],
+      );
+
+      res.json({
+        transactions,
+        hasMore,
+        stats: {
+          total: statsRow.total,
+          completed: statsRow.completed,
+          ongoing: statsRow.ongoing,
+          thisMonth: statsRow.thisMonth,
+        },
+      });
     } catch (error) {
-      console.error("Fetch transactions error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Fetch transactions error");
     }
   },
 );
@@ -1964,7 +2036,10 @@ router.get(
   authorizeRoles("student"),
   async (req, res) => {
     const DAYS_AHEAD = 30;
-    const { facultyId, date } = req.query;
+    const { date } = req.query;
+    const facultyId = Array.isArray(req.query.facultyId)
+      ? req.query.facultyId[0]
+      : req.query.facultyId;
 
     try {
       // Professors toggled 'unavailable' are still included (with their
@@ -2084,8 +2159,7 @@ router.get(
 
       res.json({ slots });
     } catch (error) {
-      console.error("Available slots error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Available slots error");
     }
   },
 );
@@ -2111,6 +2185,11 @@ router.post(
     }
     if (appointmentDate < getManilaDateString()) {
       return res.status(400).json({ error: "Appointment date cannot be in the past" });
+    }
+    if (typeof purpose === "string" && purpose.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Purpose must be 255 characters or fewer" });
     }
 
     const conn = await pool.getConnection();
@@ -2310,8 +2389,7 @@ router.post(
           error: "You already have an active booking for this date and time.",
         });
       }
-      console.error("Book slot error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Book slot error");
     } finally {
       conn.release();
     }
@@ -2513,10 +2591,7 @@ router.get(
 
       res.json({ departments: result });
     } catch (error) {
-      console.error("Services by-department error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Services by-department error");
     }
   },
 );
@@ -2548,8 +2623,7 @@ router.get(
         officeHours: dept.office_hours ?? "",
       });
     } catch (error) {
-      console.error("Office hours error:", error);
-      res.status(500).json({ message: "Internal server error" });
+      sendServerError(res, error, "Office hours error");
     }
   },
 );
@@ -2599,8 +2673,7 @@ router.get(
       );
       res.json({ notifications: rows });
     } catch (error) {
-      console.error("GET /notifications error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Get notifications error");
     }
   },
 );
@@ -2611,14 +2684,22 @@ router.patch(
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
+    const notificationId = parseInt(req.params.id, 10);
+    if (!notificationId || isNaN(notificationId)) {
+      return res.status(400).json({ error: "Invalid notification id" });
+    }
+
     try {
-      await pool.query(
+      const [result] = await pool.query(
         `UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND user_id = ?`,
-        [req.params.id, req.user.userId],
+        [notificationId, req.user.userId],
       );
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
       res.json({ message: "Marked as read" });
     } catch (error) {
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Mark notification read error");
     }
   },
 );
@@ -2636,7 +2717,7 @@ router.patch(
       );
       res.json({ message: "All marked as read" });
     } catch (error) {
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Mark all notifications read error");
     }
   },
 );

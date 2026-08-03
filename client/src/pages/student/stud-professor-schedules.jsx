@@ -8,6 +8,7 @@ import api from "../../utils/api";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
 import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 
 import "./stud-professor-schedules.css";
@@ -29,21 +30,6 @@ const ChevronRightIcon = () => (
     strokeWidth="2"
   >
     <polyline points="9 18 15 12 9 6"></polyline>
-  </svg>
-);
-const BuildingIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <rect x="3" y="2" width="18" height="20" rx="2" ry="2"></rect>
-    <line x1="9" y1="2" x2="9" y2="22"></line>
-    <line x1="15" y1="2" x2="15" y2="22"></line>
-    <line x1="3" y1="7" x2="21" y2="7"></line>
-    <line x1="3" y1="12" x2="21" y2="12"></line>
   </svg>
 );
 const ClockIcon = () => (
@@ -105,6 +91,7 @@ const Loader2Icon = () => (
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ProfessorSchedule() {
   const location = useLocation();
+  const { token } = useAuth();
   const cameFrom = location.state?.from ?? "/student/dashboard";
   const cameFromLabel = location.state?.fromLabel ?? "Home";
 
@@ -148,7 +135,6 @@ export default function ProfessorSchedule() {
 
   // ── Live updates: refetch when a professor toggles Available/Unavailable ──
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
@@ -159,7 +145,7 @@ export default function ProfessorSchedule() {
     return () => {
       socket.off("faculty:availability-status-changed", fetchSchedules);
     };
-  }, [fetchSchedules]);
+  }, [fetchSchedules, token]);
 
   // Fallback poll: a student browsing a professor from another college is in
   // their own department's socket room, not the professor's, so
@@ -343,7 +329,7 @@ export default function ProfessorSchedule() {
 
                 {/* Professors List */}
                 <div className="professors-list">
-                  {selectedDepartment.faculty.length === 0 ? (
+                  {(selectedDepartment.faculty?.length ?? 0) === 0 ? (
                     <div className="empty-state">
                       <AlertCircle />
                       <p>No faculty members found for this department.</p>

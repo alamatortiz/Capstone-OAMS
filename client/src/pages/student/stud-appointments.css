@@ -280,7 +280,7 @@ body {
 }
 
 .appointment-content .filter-select:focus,
-.appointment-content .filter-input:focus { border-color: #a855f7; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.1); }
+.appointment-content .filter-input:focus { border-color: #a855f7 !important; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.1); }
 
 [data-theme="light"] .appointment-content .filter-select,
 [data-theme="light"] .appointment-content .filter-input {

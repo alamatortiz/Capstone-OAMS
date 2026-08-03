@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import StudentPageShell from "../../components/StudentPageShell";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import PageHeader from "../../components/PageHeader";
 import { toast } from "sonner";
 import "./stud-documents.css";
@@ -9,6 +10,7 @@ import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaTomorrowDateString } from "../../utils/dateTime";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
 
 import { ChevronLeft, XCircle, FileText } from "lucide-react";
 
@@ -76,6 +78,7 @@ const AlertCircleIcon = () => (
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function DocumentsPage() {
   const navigate = useNavigate();
+  const { token } = useAuth();
 
   // ── State ───────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("active");
@@ -90,6 +93,7 @@ export default function DocumentsPage() {
   const [formOptionsLoading, setFormOptionsLoading] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  useLockBodyScroll(dialogOpen);
   const [formData, setFormData] = useState({
     type: "",
     college: "",
@@ -143,7 +147,6 @@ export default function DocumentsPage() {
 
   // Live updates: refetch when a document's status changes.
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
     const socket = connectSocket(token);
     if (!socket) return;
@@ -151,6 +154,14 @@ export default function DocumentsPage() {
     return () => {
       socket.off("document:status-updated", fetchDocuments);
     };
+  }, [fetchDocuments, token]);
+
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchDocuments();
+    }, 45000);
+    return () => clearInterval(interval);
   }, [fetchDocuments]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
@@ -247,7 +258,7 @@ export default function DocumentsPage() {
         <>
           {/* Request Document Dialog */}
           {dialogOpen && (
-            <div className="doc-dialog-overlay">
+            <div className="doc-dialog-overlay" onClick={() => setDialogOpen(false)}>
               <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
                 <div className="doc-dialog-header">
                   <div>

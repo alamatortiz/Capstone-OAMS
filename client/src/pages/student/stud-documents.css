@@ -621,11 +621,6 @@ body {
   letter-spacing: 0.3px;
 }
 
-.doc-badge svg {
-  width: 0.875rem;
-  height: 0.875rem;
-}
-
 /* Status badges */
 .doc-badge-pending {
   background-color: rgba(251, 191, 36, 0.15);
@@ -710,18 +705,6 @@ body {
   background-color: rgba(75, 85, 99, 0.1);
   color: #374151;
   border-color: rgba(75, 85, 99, 0.25);
-}
-
-.doc-badge-completed-count {
-  background-color: rgba(107, 114, 128, 0.15);
-  color: #d1d5db;
-  border-color: rgba(107, 114, 128, 0.3);
-}
-
-[data-theme="light"] .doc-badge-completed-count {
-  background-color: rgba(107, 114, 128, 0.1);
-  color: #374151;
-  border-color: rgba(107, 114, 128, 0.25);
 }
 
 /* ===== DOCUMENT CARDS ===== */

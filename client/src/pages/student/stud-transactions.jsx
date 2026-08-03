@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";
-import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { formatManilaDate } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -83,56 +83,61 @@ const CalendarIcon = () => (
   </svg>
 );
 
+const PAGE_SIZE = 20;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   // ── Transaction data state ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [transactions, setTransactions] = useState([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [txStats, setTxStats] = useState({
+    total: 0,
+    completed: 0,
+    ongoing: 0,
+    thisMonth: 0,
+  });
+
+  // Debounce the search box so every keystroke doesn't trigger a refetch.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   // ── Derived values ────────────────────────────────────────────────────────
-  const filteredTransactions = transactions.filter((transaction) => {
-    const matchesSearch =
-      transaction.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transaction.details.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === "all" || transaction.type === filterType;
-    const matchesStatus =
-      filterStatus === "all" || transaction.status === filterStatus;
-    return matchesSearch && matchesType && matchesStatus;
-  });
-  const currentManilaMonth = getManilaDateString().slice(0, 7); // "YYYY-MM"
-
   const stats = [
     {
       label: "Total",
-      value: transactions.length,
+      value: txStats.total,
       color: "text-blue-600",
       bgColor: "tx-bg-blue-50",
       icon: "list",
     },
     {
       label: "Completed",
-      value: transactions.filter((t) => t.status === "completed").length,
+      value: txStats.completed,
       color: "text-green-600",
       bgColor: "tx-bg-green-50",
       icon: "check",
     },
     {
       label: "Ongoing",
-      value: transactions.filter((t) => t.status === "ongoing").length,
+      value: txStats.ongoing,
       color: "text-orange-600",
       bgColor: "tx-bg-orange-50",
       icon: "clock",
     },
     {
       label: "This Month",
-      value: transactions.filter((t) => t.date?.slice(0, 7) === currentManilaMonth)
-        .length,
+      value: txStats.thisMonth,
       color: "text-purple-600",
       bgColor: "tx-bg-purple-50",
       icon: "calendar",
@@ -145,26 +150,56 @@ export default function TransactionsPage() {
   useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const fetchTransactions = useCallback(async () => {
-    try {
-      const res = await api.get("/student/transactions");
-      setTransactions(res.data.transactions ?? []);
-      setTxError(null);
-    } catch (err) {
-      console.error("Failed to fetch transactions:", err);
-      if (transactionsRef.current.length === 0) {
-        setTxError("Could not load your transaction history.");
-      } else {
-        toast.error("Could not refresh your transaction history.");
+  // Search/type/status filtering happens server-side (so it considers the
+  // student's whole history, not just whatever page is currently loaded).
+  // Any change to those filters — including the ones baked into this
+  // callback's identity below — resets back to the first page; only
+  // "Load More" advances the offset.
+  const fetchTransactions = useCallback(
+    async (offset = 0) => {
+      try {
+        if (offset > 0) setLoadingMore(true);
+        const res = await api.get("/student/transactions", {
+          params: {
+            search: debouncedSearch || undefined,
+            type: filterType !== "all" ? filterType : undefined,
+            status: filterStatus !== "all" ? filterStatus : undefined,
+            limit: PAGE_SIZE,
+            offset,
+          },
+        });
+        const newTransactions = res.data.transactions ?? [];
+        setTransactions((prev) =>
+          offset > 0 ? [...prev, ...newTransactions] : newTransactions,
+        );
+        setHasMore(!!res.data.hasMore);
+        if (res.data.stats) setTxStats(res.data.stats);
+        setTxError(null);
+      } catch (err) {
+        console.error("Failed to fetch transactions:", err);
+        if (transactionsRef.current.length === 0) {
+          setTxError("Could not load your transaction history.");
+        } else {
+          toast.error("Could not refresh your transaction history.");
+        }
+      } finally {
+        setTxLoading(false);
+        setLoadingMore(false);
       }
-    } finally {
-      setTxLoading(false);
-    }
-  }, []);
+    },
+    [debouncedSearch, filterType, filterStatus],
+  );
 
+  // Fresh load whenever the page mounts or the search/type/status filters
+  // change (fetchTransactions' identity changes with them).
   useEffect(() => {
-    fetchTransactions();
+    fetchTransactions(0);
   }, [fetchTransactions]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    fetchTransactions(transactions.length);
+  };
 
   // Queue events (and document:cancelled) are broadcast department-wide, not
   // just to the affected student, so they're checked against this student's
@@ -173,7 +208,7 @@ export default function TransactionsPage() {
   const handleOwnQueueEvent = useCallback(
     (payload) => {
       if (Number(payload?.studentId) === Number(user?.userId)) {
-        fetchTransactions();
+        fetchTransactions(0);
       }
     },
     [fetchTransactions, user?.userId],
@@ -182,12 +217,12 @@ export default function TransactionsPage() {
   // ── Live updates: refetch when a document/appointment status changes, or
   // one of this student's own queue events fires ─────────────────────────
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
     if (!socket) return;
 
+    const refetchFirstPage = () => fetchTransactions(0);
     const ownEvents = ["document:status-updated", "appointment:status-updated"];
     const deptWideEvents = [
       "queue:called",
@@ -198,19 +233,19 @@ export default function TransactionsPage() {
       "document:cancelled",
     ];
 
-    ownEvents.forEach((event) => socket.on(event, fetchTransactions));
+    ownEvents.forEach((event) => socket.on(event, refetchFirstPage));
     deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
 
     return () => {
-      ownEvents.forEach((event) => socket.off(event, fetchTransactions));
+      ownEvents.forEach((event) => socket.off(event, refetchFirstPage));
       deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
     };
-  }, [fetchTransactions, handleOwnQueueEvent]);
+  }, [fetchTransactions, handleOwnQueueEvent, token]);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible") fetchTransactions();
+      if (document.visibilityState === "visible") fetchTransactions(0);
     }, 45000);
     return () => clearInterval(interval);
   }, [fetchTransactions]);
@@ -359,14 +394,14 @@ export default function TransactionsPage() {
                 <h3>Could not load transactions</h3>
                 <p>{txError}</p>
               </div>
-            ) : filteredTransactions.length === 0 ? (
+            ) : transactions.length === 0 ? (
               <div className="tx-empty-state">
                 <ClipboardListIcon />
                 <h3>No Transactions Found</h3>
                 <p>You have no transaction records yet.</p>
               </div>
             ) : (
-              filteredTransactions.map((transaction) => (
+              transactions.map((transaction) => (
                 <div key={transaction.id} className={`transaction-item transaction-type-${transaction.type}`}>
                   <div className="transaction-icon">
                     <span
@@ -416,6 +451,17 @@ export default function TransactionsPage() {
               ))
             )}
           </div>
+
+          {!txLoading && !txError && hasMore && (
+            <button
+              type="button"
+              className="tx-load-more-btn"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "Loading…" : "Load More"}
+            </button>
+          )}
         </div>
     </StudentPageShell>
   );

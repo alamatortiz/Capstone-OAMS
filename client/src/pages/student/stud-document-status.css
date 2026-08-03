@@ -439,27 +439,6 @@
   background: rgba(249, 115, 22, 0.08);
 }
 
-.dss-list-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.dss-list-top-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.dss-list-title {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-primary);
-  margin: 0 0 0.2rem;
-  transition: color 0.3s ease;
-}
-
 .dss-list-college {
   font-size: 0.875rem;
   color: var(--text-tertiary);
@@ -495,49 +474,6 @@
   letter-spacing: 0.3px;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-/* Stats row inside list item */
-.dss-list-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.dss-list-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.dss-list-stat-wide {
-  flex: 1;
-  min-width: 8rem;
-}
-
-.dss-list-stat-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-tertiary);
-  transition: color 0.3s ease;
-}
-
-.dss-list-stat-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #f97316;
-  transition: color 0.3s ease;
-}
-
-.dss-list-purpose {
-  font-weight: 500;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 20rem;
 }
 
 /* ─── Count pill inside each tab ─────────────────────────────────────────── */
@@ -867,13 +803,5 @@
 @media (max-width: 640px) {
   .dss-list-item {
     padding: 1rem;
-  }
-
-  .dss-list-stats {
-    gap: 0.75rem;
-  }
-
-  .dss-list-purpose {
-    max-width: 12rem;
   }
 }

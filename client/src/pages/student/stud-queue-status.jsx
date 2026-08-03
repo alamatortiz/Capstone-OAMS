@@ -17,6 +17,7 @@ import {
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { useQueue } from "../../contexts/QueueContext";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
@@ -50,6 +51,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [notesText, setNotesText] = useState(queue.notes ?? "");
   const [savingNotes, setSavingNotes] = useState(false);
+  useLockBodyScroll(showNotesDialog);
 
   const statusMeta = getStatusMeta(queue);
   const peopleAhead = Math.max(queue.position - 1, 0);
@@ -520,6 +522,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
       {/* ── Edit Notes Dialog ── */}
       {showNotesDialog && (
         <div
+          onClick={() => setShowNotesDialog(false)}
           style={{
             position: "fixed",
             inset: 0,
@@ -532,6 +535,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
           }}
         >
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               background: "var(--card-bg)",
               borderRadius: "1rem",
@@ -846,7 +850,7 @@ export default function QueueStatusPage() {
                 ) : (
                   <div className="queue-empty-state">
                     <Users className="queue-empty-icon" />
-                    <h3 className="queue-empty-title">No Active Queues</h3>
+                    <h3 className="queue-empty-title">Not Participating in Any Queues</h3>
                     <p className="queue-empty-text">
                       You are not participating in any active queues.
                     </p>

@@ -697,6 +697,30 @@ body {
   gap: 0.5rem;
 }
 
+.tx-load-more-btn {
+  display: block;
+  margin: 1.5rem auto 0;
+  padding: 0.625rem 1.75rem;
+  border: 1px solid var(--primary-color);
+  border-radius: 0.625rem;
+  background: transparent;
+  color: var(--primary-color);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tx-load-more-btn:hover:not(:disabled) {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+.tx-load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .tx-badge {
   display: inline-flex;
   align-items: center;

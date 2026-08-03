@@ -22,6 +22,7 @@ import AppointmentListItem from "../../components/AppointmentListItem";
 import { formatManilaDate } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
 import "./stud-appointment-status.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -200,6 +201,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
 export default function AppointmentStatusPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { token } = useAuth();
   const navState = location.state ?? {};
   const fromBookings = navState.fromBookings ?? false;
 
@@ -239,7 +241,6 @@ export default function AppointmentStatusPage() {
 
   // ── Live updates: refetch when an appointment's status changes ────────────
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
@@ -257,7 +258,7 @@ export default function AppointmentStatusPage() {
     return () => {
       socket.off("appointment:status-updated", handleStatusUpdate);
     };
-  }, [fetchAppointments]);
+  }, [fetchAppointments, token]);
 
   // Fallback poll: a missed/reconnecting socket event shouldn't leave this
   // page stale until the next manual reload.
