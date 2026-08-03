@@ -85,6 +85,9 @@ const ProfessorTransactionsPage = React.lazy(
 const ProfessorDocumentRequestPage = React.lazy(
   () => import("./pages/professor/prof-documents.jsx"),
 );
+const ProfessorDocumentStatusPage = React.lazy(
+  () => import("./pages/professor/prof-document-status.jsx"),
+);
 const ProfessorScheduleManagerPage = React.lazy(
   () => import("./pages/professor/prof-schedule-manager.jsx"),
 );
@@ -196,12 +199,21 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
-              {/* ★ Document request submission form (also shows request status + detail view) */}
+              {/* ★ Document request submission form */}
               <Route
                 path="/professor/document-request"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <ProfessorDocumentRequestPage />
+                  </Suspense>
+                }
+              />
+              {/* ★ Document request status + detail view */}
+              <Route
+                path="/professor/document-status"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorDocumentStatusPage />
                   </Suspense>
                 }
               />

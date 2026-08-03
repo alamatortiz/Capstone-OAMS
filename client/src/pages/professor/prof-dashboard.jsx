@@ -190,7 +190,7 @@ export default function ProfessorDashboard() {
       description: "Pending requests",
       icon: FileText,
       bgColor: "bg-orange-50",
-      link: "/professor/document-request",
+      link: "/professor/document-status",
     },
     {
       title: "Completed",
@@ -208,7 +208,7 @@ export default function ProfessorDashboard() {
   const quickActions = [
     {
       label: "Document Request",
-      description: "Submit or track document requests",
+      description: "Submit a new document request",
       icon: FileEditIcon,
       path: "/professor/document-request",
       badge: "Documents",

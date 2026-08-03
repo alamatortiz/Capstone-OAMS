@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft, FileText, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import { toast } from "sonner";
-import { formatManilaDate, getManilaTomorrowDateString } from "../../utils/dateTime";
 import "./prof-dashboard.css";
 import "./prof-documents.css";
-import "./prof-document-status.css";
 import api from "../../utils/api";
+import { formatManilaDate, formatManilaTime, getManilaTomorrowDateString } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
+
+import { ChevronLeft, XCircle, FileText } from "lucide-react";
 
 // ─── Icons ────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -27,10 +27,11 @@ const PlusIcon = () => (
   </svg>
 );
 
-const ClockIcon = () => (
+const DownloadIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+    <polyline points="7 10 12 15 17 10"></polyline>
+    <line x1="12" y1="15" x2="12" y2="3"></line>
   </svg>
 );
 
@@ -58,217 +59,37 @@ const AlertCircleIcon = () => (
 );
 
 // ─── Status helpers ──────────────────────────────────────────────────────
-const STATUS_META = {
-  pending:    { cls: "doc-badge-pending",    label: "Pending" },
-  processing: { cls: "doc-badge-processing", label: "Processing" },
-  generated:  { cls: "doc-badge-ready",      label: "Ready for Pickup" },
-  released:   { cls: "doc-badge-released",   label: "Released" },
-  claimed:    { cls: "doc-badge-claimed",    label: "Claimed" },
-  rejected:   { cls: "doc-badge-rejected",   label: "Rejected" },
-  cancelled:  { cls: "doc-badge-cancelled",  label: "Cancelled" },
-};
-
-function getStatusMeta(status) {
-  return STATUS_META[status] ?? STATUS_META.pending;
-}
-
-function getStatusIcon(status) {
+// The faculty document-requests endpoint returns the raw DB enum ("generated")
+// instead of the translated API word ("ready") that the student/admin endpoints
+// use — see server/utils/documentStatus.js. Badge class + display label are
+// mapped separately here so the badge still reads "READY" (not "GENERATED").
+const getStatusColor = (status) => {
   switch (status) {
     case "pending":
-      return <ClockIcon />;
+      return "doc-badge-pending";
     case "processing":
-      return <AlertCircleIcon />;
+      return "doc-badge-processing";
     case "generated":
-      return <CheckCircleIcon />;
+      return "doc-badge-ready";
     case "released":
-      return <CheckCircleIcon />;
+      return "doc-badge-released";
     case "claimed":
-      return <CheckCircleIcon />;
+      return "doc-badge-claimed";
     case "rejected":
-      return <XCircleIcon />;
+      return "doc-badge-rejected";
     case "cancelled":
-      return <XCircleIcon />;
+      return "doc-badge-cancelled";
     default:
-      return <FileText />;
+      return "doc-badge-pending";
   }
-}
+};
 
-// ─── Document Detail View ──────────────────────────────────────────────────
-// Shown in place of the list when a card is clicked. Uses its own status/date
-// formatting (dss-* classes) rather than the list's doc-* ones, ported as-is
-// from the page this was merged from.
-function getDetailStatusMeta(status) {
-  switch (status) {
-    case "pending":    return { label: "Pending",          cls: "dss-badge-pending" };
-    case "processing": return { label: "Processing",       cls: "dss-badge-processing" };
-    case "generated":  return { label: "Ready for Pickup", cls: "dss-badge-ready" };
-    case "released":   return { label: "Released",         cls: "dss-badge-released" };
-    case "claimed":    return { label: "Claimed",          cls: "dss-badge-claimed" };
-    case "rejected":   return { label: "Rejected",         cls: "dss-badge-rejected" };
-    case "cancelled":  return { label: "Cancelled",        cls: "dss-badge-cancelled" };
-    default:           return { label: status,             cls: "dss-badge-pending" };
-  }
-}
-
-function formatDetailDate(dateStr) {
-  if (!dateStr) return "—";
-  return formatManilaDate(dateStr, { month: "long" });
-}
-
-function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "Document Requests" }) {
-  const statusMeta = getDetailStatusMeta(doc.status);
-  const canCancel = doc.status === "pending" || doc.status === "processing";
-
-  return (
-    <div className="dss-status-container">
-      <PageHeader
-        breadcrumb={
-          <button type="button" className="breadcrumb-link" onClick={onBack}>
-            <ChevronLeft className="breadcrumb-icon" />
-            {backLabel}
-          </button>
-        }
-        icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
-        iconClassName="dss-title-icon"
-        title="Document Details"
-        subtitle="Track your document request status"
-      />
-
-      <div className="dss-hero-card">
-        <div className="dss-hero-content">
-          <div className="dss-hero-logo">
-            <FileText style={{ width: "2.25rem", height: "2.25rem", color: "white" }} />
-          </div>
-          <div className="dss-hero-text">
-            <div className="dss-hero-header">
-              <div className="dss-hero-title">
-                <p className="dss-hero-doc-name">{doc.type}</p>
-                <p>{doc.college}</p>
-              </div>
-              <div className="dss-hero-badge">{doc.trackingNumber}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {doc.status === "generated" && (
-        <div
-          style={{
-            background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-            borderRadius: "1rem",
-            padding: "1rem 1.5rem",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            fontWeight: 700,
-            fontSize: "1rem",
-            boxShadow: "0 8px 24px rgba(34,197,94,0.3)",
-          }}
-        >
-          <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document is ready for pickup — please visit the HR/Records office!
-        </div>
-      )}
-
-      <div className="dss-detail-grid">
-        <div className="dss-detail-main">
-          <div className="dss-card">
-            <div className="dss-card-header">
-              <h3 className="dss-card-title">
-                <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
-                Request Details
-              </h3>
-              <span className={`dss-badge ${statusMeta.cls}`}>
-                {statusMeta.label}
-              </span>
-            </div>
-            <div className="dss-card-content">
-              <div className="dss-detail-row">
-                <span className="dss-detail-label">Request Date</span>
-                <span className="dss-detail-value">{formatDetailDate(doc.requestDate)}</span>
-              </div>
-              {doc.status === "claimed" && doc.claimedDate ? (
-                <div className="dss-detail-row">
-                  <span className="dss-detail-label">Date Claimed</span>
-                  <span className="dss-detail-value">{formatDetailDate(doc.claimedDate)}</span>
-                </div>
-              ) : doc.status === "released" && doc.releasedDate ? (
-                <div className="dss-detail-row">
-                  <span className="dss-detail-label">Date Released</span>
-                  <span className="dss-detail-value">{formatDetailDate(doc.releasedDate)}</span>
-                </div>
-              ) : doc.estimatedCompletion ? (
-                <div className="dss-detail-row">
-                  <span className="dss-detail-label">Estimated Completion</span>
-                  <span className="dss-detail-value">{formatDetailDate(doc.estimatedCompletion)}</span>
-                </div>
-              ) : null}
-              <div className="dss-detail-row">
-                <span className="dss-detail-label">Number of Copies</span>
-                <span className="dss-detail-value">{doc.copies ?? 1}</span>
-              </div>
-              <div className="dss-detail-row" style={{ borderBottom: "none" }}>
-                <span className="dss-detail-label">Purpose</span>
-                <span className="dss-detail-value">{doc.purpose}</span>
-              </div>
-            </div>
-          </div>
-
-          {doc.notes && (
-            <div className="dss-card">
-              <div className="dss-card-header">
-                <h3 className="dss-card-title">
-                  <MessageSquare style={{ width: "1.25rem", height: "1.25rem" }} />
-                  Notes
-                </h3>
-              </div>
-              <div className="dss-card-content">
-                <p className="dss-concern-text">{doc.notes}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="dss-detail-sidebar">
-          {canCancel && (
-            <div className="dss-card dss-cancel-card">
-              <div className="dss-card-header">
-                <h3 className="dss-card-title dss-cancel-title">
-                  <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
-                  Cancel Request
-                </h3>
-              </div>
-              <div className="dss-card-content">
-                <p
-                  style={{
-                    fontSize: "0.8rem",
-                    color: "var(--text-tertiary)",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  Cancelling will move this request to your Completed
-                  requests. You're welcome to submit a new one if you change
-                  your mind.
-                </p>
-                <button
-                  className="dss-cancel-btn"
-                  onClick={() => onCancel(doc.id)}
-                  disabled={cancelling}
-                >
-                  Cancel Request
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+const getStatusLabel = (status) => (status === "generated" ? "ready" : status);
 
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function ProfessorDocumentRequest() {
+  const navigate = useNavigate();
+
   // ── State ───────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("active");
   const [requests, setRequests] = useState([]);
@@ -277,7 +98,6 @@ export default function ProfessorDocumentRequest() {
   const [submitting, setSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
-  const [selectedDocId, setSelectedDocId] = useState(null);
   const [documentTypes, setDocumentTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(false);
 
@@ -371,6 +191,14 @@ export default function ProfessorDocumentRequest() {
     };
   }, [fetchRequests]);
 
+  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchRequests();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchRequests]);
+
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSubmitRequest = async () => {
     if (submitting) return;
@@ -422,14 +250,11 @@ export default function ProfessorDocumentRequest() {
   const activeRequests = requests.filter(
     (r) => r.status !== "claimed" && r.status !== "rejected" && r.status !== "cancelled",
   );
-  const completedRequests = requests.filter(
-    (r) => r.status === "claimed" || r.status === "rejected" || r.status === "cancelled",
-  );
+  const claimedRequests = requests.filter((r) => r.status === "claimed");
+  const rejectedRequests = requests.filter((r) => r.status === "rejected");
+  const cancelledRequests = requests.filter((r) => r.status === "cancelled");
 
   const selectedType = documentTypes.find((d) => d.name === formData.type);
-  const selectedDoc = selectedDocId
-    ? requests.find((r) => r.id === selectedDocId) ?? null
-    : null;
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -440,7 +265,7 @@ export default function ProfessorDocumentRequest() {
         <>
           {/* Request Document Dialog */}
           {dialogOpen && (
-            <div className="doc-dialog-overlay">
+            <div className="doc-dialog-overlay" onClick={() => setDialogOpen(false)}>
               <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
                 <div className="doc-dialog-header">
                   <div>
@@ -454,7 +279,13 @@ export default function ProfessorDocumentRequest() {
                     <CloseIcon />
                   </button>
                 </div>
-                <div className="doc-dialog-content">
+                <form
+                  className="doc-dialog-content"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmitRequest();
+                  }}
+                >
                   <div className="doc-form-group">
                     <label htmlFor="type">Document Type</label>
                     <select
@@ -465,6 +296,7 @@ export default function ProfessorDocumentRequest() {
                       }
                       className="doc-form-select"
                       disabled={typesLoading}
+                      required
                     >
                       <option value="">
                         {typesLoading ? "Loading document types…" : "Select document type"}
@@ -486,7 +318,7 @@ export default function ProfessorDocumentRequest() {
                         <div className="doc-hint-requirements">
                           <strong>Requirements:</strong>
                           <ul className="doc-requirements-list">
-                            {selectedType.requirements.map((req, i) => (
+                            {selectedType.requirements.map((req) => (
                               <li key={req.name}>
                                 <div className="doc-req-row">
                                   <span className="doc-req-name">{req.name}</span>
@@ -504,20 +336,6 @@ export default function ProfessorDocumentRequest() {
                       )}
                     </div>
                   )}
-
-                  <div className="doc-form-group">
-                    <label htmlFor="purpose">Purpose</label>
-                    <textarea
-                      id="purpose"
-                      placeholder="e.g., Bank loan application, Visa application"
-                      value={formData.purpose}
-                      onChange={(e) =>
-                        setFormData({ ...formData, purpose: e.target.value })
-                      }
-                      className="doc-form-textarea"
-                      rows={3}
-                    />
-                  </div>
 
                   <div className="doc-form-group">
                     <label htmlFor="copies">Number of Copies</label>
@@ -551,6 +369,22 @@ export default function ProfessorDocumentRequest() {
                   </div>
 
                   <div className="doc-form-group">
+                    <label htmlFor="purpose">Purpose</label>
+                    <textarea
+                      id="purpose"
+                      placeholder="e.g., Bank loan application, Visa application"
+                      value={formData.purpose}
+                      onChange={(e) =>
+                        setFormData({ ...formData, purpose: e.target.value })
+                      }
+                      className="doc-form-textarea"
+                      rows={3}
+                      maxLength={255}
+                      required
+                    />
+                  </div>
+
+                  <div className="doc-form-group">
                     <label htmlFor="notes">Additional Notes</label>
                     <textarea
                       id="notes"
@@ -566,6 +400,7 @@ export default function ProfessorDocumentRequest() {
 
                   <div className="doc-dialog-actions">
                     <button
+                      type="button"
                       className="doc-btn-secondary"
                       onClick={() => setDialogOpen(false)}
                       disabled={submitting}
@@ -573,14 +408,14 @@ export default function ProfessorDocumentRequest() {
                       Cancel
                     </button>
                     <button
-                      onClick={handleSubmitRequest}
+                      type="submit"
                       className="doc-form-submit"
                       disabled={submitting}
                     >
                       {submitting ? "Submitting..." : "Submit Request"}
                     </button>
                   </div>
-                </div>
+                </form>
               </div>
             </div>
           )}
@@ -595,34 +430,18 @@ export default function ProfessorDocumentRequest() {
               <>
                 You are about to cancel your request for{" "}
                 <strong>{cancelTarget?.type}</strong>. It will move to your
-                Completed requests — you're welcome to submit a new one if you
-                change your mind.
+                Cancelled requests — you're welcome to submit a new request
+                anytime if you change your mind.
               </>
             }
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="10" y1="13" x2="14" y2="17"></line>
-                <line x1="14" y1="13" x2="10" y2="17"></line>
-              </svg>
-            }
+            icon={<XCircle width={22} height={22} />}
             cancelText="Keep Request"
             confirmText={cancellingId === cancelTarget?.id ? "Cancelling…" : "Cancel Request"}
             confirmDisabled={!!cancellingId}
           />
-
         </>
       }
     >
-      {selectedDoc ? (
-        <DocumentDetail
-          doc={selectedDoc}
-          onBack={() => setSelectedDocId(null)}
-          onCancel={(id) => setCancelTarget(requests.find((r) => r.id === id) ?? null)}
-          cancelling={cancellingId === selectedDoc.id}
-        />
-      ) : (
       <div className="doc-content">
         {requestsError && <div className="doc-error-banner">{requestsError}</div>}
         {/* Header */}
@@ -655,10 +474,22 @@ export default function ProfessorDocumentRequest() {
               <AlertCircleIcon /> Active Requests <span className="doc-tab-count">{activeRequests.length}</span>
             </button>
             <button
-              className={`doc-tab ${activeTab === "completed" ? "active" : ""}`}
-              onClick={() => setActiveTab("completed")}
+              className={`doc-tab ${activeTab === "claimed" ? "active" : ""}`}
+              onClick={() => setActiveTab("claimed")}
             >
-              <CheckCircleIcon /> Completed <span className="doc-tab-count">{completedRequests.length}</span>
+              <CheckCircleIcon /> Claimed <span className="doc-tab-count">{claimedRequests.length}</span>
+            </button>
+            <button
+              className={`doc-tab ${activeTab === "rejected" ? "active" : ""}`}
+              onClick={() => setActiveTab("rejected")}
+            >
+              <XCircleIcon /> Rejected <span className="doc-tab-count">{rejectedRequests.length}</span>
+            </button>
+            <button
+              className={`doc-tab ${activeTab === "cancelled" ? "active" : ""}`}
+              onClick={() => setActiveTab("cancelled")}
+            >
+              <XCircleIcon /> Cancelled <span className="doc-tab-count">{cancelledRequests.length}</span>
             </button>
           </div>
 
@@ -672,140 +503,273 @@ export default function ProfessorDocumentRequest() {
                 </div>
               ) : activeRequests.length > 0 ? (
                 <div className="doc-cards-grid">
-                  {activeRequests.map((req) => {
-                    const statusMeta = getStatusMeta(req.status);
-                    return (
-                      <div
-                        key={req.id}
-                        className="doc-card"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => setSelectedDocId(req.id)}
-                      >
-                        <div className="doc-card-header">
-                          <div className="doc-card-icon-wrap">
-                            <FileText />
-                          </div>
-                          <div className="doc-card-title-section">
-                            <h3>{req.type}</h3>
-                            <p className="doc-card-college">{req.college}</p>
-                          </div>
-                          <div className="doc-card-header-right">
-                            <span className="doc-tracking-pill">{req.trackingNumber}</span>
-                            <span className={`doc-badge ${statusMeta.cls}`}>
-                              {getStatusIcon(req.status)}
-                              {statusMeta.label}
-                            </span>
-                          </div>
+                  {activeRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="doc-card"
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        navigate("/professor/document-status", {
+                          state: { docId: req.id, from: "documents" },
+                        })
+                      }
+                    >
+                      <div className="doc-card-header">
+                        <div className="doc-card-icon-wrap">
+                          <FileText />
                         </div>
+                        <div className="doc-card-title-section">
+                          <h3>{req.type}</h3>
+                          <p className="doc-card-college">{req.college}</p>
+                        </div>
+                        <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
+                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
+                            {getStatusLabel(req.status)}
+                          </span>
+                        </div>
+                      </div>
 
-                        <div className="doc-card-grid">
+                      <div className="doc-card-grid">
+                        <div className="doc-card-field">
+                          <label>Request Date</label>
+                          <p className="doc-card-date-value">
+                            {formatManilaDate(req.requestDate, { month: "long", day: "numeric", year: "numeric" })}
+                          </p>
+                        </div>
+                        {req.estimatedCompletion && (
                           <div className="doc-card-field">
-                            <label>Request Date</label>
+                            <label>Est. Completion</label>
                             <p className="doc-card-date-value">
-                              {formatManilaDate(req.requestDate, { month: "long" })}
+                              {formatManilaDate(req.estimatedCompletion, { month: "long", day: "numeric", year: "numeric" })}
                             </p>
                           </div>
-                          {req.estimatedCompletion && (
-                            <div className="doc-card-field">
-                              <label>Est. Completion</label>
-                              <p className="doc-card-date-value">
-                                {formatManilaDate(req.estimatedCompletion, { month: "long" })}
-                              </p>
-                            </div>
-                          )}
-                          {req.neededBy && (
-                            <div className="doc-card-field">
-                              <label>Needed By</label>
-                              <p className="doc-card-date-value">
-                                {formatManilaDate(req.neededBy, { month: "long" })}
-                              </p>
-                            </div>
-                          )}
-                          <div className="doc-card-field-full">
-                            <label>Purpose</label>
-                            <p>{req.purpose}</p>
+                        )}
+                        {req.neededBy && (
+                          <div className="doc-card-field">
+                            <label>Needed By</label>
+                            <p className="doc-card-date-value">
+                              {formatManilaDate(req.neededBy, { month: "long", day: "numeric", year: "numeric" })}
+                            </p>
                           </div>
+                        )}
+                        <div className="doc-card-field">
+                          <label>Number of Copies</label>
+                          <p className="doc-card-date-value">{req.copies ?? 1}</p>
                         </div>
-
-                        {req.notes && (
-                          <div className="doc-card-update">
-                            <p className="doc-update-title">Update</p>
-                            <p className="doc-update-text">{req.notes}</p>
-                          </div>
-                        )}
-
-                        {(req.status === "pending" || req.status === "processing") && (
-                          <button
-                            className="doc-cancel-request-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCancelTarget(req);
-                            }}
-                          >
-                            <XCircleIcon /> Cancel Request
-                          </button>
-                        )}
+                        <div className="doc-card-field-full">
+                          <label>Purpose</label>
+                          <p>{req.purpose}</p>
+                        </div>
                       </div>
-                    );
-                  })}
+
+                      {req.notes && (
+                        <div className="doc-card-update">
+                          <p className="doc-update-title">Update</p>
+                          <p className="doc-update-text">{req.notes}</p>
+                        </div>
+                      )}
+
+                      {(req.status === "generated" || req.status === "released") && (
+                        <button
+                          className="doc-card-view-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate("/professor/document-status", {
+                              state: { from: "documents", docId: req.id },
+                            });
+                          }}
+                        >
+                          <DownloadIcon /> View Pickup Details
+                        </button>
+                      )}
+
+                      {(req.status === "pending" || req.status === "processing") && (
+                        <button
+                          className="doc-cancel-request-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCancelTarget(req);
+                          }}
+                        >
+                          <XCircleIcon /> Cancel Request
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="doc-empty-state">
                   <FileText />
-                  <h3>No active requests</h3>
-                  <p>Start by requesting a document</p>
+                  <h3>No Active Requests</h3>
+                  <p>You have no active document requests.</p>
                 </div>
               )}
             </div>
           )}
 
-          {/* Completed Tab */}
-          {activeTab === "completed" && (
+          {/* Claimed Tab */}
+          {activeTab === "claimed" && (
             <div className="doc-tab-content">
-              {completedRequests.length > 0 ? (
+              {requestsLoading ? (
+                <div className="doc-empty-state">
+                  <FileText />
+                  <h3>Loading requests...</h3>
+                </div>
+              ) : claimedRequests.length > 0 ? (
                 <div className="doc-cards-grid">
-                  {completedRequests.map((req) => {
-                    const statusMeta = getStatusMeta(req.status);
-                    return (
-                      <div
-                        key={req.id}
-                        className="doc-card doc-card-completed"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => setSelectedDocId(req.id)}
-                      >
-                        <div className="doc-card-header">
-                          <div className="doc-card-icon-wrap">
-                            <FileText />
-                          </div>
-                          <div className="doc-card-title-section">
-                            <h3>{req.type}</h3>
-                            <p className="doc-card-college">
-                              {req.college} • {formatManilaDate(req.requestDate)}
-                            </p>
-                          </div>
-                          <div className="doc-card-header-right">
-                            <span className="doc-tracking-pill">{req.trackingNumber}</span>
-                            <span className={`doc-badge ${statusMeta.cls}`}>
-                              {statusMeta.label}
-                            </span>
-                          </div>
+                  {claimedRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="doc-card"
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        navigate("/professor/document-status", {
+                          state: { docId: req.id, from: "documents" },
+                        })
+                      }
+                    >
+                      <div className="doc-card-header">
+                        <div className="doc-card-icon-wrap">
+                          <FileText />
+                        </div>
+                        <div className="doc-card-title-section">
+                          <h3>{req.type}</h3>
+                          <p className="doc-card-college">{req.college}</p>
+                          {req.claimedDate && (
+                            <>
+                              <p className="doc-card-claimed-date">
+                                {formatManilaDate(req.claimedDate, { month: "long", day: "numeric", year: "numeric" })}
+                              </p>
+                              <p className="doc-card-claimed-time">{formatManilaTime(req.claimedDate)}</p>
+                            </>
+                          )}
+                        </div>
+                        <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
+                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
+                            {getStatusLabel(req.status)}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="doc-empty-state">
                   <CheckCircleIcon />
-                  <h3>No completed requests</h3>
-                  <p>Your released and rejected requests will appear here</p>
+                  <h3>No Completed Requests</h3>
+                  <p>You have no records of claimed documents.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Rejected Tab */}
+          {activeTab === "rejected" && (
+            <div className="doc-tab-content">
+              {requestsLoading ? (
+                <div className="doc-empty-state">
+                  <FileText />
+                  <h3>Loading requests...</h3>
+                </div>
+              ) : rejectedRequests.length > 0 ? (
+                <div className="doc-cards-grid">
+                  {rejectedRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="doc-card"
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        navigate("/professor/document-status", {
+                          state: { docId: req.id, from: "documents" },
+                        })
+                      }
+                    >
+                      <div className="doc-card-header">
+                        <div className="doc-card-icon-wrap">
+                          <FileText />
+                        </div>
+                        <div className="doc-card-title-section">
+                          <h3>{req.type}</h3>
+                          <p className="doc-card-college">
+                            {req.college} •{" "}
+                            {formatManilaDate(req.requestDate, { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
+                        </div>
+                        <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
+                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
+                            {getStatusLabel(req.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="doc-empty-state">
+                  <XCircleIcon />
+                  <h3>No Rejected Requests</h3>
+                  <p>You have no records of rejected document requests.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Cancelled Tab */}
+          {activeTab === "cancelled" && (
+            <div className="doc-tab-content">
+              {requestsLoading ? (
+                <div className="doc-empty-state">
+                  <FileText />
+                  <h3>Loading requests...</h3>
+                </div>
+              ) : cancelledRequests.length > 0 ? (
+                <div className="doc-cards-grid">
+                  {cancelledRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="doc-card"
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        navigate("/professor/document-status", {
+                          state: { docId: req.id, from: "documents" },
+                        })
+                      }
+                    >
+                      <div className="doc-card-header">
+                        <div className="doc-card-icon-wrap">
+                          <FileText />
+                        </div>
+                        <div className="doc-card-title-section">
+                          <h3>{req.type}</h3>
+                          <p className="doc-card-college">
+                            {req.college} •{" "}
+                            {formatManilaDate(req.requestDate, { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
+                        </div>
+                        <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
+                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
+                            {getStatusLabel(req.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="doc-empty-state">
+                  <XCircleIcon />
+                  <h3>No Cancelled Requests</h3>
+                  <p>You have no records of cancelled document requests.</p>
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-      )}
     </ProfessorPageShell>
   );
 }
