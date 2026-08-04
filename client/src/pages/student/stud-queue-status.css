@@ -500,7 +500,7 @@ body {
 }
 
 /* ===== Requirements / Procedure (ported from stud-queue.css's
-   avail-services-requirement-*/procedure-* — same values, kept
+   avail-services-requirement- and procedure- classes — same values, kept
    self-contained to this file rather than importing cross-page) ===== */
 .qss-requirements-list {
   list-style: none;
