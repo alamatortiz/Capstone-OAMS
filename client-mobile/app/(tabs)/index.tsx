@@ -61,7 +61,7 @@ const features = [
   },
 ];
 
-function OamsLogo({
+function CoamsLogo({
   style,
   outline,
 }: {
@@ -124,7 +124,7 @@ export default function WelcomeScreen() {
           <View style={styles.headerBrand}>
             <View style={styles.headerBrandLogos}>
               <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
-              <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+              <CoamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
             </View>
             <View style={styles.headerActionsGroup}>
               <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
@@ -146,7 +146,7 @@ export default function WelcomeScreen() {
         <View style={styles.heroSection}>
           <View style={styles.heroLogosRow}>
             <Image source={pncLogo} style={styles.heroPncLogoImg} resizeMode="contain" />
-            <OamsLogo style={styles.heroLogoImg} outline={isDarkMode} />
+            <CoamsLogo style={styles.heroLogoImg} outline={isDarkMode} />
           </View>
           <Text style={styles.heroTitle}>College Office Automation{'\n'}Management System</Text>
           <Text style={styles.heroSubtitle}>
@@ -213,7 +213,7 @@ export default function WelcomeScreen() {
         <View style={styles.footer}>
           <View style={styles.footerLogosLeft}>
             <Image source={pncLogo} style={styles.footerPncLogoImg} resizeMode="contain" />
-            <OamsLogo style={styles.footerLogoImg} outline={isDarkMode} />
+            <CoamsLogo style={styles.footerLogoImg} outline={isDarkMode} />
           </View>
           <View style={styles.footerRight}>
             <Text style={styles.footerTagline}>

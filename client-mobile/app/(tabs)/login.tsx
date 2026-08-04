@@ -23,7 +23,7 @@ const oamsLogo = require('@/assets/coams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
-function OamsLogo({
+function CoamsLogo({
   style,
   outline,
 }: {
@@ -146,7 +146,7 @@ export default function LoginScreen() {
             <View style={styles.branding}>
               <View style={styles.logosRow}>
                 <Image source={pncLogo} style={styles.pncLogo} resizeMode="contain" />
-                <OamsLogo style={styles.oamsLogo} outline />
+                <CoamsLogo style={styles.oamsLogo} outline />
               </View>
               <Text style={styles.universityName}>University of Cabuyao</Text>
               <Text style={styles.universitySub}>(Pamantasan ng Cabuyao)</Text>

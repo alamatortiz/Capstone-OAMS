@@ -56,7 +56,7 @@ function collegeLogoForName(collegeName?: string): ImageSourcePropType {
   return pncLogo;
 }
 
-function OamsLogo({
+function CoamsLogo({
   style,
   outline,
 }: {
@@ -373,7 +373,7 @@ export default function ProfessorDocumentsStatusScreen() {
         <View style={styles.header}>
           <View style={styles.headerBrand}>
             <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
-            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+            <CoamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
           </View>
           <View style={styles.headerActions}>
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
