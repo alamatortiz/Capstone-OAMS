@@ -23,12 +23,6 @@ const oamsLogo = require('@/assets/coams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
-const demoAccounts = [
-  { label: 'Student', email: 'student@pnc.edu.ph' },
-  { label: 'Professor', email: 'professor@pnc.edu.ph' },
-  { label: 'Admin', email: 'admin@pnc.edu.ph' },
-];
-
 function OamsLogo({
   style,
   outline,
@@ -82,10 +76,6 @@ export default function LoginScreen() {
   const styles = createStyles(theme);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
-
-  const fillDemoAccount = (demoEmail: string) => {
-    setEmail(demoEmail);
-  };
 
   const handleSubmit = async () => {
     if (!email && !password) {
@@ -239,24 +229,6 @@ export default function LoginScreen() {
                   {isLoading ? 'Signing in...' : 'Sign In'}
                 </Text>
               </Pressable>
-
-              {/* Demo accounts */}
-              <View style={styles.demoBox}>
-                <Text style={styles.demoTitle}>Demo Accounts:</Text>
-                {demoAccounts.map((account) => (
-                  <Pressable
-                    key={account.email}
-                    onPress={() => fillDemoAccount(account.email)}
-                    disabled={isLoading}
-                  >
-                    <Text style={styles.demoLine}>
-                      <Text style={styles.demoLabel}>{account.label}: </Text>
-                      {account.email}
-                    </Text>
-                  </Pressable>
-                ))}
-                <Text style={styles.demoPassword}>Tap a role to fill the email, then enter its password.</Text>
-              </View>
             </View>
 
             <Text style={styles.footerCopy}>
@@ -285,10 +257,6 @@ type ThemePalette = {
   inputIcon: string;
   placeholder: string;
   iconBtn: string;
-  demoBg: string;
-  demoBorder: string;
-  demoText: string;
-  demoTitle: string;
 };
 
 const darkPalette: ThemePalette = {
@@ -304,10 +272,6 @@ const darkPalette: ThemePalette = {
   inputIcon: '#4b5563',
   placeholder: '#374151',
   iconBtn: '#94a3b8',
-  demoBg: 'rgba(34, 197, 94, 0.1)',
-  demoBorder: 'rgba(34, 197, 94, 0.2)',
-  demoText: 'rgba(134, 239, 172, 0.7)',
-  demoTitle: '#4ade80',
 };
 
 const lightPalette: ThemePalette = {
@@ -323,10 +287,6 @@ const lightPalette: ThemePalette = {
   inputIcon: '#9ca3af',
   placeholder: '#d1d5db',
   iconBtn: '#666666',
-  demoBg: 'rgba(34, 197, 94, 0.08)',
-  demoBorder: 'rgba(34, 197, 94, 0.15)',
-  demoText: '#4b7c5d',
-  demoTitle: '#16a34a',
 };
 
 function createStyles(theme: ThemePalette) {
@@ -495,35 +455,6 @@ function createStyles(theme: ThemePalette) {
       color: '#ffffff',
       fontSize: 15,
       fontWeight: '700',
-    },
-
-    // Demo accounts
-    demoBox: {
-      backgroundColor: theme.demoBg,
-      borderWidth: 1,
-      borderColor: theme.demoBorder,
-      borderRadius: 10,
-      padding: 12,
-      gap: 2,
-    },
-    demoTitle: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.demoTitle,
-      marginBottom: 3,
-    },
-    demoLine: {
-      fontSize: 11,
-      color: theme.demoText,
-    },
-    demoLabel: {
-      color: theme.demoTitle,
-    },
-    demoPassword: {
-      fontSize: 11,
-      color: theme.demoText,
-      opacity: 0.8,
-      marginTop: 4,
     },
 
     footerCopy: {
