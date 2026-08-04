@@ -8,7 +8,7 @@ import { applyTheme, getSavedTheme } from "../utils/theme";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
 
 import ucLogo from "../assets/Pnc-Logo.png";
-import oamsLogo from "../assets/oams_logo.png";
+import oamsLogo from "../assets/coams_logo.png";
 
 import "./AdminSidebar.css";
 
@@ -150,7 +150,7 @@ export default function AdminSidebar() {
               <img
                 src={oamsLogo}
                 alt="OAMS Logo"
-                className="logo-img oams-logo-img"
+                className="logo-img coams-logo-img"
               />
             </Link>
             <button
@@ -214,7 +214,7 @@ export default function AdminSidebar() {
             <img
               src={oamsLogo}
               alt="OAMS Logo"
-              className="logo-img oams-logo-img"
+              className="logo-img coams-logo-img"
             />
           </Link>
           <div className="mobile-header-actions">

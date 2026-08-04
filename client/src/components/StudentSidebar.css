@@ -158,11 +158,11 @@
   transition: filter 0.3s ease;
 }
 
-.oams-logo-img {
+.coams-logo-img {
   filter: none;
 }
 
-[data-theme="dark"] .oams-logo-img {
+[data-theme="dark"] .coams-logo-img {
   filter:
     drop-shadow(0 0 0 rgba(255,255,255,0.85))
     drop-shadow(1px 0 0 rgba(255,255,255,0.85))

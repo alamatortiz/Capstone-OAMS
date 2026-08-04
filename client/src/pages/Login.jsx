@@ -9,7 +9,7 @@ import { applyTheme, getSavedTheme } from "../utils/theme";
 import "./Login.css";
 
 import pncLogo from "../assets/Pnc-Logo.png";
-import oamsLogo from "../assets/oams_logo.png";
+import oamsLogo from "../assets/coams_logo.png";
 import darkModeIcon from "../assets/darkmode_icon.png";
 import sunIcon from "../assets/sun_icon.png";
 
@@ -117,7 +117,7 @@ export default function Login() {
               alt="University of Cabuyao"
               className="login-pnc-logo"
             />
-            <img src={oamsLogo} alt="OAMS" className="login-oams-logo" />
+            <img src={oamsLogo} alt="OAMS" className="login-coams-logo" />
           </div>
           <p className="login-university-name">
             University of Cabuyao<br />

@@ -12,7 +12,7 @@ import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
 // up for a later re-enable. See client/src/components/NotificationBell.jsx.
 
 import ucLogo from "../assets/Pnc-Logo.png";
-import oamsLogo from "../assets/oams_logo.png";
+import oamsLogo from "../assets/coams_logo.png";
 
 import "./ProfessorSidebar.css";
 
@@ -186,7 +186,7 @@ export default function ProfessorSidebar() {
               <img
                 src={oamsLogo}
                 alt="OAMS Logo"
-                className="logo-img oams-logo-img"
+                className="logo-img coams-logo-img"
               />
             </Link>
             <button
@@ -267,7 +267,7 @@ export default function ProfessorSidebar() {
             <img
               src={oamsLogo}
               alt="OAMS Logo"
-              className="logo-img oams-logo-img"
+              className="logo-img coams-logo-img"
             />
           </Link>
           <div className="mobile-header-actions">
