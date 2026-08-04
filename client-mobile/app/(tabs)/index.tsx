@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
-const oamsLogo = require('@/assets/oams_logo.png');
+const oamsLogo = require('@/assets/coams_logo.png');
 const ccsLogo = require('@/assets/CCS.png');
 const cbaaLogo = require('@/assets/CBAA.png');
 const coedLogo = require('@/assets/COED.png');
@@ -148,7 +148,7 @@ export default function WelcomeScreen() {
             <Image source={pncLogo} style={styles.heroPncLogoImg} resizeMode="contain" />
             <OamsLogo style={styles.heroLogoImg} outline={isDarkMode} />
           </View>
-          <Text style={styles.heroTitle}>Office Automation{'\n'}Management System</Text>
+          <Text style={styles.heroTitle}>College Office Automation{'\n'}Management System</Text>
           <Text style={styles.heroSubtitle}>
             A centralized platform for students, professors, and administrators to
             streamline university services and enhance productivity.
@@ -200,7 +200,7 @@ export default function WelcomeScreen() {
           </View>
           <Text style={styles.ctaTitle}>Ready to Get Started?</Text>
           <Text style={styles.ctaSubtitle}>
-            Join thousands of students, professors, and staff using OAMS to
+            Join thousands of students, professors, and staff using COAMS to
             streamline their university experience.
           </Text>
           <Pressable style={styles.btnCta} onPress={goToLogin}>

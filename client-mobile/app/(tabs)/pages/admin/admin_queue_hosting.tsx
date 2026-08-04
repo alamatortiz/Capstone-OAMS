@@ -23,7 +23,7 @@ import QueueReasonModal from '@/components/QueueReasonModal';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
-const oamsLogo = require('@/assets/oams_logo.png');
+const oamsLogo = require('@/assets/coams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 const ccsLogo = require('@/assets/CCS.png');
