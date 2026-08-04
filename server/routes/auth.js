@@ -12,4 +12,7 @@ router.get("/me", authenticateToken, authController.getCurrentUser);
 // POST /api/auth/logout
 router.post("/logout", authController.logout);
 
+// POST /api/auth/push-token - Register/refresh this device's Expo push token
+router.post("/push-token", authenticateToken, authController.registerPushToken);
+
 module.exports = router;

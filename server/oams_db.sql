@@ -103,6 +103,19 @@ CREATE TABLE user_sessions (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
+-- One user can hold multiple tokens (phone + tablet). Unique on the token,
+-- not user_id, so re-registering on login upserts (device kept, owner may
+-- change -- shared/reissued devices on campus are a real case).
+CREATE TABLE push_tokens (
+    push_token_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT          NOT NULL,
+    expo_push_token VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_push_tokens_token (expo_push_token)
+);
+
 CREATE TABLE login_logs (
     log_id           INT          AUTO_INCREMENT PRIMARY KEY,
     user_id          INT          NULL,               -- NULL on failed attempt for unknown user

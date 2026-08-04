@@ -40,6 +40,9 @@ AGENTS.md
 # db certs (host-specific, kept local / uploaded as host secret files instead)
 *.pem
 
+# machine-specific docker port remaps etc. (e.g. a local port 3306 conflict)
+docker-compose.override.yml
+
 # firebase service account keys (uploaded to EAS credentials, never committed)
 *firebase-adminsdk*.json
 

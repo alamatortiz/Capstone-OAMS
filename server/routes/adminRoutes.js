@@ -29,6 +29,7 @@ const {
   REQUIRED_PRIOR_STATUS,
 } = require("../utils/documentStatus");
 const { createNotification } = require("../utils/notifications");
+const { sendPushNotification } = require("../utils/pushNotifications");
 const { getFacultyAvailabilityToday, formatTime } = require("../utils/facultyAvailability");
 
 // GET /api/admin/dashboard-stats
@@ -870,6 +871,12 @@ router.patch(
       emitToUser(next.student_id, "queue:called", calledPayload);
       emitToDept(deptId, "queue:called", calledPayload);
       createNotification(next.student_id, "You've been called! Please proceed to the counter.");
+      sendPushNotification(
+        next.student_id,
+        "You've been called!",
+        "Please proceed to the counter.",
+        { type: "queue:called", slotId, queueId: next.queue_id },
+      );
 
       res.json({ message: "Next student called", queueId: next.queue_id });
     } catch (error) {

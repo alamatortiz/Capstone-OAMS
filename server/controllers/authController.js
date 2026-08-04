@@ -204,6 +204,29 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
+// Upserts by token (not user_id): a device's token can outlive one user's
+// session (shared/reissued campus devices), so re-registering on login just
+// reattaches the token to whoever's logged in now rather than erroring on
+// the existing unique constraint.
+const registerPushToken = async (req, res) => {
+  const { expoPushToken } = req.body;
+  if (!expoPushToken) {
+    return res.status(400).json({ error: "expoPushToken is required" });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO push_tokens (user_id, expo_push_token) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), updated_at = CURRENT_TIMESTAMP`,
+      [req.user.userId, expoPushToken],
+    );
+    res.json({ message: "Push token registered" });
+  } catch (error) {
+    console.error("Register push token error:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 const logout = async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -220,4 +243,4 @@ const logout = async (req, res) => {
   res.json({ message: "Logout successful" });
 };
 
-module.exports = { login, getCurrentUser, logout };
+module.exports = { login, getCurrentUser, logout, registerPushToken };
