@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useQueue } from '@/context/QueueContext';
+import NotificationBell from '@/components/NotificationBell';
+import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -289,6 +291,12 @@ export default function StudentQueueStatusScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <NotificationBell
+              endpointBase="student"
+              theme={theme}
+              typePaths={STUDENT_NOTIFICATION_PATHS}
+              viewAllPath={STUDENT_NOTIFICATIONS_VIEW_ALL}
+            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>

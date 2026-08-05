@@ -20,6 +20,8 @@ import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
+import NotificationBell from '@/components/NotificationBell';
+import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
@@ -381,6 +383,12 @@ export default function StudentAnnouncementScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <NotificationBell
+              endpointBase="student"
+              theme={theme}
+              typePaths={STUDENT_NOTIFICATION_PATHS}
+              viewAllPath={STUDENT_NOTIFICATIONS_VIEW_ALL}
+            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>
@@ -558,6 +566,8 @@ type ThemePalette = {
   tertiary: string;
   primary: string;
   primaryDark: string;
+  iconBtnBg: string;
+  iconBtnBorder: string;
 };
 
 const darkPalette: ThemePalette = {
@@ -571,6 +581,8 @@ const darkPalette: ThemePalette = {
   tertiary: '#94a3b8',
   primary: '#16a34a',
   primaryDark: '#15803d',
+  iconBtnBg: 'rgba(34, 197, 94, 0.1)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
 };
 
 const lightPalette: ThemePalette = {
@@ -584,6 +596,8 @@ const lightPalette: ThemePalette = {
   tertiary: '#64748b',
   primary: '#166534',
   primaryDark: '#14532d',
+  iconBtnBg: 'rgba(34, 197, 94, 0.08)',
+  iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
 };
 
 function createStyles(theme: ThemePalette) {

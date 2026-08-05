@@ -16,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import NotificationBell from '@/components/NotificationBell';
+import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { exportRowsAsCsv } from '@/utils/csvExport';
@@ -299,6 +301,12 @@ export default function AdminQueueAnalyticsScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <NotificationBell
+              endpointBase="admin"
+              theme={theme}
+              typePaths={ADMIN_NOTIFICATION_PATHS}
+              viewAllPath={ADMIN_NOTIFICATIONS_VIEW_ALL}
+            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>

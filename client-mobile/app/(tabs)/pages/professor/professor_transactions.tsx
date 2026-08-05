@@ -19,6 +19,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import NotificationBell from '@/components/NotificationBell';
+import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/coams_logo.png');
@@ -248,7 +250,6 @@ export default function ProfessorTransactionsScreen() {
 
   const stats = {
     total: filtered.length,
-    queue: filtered.filter((t) => t.type === 'queue').length,
     appointments: filtered.filter((t) => t.type === 'appointment').length,
     documents: filtered.filter((t) => t.type === 'document').length,
   };
@@ -280,6 +281,12 @@ export default function ProfessorTransactionsScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
+            <NotificationBell
+              endpointBase="faculty"
+              theme={theme}
+              typePaths={PROFESSOR_NOTIFICATION_PATHS}
+              viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
+            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>
@@ -312,13 +319,6 @@ export default function ProfessorTransactionsScreen() {
               </View>
               <Text style={[styles.statValue, { color: '#3b82f6' }]}>{stats.total}</Text>
               <Text style={styles.statLabel}>Total Transactions</Text>
-            </View>
-            <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: 'rgba(6, 182, 212, 0.15)', borderColor: 'rgba(6, 182, 212, 0.3)' }]}>
-                <Ionicons name="people-outline" size={18} color="#06b6d4" />
-              </View>
-              <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.queue}</Text>
-              <Text style={styles.statLabel}>Queue Services</Text>
             </View>
             <View style={styles.statCard}>
               <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>

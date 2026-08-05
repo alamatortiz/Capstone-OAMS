@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
+  AppState,
   Image,
   Modal,
   Pressable,
@@ -9,7 +10,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +20,12 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
-import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import {
+  NOTIFICATION_TYPE_META,
+  PROFESSOR_NOTIFICATION_PATHS,
+  PROFESSOR_NOTIFICATIONS_VIEW_ALL,
+  type NotificationType,
+} from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/coams_logo.png');
@@ -69,35 +74,24 @@ function CoamsLogo({
   );
 }
 
-type TxType = 'queue' | 'appointment' | 'document';
-type TxStatus = 'completed' | 'ongoing' | 'cancelled';
-
-interface Transaction {
-  id: string;
-  type: TxType;
-  title: string;
-  college: string;
-  date: string;
-  time: string;
-  status: TxStatus;
-  details: string;
+interface NotificationItem {
+  notification_id: number;
+  message: string;
+  type: NotificationType;
+  is_read: boolean;
+  created_at: string;
 }
 
-const TYPE_META: Record<TxType, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
-  queue: { label: 'queue', icon: 'time-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
-  appointment: { label: 'appointment', icon: 'calendar-outline', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.35)', color: '#a855f7' },
-  document: { label: 'document', icon: 'document-text-outline', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
-};
-
-const STATUS_META: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
-  completed: { label: 'completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
-  ongoing: { label: 'ongoing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
-  cancelled: { label: 'cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
-};
-
-const formatDateShort = (dateString: string) => {
-  const [y, m, d] = dateString.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const formatTimestamp = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 };
 
 interface NavItem {
@@ -107,205 +101,165 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'home-outline' },
   { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
   { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
 ];
 
-type TypeFilter = 'all' | TxType;
-type StatusFilter = 'all' | TxStatus;
-type SelectField = 'type' | 'status' | null;
+type TypeFilter = 'all' | NotificationType;
 
-const TYPE_OPTIONS = [
+const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'all', label: 'All Types' },
   { value: 'queue', label: 'Queue' },
-  { value: 'appointment', label: 'Appointment' },
   { value: 'document', label: 'Document' },
+  { value: 'appointment', label: 'Appointment' },
+  { value: 'announcement', label: 'Announcement' },
 ];
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'ongoing', label: 'Ongoing' },
-  { value: 'cancelled', label: 'Cancelled' },
+const WATCHED_EVENTS = [
+  'queue:called',
+  'queue:served',
+  'queue:uncalled',
+  'queue:queue-stopped',
+  'appointment:status-updated',
+  'appointment:slot-updated',
+  'document:status-updated',
 ];
 
-export default function StudentTransactionsScreen() {
+export default function ProfessorNotificationsScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState<TypeFilter>('all');
-  const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
-  const [selectField, setSelectField] = useState<SelectField>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [txLoading, setTxLoading] = useState(true);
-  const [txError, setTxError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const [typeFilterOpen, setTypeFilterOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  // Debounce the search box so every keystroke doesn't trigger a refetch.
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+  const notificationsRef = useRef(notifications);
+  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
 
-  // Mirrors `transactions` for the catch block below, without making
-  // fetchTransactions depend on (and change identity with) the state itself.
-  const transactionsRef = useRef(transactions);
-  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
-
-  // Guards against out-of-order responses: e.g. tapping "Load More" and then
-  // changing a filter before that request resolves would otherwise let the
-  // stale "Load More" page land after the fresh filtered list and get
-  // appended onto it. Each call captures the current token; a response is
-  // only applied if its token is still the latest by the time it resolves.
   const requestIdRef = useRef(0);
 
-  // Search/type/status filtering happens server-side (so it considers the
-  // student's whole history, not just whatever page is currently loaded).
-  // Any change to those filters — including the ones baked into this
-  // callback's identity below — resets back to the first page; only
-  // "Load More" advances the offset.
-  const fetchTransactions = useCallback(async (offset = 0) => {
+  const fetchNotifications = useCallback(async (pageNum: number) => {
     const requestId = ++requestIdRef.current;
     try {
-      if (offset > 0) setLoadingMore(true);
-      const { data } = await api.get('/student/transactions', {
-        params: {
-          search: debouncedSearch || undefined,
-          type: filterType !== 'all' ? filterType : undefined,
-          status: filterStatus !== 'all' ? filterStatus : undefined,
-          limit: 20,
-          offset,
-        },
+      if (pageNum > 1) setLoadingMore(true);
+      const { data } = await api.get('/faculty/notifications', {
+        params: { type: filterType !== 'all' ? filterType : undefined, page: pageNum },
       });
       if (requestId !== requestIdRef.current) return;
-      const newTransactions: Transaction[] = data.transactions ?? [];
-      setTransactions((prev) => (offset > 0 ? [...prev, ...newTransactions] : newTransactions));
-      setHasMore(!!data.hasMore);
-      if (data.stats) setTxStats(data.stats);
-      setTxError(null);
+      const fetched: NotificationItem[] = data.notifications ?? [];
+      setNotifications((prev) => (pageNum > 1 ? [...prev, ...fetched] : fetched));
+      setPage(data.page ?? pageNum);
+      setTotalPages(data.totalPages ?? 1);
+      setError(null);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
-      console.error('Failed to fetch transactions:', err);
-      if (transactionsRef.current.length === 0) {
-        setTxError('Could not load your transaction history.');
+      console.error('Failed to fetch notifications:', err);
+      if (notificationsRef.current.length === 0) {
+        setError('Could not load your notifications.');
       } else {
-        Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
+        Toast.show({ type: 'error', text1: 'Could not refresh notifications.' });
       }
     } finally {
       if (requestId === requestIdRef.current) {
-        setTxLoading(false);
+        setLoading(false);
         setLoadingMore(false);
       }
     }
-  }, [debouncedSearch, filterType, filterStatus]);
+  }, [filterType]);
 
   useEffect(() => {
-    fetchTransactions(0);
-  }, [fetchTransactions]);
+    fetchNotifications(1);
+  }, [fetchNotifications]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMore) return;
-    fetchTransactions(transactions.length);
+    if (loadingMore || page >= totalPages) return;
+    fetchNotifications(page + 1);
   };
 
-  // Queue events (and document:cancelled) are broadcast department-wide, not
-  // just to the affected student, so they're checked against this student's
-  // own ID before refetching — otherwise this page would refetch every time
-  // ANY student in the department got called/served/etc.
-  const handleOwnQueueEvent = useCallback(
-    (payload: { studentId?: number | string }) => {
-      if (Number(payload?.studentId) === Number(user?.userId)) {
-        fetchTransactions(0);
-      }
-    },
-    [fetchTransactions, user?.userId],
-  );
-
-  // ── Live updates: refetch when a document/appointment status changes, or
-  // one of this student's own queue events fires (mirrors stud-transactions.jsx).
-  // Transactions are a historical log, not worth interrupting the user for --
-  // refetch silently, no notification. ──
   useEffect(() => {
-    if (!user || !token) return;
+    if (!token) return undefined;
     const socket = connectSocket(token);
-    if (!socket) return;
-
-    const refetchFirstPage = () => fetchTransactions(0);
-    const ownEvents = ['document:status-updated', 'appointment:status-updated'];
-    const deptWideEvents = [
-      'queue:called',
-      'queue:served',
-      'queue:no-show',
-      'queue:student-joined',
-      'queue:student-left',
-      'document:cancelled',
-    ];
-
-    ownEvents.forEach((event) => socket.on(event, refetchFirstPage));
-    deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
-
+    if (!socket) return undefined;
+    const refetch = () => fetchNotifications(1);
+    WATCHED_EVENTS.forEach((event) => socket.on(event, refetch));
     return () => {
-      ownEvents.forEach((event) => socket.off(event, refetchFirstPage));
-      deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
+      WATCHED_EVENTS.forEach((event) => socket.off(event, refetch));
     };
-  }, [user, token, fetchTransactions, handleOwnQueueEvent]);
+  }, [token, fetchNotifications]);
 
-  // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
+    if (!token) return undefined;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') fetchNotifications(1);
+    });
+    return () => sub.remove();
+  }, [token, fetchNotifications]);
+
+  useEffect(() => {
+    if (!token) return undefined;
     const interval = setInterval(() => {
-      fetchTransactions(0);
+      if (AppState.currentState === 'active') fetchNotifications(1);
     }, 45000);
     return () => clearInterval(interval);
-  }, [fetchTransactions]);
+  }, [token, fetchNotifications]);
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  const markRead = async (id: number) => {
+    setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
+    try {
+      await api.patch(`/faculty/notifications/${id}/read`);
+    } catch {
+      setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)));
+    }
+  };
+
+  const markAllRead = async () => {
+    const previous = notificationsRef.current;
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
+      await api.patch('/faculty/notifications/read-all');
+    } catch {
+      setNotifications(previous);
+    }
+  };
+
+  const goToNotification = (item: NotificationItem) => {
+    if (!item.is_read) markRead(item.notification_id);
+    router.push(PROFESSOR_NOTIFICATION_PATHS[item.type] as never);
+  };
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
-  const goToDashboard = () => router.push('/pages/student/student_dashboard');
+  const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
-    if (key === 'transactions') return;
     if (key === 'dashboard') { goToDashboard(); return; }
-    if (key === 'queue') { router.push('/pages/student/student_queue'); return; }
-    if (key === 'announcements') { router.push('/pages/student/student_announcement'); return; }
-    if (key === 'appointments') { router.push('/pages/student/student_appointments'); return; }
-    if (key === 'documents') { router.push('/pages/student/student_documents'); return; }
+    if (key === 'appointments') { router.push('/pages/professor/professor_appointment'); return; }
+    if (key === 'documents') { router.push('/pages/professor/professor_documents'); return; }
+    if (key === 'transactions') { router.push('/pages/professor/professor_transactions'); return; }
   };
 
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
   const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
-  // Search/type/status filtering already happened server-side, so `transactions`
-  // is the page to render as-is.
-  const stats: { key: string; label: string; value: number; icon: IoniconName; color: string; bg: string; border: string }[] = [
-    { key: 'total', label: 'Total', value: txStats.total, icon: 'list-outline', color: theme.blue, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)' },
-    { key: 'completed', label: 'Completed', value: txStats.completed, icon: 'checkmark-circle-outline', color: theme.success, bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)' },
-    { key: 'ongoing', label: 'Ongoing', value: txStats.ongoing, icon: 'time-outline', color: theme.orange, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' },
-    { key: 'month', label: 'This Month', value: txStats.thisMonth, icon: 'calendar-outline', color: theme.purple, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)' },
-  ];
-
-  const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
-  const selectTitle = selectField === 'type' ? 'Select Type' : 'Select Status';
-  const selectCurrentValue = selectField === 'type' ? filterType : filterStatus;
   const typeLabel = TYPE_OPTIONS.find((o) => o.value === filterType)?.label ?? 'All Types';
-  const statusLabel = STATUS_OPTIONS.find((o) => o.value === filterStatus)?.label ?? 'All Statuses';
 
-  const chooseOption = (value: string) => {
-    if (selectField === 'type') setFilterType(value as TypeFilter);
-    else if (selectField === 'status') setFilterStatus(value as StatusFilter);
-    setSelectField(null);
+  const chooseType = (value: string) => {
+    setFilterType(value as TypeFilter);
+    setTypeFilterOpen(false);
   };
 
   return (
@@ -324,10 +278,10 @@ export default function StudentTransactionsScreen() {
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
             <NotificationBell
-              endpointBase="student"
+              endpointBase="faculty"
               theme={theme}
-              typePaths={STUDENT_NOTIFICATION_PATHS}
-              viewAllPath={STUDENT_NOTIFICATIONS_VIEW_ALL}
+              typePaths={PROFESSOR_NOTIFICATION_PATHS}
+              viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
             />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
@@ -345,127 +299,81 @@ export default function StudentTransactionsScreen() {
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.titleIcon}>
-              <Ionicons name="trending-up-outline" size={22} color="#ffffff" />
+              <Ionicons name="notifications-outline" size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
-              <Text style={styles.pageTitle}>Transaction History</Text>
-              <Text style={styles.pageSubtitle}>View all your activities and transactions</Text>
+              <Text style={styles.pageTitle}>Notifications</Text>
+              <Text style={styles.pageSubtitle}>Stay updated on queue, document, appointment, and announcement activity</Text>
             </View>
           </View>
 
-          {/* Stats Grid */}
-          <View style={styles.statsGrid}>
-            {stats.map((stat) => (
-              <View key={stat.key} style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: stat.bg, borderColor: stat.border }]}>
-                  <Ionicons name={stat.icon} size={18} color={stat.color} />
-                </View>
-                <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Filters */}
+          {/* Filter + Mark all read */}
           <View style={styles.filtersCard}>
-            <Text style={styles.filtersTitle}>Transaction Filter</Text>
-            <Text style={styles.filtersDescription}>Search and filter your transactions</Text>
-
-            <View style={styles.filterField}>
-              <Text style={styles.filterLabel}>Search</Text>
-              <View style={styles.searchWrapper}>
-                <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search transactions..."
-                  placeholderTextColor={theme.tertiary}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-              </View>
-            </View>
-
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>Type</Text>
-              <Pressable style={styles.filterSelect} onPress={() => setSelectField('type')}>
+              <Pressable style={styles.filterSelect} onPress={() => setTypeFilterOpen(true)}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{typeLabel}</Text>
                 <Ionicons name="chevron-down" size={16} color={theme.primary} />
               </Pressable>
             </View>
-
-            <View style={styles.filterField}>
-              <Text style={styles.filterLabel}>Status</Text>
-              <Pressable style={styles.filterSelect} onPress={() => setSelectField('status')}>
-                <Text style={styles.filterSelectText} numberOfLines={1}>{statusLabel}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+            {unreadCount > 0 && (
+              <Pressable style={styles.markAllBtn} onPress={markAllRead}>
+                <Ionicons name="checkmark-done-outline" size={16} color={theme.primary} />
+                <Text style={styles.markAllBtnText}>Mark all read ({unreadCount})</Text>
               </Pressable>
-            </View>
+            )}
           </View>
 
-          {/* Transaction List */}
-          {txLoading ? (
+          {/* Notifications list */}
+          {loading ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyDescription}>Loading transactions…</Text>
+              <Text style={styles.emptyDescription}>Loading notifications…</Text>
             </View>
-          ) : txError ? (
+          ) : error ? (
             <View style={styles.emptyCard}>
               <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>Could not load transactions</Text>
-              <Text style={styles.emptyDescription}>{txError}</Text>
-              <Pressable style={styles.filterSelect} onPress={() => fetchTransactions(0)}>
+              <Text style={styles.emptyTitle}>Could not load notifications</Text>
+              <Text style={styles.emptyDescription}>{error}</Text>
+              <Pressable style={styles.filterSelect} onPress={() => fetchNotifications(1)}>
                 <Text style={styles.filterSelectText}>Retry</Text>
               </Pressable>
             </View>
-          ) : transactions.length > 0 ? (
-            <View style={styles.txList}>
-              {transactions.map((t) => {
-                const typeMeta = TYPE_META[t.type];
-                const statusMeta = STATUS_META[t.status];
+          ) : notifications.length > 0 ? (
+            <View style={styles.notifList}>
+              {notifications.map((n) => {
+                const meta = NOTIFICATION_TYPE_META[n.type] ?? NOTIFICATION_TYPE_META.queue;
                 return (
-                  <View key={t.id} style={[styles.txCard, { borderColor: typeMeta.border }]}>
-                    <View style={styles.txHeaderRow}>
-                      <View style={[styles.txIconWrap, { backgroundColor: typeMeta.bg, borderColor: typeMeta.border }]}>
-                        <Ionicons name={typeMeta.icon} size={18} color={typeMeta.color} />
-                      </View>
-                      <View style={styles.txTitleSection}>
-                        <Text style={styles.txTitle}>{t.title}</Text>
-                        <View style={styles.txBadgesRow}>
-                          <View style={[styles.txBadge, { backgroundColor: typeMeta.bg, borderColor: typeMeta.border }]}>
-                            <Text style={[styles.txBadgeText, { color: typeMeta.color }]}>{typeMeta.label}</Text>
-                          </View>
-                          <View style={[styles.txBadge, { backgroundColor: statusMeta.bg, borderColor: statusMeta.border }]}>
-                            <Text style={[styles.txBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
-                          </View>
+                  <Pressable
+                    key={n.notification_id}
+                    style={[styles.notifCard, !n.is_read && styles.notifCardUnread]}
+                    onPress={() => goToNotification(n)}
+                  >
+                    <View style={[styles.notifIconWrap, { backgroundColor: `${meta.color}26`, borderColor: `${meta.color}55` }]}>
+                      <Ionicons name={meta.icon as IoniconName} size={18} color={meta.color} />
+                    </View>
+                    <View style={styles.notifBody}>
+                      <View style={styles.notifBadgeRow}>
+                        <View style={[styles.notifBadge, { backgroundColor: `${meta.color}26`, borderColor: `${meta.color}55` }]}>
+                          <Text style={[styles.notifBadgeText, { color: meta.color }]}>{meta.label}</Text>
                         </View>
+                        {!n.is_read && <View style={styles.unreadDot} />}
                       </View>
+                      <Text style={styles.notifMessage}>{n.message}</Text>
+                      <Text style={styles.notifTime}>{formatTimestamp(n.created_at)}</Text>
                     </View>
-
-                    <Text style={styles.txCollege}>{t.college}</Text>
-                    <Text style={styles.txDetails}>{t.details}</Text>
-
-                    <View style={styles.txMetaRow}>
-                      <View style={styles.txMetaItem}>
-                        <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
-                        <Text style={styles.txMetaText}>{formatDateShort(t.date)}</Text>
-                      </View>
-                      <View style={styles.txMetaItem}>
-                        <Ionicons name="time-outline" size={13} color={theme.tertiary} />
-                        <Text style={styles.txMetaText}>{t.time}</Text>
-                      </View>
-                    </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
           ) : (
             <View style={styles.emptyCard}>
-              <Ionicons name="search-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>No transactions found</Text>
-              <Text style={styles.emptyDescription}>Try adjusting your search or filters</Text>
+              <Ionicons name="notifications-outline" size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>No Notifications</Text>
+              <Text style={styles.emptyDescription}>You're all caught up.</Text>
             </View>
           )}
 
-          {!txLoading && !txError && hasMore && (
+          {!loading && !error && page < totalPages && (
             <Pressable style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
               <Text style={styles.loadMoreBtnText}>{loadingMore ? 'Loading…' : 'Load More'}</Text>
             </Pressable>
@@ -482,30 +390,25 @@ export default function StudentTransactionsScreen() {
                 <View style={styles.drawerAvatar}>
                   <Ionicons name="person-outline" size={15} color={theme.primary} />
                 </View>
-                <Text style={styles.drawerName}>{user?.name ?? 'Student'}</Text>
+                <Text style={styles.drawerName}>{user?.name ?? 'Faculty'}</Text>
               </View>
               <View style={styles.drawerRoleBadge}>
-                <Text style={styles.drawerRoleBadgeText}>Student</Text>
+                <Text style={styles.drawerRoleBadgeText}>Professor</Text>
               </View>
               <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
             </View>
 
             <View style={styles.drawerNav}>
-              {navItems.map((item) => {
-                const active = item.key === 'transactions';
-                return (
-                  <Pressable
-                    key={item.key}
-                    style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
-                    onPress={() => handleNavPress(item.key)}
-                  >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
-                    <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {navItems.map((item) => (
+                <Pressable
+                  key={item.key}
+                  style={styles.drawerNavItem}
+                  onPress={() => handleNavPress(item.key)}
+                >
+                  <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                  <Text style={styles.drawerNavLabel}>{item.label}</Text>
+                </Pressable>
+              ))}
             </View>
 
             <Pressable style={styles.drawerLogout} onPress={handleLogout}>
@@ -517,19 +420,19 @@ export default function StudentTransactionsScreen() {
         </View>
       </Modal>
 
-      {/* Filter Options Modal (Type / Status) */}
-      <Modal visible={selectField !== null} animationType="fade" transparent onRequestClose={() => setSelectField(null)}>
+      {/* Type Filter Modal */}
+      <Modal visible={typeFilterOpen} animationType="fade" transparent onRequestClose={() => setTypeFilterOpen(false)}>
         <View style={styles.logoutOverlay}>
           <View style={styles.filterModalCard}>
-            <Text style={styles.logoutModalTitle}>{selectTitle}</Text>
+            <Text style={styles.logoutModalTitle}>Filter by Type</Text>
             <ScrollView style={styles.filterOptionsList}>
-              {selectOptions.map((opt) => {
-                const selected = opt.value === selectCurrentValue;
+              {TYPE_OPTIONS.map((opt) => {
+                const selected = opt.value === filterType;
                 return (
                   <Pressable
                     key={opt.value}
                     style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
-                    onPress={() => chooseOption(opt.value)}
+                    onPress={() => chooseType(opt.value)}
                   >
                     <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]} numberOfLines={2}>
                       {opt.label}
@@ -539,7 +442,7 @@ export default function StudentTransactionsScreen() {
                 );
               })}
             </ScrollView>
-            <Pressable style={styles.filterModalClose} onPress={() => setSelectField(null)}>
+            <Pressable style={styles.filterModalClose} onPress={() => setTypeFilterOpen(false)}>
               <Text style={styles.filterModalCloseText}>Close</Text>
             </Pressable>
           </View>
@@ -585,11 +488,6 @@ type ThemePalette = {
   subtext: string;
   tertiary: string;
   primary: string;
-  primaryDark: string;
-  success: string;
-  blue: string;
-  purple: string;
-  orange: string;
   iconBtnBg: string;
   iconBtnBorder: string;
 };
@@ -606,11 +504,6 @@ const darkPalette: ThemePalette = {
   subtext: '#94a3b8',
   tertiary: '#94a3b8',
   primary: '#16a34a',
-  primaryDark: '#15803d',
-  success: '#10b981',
-  blue: '#3b82f6',
-  purple: '#a855f7',
-  orange: '#f97316',
   iconBtnBg: 'rgba(34, 197, 94, 0.1)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
 };
@@ -627,11 +520,6 @@ const lightPalette: ThemePalette = {
   subtext: '#64748b',
   tertiary: '#64748b',
   primary: '#166534',
-  primaryDark: '#14532d',
-  success: '#059669',
-  blue: '#2563eb',
-  purple: '#9333ea',
-  orange: '#ea580c',
   iconBtnBg: 'rgba(34, 197, 94, 0.08)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
 };
@@ -683,35 +571,7 @@ function createStyles(theme: ThemePalette) {
     },
     titleTextWrap: { flex: 1 },
     pageTitle: { fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
-    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
-
-    // Stats
-    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    statCard: {
-      width: '47%',
-      alignItems: 'flex-start',
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: 'rgba(34, 197, 94, 0.2)',
-      borderRadius: 16,
-      padding: 14,
-    },
-    statIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 10,
-    },
-    statValue: { fontSize: 24, fontWeight: '800' },
-    statLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: theme.tertiary,
-      marginTop: 2,
-    },
+    pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3, lineHeight: 17 },
 
     // Filters card
     filtersCard: {
@@ -722,28 +582,8 @@ function createStyles(theme: ThemePalette) {
       padding: 18,
       gap: 14,
     },
-    filtersTitle: { fontSize: 17, fontWeight: '800', color: theme.text, textAlign: 'center' },
-    filtersDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', marginTop: -8 },
     filterField: { gap: 6 },
     filterLabel: { fontSize: 12, fontWeight: '700', color: theme.text },
-    searchWrapper: {
-      position: 'relative',
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    searchIcon: { position: 'absolute', left: 14, zIndex: 1 },
-    searchInput: {
-      flex: 1,
-      paddingVertical: 12,
-      paddingLeft: 40,
-      paddingRight: 14,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.background,
-      color: theme.text,
-      fontSize: 13,
-    },
     filterSelect: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -756,6 +596,17 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: theme.background,
     },
     filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+    markAllBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 11,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.primary,
+    },
+    markAllBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
 
     loadMoreBtn: {
       alignItems: 'center',
@@ -768,51 +619,39 @@ function createStyles(theme: ThemePalette) {
     },
     loadMoreBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
 
-    // Transaction list
-    txList: { gap: 12 },
-    txCard: {
+    // Notification list
+    notifList: { gap: 10 },
+    notifCard: {
+      flexDirection: 'row',
+      gap: 12,
       backgroundColor: theme.card,
       borderWidth: 1,
+      borderColor: theme.border,
       borderRadius: 16,
-      padding: 16,
-      gap: 8,
+      padding: 14,
     },
-    txHeaderRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    txIconWrap: {
-      width: 42,
-      height: 42,
+    notifCardUnread: { backgroundColor: theme.iconBtnBg, borderColor: theme.cardAltBorder },
+    notifIconWrap: {
+      width: 40,
+      height: 40,
       borderRadius: 12,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
     },
-    txTitleSection: { flex: 1, gap: 6 },
-    txTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
-    txBadgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-    txBadge: {
+    notifBody: { flex: 1, gap: 4 },
+    notifBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    notifBadge: {
       borderWidth: 1,
       borderRadius: 6,
       paddingVertical: 3,
       paddingHorizontal: 8,
     },
-    txBadgeText: {
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'capitalize',
-    },
-    txCollege: { fontSize: 12, color: theme.tertiary },
-    txDetails: { fontSize: 13, color: theme.subtext, lineHeight: 18 },
-    txMetaRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 4,
-      paddingTop: 10,
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-    },
-    txMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    txMetaText: { fontSize: 11, color: theme.tertiary, fontWeight: '600' },
+    notifBadgeText: { fontSize: 10, fontWeight: '700' },
+    unreadDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#ef4444' },
+    notifMessage: { fontSize: 13, color: theme.text, lineHeight: 18 },
+    notifTime: { fontSize: 11, color: theme.tertiary, fontWeight: '600' },
 
     // Empty state
     emptyCard: {
@@ -878,9 +717,7 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 12,
       borderRadius: 10,
     },
-    drawerNavItemActive: { backgroundColor: theme.primary },
     drawerNavLabel: { fontSize: 14, fontWeight: '600', color: theme.subtext },
-    drawerNavLabelActive: { color: '#ffffff' },
     drawerLogout: {
       flexDirection: 'row',
       alignItems: 'center',

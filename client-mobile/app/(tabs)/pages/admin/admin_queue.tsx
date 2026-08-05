@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
+import NotificationBell from '@/components/NotificationBell';
+import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import api from '@/utils/api';
@@ -472,6 +474,12 @@ export default function AdminQueueScreen() {
                   resizeMode="contain"
                 />
               </Pressable>
+              <NotificationBell
+                endpointBase="admin"
+                theme={theme}
+                typePaths={ADMIN_NOTIFICATION_PATHS}
+                viewAllPath={ADMIN_NOTIFICATIONS_VIEW_ALL}
+              />
               <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
                 <Ionicons name="menu-outline" size={20} color={theme.text} />
               </Pressable>
@@ -870,6 +878,12 @@ export default function AdminQueueScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <NotificationBell
+              endpointBase="admin"
+              theme={theme}
+              typePaths={ADMIN_NOTIFICATION_PATHS}
+              viewAllPath={ADMIN_NOTIFICATIONS_VIEW_ALL}
+            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>

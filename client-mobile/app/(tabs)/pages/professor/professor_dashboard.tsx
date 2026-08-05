@@ -21,6 +21,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import NotificationBell from '@/components/NotificationBell';
+import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/coams_logo.png');
@@ -310,6 +312,12 @@ export default function ProfessorDashboardScreen() {
                 resizeMode="contain"
               />
             </Pressable>
+            <NotificationBell
+              endpointBase="faculty"
+              theme={theme}
+              typePaths={PROFESSOR_NOTIFICATION_PATHS}
+              viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
+            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>

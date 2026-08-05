@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { connectSocket } from '@/utils/socket';
 import api from '@/utils/api';
@@ -23,9 +24,12 @@ type NotificationBellTheme = {
   iconBtnBorder: string;
 };
 
+type NotificationType = 'queue' | 'document' | 'appointment' | 'announcement';
+
 type NotificationItem = {
   notification_id: number;
   message: string;
+  type: NotificationType;
   is_read: boolean;
   created_at: string;
 };
@@ -61,11 +65,16 @@ function formatTimestamp(iso: string) {
 export default function NotificationBell({
   endpointBase,
   theme,
+  typePaths,
+  viewAllPath,
 }: {
-  endpointBase: 'student' | 'faculty';
+  endpointBase: 'student' | 'faculty' | 'admin';
   theme: NotificationBellTheme;
+  typePaths: Partial<Record<NotificationType, string>>;
+  viewAllPath: string;
 }) {
   const { token } = useAuth();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const notificationsRef = useRef<NotificationItem[]>([]);
@@ -136,6 +145,17 @@ export default function NotificationBell({
     }
   };
 
+  const goToNotification = (item: NotificationItem) => {
+    if (!item.is_read) markRead(item.notification_id);
+    setOpen(false);
+    router.push((typePaths[item.type] ?? viewAllPath) as never);
+  };
+
+  const goToViewAll = () => {
+    setOpen(false);
+    router.push(viewAllPath as never);
+  };
+
   const styles = createStyles(theme);
 
   return (
@@ -168,13 +188,16 @@ export default function NotificationBell({
               renderItem={({ item }) => (
                 <Pressable
                   style={[styles.item, !item.is_read && styles.itemUnread]}
-                  onPress={() => !item.is_read && markRead(item.notification_id)}
+                  onPress={() => goToNotification(item)}
                 >
                   <Text style={styles.itemMessage}>{item.message}</Text>
                   <Text style={styles.itemTime}>{formatTimestamp(item.created_at)}</Text>
                 </Pressable>
               )}
             />
+            <Pressable style={styles.viewAllBtn} onPress={goToViewAll}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -218,7 +241,7 @@ function createStyles(theme: NotificationBellTheme) {
     },
     panel: {
       width: 300,
-      maxHeight: 380,
+      maxHeight: 420,
       borderRadius: 14,
       backgroundColor: theme.card,
       borderWidth: 1,
@@ -270,6 +293,17 @@ function createStyles(theme: NotificationBellTheme) {
     itemTime: {
       fontSize: 11,
       color: theme.subtext,
+    },
+    viewAllBtn: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    viewAllText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.primary,
     },
   });
 }
