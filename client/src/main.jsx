@@ -19,6 +19,7 @@ function ScrollToTop() {
 import "./index.css";
 import App from "./App.jsx";
 import Login from "./pages/Login.jsx";
+import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/stud-dashboard.jsx";
 import QueuePage from "./pages/student/stud-queue.jsx";
@@ -106,7 +107,7 @@ import { FacultyProvider } from "./contexts/FacultyProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { Toaster } from "sonner";
 
-const LoadingFallback = () => <div>Loading...</div>;
+const LoadingFallback = () => <LoadingOverlay />;
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

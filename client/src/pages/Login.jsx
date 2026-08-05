@@ -5,6 +5,7 @@ import { Mail, Lock, Sparkles, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { applyTheme, getSavedTheme } from "../utils/theme";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 import "./Login.css";
 
@@ -18,6 +19,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getSavedTheme() === "dark");
+  const [redirecting, setRedirecting] = useState(false);
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -64,6 +66,7 @@ export default function Login() {
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         toast.success(`Welcome back, ${userData.name}!`);
+        setRedirecting(true);
         setTimeout(() => {
           const roleRoutes = {
             student: "/student/dashboard",
@@ -215,6 +218,8 @@ export default function Login() {
       <p className="login-footer-copy">
         © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights reserved.
       </p>
+
+      {redirecting && <LoadingOverlay label="Signing you in..." />}
     </div>
   );
 }
