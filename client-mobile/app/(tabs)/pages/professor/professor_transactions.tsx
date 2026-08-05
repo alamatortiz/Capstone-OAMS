@@ -513,8 +513,8 @@ export default function ProfessorTransactionsScreen() {
                 );
               })}
             </ScrollView>
-            <Pressable style={styles.logoutCancelBtn} onPress={() => setSelectField(null)}>
-              <Text style={styles.logoutCancelBtnText}>Close</Text>
+            <Pressable style={styles.filterModalClose} onPress={() => setSelectField(null)}>
+              <Text style={styles.filterModalCloseText}>Close</Text>
             </Pressable>
           </View>
         </View>
@@ -931,5 +931,9 @@ function createStyles(theme: ThemePalette) {
     filterOptionRowActive: { backgroundColor: 'rgba(22, 163, 74, 0.12)' },
     filterOptionText: { fontSize: 13, color: theme.text, flex: 1, paddingRight: 8 },
     filterOptionTextActive: { color: theme.primary, fontWeight: '700' },
+    filterModalClose: {
+      paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4,
+    },
+    filterModalCloseText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
   });
 }

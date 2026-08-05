@@ -619,8 +619,8 @@ export default function StudentQueueScreen() {
                 );
               })}
             </ScrollView>
-            <Pressable style={styles.logoutCancelBtn} onPress={() => setActiveFilter(null)}>
-              <Text style={styles.logoutCancelBtnText}>Close</Text>
+            <Pressable style={styles.filterModalClose} onPress={() => setActiveFilter(null)}>
+              <Text style={styles.filterModalCloseText}>Close</Text>
             </Pressable>
           </View>
         </View>
@@ -1401,5 +1401,9 @@ function createStyles(theme: ThemePalette) {
       color: theme.primary,
       fontWeight: '700',
     },
+    filterModalClose: {
+      paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4,
+    },
+    filterModalCloseText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
   });
 }
