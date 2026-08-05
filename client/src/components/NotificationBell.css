@@ -47,11 +47,11 @@
 }
 
 .notif-bell-dropdown {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  width: 320px;
-  max-width: calc(100vw - 2rem);
+  /* `position`, `top`, and `left` are all set inline by NotificationBell.jsx
+     -- this is rendered via a portal into <body> (so it can escape the
+     desktop sidebar's `overflow-x: hidden`), so a plain CSS anchor here
+     would have nothing meaningful to be relative to. */
+  width: min(320px, calc(100vw - 24px));
   max-height: 400px;
   background: var(--card-bg, #111612);
   border: 1px solid var(--card-border, #1e3a23);
@@ -97,6 +97,22 @@
   overflow-y: auto;
 }
 
+.notif-bell-view-all {
+  display: block;
+  text-align: center;
+  padding: 0.625rem 1rem;
+  border-top: 1px solid var(--card-border, #1e3a23);
+  color: var(--primary-color, #16a34a);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.notif-bell-view-all:hover {
+  text-decoration: underline;
+}
+
 .notif-bell-empty {
   padding: 1.5rem 1rem;
   text-align: center;
@@ -138,10 +154,4 @@
 .notif-bell-time {
   font-size: 0.7rem;
   color: var(--muted-foreground, #94a3b8);
-}
-
-@media (max-width: 480px) {
-  .notif-bell-dropdown {
-    width: calc(100vw - 2rem);
-  }
 }

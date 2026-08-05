@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
+import NotificationBell from "./NotificationBell";
 
 import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/coams_logo.png";
@@ -86,6 +87,14 @@ const MoonIcon = () => (
   </svg>
 );
 
+// Where a clicked notification should land, by its `type`.
+const NOTIFICATION_TYPE_PATHS = {
+  queue: "/admin/queue",
+  document: "/admin/document-processing",
+  appointment: "/admin/appointments",
+  announcement: "/admin/announcements",
+};
+
 const navItems = [
   { icon: HomeIcon, label: "Dashboard", path: "/admin/dashboard" },
   { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
@@ -161,6 +170,11 @@ export default function AdminSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <NotificationBell
+              endpointBase="admin"
+              viewAllPath="/admin/notifications"
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
           </div>
 
           <div className="sidebar-user-section">
@@ -226,6 +240,12 @@ export default function AdminSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <NotificationBell
+              endpointBase="admin"
+              viewAllPath="/admin/notifications"
+              onOpen={() => setSidebarOpen(false)}
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
             <button
               className="sidebar-toggle"
               onClick={() => setSidebarOpen(!sidebarOpen)}

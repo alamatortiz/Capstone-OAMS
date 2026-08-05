@@ -6,8 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
-// NotificationBell temporarily disabled in the UI -- backend/DB stay wired
-// up for a later re-enable. See client/src/components/NotificationBell.jsx.
+import NotificationBell from "./NotificationBell";
 
 import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/coams_logo.png";
@@ -92,6 +91,16 @@ const MoonIcon = () => (
 const MegaphoneNavIcon = () => <LucideMegaphone />;
 const FileTextNavIcon = () => <LucideFileText />;
 
+// Where a clicked notification should land, by its `type` -- the screen
+// that actually shows the event the notification was about, not just the
+// generic notifications list.
+const NOTIFICATION_TYPE_PATHS = {
+  queue: "/student/queue-status",
+  document: "/student/document-status",
+  appointment: "/student/appointment-status",
+  announcement: "/student/announcements",
+};
+
 const navItems = [
   { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
   { icon: MegaphoneNavIcon, label: "Announcements", path: "/student/announcements" },
@@ -168,6 +177,11 @@ export default function StudentSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <NotificationBell
+              endpointBase="student"
+              viewAllPath="/student/notifications"
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
           </div>
 
           <div className="sidebar-user-section">
@@ -233,6 +247,12 @@ export default function StudentSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <NotificationBell
+              endpointBase="student"
+              viewAllPath="/student/notifications"
+              onOpen={() => setSidebarOpen(false)}
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
             <button
               className="sidebar-toggle"
               onClick={() => setSidebarOpen(!sidebarOpen)}

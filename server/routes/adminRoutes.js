@@ -21,6 +21,7 @@ const {
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
+const notificationsController = require("../controllers/notificationsController");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const {
   DB_STATUS_MAP,
@@ -603,7 +604,7 @@ router.patch(
         const uncalledPayload = { slotId, queueId: serving.queue_id, studentId: serving.student_id };
         emitToSlot(slotId, "queue:uncalled", uncalledPayload);
         emitToUser(serving.student_id, "queue:uncalled", uncalledPayload);
-        createNotification(serving.student_id, "The queue was paused while you were being served. You've been moved back to waiting.");
+        createNotification(serving.student_id, "The queue was paused while you were being served. You've been moved back to waiting.", "queue");
       }
       res.json({
         message: "Queue paused",
@@ -755,7 +756,7 @@ router.patch(
       for (const entry of affected) {
         const stoppedPayload = { slotId, queueId: entry.queue_id, studentId: entry.student_id, reason };
         emitToUser(entry.student_id, "queue:queue-stopped", stoppedPayload);
-        createNotification(entry.student_id, `The queue you were in was stopped: ${reason}`);
+        createNotification(entry.student_id, `The queue you were in was stopped: ${reason}`, "queue");
       }
 
       res.json({
@@ -870,7 +871,7 @@ router.patch(
       emitToSlot(slotId, "queue:called", calledPayload);
       emitToUser(next.student_id, "queue:called", calledPayload);
       emitToDept(deptId, "queue:called", calledPayload);
-      createNotification(next.student_id, "You've been called! Please proceed to the counter.");
+      createNotification(next.student_id, "You've been called! Please proceed to the counter.", "queue");
       sendPushNotification(
         next.student_id,
         "You've been called!",
@@ -1049,7 +1050,7 @@ router.patch(
       emitToSlot(slotId, "queue:served", servedPayload);
       emitToUser(serving.student_id, "queue:served", servedPayload);
       emitToDept(deptId, "queue:served", servedPayload);
-      createNotification(serving.student_id, "Your queue service has been completed.");
+      createNotification(serving.student_id, "Your queue service has been completed.", "queue");
 
       if (settleResult) {
         const settledPayload = { slotId, status: settleResult.newStatus };
@@ -1825,7 +1826,7 @@ router.patch(
       }
 
       emitToUser(request.faculty_id, "document:status-updated", { requestId, status });
-      createNotification(request.faculty_id, `Your document request is now ${status}.`);
+      createNotification(request.faculty_id, `Your document request is now ${status}.`, "document");
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -1919,7 +1920,7 @@ router.patch(
       }
 
       emitToUser(request.student_id, "document:status-updated", { requestId, status });
-      createNotification(request.student_id, `Your document request is now ${status}.`);
+      createNotification(request.student_id, `Your document request is now ${status}.`, "document");
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -3787,6 +3788,72 @@ router.post(
       res.json({ message: "Temporary password generated", tempPassword });
     } catch (error) {
       console.error("POST /users/:id/reset-password error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/notifications
+router.get(
+  "/notifications",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const result = await notificationsController.getNotifications(req.user.userId, {
+        type: req.query.type,
+        page: req.query.page,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("GET /notifications error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/notifications/:id/read
+router.patch(
+  "/notifications/:id/read",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const notificationId = parseInt(req.params.id, 10);
+    if (!notificationId || isNaN(notificationId)) {
+      return res.status(400).json({ error: "Invalid notification id" });
+    }
+
+    try {
+      const affectedRows = await notificationsController.markNotificationRead(
+        req.user.userId,
+        notificationId,
+      );
+      if (affectedRows === 0) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      res.json({ message: "Marked as read" });
+    } catch (error) {
+      console.error("PATCH /notifications/:id/read error:", error);
+      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+    }
+  },
+);
+
+// PATCH /api/admin/notifications/read-all
+router.patch(
+  "/notifications/read-all",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      await notificationsController.markAllNotificationsRead(req.user.userId);
+      res.json({ message: "All marked as read" });
+    } catch (error) {
+      console.error("PATCH /notifications/read-all error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
     }
   },

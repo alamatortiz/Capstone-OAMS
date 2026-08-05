@@ -8,8 +8,7 @@ import LogoutConfirmModal from "./LogoutConfirmModal";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import api from "../utils/api";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
-// NotificationBell temporarily disabled in the UI -- backend/DB stay wired
-// up for a later re-enable. See client/src/components/NotificationBell.jsx.
+import NotificationBell from "./NotificationBell";
 
 import ucLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/coams_logo.png";
@@ -84,6 +83,16 @@ const MoonIcon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
+
+// Where a clicked notification should land, by its `type`. Professor has no
+// dedicated queue or announcements screen, so those two fall back to the
+// dashboard rather than a dead/nonexistent route.
+const NOTIFICATION_TYPE_PATHS = {
+  queue: "/professor/dashboard",
+  document: "/professor/document-status",
+  appointment: "/professor/appointments",
+  announcement: "/professor/dashboard",
+};
 
 const navItems = [
   { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
@@ -197,6 +206,11 @@ export default function ProfessorSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <NotificationBell
+              endpointBase="faculty"
+              viewAllPath="/professor/notifications"
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
           </div>
 
           <div className="sidebar-user-section">
@@ -279,6 +293,12 @@ export default function ProfessorSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <NotificationBell
+              endpointBase="faculty"
+              viewAllPath="/professor/notifications"
+              onOpen={() => setSidebarOpen(false)}
+              typePaths={NOTIFICATION_TYPE_PATHS}
+            />
             <button
               className="sidebar-toggle"
               onClick={() => setSidebarOpen(!sidebarOpen)}

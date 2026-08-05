@@ -12,6 +12,7 @@ const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
 const { STATUS_LABEL_MAP } = require("../utils/documentStatus");
 const { createNotification } = require("../utils/notifications");
+const notificationsController = require("../controllers/notificationsController");
 const { UPLOAD_DIR } = require("../middleware/upload");
 const { getAttachmentsMap, isPathInsideUploadDir } = require("../utils/announcementAttachments");
 
@@ -1717,7 +1718,7 @@ router.delete(
         appointmentId,
         status: "cancelled",
       });
-      createNotification(appt.faculty_id, "A student cancelled their appointment with you.");
+      createNotification(appt.faculty_id, "A student cancelled their appointment with you.", "appointment");
 
       res.json({
         message: "Appointment cancelled successfully",
@@ -2344,7 +2345,7 @@ router.post(
         date: appointmentDate,
         spotsLeft: newSpotsLeft,
       });
-      createNotification(slot.faculty_id, "A student booked an appointment with you.");
+      createNotification(slot.faculty_id, "A student booked an appointment with you.", "appointment");
 
       // Read the just-written snapshot directly off the appointment row --
       // no join needed, since we populated it ourselves a moment ago.
@@ -2666,12 +2667,11 @@ router.get(
   authorizeRoles("student"),
   async (req, res) => {
     try {
-      const [rows] = await pool.query(
-        `SELECT notification_id, message, is_read, created_at
-         FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
-        [req.user.userId],
-      );
-      res.json({ notifications: rows });
+      const result = await notificationsController.getNotifications(req.user.userId, {
+        type: req.query.type,
+        page: req.query.page,
+      });
+      res.json(result);
     } catch (error) {
       sendServerError(res, error, "Get notifications error");
     }
@@ -2690,11 +2690,11 @@ router.patch(
     }
 
     try {
-      const [result] = await pool.query(
-        `UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND user_id = ?`,
-        [notificationId, req.user.userId],
+      const affectedRows = await notificationsController.markNotificationRead(
+        req.user.userId,
+        notificationId,
       );
-      if (result.affectedRows === 0) {
+      if (affectedRows === 0) {
         return res.status(404).json({ error: "Notification not found" });
       }
       res.json({ message: "Marked as read" });
@@ -2711,10 +2711,7 @@ router.patch(
   authorizeRoles("student"),
   async (req, res) => {
     try {
-      await pool.query(
-        `UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE`,
-        [req.user.userId],
-      );
+      await notificationsController.markAllNotificationsRead(req.user.userId);
       res.json({ message: "All marked as read" });
     } catch (error) {
       sendServerError(res, error, "Mark all notifications read error");

@@ -74,6 +74,7 @@ const AdminDataManagement = React.lazy(
 import AppointmentsPage from "./pages/student/stud-appointments.jsx";
 import DocumentsPage from "./pages/student/stud-documents.jsx";
 import TransactionsPage from "./pages/student/stud-transactions.jsx";
+import StudentNotifications from "./pages/student/stud-notifications.jsx";
 import ProfessorDashboard from "./pages/professor/prof-dashboard.jsx";
 
 const ProfessorAppointmentsPage = React.lazy(
@@ -91,10 +92,14 @@ const ProfessorDocumentStatusPage = React.lazy(
 const ProfessorScheduleManagerPage = React.lazy(
   () => import("./pages/professor/prof-schedule-manager.jsx"),
 );
+const ProfessorNotifications = React.lazy(
+  () => import("./pages/professor/prof-notifications.jsx"),
+);
 
 import AdminDashboard from "./pages/admin/adm-dashboard.jsx";
 import AdminAppointment from "./pages/admin/adm-appointment.jsx";
 import AdminTransaction from "./pages/admin/adm-transactions.jsx";
+import AdminNotifications from "./pages/admin/adm-notifications.jsx";
 import AdminQueue from "./pages/admin/adm-queue.jsx";
 import { QueueProvider } from "./contexts/QueueProvider.jsx";
 import { FacultyProvider } from "./contexts/FacultyProvider.jsx";
@@ -178,6 +183,10 @@ createRoot(document.getElementById("root")).render(
                 path="/student/transactions"
                 element={<TransactionsPage />}
               />
+              <Route
+                path="/student/notifications"
+                element={<StudentNotifications />}
+              />
             </Route>
 
             {/* ─── Protected Faculty Routes ──────────────────────────────────── */}
@@ -235,6 +244,15 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
+              {/* ★ Notifications page */}
+              <Route
+                path="/professor/notifications"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorNotifications />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* ─── Protected Admin Routes ────────────────────────────────────── */}
@@ -247,6 +265,10 @@ createRoot(document.getElementById("root")).render(
               <Route
                 path="/admin/transactions"
                 element={<AdminTransaction />}
+              />
+              <Route
+                path="/admin/notifications"
+                element={<AdminNotifications />}
               />
               <Route path="/admin/queue" element={<AdminQueue />} />
               <Route

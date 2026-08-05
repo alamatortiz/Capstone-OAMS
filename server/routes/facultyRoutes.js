@@ -7,6 +7,7 @@ const {
 } = require("../middleware/authMiddleware");
 const { getManilaDateString } = require("../utils/dateTime");
 const { createNotification } = require("../utils/notifications");
+const notificationsController = require("../controllers/notificationsController");
 const { emitToUser, emitToDept } = require("../sockets");
 const { isValidTransition } = require("../utils/appointmentStatus");
 
@@ -382,7 +383,7 @@ router.patch(
 
       emitToUser(appt.student_id, "appointment:status-updated", { appointmentId: Number(id), status });
       emitToDept(appt.department_id, "appointment:status-updated", { appointmentId: Number(id), status });
-      createNotification(appt.student_id, `Your appointment has been ${status}.`);
+      createNotification(appt.student_id, `Your appointment has been ${status}.`, "appointment");
 
       res.json({ message: "Status updated" });
     } catch (err) {
@@ -885,6 +886,7 @@ router.patch(
         createNotification(
           b.student_id,
           `Your appointment on ${dateStr} was cancelled because the professor changed that time slot. Please book a new one.`,
+          "appointment",
         );
       }
 
@@ -968,6 +970,7 @@ router.delete(
         createNotification(
           appt.student_id,
           `Your appointment on ${dateStr} was cancelled because the professor removed that time slot. Please book a new one.`,
+          "appointment",
         );
       }
 
@@ -1313,12 +1316,11 @@ router.get(
   authorizeRoles("faculty"),
   async (req, res) => {
     try {
-      const [rows] = await pool.query(
-        `SELECT notification_id, message, is_read, created_at
-         FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
-        [req.user.userId],
-      );
-      res.json({ notifications: rows });
+      const result = await notificationsController.getNotifications(req.user.userId, {
+        type: req.query.type,
+        page: req.query.page,
+      });
+      res.json(result);
     } catch (error) {
       console.error("GET /notifications error:", error);
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
@@ -1332,11 +1334,19 @@ router.patch(
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
+    const notificationId = parseInt(req.params.id, 10);
+    if (!notificationId || isNaN(notificationId)) {
+      return res.status(400).json({ error: "Invalid notification id" });
+    }
+
     try {
-      await pool.query(
-        `UPDATE notifications SET is_read = TRUE WHERE notification_id = ? AND user_id = ?`,
-        [req.params.id, req.user.userId],
+      const affectedRows = await notificationsController.markNotificationRead(
+        req.user.userId,
+        notificationId,
       );
+      if (affectedRows === 0) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
       res.json({ message: "Marked as read" });
     } catch (error) {
       res.status(500).json({ message: "Internal server error", dev_error: error.message });
@@ -1351,10 +1361,7 @@ router.patch(
   authorizeRoles("faculty"),
   async (req, res) => {
     try {
-      await pool.query(
-        `UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE`,
-        [req.user.userId],
-      );
+      await notificationsController.markAllNotificationsRead(req.user.userId);
       res.json({ message: "All marked as read" });
     } catch (error) {
       res.status(500).json({ message: "Internal server error", dev_error: error.message });

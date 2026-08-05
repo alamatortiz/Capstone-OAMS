@@ -47,7 +47,7 @@ function emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult }) {
   emitToSlot(slotId, "queue:no-show", noShowPayload);
   emitToUser(studentId, "queue:no-show", noShowPayload);
   emitToDept(deptId, "queue:no-show", noShowPayload);
-  createNotification(studentId, "You were marked as a no-show and your queue ticket was voided.");
+  createNotification(studentId, "You were marked as a no-show and your queue ticket was voided.", "queue");
 
   if (settleResult) {
     const settledPayload = { slotId, status: settleResult.newStatus };
