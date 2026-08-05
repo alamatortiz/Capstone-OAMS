@@ -877,11 +877,11 @@ body {
 
 @media (max-width: 640px) {
   .qt-analytics-grid-2 {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .qt-queue-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -921,7 +921,7 @@ body {
   }
 
   .qt-queue-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -936,7 +936,7 @@ body {
   }
 
   .qt-metrics-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }
 

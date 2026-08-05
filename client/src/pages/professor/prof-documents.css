@@ -862,7 +862,7 @@
   }
 
   .doc-card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .doc-card-field-full {

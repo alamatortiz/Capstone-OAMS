@@ -207,13 +207,6 @@
   color: #a855f7;
 }
 
-/* ===== College Statistics Section ===== */
-.admin-transaction-college-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
 .admin-transaction-section-header {
   display: flex;
   flex-direction: column;
@@ -235,102 +228,6 @@
   margin: 0;
   transition: color 0.3s ease;
   text-align: left;
-}
-
-.admin-transaction-college-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-}
-
-@media (max-width: 1024px) {
-  .admin-transaction-college-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .admin-transaction-college-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.admin-transaction-college-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 1.25rem;
-  transition: all 0.3s ease;
-}
-
-.admin-transaction-college-card:hover {
-  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.3);
-}
-
-.admin-transaction-college-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  text-align: left;
-}
-
-.admin-transaction-college-header svg {
-  width: 1.25rem;
-  height: 1.25rem;
-  color: var(--primary-color);
-  flex-shrink: 0;
-}
-
-.admin-transaction-college-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.admin-transaction-college-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.75rem;
-}
-
-.admin-transaction-college-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  text-align: center;
-}
-
-.admin-transaction-college-stat-label {
-  font-size: 0.7rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  transition: color 0.3s ease;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.admin-transaction-college-stat-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--primary-color);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.admin-transaction-college-queue {
-  color: #3b82f6;
-}
-
-.admin-transaction-college-appointment {
-  color: #10b981;
-}
-
-.admin-transaction-college-document {
-  color: #a855f7;
 }
 
 /* ===== Transaction Log Section ===== */
@@ -816,10 +713,6 @@
   .admin-transaction-filter-selects {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .admin-transaction-college-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 @media (max-width: 768px) {
@@ -880,7 +773,7 @@
   }
 
   .admin-transaction-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }
 
@@ -894,10 +787,6 @@
 
   .admin-transaction-section-header h2 {
     font-size: 1.05rem;
-  }
-
-  .admin-transaction-college-grid {
-    grid-template-columns: 1fr;
   }
 
   .admin-transaction-filter-selects {
