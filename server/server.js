@@ -31,6 +31,8 @@ const facultyRoutes = require("./routes/facultyRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { startNoShowSweeper } = require("./jobs/queueNoShowSweeper");
 const { startExpirySweeper } = require("./jobs/queueExpirySweeper");
+const { startDocumentPickupSweeper } = require("./jobs/documentPickupSweeper");
+const { startAppointmentReminderSweeper } = require("./jobs/appointmentReminderSweeper");
 const { initSocketServer } = require("./sockets");
 
 app.use("/api/auth", authRoutes);
@@ -64,3 +66,5 @@ server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 startNoShowSweeper();
 startExpirySweeper();
+startDocumentPickupSweeper();
+startAppointmentReminderSweeper();

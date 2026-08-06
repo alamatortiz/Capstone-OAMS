@@ -346,6 +346,12 @@ CREATE TABLE appointments (
     -- other timestamp column, so without this an approved/completed
     -- appointment would forever sort/display by its original booking time.
     updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by appointmentReminderSweeper.js once a reminder notification has
+    -- been sent for this appointment, so the sweep never re-notifies the
+    -- same appointment on a later run (unlike updated_at, a fixed
+    -- appointment_date/time keeps matching the sweep's "within N hours"
+    -- window on every tick until the appointment passes).
+    reminder_sent_at    TIMESTAMP    NULL DEFAULT NULL,
     -- Computed from this row's own columns; NULL whenever status is
     -- cancelled/rejected, so any number of cancelled/rejected rows can share
     -- the same student/faculty/date/time -- only a genuinely ACTIVE duplicate

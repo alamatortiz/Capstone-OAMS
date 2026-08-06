@@ -46,6 +46,9 @@ docker-compose.override.yml
 # firebase service account keys (uploaded to EAS credentials, never committed)
 *firebase-adminsdk*.json
 
+# internal ops reference doc, kept local only
+docs/aiven-schema-sync.md
+
 # OS file
 .DS_Store
 Thumbs.db

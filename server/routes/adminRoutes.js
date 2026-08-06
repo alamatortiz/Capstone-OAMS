@@ -2704,6 +2704,25 @@ router.post(
       const attachments = await getAttachments(result.insertId);
       emitToDept(deptId, "announcement:changed", { announcementId: result.insertId });
 
+      // Automatically notify every student and faculty member in the
+      // department -- announcements previously reached nobody through the
+      // notifications system despite `type='announcement'` existing in the
+      // ENUM since it was built. Fire-and-forget like every other
+      // createNotification call site in this file; a failure here must
+      // never affect the already-committed announcement.
+      (async () => {
+        try {
+          const [[students], [faculty]] = await Promise.all([
+            pool.query(`SELECT student_id AS user_id FROM students WHERE department_id = ?`, [deptId]),
+            pool.query(`SELECT faculty_id AS user_id FROM faculty WHERE department_id = ?`, [deptId]),
+          ]);
+          const message = `A new announcement has been posted: "${title.trim()}"`;
+          [...students, ...faculty].forEach((row) => createNotification(row.user_id, message, "announcement"));
+        } catch (err) {
+          console.error("Announcement broadcast notification error:", err.message);
+        }
+      })();
+
       res.status(201).json({
         announcement: {
           id: String(result.insertId),
