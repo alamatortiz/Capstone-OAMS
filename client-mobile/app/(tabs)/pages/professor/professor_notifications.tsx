@@ -3,6 +3,7 @@ import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   AppState,
+  DeviceEventEmitter,
   Image,
   Modal,
   Pressable,
@@ -19,7 +20,11 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
-import NotificationBell from '@/components/NotificationBell';
+import NotificationBell, {
+  WATCHED_EVENTS,
+  NOTIFICATIONS_SYNC_EVENT,
+  broadcastNotificationsChanged,
+} from '@/components/NotificationBell';
 import {
   NOTIFICATION_TYPE_META,
   PROFESSOR_NOTIFICATION_PATHS,
@@ -109,22 +114,14 @@ const navItems: NavItem[] = [
 
 type TypeFilter = 'all' | NotificationType;
 
+// Queue and Announcement are deliberately excluded from the filter: this
+// system never creates queue-type notifications for faculty, and never
+// creates announcement-type notifications for anyone (announcements only
+// ever broadcast live over Socket.IO, bypassing the notifications table).
 const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'all', label: 'All Types' },
-  { value: 'queue', label: 'Queue' },
   { value: 'document', label: 'Document' },
   { value: 'appointment', label: 'Appointment' },
-  { value: 'announcement', label: 'Announcement' },
-];
-
-const WATCHED_EVENTS = [
-  'queue:called',
-  'queue:served',
-  'queue:uncalled',
-  'queue:queue-stopped',
-  'appointment:status-updated',
-  'appointment:slot-updated',
-  'document:status-updated',
 ];
 
 export default function ProfessorNotificationsScreen() {
@@ -215,12 +212,19 @@ export default function ProfessorNotificationsScreen() {
     return () => clearInterval(interval);
   }, [token, fetchNotifications]);
 
+  useEffect(() => {
+    const refetch = () => fetchNotifications(1);
+    const sub = DeviceEventEmitter.addListener(NOTIFICATIONS_SYNC_EVENT, refetch);
+    return () => sub.remove();
+  }, [fetchNotifications]);
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const markRead = async (id: number) => {
     setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
     try {
       await api.patch(`/faculty/notifications/${id}/read`);
+      broadcastNotificationsChanged();
     } catch {
       setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)));
     }
@@ -231,6 +235,7 @@ export default function ProfessorNotificationsScreen() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
       await api.patch('/faculty/notifications/read-all');
+      broadcastNotificationsChanged();
     } catch {
       setNotifications(previous);
     }
@@ -303,7 +308,7 @@ export default function ProfessorNotificationsScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Notifications</Text>
-              <Text style={styles.pageSubtitle}>Stay updated on queue, document, appointment, and announcement activity</Text>
+              <Text style={styles.pageSubtitle}>Stay updated on document and appointment activity</Text>
             </View>
           </View>
 

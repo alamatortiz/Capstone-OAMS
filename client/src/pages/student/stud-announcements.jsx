@@ -138,21 +138,44 @@ export default function AnnouncementsPage() {
   };
 
   // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
+  // `announcements` holds whatever page(s) have been loaded for the CURRENT
+  // tab only -- filtering/pagination now happens server-side (see
+  // fetchAnnouncements), so there's no separate "all announcements ever
+  // fetched" cache to filter client-side anymore.
   const [announcements, setAnnouncements] = useState([]);
   const [annLoading, setAnnLoading] = useState(true);
   const [annError, setAnnError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Mirrors `announcements` for the catch block below, without making
   // fetchAnnouncements depend on (and change identity with) the state itself.
   const announcementsRef = useRef(announcements);
   useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
 
-  const fetchAnnouncements = useCallback(async () => {
+  // Guards against out-of-order responses: e.g. switching tabs while a Load
+  // More request for the previous tab is still in flight would otherwise let
+  // the stale response land after the fresh one and get appended onto the
+  // wrong tab's list. Each call captures the current token; a response is
+  // only applied if its token is still the latest by the time it resolves.
+  const requestIdRef = useRef(0);
+
+  const fetchAnnouncements = useCallback(async (pageNum, category) => {
+    const requestId = ++requestIdRef.current;
     setAnnError(null);
+    if (pageNum > 1) setLoadingMore(true);
     try {
-      const { data } = await api.get("/student/announcements");
-      setAnnouncements(data.announcements ?? []);
+      const { data } = await api.get("/student/announcements", {
+        params: { category, page: pageNum },
+      });
+      if (requestId !== requestIdRef.current) return;
+      const fetched = data.announcements ?? [];
+      setAnnouncements((prev) => (pageNum > 1 ? [...prev, ...fetched] : fetched));
+      setPage(data.page ?? pageNum);
+      setTotalPages(data.totalPages ?? 1);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error("Fetch announcements error:", err);
       if (announcementsRef.current.length === 0) {
         setAnnError("Could not load announcements. Please try again.");
@@ -160,35 +183,52 @@ export default function AnnouncementsPage() {
         toast.error("Could not refresh announcements.");
       }
     } finally {
-      setAnnLoading(false);
+      if (requestId === requestIdRef.current) {
+        setAnnLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
+  // Fresh load at page 1 whenever the mount happens or the selected tab
+  // changes -- explicitly shows the loading state (rather than a silent
+  // background refresh) since the visible content is about to change.
   useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
+    setAnnLoading(true);
+    fetchAnnouncements(1, selectedFilter);
+  }, [selectedFilter, fetchAnnouncements]);
 
-  // ── Live updates: refetch when an admin posts/edits/removes an announcement ──
+  const handleLoadMore = () => {
+    if (loadingMore || page >= totalPages) return;
+    fetchAnnouncements(page + 1, selectedFilter);
+  };
+
+  // ── Live updates: refetch when an admin posts/edits/removes an
+  // announcement. Refetches the currently active tab from page 1 (a full
+  // resync), silently -- unlike the effect above, this doesn't toggle
+  // annLoading, since it's a background refresh of content already on
+  // screen, not a user-driven navigation to new content. ────────────────
   useEffect(() => {
     if (!token) return;
 
     const socket = connectSocket(token);
     if (!socket) return;
 
-    socket.on("announcement:changed", fetchAnnouncements);
+    const refetchCurrentTab = () => fetchAnnouncements(1, selectedFilter);
+    socket.on("announcement:changed", refetchCurrentTab);
 
     return () => {
-      socket.off("announcement:changed", fetchAnnouncements);
+      socket.off("announcement:changed", refetchCurrentTab);
     };
-  }, [fetchAnnouncements, token]);
+  }, [fetchAnnouncements, selectedFilter, token]);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible") fetchAnnouncements();
+      if (document.visibilityState === "visible") fetchAnnouncements(1, selectedFilter);
     }, 45000);
     return () => clearInterval(interval);
-  }, [fetchAnnouncements]);
+  }, [fetchAnnouncements, selectedFilter]);
 
   // ── Filter tabs ────────────────────────────────────────────────────────────
   const filterTabs = [
@@ -200,17 +240,7 @@ export default function AnnouncementsPage() {
     { id: "general", label: "General" },
   ];
 
-  // ── Filtered announcements. The backend already scopes the list to the
-  //    student's own department, so only the category tab filter is
-  //    applied here. ──────────────────────────────────────────────────
-  const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
-  // Pinned announcements are NOT excluded here -- they have their own
-  // dedicated "Pinned" tab, but a pinned item matching the selected
-  // category (or "All") should still appear in that tab too, rather than
-  // only ever being visible under "Pinned".
-  const filteredAnnouncements = announcements.filter(
-    (a) => selectedFilter === "all" || a.category === selectedFilter,
-  );
+  const hasMore = page < totalPages;
 
   const getCategoryColor = (announcement) => {
     if (announcement.isPinned) return "announcement-pinned";
@@ -238,6 +268,7 @@ export default function AnnouncementsPage() {
 
   // ── Per-tab empty state copy ────────────────────────────────────────────
   const emptyStateCopy = {
+    pinned: { title: "No Pinned Announcements", description: "There are no pinned announcements yet." },
     all: { title: "No Announcements Found", description: "There are no announcements yet." },
     important: { title: "No Important Announcements Found", description: "There are no important announcements yet." },
     event: { title: "No Event Announcements Found", description: "There are no event announcements yet." },
@@ -344,7 +375,7 @@ export default function AnnouncementsPage() {
               <AlertCircleIcon />
               <h3>Something went wrong</h3>
               <p>{annError}</p>
-              <button className="ann-retry-btn" onClick={fetchAnnouncements}>
+              <button className="ann-retry-btn" onClick={() => fetchAnnouncements(1, selectedFilter)}>
                 Retry
               </button>
             </div>
@@ -373,134 +404,83 @@ export default function AnnouncementsPage() {
             </div>
           )}
 
-          {/* Pinned Tab Content */}
-          {!annLoading && selectedFilter === "pinned" && (
+          {/* Active tab's content -- server already returns exactly this
+              tab's items (see fetchAnnouncements), so there's just one list
+              to render regardless of which tab is selected. */}
+          {!annLoading && (
             <section className="announcements-section">
-              {pinnedAnnouncements.length === 0 ? (
-                <div className="ann-empty-state">
-                  <MegaphoneIcon />
-                  <h3>No Pinned Announcements</h3>
-                  <p>There are no pinned announcements yet.</p>
-                </div>
-              ) : (
-                <div className="announcements-list">
-                  {pinnedAnnouncements.map((announcement) => (
-                    <div
-                      key={announcement.id}
-                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement)}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setViewingAnnouncement(announcement)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setViewingAnnouncement(announcement);
-                        }
-                      }}
-                    >
-                      <div className="announcement-header">
-                        <div className="announcement-icon">
-                          {getAnnouncementIcon(announcement.category)}
-                        </div>
-                        <div className="announcement-content">
-                          <div className="announcement-title-group">
-                            <h3 className="announcement-title">
-                              {announcement.title}
-                              {announcement.attachments?.length > 0 && (
-                                <PaperclipIcon className="announcement-attachment-flag" />
-                              )}
-                            </h3>
-                            <div className="announcement-meta">
-                              <span className="announcement-college">
-                                {announcement.college}
-                              </span>
-                              <span className="announcement-date">
-                                {formatPostedLabel(announcement, "short")}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="announcement-description">
-                            {announcement.description}
-                          </p>
-                        </div>
-                        <span
-                          className={`announcement-badge ${announcement.isPinned ? "badge-pinned" : `badge-${announcement.category}`}`}
-                        >
-                          {announcement.category
-                            ? announcement.category.charAt(0).toUpperCase() +
-                              announcement.category.slice(1)
-                            : "Notice"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* All / Category Tab Content */}
-          {!annLoading && selectedFilter !== "pinned" && (
-            <section className="announcements-section">
-              {filteredAnnouncements.length === 0 ? (
+              {announcements.length === 0 ? (
                 <div className="ann-empty-state">
                   <MegaphoneIcon />
                   <h3>{currentEmptyState.title}</h3>
                   <p>{currentEmptyState.description}</p>
                 </div>
               ) : (
-                <div className="announcements-list">
-                  {filteredAnnouncements.map((announcement) => (
-                    <div
-                      key={announcement.id}
-                      className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement)}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setViewingAnnouncement(announcement)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setViewingAnnouncement(announcement);
-                        }
-                      }}
-                    >
-                      <div className="announcement-header">
-                        <div className="announcement-icon">
-                          {getAnnouncementIcon(announcement.category)}
-                        </div>
-                        <div className="announcement-content">
-                          <div className="announcement-title-group">
-                            <h3 className="announcement-title">
-                              {announcement.title}
-                              {announcement.attachments?.length > 0 && (
-                                <PaperclipIcon className="announcement-attachment-flag" />
-                              )}
-                            </h3>
-                            <div className="announcement-meta">
-                              <span className="announcement-college">
-                                {announcement.college}
-                              </span>
-                              <span className="announcement-date">
-                                {formatPostedLabel(announcement, "short")}
-                              </span>
-                            </div>
+                <>
+                  <div className="announcements-list">
+                    {announcements.map((announcement) => (
+                      <div
+                        key={announcement.id}
+                        className={`announcement-card announcement-card-clickable ${getCategoryColor(announcement)}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setViewingAnnouncement(announcement)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setViewingAnnouncement(announcement);
+                          }
+                        }}
+                      >
+                        <div className="announcement-header">
+                          <div className="announcement-icon">
+                            {getAnnouncementIcon(announcement.category)}
                           </div>
-                          <p className="announcement-description">
-                            {announcement.description}
-                          </p>
+                          <div className="announcement-content">
+                            <div className="announcement-title-group">
+                              <h3 className="announcement-title">
+                                {announcement.title}
+                                {announcement.attachments?.length > 0 && (
+                                  <PaperclipIcon className="announcement-attachment-flag" />
+                                )}
+                              </h3>
+                              <div className="announcement-meta">
+                                <span className="announcement-college">
+                                  {announcement.college}
+                                </span>
+                                <span className="announcement-date">
+                                  {formatPostedLabel(announcement, "short")}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="announcement-description">
+                              {announcement.description}
+                            </p>
+                          </div>
+                          <span
+                            className={`announcement-badge ${announcement.isPinned ? "badge-pinned" : `badge-${announcement.category}`}`}
+                          >
+                            {announcement.category
+                              ? announcement.category.charAt(0).toUpperCase() +
+                                announcement.category.slice(1)
+                              : "Notice"}
+                          </span>
                         </div>
-                        <span
-                          className={`announcement-badge ${announcement.isPinned ? "badge-pinned" : `badge-${announcement.category}`}`}
-                        >
-                          {announcement.category
-                            ? announcement.category.charAt(0).toUpperCase() +
-                              announcement.category.slice(1)
-                            : "Notice"}
-                        </span>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+
+                  {hasMore && (
+                    <button
+                      type="button"
+                      className="ann-load-more-btn"
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? "Loading…" : "Load More"}
+                    </button>
+                  )}
+                </>
               )}
             </section>
           )}

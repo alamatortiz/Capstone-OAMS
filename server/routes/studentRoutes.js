@@ -278,12 +278,25 @@ router.get(
 
 // GET /api/student/announcements
 // Returns only the student's own department's announcements.
+//
+// `category` is optional and toggles between two distinct call shapes:
+//  - omitted: full, unpaginated department history (all categories) -- the
+//    shape the dashboard's "Pinned Announcements" widget relies on, since it
+//    needs the complete pinned set to preview/count correctly, not one page
+//    of one category. { announcements }
+//  - provided ("pinned" | "all" | important/event/reminder/general): paged,
+//    category-scoped result for the dedicated Announcements screen's
+//    tabs + Load More. { announcements, page, totalPages }
+const ANNOUNCEMENT_CATEGORIES = ["important", "event", "reminder", "general"];
+const ANNOUNCEMENTS_PAGE_SIZE = 10;
+
 router.get(
   "/announcements",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
+    const { category } = req.query;
     try {
       const [[stu]] = await pool.query(
         `SELECT department_id FROM students WHERE student_id = ?`,
@@ -291,8 +304,18 @@ router.get(
       );
       const studentDeptId = stu?.department_id ?? null;
 
-      const [rows] = await pool.query(
-        `SELECT
+      const filterClauses = ["a.department_id = ?", "a.status = 'active'"];
+      const filterParams = [studentDeptId];
+      if (category === "pinned") {
+        filterClauses.push("a.is_pinned = 1");
+      } else if (ANNOUNCEMENT_CATEGORIES.includes(category)) {
+        filterClauses.push("a.type = ?");
+        filterParams.push(category);
+      }
+      const whereClause = `WHERE ${filterClauses.join(" AND ")}`;
+
+      const baseSelect = `
+        SELECT
            a.announcement_id,
            a.title,
            a.content,
@@ -305,10 +328,28 @@ router.get(
            d.department_abbreviation
          FROM announcements a
          JOIN departments d ON a.department_id = d.department_id
-         WHERE a.department_id = ? AND a.status = 'active'
-         ORDER BY a.is_pinned DESC, a.updated_at DESC`,
-        [studentDeptId],
-      );
+         ${whereClause}
+         ORDER BY a.is_pinned DESC, a.updated_at DESC`;
+
+      let rows;
+      let page;
+      let totalPages;
+      if (category) {
+        page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const offset = (page - 1) * ANNOUNCEMENTS_PAGE_SIZE;
+        const [[{ total }]] = await pool.query(
+          `SELECT COUNT(*) AS total FROM announcements a ${whereClause}`,
+          filterParams,
+        );
+        totalPages = Math.max(1, Math.ceil(total / ANNOUNCEMENTS_PAGE_SIZE));
+        [rows] = await pool.query(`${baseSelect} LIMIT ? OFFSET ?`, [
+          ...filterParams,
+          ANNOUNCEMENTS_PAGE_SIZE,
+          offset,
+        ]);
+      } else {
+        [rows] = await pool.query(baseSelect, filterParams);
+      }
 
       const attachmentsMap = await getAttachmentsMap(rows.map((row) => row.announcement_id));
 
@@ -327,7 +368,7 @@ router.get(
         attachments: attachmentsMap[row.announcement_id] || [],
       }));
 
-      res.json({ announcements });
+      res.json(category ? { announcements, page, totalPages } : { announcements });
     } catch (error) {
       sendServerError(res, error, "Fetch announcements error");
     }
@@ -1865,7 +1906,8 @@ router.get(
 
     const { search, type, status } = req.query;
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
-    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const offset = (page - 1) * limit;
 
     // Each branch is only ever filtered by student_id -- type/status/search
     // are applied once, on the unioned result, so they consider the
@@ -1938,20 +1980,24 @@ router.get(
         ? `WHERE ${filterClauses.join(" AND ")}`
         : "";
 
-      // Request one extra row so `hasMore` can be derived without a second
-      // COUNT query -- trimmed off before the response is built.
+      // Total count over the FILTERED (search/type/status) result set, used
+      // to compute totalPages -- distinct from the stats query below, which
+      // is always scoped to the student's unfiltered full history.
+      const [[{ total: filteredTotal }]] = await pool.query(
+        `SELECT COUNT(*) AS total FROM (${unionSql}) AS combined ${whereClause}`,
+        [studentId, studentId, studentId, ...filterParams],
+      );
+      const totalPages = Math.max(1, Math.ceil(filteredTotal / limit));
+
       const [rows] = await pool.query(
         `SELECT * FROM (${unionSql}) AS combined
          ${whereClause}
          ORDER BY event_time DESC
          LIMIT ? OFFSET ?`,
-        [studentId, studentId, studentId, ...filterParams, limit + 1, offset],
+        [studentId, studentId, studentId, ...filterParams, limit, offset],
       );
 
-      const hasMore = rows.length > limit;
-      const pageRows = hasMore ? rows.slice(0, limit) : rows;
-
-      const transactions = pageRows.map((row) => {
+      const transactions = rows.map((row) => {
         const eventDate = new Date(row.event_time);
         return {
           id: `${row.type}-${row.id}`,
@@ -1989,9 +2035,9 @@ router.get(
       const [[statsRow]] = await pool.query(
         `SELECT
            COUNT(*) AS total,
-           SUM(raw_status IN (?)) AS completed,
-           SUM(raw_status IN (?)) AS ongoing,
-           SUM(event_time >= ?) AS thisMonth
+           COALESCE(SUM(raw_status IN (?)), 0) AS completed,
+           COALESCE(SUM(raw_status IN (?)), 0) AS ongoing,
+           COALESCE(SUM(event_time >= ?), 0) AS thisMonth
          FROM (${unionSql}) AS combined`,
         [
           STATUS_GROUPS.completed,
@@ -2005,7 +2051,8 @@ router.get(
 
       res.json({
         transactions,
-        hasMore,
+        page,
+        totalPages,
         stats: {
           total: statsRow.total,
           completed: statsRow.completed,

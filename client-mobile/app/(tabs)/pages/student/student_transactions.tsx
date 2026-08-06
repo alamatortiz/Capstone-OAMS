@@ -145,7 +145,8 @@ export default function StudentTransactionsScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
   const router = useRouter();
@@ -175,25 +176,28 @@ export default function StudentTransactionsScreen() {
   // Search/type/status filtering happens server-side (so it considers the
   // student's whole history, not just whatever page is currently loaded).
   // Any change to those filters — including the ones baked into this
-  // callback's identity below — resets back to the first page; only
-  // "Load More" advances the offset.
-  const fetchTransactions = useCallback(async (offset = 0) => {
+  // callback's identity below — resets back to the first page (mirrors
+  // student_notifications.tsx: pageNum is always an explicit argument, never
+  // read from `page` state, so a filter change re-fires the mount effect
+  // below with pageNum=1 with no extra reset logic needed).
+  const fetchTransactions = useCallback(async (pageNum = 1) => {
     const requestId = ++requestIdRef.current;
     try {
-      if (offset > 0) setLoadingMore(true);
+      if (pageNum > 1) setLoadingMore(true);
       const { data } = await api.get('/student/transactions', {
         params: {
           search: debouncedSearch || undefined,
           type: filterType !== 'all' ? filterType : undefined,
           status: filterStatus !== 'all' ? filterStatus : undefined,
           limit: 20,
-          offset,
+          page: pageNum,
         },
       });
       if (requestId !== requestIdRef.current) return;
       const newTransactions: Transaction[] = data.transactions ?? [];
-      setTransactions((prev) => (offset > 0 ? [...prev, ...newTransactions] : newTransactions));
-      setHasMore(!!data.hasMore);
+      setTransactions((prev) => (pageNum > 1 ? [...prev, ...newTransactions] : newTransactions));
+      setPage(data.page ?? pageNum);
+      setTotalPages(data.totalPages ?? 1);
       if (data.stats) setTxStats(data.stats);
       setTxError(null);
     } catch (err) {
@@ -213,12 +217,12 @@ export default function StudentTransactionsScreen() {
   }, [debouncedSearch, filterType, filterStatus]);
 
   useEffect(() => {
-    fetchTransactions(0);
+    fetchTransactions(1);
   }, [fetchTransactions]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMore) return;
-    fetchTransactions(transactions.length);
+    if (loadingMore || page >= totalPages) return;
+    fetchTransactions(page + 1);
   };
 
   // Queue events (and document:cancelled) are broadcast department-wide, not
@@ -228,7 +232,7 @@ export default function StudentTransactionsScreen() {
   const handleOwnQueueEvent = useCallback(
     (payload: { studentId?: number | string }) => {
       if (Number(payload?.studentId) === Number(user?.userId)) {
-        fetchTransactions(0);
+        fetchTransactions(1);
       }
     },
     [fetchTransactions, user?.userId],
@@ -243,7 +247,7 @@ export default function StudentTransactionsScreen() {
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const refetchFirstPage = () => fetchTransactions(0);
+    const refetchFirstPage = () => fetchTransactions(1);
     const ownEvents = ['document:status-updated', 'appointment:status-updated'];
     const deptWideEvents = [
       'queue:called',
@@ -266,7 +270,7 @@ export default function StudentTransactionsScreen() {
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchTransactions(0);
+      fetchTransactions(1);
     }, 45000);
     return () => clearInterval(interval);
   }, [fetchTransactions]);
@@ -412,7 +416,7 @@ export default function StudentTransactionsScreen() {
               <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>Could not load transactions</Text>
               <Text style={styles.emptyDescription}>{txError}</Text>
-              <Pressable style={styles.filterSelect} onPress={() => fetchTransactions(0)}>
+              <Pressable style={styles.filterSelect} onPress={() => fetchTransactions(1)}>
                 <Text style={styles.filterSelectText}>Retry</Text>
               </Pressable>
             </View>
@@ -465,7 +469,7 @@ export default function StudentTransactionsScreen() {
             </View>
           )}
 
-          {!txLoading && !txError && hasMore && (
+          {!txLoading && !txError && page < totalPages && (
             <Pressable style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
               <Text style={styles.loadMoreBtnText}>{loadingMore ? 'Loading…' : 'Load More'}</Text>
             </Pressable>

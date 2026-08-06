@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft, Bell, Clock, FileText, Calendar, Megaphone } from "lucide-react";
 import AdminPageShell from "../../components/AdminPageShell";
@@ -24,10 +24,10 @@ const ChevronDownIcon = ({ className = "" }) => (
 );
 
 const TYPE_META = {
-  queue: { label: "Queue", icon: Clock, badgeClass: "notif-badge-queue", iconClass: "notif-icon-queue" },
-  document: { label: "Document", icon: FileText, badgeClass: "notif-badge-document", iconClass: "notif-icon-document" },
-  appointment: { label: "Appointment", icon: Calendar, badgeClass: "notif-badge-appointment", iconClass: "notif-icon-appointment" },
-  announcement: { label: "Announcement", icon: Megaphone, badgeClass: "notif-badge-announcement", iconClass: "notif-icon-announcement" },
+  queue: { label: "Queue", updateLabel: "Queue Update", icon: Clock, badgeClass: "notif-badge-queue", iconClass: "notif-icon-queue" },
+  document: { label: "Document", updateLabel: "Document Update", icon: FileText, badgeClass: "notif-badge-document", iconClass: "notif-icon-document" },
+  appointment: { label: "Appointment", updateLabel: "Appointment Update", icon: Calendar, badgeClass: "notif-badge-appointment", iconClass: "notif-icon-appointment" },
+  announcement: { label: "Announcement", updateLabel: "Announcement Update", icon: Megaphone, badgeClass: "notif-badge-announcement", iconClass: "notif-icon-announcement" },
 };
 
 const TYPE_OPTIONS = [
@@ -56,19 +56,29 @@ export default function AdminNotifications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Guards against out-of-order responses: e.g. changing the type filter and
+  // then the page before the first request resolves would otherwise let the
+  // stale response land after the fresh one and overwrite it. Each call
+  // captures the current token; a response is only applied if its token is
+  // still the latest by the time it resolves.
+  const requestIdRef = useRef(0);
+
   const fetchNotifications = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       setError(null);
       const res = await api.get("/admin/notifications", {
         params: { type: filterType !== "all" ? filterType : undefined, page },
       });
+      if (requestId !== requestIdRef.current) return;
       setNotifications(res.data.notifications ?? []);
       setTotalPages(res.data.totalPages ?? 1);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error("Failed to fetch notifications:", err);
       setError("Could not load your notifications.");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [filterType, page]);
 
@@ -127,8 +137,8 @@ export default function AdminNotifications() {
   };
 
   return (
-    <AdminPageShell outerClassName="notifications-with-sidebar" mainClassName="notifications-main">
-      <div className="notifications-container">
+    <AdminPageShell outerClassName="adm-notifications-with-sidebar" mainClassName="adm-notifications-main">
+      <div className="adm-notifications-container">
         <PageHeader
           breadcrumb={
             <Link to="/admin/dashboard" className="breadcrumb-link">
@@ -165,55 +175,58 @@ export default function AdminNotifications() {
           </div>
         </div>
 
-        <div className="notif-list-card">
-          <div className="notif-list-header">
-            <h2>Recent Notifications</h2>
-            <p>Queue, document, appointment, and announcement activity</p>
-          </div>
-          <div className="notifications-list">
-            {loading ? (
-              <div className="notif-empty-state">
-                <Bell />
-                <h3>Loading notifications…</h3>
-              </div>
-            ) : error ? (
-              <div className="notif-empty-state">
-                <Bell />
-                <h3>Could not load notifications</h3>
-                <p>{error}</p>
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="notif-empty-state">
-                <Bell />
-                <h3>No Notifications</h3>
-                <p>You're all caught up.</p>
-              </div>
-            ) : (
-              notifications.map((n) => {
-                const meta = TYPE_META[n.type] ?? TYPE_META.queue;
-                const TypeIcon = meta.icon;
-                return (
-                  <button
-                    type="button"
-                    key={n.notification_id}
-                    className={`notif-item ${n.is_read ? "" : "notif-item--unread"}`}
-                    onClick={() => goToNotification(n)}
-                  >
-                    <span className={`notif-item-icon ${meta.iconClass}`}>
-                      <TypeIcon />
-                    </span>
-                    <span className="notif-item-body">
-                      <span className="notif-item-top">
+        <div className="notifications-list">
+          {loading ? (
+            <div className="notif-empty-state">
+              <Bell />
+              <h3>Loading notifications…</h3>
+            </div>
+          ) : error ? (
+            <div className="notif-empty-state">
+              <Bell />
+              <h3>Could not load notifications</h3>
+              <p>{error}</p>
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="notif-empty-state">
+              <Bell />
+              <h3>No Notifications</h3>
+              <p>You're all caught up.</p>
+            </div>
+          ) : (
+            notifications.map((n) => {
+              const meta = TYPE_META[n.type] ?? TYPE_META.queue;
+              const TypeIcon = meta.icon;
+              return (
+                <button
+                  type="button"
+                  key={n.notification_id}
+                  className={`notif-item notif-item-${n.type} ${n.is_read ? "" : "notif-item--unread"}`}
+                  onClick={() => goToNotification(n)}
+                >
+                  <span className={`notif-item-icon ${meta.iconClass}`}>
+                    <TypeIcon />
+                  </span>
+                  <span className="notif-item-content">
+                    <span className="notif-item-header">
+                      <span className="notif-item-title">{meta.updateLabel}</span>
+                      <span className="notif-item-badges">
                         <span className={`notif-badge ${meta.badgeClass}`}>{meta.label}</span>
-                        <span className="notif-item-time">{formatManilaDateTime(n.created_at)}</span>
+                        {!n.is_read && <span className="notif-badge notif-badge-unread">Unread</span>}
                       </span>
-                      <span className="notif-item-message">{n.message}</span>
                     </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
+                    <span className="notif-item-message">{n.message}</span>
+                  </span>
+                  <span className="notif-item-meta">
+                    <span className="notif-item-time">
+                      <Clock className="notif-item-time-icon" />
+                      {formatManilaDateTime(n.created_at)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          )}
         </div>
 
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />

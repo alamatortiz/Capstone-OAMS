@@ -92,11 +92,17 @@ interface DocumentRequest {
   neededBy?: string;
 }
 
+interface DocumentRequirement {
+  name: string;
+  description?: string;
+  isMandatory: boolean;
+}
+
 interface DocumentTypeOption {
   id: number;
   name: string;
   processingTime: string;
-  requirements: string[];
+  requirements: DocumentRequirement[];
 }
 
 interface NavItem {
@@ -113,13 +119,13 @@ const navItems: NavItem[] = [
 ];
 
 const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string; color: string; icon: IoniconName }> = {
-  pending: { label: 'Pending', bg: 'rgba(251, 191, 36, 0.18)', border: 'rgba(251, 191, 36, 0.35)', color: '#fbbf24', icon: 'time-outline' },
-  processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.18)', border: 'rgba(59, 130, 246, 0.35)', color: '#60a5fa', icon: 'alert-circle-outline' },
-  generated: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.35)', color: '#5eead4', icon: 'checkmark-circle-outline' },
-  released: { label: 'Released', bg: 'rgba(107, 114, 128, 0.18)', border: 'rgba(107, 114, 128, 0.35)', color: '#d1d5db', icon: 'checkmark-circle-outline' },
-  claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.35)', color: '#34d399', icon: 'checkmark-circle-outline' },
-  rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.35)', color: '#fca5a5', icon: 'close-circle-outline' },
-  cancelled: { label: 'Cancelled', bg: 'rgba(107, 114, 128, 0.18)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af', icon: 'close-circle-outline' },
+  pending: { label: 'Pending', bg: 'rgba(251, 191, 36, 0.15)', border: 'rgba(251, 191, 36, 0.35)', color: '#f59e0b', icon: 'time-outline' },
+  processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6', icon: 'alert-circle-outline' },
+  generated: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
+  released: { label: 'Released', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
+  claimed: { label: 'Claimed', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af', icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af', icon: 'close-circle-outline' },
 };
 
 const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
@@ -159,11 +165,10 @@ function buildNeededByOptions() {
 const NEEDED_BY_OPTIONS = buildNeededByOptions();
 const MIN_NEEDED_BY_DATE = getTomorrowDateString();
 
-const emptyFormData: { typeId: number | ''; purpose: string; copies: string; notes: string; neededBy: string } = {
+const emptyFormData: { typeId: number | ''; purpose: string; copies: string; neededBy: string } = {
   typeId: '',
   purpose: '',
   copies: '1',
-  notes: '',
   neededBy: '',
 };
 
@@ -322,7 +327,6 @@ export default function ProfessorDocumentsScreen() {
         request_type: selectedType.name,
         purpose: formData.purpose.trim(),
         copies: formData.copies,
-        notes: formData.notes.trim(),
         needed_by: formData.neededBy || null,
       });
       await fetchRequests();
@@ -748,10 +752,22 @@ export default function ProfessorDocumentsScreen() {
                     {selectedType.processingTime}
                   </Text>
                   {selectedType.requirements.length > 0 && (
-                    <Text style={styles.hintText}>
-                      <Text style={styles.hintBold}>Requirements: </Text>
-                      {selectedType.requirements.join(', ')}
-                    </Text>
+                    <View style={styles.hintRequirements}>
+                      <Text style={[styles.hintText, styles.hintBold]}>Requirements:</Text>
+                      {selectedType.requirements.map((req) => (
+                        <View key={req.name} style={styles.hintRequirementRow}>
+                          <View style={styles.hintRequirementNameRow}>
+                            <Text style={styles.hintText}>{req.name}</Text>
+                            <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                              <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                                {req.isMandatory ? 'Required' : 'Optional'}
+                              </Text>
+                            </View>
+                          </View>
+                          {req.description && <Text style={styles.hintRequirementDesc}>{req.description}</Text>}
+                        </View>
+                      ))}
+                    </View>
                   )}
                 </View>
               )}
@@ -788,19 +804,6 @@ export default function ProfessorDocumentsScreen() {
                   multiline
                   numberOfLines={3}
                   maxLength={255}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Additional Notes</Text>
-                <TextInput
-                  style={styles.textArea}
-                  placeholder="Any special instructions or urgency notes (optional)"
-                  placeholderTextColor={theme.tertiary}
-                  value={formData.notes}
-                  onChangeText={(v) => setFormData((prev) => ({ ...prev, notes: v }))}
-                  multiline
-                  numberOfLines={2}
                 />
               </View>
 
@@ -1324,6 +1327,20 @@ function createStyles(theme: ThemePalette) {
     },
     hintText: { fontSize: 12.5, color: theme.subtext, lineHeight: 18 },
     hintBold: { fontWeight: '700', color: theme.text },
+    hintRequirements: { gap: 6, marginTop: 2 },
+    hintRequirementRow: { gap: 2 },
+    hintRequirementNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    hintRequirementDesc: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
 
     dialogActionsRow: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
     submitBtn: {

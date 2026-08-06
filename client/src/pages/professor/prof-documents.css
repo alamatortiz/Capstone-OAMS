@@ -258,9 +258,9 @@
 }
 
 .doc-req-tag-required {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
 }
 
 .doc-req-tag-optional {
@@ -452,15 +452,15 @@
 }
 
 .doc-badge-released {
-  background-color: rgba(107, 114, 128, 0.15);
-  color: #d1d5db;
-  border-color: rgba(107, 114, 128, 0.3);
+  background-color: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 .doc-badge-claimed {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border-color: rgba(16, 185, 129, 0.3);
+  background-color: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 .doc-badge-rejected {
@@ -494,9 +494,9 @@
 }
 
 [data-theme="light"] .doc-badge-released {
-  background-color: rgba(75, 85, 99, 0.1);
-  color: #1f2937;
-  border-color: rgba(75, 85, 99, 0.25);
+  background-color: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
 }
 
 [data-theme="light"] .doc-badge-claimed {
@@ -538,10 +538,6 @@
   border-color: rgba(249, 115, 22, 0.4);
 }
 
-.doc-card-completed {
-  opacity: 0.85;
-}
-
 .doc-card-header {
   display: flex;
   align-items: flex-start;
@@ -567,11 +563,6 @@
   width: 1.5rem;
   height: 1.5rem;
   stroke: currentColor;
-}
-
-.doc-card-completed .doc-card-icon-wrap {
-  background: rgba(107, 114, 128, 0.1);
-  color: var(--text-tertiary);
 }
 
 [data-theme="light"] .doc-card-icon-wrap {
@@ -786,7 +777,7 @@
 /* ===== EMPTY STATE ===== */
 .doc-empty-state {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1rem;
   padding: 3rem 1.5rem;
   text-align: center;

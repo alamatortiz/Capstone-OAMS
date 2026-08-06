@@ -531,7 +531,6 @@ body {
   border-radius: 1rem;
   padding: 1.25rem 1.5rem;
 }
-.week-section + .week-section { margin-top: 0; padding-top: 1.25rem; border-top: none; }
 
 .week-section-header { width: 100%; }
 

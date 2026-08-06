@@ -3,6 +3,7 @@ import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   AppState,
+  DeviceEventEmitter,
   Image,
   Modal,
   Pressable,
@@ -19,7 +20,11 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
-import NotificationBell from '@/components/NotificationBell';
+import NotificationBell, {
+  WATCHED_EVENTS,
+  NOTIFICATIONS_SYNC_EVENT,
+  broadcastNotificationsChanged,
+} from '@/components/NotificationBell';
 import {
   NOTIFICATION_TYPE_META,
   ADMIN_NOTIFICATION_PATHS,
@@ -118,16 +123,6 @@ const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'announcement', label: 'Announcement' },
 ];
 
-const WATCHED_EVENTS = [
-  'queue:called',
-  'queue:served',
-  'queue:uncalled',
-  'queue:queue-stopped',
-  'appointment:status-updated',
-  'appointment:slot-updated',
-  'document:status-updated',
-];
-
 export default function AdminNotificationsScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -216,12 +211,19 @@ export default function AdminNotificationsScreen() {
     return () => clearInterval(interval);
   }, [token, fetchNotifications]);
 
+  useEffect(() => {
+    const refetch = () => fetchNotifications(1);
+    const sub = DeviceEventEmitter.addListener(NOTIFICATIONS_SYNC_EVENT, refetch);
+    return () => sub.remove();
+  }, [fetchNotifications]);
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const markRead = async (id: number) => {
     setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
     try {
       await api.patch(`/admin/notifications/${id}/read`);
+      broadcastNotificationsChanged();
     } catch {
       setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)));
     }
@@ -232,6 +234,7 @@ export default function AdminNotificationsScreen() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
       await api.patch('/admin/notifications/read-all');
+      broadcastNotificationsChanged();
     } catch {
       setNotifications(previous);
     }

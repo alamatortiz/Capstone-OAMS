@@ -6,6 +6,7 @@ import {
 } from "../../components/StudentSidebar";
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
+import Pagination from "../../components/Pagination";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -97,8 +98,8 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [txStats, setTxStats] = useState({
     total: 0,
     completed: 0,
@@ -107,8 +108,14 @@ export default function TransactionsPage() {
   });
 
   // Debounce the search box so every keystroke doesn't trigger a refetch.
+  // setPage(1) is batched together with setDebouncedSearch here (React 19
+  // batches state updates from timeouts, not just event handlers) so a
+  // filter change never fetches an out-of-range page from a prior search.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(1);
+    }, 400);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
@@ -149,33 +156,39 @@ export default function TransactionsPage() {
   const transactionsRef = useRef(transactions);
   useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
 
+  // Guards against out-of-order responses: e.g. clicking page 2 then page 3
+  // quickly would otherwise let page 2's slower response land after page
+  // 3's and overwrite it. Each call captures the current token; a response
+  // is only applied if its token is still the latest by the time it resolves.
+  const requestIdRef = useRef(0);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   // Search/type/status filtering happens server-side (so it considers the
   // student's whole history, not just whatever page is currently loaded).
-  // Any change to those filters — including the ones baked into this
-  // callback's identity below — resets back to the first page; only
-  // "Load More" advances the offset.
+  // `page` is part of this callback's identity, so both a filter change and
+  // a Pagination click go through the same effect below; filter changes
+  // reset `page` back to 1 at their call site (see the FilterSelect
+  // onChange handlers and the search-debounce effect above).
   const fetchTransactions = useCallback(
-    async (offset = 0) => {
+    async () => {
+      const requestId = ++requestIdRef.current;
       try {
-        if (offset > 0) setLoadingMore(true);
         const res = await api.get("/student/transactions", {
           params: {
             search: debouncedSearch || undefined,
             type: filterType !== "all" ? filterType : undefined,
             status: filterStatus !== "all" ? filterStatus : undefined,
             limit: PAGE_SIZE,
-            offset,
+            page,
           },
         });
-        const newTransactions = res.data.transactions ?? [];
-        setTransactions((prev) =>
-          offset > 0 ? [...prev, ...newTransactions] : newTransactions,
-        );
-        setHasMore(!!res.data.hasMore);
+        if (requestId !== requestIdRef.current) return;
+        setTransactions(res.data.transactions ?? []);
+        setTotalPages(res.data.totalPages ?? 1);
         if (res.data.stats) setTxStats(res.data.stats);
         setTxError(null);
       } catch (err) {
+        if (requestId !== requestIdRef.current) return;
         console.error("Failed to fetch transactions:", err);
         if (transactionsRef.current.length === 0) {
           setTxError("Could not load your transaction history.");
@@ -183,23 +196,18 @@ export default function TransactionsPage() {
           toast.error("Could not refresh your transaction history.");
         }
       } finally {
-        setTxLoading(false);
-        setLoadingMore(false);
+        if (requestId === requestIdRef.current) setTxLoading(false);
       }
     },
-    [debouncedSearch, filterType, filterStatus],
+    [debouncedSearch, filterType, filterStatus, page],
   );
 
-  // Fresh load whenever the page mounts or the search/type/status filters
-  // change (fetchTransactions' identity changes with them).
+  // Fresh load whenever the page mounts, the search/type/status filters
+  // change, or the user navigates to a different page (fetchTransactions'
+  // identity changes with all of them).
   useEffect(() => {
-    fetchTransactions(0);
+    fetchTransactions();
   }, [fetchTransactions]);
-
-  const handleLoadMore = () => {
-    if (loadingMore || !hasMore) return;
-    fetchTransactions(transactions.length);
-  };
 
   // Queue events (and document:cancelled) are broadcast department-wide, not
   // just to the affected student, so they're checked against this student's
@@ -208,21 +216,22 @@ export default function TransactionsPage() {
   const handleOwnQueueEvent = useCallback(
     (payload) => {
       if (Number(payload?.studentId) === Number(user?.userId)) {
-        fetchTransactions(0);
+        fetchTransactions();
       }
     },
     [fetchTransactions, user?.userId],
   );
 
   // ── Live updates: refetch when a document/appointment status changes, or
-  // one of this student's own queue events fires ─────────────────────────
+  // one of this student's own queue events fires. Refetches whatever page
+  // is currently being viewed, rather than forcing the user back to page 1. ─
   useEffect(() => {
     if (!token) return;
 
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const refetchFirstPage = () => fetchTransactions(0);
+    const refetchCurrentPage = () => fetchTransactions();
     const ownEvents = ["document:status-updated", "appointment:status-updated"];
     const deptWideEvents = [
       "queue:called",
@@ -233,11 +242,11 @@ export default function TransactionsPage() {
       "document:cancelled",
     ];
 
-    ownEvents.forEach((event) => socket.on(event, refetchFirstPage));
+    ownEvents.forEach((event) => socket.on(event, refetchCurrentPage));
     deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
 
     return () => {
-      ownEvents.forEach((event) => socket.off(event, refetchFirstPage));
+      ownEvents.forEach((event) => socket.off(event, refetchCurrentPage));
       deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
     };
   }, [fetchTransactions, handleOwnQueueEvent, token]);
@@ -245,7 +254,7 @@ export default function TransactionsPage() {
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible") fetchTransactions(0);
+      if (document.visibilityState === "visible") fetchTransactions();
     }, 45000);
     return () => clearInterval(interval);
   }, [fetchTransactions]);
@@ -355,7 +364,7 @@ export default function TransactionsPage() {
                 id="tx-type-select"
                 label="Type"
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
                 options={[
                   { value: "all", label: "All Types" },
                   { value: "queue", label: "Queue" },
@@ -369,7 +378,7 @@ export default function TransactionsPage() {
                 id="tx-status-select"
                 label="Status"
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                 options={[
                   { value: "all", label: "All Statuses" },
                   { value: "completed", label: "Completed" },
@@ -452,15 +461,8 @@ export default function TransactionsPage() {
             )}
           </div>
 
-          {!txLoading && !txError && hasMore && (
-            <button
-              type="button"
-              className="tx-load-more-btn"
-              onClick={handleLoadMore}
-              disabled={loadingMore}
-            >
-              {loadingMore ? "Loading…" : "Load More"}
-            </button>
+          {!txLoading && !txError && (
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
           )}
         </div>
     </StudentPageShell>

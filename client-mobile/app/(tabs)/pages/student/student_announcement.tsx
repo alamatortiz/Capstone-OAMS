@@ -168,22 +168,43 @@ export default function StudentAnnouncementScreen() {
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
+  // Holds whatever page(s) have been loaded for the CURRENT tab only --
+  // filtering/pagination now happens server-side (see fetchAnnouncements),
+  // so there's no separate "all announcements ever fetched" cache anymore.
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Mirrors `announcements` for the catch block below, without making
   // fetchAnnouncements depend on (and change identity with) the state itself.
   const announcementsRef = useRef(announcements);
   useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
 
-  const fetchAnnouncements = useCallback(async () => {
+  // Guards against out-of-order responses: e.g. switching tabs while a Load
+  // More request for the previous tab is still in flight would otherwise let
+  // the stale response land after the fresh one and get appended onto the
+  // wrong tab's list (mirrors student_transactions.tsx's requestIdRef).
+  const requestIdRef = useRef(0);
+
+  const fetchAnnouncements = useCallback(async (pageNum: number, category: FilterTabKey) => {
+    const requestId = ++requestIdRef.current;
     setError(null);
+    if (pageNum > 1) setLoadingMore(true);
     try {
-      const { data } = await api.get('/student/announcements');
-      setAnnouncements(data.announcements ?? []);
+      const { data } = await api.get('/student/announcements', {
+        params: { category, page: pageNum },
+      });
+      if (requestId !== requestIdRef.current) return;
+      const fetched: Announcement[] = data.announcements ?? [];
+      setAnnouncements((prev) => (pageNum > 1 ? [...prev, ...fetched] : fetched));
+      setPage(data.page ?? pageNum);
+      setTotalPages(data.totalPages ?? 1);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch announcements error:', err);
       if (announcementsRef.current.length === 0) {
         setError('Could not load announcements. Please try again.');
@@ -191,23 +212,38 @@ export default function StudentAnnouncementScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
       }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
+  // Fresh load at page 1 whenever the mount happens or the selected tab
+  // changes -- explicitly shows the loading state since the visible content
+  // is about to change, not a silent background refresh.
   useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
+    setLoading(true);
+    fetchAnnouncements(1, selectedFilter);
+  }, [selectedFilter, fetchAnnouncements]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || page >= totalPages) return;
+    fetchAnnouncements(page + 1, selectedFilter);
+  };
 
   // ── Live updates: refetch + notify when an admin posts/edits/removes an
-  // announcement (mirrors stud-announcements.jsx's "announcement:changed"). ──
+  // announcement (mirrors stud-announcements.jsx's "announcement:changed").
+  // Refetches the currently active tab from page 1, silently -- unlike the
+  // effect above, this doesn't toggle `loading`, since it's a background
+  // refresh of content already on screen, not a user-driven navigation. ──
   useEffect(() => {
     if (!user || !token) return;
     const socket = connectSocket(token);
     if (!socket) return;
 
     const onAnnouncementChanged = (payload: any) => {
-      fetchAnnouncements();
+      fetchAnnouncements(1, selectedFilter);
       notify('New announcement', payload?.title ? String(payload.title) : 'An announcement was posted or updated.');
     };
     socket.on('announcement:changed', onAnnouncementChanged);
@@ -215,7 +251,7 @@ export default function StudentAnnouncementScreen() {
     return () => {
       socket.off('announcement:changed', onAnnouncementChanged);
     };
-  }, [user, token, fetchAnnouncements]);
+  }, [user, token, fetchAnnouncements, selectedFilter]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -297,16 +333,11 @@ export default function StudentAnnouncementScreen() {
     router.replace('/login');
   };
 
-  // The backend already scopes the list to the student's own department
-  // (plus any cross-college notices), so only the category tab filter is
-  // applied here -- mirrors stud-announcements.jsx (web).
-  const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
-  const filteredAnnouncements = announcements.filter(
-    (a) => selectedFilter === 'all' || a.category === selectedFilter,
-  );
-
+  // The backend now returns exactly this tab's items, paginated
+  // (mirrors stud-announcements.jsx (web)), so `announcements` itself is
+  // already the correct list to render -- no client-side filtering needed.
   const isPinnedTab = selectedFilter === 'pinned';
-  const visibleList = isPinnedTab ? pinnedAnnouncements : filteredAnnouncements;
+  const hasMore = page < totalPages;
   const sectionTitle = isPinnedTab
     ? 'Pinned Announcements'
     : selectedFilter === 'all'
@@ -435,7 +466,7 @@ export default function StudentAnnouncementScreen() {
               <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>Something went wrong</Text>
               <Text style={styles.emptyDescription}>{error}</Text>
-              <Pressable style={styles.collegeFilterBtn} onPress={fetchAnnouncements}>
+              <Pressable style={styles.collegeFilterBtn} onPress={() => fetchAnnouncements(1, selectedFilter)}>
                 <Text style={styles.collegeFilterText}>Retry</Text>
               </Pressable>
             </View>
@@ -451,7 +482,7 @@ export default function StudentAnnouncementScreen() {
           {!loading && !error && (
           <View>
             <Text style={styles.sectionTitle}>{sectionTitle}</Text>
-            {visibleList.length === 0 ? (
+            {announcements.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="notifications-off-outline" size={32} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>
@@ -464,7 +495,14 @@ export default function StudentAnnouncementScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={styles.list}>{visibleList.map((a) => renderCard(a))}</View>
+              <>
+                <View style={styles.list}>{announcements.map((a) => renderCard(a))}</View>
+                {hasMore && (
+                  <Pressable style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+                    <Text style={styles.loadMoreBtnText}>{loadingMore ? 'Loading…' : 'Load More'}</Text>
+                  </Pressable>
+                )}
+              </>
             )}
           </View>
           )}
@@ -751,6 +789,18 @@ function createStyles(theme: ThemePalette) {
     list: {
       gap: 12,
     },
+
+    loadMoreBtn: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 13,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+      marginTop: 12,
+    },
+    loadMoreBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
 
     // Card
     card: {

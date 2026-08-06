@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
+  DeviceEventEmitter,
   FlatList,
   Modal,
   Pressable,
@@ -38,17 +39,32 @@ type NotificationItem = {
 // logic (same endpoints, same watched socket events, same 45s fallback poll)
 // -- AppState replaces document.visibilityState, Modal replaces the CSS
 // dropdown + mousedown outside-click listener.
-const WATCHED_EVENTS = [
+// Exported so the full Notifications screen (one per role) watches the same
+// events as this bell instead of a 2nd copy that can silently drift out of
+// sync with this one (this is how "queue:no-show" was previously missing
+// from the per-screen copies despite being present here).
+export const WATCHED_EVENTS = [
   'queue:called',
   'queue:served',
   'queue:uncalled',
   'queue:queue-stopped',
+  'queue:no-show',
   'appointment:status-updated',
   'appointment:slot-updated',
   'document:status-updated',
 ];
 
 const FALLBACK_POLL_INTERVAL_MS = 45000;
+
+// The bell and the full Notifications screen each keep their own independent
+// `notifications` state, so marking read/all-read in one previously left the
+// other stale until the next socket event, foreground refresh, or poll.
+// Mirrors web's `NOTIFICATIONS_SYNC_EVENT` (a same-tab `window` event there);
+// `DeviceEventEmitter` is React Native's equivalent in-app pub-sub, built
+// into the `react-native` package so this needs no new dependency.
+export const NOTIFICATIONS_SYNC_EVENT = 'oams:notifications-sync';
+export const broadcastNotificationsChanged = () =>
+  DeviceEventEmitter.emit(NOTIFICATIONS_SYNC_EVENT);
 
 function formatTimestamp(iso: string) {
   const date = new Date(iso);
@@ -120,6 +136,11 @@ export default function NotificationBell({
     return () => clearInterval(interval);
   }, [token, fetchNotifications]);
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(NOTIFICATIONS_SYNC_EVENT, fetchNotifications);
+    return () => sub.remove();
+  }, [fetchNotifications]);
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const markRead = async (id: number) => {
@@ -128,6 +149,7 @@ export default function NotificationBell({
     );
     try {
       await api.patch(`/${endpointBase}/notifications/${id}/read`);
+      broadcastNotificationsChanged();
     } catch {
       setNotifications((prev) =>
         prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)),
@@ -140,6 +162,7 @@ export default function NotificationBell({
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
       await api.patch(`/${endpointBase}/notifications/read-all`);
+      broadcastNotificationsChanged();
     } catch {
       setNotifications(previous);
     }

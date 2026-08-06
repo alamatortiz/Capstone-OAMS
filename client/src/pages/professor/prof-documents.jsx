@@ -105,7 +105,6 @@ export default function ProfessorDocumentRequest() {
   const [formData, setFormData] = useState({
     type: "",
     purpose: "",
-    notes: "",
     copies: "1",
     neededBy: "",
   });
@@ -214,13 +213,12 @@ export default function ProfessorDocumentRequest() {
         service_id: selectedService?.id,
         request_type: formData.type,
         purpose: formData.purpose,
-        notes: formData.notes,
         copies: formData.copies,
         needed_by: formData.neededBy || null,
       });
       await fetchRequests();
       setDialogOpen(false);
-      setFormData({ type: "", purpose: "", notes: "", copies: "1", neededBy: "" });
+      setFormData({ type: "", purpose: "", copies: "1", neededBy: "" });
       toast.success("Document request submitted successfully!");
     } catch (err) {
       console.error("Failed to submit document request:", err);
@@ -381,20 +379,6 @@ export default function ProfessorDocumentRequest() {
                       rows={3}
                       maxLength={255}
                       required
-                    />
-                  </div>
-
-                  <div className="doc-form-group">
-                    <label htmlFor="notes">Additional Notes</label>
-                    <textarea
-                      id="notes"
-                      placeholder="Any special instructions or urgency notes (optional)"
-                      value={formData.notes}
-                      onChange={(e) =>
-                        setFormData({ ...formData, notes: e.target.value })
-                      }
-                      className="doc-form-textarea"
-                      rows={2}
                     />
                   </div>
 

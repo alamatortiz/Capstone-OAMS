@@ -343,6 +343,31 @@ body {
   gap: 1rem;
 }
 
+.ann-load-more-btn {
+  display: block;
+  margin: 0.5rem auto 0;
+  padding: 0.625rem 1.75rem;
+  border: 1px solid var(--primary-color);
+  border-radius: 0.625rem;
+  background: transparent;
+  color: var(--primary-color);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ann-load-more-btn:hover:not(:disabled) {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+.ann-load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ===== ANNOUNCEMENT CARD ===== */
 .announcement-card {
   background: var(--card-bg);

@@ -22,6 +22,7 @@ export const NOTIFICATION_EVENTS = [
   "queue:served",
   "queue:uncalled",
   "queue:queue-stopped",
+  "queue:no-show",
   "appointment:status-updated",
   "appointment:slot-updated",
   "document:status-updated",
