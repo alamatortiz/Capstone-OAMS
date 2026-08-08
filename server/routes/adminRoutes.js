@@ -29,7 +29,7 @@ const {
   VALID_SCAN_STATUSES,
   REQUIRED_PRIOR_STATUS,
 } = require("../utils/documentStatus");
-const { createNotification } = require("../utils/notifications");
+const { createNotification, createNotificationsBatch } = require("../utils/notifications");
 const { sendPushNotification } = require("../utils/pushNotifications");
 const { getFacultyAvailabilityToday, formatTime } = require("../utils/facultyAvailability");
 
@@ -2707,8 +2707,10 @@ router.post(
       // Automatically notify every student and faculty member in the
       // department -- announcements previously reached nobody through the
       // notifications system despite `type='announcement'` existing in the
-      // ENUM since it was built. Fire-and-forget like every other
-      // createNotification call site in this file; a failure here must
+      // ENUM since it was built. One batch insert (not one query per user)
+      // so a large department doesn't fire dozens/hundreds of concurrent
+      // queries against the connection pool. Fire-and-forget like every
+      // other notification call site in this file; a failure here must
       // never affect the already-committed announcement.
       (async () => {
         try {
@@ -2717,7 +2719,8 @@ router.post(
             pool.query(`SELECT faculty_id AS user_id FROM faculty WHERE department_id = ?`, [deptId]),
           ]);
           const message = `A new announcement has been posted: "${title.trim()}"`;
-          [...students, ...faculty].forEach((row) => createNotification(row.user_id, message, "announcement"));
+          const userIds = [...students, ...faculty].map((row) => row.user_id);
+          await createNotificationsBatch(userIds, message, "announcement");
         } catch (err) {
           console.error("Announcement broadcast notification error:", err.message);
         }

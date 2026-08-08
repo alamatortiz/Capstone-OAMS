@@ -1,8 +1,11 @@
 const pool = require("../db");
 const { createNotification } = require("../utils/notifications");
+const { emitToUser, emitToDept } = require("../sockets");
 
 const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
 const REMINDER_LEAD_HOURS = 24;
+const COMPLETE_GRACE_HOURS = 3;
+const PENDING_NUDGE_HOURS = 48;
 
 // `appointment_date`/`appointment_time` are plain calendar-date/wall-clock
 // values (no timezone conversion needed, unlike TIMESTAMP columns) -- this
@@ -15,7 +18,7 @@ function formatTime(value) {
   return String(value).slice(0, 5);
 }
 
-function buildMessage({ appointment_date, appointment_time, location_snapshot }) {
+function buildReminderMessage({ appointment_date, appointment_time, location_snapshot }) {
   const dateStr = formatDate(appointment_date);
   const timeStr = formatTime(appointment_time);
   const locationPart = location_snapshot ? ` at ${location_snapshot}` : "";
@@ -38,8 +41,6 @@ async function sweepAppointmentReminders() {
       [REMINDER_LEAD_HOURS],
     );
 
-    if (due.length === 0) return;
-
     let remindedCount = 0;
     for (const row of due) {
       const [result] = await pool.query(
@@ -51,7 +52,7 @@ async function sweepAppointmentReminders() {
       // tick already claimed this row, affectedRows is 0 and we skip it.
       if (result.affectedRows === 0) continue;
 
-      createNotification(row.student_id, buildMessage(row), "appointment");
+      createNotification(row.student_id, buildReminderMessage(row), "appointment");
       remindedCount += 1;
     }
 
@@ -60,8 +61,79 @@ async function sweepAppointmentReminders() {
         `[appointmentReminderSweeper] Sent ${remindedCount} reminder${remindedCount === 1 ? "" : "s"}`,
       );
     }
+
+    await sweepStaleApproved();
+    await sweepStalePending();
   } catch (error) {
     console.error("[appointmentReminderSweeper] Sweep failed:", error);
+  }
+}
+
+// An 'approved' appointment whose date/time passed COMPLETE_GRACE_HOURS ago
+// with nobody marking it otherwise (completed/cancelled) would otherwise sit
+// in 'approved' forever -- there's no check-in mechanism for appointments
+// the way queues have one, so this can't detect a genuine no-show, but
+// auto-resolving stale approved appointments to 'completed' avoids the
+// alternative of a permanently-stuck, obviously-past-due record. Mirrors the
+// exact notify+emit shape of the manual status-update route in
+// facultyRoutes.js so a transaction feed can't tell the two apart.
+async function sweepStaleApproved() {
+  const [stale] = await pool.query(
+    `SELECT appointment_id, student_id, department_id
+     FROM appointments
+     WHERE status = 'approved'
+       AND TIMESTAMP(appointment_date, appointment_time) <= (NOW() - INTERVAL ? HOUR)`,
+    [COMPLETE_GRACE_HOURS],
+  );
+
+  let completedCount = 0;
+  for (const row of stale) {
+    const [result] = await pool.query(
+      `UPDATE appointments SET status = 'completed' WHERE appointment_id = ? AND status = 'approved'`,
+      [row.appointment_id],
+    );
+    if (result.affectedRows === 0) continue;
+
+    emitToUser(row.student_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "completed" });
+    emitToDept(row.department_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "completed" });
+    createNotification(row.student_id, "Your appointment has been marked as completed.", "appointment");
+    completedCount += 1;
+  }
+
+  if (completedCount > 0) {
+    console.log(`[appointmentReminderSweeper] Auto-completed ${completedCount} past-due appointment${completedCount === 1 ? "" : "s"}`);
+  }
+}
+
+// A 'pending' request nobody approved or rejected within PENDING_NUDGE_HOURS
+// nudges the faculty member who's blocking it -- pending_nudge_sent_at is a
+// dedicated flag (separate from reminder_sent_at, which tracks an unrelated
+// notification on the same row) so this fires exactly once per request, not
+// every 15 minutes for as long as it stays pending.
+async function sweepStalePending() {
+  const [stale] = await pool.query(
+    `SELECT appointment_id, faculty_id
+     FROM appointments
+     WHERE status = 'pending'
+       AND pending_nudge_sent_at IS NULL
+       AND created_at <= (NOW() - INTERVAL ? HOUR)`,
+    [PENDING_NUDGE_HOURS],
+  );
+
+  let nudgedCount = 0;
+  for (const row of stale) {
+    const [result] = await pool.query(
+      `UPDATE appointments SET pending_nudge_sent_at = NOW() WHERE appointment_id = ? AND pending_nudge_sent_at IS NULL`,
+      [row.appointment_id],
+    );
+    if (result.affectedRows === 0) continue;
+
+    createNotification(row.faculty_id, "You have a pending appointment request awaiting your response.", "appointment");
+    nudgedCount += 1;
+  }
+
+  if (nudgedCount > 0) {
+    console.log(`[appointmentReminderSweeper] Nudged faculty on ${nudgedCount} stale pending request${nudgedCount === 1 ? "" : "s"}`);
   }
 }
 

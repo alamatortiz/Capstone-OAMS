@@ -352,6 +352,12 @@ CREATE TABLE appointments (
     -- appointment_date/time keeps matching the sweep's "within N hours"
     -- window on every tick until the appointment passes).
     reminder_sent_at    TIMESTAMP    NULL DEFAULT NULL,
+    -- Set by appointmentReminderSweeper.js once it has nudged the faculty
+    -- member that a 'pending' request has sat unanswered for 48+ hours --
+    -- a separate flag from reminder_sent_at since they track two unrelated
+    -- notifications on the same row (one to the student pre-appointment,
+    -- one to faculty while still awaiting approval).
+    pending_nudge_sent_at TIMESTAMP  NULL DEFAULT NULL,
     -- Computed from this row's own columns; NULL whenever status is
     -- cancelled/rejected, so any number of cancelled/rejected rows can share
     -- the same student/faculty/date/time -- only a genuinely ACTIVE duplicate
@@ -409,6 +415,11 @@ CREATE TABLE document_requests (
     -- transactions feeds sort by "most recently modified" instead of only
     -- "most recently created".
     updated_at              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by documentPickupSweeper.js once it has notified an admin that this
+    -- request has sat unclaimed for 7+ days -- prevents re-escalating the
+    -- same request on every subsequent daily sweep (the student's own daily
+    -- reminder is separate and intentionally keeps repeating; see updated_at).
+    escalated_at            TIMESTAMP    NULL DEFAULT NULL,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_document_requests_tracking (tracking_number)
@@ -563,6 +574,10 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     -- Auto-touched on any change to this row. Lets the transactions feeds
     -- sort by "most recently modified" instead of only "most recently created".
     updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by documentPickupSweeper.js once it has notified an admin that this
+    -- request has sat unclaimed for 7+ days -- see document_requests.escalated_at
+    -- for the full reasoning (identical pattern, mirrored here).
+    escalated_at         TIMESTAMP    NULL DEFAULT NULL,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_faculty_doc_requests_faculty (faculty_id)
