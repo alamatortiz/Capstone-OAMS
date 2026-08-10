@@ -97,7 +97,7 @@ export default function CalendarGrid({
 
               const isSelected = cell.date === selectedDate;
               const isToday = cell.date === todayStr;
-              let mod = "";
+              let mod;
               if (cell.isPast) mod = "cg-cell--past";
               else if (cell.status === "available") mod = "cg-cell--available";
               else if (cell.status === "blocked") mod = "cg-cell--blocked";

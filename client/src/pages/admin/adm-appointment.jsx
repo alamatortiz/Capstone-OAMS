@@ -196,9 +196,6 @@ export default function AdminAppointment() {
 
   const AppointmentCard = ({ appointment, onViewDetails }) => {
     const collegeData = COLLEGES.find((c) => c.name === appointment.college);
-    const handleViewDetails = (appointment) => {
-      console.log("Viewing details for:", appointment);
-    };
     return (
       <div key={appointment.id} className="admin-appointment-card">
         <div className="admin-appointment-card-content">

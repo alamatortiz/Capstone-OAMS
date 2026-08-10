@@ -1225,8 +1225,7 @@ body {
   .queue-breadcrumb,
   .qss-card-action,
   .queue-cancel-card,
-  .queue-dialog-actions,
-  .chat-widget {
+  .queue-dialog-actions {
     display: none;
   }
 
