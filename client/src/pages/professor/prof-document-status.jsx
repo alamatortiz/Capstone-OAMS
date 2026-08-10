@@ -104,7 +104,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
           }}
         >
           <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document is ready for pickup — please visit the HR/Records office!
+          Your document is ready for pickup — please proceed to the designated location
         </div>
       )}
 
@@ -125,7 +125,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
           }}
         >
           <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document has been released to the HR/Records office — visit to complete pickup.
+          Your document has been released to the designated location — visit to complete pickup.
         </div>
       )}
 
@@ -575,12 +575,6 @@ export default function ProfessorDocumentStatus() {
                                 <label>Request Date</label>
                                 <p>{formatDateShort(doc.requestDate)}</p>
                               </div>
-                              {doc.estimatedCompletion && (
-                                <div className="dss-list-card-field">
-                                  <label>Est. Completion</label>
-                                  <p>{formatDateShort(doc.estimatedCompletion)}</p>
-                                </div>
-                              )}
                               <div className="dss-list-card-field-full">
                                 <label>Purpose</label>
                                 <p>{doc.purpose}</p>

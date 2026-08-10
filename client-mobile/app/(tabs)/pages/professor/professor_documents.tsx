@@ -472,12 +472,6 @@ export default function ProfessorDocumentsScreen() {
                           <Text style={styles.docInfoLabel}>Request Date</Text>
                           <Text style={styles.docInfoDateValue}>{formatDate(req.requestDate)}</Text>
                         </View>
-                        {req.estimatedCompletion && (
-                          <View style={styles.docInfoField}>
-                            <Text style={styles.docInfoLabel}>Est. Completion</Text>
-                            <Text style={styles.docInfoDateValue}>{formatDate(req.estimatedCompletion)}</Text>
-                          </View>
-                        )}
                         {req.neededBy && (
                           <View style={styles.docInfoField}>
                             <Text style={styles.docInfoLabel}>Needed By</Text>
@@ -784,7 +778,7 @@ export default function ProfessorDocumentsScreen() {
                 <Text style={styles.formLabel}>Purpose</Text>
                 <TextInput
                   style={styles.textArea}
-                  placeholder="e.g., Bank loan application, Visa application"
+                  placeholder="Specify the purpose of your request"
                   placeholderTextColor={theme.tertiary}
                   value={formData.purpose}
                   onChangeText={(v) => setFormData((prev) => ({ ...prev, purpose: v }))}

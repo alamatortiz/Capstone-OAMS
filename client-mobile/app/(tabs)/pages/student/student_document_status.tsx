@@ -622,12 +622,6 @@ function DocumentListItem({
           <Text style={styles.listFieldLabel}>{completed ? 'Date Requested' : 'Request Date'}</Text>
           <Text style={styles.listFieldValue}>{formatDateShort(doc.requestDate)}</Text>
         </View>
-        {!completed && doc.estimatedCompletion && (
-          <View style={styles.listField}>
-            <Text style={styles.listFieldLabel}>Est. Completion</Text>
-            <Text style={styles.listFieldValue}>{formatDateShort(doc.estimatedCompletion)}</Text>
-          </View>
-        )}
         {completed && doc.claimedDate && (
           <View style={styles.listField}>
             <Text style={styles.listFieldLabel}>Date Acquired</Text>
@@ -708,17 +702,17 @@ function DocumentDetail({
         <View style={styles.readyBanner}>
           <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
-            Your document is ready for pickup — please visit the registrar&apos;s office!
+            Your document is ready for pickup — please proceed to the designated location
           </Text>
         </View>
       )}
 
       {/* Released alert */}
       {doc.status === 'released' && (
-        <View style={styles.releasedBanner}>
+        <View style={styles.readyBanner}>
           <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
-            Your document has been released to the registrar&apos;s office — visit to complete pickup.
+            Your document has been released to the designated location — visit to complete pickup.
           </Text>
         </View>
       )}
@@ -748,11 +742,6 @@ function DocumentDetail({
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date Released</Text>
             <Text style={styles.detailValue}>{formatDateLong(doc.releasedDate)}</Text>
-          </View>
-        ) : doc.estimatedCompletion ? (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Estimated Completion</Text>
-            <Text style={styles.detailValue}>{formatDateLong(doc.estimatedCompletion)}</Text>
           </View>
         ) : null}
         <View style={styles.detailRow}>
@@ -1023,10 +1012,6 @@ function createStyles(theme: ThemePalette) {
     readyBanner: {
       flexDirection: 'row', alignItems: 'center', gap: 10,
       backgroundColor: '#16a34a', borderRadius: 16, padding: 14,
-    },
-    releasedBanner: {
-      flexDirection: 'row', alignItems: 'center', gap: 10,
-      backgroundColor: '#4b5563', borderRadius: 16, padding: 14,
     },
     readyBannerText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#ffffff' },
 

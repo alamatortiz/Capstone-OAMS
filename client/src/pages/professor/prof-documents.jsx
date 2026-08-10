@@ -343,7 +343,7 @@ export default function ProfessorDocumentRequest() {
                     <label htmlFor="purpose">Purpose</label>
                     <textarea
                       id="purpose"
-                      placeholder="e.g., Bank loan application, Visa application"
+                      placeholder="Specify the purpose of your request"
                       value={formData.purpose}
                       onChange={(e) =>
                         setFormData({ ...formData, purpose: e.target.value })
@@ -494,14 +494,6 @@ export default function ProfessorDocumentRequest() {
                             {formatManilaDate(req.requestDate, { month: "long", day: "numeric", year: "numeric" })}
                           </p>
                         </div>
-                        {req.estimatedCompletion && (
-                          <div className="doc-card-field">
-                            <label>Est. Completion</label>
-                            <p className="doc-card-date-value">
-                              {formatManilaDate(req.estimatedCompletion, { month: "long", day: "numeric", year: "numeric" })}
-                            </p>
-                          </div>
-                        )}
                         {req.neededBy && (
                           <div className="doc-card-field">
                             <label>Needed By</label>

@@ -705,12 +705,6 @@ function DocumentListItem({
             <Text style={styles.listFieldLabel}>Request Date</Text>
             <Text style={styles.listFieldValue}>{formatDateShort(doc.requestDate)}</Text>
           </View>
-          {doc.estimatedCompletion && (
-            <View style={styles.listField}>
-              <Text style={styles.listFieldLabel}>Est. Completion</Text>
-              <Text style={styles.listFieldValue}>{formatDateShort(doc.estimatedCompletion)}</Text>
-            </View>
-          )}
           <View style={styles.listFieldFull}>
             <Text style={styles.listFieldLabel}>Purpose</Text>
             <Text style={styles.listFieldValueMuted} numberOfLines={2}>{doc.purpose}</Text>
@@ -786,7 +780,7 @@ function DocumentDetail({
         <View style={styles.readyBanner}>
           <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
-            Your document is ready for pickup — please visit the HR/Records office!
+            Your document is ready for pickup — please proceed to the designated location
           </Text>
         </View>
       )}
@@ -796,7 +790,7 @@ function DocumentDetail({
         <View style={styles.readyBanner}>
           <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
-            Your document has been released to the HR/Records office — visit to complete pickup.
+            Your document has been released to the designated location — visit to complete pickup.
           </Text>
         </View>
       )}
@@ -839,12 +833,6 @@ function DocumentDetail({
           <Text style={styles.detailLabel}>Number of Copies</Text>
           <Text style={styles.detailValue}>{doc.copies ?? 1}</Text>
         </View>
-        {doc.estimatedCompletion ? (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Estimated Completion</Text>
-            <Text style={styles.detailValue}>{formatDate(doc.estimatedCompletion)}</Text>
-          </View>
-        ) : null}
         <View style={[styles.detailRow, styles.detailRowLast]}>
           <Text style={styles.detailLabel}>Purpose</Text>
           <Text style={styles.detailValue}>{doc.purpose}</Text>

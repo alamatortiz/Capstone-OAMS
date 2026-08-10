@@ -372,12 +372,6 @@ export default function StudentDocumentsScreen() {
                 <Text style={styles.docFieldLabel}>Request Date</Text>
                 <Text style={styles.docFieldValue}>{formatDateLong(doc.requestDate)}</Text>
               </View>
-              {doc.estimatedCompletion && (
-                <View style={styles.docField}>
-                  <Text style={styles.docFieldLabel}>Est. Completion</Text>
-                  <Text style={styles.docFieldValue}>{formatDateLong(doc.estimatedCompletion)}</Text>
-                </View>
-              )}
               <View style={styles.docFieldFull}>
                 <Text style={styles.docFieldLabel}>Purpose</Text>
                 <Text style={styles.docFieldValue}>{doc.purpose}</Text>
@@ -718,6 +712,7 @@ export default function StudentDocumentsScreen() {
                   onChangeText={(v) => setFormData((f) => ({ ...f, purpose: v }))}
                   multiline
                   numberOfLines={3}
+                  maxLength={255}
                 />
               </View>
 

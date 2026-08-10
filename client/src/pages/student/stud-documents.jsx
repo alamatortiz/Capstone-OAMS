@@ -531,18 +531,6 @@ export default function DocumentsPage() {
                               })}
                             </p>
                           </div>
-                          {doc.estimatedCompletion && (
-                            <div className="doc-card-field">
-                              <label>Est. Completion</label>
-                              <p className="doc-card-date-value">
-                                {formatManilaDate(doc.estimatedCompletion, {
-                                  month: "long",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })}
-                              </p>
-                            </div>
-                          )}
                           {doc.neededBy && (
                             <div className="doc-card-field">
                               <label>Needed By</label>

@@ -556,12 +556,6 @@ export default function DocumentStatusPage() {
                                 <label>Request Date</label>
                                 <p>{formatDateShort(doc.requestDate)}</p>
                               </div>
-                              {doc.estimatedCompletion && (
-                                <div className="dss-list-card-field">
-                                  <label>Est. Completion</label>
-                                  <p>{formatDateShort(doc.estimatedCompletion)}</p>
-                                </div>
-                              )}
                               <div className="dss-list-card-field-full">
                                 <label>Purpose</label>
                                 <p>{doc.purpose}</p>
