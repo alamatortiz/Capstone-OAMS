@@ -40,4 +40,31 @@ async function settleSlotAfterEntryChange(db, slotId) {
   return null;
 }
 
-module.exports = { settleSlotAfterEntryChange };
+// Locks a queue_slots row (with its owning service's department_id) and
+// checks the calling admin may manage it -- shared by every admin
+// queue-hosting mutation route (pause/resume/close/call-next/mark-arrived/
+// serve/skip). On failure, rolls back and writes the 404/403 response
+// itself, returning null so the caller can just `if (!slot) return;`.
+// Returns the row ({ slot_id, status, department_id }) on success.
+async function getOwnedSlotOrRespond(conn, res, { slotId, deptId }) {
+  const [[slot]] = await conn.query(
+    `SELECT qs.slot_id, qs.status, s.department_id
+     FROM queue_slots qs
+     JOIN services s ON qs.service_id = s.service_id
+     WHERE qs.slot_id = ? FOR UPDATE`,
+    [slotId],
+  );
+  if (!slot) {
+    await conn.rollback();
+    res.status(404).json({ error: "Queue slot not found" });
+    return null;
+  }
+  if (slot.department_id !== deptId) {
+    await conn.rollback();
+    res.status(403).json({ error: "You can only manage queues for your own department" });
+    return null;
+  }
+  return slot;
+}
+
+module.exports = { settleSlotAfterEntryChange, getOwnedSlotOrRespond };

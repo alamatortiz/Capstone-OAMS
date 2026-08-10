@@ -31,9 +31,71 @@ const REQUIRED_PRIOR_STATUS = {
   claimed: "released",
 };
 
+// Table/owner-column pair for each requester role. Kept as an internal,
+// hardcoded config -- never build these queries by splicing a caller-supplied
+// table/column name into SQL, even though today's two callers are trusted.
+const CANCEL_CONFIG = {
+  student: {
+    ownerColumn: "student_id",
+    selectSql: `SELECT dr.request_id, dr.student_id, dr.status, s.department_id
+                FROM document_requests dr
+                JOIN document_services s ON dr.service_id = s.service_id
+                WHERE dr.request_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE document_requests SET status = 'cancelled' WHERE request_id = ?`,
+  },
+  faculty: {
+    ownerColumn: "faculty_id",
+    selectSql: `SELECT fdr.request_id, fdr.faculty_id, fdr.status, s.department_id
+                FROM faculty_document_requests fdr
+                JOIN document_services s ON fdr.service_id = s.service_id
+                WHERE fdr.request_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE faculty_document_requests SET status = 'cancelled' WHERE request_id = ?`,
+  },
+};
+
+// Shared soft-cancel flow for a "my own pending/processing document request"
+// DELETE route (student cancelling document_requests, faculty cancelling
+// faculty_document_requests). Runs the lock/ownership/status checks and the
+// UPDATE inside the caller's own transaction connection; the caller commits
+// nothing itself -- this function calls beginTransaction/commit/rollback.
+// Returns a plain result object rather than writing to `res` directly,
+// since the two routes use different outer response-JSON keys (`error` vs
+// `message`) that are each an established, intentional per-role convention.
+async function cancelOwnDocumentRequest(conn, { role, ownerId, requestId }) {
+  const cfg = CANCEL_CONFIG[role];
+  await conn.beginTransaction();
+
+  const [[request]] = await conn.query(cfg.selectSql, [requestId]);
+
+  if (!request) {
+    await conn.rollback();
+    return { ok: false, status: 404, message: "Document request not found" };
+  }
+  if (request[cfg.ownerColumn] !== ownerId) {
+    await conn.rollback();
+    return { ok: false, status: 403, message: "You can only cancel your own document requests" };
+  }
+  if (!["pending", "processing"].includes(request.status)) {
+    await conn.rollback();
+    return {
+      ok: false,
+      status: 409,
+      message: `Cannot cancel a request that is already ${request.status}`,
+    };
+  }
+
+  await conn.query(cfg.updateSql, [requestId]);
+  await conn.commit();
+
+  return { ok: true, departmentId: request.department_id };
+}
+
 module.exports = {
   DB_STATUS_MAP,
   STATUS_LABEL_MAP,
   VALID_SCAN_STATUSES,
   REQUIRED_PRIOR_STATUS,
+  cancelOwnDocumentRequest,
 };

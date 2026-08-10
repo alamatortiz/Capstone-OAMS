@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const pool = require("../db");
+const { sendServerError } = require("../utils/errorResponse");
 
 // Per the capstone paper's User Login Activity Diagram: "a three-tries limit
 // before a temporary lockout of the account." The paper doesn't specify an
@@ -185,10 +186,7 @@ const login = async (req, res) => {
 
     res.json({ message: "Login successful", token, user: profile });
   } catch (error) {
-    console.error("Login Server Error:", error);
-    return res
-      .status(500)
-      .json({ message: "Internal server error", dev_error: error.message });
+    return sendServerError(res, error, "Login Server Error:");
   }
 };
 

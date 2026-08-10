@@ -33,8 +33,6 @@ CREATE TABLE users (
     role                ENUM('student','faculty','admin') NOT NULL,
     status              ENUM('active','inactive','suspended') DEFAULT 'active',
     last_login_at       TIMESTAMP    NULL,
-    external_auth_id    VARCHAR(100) NULL,
-    external_auth_source VARCHAR(50) DEFAULT 'local',
     failed_login_attempts INT        NOT NULL DEFAULT 0,
     locked_until        TIMESTAMP    NULL DEFAULT NULL,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -435,8 +433,6 @@ CREATE TABLE document_requests (
 CREATE TABLE generated_files (
     file_id         INT          AUTO_INCREMENT PRIMARY KEY,
     request_id      INT          NULL,
-    file_name       VARCHAR(255) NULL,
-    file_path       VARCHAR(255) NULL,
     qr_code         VARCHAR(255),
     generated_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (request_id) REFERENCES document_requests(request_id) ON DELETE CASCADE
@@ -493,16 +489,10 @@ CREATE TABLE announcement_attachments (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE external_sync_logs (
     sync_id           INT          AUTO_INCREMENT PRIMARY KEY,
-    user_id           INT          NULL,
     external_system   VARCHAR(50)  DEFAULT 'Pinnacle',
     sync_type         ENUM('auth','profile','enrollment','schedule') NOT NULL,
-    external_user_id  VARCHAR(100),
     sync_status       ENUM('pending','success','failed') DEFAULT 'pending',
-    request_payload   JSON,
-    response_payload  JSON,
-    error_message     TEXT,
-    synced_at         TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+    synced_at         TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -525,15 +515,12 @@ CREATE TABLE audit_logs (
 );
 
 -- System configuration controlled by admins
--- NOTE: updated_by must be set explicitly on every UPDATE — it is not auto-managed.
 CREATE TABLE system_settings (
     setting_id      INT          AUTO_INCREMENT PRIMARY KEY,
     setting_key     VARCHAR(100) NOT NULL UNIQUE,
     setting_value   TEXT,
     description     TEXT,
-    updated_by      INT          NULL,
-    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (updated_by) REFERENCES administrators(admin_id) ON DELETE SET NULL
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -592,6 +579,75 @@ ALTER TABLE generated_files
         FOREIGN KEY (faculty_request_id) REFERENCES faculty_document_requests(request_id) ON DELETE CASCADE,
     ADD CONSTRAINT chk_generated_files_one_parent
         CHECK ((request_id IS NOT NULL AND faculty_request_id IS NULL) OR (request_id IS NULL AND faculty_request_id IS NOT NULL));
+
+-- ─────────────────────────────────────────────────────────────
+-- 16. SECTIONS & SUBMISSIONS (schema only -- no routes/controllers/UI yet)
+-- Professors will eventually host a section of students and post file-
+-- submission assignments; students submit files that were either generated
+-- by COAMS itself (always carries a reference_code) or issued by the school
+-- some other way (code optional). Reserved for a future feature -- kept here
+-- now so the schema exists ahead of time.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE sections (
+    section_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    faculty_id      INT          NOT NULL,
+    department_id   INT          NOT NULL,
+    section_name    VARCHAR(100) NOT NULL,
+    status          ENUM('active','archived') DEFAULT 'active',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (faculty_id)    REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    INDEX idx_sections_faculty (faculty_id)
+);
+
+-- Join table (not a direct FK on students) so a student's enrollment history
+-- survives being dropped and re-enrolled without any change to `students`.
+CREATE TABLE section_enrollments (
+    enrollment_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    section_id      INT          NOT NULL,
+    student_id      INT          NOT NULL,
+    status          ENUM('enrolled','dropped') DEFAULT 'enrolled',
+    enrolled_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (section_id) REFERENCES sections(section_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_section_enrollments_section_student (section_id, student_id)
+);
+
+CREATE TABLE submissions (
+    submission_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    section_id      INT          NOT NULL,
+    title           VARCHAR(255) NOT NULL,
+    description     TEXT         NULL,
+    requires_code   BOOLEAN      NOT NULL DEFAULT FALSE, -- mirrors document_services.requires_coding
+    deadline        DATETIME     NULL,
+    status          ENUM('open','closed') DEFAULT 'open',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (section_id) REFERENCES sections(section_id) ON DELETE CASCADE,
+    INDEX idx_submissions_section (section_id)
+);
+
+-- A submitted file is either COAMS-generated (always carries a reference_code,
+-- mirroring generated_files.qr_code) or issued by the school some other way
+-- (code optional) -- enforced by the CHECK below. Mirrors announcement_attachments
+-- for the filename/file_path/mime_type/file_size shape; this feature will reuse
+-- server/middleware/upload.js's existing multer config when it's eventually built.
+CREATE TABLE submitted_files (
+    submitted_file_id INT          AUTO_INCREMENT PRIMARY KEY,
+    submission_id     INT          NOT NULL,
+    student_id        INT          NOT NULL,
+    filename          VARCHAR(255) NOT NULL,
+    file_path         VARCHAR(255) NOT NULL,
+    mime_type         VARCHAR(100) NOT NULL,
+    file_size         INT          NOT NULL,
+    source            ENUM('coams','school') NOT NULL,
+    reference_code    VARCHAR(100) NULL,
+    submitted_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (submission_id) REFERENCES submissions(submission_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id)    REFERENCES students(student_id),
+    CHECK (source = 'school' OR reference_code IS NOT NULL),
+    INDEX idx_submitted_files_submission (submission_id)
+);
 
 -- ============================================================
 -- Schema definition ends here.

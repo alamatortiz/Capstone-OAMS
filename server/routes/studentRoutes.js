@@ -1,20 +1,18 @@
 const express = require("express");
 const router = express.Router();
-const path = require("path");
 const pool = require("../db");
 const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
-const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
+const { getManilaDateString, getManilaTimeString, formatTime12h, formatRelativeTime } = require("../utils/dateTime");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
-const { STATUS_LABEL_MAP } = require("../utils/documentStatus");
+const { STATUS_LABEL_MAP, cancelOwnDocumentRequest } = require("../utils/documentStatus");
 const { createNotification } = require("../utils/notifications");
 const notificationsController = require("../controllers/notificationsController");
-const { UPLOAD_DIR } = require("../middleware/upload");
-const { getAttachmentsMap, isPathInsideUploadDir } = require("../utils/announcementAttachments");
+const { getAttachmentsMap, serveAnnouncementAttachment } = require("../utils/announcementAttachments");
 
 // Logs the real error server-side (unchanged from before) but only ever
 // sends a generic, safe message to the client under the `error` key --
@@ -394,29 +392,12 @@ router.get(
         `SELECT department_id FROM students WHERE student_id = ?`,
         [studentId],
       );
-      const studentDeptId = stu?.department_id ?? null;
-
-      const [[row]] = await pool.query(
-        `SELECT a.department_id, aa.file_path, aa.mime_type
-         FROM announcement_attachments aa
-         JOIN announcements a ON a.announcement_id = aa.announcement_id
-         WHERE aa.attachment_id = ? AND aa.announcement_id = ?`,
-        [attachmentId, announcementId],
-      );
-      if (!row) {
-        return res.status(404).json({ error: "Attachment not found" });
-      }
-      if (row.department_id !== studentDeptId) {
-        return res.status(403).json({ error: "Cannot view this attachment" });
-      }
-
-      const resolvedPath = path.join(UPLOAD_DIR, row.file_path);
-      if (!isPathInsideUploadDir(resolvedPath)) {
-        return res.status(400).json({ error: "Invalid attachment path" });
-      }
-
-      res.type(row.mime_type || "application/octet-stream");
-      res.sendFile(resolvedPath);
+      await serveAnnouncementAttachment(res, {
+        announcementId,
+        attachmentId,
+        callerDeptId: stu?.department_id ?? null,
+        forbiddenMessage: "Cannot view this attachment",
+      });
     } catch (error) {
       sendServerError(res, error, "Announcement attachment fetch error");
     }
@@ -503,7 +484,7 @@ router.post(
         .json({ error: "Purpose must be 255 characters or fewer" });
     }
 
-    const copyCount = copies === undefined ? 1 : parseInt(copies, 10);
+    const copyCount = copies === undefined ? 1 : Number(copies);
     if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 20) {
       return res
         .status(400)
@@ -729,46 +710,17 @@ router.delete(
 
     const conn = await pool.getConnection();
     try {
-      await conn.beginTransaction();
-
-      // Lock the row so an admin's status-changing UPDATE (e.g. to
-      // "generated") can't land in the narrow window between this SELECT
-      // and the DELETE below.
-      const [[request]] = await conn.query(
-        `SELECT dr.request_id, dr.student_id, dr.status, s.department_id
-         FROM document_requests dr
-         JOIN document_services s ON dr.service_id = s.service_id
-         WHERE dr.request_id = ?
-         FOR UPDATE`,
-        [requestId],
-      );
-
-      if (!request) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Document request not found" });
+      const result = await cancelOwnDocumentRequest(conn, {
+        role: "student",
+        ownerId: studentId,
+        requestId,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ error: result.message });
       }
-      if (request.student_id !== studentId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only cancel your own document requests" });
-      }
-      if (!["pending", "processing"].includes(request.status)) {
-        await conn.rollback();
-        return res.status(409).json({
-          error: `Cannot cancel a request that is already ${request.status}`,
-        });
-      }
-
-      await conn.query(
-        `UPDATE document_requests SET status = 'cancelled' WHERE request_id = ?`,
-        [requestId],
-      );
-
-      await conn.commit();
 
       emitToUser(studentId, "document:cancelled", { requestId, studentId });
-      emitToDept(request.department_id, "document:cancelled", { requestId, studentId });
+      emitToDept(result.departmentId, "document:cancelled", { requestId, studentId });
 
       res.json({
         message: "Document request cancelled successfully",
@@ -2675,33 +2627,6 @@ router.get(
     }
   },
 );
-
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Converts a MySQL TIME string (HH:MM:SS) to 12-hour format (e.g. "2:00 PM").
- */
-function formatTime12h(timeStr) {
-  if (!timeStr) return "";
-  const parts = String(timeStr).split(":");
-  const h = parseInt(parts[0], 10);
-  const m = parts[1] ?? "00";
-  const suffix = h >= 12 ? "PM" : "AM";
-  return `${h % 12 || 12}:${m} ${suffix}`;
-}
-function formatRelativeTime(date) {
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? "s" : ""} ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? "s" : ""} ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
-}
 
 // ─────────────────────────────────────────────────────────────
 // NOTIFICATIONS

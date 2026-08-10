@@ -16,13 +16,13 @@ const {
   insertAttachments,
   validateBudget,
   deleteFiles,
-  isPathInsideUploadDir,
+  serveAnnouncementAttachment,
 } = require("../utils/announcementAttachments");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
-const { getManilaDateString, getManilaTimeString } = require("../utils/dateTime");
+const { getManilaDateString, getManilaTimeString, formatRelativeTime, formatTime12h: formatTime } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
 const notificationsController = require("../controllers/notificationsController");
-const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
+const { settleSlotAfterEntryChange, getOwnedSlotOrRespond } = require("../utils/queueSlotSettlement");
 const {
   DB_STATUS_MAP,
   STATUS_LABEL_MAP,
@@ -31,7 +31,8 @@ const {
 } = require("../utils/documentStatus");
 const { createNotification, createNotificationsBatch } = require("../utils/notifications");
 const { sendPushNotification } = require("../utils/pushNotifications");
-const { getFacultyAvailabilityToday, formatTime } = require("../utils/facultyAvailability");
+const { getFacultyAvailabilityToday } = require("../utils/facultyAvailability");
+const { sendServerError } = require("../utils/errorResponse");
 
 // GET /api/admin/dashboard-stats
 // Scoped to the admin's own department_id
@@ -218,10 +219,7 @@ router.get(
         })),
       });
     } catch (error) {
-      console.error("Admin dashboard stats error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Admin dashboard stats error:");
     }
   },
 );
@@ -257,10 +255,7 @@ router.get(
 
       res.json({ services });
     } catch (error) {
-      console.error("Queue hosting services error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Queue hosting services error:");
     }
   },
 );
@@ -376,10 +371,7 @@ router.get(
 
       res.json({ queues: formatted });
     } catch (error) {
-      console.error("Queue hosting fetch error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Queue hosting fetch error:");
     }
   },
 );
@@ -520,10 +512,7 @@ router.post(
           error: "A queue for this service and start time already exists today",
         });
       }
-      console.error("Open queue error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Open queue error:");
     } finally {
       conn.release();
     }
@@ -551,23 +540,8 @@ router.patch(
       await conn.beginTransaction();
 
       const deptId = await getAdminDepartmentId(adminId);
-      const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, qs.status, s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? FOR UPDATE`,
-        [slotId],
-      );
-      if (!slot) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
-      }
-      if (slot.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only manage queues for your own department" });
-      }
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
       if (slot.status !== "open") {
         await conn.rollback();
         return res
@@ -615,10 +589,7 @@ router.patch(
       });
     } catch (error) {
       await conn.rollback();
-      console.error("Pause queue error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Pause queue error:");
     } finally {
       conn.release();
     }
@@ -637,23 +608,8 @@ router.patch(
       await conn.beginTransaction();
 
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, qs.status, s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? FOR UPDATE`,
-        [slotId],
-      );
-      if (!slot) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
-      }
-      if (slot.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only manage queues for your own department" });
-      }
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
       if (slot.status !== "paused") {
         await conn.rollback();
         return res
@@ -673,10 +629,7 @@ router.patch(
       res.json({ message: "Queue resumed", slotId, status: "open" });
     } catch (error) {
       await conn.rollback();
-      console.error("Resume queue error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Resume queue error:");
     } finally {
       conn.release();
     }
@@ -700,23 +653,8 @@ router.patch(
       await conn.beginTransaction();
 
       const deptId = await getAdminDepartmentId(adminId);
-      const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, qs.status, s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? FOR UPDATE`,
-        [slotId],
-      );
-      if (!slot) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
-      }
-      if (slot.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only manage queues for your own department" });
-      }
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
       if (slot.status === "cancelled") {
         await conn.rollback();
         return res.status(409).json({ error: `Queue is already ${slot.status}` });
@@ -768,10 +706,7 @@ router.patch(
       });
     } catch (error) {
       await conn.rollback();
-      console.error("Close queue error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Close queue error:");
     } finally {
       conn.release();
     }
@@ -794,23 +729,8 @@ router.patch(
       await conn.beginTransaction();
 
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, qs.status, s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? FOR UPDATE`,
-        [slotId],
-      );
-      if (!slot) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
-      }
-      if (slot.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only manage queues for your own department" });
-      }
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
       if (slot.status === "paused") {
         await conn.rollback();
         return res.status(409).json({
@@ -882,10 +802,7 @@ router.patch(
       res.json({ message: "Next student called", queueId: next.queue_id });
     } catch (error) {
       await conn.rollback();
-      console.error("Call next error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Call next error:");
     } finally {
       conn.release();
     }
@@ -908,23 +825,8 @@ router.patch(
       await conn.beginTransaction();
 
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? FOR UPDATE`,
-        [slotId],
-      );
-      if (!slot) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
-      }
-      if (slot.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only manage queues for your own department" });
-      }
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
 
       const [[serving]] = await conn.query(
         `SELECT queue_id, student_id FROM queues
@@ -967,10 +869,7 @@ router.patch(
       res.json({ message: "Student marked as arrived", queueId: serving.queue_id });
     } catch (error) {
       await conn.rollback();
-      console.error("Mark arrived error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Mark arrived error:");
     } finally {
       conn.release();
     }
@@ -990,23 +889,8 @@ router.patch(
       await conn.beginTransaction();
 
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? FOR UPDATE`,
-        [slotId],
-      );
-      if (!slot) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
-      }
-      if (slot.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only manage queues for your own department" });
-      }
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
 
       const [[serving]] = await conn.query(
         `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
@@ -1064,10 +948,7 @@ router.patch(
       });
     } catch (error) {
       await conn.rollback();
-      console.error("Mark as served error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Mark as served error:");
     } finally {
       conn.release();
     }
@@ -1096,23 +977,8 @@ router.patch(
       await conn.beginTransaction();
 
       const deptId = await getAdminDepartmentId(adminId);
-      const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? FOR UPDATE`,
-        [slotId],
-      );
-      if (!slot) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Queue slot not found" });
-      }
-      if (slot.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only manage queues for your own department" });
-      }
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
 
       const [[serving]] = await conn.query(
         `SELECT queue_id, student_id FROM queues WHERE slot_id = ? AND status = 'serving' LIMIT 1 FOR UPDATE`,
@@ -1152,10 +1018,7 @@ router.patch(
       });
     } catch (error) {
       await conn.rollback();
-      console.error("Skip student error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Skip student error:");
     } finally {
       conn.release();
     }
@@ -1242,10 +1105,7 @@ router.get(
 
       res.json({ appointments });
     } catch (error) {
-      console.error("Admin appointments fetch error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Admin appointments fetch error:");
     }
   },
 );
@@ -1507,10 +1367,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error("Admin transactions fetch error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Admin transactions fetch error:");
     }
   },
 );
@@ -1570,8 +1427,7 @@ router.get(
 
       res.json({ entries });
     } catch (error) {
-      console.error("Queue entries fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Queue entries fetch error:");
     }
   },
 );
@@ -1642,8 +1498,7 @@ router.get(
 
       res.json({ documents });
     } catch (error) {
-      console.error("Document processing fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Document processing fetch error:");
     }
   },
 );
@@ -1712,8 +1567,7 @@ router.get(
 
       res.json({ documents });
     } catch (error) {
-      console.error("Faculty document processing fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Faculty document processing fetch error:");
     }
   },
 );
@@ -1830,8 +1684,7 @@ router.patch(
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
-      console.error("Faculty document status update error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Faculty document status update error:");
     }
   },
 );
@@ -1924,8 +1777,7 @@ router.patch(
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
-      console.error("Document status update error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Document status update error:");
     }
   },
 );
@@ -1946,8 +1798,7 @@ router.get(
       const faculty = await getFacultyAvailabilityToday(deptId);
       res.json({ faculty });
     } catch (error) {
-      console.error("Faculty availability fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Faculty availability fetch error:");
     }
   },
 );
@@ -2021,8 +1872,7 @@ router.get(
         requiresCoding: !!r.requires_coding,
       })) });
     } catch (error) {
-      console.error("Document types fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Document types fetch error:");
     }
   },
 );
@@ -2055,8 +1905,7 @@ router.get(
       // optional requirement silently becomes "mandatory" on the next save.
       res.json({ requirements: rows.map((r) => ({ ...r, isMandatory: !!r.isMandatory })) });
     } catch (error) {
-      console.error("Requirements fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Requirements fetch error:");
     }
   },
 );
@@ -2096,8 +1945,7 @@ router.post(
       await logAudit(req.user.userId, "CREATE", "document_services", newId, null, { name, status: status || "active", processingTime });
       res.status(201).json({ message: "Document type created", id: newId });
     } catch (error) {
-      console.error("Document type create error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Document type create error:");
     }
   },
 );
@@ -2149,8 +1997,7 @@ router.put(
       );
       res.json({ message: "Document type updated" });
     } catch (error) {
-      console.error("Document type update error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Document type update error:");
     }
   },
 );
@@ -2176,8 +2023,7 @@ router.delete(
       await logAudit(req.user.userId, "DELETE", "document_services", serviceId, { name: svc.service_name }, null);
       res.json({ message: "Document type deleted" });
     } catch (error) {
-      console.error("Document type delete error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Document type delete error:");
     }
   },
 );
@@ -2210,8 +2056,7 @@ router.get(
         isGlobal: r.department_id === null,
       })) });
     } catch (error) {
-      console.error("Locations fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Locations fetch error:");
     }
   },
 );
@@ -2244,8 +2089,7 @@ router.post(
       );
       res.status(201).json({ id: loc.location_id, name: loc.location_name, isGlobal: false });
     } catch (error) {
-      console.error("Location create error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Location create error:");
     }
   },
 );
@@ -2286,8 +2130,7 @@ router.get(
         locationName: r.locationName || null,
       })) });
     } catch (error) {
-      console.error("Service types fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service types fetch error:");
     }
   },
 );
@@ -2316,8 +2159,7 @@ router.post(
       await logAudit(req.user.userId, "CREATE", "services", newId, null, { name });
       res.status(201).json({ message: "Service type created", id: newId });
     } catch (error) {
-      console.error("Service type create error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service type create error:");
     }
   },
 );
@@ -2355,8 +2197,7 @@ router.put(
       );
       res.json({ message: "Service type updated" });
     } catch (error) {
-      console.error("Service type update error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service type update error:");
     }
   },
 );
@@ -2382,8 +2223,7 @@ router.delete(
       await logAudit(req.user.userId, "DELETE", "services", serviceId, { name: svc.service_name }, null);
       res.json({ message: "Service type deleted" });
     } catch (error) {
-      console.error("Service type delete error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service type delete error:");
     }
   },
 );
@@ -2417,8 +2257,7 @@ router.get(
       );
       res.json({ requirements: rows.map((r) => ({ ...r, isMandatory: !!r.isMandatory })) });
     } catch (error) {
-      console.error("Service requirements fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service requirements fetch error:");
     }
   },
 );
@@ -2457,8 +2296,7 @@ router.put(
       );
       res.json({ message: "Service requirements updated" });
     } catch (error) {
-      console.error("Service requirements update error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service requirements update error:");
     }
   },
 );
@@ -2491,8 +2329,7 @@ router.get(
       );
       res.json({ steps: rows });
     } catch (error) {
-      console.error("Service steps fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service steps fetch error:");
     }
   },
 );
@@ -2531,8 +2368,7 @@ router.put(
       );
       res.json({ message: "Service procedure steps updated" });
     } catch (error) {
-      console.error("Service steps update error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Service steps update error:");
     }
   },
 );
@@ -2591,8 +2427,7 @@ router.get(
         }),
       })) });
     } catch (error) {
-      console.error("Audit logs fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Audit logs fetch error:");
     }
   },
 );
@@ -2641,8 +2476,7 @@ router.get(
         })),
       });
     } catch (error) {
-      console.error("Announcements fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcements fetch error:");
     }
   },
 );
@@ -2743,8 +2577,7 @@ router.post(
     } catch (error) {
       await conn.rollback();
       deleteFiles(req.files);
-      console.error("Announcement create error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement create error:");
     } finally {
       conn.release();
     }
@@ -2830,8 +2663,7 @@ router.put(
     } catch (error) {
       await conn.rollback();
       deleteFiles(req.files);
-      console.error("Announcement update error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement update error:");
     } finally {
       conn.release();
     }
@@ -2870,8 +2702,7 @@ router.delete(
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Attachment removed" });
     } catch (error) {
-      console.error("Announcement attachment delete error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement attachment delete error:");
     }
   },
 );
@@ -2899,8 +2730,7 @@ router.patch(
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ isPinned: !!newPinned });
     } catch (error) {
-      console.error("Announcement pin toggle error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement pin toggle error:");
     }
   },
 );
@@ -2929,8 +2759,7 @@ router.patch(
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement archived" });
     } catch (error) {
-      console.error("Announcement archive error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement archive error:");
     }
   },
 );
@@ -2959,8 +2788,7 @@ router.patch(
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement restored", date: new Date().toISOString(), isReposted: true });
     } catch (error) {
-      console.error("Announcement restore error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement restore error:");
     }
   },
 );
@@ -2998,8 +2826,7 @@ router.delete(
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement deleted" });
     } catch (error) {
-      console.error("Announcement delete error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement delete error:");
     }
   },
 );
@@ -3019,30 +2846,14 @@ router.get(
     const attachmentId = parseInt(req.params.attachmentId, 10);
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
-      const [[row]] = await pool.query(
-        `SELECT a.department_id, aa.file_path, aa.mime_type
-         FROM announcement_attachments aa
-         JOIN announcements a ON a.announcement_id = aa.announcement_id
-         WHERE aa.attachment_id = ? AND aa.announcement_id = ?`,
-        [attachmentId, announcementId],
-      );
-      if (!row) {
-        return res.status(404).json({ error: "Attachment not found" });
-      }
-      if (row.department_id !== deptId) {
-        return res.status(403).json({ error: "Cannot view attachments from another department" });
-      }
-
-      const resolvedPath = path.join(UPLOAD_DIR, row.file_path);
-      if (!isPathInsideUploadDir(resolvedPath)) {
-        return res.status(400).json({ error: "Invalid attachment path" });
-      }
-
-      res.type(row.mime_type || "application/octet-stream");
-      res.sendFile(resolvedPath);
+      await serveAnnouncementAttachment(res, {
+        announcementId,
+        attachmentId,
+        callerDeptId: deptId,
+        forbiddenMessage: "Cannot view attachments from another department",
+      });
     } catch (error) {
-      console.error("Announcement attachment fetch error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Announcement attachment fetch error:");
     }
   },
 );
@@ -3301,8 +3112,7 @@ router.get(
 
       res.json({ performance, positiveInsights, improvementAreas, serviceTypes, trends });
     } catch (error) {
-      console.error("Queue analytics error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Queue analytics error:");
     }
   },
 );
@@ -3330,8 +3140,7 @@ router.get(
         syncEnabled: map.pinnacle_sync_enabled === "true",
       });
     } catch (error) {
-      console.error("Pinnacle config get error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Pinnacle config get error:");
     }
   },
 );
@@ -3362,8 +3171,7 @@ router.post(
       await logAudit(adminId, "UPDATE", "system_settings", null, null, { apiUrl, syncInterval, syncEnabled });
       res.json({ message: "Configuration saved successfully." });
     } catch (error) {
-      console.error("Pinnacle config save error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Pinnacle config save error:");
     }
   },
 );
@@ -3406,8 +3214,7 @@ router.get(
         })),
       });
     } catch (error) {
-      console.error("Pinnacle stats error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Pinnacle stats error:");
     }
   },
 );
@@ -3429,8 +3236,7 @@ router.post(
       );
       res.json({ message: "Sync completed successfully.", syncedAt: inserted.synced_at });
     } catch (error) {
-      console.error("Pinnacle trigger error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Pinnacle trigger error:");
     }
   },
 );
@@ -3533,8 +3339,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error("Scan verify error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Scan verify error:");
     }
   },
 );
@@ -3570,32 +3375,19 @@ router.get(
         [adminUserId],
       );
 
-      const now = Date.now();
-      const formatRelative = (ts) => {
-        const diffMs = now - new Date(ts).getTime();
-        const mins = Math.floor(diffMs / 60000);
-        if (mins < 1) return "Just now";
-        if (mins < 60) return `${mins} minute${mins > 1 ? "s" : ""} ago`;
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs} hour${hrs > 1 ? "s" : ""} ago`;
-        const days = Math.floor(hrs / 24);
-        return `${days} day${days > 1 ? "s" : ""} ago`;
-      };
-
       res.json({
         scans: rows.map((r) => ({
           id: r.log_id,
           name: r.student_name,
           docType: r.doc_type,
           tracking: r.tracking_number,
-          time: formatRelative(r.scan_time),
+          time: formatRelativeTime(new Date(r.scan_time)),
           status: VALID_SCAN_STATUSES.includes(r.status) ? "valid" : "expired",
           requesterType: r.requester_type,
         })),
       });
     } catch (error) {
-      console.error("Recent scans error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Recent scans error:");
     }
   },
 );
@@ -3665,8 +3457,7 @@ router.get(
 
       res.json({ users });
     } catch (error) {
-      console.error("GET /users error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "GET /users error:");
     }
   },
 );
@@ -3723,8 +3514,7 @@ router.put(
 
       res.json({ message: "User updated" });
     } catch (error) {
-      console.error("PUT /users/:id error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "PUT /users/:id error:");
     }
   },
 );
@@ -3753,8 +3543,7 @@ router.patch(
 
       res.json({ message: "Status updated", status });
     } catch (error) {
-      console.error("PATCH /users/:id/status error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "PATCH /users/:id/status error:");
     }
   },
 );
@@ -3777,8 +3566,7 @@ router.delete(
 
       res.json({ message: "User deleted" });
     } catch (error) {
-      console.error("DELETE /users/:id error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "DELETE /users/:id error:");
     }
   },
 );
@@ -3809,8 +3597,7 @@ router.post(
 
       res.json({ message: "Temporary password generated", tempPassword });
     } catch (error) {
-      console.error("POST /users/:id/reset-password error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "POST /users/:id/reset-password error:");
     }
   },
 );
@@ -3832,8 +3619,7 @@ router.get(
       });
       res.json(result);
     } catch (error) {
-      console.error("GET /notifications error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "GET /notifications error:");
     }
   },
 );
@@ -3859,8 +3645,7 @@ router.patch(
       }
       res.json({ message: "Marked as read" });
     } catch (error) {
-      console.error("PATCH /notifications/:id/read error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "PATCH /notifications/:id/read error:");
     }
   },
 );
@@ -3875,8 +3660,7 @@ router.patch(
       await notificationsController.markAllNotificationsRead(req.user.userId);
       res.json({ message: "All marked as read" });
     } catch (error) {
-      console.error("PATCH /notifications/read-all error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "PATCH /notifications/read-all error:");
     }
   },
 );

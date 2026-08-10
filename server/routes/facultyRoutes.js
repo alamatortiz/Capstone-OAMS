@@ -5,13 +5,16 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
-const { getManilaDateString } = require("../utils/dateTime");
+const { getManilaDateString, formatTime12h: formatTime, formatRelativeTime } = require("../utils/dateTime");
 const { createNotification } = require("../utils/notifications");
 const notificationsController = require("../controllers/notificationsController");
 const { emitToUser, emitToDept } = require("../sockets");
 const { isValidTransition } = require("../utils/appointmentStatus");
+const { cancelOwnDocumentRequest } = require("../utils/documentStatus");
+const { sendServerError } = require("../utils/errorResponse");
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const VALID_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // GET /api/faculty/dashboard-stats
 router.get(
@@ -131,10 +134,7 @@ router.get(
         })),
       });
     } catch (error) {
-      console.error("Faculty dashboard stats error:", error);
-      res
-        .status(500)
-        .json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "Faculty dashboard stats error:");
     }
   },
 );
@@ -155,8 +155,7 @@ router.get(
       );
       res.json({ availabilityStatus: row?.availability_status ?? "available" });
     } catch (err) {
-      console.error("GET /availability-status error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "GET /availability-status error:");
     }
   },
 );
@@ -190,19 +189,10 @@ router.patch(
       });
       res.json({ message: "Availability status updated", availabilityStatus: status });
     } catch (err) {
-      console.error("PATCH /availability-status error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "PATCH /availability-status error:");
     }
   },
 );
-
-function formatTime(timeStr) {
-  if (!timeStr) return "";
-  const [h, m] = timeStr.split(":");
-  const hour = parseInt(h, 10);
-  const suffix = hour >= 12 ? "PM" : "AM";
-  return `${hour % 12 || 12}:${m} ${suffix}`;
-}
 
 function buildActivityTitle(row) {
   if (row.status === "cancelled") {
@@ -233,17 +223,6 @@ function statusToDot(status) {
       cancelled: "dot-gray",
     }[status] ?? "dot-gray"
   );
-}
-
-function formatRelativeTime(date) {
-  const diffMs = new Date() - date;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? "s" : ""} ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? "s" : ""} ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -300,8 +279,7 @@ router.get(
         requestedAt: r.created_at,
       })));
     } catch (err) {
-      console.error("GET /appointments error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "GET /appointments error:");
     }
   }
 );
@@ -388,8 +366,7 @@ router.patch(
       res.json({ message: "Status updated" });
     } catch (err) {
       await conn.rollback();
-      console.error("PATCH /appointments/:id/status error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "PATCH /appointments/:id/status error:");
     } finally {
       conn.release();
     }
@@ -458,8 +435,7 @@ router.get(
       rows.sort((a, b) => new Date(b.event_time) - new Date(a.event_time));
       res.json(rows);
     } catch (err) {
-      console.error("GET /transactions error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "GET /transactions error:");
     }
   }
 );
@@ -500,8 +476,7 @@ router.get(
         isGlobal: r.department_id === null,
       })) });
     } catch (err) {
-      console.error("GET /locations error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "GET /locations error:");
     }
   },
 );
@@ -538,8 +513,7 @@ router.post(
       );
       res.status(201).json({ id: loc.location_id, name: loc.location_name, isGlobal: false });
     } catch (err) {
-      console.error("POST /locations error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "POST /locations error:");
     }
   },
 );
@@ -597,8 +571,7 @@ router.get(
       }));
       res.json(result);
     } catch (err) {
-      console.error("GET /availability error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "GET /availability error:");
     }
   }
 );
@@ -614,6 +587,9 @@ router.post(
     const { day_of_week, start_time, end_time, location, max_students, appointmentTypes } = req.body;
     if (!day_of_week || !start_time || !end_time) {
       return res.status(400).json({ message: "day_of_week, start_time, end_time are required" });
+    }
+    if (!VALID_DAYS.includes(day_of_week)) {
+      return res.status(400).json({ message: "Invalid day_of_week" });
     }
     if (end_time <= start_time) {
       return res.status(400).json({ message: "end_time must be after start_time" });
@@ -701,8 +677,7 @@ router.post(
       });
     } catch (err) {
       await conn.rollback();
-      console.error("POST /availability error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "POST /availability error:");
     } finally {
       conn.release();
     }
@@ -719,6 +694,10 @@ router.patch(
     const facultyId = req.user.userId;
     const { id } = req.params;
     const { day_of_week, start_time, end_time, location, max_students, appointmentTypes } = req.body;
+
+    if (day_of_week !== undefined && !VALID_DAYS.includes(day_of_week)) {
+      return res.status(400).json({ message: "Invalid day_of_week" });
+    }
 
     let maxStu;
     if (max_students !== undefined) {
@@ -893,8 +872,7 @@ router.patch(
       res.json({ message: "Availability updated", cancelledAppointments: noLongerFits.length });
     } catch (err) {
       await conn.rollback();
-      console.error("PATCH /availability/:id error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "PATCH /availability/:id error:");
     } finally {
       conn.release();
     }
@@ -977,104 +955,9 @@ router.delete(
       res.json({ message: "Availability deleted", cancelledAppointments: affected.length });
     } catch (err) {
       await conn.rollback();
-      console.error("DELETE /availability/:id error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "DELETE /availability/:id error:");
     } finally {
       conn.release();
-    }
-  }
-);
-
-// ─────────────────────────────────────────────────────────────
-// APPOINTMENT SERVICES (slot management)
-// ─────────────────────────────────────────────────────────────
-
-// GET /api/faculty/appointment-services
-router.get(
-  "/appointment-services",
-  authenticateToken,
-  authorizeRoles("faculty"),
-  async (req, res) => {
-    const facultyId = req.user.userId;
-    try {
-      const [rows] = await pool.query(
-        "SELECT * FROM appointment_services WHERE faculty_id = ? ORDER BY service_id",
-        [facultyId]
-      );
-      res.json(rows);
-    } catch (err) {
-      console.error("GET /appointment-services error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
-    }
-  }
-);
-
-// POST /api/faculty/appointment-services
-router.post(
-  "/appointment-services",
-  authenticateToken,
-  authorizeRoles("faculty"),
-  async (req, res) => {
-    const facultyId = req.user.userId;
-    const { service_name, description } = req.body;
-    if (!service_name) return res.status(400).json({ message: "service_name is required" });
-    try {
-      const [result] = await pool.query(
-        "INSERT INTO appointment_services (service_name, description, faculty_id) VALUES (?,?,?)",
-        [service_name, description ?? null, facultyId]
-      );
-      res.status(201).json({ service_id: result.insertId, message: "Service created" });
-    } catch (err) {
-      console.error("POST /appointment-services error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
-    }
-  }
-);
-
-// PUT /api/faculty/appointment-services/:id
-router.put(
-  "/appointment-services/:id",
-  authenticateToken,
-  authorizeRoles("faculty"),
-  async (req, res) => {
-    const facultyId = req.user.userId;
-    const { id } = req.params;
-    const { service_name, description } = req.body;
-    try {
-      const [result] = await pool.query(
-        `UPDATE appointment_services
-         SET service_name = COALESCE(?, service_name),
-             description = COALESCE(?, description)
-         WHERE service_id = ? AND faculty_id = ?`,
-        [service_name ?? null, description ?? null, id, facultyId]
-      );
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Service not found" });
-      res.json({ message: "Service updated" });
-    } catch (err) {
-      console.error("PUT /appointment-services/:id error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
-    }
-  }
-);
-
-// DELETE /api/faculty/appointment-services/:id
-router.delete(
-  "/appointment-services/:id",
-  authenticateToken,
-  authorizeRoles("faculty"),
-  async (req, res) => {
-    const facultyId = req.user.userId;
-    const { id } = req.params;
-    try {
-      const [result] = await pool.query(
-        "DELETE FROM appointment_services WHERE service_id = ? AND faculty_id = ?",
-        [id, facultyId]
-      );
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Service not found" });
-      res.json({ message: "Service deleted" });
-    } catch (err) {
-      console.error("DELETE /appointment-services/:id error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
     }
   }
 );
@@ -1119,8 +1002,7 @@ router.get(
 
       res.json(rows.map((r) => ({ ...r, requirements: requirementsMap[r.service_id] ?? [] })));
     } catch (err) {
-      console.error("GET /document-services error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "GET /document-services error:");
     }
   }
 );
@@ -1145,8 +1027,7 @@ router.get(
       );
       res.json(rows);
     } catch (err) {
-      console.error("GET /my-document-requests error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "GET /my-document-requests error:");
     }
   }
 );
@@ -1225,8 +1106,7 @@ router.post(
         message: "Request submitted",
       });
     } catch (err) {
-      console.error("POST /my-document-requests error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "POST /my-document-requests error:");
     }
   }
 );
@@ -1250,46 +1130,17 @@ router.delete(
 
     const conn = await pool.getConnection();
     try {
-      await conn.beginTransaction();
-
-      // Lock the row so an admin's status-changing UPDATE (e.g. to
-      // "generated") can't land in the narrow window between this SELECT
-      // and the DELETE below.
-      const [[request]] = await conn.query(
-        `SELECT fdr.request_id, fdr.faculty_id, fdr.status, s.department_id
-         FROM faculty_document_requests fdr
-         JOIN document_services s ON fdr.service_id = s.service_id
-         WHERE fdr.request_id = ?
-         FOR UPDATE`,
-        [requestId]
-      );
-
-      if (!request) {
-        await conn.rollback();
-        return res.status(404).json({ message: "Document request not found" });
+      const result = await cancelOwnDocumentRequest(conn, {
+        role: "faculty",
+        ownerId: facultyId,
+        requestId,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.message });
       }
-      if (request.faculty_id !== facultyId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ message: "You can only cancel your own document requests" });
-      }
-      if (!["pending", "processing"].includes(request.status)) {
-        await conn.rollback();
-        return res.status(409).json({
-          message: `Cannot cancel a request that is already ${request.status}`,
-        });
-      }
-
-      await conn.query(
-        `UPDATE faculty_document_requests SET status = 'cancelled' WHERE request_id = ?`,
-        [requestId]
-      );
-
-      await conn.commit();
 
       emitToUser(facultyId, "document:cancelled", { requestId, facultyId });
-      emitToDept(request.department_id, "document:cancelled", { requestId, facultyId });
+      emitToDept(result.departmentId, "document:cancelled", { requestId, facultyId });
 
       res.json({
         message: "Document request cancelled successfully",
@@ -1297,8 +1148,7 @@ router.delete(
       });
     } catch (err) {
       await conn.rollback();
-      console.error("DELETE /my-document-requests/:requestId error:", err);
-      res.status(500).json({ message: "Internal server error", dev_error: err.message });
+      sendServerError(res, err, "DELETE /my-document-requests/:requestId error:");
     } finally {
       conn.release();
     }
@@ -1322,8 +1172,7 @@ router.get(
       });
       res.json(result);
     } catch (error) {
-      console.error("GET /notifications error:", error);
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "GET /notifications error:");
     }
   },
 );
@@ -1349,7 +1198,7 @@ router.patch(
       }
       res.json({ message: "Marked as read" });
     } catch (error) {
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "PATCH /notifications/:id/read error:");
     }
   },
 );
@@ -1364,7 +1213,7 @@ router.patch(
       await notificationsController.markAllNotificationsRead(req.user.userId);
       res.json({ message: "All marked as read" });
     } catch (error) {
-      res.status(500).json({ message: "Internal server error", dev_error: error.message });
+      sendServerError(res, error, "PATCH /notifications/read-all error:");
     }
   },
 );

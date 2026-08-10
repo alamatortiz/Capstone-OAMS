@@ -1,12 +1,5 @@
 const pool = require("../db");
-const { getManilaDateString, getManilaTimeString } = require("./dateTime");
-
-function formatTime(timeStr) {
-  if (!timeStr) return "";
-  const [h, m] = timeStr.split(":");
-  const hour = parseInt(h, 10);
-  return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
-}
+const { getManilaDateString, getManilaTimeString, formatTime12h: formatTime } = require("./dateTime");
 
 function toTimeStr(val) {
   if (!val) return "00:00:00";
@@ -166,4 +159,4 @@ async function getFacultyAvailabilityToday(deptId) {
   });
 }
 
-module.exports = { getFacultyAvailabilityToday, formatTime, computeIsBusy };
+module.exports = { getFacultyAvailabilityToday, computeIsBusy };

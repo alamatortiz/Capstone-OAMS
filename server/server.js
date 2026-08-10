@@ -23,12 +23,18 @@ app.use(
   }),
 );
 app.use(express.json());
+// Without this, a request sent with the wrong Content-Type (e.g. a client
+// bug sending form-encoded instead of JSON) left `req.body` `undefined`
+// instead of `{}`, since no parser matched it at all -- every route handler
+// that destructures `req.body` then threw a raw, uncaught TypeError.
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
 const authRoutes = require("./routes/auth");
 const studentRoutes = require("./routes/studentRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const { sendServerError } = require("./utils/errorResponse");
 const { startNoShowSweeper } = require("./jobs/queueNoShowSweeper");
 const { startExpirySweeper } = require("./jobs/queueExpirySweeper");
 const { startDocumentPickupSweeper } = require("./jobs/documentPickupSweeper");
@@ -57,6 +63,18 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: err.message });
   }
   next(err);
+});
+
+// Catch-all: anything not already handled above (malformed JSON from
+// express.json(), or an uncaught synchronous exception in a route handler)
+// previously fell through to Express's default handler, which renders a
+// full HTML stack trace -- including real server file paths -- instead of
+// a clean JSON error. This must stay the LAST middleware registered.
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Malformed request body" });
+  }
+  sendServerError(res, err, "Unhandled error");
 });
 
 initSocketServer(server);
