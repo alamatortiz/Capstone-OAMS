@@ -723,7 +723,7 @@ body {
 
 .tx-badge-cancelled {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--danger);
   border: 0.5px solid rgba(239, 68, 68, 0.3);
 }
 

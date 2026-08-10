@@ -1,3 +1,31 @@
+/* Semantic status/type color tokens -- this file previously had no :root
+   block of its own and only "worked" by accident via whichever other
+   page's CSS happened to load first in Vite's global bundle. */
+:root,
+[data-theme="dark"] {
+  --success: #10b981;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --danger: var(--destructive);
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --violet: #7c3aed;
+  --pink: #ec4899;
+}
+
+[data-theme="light"] {
+  --success: #059669;
+  --warning: #d97706;
+  --destructive: #dc2626;
+  --danger: var(--destructive);
+  --blue: #2563eb;
+  --cyan: #0891b2;
+  --purple: #9333ea;
+  --violet: #6d28d9;
+  --pink: #db2777;
+}
+
 /* ===== Layout ===== */
 .admin-transaction-with-sidebar {
   display: flex;
@@ -151,11 +179,11 @@
 }
 
 .admin-transaction-stat-card.admin-transaction-stat-appointment {
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(168, 85, 247, 0.3);
 }
 
 .admin-transaction-stat-card.admin-transaction-stat-document {
-  border-color: rgba(168, 85, 247, 0.3);
+  border-color: rgba(245, 158, 11, 0.3);
 }
 
 .admin-transaction-stat-content {
@@ -200,11 +228,11 @@
 }
 
 .admin-transaction-stat-appointment svg {
-  color: #10b981;
+  color: #a855f7;
 }
 
 .admin-transaction-stat-document svg {
-  color: #a855f7;
+  color: #f59e0b;
 }
 
 .admin-transaction-section-header {
@@ -489,15 +517,15 @@
 }
 
 .admin-transaction-badge-appointment {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 0.5px solid rgba(16, 185, 129, 0.3);
+  background-color: rgba(168, 85, 247, 0.15);
+  color: var(--purple);
+  border: 0.5px solid rgba(168, 85, 247, 0.3);
 }
 
 .admin-transaction-badge-document {
-  background-color: rgba(168, 85, 247, 0.15);
-  color: #a855f7;
-  border: 0.5px solid rgba(168, 85, 247, 0.3);
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.3);
 }
 
 .admin-transaction-badge-completed {
@@ -507,47 +535,49 @@
 }
 
 .admin-transaction-badge-approved {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border: 0.5px solid rgba(59, 130, 246, 0.3);
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 0.5px solid rgba(16, 185, 129, 0.3);
 }
 
 .admin-transaction-badge-rejected {
   background-color: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--danger);
   border: 0.5px solid rgba(239, 68, 68, 0.3);
 }
 
 .admin-transaction-badge-cancelled {
   background-color: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--danger);
   border: 0.5px solid rgba(239, 68, 68, 0.3);
 }
 
 .admin-transaction-badge-noshow {
   background-color: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--danger);
   border: 0.5px solid rgba(239, 68, 68, 0.3);
 }
 
 .admin-transaction-badge-pending {
-  background-color: rgba(234, 179, 8, 0.15);
-  color: #eab308;
-  border: 0.5px solid rgba(234, 179, 8, 0.3);
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.3);
 }
 
-/* Document-only status colors, matching stud-documents/stud-document-status doc-badge palette.
-   Kept separate from the shared pending/rejected classes above so appointment rows are unaffected. */
+/* Document-only status classes -- kept as separate selectors since JSX
+   assigns them specifically for document rows; colors intentionally match
+   the shared pending/rejected badges above now that all "pending"/"rejected"
+   statuses use one consistent color app-wide. */
 .admin-transaction-badge-doc-pending {
-  background-color: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
-  border: 0.5px solid rgba(251, 191, 36, 0.3);
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.3);
   text-transform: uppercase;
 }
 
 .admin-transaction-badge-doc-rejected {
   background-color: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+  color: var(--danger);
   border: 0.5px solid rgba(239, 68, 68, 0.3);
   text-transform: uppercase;
 }
