@@ -139,10 +139,10 @@ const STATUS_TINTS: Record<DocumentStatus, { bg: string; border: string; color: 
   pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: 'alert-circle-outline' },
   processing: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6', icon: 'time-outline' },
   ready: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e', icon: 'checkmark-circle-outline' },
-  released: { bg: 'rgba(100, 116, 139, 0.15)', border: 'rgba(100, 116, 139, 0.35)', color: '#94a3b8', icon: 'checkmark-circle-outline' },
+  released: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
   claimed: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
   rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
-  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af', icon: 'close-circle-outline' },
+  cancelled: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
 };
 
 const DONE_STATUSES: DocumentStatus[] = ['claimed', 'rejected', 'cancelled'];

@@ -112,9 +112,9 @@ const STATUS_META: Record<DocStatus, { label: string; icon: IoniconName; bg: str
   processing: { label: 'processing', icon: 'alert-circle-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
   ready: { label: 'ready', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
   released: { label: 'released', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  claimed: { label: 'claimed', icon: 'checkmark-circle-outline', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' },
+  claimed: { label: 'claimed', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
   rejected: { label: 'rejected', icon: 'close-circle-outline', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-  cancelled: { label: 'cancelled', icon: 'close-circle-outline', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' },
+  cancelled: { label: 'cancelled', icon: 'close-circle-outline', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
 };
 
 const formatDateLong = (dateString?: string) => {
