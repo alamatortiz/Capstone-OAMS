@@ -12,7 +12,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 
 import "./stud-dashboard.css";
 import api from "../../utils/api";
-import { formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDateTime, parseOfficeHoursSchedule } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 
 // ─── Dashboard Content Icons ──────────────────────────────────────────────────
@@ -286,23 +286,6 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (authUser) fetchOfficeHours();
   }, [authUser, fetchOfficeHours]);
-
-  // Splits only on a comma followed by a weekday name (the actual entry
-  // delimiter, e.g. "Monday - Friday: 8 AM - 5 PM, Saturday: 8 AM - 12 PM")
-  // rather than any capital letter -- a naive "any capital letter" split
-  // would mis-split free text like "Monday: 9-11, By Appointment" on "By".
-  const parseSchedule = (hoursStr) => {
-    if (!hoursStr) return [];
-    const weekdayNames = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday";
-    return hoursStr.split(new RegExp(`,\\s*(?=(?:${weekdayNames})\\b)`)).map((entry) => {
-      const colonIdx = entry.indexOf(": ");
-      if (colonIdx === -1) return { day: entry.trim(), time: "" };
-      return {
-        day: entry.substring(0, colonIdx).trim(),
-        time: entry.substring(colonIdx + 2).trim(),
-      };
-    });
-  };
 
   // Pinned announcements only, capped to the top 2 for the dashboard preview
   const allPinnedAnnouncements = announcements.filter((a) => a.isPinned);
@@ -829,7 +812,7 @@ export default function StudentDashboard() {
               ) : (
                 <>
                   <div className="stud-hours-schedule">
-                    {parseSchedule(officeHours.officeHours).map((entry, i) => (
+                    {parseOfficeHoursSchedule(officeHours.officeHours).map((entry, i) => (
                       <div key={i} className="stud-hours-item">
                         <p className="stud-hours-day">{entry.day}</p>
                         <p className="stud-hours-time">{entry.time}</p>

@@ -219,14 +219,17 @@ body {
   }
 }
 
-/* ===== Welcome Banner ===== */
-.banner-ccs-logo {
-  height: 2rem;
+/* ===== Welcome Banner (matches stud-dashboard.css sizing) ===== */
+.professor-dashboard .banner-ccs-logo {
+  width: 4.5rem;
+  height: 4.5rem;
   object-fit: contain;
   flex-shrink: 0;
+  display: block;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
 }
 
-.welcome-banner {
+.professor-dashboard .welcome-banner {
   position: relative;
   overflow: hidden;
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
@@ -235,28 +238,23 @@ body {
   color: white;
   box-shadow: 0 10px 30px rgba(34, 197, 94, 0.2);
   transition: all 0.3s ease;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
 }
 
-.banner-backdrop {
+.professor-dashboard .banner-backdrop {
   position: absolute;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   pointer-events: none;
 }
 
-.banner-backdrop-1 {
+.professor-dashboard .banner-backdrop-1 {
   width: 10rem;
   height: 10rem;
   top: -2rem;
   right: -2rem;
 }
 
-.banner-backdrop-2 {
+.professor-dashboard .banner-backdrop-2 {
   width: 6rem;
   height: 6rem;
   bottom: -2.5rem;
@@ -264,48 +262,49 @@ body {
   opacity: 0.5;
 }
 
-.banner-content {
+.professor-dashboard .banner-content {
   position: relative;
   z-index: 1;
 }
 
-.banner-greeting {
+.professor-dashboard .banner-greeting {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 1rem;
+  font-size: 1.5rem;
   font-weight: 400;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.15rem;
   text-align: left;
 }
 
-.banner-title-row {
+.professor-dashboard .banner-title-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   justify-content: flex-start;
 }
 
-.banner-title {
-  font-size: 1.5rem;
+.professor-dashboard .banner-title {
+  font-size: 2.25rem;
   font-weight: 700;
   margin: 0;
-  line-height: 1.2;
-  text-align: left;
+  line-height: 1.1;
+  text-align: justify;
+  text-justify: inter-word;
 }
 
 @media (min-width: 768px) {
-  .banner-title {
-    font-size: 1.75rem;
+  .professor-dashboard .banner-title {
+    font-size: 2.75rem;
   }
 }
 
-.banner-badges {
+.professor-dashboard .banner-badges {
   margin-top: 1rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.banner-badges .badge {
+.professor-dashboard .banner-badges .badge {
   background: rgba(255, 255, 255, 0.2);
   color: white;
   padding: 0.375rem 0.875rem;
@@ -314,10 +313,6 @@ body {
   font-weight: 500;
   border: 1px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
-}
-
-@media (max-width: 640px) {
-  .welcome-banner { flex-direction: column; }
 }
 
 /* ===== Stats Grid ===== */
@@ -478,27 +473,29 @@ body {
   margin-top: 0.75rem;
 }
 
-/* ===== Today's Appointments Section ===== */
-.todays-appointments-section {
+.professor-dashboard .recent-activity-section {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.section-header {
+/* ===== Section headers / "view all" links (shared: Quick Actions, Recent Activity) ===== */
+.professor-dashboard .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 0.5rem;
 }
 
-.section-header h2 {
-  font-size: 1.125rem;
+.professor-dashboard .section-header h2 {
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
   transition: color 0.3s ease;
+  letter-spacing: -0.5px;
 }
 
-.view-all-link {
+.professor-dashboard .view-all-link {
   background: transparent;
   border: none;
   color: var(--primary-color);
@@ -513,64 +510,130 @@ body {
   transition: gap 0.2s ease;
 }
 
-.view-all-link:hover {
+.professor-dashboard .view-all-link:hover {
   gap: 0.5rem;
 }
 
-.view-all-link svg {
+.professor-dashboard .view-all-link svg {
   width: 0.75rem;
   height: 0.75rem;
 }
 
-.appointments-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  overflow: hidden;
-  transition: all 0.3s ease;
+/* "View All" pill button used INSIDE a card header (Today's Appointments,
+   Pinned Announcements) -- distinct from .view-all-link above, which sits
+   outside the card next to a plain <h2>. Mirrors stud-dashboard.css's
+   .view-all-btn used the same way inside .queue-preview-card/.announcements-card. */
+.professor-dashboard .view-all-btn {
+  background: transparent;
+  border: none;
+  color: var(--primary-color);
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
 }
 
-.appointments-list {
+.professor-dashboard .view-all-btn:hover {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.professor-dashboard .view-all-btn svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* Empty-state icon circle, mirrors stud-dashboard.css's .empty-icon/.empty-content
+   used by the Active Queue preview card's empty state. */
+.professor-dashboard .empty-content {
+  text-align: center;
+  padding: 2rem 1.25rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
   display: flex;
   flex-direction: column;
-  padding: 1rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
-.appointment-empty {
-  width: 100%;
-  text-align: center;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  padding: 1rem 0;
+.professor-dashboard .empty-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.appointment-item {
+.professor-dashboard .empty-icon .icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* ===== Today's Appointments preview card — purple theme ===== */
+.professor-dashboard .appointments-preview-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 1rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.professor-dashboard .appointments-preview-card .card-header {
+  border-bottom-color: transparent;
+  padding-bottom: 1rem;
+}
+
+.professor-dashboard .appointments-preview-card .card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.professor-dashboard .appointments-preview-card .card-title .icon,
+.professor-dashboard .appointments-preview-card .view-all-btn {
+  color: var(--purple);
+}
+
+.professor-dashboard .appointments-preview-card .view-all-btn:hover {
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.professor-dashboard .appointments-preview-card .empty-icon {
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--purple);
+}
+
+.professor-dashboard .appointment-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1.5px solid rgba(34, 197, 94, 0.4);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 0.75rem;
-  background-color: rgba(34, 197, 94, 0.08);
+  background-color: rgba(168, 85, 247, 0.06);
   transition: all 0.3s ease;
   margin-bottom: 0.75rem;
 }
 
-[data-theme="light"] .appointment-item {
-  border: 1.5px solid rgba(34, 197, 94, 0.3);
-  background-color: rgba(34, 197, 94, 0.06);
-}
-
-.appointment-item:last-child {
+.professor-dashboard .appointment-item:last-child {
   margin-bottom: 0;
 }
 
-.appointment-item:hover {
-  background-color: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.6);
+.professor-dashboard .appointment-item:hover {
+  background-color: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
-.appointment-item .appointment-icon {
+.professor-dashboard .appointment-item .appointment-icon {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
@@ -578,23 +641,23 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(34, 197, 94, 0.15) 100%);
-  color: var(--primary-color);
-  border: 1.5px solid rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.15) 100%);
+  color: var(--purple);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   transition: all 0.3s ease;
 }
 
-.appointment-item .appointment-icon:hover {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.35) 0%, rgba(34, 197, 94, 0.25) 100%);
-  border-color: rgba(34, 197, 94, 0.5);
+.professor-dashboard .appointment-item .appointment-icon:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(168, 85, 247, 0.25) 100%);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
-.appointment-item .appointment-icon svg {
+.professor-dashboard .appointment-item .appointment-icon svg {
   width: 1.25rem;
   height: 1.25rem;
 }
 
-.appointment-details {
+.professor-dashboard .appointment-details {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -602,7 +665,7 @@ body {
   gap: 0.25rem;
 }
 
-.appointment-student {
+.professor-dashboard .appointment-student {
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--text-primary);
@@ -611,7 +674,7 @@ body {
   line-height: 1.2;
 }
 
-.appointment-purpose {
+.professor-dashboard .appointment-purpose {
   font-size: 0.8rem;
   color: var(--text-secondary);
   margin: 0;
@@ -619,7 +682,7 @@ body {
   line-height: 1.2;
 }
 
-.appointment-time-status {
+.professor-dashboard .appointment-time-status {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -628,7 +691,7 @@ body {
   padding-left: 1rem;
 }
 
-.appointment-time {
+.professor-dashboard .appointment-time {
   font-weight: 700;
   font-size: 0.875rem;
   color: var(--text-primary);
@@ -636,72 +699,88 @@ body {
   line-height: 1;
 }
 
-.appointment-badge {
+/* Appointment status pills -- shared by the Today's Appointments preview AND
+   Recent Activity below, since both surface real appointment statuses.
+   Colors copied verbatim from prof-appointments.css's .appt-status-badge--*
+   (the authoritative appointments-module palette) so the dashboard always
+   matches real status colors; ALL CAPS per the dashboard's own requirement
+   (the real Appointments page keeps its own unscoped, `capitalize`d rule --
+   untouched, since it lives in a separate stylesheet only loaded there). */
+.professor-dashboard .appt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.25rem 0.6rem;
   border-radius: 0.375rem;
   font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: capitalize;
-  transition: all 0.3s ease;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
   white-space: nowrap;
+  transition: all 0.3s ease;
 }
 
-.appointment-badge.status-approved {
-  background: rgba(34, 197, 94, 0.2);
+.professor-dashboard .appt-status-badge--pending   { background: rgba(251, 191, 36, 0.2);  color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.4); }
+.professor-dashboard .appt-status-badge--approved  { background: rgba(34, 197, 94, 0.18);  color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
+.professor-dashboard .appt-status-badge--completed { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+.professor-dashboard .appt-status-badge--rejected  { background: rgba(239, 68, 68, 0.18);  color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
+.professor-dashboard .appt-status-badge--cancelled { background: rgba(107, 114, 128, 0.15); color: #d1d5db; border: 1px solid rgba(107, 114, 128, 0.35); }
+
+[data-theme="light"] .professor-dashboard .appt-status-badge--pending   { background: rgba(217, 119, 6, 0.1);  color: #92400e; border-color: rgba(217, 119, 6, 0.3); }
+[data-theme="light"] .professor-dashboard .appt-status-badge--approved  { background: rgba(5, 150, 105, 0.1);  color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
+[data-theme="light"] .professor-dashboard .appt-status-badge--completed { background: rgba(5, 150, 105, 0.1);  color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
+[data-theme="light"] .professor-dashboard .appt-status-badge--rejected  { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .professor-dashboard .appt-status-badge--cancelled { background: rgba(107, 114, 128, 0.08); color: #374151; border-color: rgba(107, 114, 128, 0.2); }
+
+/* "+N more" link, mirrors stud-dashboard.css's .pinned-more-link, reused by
+   both the Today's Appointments and Pinned Announcements preview cards. */
+.professor-dashboard .pinned-more-link {
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--primary-color);
-  border: 0.5px solid rgba(34, 197, 94, 0.4);
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease;
 }
 
-[data-theme="light"] .appointment-badge.status-approved {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--primary-dark);
-  border: 0.5px solid rgba(34, 197, 94, 0.3);
-}
-
-.appointment-badge.status-pending {
-  background: rgba(245, 158, 11, 0.2);
-  color: var(--warning);
-  border: 0.5px solid rgba(245, 158, 11, 0.4);
-}
-
-[data-theme="light"] .appointment-badge.status-pending {
-  background: rgba(245, 158, 11, 0.15);
-  color: #d97706;
-  border: 0.5px solid rgba(245, 158, 11, 0.3);
+.professor-dashboard .pinned-more-link:hover {
+  background: rgba(34, 197, 94, 0.1);
 }
 
 
 /* ===== Quick Actions ===== */
-.quick-actions-section {
+.professor-dashboard .quick-actions-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
-.quick-actions-grid {
+.professor-dashboard .quick-actions-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.875rem;
+  gap: 1.25rem;
 }
 
 @media (min-width: 1024px) {
-  .quick-actions-grid {
-    grid-template-columns: repeat(3, 1fr);
+  .professor-dashboard .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-.quick-action-link {
+.professor-dashboard .quick-action-link {
   text-decoration: none;
   color: inherit;
   display: block;
 }
 
-.quick-action-card {
+.professor-dashboard .quick-action-card {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 1rem;
-  border-radius: 1rem;
+  padding: 1.5rem;
+  border-radius: 1.25rem;
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   cursor: pointer;
@@ -711,20 +790,20 @@ body {
   min-height: 5.5rem;
 }
 
-.quick-action-card:hover {
+.professor-dashboard .quick-action-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
 /* ── Student-style action card inner layout ──────────────────────────── */
-.action-main {
+.professor-dashboard .action-main {
   display: flex;
   gap: 0.875rem;
   align-items: stretch;
   flex: 1;
 }
 
-.action-icon {
+.professor-dashboard .action-icon {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 1.125rem;
@@ -732,11 +811,12 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
   z-index: 1;
 }
 
-.action-icon svg {
+.professor-dashboard .action-icon svg {
   width: 1.75rem;
   height: 1.75rem;
   stroke-width: 2;
@@ -744,18 +824,20 @@ body {
   stroke: #fff;
 }
 
-.quick-action-card:hover .action-icon {
+.professor-dashboard .quick-action-card:hover .action-icon {
   transform: scale(1.08);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Professor-specific gradient colors (orange / violet / green) */
-.professor-dashboard .action-gradient-1 { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+/* Per-tile gradient colors, each matching that module's accent color
+   elsewhere in the app: Announcements=green, Appointments=violet,
+   Schedule Manager=sky blue, Document Request=orange/warning. */
+.professor-dashboard .action-gradient-1 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
 .professor-dashboard .action-gradient-2 { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
-.professor-dashboard .action-gradient-3 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
-.professor-dashboard .action-gradient-4 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+.professor-dashboard .action-gradient-3 { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); }
+.professor-dashboard .action-gradient-4 { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
 
-.action-body {
+.professor-dashboard .action-body {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -763,67 +845,120 @@ body {
   flex: 1;
 }
 
-.action-badge {
-  display: inline-block;
-  background: rgba(22, 163, 74, 0.12);
+.professor-dashboard .action-badge {
+  background: rgba(22, 163, 74, 0.15);
   color: var(--primary-color);
-  padding: 0.25rem 0.625rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  border: 1px solid rgba(22, 163, 74, 0.22);
-  margin-bottom: 0.35rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.625rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border: 1px solid rgba(22, 163, 74, 0.25);
 }
 
-.action-badge-right {
+.professor-dashboard .quick-action-card:hover .action-badge {
+  background: rgba(22, 163, 74, 0.25);
+}
+
+/* Sky-blue badge — Schedule Manager (gradient-3) */
+.professor-dashboard .quick-action-card:has(.action-gradient-3) .action-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.professor-dashboard .quick-action-card:has(.action-gradient-3):hover .action-badge {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-3) .action-badge {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-3):hover .action-badge {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+/* Orange badge — Document Request (gradient-4), matches Documents' warning/orange theme */
+.professor-dashboard .quick-action-card:has(.action-gradient-4) .action-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.professor-dashboard .quick-action-card:has(.action-gradient-4):hover .action-badge {
+  background: rgba(245, 158, 11, 0.25);
+}
+
+[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-4) .action-badge {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-4):hover .action-badge {
+  background: rgba(217, 119, 6, 0.2);
+}
+
+.professor-dashboard .action-badge-right {
   align-self: flex-start;
   margin-top: 0;
 }
 
-.action-title {
-  font-size: 0.92rem;
+.professor-dashboard .action-title {
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
   line-height: 1.3;
+  letter-spacing: -0.3px;
   transition: color 0.3s ease;
 }
 
-.action-description {
-  font-size: 0.72rem;
+.professor-dashboard .action-description {
+  font-size: 0.875rem;
   color: var(--text-tertiary);
-  margin: 0 0 0.5rem 0;
-  line-height: 1.4;
+  margin-bottom: 1rem;
+  line-height: 1.6;
   flex: 1;
   transition: color 0.3s ease;
 }
 
-.action-cta {
+.professor-dashboard .action-cta {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: var(--primary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   transition: gap 0.2s ease, color 0.2s ease;
 }
 
-.action-cta svg {
-  width: 0.875rem;
-  height: 0.875rem;
+.professor-dashboard .action-cta svg {
+  width: 1rem;
+  height: 1rem;
 }
 
-.quick-action-card:hover .action-cta {
+.professor-dashboard .quick-action-card:hover .action-cta {
   gap: 0.6rem;
 }
 
 @media (max-width: 640px) {
-  .quick-actions-grid {
+  .professor-dashboard .quick-actions-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.625rem;
   }
 
-  .quick-action-card {
+  .professor-dashboard .quick-action-card {
     padding: 0.75rem;
     min-height: 5rem;
     gap: 0.5rem;
@@ -831,21 +966,21 @@ body {
 }
 
 /* ===== Preview Grid ===== */
-.preview-grid {
+.professor-dashboard .preview-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.5rem;
 }
 
 @media (min-width: 1024px) {
-  .preview-grid {
+  .professor-dashboard .preview-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 /* ===== Cards ===== */
-.activity-card,
-.service-hours-card {
+.professor-dashboard .activity-card,
+.professor-dashboard .announcements-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1rem;
@@ -853,7 +988,7 @@ body {
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-.card-header {
+.professor-dashboard .card-header {
   padding: 1.25rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
@@ -862,11 +997,11 @@ body {
   transition: border-color 0.3s ease;
 }
 
-[data-theme="light"] .card-header {
+[data-theme="light"] .professor-dashboard .card-header {
   border-bottom: 1px solid #e2e8f0;
 }
 
-.card-title {
+.professor-dashboard .card-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -877,143 +1012,398 @@ body {
   transition: color 0.3s ease;
 }
 
-[data-theme="light"] .card-title {
+[data-theme="light"] .professor-dashboard .card-title {
   color: #1f2937;
 }
 
-[data-theme="dark"] .card-title {
+[data-theme="dark"] .professor-dashboard .card-title {
   color: var(--foreground);
 }
 
-.card-title .icon {
+.professor-dashboard .card-title .icon {
   width: 1.25rem;
   height: 1.25rem;
 }
 
-.card-content {
+.professor-dashboard .card-content {
   padding: 1.25rem;
 }
 
 /* ===== Activity Card ===== */
-.activity-card {
-  background: linear-gradient(135deg, rgba(17, 22, 18, 0.95) 0%, var(--card-bg) 100%);
+.professor-dashboard .activity-card {
+  background: var(--card-bg);
   border-color: rgba(34, 197, 94, 0.25);
 }
 
-[data-theme="light"] .activity-card {
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, white 100%);
-  border-color: rgba(34, 197, 94, 0.15);
-}
-
-.activity-list {
+.professor-dashboard .activity-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
 }
 
-.activity-item-simple {
+.professor-dashboard .activity-empty {
+  margin: 2rem 1.25rem;
+  color: var(--text-tertiary);
+}
+
+/* Recent Activity rows -- icon avatar + title/time + status pill, mirrors
+   stud-dashboard.css's .activity-item (purple .activity-appointment variant
+   only, since every faculty activity event is appointment-sourced). */
+.professor-dashboard .activity-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-  background: rgba(34, 197, 94, 0.05);
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid #334155;
   transition: all 0.3s ease;
 }
 
-[data-theme="light"] .activity-item-simple {
-  background: rgba(34, 197, 94, 0.08);
+[data-theme="light"] .professor-dashboard .activity-item {
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.activity-item-simple:hover {
-  background: rgba(34, 197, 94, 0.1);
+.professor-dashboard .activity-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 1.6rem;
 }
 
-.activity-dot {
-  width: 0.5rem;
-  height: 0.5rem;
+.professor-dashboard .activity-icon {
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 0.375rem;
-}
-
-.activity-dot.dot-green {
-  background: #10b981;
-}
-
-.activity-dot.dot-amber {
-  background: #f59e0b;
-}
-
-.activity-dot.dot-red {
-  background: #ef4444;
-}
-
-.activity-dot.dot-gray {
-  background: #6b7280;
-}
-
-.activity-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-/* ===== Service Hours ===== */
-.service-hours-card {
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  border: 1px solid var(--success);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  color: white;
-  transition: all 0.3s ease;
-}
-
-.hours-header {
-  margin-bottom: 1.5rem;
-}
-
-.hours-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  margin: 0;
-  margin-bottom: 0.5rem;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
 }
 
-.hours-title .icon {
+.professor-dashboard .activity-icon svg {
   width: 1.25rem;
   height: 1.25rem;
 }
 
-.hours-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.professor-dashboard .activity-appointment {
+  background: rgba(168, 85, 247, 0.15);
+  color: var(--purple);
 }
 
-@media (min-width: 768px) {
-  .hours-grid {
-    flex-direction: column;
-  }
+.professor-dashboard .activity-details {
+  flex: 1;
+  min-width: 0;
+  text-align: justify;
 }
 
-
-.hours-label {
+.professor-dashboard .activity-title {
   font-weight: 600;
   font-size: 0.875rem;
-  color: white;
-  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+  text-align: justify;
+  transition: color 0.3s ease;
 }
 
-.hours-time {
-  font-size: 0.875rem;
+.professor-dashboard .activity-time {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: justify;
+  transition: color 0.3s ease;
+}
+
+/* Recent Activity's status pill matches student's .activity-badge sizing
+   convention (0.75rem/600/0.25rem-0.75rem padding) rather than the more
+   compact .appt-status-badge base used by Today's Appointments -- that
+   card intentionally reuses the real Appointments module's exact badge
+   dimensions per an earlier explicit request; this one doesn't need to. */
+.professor-dashboard .activity-item .appt-status-badge {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+/* ===== Pinned Announcements card (mirrors stud-dashboard.css's
+   .pinned-announcement-* / .pinned-badge-pinned, already green-themed to
+   match prof-announcements.css's own pinned-pill green) ===== */
+.professor-dashboard .announcements-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.professor-dashboard .announcements-card .card-header {
+  border-bottom-color: transparent;
+  padding-bottom: 1rem;
+}
+
+.professor-dashboard .announcements-card .card-title .icon {
+  color: var(--primary-color);
+}
+
+.professor-dashboard .announcements-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.professor-dashboard .announcement-empty {
+  margin: 2rem 1.25rem;
+  color: var(--text-tertiary);
+}
+
+.professor-dashboard .pinned-announcement-card {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1rem;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.professor-dashboard .pinned-announcement-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.professor-dashboard .pinned-announcement-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.professor-dashboard .pinned-announcement-icon svg,
+.professor-dashboard .pinned-announcement-icon .icon {
+  width: 1.375rem;
+  height: 1.375rem;
+  stroke-width: 2;
+}
+
+.professor-dashboard .pinned-announcement-pinned .pinned-announcement-icon {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.professor-dashboard .pinned-announcement-content {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.professor-dashboard .pinned-announcement-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.1rem 0;
+  line-height: 1.3;
+  transition: color 0.3s ease;
+}
+
+.professor-dashboard .pinned-announcement-description {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.6rem 0;
+  line-height: 1.5;
+  text-align: justify;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  transition: color 0.3s ease;
+}
+
+.professor-dashboard .pinned-announcement-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0.02rem 0 0.4rem 0;
+  transition: color 0.3s ease;
+}
+
+.professor-dashboard .pinned-announcement-college {
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.professor-dashboard .pinned-announcement-date {
+  color: var(--text-tertiary);
+}
+
+.professor-dashboard .pinned-announcement-badge {
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.professor-dashboard .pinned-badge-pinned {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* ===== Office Hours (full-width, green-themed, mirrors
+   stud-dashboard.css's .stud-office-hours-card) ===== */
+.professor-dashboard .prof-office-hours-card {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  color: white;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.professor-dashboard .prof-office-hours-card::before {
+  content: '';
+  position: absolute;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  top: -3rem;
+  right: -3rem;
+  pointer-events: none;
+}
+
+.professor-dashboard .prof-office-hours-card::after {
+  content: '';
+  position: absolute;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  bottom: -2rem;
+  right: 8rem;
+  pointer-events: none;
+}
+
+.professor-dashboard .prof-hours-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.professor-dashboard .prof-hours-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.professor-dashboard .prof-hours-title .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.professor-dashboard .prof-hours-dept {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.professor-dashboard .prof-hours-body {
+  position: relative;
+  z-index: 1;
+}
+
+.professor-dashboard .prof-hours-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.professor-dashboard .prof-hours-item {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  flex: 1;
+  min-width: 180px;
+  backdrop-filter: blur(4px);
+}
+
+.professor-dashboard .prof-hours-day {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 0.25rem 0;
+}
+
+.professor-dashboard .prof-hours-time {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+.professor-dashboard .prof-hours-location {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.professor-dashboard .prof-hours-location-label {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.4px;
+}
+
+.professor-dashboard .prof-hours-location-value {
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
-  line-height: 1.6;
+}
+
+.professor-dashboard .prof-hours-loading,
+.professor-dashboard .prof-hours-empty {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  margin: 0;
 }
 
 /* ===== Responsive ===== */
@@ -1043,11 +1433,11 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .banner-title {
-    font-size: 1.25rem;
+  .professor-dashboard .banner-title {
+    font-size: 1.875rem;
   }
 
-  .preview-grid {
+  .professor-dashboard .preview-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1057,8 +1447,8 @@ body {
     padding: 1rem;
   }
 
-  .banner-title {
-    font-size: 1.25rem;
+  .professor-dashboard .banner-title {
+    font-size: 1.75rem;
   }
 
   .professor-dashboard .stats-grid {

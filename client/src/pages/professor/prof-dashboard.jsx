@@ -7,6 +7,8 @@ import ProfessorPageShell from "../../components/ProfessorPageShell";
 import "./prof-dashboard.css";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
+import { getCollegeLogo } from "../../data/collegeLogo";
+import { formatManilaDateTime, parseOfficeHoursSchedule } from "../../utils/dateTime";
 
 // ── Icons (unchanged from original) ──────────────────────────────────────────
 const CalendarIcon = () => (
@@ -21,20 +23,6 @@ const CalendarIcon = () => (
     <line x1="16" y1="2" x2="16" y2="6"></line>
     <line x1="8" y1="2" x2="8" y2="6"></line>
     <line x1="3" y1="10" x2="21" y2="10"></line>
-  </svg>
-);
-const UsersIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-    <circle cx="9" cy="7" r="4"></circle>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
   </svg>
 );
 const CheckCircleIcon = () => (
@@ -70,17 +58,6 @@ const ClockIcon = () => (
   >
     <circle cx="12" cy="12" r="10"></circle>
     <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-);
-const ActivityIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
   </svg>
 );
 const FileEditIcon = () => (
@@ -197,6 +174,29 @@ export default function ProfessorDashboard() {
     };
   }, [authUser, fetchAnnouncements]);
 
+  // ── Office hours state (mirrors stud-dashboard.jsx's own fetch) ───────────
+  const [officeHours, setOfficeHours] = useState(null);
+  const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
+  const [officeHoursError, setOfficeHoursError] = useState(null);
+
+  const fetchOfficeHours = useCallback(async () => {
+    try {
+      setOfficeHoursLoading(true);
+      const res = await api.get("/faculty/office-hours");
+      setOfficeHours(res.data);
+      setOfficeHoursError(null);
+    } catch (err) {
+      console.error("Failed to fetch office hours:", err);
+      setOfficeHoursError("Could not load office hours.");
+    } finally {
+      setOfficeHoursLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser) fetchOfficeHours();
+  }, [authUser, fetchOfficeHours]);
+
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;
   const loading = dashLoading;
@@ -237,21 +237,28 @@ export default function ProfessorDashboard() {
   const todayAppointments = dashStats?.todayAppointments ?? [];
   const recentActivity = dashStats?.recentActivity ?? [];
 
-  const pinnedAnnouncementsCount = announcements.filter((a) => a.isPinned).length;
+  // Pinned announcements only, capped to the top 2 for the dashboard preview
+  // (mirrors stud-dashboard.jsx's own pinned-announcements derivation).
+  const allPinnedAnnouncements = announcements.filter((a) => a.isPinned);
+  const pinnedPreview = allPinnedAnnouncements.slice(0, 2);
+  const morePinnedCount = allPinnedAnnouncements.length - pinnedPreview.length;
 
   // Position in this array is load-bearing: quick-actions-grid renders cards
-  // via a positional `action-gradient-${index+1}` CSS class (prof-dashboard.css),
-  // not the unused `gradient`-style field some other dashboards carry -- so
-  // appending (not prepending) keeps this tile on gradient-3 (green), which
-  // already exists in that file. Prepending would push it onto gradient-1
-  // (orange) instead.
+  // via a positional `action-gradient-${index+1}` CSS class (prof-dashboard.css).
   const quickActions = [
     {
-      label: "Document Request",
-      description: "Submit a new document request",
-      icon: FileEditIcon,
-      path: "/professor/document-request",
-      badge: "Documents",
+      label: "Announcements",
+      description: "Notices and updates for faculty in your department",
+      icon: MegaphoneIcon,
+      path: "/professor/announcements",
+      badge: `${allPinnedAnnouncements.length} Pinned`,
+    },
+    {
+      label: "Appointments",
+      description: "Review and manage student appointment requests.",
+      icon: CalendarIcon,
+      path: "/professor/appointments",
+      // no badge — matches the student dashboard's badge-less "Appointment Booking" tile
     },
     {
       label: "Schedule Manager",
@@ -261,11 +268,11 @@ export default function ProfessorDashboard() {
       badge: "Schedule",
     },
     {
-      label: "Announcements",
-      description: "Notices and updates for faculty in your department",
-      icon: MegaphoneIcon,
-      path: "/professor/announcements",
-      badge: `${pinnedAnnouncementsCount} Pinned`,
+      label: "Document Request",
+      description: "Submit a new document request",
+      icon: FileEditIcon,
+      path: "/professor/document-request",
+      badge: "Documents",
     },
   ];
 
@@ -283,21 +290,14 @@ export default function ProfessorDashboard() {
             <div className="banner-backdrop banner-backdrop-1"></div>
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
-              <p className="banner-greeting">
-                Welcome back, Prof. {user?.name?.split(" ")[0]}!
-              </p>
+              <p className="banner-greeting">Good day!</p>
               <div className="banner-title-row">
                 <img
-                  src={
-                    new URL(
-                      `../../assets/${user?.departmentAbbrev || "CCS"}.png`,
-                      import.meta.url,
-                    ).href
-                  }
+                  src={getCollegeLogo(user?.college)}
                   alt="College Logo"
                   className="banner-ccs-logo"
                 />
-                <h1 className="banner-title">{user?.college ?? ""}</h1>
+                <h1 className="banner-title">Prof. {user?.name ?? "Faculty"}</h1>
               </div>
               <div className="banner-badges">
                 <span className="badge">Professor Portal</span>
@@ -339,9 +339,11 @@ export default function ProfessorDashboard() {
                         <action.icon />
                       </div>
                       <div className="action-body">
-                        <span className="action-badge action-badge-right">
-                          {action.badge}
-                        </span>
+                        {action.badge && (
+                          <span className="action-badge action-badge-right">
+                            {action.badge}
+                          </span>
+                        )}
                         <h3 className="action-title">{action.label}</h3>
                         <p className="action-description">{action.description}</p>
                         <div className="action-cta">
@@ -356,70 +358,124 @@ export default function ProfessorDashboard() {
             </div>
           </section>
 
-          {/* Today's Appointments */}
-          <section className="todays-appointments-section">
-            <div className="section-header">
-              <h2>Today's Appointments</h2>
-              <Link to="/professor/appointments" className="view-all-link">
-                View All <ChevronRightIcon />
-              </Link>
-            </div>
-            <div className="appointments-card">
-              <div className="appointments-list">
+          {/* Preview Grid: Today's Appointments + Pinned Announcements */}
+          <div className="preview-grid">
+            {/* Today's Appointments */}
+            <div className="appointments-preview-card">
+              <div className="card-header">
+                <h3 className="card-title">
+                  <CalendarClockIcon />
+                  Today's Appointments
+                </h3>
+                <Link to="/professor/appointments" className="view-all-btn">
+                  View All <ChevronRightIcon />
+                </Link>
+              </div>
+              <div className="card-content">
                 {loading ? (
                   <p className="activity-loading">Loading appointments...</p>
                 ) : todayAppointments.length === 0 ? (
-                  <p className="appointment-empty">
-                    No appointments scheduled for today.
-                  </p>
-                ) : (
-                  todayAppointments.map((apt) => (
-                    <div key={apt.id} className="appointment-item">
-                      <div className="appointment-icon">
-                        <UsersIcon />
-                      </div>
-                      <div className="appointment-details">
-                        <p
-                          className="appointment-student"
-                          style={{ textAlign: "justify" }}
-                        >
-                          {apt.student}
-                        </p>
-                        <p
-                          className="appointment-purpose"
-                          style={{ textAlign: "justify" }}
-                        >
-                          {apt.purpose}
-                        </p>
-                      </div>
-                      <div className="appointment-time-status">
-                        <p className="appointment-time">{apt.time}</p>
-                        <span
-                          className={`appointment-badge status-${apt.status}`}
-                        >
-                          {apt.status}
-                        </span>
-                      </div>
+                  <div className="empty-content">
+                    <div className="empty-icon">
+                      <CalendarClockIcon />
                     </div>
-                  ))
+                    <p>No appointments scheduled for today.</p>
+                  </div>
+                ) : (
+                  <>
+                    {todayAppointments.slice(0, 3).map((apt) => (
+                      <div key={apt.id} className="appointment-item">
+                        <div className="appointment-icon">
+                          <CalendarClockIcon />
+                        </div>
+                        <div className="appointment-details">
+                          <p className="appointment-student">{apt.student}</p>
+                          <p className="appointment-purpose">{apt.purpose}</p>
+                        </div>
+                        <div className="appointment-time-status">
+                          <p className="appointment-time">{apt.time}</p>
+                          <span
+                            className={`appt-status-badge appt-status-badge--${apt.status}`}
+                          >
+                            {apt.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {todayAppointments.length > 3 && (
+                      <Link to="/professor/appointments" className="pinned-more-link">
+                        + {todayAppointments.length - 3} more today
+                      </Link>
+                    )}
+                  </>
                 )}
               </div>
             </div>
-          </section>
 
-          {/* Bottom Grid */}
-          <div className="preview-grid">
-            {/* Recent Activity */}
-            <div className="activity-card">
+            {/* Pinned Announcements */}
+            <div className="announcements-card">
               <div className="card-header">
                 <h3 className="card-title">
-                  <ActivityIcon />
-                  Recent Activity
+                  <MegaphoneIcon />
+                  Pinned Announcements
                 </h3>
-                <Link to="/professor/transactions" className="view-all-link">
-                  See All <ChevronRightIcon />
+                <Link to="/professor/announcements" className="view-all-btn">
+                  View All <ChevronRightIcon />
                 </Link>
               </div>
+              <div className="card-content announcements-content">
+                {allPinnedAnnouncements.length === 0 ? (
+                  <p className="announcement-empty">No pinned announcements.</p>
+                ) : (
+                  pinnedPreview.map((ann) => (
+                    <Link
+                      key={ann.id}
+                      to="/professor/announcements"
+                      className="pinned-announcement-card pinned-announcement-pinned"
+                    >
+                      <div className="pinned-announcement-icon">
+                        <MegaphoneIcon />
+                      </div>
+                      <div className="pinned-announcement-content">
+                        <p className="pinned-announcement-title">{ann.title}</p>
+                        <div className="pinned-announcement-meta">
+                          <span className="pinned-announcement-college">
+                            {ann.college}
+                          </span>
+                          <span className="pinned-announcement-date">
+                            {formatManilaDateTime(ann.date)}
+                          </span>
+                        </div>
+                        {ann.description && (
+                          <p className="pinned-announcement-description">
+                            {ann.description}
+                          </p>
+                        )}
+                      </div>
+                      <span className="pinned-announcement-badge pinned-badge-pinned">
+                        Pinned
+                      </span>
+                    </Link>
+                  ))
+                )}
+                {morePinnedCount > 0 && (
+                  <Link to="/professor/announcements" className="pinned-more-link">
+                    + {morePinnedCount} more pinned
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <section className="recent-activity-section">
+            <div className="section-header">
+              <h2>Recent Activity</h2>
+              <Link to="/professor/transactions" className="view-all-link">
+                See All <ChevronRightIcon />
+              </Link>
+            </div>
+            <div className="activity-card">
               <div className="card-content">
                 <div className="activity-list">
                   {loading ? (
@@ -428,45 +484,76 @@ export default function ProfessorDashboard() {
                     <p className="activity-empty">No recent activity.</p>
                   ) : (
                     recentActivity.map((item) => (
-                      <div key={item.id} className="activity-item-simple">
-                        <div className={`activity-dot ${item.dot}`}></div>
-                        <div>
-                          <p className="activity-text">{item.title}</p>
+                      <div key={item.id} className="activity-item">
+                        <div className="activity-icon activity-appointment">
+                          <CalendarClockIcon />
+                        </div>
+                        <div className="activity-details">
+                          <p className="activity-title">{item.title}</p>
                           <p className="activity-time">{item.time}</p>
                         </div>
+                        <span
+                          className={`appt-status-badge appt-status-badge--${item.status}`}
+                        >
+                          {item.status}
+                        </span>
                       </div>
                     ))
                   )}
                 </div>
               </div>
             </div>
+          </section>
 
-            {/* Office Hours */}
-            <div className="service-hours-card">
-              <div className="hours-header">
-                <h3 className="hours-title">
-                  <ClockIcon />
-                  Office Hours
-                </h3>
-              </div>
-              <div className="hours-grid">
-                <div>
-                  <p className="hours-label">Weekdays</p>
-                  <p className="hours-time">
-                    Monday – Friday: 8:00 AM – 5:00 PM
-                  </p>
-                </div>
-                <div>
-                  <p className="hours-label">Weekend</p>
-                  <p className="hours-time">
-                    Saturday: 8:00 AM – 12:00 PM
-                    <br />
-                    Sunday: Closed
-                  </p>
-                </div>
-              </div>
+          {/* Office Hours */}
+          <section className="prof-office-hours-card">
+            <div className="prof-hours-header">
+              <h2 className="prof-hours-title">
+                <ClockIcon />
+                Office Hours
+              </h2>
+              {!officeHoursLoading && officeHours && (
+                <span className="prof-hours-dept">
+                  {officeHours.departmentName} ({officeHours.departmentAbbrev})
+                </span>
+              )}
             </div>
-          </div>
+            <div className="prof-hours-body">
+              {officeHoursLoading ? (
+                <p className="prof-hours-loading">Loading office hours...</p>
+              ) : officeHoursError ? (
+                <p className="prof-hours-empty">
+                  {officeHoursError}{" "}
+                  <button
+                    className="breadcrumb-link"
+                    style={{ display: "inline", padding: 0 }}
+                    onClick={fetchOfficeHours}
+                  >
+                    Retry
+                  </button>
+                </p>
+              ) : !officeHours ? (
+                <p className="prof-hours-empty">No office hours available.</p>
+              ) : (
+                <>
+                  <div className="prof-hours-schedule">
+                    {parseOfficeHoursSchedule(officeHours.officeHours).map((entry, i) => (
+                      <div key={i} className="prof-hours-item">
+                        <p className="prof-hours-day">{entry.day}</p>
+                        <p className="prof-hours-time">{entry.time}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {officeHours.officeLocation && (
+                    <div className="prof-hours-location">
+                      <span className="prof-hours-location-label">Location:</span>
+                      <span className="prof-hours-location-value">{officeHours.officeLocation}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
         </div>
     </ProfessorPageShell>
   );

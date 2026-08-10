@@ -119,3 +119,22 @@ export function formatTimeString(hhmm) {
   return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+// Splits a department's free-text office-hours string (e.g. "Monday - Friday:
+// 8 AM - 5 PM, Saturday: 8 AM - 12 PM") into { day, time } chip entries for
+// the student/professor dashboard office-hours cards. Splits only on a comma
+// followed by a weekday name (the actual entry delimiter) rather than any
+// capital letter -- a naive "any capital letter" split would mis-split free
+// text like "Monday: 9-11, By Appointment" on "By".
+export function parseOfficeHoursSchedule(hoursStr) {
+  if (!hoursStr) return [];
+  const weekdayNames = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday";
+  return hoursStr.split(new RegExp(`,\\s*(?=(?:${weekdayNames})\\b)`)).map((entry) => {
+    const colonIdx = entry.indexOf(": ");
+    if (colonIdx === -1) return { day: entry.trim(), time: "" };
+    return {
+      day: entry.substring(0, colonIdx).trim(),
+      time: entry.substring(colonIdx + 2).trim(),
+    };
+  });
+}
+

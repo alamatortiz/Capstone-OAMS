@@ -130,6 +130,7 @@ router.get(
         recentActivity: recentActivity.map((row, i) => ({
           id: i + 1,
           title: buildActivityTitle(row),
+          status: row.status,
           dot: statusToDot(row.status),
           time: formatRelativeTime(new Date(row.event_time)),
         })),
@@ -157,6 +158,37 @@ router.get(
       res.json({ availabilityStatus: row?.availability_status ?? "available" });
     } catch (err) {
       sendServerError(res, err, "GET /availability-status error:");
+    }
+  },
+);
+
+// GET /api/faculty/office-hours
+// The logged-in faculty member's own department office hours/location --
+// mirrors GET /api/student/office-hours (studentRoutes.js), just joined
+// through the faculty table instead of students.
+router.get(
+  "/office-hours",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [[dept]] = await pool.query(
+        `SELECT d.department_name, d.department_abbreviation, d.office_location, d.office_hours
+         FROM faculty f
+         JOIN departments d ON f.department_id = d.department_id
+         WHERE f.faculty_id = ?`,
+        [facultyId],
+      );
+      if (!dept) return res.status(404).json({ message: "Department not found" });
+      res.json({
+        departmentName: dept.department_name,
+        departmentAbbrev: dept.department_abbreviation,
+        officeLocation: dept.office_location ?? "",
+        officeHours: dept.office_hours ?? "",
+      });
+    } catch (error) {
+      sendServerError(res, error, "Faculty office hours error:");
     }
   },
 );
