@@ -113,6 +113,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'home-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
   { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
   { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
   { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
@@ -260,6 +261,10 @@ export default function ProfessorDocumentsScreen() {
     if (key === 'documents') return;
     if (key === 'dashboard') {
       goToDashboard();
+      return;
+    }
+    if (key === 'announcements') {
+      router.push('/pages/professor/professor_announcement');
       return;
     }
     if (key === 'appointments') {

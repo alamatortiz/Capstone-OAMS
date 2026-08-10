@@ -509,27 +509,34 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 7 · SAMPLE ANNOUNCEMENTS (for UI evaluation)
 -- One of each category (general/important/event/reminder), plus pinned
--- combos. department_id 1001 = CCS.
+-- combos, plus two faculty-audience rows (no real category -- type is
+-- always 'general' for these). department_id 1001 = CCS.
 -- ─────────────────────────────────────────────────────────────
-INSERT INTO announcements (title, content, type, is_pinned, department_id, created_by) VALUES
+INSERT INTO announcements (title, content, type, is_pinned, audience, department_id, created_by) VALUES
 ('Library Extended Hours for Midterms',
  'The CCS library will stay open until 9:00 PM on weekdays for the rest of the term to give everyone more room to study.',
- 'general', FALSE, 1001, 'Admin Superuser'),
+ 'general', FALSE, 'students', 1001, 'Admin Superuser'),
 ('Enrollment Deadline Extended',
  'Late enrollment for the current semester has been extended by one week. Visit the registrar window before the new cutoff.',
- 'important', TRUE, 1001, 'Admin Superuser'),
+ 'important', TRUE, 'students', 1001, 'Admin Superuser'),
 ('IT Week 2026 Kickoff',
  'Join us for IT Week 2026! A full week of tech talks, competitions, and department activities starts Monday.',
- 'event', FALSE, 1001, 'Admin Superuser'),
+ 'event', FALSE, 'students', 1001, 'Admin Superuser'),
 ('Reminder: Submit Clearance Forms',
  'A quick reminder to submit your clearance forms to the department office before the end of the month.',
- 'reminder', FALSE, 1001, 'Admin Superuser'),
+ 'reminder', FALSE, 'students', 1001, 'Admin Superuser'),
 ('University-Wide Job Fair',
  'PNC is hosting a university-wide job fair open to students from every college. Bring your resume!',
- 'event', FALSE, 1001, 'Admin Superuser'),
+ 'event', FALSE, 'students', 1001, 'Admin Superuser'),
 ('System Maintenance Notice',
  'The student portal will undergo scheduled maintenance this weekend and may be intermittently unavailable.',
- 'important', TRUE, 1001, 'Admin Superuser');
+ 'important', TRUE, 'students', 1001, 'Admin Superuser'),
+('Faculty Meeting: End-of-Term Grade Submission',
+ 'All CCS faculty are required to attend the end-of-term meeting covering grade submission deadlines and procedures.',
+ 'general', TRUE, 'faculty', 1001, 'Admin Superuser'),
+('Consultation Hours Reporting Reminder',
+ 'Please ensure your posted consultation hours in the system are accurate and up to date before the department audit.',
+ 'general', FALSE, 'faculty', 1001, 'Admin Superuser');
 
 
 -- ─────────────────────────────────────────────────────────────

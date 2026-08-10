@@ -157,7 +157,7 @@ router.get(
 
       // 8. Announcements list
       const [announcements] = await pool.query(
-        `SELECT announcement_id, title, content AS description, type, is_pinned, created_at, updated_at
+        `SELECT announcement_id, title, content AS description, type, audience, is_pinned, created_at, updated_at
          FROM announcements
          WHERE department_id = ? AND status = 'active'
          ORDER BY is_pinned DESC, updated_at DESC
@@ -205,6 +205,7 @@ router.get(
           title: a.title,
           description: a.description,
           tag: a.type || "general",
+          audience: a.audience || "students",
           isPinned: a.is_pinned === 1,
           isReposted: new Date(a.updated_at).getTime() !== new Date(a.created_at).getTime(),
           date: new Date(a.updated_at).toLocaleString("en-US", {
@@ -2448,7 +2449,7 @@ router.get(
 
       const [rows] = await pool.query(
         `SELECT a.announcement_id, a.title, a.content,
-                a.is_pinned AS isPinned, a.type, a.status, a.created_by AS createdBy,
+                a.is_pinned AS isPinned, a.type, a.audience, a.status, a.created_by AS createdBy,
                 a.department_id, a.created_at, a.updated_at,
                 d.department_abbreviation
          FROM announcements a
@@ -2467,6 +2468,7 @@ router.get(
           content: r.content,
           isPinned: !!r.isPinned,
           type: r.type || "general",
+          audience: r.audience || "students",
           status: r.status || "active",
           createdBy: r.createdBy || "Admin Office",
           date: r.updated_at,
@@ -2493,6 +2495,14 @@ router.post(
   upload.array("attachments", MAX_FILES),
   async (req, res) => {
     const { title, content, type = "general" } = req.body;
+    const audience = req.body.audience === "faculty" ? "faculty" : "students";
+    if (req.body.audience && !["students", "faculty"].includes(req.body.audience)) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: "audience must be 'students' or 'faculty'" });
+    }
+    // Faculty announcements have no real category -- force it server-side so
+    // a stale/tampered client can't smuggle a real type onto a faculty row.
+    const finalType = audience === "faculty" ? "general" : type || "general";
     const isPinned = req.body.isPinned === true || req.body.isPinned === "true";
     if (!title?.trim() || !content?.trim()) {
       deleteFiles(req.files);
@@ -2527,9 +2537,9 @@ router.post(
       const createdBy = adminRow?.full_name || "Admin Office";
 
       const [result] = await conn.query(
-        `INSERT INTO announcements (title, content, type, status, created_by, is_pinned, department_id)
-         VALUES (?, ?, ?, 'active', ?, ?, ?)`,
-        [title.trim(), content.trim(), type, createdBy, isPinned ? 1 : 0, deptId],
+        `INSERT INTO announcements (title, content, type, status, created_by, is_pinned, audience, department_id)
+         VALUES (?, ?, ?, 'active', ?, ?, ?, ?)`,
+        [title.trim(), content.trim(), finalType, createdBy, isPinned ? 1 : 0, audience, deptId],
       );
       await insertAttachments(result.insertId, req.files, conn);
 
@@ -2538,23 +2548,21 @@ router.post(
       const attachments = await getAttachments(result.insertId);
       emitToDept(deptId, "announcement:changed", { announcementId: result.insertId });
 
-      // Automatically notify every student and faculty member in the
-      // department -- announcements previously reached nobody through the
-      // notifications system despite `type='announcement'` existing in the
-      // ENUM since it was built. One batch insert (not one query per user)
-      // so a large department doesn't fire dozens/hundreds of concurrent
-      // queries against the connection pool. Fire-and-forget like every
-      // other notification call site in this file; a failure here must
+      // Notify only the announcement's own audience -- students never see
+      // faculty-only announcements and vice versa, so notifying them would
+      // point at content they can't open. One batch insert (not one query
+      // per user) so a large department doesn't fire dozens/hundreds of
+      // concurrent queries against the connection pool. Fire-and-forget like
+      // every other notification call site in this file; a failure here must
       // never affect the already-committed announcement.
       (async () => {
         try {
-          const [[students], [faculty]] = await Promise.all([
-            pool.query(`SELECT student_id AS user_id FROM students WHERE department_id = ?`, [deptId]),
-            pool.query(`SELECT faculty_id AS user_id FROM faculty WHERE department_id = ?`, [deptId]),
-          ]);
+          const [rows] =
+            audience === "faculty"
+              ? await pool.query(`SELECT faculty_id AS user_id FROM faculty WHERE department_id = ?`, [deptId])
+              : await pool.query(`SELECT student_id AS user_id FROM students WHERE department_id = ?`, [deptId]);
           const message = `A new announcement has been posted: "${title.trim()}"`;
-          const userIds = [...students, ...faculty].map((row) => row.user_id);
-          await createNotificationsBatch(userIds, message, "announcement");
+          await createNotificationsBatch(rows.map((row) => row.user_id), message, "announcement");
         } catch (err) {
           console.error("Announcement broadcast notification error:", err.message);
         }
@@ -2565,7 +2573,8 @@ router.post(
           id: String(result.insertId),
           title: title.trim(),
           content: content.trim(),
-          type,
+          type: finalType,
+          audience,
           status: "active",
           isPinned: !!isPinned,
           isReposted: false,
@@ -2614,7 +2623,7 @@ router.put(
       }
 
       const [[row]] = await conn.query(
-        `SELECT department_id FROM announcements WHERE announcement_id = ?`, [announcementId],
+        `SELECT department_id, audience FROM announcements WHERE announcement_id = ?`, [announcementId],
       );
       if (!row) {
         await conn.rollback();
@@ -2626,6 +2635,10 @@ router.put(
         deleteFiles(req.files);
         return res.status(403).json({ error: "Cannot edit announcements from another department" });
       }
+      // Audience is locked at creation and never accepted from the edit
+      // form -- but a faculty-audience row must still keep type='general'
+      // even if a stale/tampered request tries to send a real type.
+      const finalType = row.audience === "faculty" ? "general" : type || "general";
 
       if (req.files && req.files.length > 0) {
         const [[existing]] = await conn.query(
@@ -2648,7 +2661,7 @@ router.put(
       // reasons.
       await conn.query(
         `UPDATE announcements SET title = ?, content = ?, type = ?, updated_at = CURRENT_TIMESTAMP WHERE announcement_id = ?`,
-        [title.trim(), content.trim(), type || "general", announcementId],
+        [title.trim(), content.trim(), finalType, announcementId],
       );
 
       if (req.files && req.files.length > 0) {

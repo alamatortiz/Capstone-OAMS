@@ -82,11 +82,17 @@ function isPathInsideUploadDir(resolvedPath) {
 
 // Resolves and serves one announcement attachment inline (image/PDF/etc.),
 // after checking it belongs to the caller's own department. Shared by the
-// student and admin "view attachment" routes, which differ only in how they
-// look up the caller's department_id and their 403 message.
-async function serveAnnouncementAttachment(res, { announcementId, attachmentId, callerDeptId, forbiddenMessage }) {
+// student, faculty, and admin "view attachment" routes, which differ only in
+// how they look up the caller's department_id and their 403 message.
+//
+// `expectedAudience` ('students' | 'faculty') is optional -- student and
+// faculty routes pass their own role so a caller can't reach an attachment
+// belonging to an announcement meant for the other audience even if they
+// know/guess its id, bypassing the list endpoint's filtering entirely. Admin
+// omits it since admins manage announcements for both audiences.
+async function serveAnnouncementAttachment(res, { announcementId, attachmentId, callerDeptId, expectedAudience, forbiddenMessage }) {
   const [[row]] = await pool.query(
-    `SELECT a.department_id, aa.file_path, aa.mime_type
+    `SELECT a.department_id, a.audience, aa.file_path, aa.mime_type
      FROM announcement_attachments aa
      JOIN announcements a ON a.announcement_id = aa.announcement_id
      WHERE aa.attachment_id = ? AND aa.announcement_id = ?`,
@@ -95,7 +101,7 @@ async function serveAnnouncementAttachment(res, { announcementId, attachmentId, 
   if (!row) {
     return res.status(404).json({ error: "Attachment not found" });
   }
-  if (row.department_id !== callerDeptId) {
+  if (row.department_id !== callerDeptId || (expectedAudience && row.audience !== expectedAudience)) {
     return res.status(403).json({ error: forbiddenMessage });
   }
 

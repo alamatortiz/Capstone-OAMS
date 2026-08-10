@@ -555,11 +555,16 @@ export default function AdminDashboard() {
                         {ann.description}
                       </p>
                       <div className="announcement-important-date">
-                        <span
-                          className={`announcement-tag tag-${ann.isPinned ? "pinned" : ann.tag || "general"}`}
-                        >
-                          {ann.tag || "general"}
+                        <span className={`announcement-tag tag-audience-${ann.audience || "students"}`}>
+                          {ann.audience === "faculty" ? "Faculty" : "Students"}
                         </span>
+                        {(ann.audience || "students") === "students" && (
+                          <span
+                            className={`announcement-tag tag-${ann.isPinned ? "pinned" : ann.tag || "general"}`}
+                          >
+                            {ann.tag || "general"}
+                          </span>
+                        )}
                         <span className="announcement-date">{ann.date}</span>
                       </div>
                     </div>

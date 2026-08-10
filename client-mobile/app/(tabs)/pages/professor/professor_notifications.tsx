@@ -107,6 +107,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'home-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
   { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
   { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
   { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
@@ -114,14 +115,16 @@ const navItems: NavItem[] = [
 
 type TypeFilter = 'all' | NotificationType;
 
-// Queue and Announcement are deliberately excluded from the filter: this
-// system never creates queue-type notifications for faculty, and never
-// creates announcement-type notifications for anyone (announcements only
-// ever broadcast live over Socket.IO, bypassing the notifications table).
+// Queue is deliberately excluded from the filter: this system never creates
+// queue-type notifications for faculty. Announcement notifications are real
+// (adminRoutes.js's POST /admin/announcements inserts one per targeted
+// faculty member) and now route to a real screen (professor_announcement.tsx),
+// so they get a filter option like every other real type.
 const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'all', label: 'All Types' },
   { value: 'document', label: 'Document' },
   { value: 'appointment', label: 'Appointment' },
+  { value: 'announcement', label: 'Announcement' },
 ];
 
 export default function ProfessorNotificationsScreen() {
@@ -252,6 +255,7 @@ export default function ProfessorNotificationsScreen() {
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
     if (key === 'dashboard') { goToDashboard(); return; }
+    if (key === 'announcements') { router.push('/pages/professor/professor_announcement'); return; }
     if (key === 'appointments') { router.push('/pages/professor/professor_appointment'); return; }
     if (key === 'documents') { router.push('/pages/professor/professor_documents'); return; }
     if (key === 'transactions') { router.push('/pages/professor/professor_transactions'); return; }

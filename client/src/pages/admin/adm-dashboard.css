@@ -946,6 +946,21 @@ body {
   border: 0.5px solid rgba(34, 197, 94, 0.4);
 }
 
+/* This preview list blends student- and faculty-audience announcements
+   together -- this tag is what keeps a faculty row's meaningless 'general'
+   type tag from reading as a real category. */
+.announcement-tag.tag-audience-students {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  border: 0.5px solid rgba(59, 130, 246, 0.4);
+}
+
+.announcement-tag.tag-audience-faculty {
+  background: rgba(139, 92, 246, 0.2);
+  color: #8b5cf6;
+  border: 0.5px solid rgba(139, 92, 246, 0.4);
+}
+
 .announcement-date {
   font-size: 0.75rem;
   color: var(--text-tertiary);

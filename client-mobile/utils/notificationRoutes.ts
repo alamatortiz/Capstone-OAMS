@@ -11,13 +11,14 @@ export const STUDENT_NOTIFICATION_PATHS: Record<NotificationType, string> = {
 };
 export const STUDENT_NOTIFICATIONS_VIEW_ALL = '/pages/student/student_notifications';
 
-// Professor has no dedicated queue or announcements screen, so both fall back
-// to the dashboard -- matches web's ProfessorSidebar.jsx NOTIFICATION_TYPE_PATHS.
+// Professor has no dedicated queue screen, so that one falls back to the
+// dashboard -- announcements now route to their own screen. Matches web's
+// ProfessorSidebar.jsx NOTIFICATION_TYPE_PATHS.
 export const PROFESSOR_NOTIFICATION_PATHS: Record<NotificationType, string> = {
   queue: '/pages/professor/professor_dashboard',
   document: '/pages/professor/professor_documents_status',
   appointment: '/pages/professor/professor_appointment',
-  announcement: '/pages/professor/professor_dashboard',
+  announcement: '/pages/professor/professor_announcement',
 };
 export const PROFESSOR_NOTIFICATIONS_VIEW_ALL = '/pages/professor/professor_notifications';
 

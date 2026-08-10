@@ -110,11 +110,6 @@ interface QuickAction {
   gradient: readonly [string, string];
 }
 
-const quickActions: QuickAction[] = [
-  { key: 'document-request', title: 'Document Request', description: 'Submit a new document request', icon: 'create-outline', badge: 'Documents', gradient: ['#f97316', '#ea580c'] },
-  { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your consultation hours', icon: 'time-outline', badge: 'Schedule', gradient: ['#a855f7', '#9333ea'] },
-];
-
 interface TodayAppointment {
   id: number;
   student: string;
@@ -155,6 +150,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'home-outline' },
+  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
   { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
   { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
   { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
@@ -171,6 +167,7 @@ export default function ProfessorDashboardScreen() {
   const [dashData, setDashData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [announcements, setAnnouncements] = useState<{ isPinned: boolean }[]>([]);
 
   // Mirrors `dashData` for the catch block below, without making fetchStats
   // depend on (and change identity with) the state itself.
@@ -195,9 +192,22 @@ export default function ProfessorDashboardScreen() {
     }
   }, []);
 
+  // Fetches the live pinned-count for the Announcements quick-action tile.
+  // Kept separate from fetchStats/dashData since it's an unrelated resource
+  // (mirrors student_dashboard.tsx's own separate announcements fetch).
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const { data } = await api.get('/faculty/announcements');
+      setAnnouncements(data?.announcements ?? []);
+    } catch (err) {
+      console.error('Failed to fetch announcements:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    fetchAnnouncements();
+  }, [fetchStats, fetchAnnouncements]);
 
   useEffect(() => {
     if (!user || !token) return;
@@ -210,6 +220,16 @@ export default function ProfessorDashboardScreen() {
       events.forEach((event) => socket.off(event, refetch));
     };
   }, [user, token, fetchStats]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const socket = connectSocket(token);
+    if (!socket) return;
+    socket.on('announcement:changed', fetchAnnouncements);
+    return () => {
+      socket.off('announcement:changed', fetchAnnouncements);
+    };
+  }, [user, token, fetchAnnouncements]);
 
   const s = dashData?.stats;
   const stats: StatItem[] = [
@@ -262,9 +282,25 @@ export default function ProfessorDashboardScreen() {
     comingSoon();
   };
 
+  // Position in this array is load-bearing: styles.actionsGrid renders cards
+  // in a single vertical stack (no width/flexBasis constraint), so this is
+  // just render order, not a CSS-column dependency the way the web
+  // dashboard's positional gradient classes are -- but keep Announcements
+  // last regardless, matching the web dashboard's own append convention.
+  const pinnedAnnouncementsCount = announcements.filter((a) => a.isPinned).length;
+  const quickActions: QuickAction[] = [
+    { key: 'document-request', title: 'Document Request', description: 'Submit a new document request', icon: 'create-outline', badge: 'Documents', gradient: ['#f97316', '#ea580c'] },
+    { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your consultation hours', icon: 'time-outline', badge: 'Schedule', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'announcements', title: 'Announcements', description: 'Notices and updates for faculty in your department.', icon: 'megaphone-outline', badge: `${pinnedAnnouncementsCount} Pinned`, gradient: ['#22c55e', '#16a34a'] },
+  ];
+
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
     if (key === 'dashboard') return;
+    if (key === 'announcements') {
+      router.push('/pages/professor/professor_announcement');
+      return;
+    }
     if (key === 'appointments') {
       router.push('/pages/professor/professor_appointment');
       return;
@@ -393,6 +429,10 @@ export default function ProfessorDashboardScreen() {
                   }
                   if (action.key === 'schedule-manager') {
                     router.push('/pages/professor/professor_schedule_manager');
+                    return;
+                  }
+                  if (action.key === 'announcements') {
+                    router.push('/pages/professor/professor_announcement');
                     return;
                   }
                   comingSoon();

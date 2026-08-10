@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { FileText } from "lucide-react";
+import { FileText, Megaphone } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
@@ -101,6 +101,7 @@ const CalendarClockIcon = () => (
     <polyline points="17 15.5 17 17 18 18"></polyline>
   </svg>
 );
+const MegaphoneIcon = () => <Megaphone className="icon" />;
 
 export default function ProfessorDashboard() {
   const { user: authUser } = useAuth();
@@ -165,6 +166,37 @@ export default function ProfessorDashboard() {
     };
   }, [authUser, fetchStats]);
 
+  // ── Announcements (for the Quick Actions tile's live pinned count) ────────
+  // Kept separate from fetchStats/dashStats since it's an unrelated resource
+  // (mirrors stud-dashboard.jsx's own separate announcements fetch).
+  const [announcements, setAnnouncements] = useState([]);
+
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const { data } = await api.get("/faculty/announcements");
+      setAnnouncements(data?.announcements ?? []);
+    } catch (err) {
+      console.error("Failed to fetch announcements:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser) fetchAnnouncements();
+  }, [authUser, fetchAnnouncements]);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("oams_token");
+    if (!authUser || !token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    socket.on("announcement:changed", fetchAnnouncements);
+    return () => {
+      socket.off("announcement:changed", fetchAnnouncements);
+    };
+  }, [authUser, fetchAnnouncements]);
+
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;
   const loading = dashLoading;
@@ -205,6 +237,14 @@ export default function ProfessorDashboard() {
   const todayAppointments = dashStats?.todayAppointments ?? [];
   const recentActivity = dashStats?.recentActivity ?? [];
 
+  const pinnedAnnouncementsCount = announcements.filter((a) => a.isPinned).length;
+
+  // Position in this array is load-bearing: quick-actions-grid renders cards
+  // via a positional `action-gradient-${index+1}` CSS class (prof-dashboard.css),
+  // not the unused `gradient`-style field some other dashboards carry -- so
+  // appending (not prepending) keeps this tile on gradient-3 (green), which
+  // already exists in that file. Prepending would push it onto gradient-1
+  // (orange) instead.
   const quickActions = [
     {
       label: "Document Request",
@@ -219,6 +259,13 @@ export default function ProfessorDashboard() {
       icon: CalendarClockIcon,
       path: "/professor/schedule-manager",
       badge: "Schedule",
+    },
+    {
+      label: "Announcements",
+      description: "Notices and updates for faculty in your department",
+      icon: MegaphoneIcon,
+      path: "/professor/announcements",
+      badge: `${pinnedAnnouncementsCount} Pinned`,
     },
   ];
 

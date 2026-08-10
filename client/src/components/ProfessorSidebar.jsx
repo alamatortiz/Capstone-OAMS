@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { FileText as LucideFileText } from "lucide-react";
+import { FileText as LucideFileText, Megaphone as LucideMegaphone } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
@@ -31,6 +31,7 @@ const CalendarIconNav = () => (
   </svg>
 );
 const FileTextNavIcon = () => <LucideFileText />;
+const MegaphoneNavIcon = () => <LucideMegaphone />;
 const HistoryIconNav = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
@@ -85,17 +86,18 @@ const MoonIcon = () => (
 );
 
 // Where a clicked notification should land, by its `type`. Professor has no
-// dedicated queue or announcements screen, so those two fall back to the
-// dashboard rather than a dead/nonexistent route.
+// dedicated queue screen, so that one falls back to the dashboard;
+// announcements now route to their own screen.
 const NOTIFICATION_TYPE_PATHS = {
   queue: "/professor/dashboard",
   document: "/professor/document-status",
   appointment: "/professor/appointments",
-  announcement: "/professor/dashboard",
+  announcement: "/professor/announcements",
 };
 
 const navItems = [
   { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
+  { icon: MegaphoneNavIcon, label: "Announcements", path: "/professor/announcements" },
   { icon: CalendarIconNav, label: "Appointments", path: "/professor/appointments" },
   { icon: FileTextNavIcon, label: "Documents", path: "/professor/document-request" },
   { icon: HistoryIconNav, label: "Transactions", path: "/professor/transactions" },

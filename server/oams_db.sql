@@ -459,6 +459,12 @@ CREATE TABLE announcements (
     status          ENUM('active','archived')                      NOT NULL DEFAULT 'active',
     created_by      VARCHAR(255) NULL,
     is_pinned       BOOLEAN      NOT NULL DEFAULT FALSE,
+    -- Who this announcement is for. Faculty-audience announcements have no
+    -- real category -- `type` is always forced to 'general' for them
+    -- server-side and the type picker is hidden client-side, since the ENUM
+    -- above has no NULL option and adding one would ripple through every
+    -- existing type-keyed lookup for no benefit.
+    audience        ENUM('students','faculty') NOT NULL DEFAULT 'students',
     department_id   INT          NOT NULL,   -- the posting department, always real
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Deliberately NOT "ON UPDATE CURRENT_TIMESTAMP" -- pin/archive/restore all
@@ -467,7 +473,8 @@ CREATE TABLE announcements (
     -- specific handlers set this explicitly in their own UPDATE statement.
     updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
-    INDEX idx_announcements_pinned_updated (is_pinned, updated_at)
+    INDEX idx_announcements_pinned_updated (is_pinned, updated_at),
+    INDEX idx_announcements_audience (audience, department_id, status)
 );
 
 -- Up to 5 files per announcement, sharing a combined 50MB budget enforced

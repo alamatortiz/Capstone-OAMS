@@ -96,6 +96,9 @@ const ProfessorScheduleManagerPage = React.lazy(
 const ProfessorNotifications = React.lazy(
   () => import("./pages/professor/prof-notifications.jsx"),
 );
+const ProfessorAnnouncementsPage = React.lazy(
+  () => import("./pages/professor/prof-announcements.jsx"),
+);
 
 import AdminDashboard from "./pages/admin/adm-dashboard.jsx";
 import AdminAppointment from "./pages/admin/adm-appointment.jsx";
@@ -195,6 +198,15 @@ createRoot(document.getElementById("root")).render(
               <Route
                 path="/professor/dashboard"
                 element={<ProfessorDashboard />}
+              />
+              {/* ★ Announcements page */}
+              <Route
+                path="/professor/announcements"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorAnnouncementsPage />
+                  </Suspense>
+                }
               />
               <Route
                 path="/professor/queue"

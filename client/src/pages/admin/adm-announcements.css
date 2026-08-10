@@ -129,6 +129,41 @@
   stroke: currentColor;
 }
 
+/* ===== Source toggle ===== */
+/* Mirrors adm-document-processing.css's .adp-source-toggle, but colored with
+   this page's own accent (var(--primary-color)) instead of that page's
+   orange -- the active color should match whatever page it's on, not carry
+   a fixed "faculty" meaning. */
+.ann-source-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+  width: fit-content;
+}
+.ann-source-btn {
+  padding: 0.5rem 1.1rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.ann-source-btn:hover:not(.ann-source-btn-active) {
+  color: var(--text-primary);
+}
+.ann-source-btn-active {
+  background: var(--primary-color);
+  color: #fff;
+  cursor: default;
+}
+
 /* ===== Stats grid ===== */
 .ann-stats-grid {
   display: grid;

@@ -302,7 +302,7 @@ router.get(
       );
       const studentDeptId = stu?.department_id ?? null;
 
-      const filterClauses = ["a.department_id = ?", "a.status = 'active'"];
+      const filterClauses = ["a.department_id = ?", "a.status = 'active'", "a.audience = 'students'"];
       const filterParams = [studentDeptId];
       if (category === "pinned") {
         filterClauses.push("a.is_pinned = 1");
@@ -396,6 +396,7 @@ router.get(
         announcementId,
         attachmentId,
         callerDeptId: stu?.department_id ?? null,
+        expectedAudience: "students",
         forbiddenMessage: "Cannot view this attachment",
       });
     } catch (error) {

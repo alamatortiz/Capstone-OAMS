@@ -12,6 +12,7 @@ const { emitToUser, emitToDept } = require("../sockets");
 const { isValidTransition } = require("../utils/appointmentStatus");
 const { cancelOwnDocumentRequest } = require("../utils/documentStatus");
 const { sendServerError } = require("../utils/errorResponse");
+const { getAttachmentsMap, serveAnnouncementAttachment } = require("../utils/announcementAttachments");
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const VALID_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -1214,6 +1215,132 @@ router.patch(
       res.json({ message: "All marked as read" });
     } catch (error) {
       sendServerError(res, error, "PATCH /notifications/read-all error:");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// ANNOUNCEMENTS ENDPOINT (faculty-audience only)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/faculty/announcements
+// Returns only the faculty member's own department's faculty-audience
+// announcements (audience='faculty'). There's no category/type filter here
+// the way the student endpoint has one -- the professor screen has no tabs,
+// since faculty announcements never carry a real category.
+//
+// `page` is optional and toggles between two call shapes, mirroring the
+// student endpoint's `category`-presence toggle:
+//  - omitted: full, unpaginated list -- the shape the dashboard's
+//    quick-action tile relies on for its live pinned count, since it needs
+//    the complete set, not one page. { announcements }
+//  - provided: paged result for the dedicated Announcements screen's Load
+//    More. { announcements, page, totalPages }
+const FACULTY_ANNOUNCEMENTS_PAGE_SIZE = 10;
+
+router.get(
+  "/announcements",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId],
+      );
+      const facultyDeptId = fac?.department_id ?? null;
+
+      const whereClause = "WHERE a.department_id = ? AND a.status = 'active' AND a.audience = 'faculty'";
+      const filterParams = [facultyDeptId];
+
+      const baseSelect = `
+        SELECT
+           a.announcement_id,
+           a.title,
+           a.content,
+           a.is_pinned,
+           a.created_at,
+           a.updated_at,
+           d.department_id,
+           d.department_name,
+           d.department_abbreviation
+         FROM announcements a
+         JOIN departments d ON a.department_id = d.department_id
+         ${whereClause}
+         ORDER BY a.is_pinned DESC, a.updated_at DESC`;
+
+      let rows;
+      let page;
+      let totalPages;
+      if (req.query.page) {
+        page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const offset = (page - 1) * FACULTY_ANNOUNCEMENTS_PAGE_SIZE;
+        const [[{ total }]] = await pool.query(
+          `SELECT COUNT(*) AS total FROM announcements a ${whereClause}`,
+          filterParams,
+        );
+        totalPages = Math.max(1, Math.ceil(total / FACULTY_ANNOUNCEMENTS_PAGE_SIZE));
+        [rows] = await pool.query(`${baseSelect} LIMIT ? OFFSET ?`, [
+          ...filterParams,
+          FACULTY_ANNOUNCEMENTS_PAGE_SIZE,
+          offset,
+        ]);
+      } else {
+        [rows] = await pool.query(baseSelect, filterParams);
+      }
+
+      const attachmentsMap = await getAttachmentsMap(rows.map((row) => row.announcement_id));
+
+      const announcements = rows.map((row) => ({
+        id: String(row.announcement_id),
+        title: row.title,
+        description: row.content,
+        isPinned: !!row.is_pinned,
+        date: row.updated_at,
+        isReposted: new Date(row.updated_at).getTime() !== new Date(row.created_at).getTime(),
+        departmentId: row.department_id,
+        departmentName: row.department_name,
+        departmentAbbrev: row.department_abbreviation,
+        college: `${row.department_name} (${row.department_abbreviation})`,
+        attachments: attachmentsMap[row.announcement_id] || [],
+      }));
+
+      res.json(req.query.page ? { announcements, page, totalPages } : { announcements });
+    } catch (error) {
+      sendServerError(res, error, "Fetch faculty announcements error");
+    }
+  },
+);
+
+// GET /api/faculty/announcements/:id/attachments/:attachmentId
+// Serves one specific attachment inline (image/PDF/etc.), visibility-scoped
+// exactly like the list route above (own department, faculty audience only).
+router.get(
+  "/announcements/:id/attachments/:attachmentId",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const announcementId = parseInt(req.params.id, 10);
+    const attachmentId = parseInt(req.params.attachmentId, 10);
+    if (isNaN(announcementId) || isNaN(attachmentId)) {
+      return res.status(400).json({ error: "Invalid announcement or attachment id" });
+    }
+    try {
+      const [[fac]] = await pool.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ?",
+        [facultyId],
+      );
+      await serveAnnouncementAttachment(res, {
+        announcementId,
+        attachmentId,
+        callerDeptId: fac?.department_id ?? null,
+        expectedAudience: "faculty",
+        forbiddenMessage: "Cannot view this attachment",
+      });
+    } catch (error) {
+      sendServerError(res, error, "Announcement attachment fetch error");
     }
   },
 );

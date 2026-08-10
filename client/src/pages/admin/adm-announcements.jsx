@@ -103,6 +103,16 @@ const TYPE_META = {
 };
 
 const EMPTY_FORM = { title: "", content: "", type: "general", isPinned: false };
+// Create form only -- audience is locked in at creation, so the Edit form
+// (which reuses EMPTY_FORM) never carries it.
+const EMPTY_CREATE_FORM = { ...EMPTY_FORM, audience: "students" };
+
+// Source toggle above the list (mirrors adm-document-processing.jsx's
+// Students/Faculty toggle) -- switches which entire audience is visible.
+const AUDIENCE_VIEWS = [
+  { id: "students", label: "Students" },
+  { id: "faculty", label: "Faculty" },
+];
 
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
 // advisory here for the running-total UI, the server stays authoritative.
@@ -136,13 +146,14 @@ export default function AdminAnnouncements() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
+  const [audienceView, setAudienceView] = useState("students");
   const [activeTab, setActiveTab] = useState("active");
 
   const [viewingAnnouncement, setViewingAnnouncement] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [isCreating, setIsCreating] = useState(false);
-  const [createForm, setCreateForm] = useState(EMPTY_FORM);
+  const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
   const [deleteId, setDeleteId] = useState(null);
 
   // ── Attachments (up to MAX_FILES per announcement, each ≤ MAX_FILE_BYTES) ──
@@ -257,22 +268,35 @@ export default function AdminAnnouncements() {
 
   useEffect(() => { fetchAnnouncements(); }, []);
 
+  // Mirrors adm-document-processing.jsx's source-switch handler -- switching
+  // audience swaps the entire visible dataset, so the type filter and search
+  // reset since they scoped the previous audience's content.
+  const handleAudienceViewChange = (id) => {
+    setAudienceView(id);
+    setSelectedType("all");
+    setSearchQuery("");
+  };
+
   // ── Derived stats ──────────────────────────────────────────────────────────
+  // The audience toggle swaps the entire visible dataset -- stats included --
+  // matching adm-document-processing.jsx's full-dataset-swap semantics.
+  const audienceScoped = announcements.filter((a) => a.audience === audienceView);
+
   const stats = {
-    total:     announcements.filter((a) => a.status === "active").length,
-    pinned:    announcements.filter((a) => a.isPinned && a.status === "active").length,
-    important: announcements.filter((a) => a.type === "important" && a.status === "active").length,
-    archived:  announcements.filter((a) => a.status === "archived").length,
+    total:     audienceScoped.filter((a) => a.status === "active").length,
+    pinned:    audienceScoped.filter((a) => a.isPinned && a.status === "active").length,
+    important: audienceScoped.filter((a) => a.type === "important" && a.status === "active").length,
+    archived:  audienceScoped.filter((a) => a.status === "archived").length,
   };
 
   const getFiltered = (tab) => {
-    let list = announcements.filter((a) => {
+    let list = audienceScoped.filter((a) => {
       if (tab === "archived") return a.status === "archived";
       if (tab === "pinned") return a.status === "active" && a.isPinned;
       if (tab === "unpinned") return a.status === "active" && !a.isPinned;
       return a.status === "active";
     });
-    if (selectedType !== "all") list = list.filter((a) => a.type === selectedType);
+    if (audienceView === "students" && selectedType !== "all") list = list.filter((a) => a.type === selectedType);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -381,7 +405,7 @@ export default function AdminAnnouncements() {
     }
   };
 
-  const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_FORM); setCreateFiles([]); };
+  const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_CREATE_FORM); setCreateFiles([]); };
 
   const saveCreate = async () => {
     if (!createForm.title.trim() || !createForm.content.trim()) {
@@ -394,6 +418,7 @@ export default function AdminAnnouncements() {
       formData.append("content", createForm.content);
       formData.append("type", createForm.type);
       formData.append("isPinned", createForm.isPinned);
+      formData.append("audience", createForm.audience);
       createFiles.forEach((f) => formData.append("attachments", f.file));
       const { data } = await api.post("/admin/announcements", formData);
       setAnnouncements((prev) => [data.announcement, ...prev]);
@@ -451,9 +476,11 @@ export default function AdminAnnouncements() {
                     <div className="ann-view-banner-date"><CalendarIcon />{formatPostedLabel(viewingAnnouncement)}</div>
                   </div>
                   <div className="ann-view-banner-badges">
-                    <span className={`ann-badge ${viewingAnnouncement.isPinned ? "ann-badge-pinned" : TYPE_META[viewingAnnouncement.type].badgeClass}`}>
-                      {TYPE_META[viewingAnnouncement.type].label}
-                    </span>
+                    {viewingAnnouncement.audience === "students" && (
+                      <span className={`ann-badge ${viewingAnnouncement.isPinned ? "ann-badge-pinned" : TYPE_META[viewingAnnouncement.type].badgeClass}`}>
+                        {TYPE_META[viewingAnnouncement.type].label}
+                      </span>
+                    )}
                     {viewingAnnouncement.isPinned && (
                       <span className="ann-pinned-pill"><PinIcon /> Pinned</span>
                     )}
@@ -526,17 +553,19 @@ export default function AdminAnnouncements() {
                   <label htmlFor="edit-content">Content *</label>
                   <textarea id="edit-content" className="ann-textarea" value={editForm.content} onChange={(e) => setEditForm({ ...editForm, content: e.target.value })} />
                 </div>
-                <div className="ann-field-row">
-                  <div className="ann-field">
-                    <label htmlFor="edit-type">Type *</label>
-                    <select id="edit-type" className="ann-select" value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>
-                      <option value="general">General</option>
-                      <option value="important">Important</option>
-                      <option value="event">Event</option>
-                      <option value="reminder">Reminder</option>
-                    </select>
+                {editingAnnouncement?.audience !== "faculty" && (
+                  <div className="ann-field-row">
+                    <div className="ann-field">
+                      <label htmlFor="edit-type">Type *</label>
+                      <select id="edit-type" className="ann-select" value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>
+                        <option value="general">General</option>
+                        <option value="important">Important</option>
+                        <option value="event">Event</option>
+                        <option value="reminder">Reminder</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="ann-field">
                   <label htmlFor="edit-attachment">
@@ -629,16 +658,36 @@ export default function AdminAnnouncements() {
                   <label htmlFor="create-content">Content *</label>
                   <textarea id="create-content" className="ann-textarea" placeholder="Enter announcement content" value={createForm.content} onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })} />
                 </div>
+                <div className="ann-field">
+                  <label htmlFor="create-audience">Audience *</label>
+                  <select
+                    id="create-audience"
+                    className="ann-select"
+                    value={createForm.audience}
+                    onChange={(e) => {
+                      const audience = e.target.value;
+                      // Faculty announcements have no real category -- clear
+                      // it locally too so the form doesn't show a stale type
+                      // selection the server would silently override anyway.
+                      setCreateForm({ ...createForm, audience, type: audience === "faculty" ? "general" : createForm.type });
+                    }}
+                  >
+                    <option value="students">Students</option>
+                    <option value="faculty">Faculty</option>
+                  </select>
+                </div>
                 <div className="ann-field-row">
-                  <div className="ann-field">
-                    <label htmlFor="create-type">Type *</label>
-                    <select id="create-type" className="ann-select" value={createForm.type} onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}>
-                      <option value="general">General</option>
-                      <option value="important">Important</option>
-                      <option value="event">Event</option>
-                      <option value="reminder">Reminder</option>
-                    </select>
-                  </div>
+                  {createForm.audience === "students" && (
+                    <div className="ann-field">
+                      <label htmlFor="create-type">Type *</label>
+                      <select id="create-type" className="ann-select" value={createForm.type} onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}>
+                        <option value="general">General</option>
+                        <option value="important">Important</option>
+                        <option value="event">Event</option>
+                        <option value="reminder">Reminder</option>
+                      </select>
+                    </div>
+                  )}
                   <div className="ann-field">
                     <label htmlFor="create-pinned">Pin Announcement</label>
                     <select id="create-pinned" className="ann-select" value={createForm.isPinned ? "true" : "false"} onChange={(e) => setCreateForm({ ...createForm, isPinned: e.target.value === "true" })}>
@@ -720,10 +769,26 @@ export default function AdminAnnouncements() {
             subtitleClassName="ann-page-subtitle"
           />
 
-          <button className="ann-btn-new" onClick={() => setIsCreating(true)}>
+          <button
+            className="ann-btn-new"
+            onClick={() => { setCreateForm({ ...EMPTY_CREATE_FORM, audience: audienceView }); setIsCreating(true); }}
+          >
             <PlusIconSmall />
             New Announcement
           </button>
+
+          {/* Source toggle */}
+          <div className="ann-source-toggle">
+            {AUDIENCE_VIEWS.map((v) => (
+              <button
+                key={v.id}
+                className={`ann-source-btn ${audienceView === v.id ? "ann-source-btn-active" : ""}`}
+                onClick={() => handleAudienceViewChange(v.id)}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
 
           {/* Stats */}
           <div className="ann-stats-grid">
@@ -756,13 +821,15 @@ export default function AdminAnnouncements() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <select className="ann-select" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
-              <option value="all">All Types</option>
-              <option value="important">Important</option>
-              <option value="event">Events</option>
-              <option value="reminder">Reminders</option>
-              <option value="general">General</option>
-            </select>
+            {audienceView === "students" && (
+              <select className="ann-select" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
+                <option value="all">All Types</option>
+                <option value="important">Important</option>
+                <option value="event">Events</option>
+                <option value="reminder">Reminders</option>
+                <option value="general">General</option>
+              </select>
+            )}
           </div>
 
           {/* List */}
@@ -818,7 +885,9 @@ export default function AdminAnnouncements() {
                               {a.isPinned && <PinIcon className="ann-pin-flag" />}
                               {a.attachments?.length > 0 && <PaperclipIcon className="ann-attachment-flag" title="Has attachment" />}
                             </div>
-                            <span className={`ann-badge ${meta.badgeClass}`}>{meta.label}</span>
+                            {audienceView === "students" && (
+                              <span className={`ann-badge ${meta.badgeClass}`}>{meta.label}</span>
+                            )}
                           </div>
                           <p className="ann-item-desc">{a.content}</p>
                           <div className="ann-item-meta">

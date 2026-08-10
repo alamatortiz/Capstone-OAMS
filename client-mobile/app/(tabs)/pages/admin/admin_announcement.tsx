@@ -74,6 +74,7 @@ function CoamsLogo({
 
 type AnnouncementType = 'important' | 'event' | 'reminder' | 'general';
 type AnnouncementStatus = 'active' | 'archived';
+type AnnouncementAudience = 'students' | 'faculty';
 
 interface AnnouncementAttachment {
   id: string;
@@ -87,6 +88,7 @@ interface AnnouncementItem {
   title: string;
   content: string;
   type: AnnouncementType;
+  audience: AnnouncementAudience;
   date: string;
   isPinned: boolean;
   isReposted: boolean;
@@ -216,8 +218,22 @@ const YES_NO_OPTIONS = [
   { value: 'true', label: 'Yes' },
 ];
 
+// Source toggle above the list (mirrors admin_document_processing.tsx's
+// Students/Faculty toggle) -- switches which entire audience is visible.
+const AUDIENCE_VIEWS: { id: AnnouncementAudience; label: string }[] = [
+  { id: 'students', label: 'Students' },
+  { id: 'faculty', label: 'Faculty' },
+];
+
+// Create form's Audience picker -- locked in after creation, no edit-form
+// equivalent.
+const AUDIENCE_FORM_OPTIONS = [
+  { value: 'students', label: 'Students' },
+  { value: 'faculty', label: 'Faculty' },
+];
+
 const EMPTY_FORM = { title: '', content: '', type: 'general' as AnnouncementType };
-const EMPTY_CREATE_FORM = { ...EMPTY_FORM, isPinned: false };
+const EMPTY_CREATE_FORM = { ...EMPTY_FORM, isPinned: false, audience: 'students' as AnnouncementAudience };
 
 // Single line whose label reflects whether this announcement has ever been
 // edited/restored (isReposted, set server-side) -- "Posted" the first time,
@@ -282,6 +298,7 @@ export default function AdminAnnouncementScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<TypeFilter>('all');
+  const [audienceView, setAudienceView] = useState<AnnouncementAudience>('students');
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [picker, setPicker] = useState<PickerState | null>(null);
 
@@ -314,6 +331,15 @@ export default function AdminAnnouncementScreen() {
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
+
+  // Mirrors admin_document_processing.tsx's handleSourceChange -- switching
+  // audience swaps the entire visible dataset, so the type filter and search
+  // reset since they scoped the previous audience's content.
+  const handleAudienceViewChange = (id: AnnouncementAudience) => {
+    setAudienceView(id);
+    setSelectedType('all');
+    setSearchQuery('');
+  };
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
@@ -351,21 +377,25 @@ export default function AdminAnnouncementScreen() {
   };
 
   // ── Derived stats + filtered list (mirrors admin-announcements.jsx) ──
+  // The audience toggle swaps the entire visible dataset -- stats included --
+  // matching admin_document_processing.tsx's full-dataset-swap semantics.
+  const audienceScoped = announcements.filter((a) => a.audience === audienceView);
+
   const stats = {
-    total: announcements.filter((a) => a.status === 'active').length,
-    pinned: announcements.filter((a) => a.isPinned && a.status === 'active').length,
-    important: announcements.filter((a) => a.type === 'important' && a.status === 'active').length,
-    archived: announcements.filter((a) => a.status === 'archived').length,
+    total: audienceScoped.filter((a) => a.status === 'active').length,
+    pinned: audienceScoped.filter((a) => a.isPinned && a.status === 'active').length,
+    important: audienceScoped.filter((a) => a.type === 'important' && a.status === 'active').length,
+    archived: audienceScoped.filter((a) => a.status === 'archived').length,
   };
 
   const getFiltered = (tab: TabKey) => {
-    let list = announcements.filter((a) => {
+    let list = audienceScoped.filter((a) => {
       if (tab === 'archived') return a.status === 'archived';
       if (tab === 'pinned') return a.status === 'active' && a.isPinned;
       if (tab === 'unpinned') return a.status === 'active' && !a.isPinned;
       return a.status === 'active';
     });
-    if (selectedType !== 'all') list = list.filter((a) => a.type === selectedType);
+    if (audienceView === 'students' && selectedType !== 'all') list = list.filter((a) => a.type === selectedType);
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -530,7 +560,7 @@ export default function AdminAnnouncementScreen() {
   };
 
   const openCreate = () => {
-    setCreateForm(EMPTY_CREATE_FORM);
+    setCreateForm({ ...EMPTY_CREATE_FORM, audience: audienceView });
     setCreateAttachment(null);
     setIsCreating(true);
   };
@@ -552,6 +582,7 @@ export default function AdminAnnouncementScreen() {
         formData.append('content', createForm.content);
         formData.append('type', createForm.type);
         formData.append('isPinned', String(createForm.isPinned));
+        formData.append('audience', createForm.audience);
         formData.append('attachments', {
           uri: createAttachment.uri,
           name: createAttachment.name,
@@ -566,6 +597,7 @@ export default function AdminAnnouncementScreen() {
           content: createForm.content,
           type: createForm.type,
           isPinned: createForm.isPinned,
+          audience: createForm.audience,
         }));
       }
       setAnnouncements((prev) => [data.announcement, ...prev]);
@@ -639,6 +671,22 @@ export default function AdminAnnouncementScreen() {
             </LinearGradient>
           </Pressable>
 
+          {/* Source toggle */}
+          <View style={styles.sourceToggle}>
+            {AUDIENCE_VIEWS.map((v) => {
+              const active = audienceView === v.id;
+              return (
+                <Pressable
+                  key={v.id}
+                  style={[styles.sourceBtn, active && styles.sourceBtnActive]}
+                  onPress={() => handleAudienceViewChange(v.id)}
+                >
+                  <Text style={[styles.sourceBtnText, active && styles.sourceBtnTextActive]}>{v.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
             {STAT_CARDS.map((stat) => (
@@ -664,25 +712,27 @@ export default function AdminAnnouncementScreen() {
                 onChangeText={setSearchQuery}
               />
             </View>
-            <Pressable
-              style={styles.filterSelect}
-              onPress={() =>
-                setPicker({
-                  title: 'Select Type',
-                  options: TYPE_FILTER_OPTIONS,
-                  currentValue: selectedType,
-                  onSelect: (value) => {
-                    setSelectedType(value as TypeFilter);
-                    setPicker(null);
-                  },
-                })
-              }
-            >
-              <Text style={styles.filterSelectText} numberOfLines={1}>
-                {typeFilterLabel}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={theme.primary} />
-            </Pressable>
+            {audienceView === 'students' && (
+              <Pressable
+                style={styles.filterSelect}
+                onPress={() =>
+                  setPicker({
+                    title: 'Select Type',
+                    options: TYPE_FILTER_OPTIONS,
+                    currentValue: selectedType,
+                    onSelect: (value) => {
+                      setSelectedType(value as TypeFilter);
+                      setPicker(null);
+                    },
+                  })
+                }
+              >
+                <Text style={styles.filterSelectText} numberOfLines={1}>
+                  {typeFilterLabel}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+              </Pressable>
+            )}
           </View>
 
           {/* Tabs */}
@@ -733,9 +783,11 @@ export default function AdminAnnouncementScreen() {
                           {a.title}
                         </Text>
                         <View style={styles.itemBadgeRow}>
-                          <View style={[styles.badge, { backgroundColor: meta.badgeBg, borderColor: meta.badgeBorder }]}>
-                            <Text style={[styles.badgeText, { color: meta.badgeColor }]}>{meta.label}</Text>
-                          </View>
+                          {audienceView === 'students' && (
+                            <View style={[styles.badge, { backgroundColor: meta.badgeBg, borderColor: meta.badgeBorder }]}>
+                              <Text style={[styles.badgeText, { color: meta.badgeColor }]}>{meta.label}</Text>
+                            </View>
+                          )}
                           {a.attachments?.length > 0 && (
                             <View style={[styles.countBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                               <Ionicons name="attach-outline" size={11} color={theme.primary} />
@@ -857,19 +909,21 @@ export default function AdminAnnouncementScreen() {
                     <Text style={styles.viewBannerDate}>{formatPostedLabel(viewingAnnouncement)}</Text>
                   </View>
                   <View style={styles.viewBannerBadges}>
-                    <View
-                      style={[
-                        styles.badge,
-                        {
-                          backgroundColor: viewingAnnouncement.isPinned ? PINNED_META.badgeBg : TYPE_META[viewingAnnouncement.type].badgeBg,
-                          borderColor: viewingAnnouncement.isPinned ? PINNED_META.badgeBorder : TYPE_META[viewingAnnouncement.type].badgeBorder,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.badgeText, { color: viewingAnnouncement.isPinned ? PINNED_META.badgeColor : TYPE_META[viewingAnnouncement.type].badgeColor }]}>
-                        {TYPE_META[viewingAnnouncement.type].label}
-                      </Text>
-                    </View>
+                    {viewingAnnouncement.audience === 'students' && (
+                      <View
+                        style={[
+                          styles.badge,
+                          {
+                            backgroundColor: viewingAnnouncement.isPinned ? PINNED_META.badgeBg : TYPE_META[viewingAnnouncement.type].badgeBg,
+                            borderColor: viewingAnnouncement.isPinned ? PINNED_META.badgeBorder : TYPE_META[viewingAnnouncement.type].badgeBorder,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.badgeText, { color: viewingAnnouncement.isPinned ? PINNED_META.badgeColor : TYPE_META[viewingAnnouncement.type].badgeColor }]}>
+                          {TYPE_META[viewingAnnouncement.type].label}
+                        </Text>
+                      </View>
+                    )}
                     {viewingAnnouncement.isPinned && (
                       <View style={styles.pinnedPill}>
                         <Text style={styles.pinnedPillText}>📌 Pinned</Text>
@@ -971,25 +1025,27 @@ export default function AdminAnnouncementScreen() {
                   textAlignVertical="top"
                 />
               </View>
-              <Pressable
-                style={styles.filterSelect}
-                onPress={() =>
-                  setPicker({
-                    title: 'Select Type',
-                    options: TYPE_FORM_OPTIONS,
-                    currentValue: editForm.type,
-                    onSelect: (value) => {
-                      setEditForm({ ...editForm, type: value as AnnouncementType });
-                      setPicker(null);
-                    },
-                  })
-                }
-              >
-                <Text style={styles.filterSelectText} numberOfLines={1}>
-                  {TYPE_META[editForm.type].label}
-                </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
-              </Pressable>
+              {editingAnnouncement?.audience !== 'faculty' && (
+                <Pressable
+                  style={styles.filterSelect}
+                  onPress={() =>
+                    setPicker({
+                      title: 'Select Type',
+                      options: TYPE_FORM_OPTIONS,
+                      currentValue: editForm.type,
+                      onSelect: (value) => {
+                        setEditForm({ ...editForm, type: value as AnnouncementType });
+                        setPicker(null);
+                      },
+                    })
+                  }
+                >
+                  <Text style={styles.filterSelectText} numberOfLines={1}>
+                    {TYPE_META[editForm.type].label}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                </Pressable>
+              )}
 
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>
@@ -1074,28 +1130,54 @@ export default function AdminAnnouncementScreen() {
                   textAlignVertical="top"
                 />
               </View>
+              <Pressable
+                style={[styles.filterSelect, { marginBottom: 14 }]}
+                onPress={() =>
+                  setPicker({
+                    title: 'Select Audience',
+                    options: AUDIENCE_FORM_OPTIONS,
+                    currentValue: createForm.audience,
+                    onSelect: (value) => {
+                      const audience = value as AnnouncementAudience;
+                      // Faculty announcements have no real category -- clear
+                      // it locally too so the form doesn't show a stale type
+                      // selection the server would silently override anyway.
+                      setCreateForm({ ...createForm, audience, type: audience === 'faculty' ? 'general' : createForm.type });
+                      setPicker(null);
+                    },
+                  })
+                }
+              >
+                <Text style={styles.filterSelectText} numberOfLines={1}>
+                  {AUDIENCE_FORM_OPTIONS.find((o) => o.value === createForm.audience)?.label}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+              </Pressable>
+
               <View style={styles.formRow}>
+                {createForm.audience === 'students' && (
+                  <Pressable
+                    style={[styles.filterSelect, styles.formSelectHalf]}
+                    onPress={() =>
+                      setPicker({
+                        title: 'Select Type',
+                        options: TYPE_FORM_OPTIONS,
+                        currentValue: createForm.type,
+                        onSelect: (value) => {
+                          setCreateForm({ ...createForm, type: value as AnnouncementType });
+                          setPicker(null);
+                        },
+                      })
+                    }
+                  >
+                    <Text style={styles.filterSelectText} numberOfLines={1}>
+                      {TYPE_META[createForm.type].label}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                  </Pressable>
+                )}
                 <Pressable
-                  style={[styles.filterSelect, styles.formSelectHalf]}
-                  onPress={() =>
-                    setPicker({
-                      title: 'Select Type',
-                      options: TYPE_FORM_OPTIONS,
-                      currentValue: createForm.type,
-                      onSelect: (value) => {
-                        setCreateForm({ ...createForm, type: value as AnnouncementType });
-                        setPicker(null);
-                      },
-                    })
-                  }
-                >
-                  <Text style={styles.filterSelectText} numberOfLines={1}>
-                    {TYPE_META[createForm.type].label}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color={theme.primary} />
-                </Pressable>
-                <Pressable
-                  style={[styles.filterSelect, styles.formSelectHalf]}
+                  style={[styles.filterSelect, createForm.audience === 'students' && styles.formSelectHalf]}
                   onPress={() =>
                     setPicker({
                       title: 'Pin this announcement?',
@@ -1409,6 +1491,25 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 16,
     },
     newBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+
+    // Source toggle (mirrors admin_document_processing.tsx's Students/Faculty
+    // toggle, but colored with this screen's own green accent instead of that
+    // screen's orange -- the color should match whatever page it's on, not
+    // carry a fixed "faculty" meaning).
+    sourceToggle: {
+      flexDirection: 'row',
+      gap: 4,
+      alignSelf: 'flex-start',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 4,
+    },
+    sourceBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 9 },
+    sourceBtnActive: { backgroundColor: theme.primary },
+    sourceBtnText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
+    sourceBtnTextActive: { color: '#ffffff' },
 
     // Stats
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

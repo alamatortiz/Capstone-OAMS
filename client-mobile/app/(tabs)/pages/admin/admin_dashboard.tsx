@@ -133,11 +133,21 @@ const ANNOUNCEMENT_TAG_TINTS: Record<string, { bg: string; border: string; color
   pinned: { bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' },
 };
 
+// This preview list blends student- and faculty-audience announcements
+// together (the "Announcements" stat total isn't audience-split either) --
+// this tag is what keeps a faculty row's meaningless 'general' type tag from
+// reading as a real category.
+const AUDIENCE_TAG_TINTS: Record<string, { bg: string; border: string; color: string }> = {
+  students: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
+  faculty: { bg: 'rgba(139, 92, 246, 0.2)', border: 'rgba(139, 92, 246, 0.4)', color: '#8b5cf6' },
+};
+
 interface AnnouncementItem {
   id: string;
   title: string;
   description: string;
   tag: string;
+  audience?: 'students' | 'faculty';
   date: string;
   isPinned?: boolean;
 }
@@ -510,6 +520,8 @@ export default function AdminDashboardScreen() {
             <View style={styles.announcementsList}>
               {announcements.map((ann) => {
                 const tint = ann.isPinned ? ANNOUNCEMENT_TAG_TINTS.pinned : (ANNOUNCEMENT_TAG_TINTS[ann.tag] ?? ANNOUNCEMENT_TAG_TINTS.general);
+                const audience = ann.audience ?? 'students';
+                const audienceTint = AUDIENCE_TAG_TINTS[audience];
                 return (
                   <View key={ann.id} style={styles.announcementItem}>
                     <View style={styles.announcementBody}>
@@ -519,9 +531,16 @@ export default function AdminDashboardScreen() {
                       </Text>
                       <Text style={styles.announcementDescription}>{ann.description}</Text>
                       <View style={styles.announcementMetaRow}>
-                        <View style={[styles.tagPill, { backgroundColor: tint.bg, borderColor: tint.border }]}>
-                          <Text style={[styles.tagPillText, { color: tint.color }]}>{ann.tag}</Text>
+                        <View style={[styles.tagPill, { backgroundColor: audienceTint.bg, borderColor: audienceTint.border }]}>
+                          <Text style={[styles.tagPillText, { color: audienceTint.color }]}>
+                            {audience === 'faculty' ? 'Faculty' : 'Students'}
+                          </Text>
                         </View>
+                        {audience === 'students' && (
+                          <View style={[styles.tagPill, { backgroundColor: tint.bg, borderColor: tint.border }]}>
+                            <Text style={[styles.tagPillText, { color: tint.color }]}>{ann.tag}</Text>
+                          </View>
+                        )}
                         <Text style={styles.announcementDate}>{ann.date}</Text>
                       </View>
                     </View>
