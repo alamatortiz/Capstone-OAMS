@@ -22,6 +22,8 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/coams_logo.png');
@@ -76,8 +78,6 @@ function CoamsLogo({
 // notes, estimated_completion, needed_by) — this screen ports the actual wired
 // prof-documents.jsx/.css 1:1: Request Document dialog (type/purpose/needed-by/
 // notes), Active/Completed tabs, and the Cancel Request confirm flow. ───
-type DocStatus = 'pending' | 'processing' | 'generated' | 'released' | 'claimed' | 'rejected' | 'cancelled';
-
 interface DocumentRequest {
   id: string;
   type: string;
@@ -118,16 +118,6 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
 ];
 
-const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string; color: string; icon: IoniconName }> = {
-  pending: { label: 'Pending', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: 'time-outline' },
-  processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6', icon: 'alert-circle-outline' },
-  generated: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
-  released: { label: 'Released', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
-  claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
-  rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
-  cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
-};
-
 const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
 const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
@@ -143,27 +133,6 @@ function formatDate(dateStr?: string) {
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
-
-function getTomorrowDateString() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function buildNeededByOptions() {
-  const options: { key: string; label: string }[] = [];
-  const start = new Date();
-  start.setDate(start.getDate() + 1);
-  for (let i = 0; i < 21; i += 1) {
-    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-    const key = d.toISOString().slice(0, 10);
-    options.push({ key, label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) });
-  }
-  return options;
-}
-
-const NEEDED_BY_OPTIONS = buildNeededByOptions();
-const MIN_NEEDED_BY_DATE = getTomorrowDateString();
 
 const emptyFormData: { typeId: number | ''; purpose: string; copies: string; neededBy: string } = {
   typeId: '',
@@ -184,12 +153,17 @@ export default function ProfessorDocumentsScreen() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState(emptyFormData);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [showNeededByPicker, setShowNeededByPicker] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const { user, logout, token } = useAuth();
+  const tomorrowDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d;
+  })();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -464,7 +438,7 @@ export default function ProfessorDocumentsScreen() {
             ) : activeRequests.length > 0 ? (
               <View style={styles.docList}>
                 {activeRequests.map((req) => {
-                  const meta = STATUS_META[req.status];
+                  const meta = getHubStatusMeta(req.status);
                   return (
                     <Pressable
                       key={req.id}
@@ -578,7 +552,7 @@ export default function ProfessorDocumentsScreen() {
             ) : claimedRequests.length > 0 ? (
               <View style={styles.docList}>
                 {claimedRequests.map((req) => {
-                  const meta = STATUS_META[req.status];
+                  const meta = getHubStatusMeta(req.status);
                   return (
                     <Pressable
                       key={req.id}
@@ -626,7 +600,7 @@ export default function ProfessorDocumentsScreen() {
             ) : rejectedRequests.length > 0 ? (
               <View style={styles.docList}>
                 {rejectedRequests.map((req) => {
-                  const meta = STATUS_META[req.status];
+                  const meta = getHubStatusMeta(req.status);
                   return (
                     <Pressable
                       key={req.id}
@@ -676,7 +650,7 @@ export default function ProfessorDocumentsScreen() {
             ) : cancelledRequests.length > 0 ? (
               <View style={styles.docList}>
                 {cancelledRequests.map((req) => {
-                  const meta = STATUS_META[req.status];
+                  const meta = getHubStatusMeta(req.status);
                   return (
                     <Pressable
                       key={req.id}
@@ -785,12 +759,25 @@ export default function ProfessorDocumentsScreen() {
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Needed By (optional)</Text>
-                <Pressable style={styles.selectTrigger} onPress={() => setDatePickerOpen(true)}>
+                <Pressable style={styles.selectTrigger} onPress={() => setShowNeededByPicker(true)}>
                   <Text style={formData.neededBy ? styles.selectTriggerText : styles.selectPlaceholder}>
-                    {formData.neededBy ? formatDate(formData.neededBy) : 'Select a date'}
+                    {formData.neededBy || 'Select a date'}
                   </Text>
                   <Ionicons name="calendar-outline" size={16} color={theme.subtext} />
                 </Pressable>
+                {showNeededByPicker && (
+                  <DateTimePicker
+                    value={formData.neededBy ? new Date(formData.neededBy) : tomorrowDate}
+                    mode="date"
+                    minimumDate={tomorrowDate}
+                    onChange={(event, selectedDate) => {
+                      setShowNeededByPicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setFormData((prev) => ({ ...prev, neededBy: selectedDate.toISOString().slice(0, 10) }));
+                      }
+                    }}
+                  />
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -854,44 +841,6 @@ export default function ProfessorDocumentsScreen() {
         </View>
       </Modal>
 
-      {/* Needed By Date Picker */}
-      <Modal visible={datePickerOpen} animationType="fade" transparent onRequestClose={() => setDatePickerOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.pickerModalCard}>
-            <Text style={styles.pickerModalTitle}>Needed By</Text>
-            <ScrollView style={{ maxHeight: 320 }}>
-              <Pressable
-                style={styles.pickerOption}
-                onPress={() => {
-                  setFormData((prev) => ({ ...prev, neededBy: '' }));
-                  setDatePickerOpen(false);
-                }}
-              >
-                <Text style={styles.pickerOptionText}>No specific date</Text>
-              </Pressable>
-              {NEEDED_BY_OPTIONS.filter((o) => o.key >= MIN_NEEDED_BY_DATE).map((o) => {
-                const selected = formData.neededBy === o.key;
-                return (
-                  <Pressable
-                    key={o.key}
-                    style={[styles.pickerOption, selected && styles.pickerOptionActive]}
-                    onPress={() => {
-                      setFormData((prev) => ({ ...prev, neededBy: o.key }));
-                      setDatePickerOpen(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>{o.label}</Text>
-                    {selected && <Ionicons name="checkmark" size={16} color="#f97316" />}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Pressable style={styles.pickerModalClose} onPress={() => setDatePickerOpen(false)}>
-              <Text style={styles.pickerModalCloseText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
 
       {/* Cancel Confirm Modal */}
       <Modal visible={!!cancelTarget} animationType="fade" transparent onRequestClose={() => setCancelTarget(null)}>

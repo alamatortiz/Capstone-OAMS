@@ -11,6 +11,7 @@ import { formatManilaDate, formatManilaTime, getManilaTomorrowDateString } from 
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
+import { getDocStatusHubMeta } from "../../utils/documentStatus";
 
 import { ChevronLeft, XCircle, FileText } from "lucide-react";
 
@@ -208,27 +209,6 @@ export default function DocumentsPage() {
       );
     } finally {
       setCancellingId(null);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-        return "doc-badge-pending";
-      case "processing":
-        return "doc-badge-processing";
-      case "ready":
-        return "doc-badge-ready";
-      case "released":
-        return "doc-badge-released";
-      case "claimed":
-        return "doc-badge-claimed";
-      case "rejected":
-        return "doc-badge-rejected";
-      case "cancelled":
-        return "doc-badge-cancelled";
-      default:
-        return "doc-badge-pending";
     }
   };
 
@@ -533,9 +513,9 @@ export default function DocumentsPage() {
                           <div className="doc-card-header-right">
                             <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
-                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                              className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
-                              {doc.status}
+                              {getDocStatusHubMeta(doc.status).label}
                             </span>
                           </div>
                         </div>
@@ -677,9 +657,9 @@ export default function DocumentsPage() {
                           <div className="doc-card-header-right">
                             <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
-                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                              className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
-                              {doc.status}
+                              {getDocStatusHubMeta(doc.status).label}
                             </span>
                           </div>
                         </div>
@@ -735,9 +715,9 @@ export default function DocumentsPage() {
                           <div className="doc-card-header-right">
                             <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
-                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                              className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
-                              {doc.status}
+                              {getDocStatusHubMeta(doc.status).label}
                             </span>
                           </div>
                         </div>
@@ -793,9 +773,9 @@ export default function DocumentsPage() {
                           <div className="doc-card-header-right">
                             <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
-                              className={`doc-badge ${getStatusColor(doc.status)}`}
+                              className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
-                              {doc.status}
+                              {getDocStatusHubMeta(doc.status).label}
                             </span>
                           </div>
                         </div>

@@ -23,6 +23,7 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
+import { DocStatus, getDetailStatusMeta } from '@/utils/documentStatus';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/coams_logo.png');
@@ -86,8 +87,6 @@ function CoamsLogo({
   );
 }
 
-type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled';
-
 interface DocumentRecord {
   id: string;
   type: string;
@@ -131,16 +130,6 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
 ];
 
-const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string; color: string }> = {
-  pending: { label: 'Pending', bg: 'rgba(251, 191, 36, 0.15)', border: 'rgba(251, 191, 36, 0.35)', color: '#f59e0b' },
-  processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
-  ready: { label: 'Ready for Pickup', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
-  released: { label: 'Released', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-  cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-};
-
 const formatDateLong = (dateString?: string) => {
   if (!dateString) return '—';
   return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -151,7 +140,14 @@ const formatDateShort = (dateString?: string) => {
   return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-type TabKey = 'active' | 'completed';
+const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
+type TabKey = (typeof TABS)[number];
+const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
+  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
+  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+};
 
 export default function StudentDocumentStatusScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -264,9 +260,15 @@ export default function StudentDocumentStatusScreen() {
   const activeDocuments = documents.filter(
     (d) => d.status !== 'claimed' && d.status !== 'rejected' && d.status !== 'cancelled',
   );
-  const completedDocuments = documents.filter(
-    (d) => d.status === 'claimed' || d.status === 'rejected' || d.status === 'cancelled',
-  );
+  const claimedDocuments = documents.filter((d) => d.status === 'claimed');
+  const rejectedDocuments = documents.filter((d) => d.status === 'rejected');
+  const cancelledDocuments = documents.filter((d) => d.status === 'cancelled');
+  const tabCounts: Record<TabKey, number> = {
+    active: activeDocuments.length,
+    claimed: claimedDocuments.length,
+    rejected: rejectedDocuments.length,
+    cancelled: cancelledDocuments.length,
+  };
 
   const confirmCancelRequest = async () => {
     if (!selectedDoc) return;
@@ -365,18 +367,23 @@ export default function StudentDocumentStatusScreen() {
               {!loading && !error && (
               <>
               {/* Tabs */}
-              <View style={styles.tabsRow}>
-                <Pressable style={[styles.tab, activeTab === 'active' && styles.tabActive]} onPress={() => setActiveTab('active')}>
-                  <Ionicons name="alert-circle-outline" size={15} color={activeTab === 'active' ? theme.orange : theme.subtext} />
-                  <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>Active Requests</Text>
-                  <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{activeDocuments.length}</Text></View>
-                </Pressable>
-                <Pressable style={[styles.tab, activeTab === 'completed' && styles.tabActive]} onPress={() => setActiveTab('completed')}>
-                  <Ionicons name="checkmark-circle-outline" size={15} color={activeTab === 'completed' ? theme.orange : theme.subtext} />
-                  <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive]}>Completed</Text>
-                  <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{completedDocuments.length}</Text></View>
-                </Pressable>
-              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.tabsRow}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {TABS.map((tab) => {
+                  const active = activeTab === tab;
+                  return (
+                    <Pressable key={tab} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab)}>
+                      <Ionicons name={TAB_META[tab].icon} size={15} color={active ? theme.orange : theme.subtext} />
+                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_META[tab].label}</Text>
+                      <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabCounts[tab]}</Text></View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
               {/* Active Tab */}
               {activeTab === 'active' && (
@@ -405,11 +412,11 @@ export default function StudentDocumentStatusScreen() {
                 )
               )}
 
-              {/* Completed Tab */}
-              {activeTab === 'completed' && (
-                completedDocuments.length > 0 ? (
+              {/* Claimed Tab */}
+              {activeTab === 'claimed' && (
+                claimedDocuments.length > 0 ? (
                   <View style={styles.docsList}>
-                    {completedDocuments.map((doc) => (
+                    {claimedDocuments.map((doc) => (
                       <DocumentListItem
                         key={doc.id}
                         theme={theme}
@@ -424,7 +431,55 @@ export default function StudentDocumentStatusScreen() {
                   <View style={styles.emptyCard}>
                     <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
                     <Text style={styles.emptyTitle}>No Completed Requests</Text>
-                    <Text style={styles.emptyDescription}>Your completed and rejected requests will appear here.</Text>
+                    <Text style={styles.emptyDescription}>You have no records of claimed documents.</Text>
+                  </View>
+                )
+              )}
+
+              {/* Rejected Tab */}
+              {activeTab === 'rejected' && (
+                rejectedDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {rejectedDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        styles={styles}
+                        doc={doc}
+                        completed
+                        onPress={() => setSelectedDocId(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Rejected Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no records of rejected document requests.</Text>
+                  </View>
+                )
+              )}
+
+              {/* Cancelled Tab */}
+              {activeTab === 'cancelled' && (
+                cancelledDocuments.length > 0 ? (
+                  <View style={styles.docsList}>
+                    {cancelledDocuments.map((doc) => (
+                      <DocumentListItem
+                        key={doc.id}
+                        theme={theme}
+                        styles={styles}
+                        doc={doc}
+                        completed
+                        onPress={() => setSelectedDocId(doc.id)}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
+                    <Text style={styles.emptyDescription}>You have no records of cancelled document requests.</Text>
                   </View>
                 )
               )}
@@ -486,7 +541,7 @@ export default function StudentDocumentStatusScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
-              You are about to cancel your request for {selectedDoc?.type}. It will move to your Completed
+              You are about to cancel your request for {selectedDoc?.type}. It will move to your Cancelled
               requests — you&apos;re welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
@@ -543,7 +598,7 @@ function DocumentListItem({
   completed: boolean;
   onPress: () => void;
 }) {
-  const meta = STATUS_META[doc.status];
+  const meta = getDetailStatusMeta(doc.status);
   return (
     <Pressable style={[styles.listCard, completed && styles.listCardCompleted]} onPress={onPress}>
       <View style={styles.listCardHeader}>
@@ -608,7 +663,7 @@ function DocumentDetail({
   requirements: DocumentRequirement[];
   reqLoading: boolean;
 }) {
-  const meta = STATUS_META[doc.status];
+  const meta = getDetailStatusMeta(doc.status);
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
 
   return (

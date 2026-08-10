@@ -9,6 +9,7 @@ import "./prof-documents.css";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaTomorrowDateString } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
+import { getDocStatusHubMeta } from "../../utils/documentStatus";
 
 import { ChevronLeft, XCircle, FileText } from "lucide-react";
 
@@ -57,34 +58,6 @@ const AlertCircleIcon = () => (
     <circle cx="12" cy="16" r="0.7" fill="currentColor" stroke="none" />
   </svg>
 );
-
-// ─── Status helpers ──────────────────────────────────────────────────────
-// The faculty document-requests endpoint returns the raw DB enum ("generated")
-// instead of the translated API word ("ready") that the student/admin endpoints
-// use — see server/utils/documentStatus.js. Badge class + display label are
-// mapped separately here so the badge still reads "READY" (not "GENERATED").
-const getStatusColor = (status) => {
-  switch (status) {
-    case "pending":
-      return "doc-badge-pending";
-    case "processing":
-      return "doc-badge-processing";
-    case "generated":
-      return "doc-badge-ready";
-    case "released":
-      return "doc-badge-released";
-    case "claimed":
-      return "doc-badge-claimed";
-    case "rejected":
-      return "doc-badge-rejected";
-    case "cancelled":
-      return "doc-badge-cancelled";
-    default:
-      return "doc-badge-pending";
-  }
-};
-
-const getStatusLabel = (status) => (status === "generated" ? "ready" : status);
 
 // ─── Main Component ──────────────────────────────────────────────────────
 export default function ProfessorDocumentRequest() {
@@ -508,8 +481,8 @@ export default function ProfessorDocumentRequest() {
                         </div>
                         <div className="doc-card-header-right">
                           <span className="doc-tracking-pill">{req.trackingNumber}</span>
-                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
-                            {getStatusLabel(req.status)}
+                          <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
+                            {getDocStatusHubMeta(req.status).label}
                           </span>
                         </div>
                       </div>
@@ -631,8 +604,8 @@ export default function ProfessorDocumentRequest() {
                         </div>
                         <div className="doc-card-header-right">
                           <span className="doc-tracking-pill">{req.trackingNumber}</span>
-                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
-                            {getStatusLabel(req.status)}
+                          <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
+                            {getDocStatusHubMeta(req.status).label}
                           </span>
                         </div>
                       </div>
@@ -683,8 +656,8 @@ export default function ProfessorDocumentRequest() {
                         </div>
                         <div className="doc-card-header-right">
                           <span className="doc-tracking-pill">{req.trackingNumber}</span>
-                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
-                            {getStatusLabel(req.status)}
+                          <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
+                            {getDocStatusHubMeta(req.status).label}
                           </span>
                         </div>
                       </div>
@@ -735,8 +708,8 @@ export default function ProfessorDocumentRequest() {
                         </div>
                         <div className="doc-card-header-right">
                           <span className="doc-tracking-pill">{req.trackingNumber}</span>
-                          <span className={`doc-badge ${getStatusColor(req.status)}`}>
-                            {getStatusLabel(req.status)}
+                          <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
+                            {getDocStatusHubMeta(req.status).label}
                           </span>
                         </div>
                       </div>

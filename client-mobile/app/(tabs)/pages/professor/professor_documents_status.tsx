@@ -23,6 +23,7 @@ import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import { DocStatus, getDetailStatusMeta } from '@/utils/documentStatus';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/coams_logo.png');
@@ -106,8 +107,6 @@ function CoamsLogo({
 // full detail view (hero, request details, notes, tracking number, cancel),
 // and the "opened from the request page" back-navigation behavior. IDs match
 // the demo set in professor_documents.tsx so a tap-through from there resolves. ───
-type DocStatus = 'pending' | 'processing' | 'generated' | 'released' | 'claimed' | 'rejected' | 'cancelled';
-
 interface DocumentRecord {
   id: string;
   type: string;
@@ -147,16 +146,6 @@ const navItems: NavItem[] = [
   { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
   { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
 ];
-
-const STATUS_META: Record<DocStatus, { label: string; bg: string; border: string; color: string }> = {
-  pending: { label: 'Pending', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
-  processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
-  generated: { label: 'Ready for Pickup', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
-  released: { label: 'Released', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  rejected: { label: 'Rejected', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-  cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-};
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '—';
@@ -674,7 +663,7 @@ function DocumentListItem({
   variant: TabKey;
   onPress: () => void;
 }) {
-  const meta = STATUS_META[doc.status];
+  const meta = getDetailStatusMeta(doc.status);
   const completed = variant !== 'active';
   return (
     <Pressable style={[styles.listCard, completed && styles.listCardCompleted]} onPress={onPress}>
@@ -752,7 +741,7 @@ function DocumentDetail({
   requirements: DocumentRequirement[];
   reqLoading: boolean;
 }) {
-  const meta = STATUS_META[doc.status];
+  const meta = getDetailStatusMeta(doc.status);
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
 
   return (

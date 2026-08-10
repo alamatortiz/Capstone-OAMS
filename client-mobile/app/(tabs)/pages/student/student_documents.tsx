@@ -23,6 +23,7 @@ import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { connectSocket } from '@/utils/socket';
+import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/coams_logo.png');
@@ -71,8 +72,6 @@ function CoamsLogo({
   );
 }
 
-type DocStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled';
-
 interface DocumentRequest {
   id: string;
   type: string;
@@ -107,16 +106,6 @@ interface DocumentTypeOption {
   requirements: DocumentRequirement[];
 }
 
-const STATUS_META: Record<DocStatus, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
-  pending: { label: 'pending', icon: 'time-outline', bg: 'rgba(251, 191, 36, 0.15)', border: 'rgba(251, 191, 36, 0.35)', color: '#f59e0b' },
-  processing: { label: 'processing', icon: 'alert-circle-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
-  ready: { label: 'ready', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  released: { label: 'released', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  claimed: { label: 'claimed', icon: 'checkmark-circle-outline', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
-  rejected: { label: 'rejected', icon: 'close-circle-outline', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-  cancelled: { label: 'cancelled', icon: 'close-circle-outline', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-};
-
 const formatDateLong = (dateString?: string) => {
   if (!dateString) return '—';
   return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -142,7 +131,14 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
 ];
 
-type ActiveTab = 'active' | 'completed';
+const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
+type TabKey = (typeof TABS)[number];
+const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
+  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
+  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
+  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+};
 type SelectField = 'college' | 'type' | null;
 
 export default function StudentDocumentsScreen() {
@@ -158,7 +154,7 @@ export default function StudentDocumentsScreen() {
   const [documents, setDocuments] = useState<DocumentRequest[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docsError, setDocsError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('active');
+  const [activeTab, setActiveTab] = useState<TabKey>('active');
 
   const [collegesFromDB, setCollegesFromDB] = useState<CollegeOption[]>([]);
   const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, DocumentTypeOption[]>>({});
@@ -261,9 +257,15 @@ export default function StudentDocumentsScreen() {
   const activeDocuments = documents.filter(
     (doc) => doc.status !== 'claimed' && doc.status !== 'rejected' && doc.status !== 'cancelled',
   );
-  const completedDocuments = documents.filter(
-    (doc) => doc.status === 'claimed' || doc.status === 'rejected' || doc.status === 'cancelled',
-  );
+  const claimedDocuments = documents.filter((doc) => doc.status === 'claimed');
+  const rejectedDocuments = documents.filter((doc) => doc.status === 'rejected');
+  const cancelledDocuments = documents.filter((doc) => doc.status === 'cancelled');
+  const tabCounts: Record<TabKey, number> = {
+    active: activeDocuments.length,
+    claimed: claimedDocuments.length,
+    rejected: rejectedDocuments.length,
+    cancelled: cancelledDocuments.length,
+  };
 
   const openDialog = () => {
     setFormData({ type: '', college: '', copies: '1', purpose: '', neededBy: '' });
@@ -337,7 +339,7 @@ export default function StudentDocumentsScreen() {
   };
 
   const renderDocumentCard = (doc: DocumentRequest, completed: boolean) => {
-    const meta = STATUS_META[doc.status];
+    const meta = getHubStatusMeta(doc.status);
     return (
       <Pressable key={doc.id} onPress={() => goToDocumentStatus(doc)} style={[styles.docCard, completed && styles.docCardCompleted]}>
         <View style={styles.docCardHeader}>
@@ -464,18 +466,23 @@ export default function StudentDocumentsScreen() {
           </Pressable>
 
           {/* Tabs */}
-          <View style={styles.tabsRow}>
-            <Pressable style={[styles.tab, activeTab === 'active' && styles.tabActive]} onPress={() => setActiveTab('active')}>
-              <Ionicons name="alert-circle-outline" size={15} color={activeTab === 'active' ? theme.orange : theme.subtext} />
-              <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>Active Requests</Text>
-              <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{activeDocuments.length}</Text></View>
-            </Pressable>
-            <Pressable style={[styles.tab, activeTab === 'completed' && styles.tabActive]} onPress={() => setActiveTab('completed')}>
-              <Ionicons name="checkmark-circle-outline" size={15} color={activeTab === 'completed' ? theme.orange : theme.subtext} />
-              <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive]}>Completed</Text>
-              <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{completedDocuments.length}</Text></View>
-            </Pressable>
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsRow}
+            contentContainerStyle={{ gap: 8 }}
+          >
+            {TABS.map((tab) => {
+              const active = activeTab === tab;
+              return (
+                <Pressable key={tab} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab)}>
+                  <Ionicons name={TAB_META[tab].icon} size={15} color={active ? theme.orange : theme.subtext} />
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_META[tab].label}</Text>
+                  <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabCounts[tab]}</Text></View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
           {docsError && (
             <View style={styles.emptyCard}>
@@ -511,18 +518,52 @@ export default function StudentDocumentsScreen() {
             </View>
           )}
 
-          {/* Completed Tab */}
-          {!docsLoading && !docsError && activeTab === 'completed' && (
+          {/* Claimed Tab */}
+          {!docsLoading && !docsError && activeTab === 'claimed' && (
             <View style={styles.tabPanel}>
-              {completedDocuments.length === 0 ? (
+              {claimedDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
-                  <Text style={styles.emptyTitle}>No completed requests</Text>
-                  <Text style={styles.emptyDescription}>Your completed and rejected requests will appear here</Text>
+                  <Text style={styles.emptyTitle}>No Completed Requests</Text>
+                  <Text style={styles.emptyDescription}>You have no records of claimed documents.</Text>
                 </View>
               ) : (
                 <View style={styles.docsList}>
-                  {completedDocuments.map((doc) => renderDocumentCard(doc, true))}
+                  {claimedDocuments.map((doc) => renderDocumentCard(doc, true))}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Rejected Tab */}
+          {!docsLoading && !docsError && activeTab === 'rejected' && (
+            <View style={styles.tabPanel}>
+              {rejectedDocuments.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>No Rejected Requests</Text>
+                  <Text style={styles.emptyDescription}>You have no records of rejected document requests.</Text>
+                </View>
+              ) : (
+                <View style={styles.docsList}>
+                  {rejectedDocuments.map((doc) => renderDocumentCard(doc, true))}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Cancelled Tab */}
+          {!docsLoading && !docsError && activeTab === 'cancelled' && (
+            <View style={styles.tabPanel}>
+              {cancelledDocuments.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
+                  <Text style={styles.emptyDescription}>You have no records of cancelled document requests.</Text>
+                </View>
+              ) : (
+                <View style={styles.docsList}>
+                  {cancelledDocuments.map((doc) => renderDocumentCard(doc, true))}
                 </View>
               )}
             </View>
@@ -753,7 +794,7 @@ export default function StudentDocumentsScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
-              You are about to cancel your request for {cancelTarget?.type}. It will move to your Completed
+              You are about to cancel your request for {cancelTarget?.type}. It will move to your Cancelled
               requests — you&apos;re welcome to submit a new one if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
@@ -944,7 +985,7 @@ function createStyles(theme: ThemePalette) {
       flexDirection: 'row', alignItems: 'center', gap: 4,
       paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, flexShrink: 0,
     },
-    statusBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+    statusBadgeText: { fontSize: 10, fontWeight: '700' },
 
     docFieldsGrid: { gap: 10 },
     docField: { gap: 3 },

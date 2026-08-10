@@ -17,6 +17,7 @@ import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
+import { getDocStatusDetailMeta } from "../../utils/documentStatus";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 
@@ -28,23 +29,6 @@ const CheckCircleIcon = () => (
 );
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-// The faculty document-requests endpoint returns the raw DB enum ("generated")
-// instead of the translated API word ("ready") that student/admin endpoints use
-// — see server/utils/documentStatus.js — so "generated" is used here as the
-// ready-for-pickup key. Label text still reads "Ready" either way.
-const getStatusMeta = (status) => {
-  switch (status) {
-    case "pending":    return { label: "Pending",    cls: "dss-badge-pending" };
-    case "processing": return { label: "Processing", cls: "dss-badge-processing" };
-    case "generated":  return { label: "Ready",      cls: "dss-badge-ready" };
-    case "released":   return { label: "Released",   cls: "dss-badge-released" };
-    case "claimed":    return { label: "Claimed",    cls: "dss-badge-claimed" };
-    case "rejected":   return { label: "Rejected",   cls: "dss-badge-rejected" };
-    case "cancelled":  return { label: "Cancelled",  cls: "dss-badge-cancelled" };
-    default:           return { label: status,       cls: "dss-badge-pending" };
-  }
-};
-
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";
   return formatManilaDate(dateStr, {
@@ -66,7 +50,7 @@ const formatDateShort = (dateStr) => {
 // ─── Detail View ──────────────────────────────────────────────────────────────
 function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Documents", requirements, reqLoading }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const statusMeta = getStatusMeta(doc.status);
+  const statusMeta = getDocStatusDetailMeta(doc.status);
   const canCancel = doc.status === "pending" || doc.status === "processing";
 
   return (
@@ -564,7 +548,7 @@ export default function ProfessorDocumentStatus() {
                   <div className="dss-list-container">
                     {activeDocuments.length > 0 ? (
                       activeDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
@@ -638,7 +622,7 @@ export default function ProfessorDocumentStatus() {
                   <div className="dss-list-container">
                     {claimedDocuments.length > 0 ? (
                       claimedDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
@@ -690,7 +674,7 @@ export default function ProfessorDocumentStatus() {
                   <div className="dss-list-container">
                     {rejectedDocuments.length > 0 ? (
                       rejectedDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
@@ -734,7 +718,7 @@ export default function ProfessorDocumentStatus() {
                   <div className="dss-list-container">
                     {cancelledDocuments.length > 0 ? (
                       cancelledDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}

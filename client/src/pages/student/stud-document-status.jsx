@@ -18,6 +18,7 @@ import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
+import { getDocStatusDetailMeta } from "../../utils/documentStatus";
 import "./stud-document-status.css";
 
 const CheckCircleIcon = () => (
@@ -28,19 +29,6 @@ const CheckCircleIcon = () => (
 );
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const getStatusMeta = (status) => {
-  switch (status) {
-    case "pending":    return { label: "Pending",    cls: "dss-badge-pending" };
-    case "processing": return { label: "Processing", cls: "dss-badge-processing" };
-    case "ready":      return { label: "Ready",      cls: "dss-badge-ready" };
-    case "released":   return { label: "Released",   cls: "dss-badge-released" };
-    case "claimed":    return { label: "Claimed",    cls: "dss-badge-claimed" };
-    case "rejected":   return { label: "Rejected",   cls: "dss-badge-rejected" };
-    case "cancelled":  return { label: "Cancelled",  cls: "dss-badge-cancelled" };
-    default:           return { label: status,       cls: "dss-badge-pending" };
-  }
-};
-
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";
   return formatManilaDate(dateStr, {
@@ -62,7 +50,7 @@ const formatDateShort = (dateStr) => {
 // ─── Detail View ──────────────────────────────────────────────────────────────
 function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Documents", requirements, reqLoading }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const statusMeta = getStatusMeta(doc.status);
+  const statusMeta = getDocStatusDetailMeta(doc.status);
   const canCancel = doc.status === "pending" || doc.status === "processing";
 
   return (
@@ -541,7 +529,7 @@ export default function DocumentStatusPage() {
                   <div className="dss-list-container">
                     {activeDocuments.length > 0 ? (
                       activeDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
@@ -615,7 +603,7 @@ export default function DocumentStatusPage() {
                   <div className="dss-list-container">
                     {claimedDocuments.length > 0 ? (
                       claimedDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
@@ -667,7 +655,7 @@ export default function DocumentStatusPage() {
                   <div className="dss-list-container">
                     {rejectedDocuments.length > 0 ? (
                       rejectedDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
@@ -711,7 +699,7 @@ export default function DocumentStatusPage() {
                   <div className="dss-list-container">
                     {cancelledDocuments.length > 0 ? (
                       cancelledDocuments.map((doc) => {
-                        const statusMeta = getStatusMeta(doc.status);
+                        const statusMeta = getDocStatusDetailMeta(doc.status);
                         return (
                           <div
                             key={doc.id}
