@@ -194,7 +194,7 @@ export default function StudentNotifications() {
             <div className="notif-empty-state">
               <Bell />
               <h3>No Notifications</h3>
-              <p>You're all caught up.</p>
+              <p>You're all caught up</p>
             </div>
           ) : (
             notifications.map((n) => {

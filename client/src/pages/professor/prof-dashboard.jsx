@@ -60,24 +60,6 @@ const ClockIcon = () => (
     <polyline points="12 6 12 12 16 14"></polyline>
   </svg>
 );
-const FileEditIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-    <line x1="12" y1="18" x2="12" y2="12"></line>
-    <line x1="9" y1="15" x2="15" y2="15"></line>
-  </svg>
-);
-const CalendarClockIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-    <line x1="16" y1="2" x2="16" y2="6"></line>
-    <line x1="8" y1="2" x2="8" y2="6"></line>
-    <line x1="3" y1="10" x2="21" y2="10"></line>
-    <circle cx="17" cy="17" r="3"></circle>
-    <polyline points="17 15.5 17 17 18 18"></polyline>
-  </svg>
-);
 const MegaphoneIcon = () => <Megaphone className="icon" />;
 
 export default function ProfessorDashboard() {
@@ -263,14 +245,14 @@ export default function ProfessorDashboard() {
     {
       label: "Schedule Manager",
       description: "Set your consultation hours",
-      icon: CalendarClockIcon,
+      icon: CalendarIcon,
       path: "/professor/schedule-manager",
       badge: "Schedule",
     },
     {
       label: "Document Request",
       description: "Submit a new document request",
-      icon: FileEditIcon,
+      icon: FileText,
       path: "/professor/document-request",
       badge: "Documents",
     },
@@ -364,7 +346,7 @@ export default function ProfessorDashboard() {
             <div className="appointments-preview-card">
               <div className="card-header">
                 <h3 className="card-title">
-                  <CalendarClockIcon />
+                  <CalendarIcon />
                   Today's Appointments
                 </h3>
                 <Link to="/professor/appointments" className="view-all-btn">
@@ -377,7 +359,7 @@ export default function ProfessorDashboard() {
                 ) : todayAppointments.length === 0 ? (
                   <div className="empty-content">
                     <div className="empty-icon">
-                      <CalendarClockIcon />
+                      <CalendarIcon />
                     </div>
                     <p>No appointments scheduled for today.</p>
                   </div>
@@ -386,7 +368,7 @@ export default function ProfessorDashboard() {
                     {todayAppointments.slice(0, 3).map((apt) => (
                       <div key={apt.id} className="appointment-item">
                         <div className="appointment-icon">
-                          <CalendarClockIcon />
+                          <CalendarIcon />
                         </div>
                         <div className="appointment-details">
                           <p className="appointment-student">{apt.student}</p>
@@ -425,7 +407,12 @@ export default function ProfessorDashboard() {
               </div>
               <div className="card-content announcements-content">
                 {allPinnedAnnouncements.length === 0 ? (
-                  <p className="announcement-empty">No pinned announcements.</p>
+                  <div className="empty-content">
+                    <div className="empty-icon">
+                      <MegaphoneIcon />
+                    </div>
+                    <p>No pinned announcements</p>
+                  </div>
                 ) : (
                   pinnedPreview.map((ann) => (
                     <Link
@@ -476,31 +463,29 @@ export default function ProfessorDashboard() {
               </Link>
             </div>
             <div className="activity-card">
-              <div className="card-content">
-                <div className="activity-list">
-                  {loading ? (
-                    <p className="activity-loading">Loading...</p>
-                  ) : recentActivity.length === 0 ? (
-                    <p className="activity-empty">No recent activity.</p>
-                  ) : (
-                    recentActivity.map((item) => (
-                      <div key={item.id} className="activity-item">
-                        <div className="activity-icon activity-appointment">
-                          <CalendarClockIcon />
-                        </div>
-                        <div className="activity-details">
-                          <p className="activity-title">{item.title}</p>
-                          <p className="activity-time">{item.time}</p>
-                        </div>
-                        <span
-                          className={`appt-status-badge appt-status-badge--${item.status}`}
-                        >
-                          {item.status}
-                        </span>
+              <div className="activity-list">
+                {loading ? (
+                  <p className="activity-loading">Loading...</p>
+                ) : recentActivity.length === 0 ? (
+                  <p className="activity-empty">No recent activity.</p>
+                ) : (
+                  recentActivity.map((item) => (
+                    <div key={item.id} className="activity-item">
+                      <div className="activity-icon activity-appointment">
+                        <CalendarIcon />
                       </div>
-                    ))
-                  )}
-                </div>
+                      <div className="activity-details">
+                        <p className="activity-title">{item.title}</p>
+                        <p className="activity-time">{item.time}</p>
+                      </div>
+                      <span
+                        className={`appt-status-badge appt-status-badge--${item.status}`}
+                      >
+                        {item.status}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </section>

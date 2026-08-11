@@ -540,7 +540,7 @@ body {
 
 .tx-empty-state {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 1rem;
   padding: 3rem 1.5rem;
   text-align: center;

@@ -13,7 +13,7 @@ import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
 import { getDocStatusHubMeta } from "../../utils/documentStatus";
 
-import { ChevronLeft, XCircle, FileText } from "lucide-react";
+import { ChevronLeft, XCircle, FileText, CheckCircle2 } from "lucide-react";
 
 // ─── Document Object Structure (JSDoc) ────────────────────────────────────
 /**
@@ -50,13 +50,6 @@ const DownloadIcon = () => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
     <polyline points="7 10 12 15 17 10"></polyline>
     <line x1="12" y1="15" x2="12" y2="3"></line>
-  </svg>
-);
-
-const CheckCircleIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
 
@@ -465,7 +458,7 @@ export default function DocumentsPage() {
                 className={`doc-tab ${activeTab === "claimed" ? "active" : ""}`}
                 onClick={() => setActiveTab("claimed")}
               >
-                <CheckCircleIcon /> Claimed <span className="doc-tab-count">{claimedDocuments.length}</span>
+                <CheckCircle2 /> Claimed <span className="doc-tab-count">{claimedDocuments.length}</span>
               </button>
               <button
                 className={`doc-tab ${activeTab === "rejected" ? "active" : ""}`}
@@ -593,7 +586,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <FileText />
                     <h3>No Active Requests</h3>
-                    <p>You have no active document requests.</p>
+                    <p>You have no active document requests</p>
                   </div>
                 )}
               </div>
@@ -656,9 +649,9 @@ export default function DocumentsPage() {
                   </div>
                 ) : (
                   <div className="doc-empty-state">
-                    <CheckCircleIcon />
+                    <CheckCircle2 />
                     <h3>No Completed Requests</h3>
-                    <p>You have no records of claimed documents.</p>
+                    <p>You have no records of claimed documents</p>
                   </div>
                 )}
               </div>
@@ -716,7 +709,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <XCircleIcon />
                     <h3>No Rejected Requests</h3>
-                    <p>You have no records of rejected document requests.</p>
+                    <p>You have no records of rejected document requests</p>
                   </div>
                 )}
               </div>
@@ -774,7 +767,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <XCircleIcon />
                     <h3>No Cancelled Requests</h3>
-                    <p>You have no records of cancelled document requests.</p>
+                    <p>You have no records of cancelled document requests</p>
                   </div>
                 )}
               </div>

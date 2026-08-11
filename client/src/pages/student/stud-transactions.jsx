@@ -407,7 +407,7 @@ export default function TransactionsPage() {
               <div className="tx-empty-state">
                 <ClipboardListIcon />
                 <h3>No Transactions Found</h3>
-                <p>You have no transaction records yet.</p>
+                <p>You have no transaction records yet</p>
               </div>
             ) : (
               transactions.map((transaction) => (

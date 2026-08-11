@@ -268,12 +268,12 @@ export default function AnnouncementsPage() {
 
   // ── Per-tab empty state copy ────────────────────────────────────────────
   const emptyStateCopy = {
-    pinned: { title: "No Pinned Announcements", description: "There are no pinned announcements yet." },
-    all: { title: "No Announcements Found", description: "There are no announcements yet." },
-    important: { title: "No Important Announcements Found", description: "There are no important announcements yet." },
-    event: { title: "No Event Announcements Found", description: "There are no event announcements yet." },
-    reminder: { title: "No Reminder Announcements Found", description: "There are no reminder announcements yet." },
-    general: { title: "No General Announcements Found", description: "There are no general announcements yet." },
+    pinned: { title: "No Pinned Announcements", description: "There are no pinned announcements yet" },
+    all: { title: "No Announcements Found", description: "There are no announcements yet" },
+    important: { title: "No Important Announcements Found", description: "There are no important announcements yet" },
+    event: { title: "No Event Announcements Found", description: "There are no event announcements yet" },
+    reminder: { title: "No Reminder Announcements Found", description: "There are no reminder announcements yet" },
+    general: { title: "No General Announcements Found", description: "There are no general announcements yet" },
   };
   const currentEmptyState = emptyStateCopy[selectedFilter] ?? emptyStateCopy.all;
 

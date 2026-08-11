@@ -852,7 +852,7 @@ export default function QueueStatusPage() {
                     <Users className="queue-empty-icon" />
                     <h3 className="queue-empty-title">Not Participating in Any Queues</h3>
                     <p className="queue-empty-text">
-                      You are not participating in any active queues.
+                      You are not participating in any active queues
                     </p>
                     <button
                       onClick={() => navigate("/student/queue")}

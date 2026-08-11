@@ -121,19 +121,6 @@ const ActivityIcon = () => (
   </svg>
 );
 const GraduationCapIcon = () => <LucideGraduationCap className="icon" />;
-const TimerIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="13" r="8"></circle>
-    <path d="M12 9v4l3 2"></path>
-    <path d="M7 2h10"></path>
-  </svg>
-);
 const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
 
 const formatActivityStatus = (status, type) => {
@@ -419,7 +406,7 @@ export default function StudentDashboard() {
   const quickActions = [
     {
       title: "Announcements",
-      description: "Stay updated with the latest notices from your department.",
+      description: "Stay updated with the latest notices from your department",
       icon: MegaphoneIcon,
       link: "/student/announcements",
       gradient: "from-violet-500 to-purple-600",
@@ -428,7 +415,7 @@ export default function StudentDashboard() {
     {
       title: "Appointment Booking",
       description:
-        "Schedule appointments with professors and view available slots.",
+        "Schedule appointments with professors and view available slots",
       icon: CalendarIcon,
       link: "/student/appointments",
       gradient: "from-indigo-500 to-purple-600",
@@ -436,14 +423,14 @@ export default function StudentDashboard() {
     {
       title: "Queue Tracking",
       description:
-        "View detailed analytics and history of all your queue activities.",
+        "View detailed analytics and history of all your queue activities",
       icon: ActivityIcon,
       link: "/student/queue-tracking",
       gradient: "from-cyan-500 to-blue-600",
     },
     {
       title: "Professor Schedules",
-      description: "Check professor consultation hours and availability across all departments.",
+      description: "Check professor consultation hours and availability across all departments",
       icon: GraduationCapIcon,
       link: "/student/professor-schedules",
       gradient: "from-sky-500 to-blue-600",
@@ -565,7 +552,7 @@ export default function StudentDashboard() {
               <div className="queue-preview-card">
                 <div className="card-header">
                   <h3 className="dash-card-title">
-                    <TimerIcon />
+                    <QueueIconNav />
                     Active Queue
                   </h3>
                   <Link to="/student/queue-status" className="view-all-btn">
@@ -650,13 +637,13 @@ export default function StudentDashboard() {
               <div className="queue-preview-card empty">
                 <div className="card-header">
                   <h3 className="dash-card-title">
-                    <TimerIcon />
+                    <QueueIconNav />
                     Active Queue
                   </h3>
                 </div>
                 <div className="card-content empty-content">
                   <div className="empty-icon">
-                    <ClockIcon />
+                    <QueueIconNav />
                   </div>
                   <p>No Active Queues</p>
                 </div>
@@ -682,9 +669,12 @@ export default function StudentDashboard() {
                 ) : announcementsError ? (
                   <p className="announcement-empty">{announcementsError}</p>
                 ) : allPinnedAnnouncements.length === 0 ? (
-                  <p className="announcement-empty">
-                    No pinned announcements.
-                  </p>
+                  <div className="empty-content">
+                    <div className="empty-icon">
+                      <MegaphoneIcon />
+                    </div>
+                    <p>No pinned announcements</p>
+                  </div>
                 ) : (
                   pinnedPreview.map((ann) => (
                     <Link
@@ -746,7 +736,7 @@ export default function StudentDashboard() {
                 </div>
               ) : recentActivity.length === 0 ? (
                 <div className="activity-list">
-                  <p className="activity-empty">No recent activity yet.</p>
+                  <p className="activity-empty">No recent activity yet</p>
                 </div>
               ) : (
                 <div className="activity-list">
@@ -808,7 +798,7 @@ export default function StudentDashboard() {
                   </button>
                 </p>
               ) : !officeHours ? (
-                <p className="stud-hours-empty">No office hours available.</p>
+                <p className="stud-hours-empty">No office hours available</p>
               ) : (
                 <>
                   <div className="stud-hours-schedule">

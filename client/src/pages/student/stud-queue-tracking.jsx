@@ -272,7 +272,7 @@ export default function QueueTrackingPage() {
                     <Users className="qt-empty-icon" />
                     <h3 className="qt-empty-title">No Active Queues</h3>
                     <p className="qt-empty-description">
-                      You are not participating in any active queues.
+                      You are not participating in any active queues
                     </p>
                     <Link
                       to="/student/queue"
@@ -467,7 +467,7 @@ export default function QueueTrackingPage() {
                     <History className="qt-empty-icon" />
                     <h3 className="qt-empty-title">No Queue History Records</h3>
                     <p className="qt-empty-description">
-                      No queueing records yet.
+                      No queueing records yet
                     </p>
                   </div>
                 ) : (

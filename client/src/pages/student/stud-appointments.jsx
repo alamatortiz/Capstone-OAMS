@@ -14,7 +14,7 @@ import CalendarGrid from "../../components/CalendarGrid";
 import { useAuth } from "../../context/AuthContext";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
-import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -58,13 +58,6 @@ const UsersIcon = () => (
 const ChevronRightIcon = () => (
   <svg className="appointment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="9 18 15 12 9 6"></polyline>
-  </svg>
-);
-
-const CheckCircleIcon = () => (
-  <svg className="appointment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
 
@@ -622,7 +615,7 @@ export default function AppointmentsPage() {
               ) : slotsError ? (
                 <div className="appt-empty-state"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
               ) : availableSlots.length === 0 ? (
-                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published their consultation hours yet."}</p></div>
+                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published their consultation hours yet"}</p></div>
               ) : selectedDate ? (
                 <div className="week-section">
                   <div className="week-section-header">
@@ -655,9 +648,9 @@ export default function AppointmentsPage() {
               {bookingsLoading ? (
                 <div className="appt-empty-state appt-empty-state--card"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading your appointments…</h3></div>
               ) : bookingsError ? (
-                <div className="appt-empty-state appt-empty-state--card"><CheckCircleIcon /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
+                <div className="appt-empty-state appt-empty-state--card"><CheckCircle2 className="appointment-icon" /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
               ) : activeBookings.length === 0 ? (
-                <div className="appt-empty-state appt-empty-state--card"><CheckCircleIcon /><h3>No Appointments Booked</h3><p>You have no active appointments yet.</p></div>
+                <div className="appt-empty-state appt-empty-state--card"><CheckCircle2 className="appointment-icon" /><h3>No Appointments Booked</h3><p>You have no active appointments yet</p></div>
               ) : (
                 <div className="bookings-list">
                   {sortedActiveBookings.map((booking) => (

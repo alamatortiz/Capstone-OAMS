@@ -569,7 +569,7 @@ export default function DocumentStatusPage() {
                         <FileText className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Active Requests</h3>
                         <p className="dss-empty-text">
-                          You have no active document requests.
+                          You have no active document requests
                         </p>
                         <button
                           onClick={() => navigate("/student/documents")}
@@ -637,7 +637,7 @@ export default function DocumentStatusPage() {
                         <CheckCircle2 className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Completed Requests</h3>
                         <p className="dss-empty-text">
-                          You have no records of claimed documents.
+                          You have no records of claimed documents
                         </p>
                       </div>
                     )}
@@ -681,7 +681,7 @@ export default function DocumentStatusPage() {
                         <XCircle className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Rejected Requests</h3>
                         <p className="dss-empty-text">
-                          You have no records of rejected document requests.
+                          You have no records of rejected document requests
                         </p>
                       </div>
                     )}
@@ -725,7 +725,7 @@ export default function DocumentStatusPage() {
                         <XCircle className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Cancelled Requests</h3>
                         <p className="dss-empty-text">
-                          You have no records of cancelled document requests.
+                          You have no records of cancelled document requests
                         </p>
                       </div>
                     )}

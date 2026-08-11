@@ -456,10 +456,10 @@ export default function AppointmentStatusPage() {
                       </h3>
                       <p className="apst-empty-text">
                         {activeTab === "all"
-                          ? "You have no active appointments yet."
+                          ? "You have no active appointments yet"
                           : activeTab === "pending"
-                            ? "You have no records of pending appointments."
-                            : `You have no records of ${activeTab} appointments.`}
+                            ? "You have no records of pending appointments"
+                            : `You have no records of ${activeTab} appointments`}
                       </p>
                       {(activeTab === "all" || activeTab === "pending") && (
                         <button

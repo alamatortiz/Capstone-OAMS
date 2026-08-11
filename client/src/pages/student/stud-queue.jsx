@@ -709,7 +709,7 @@ export default function QueuePage() {
                       <CheckCircle2 className="no-queues-icon" />
                       <h3 className="no-queues-title">Not Participating in Any Queues</h3>
                       <p className="no-queues-description">
-                        You are not participating in any active queues.
+                        You are not participating in any active queues
                       </p>
                     </div>
                   )}
@@ -874,8 +874,8 @@ export default function QueuePage() {
                       <h3 className="no-queues-title">No Active Queues</h3>
                       <p className="no-queues-description">
                         {(selectedCollege !== 'all' || selectedService !== 'all')
-                          ? 'Try adjusting your filters.'
-                          : 'There are no open queues yet.'}
+                          ? 'Try adjusting your filters'
+                          : 'There are no open queues yet'}
                       </p>
                     </div>
                   )}

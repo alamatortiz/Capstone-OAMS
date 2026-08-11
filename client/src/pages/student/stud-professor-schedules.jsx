@@ -267,7 +267,7 @@ export default function ProfessorSchedule() {
               {departments.length === 0 ? (
                 <div className="empty-state">
                   <AlertCircle />
-                  <p>No faculty schedules are available yet.</p>
+                  <p>No faculty schedules are available yet</p>
                 </div>
               ) : (
                 departments.map((dept) => {
@@ -332,7 +332,7 @@ export default function ProfessorSchedule() {
                   {(selectedDepartment.faculty?.length ?? 0) === 0 ? (
                     <div className="empty-state">
                       <AlertCircle />
-                      <p>No faculty members found for this department.</p>
+                      <p>No faculty members found for this department</p>
                     </div>
                   ) : (
                     selectedDepartment.faculty.map((professor) => {
@@ -385,7 +385,7 @@ export default function ProfessorSchedule() {
                             </div>
                           ) : getDaySchedules(professor).length === 0 ? (
                             <p style={{ opacity: 0.6, fontSize: "0.85rem" }}>
-                              No consultation hours have been set yet.
+                              No consultation hours have been set yet
                             </p>
                           ) : (
                             <div className="schedule-list">
