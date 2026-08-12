@@ -333,26 +333,6 @@ export default function StudentQueueStatusScreen() {
                 </View>
               </View>
 
-              {/* Queue Tracking link */}
-              <Pressable
-                style={styles.trackingBtn}
-                onPress={() =>
-                  router.push({
-                    pathname: '/pages/student/student_queue_tracking',
-                    params: { from: 'queue-status' },
-                  })
-                }
-              >
-                <LinearGradient colors={['#3b82f6', '#6366f1']} style={styles.trackingIconBox}>
-                  <Ionicons name="pulse-outline" size={20} color="#ffffff" />
-                </LinearGradient>
-                <View style={styles.trackingTextWrap}>
-                  <Text style={styles.trackingTitle}>Queue Tracking</Text>
-                  <Text style={styles.trackingSubtitle}>Monitor your active queue positions in real-time</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={theme.blue} />
-              </Pressable>
-
               {/* Queue List */}
               {queues.length > 0 ? (
                 <View style={styles.queueList}>
@@ -1142,40 +1122,6 @@ function createStyles(theme: ThemePalette) {
       fontSize: 12,
       color: theme.subtext,
       marginTop: 3,
-    },
-
-    // Queue tracking link
-    trackingBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: theme.cardAlt,
-      borderWidth: 1,
-      borderColor: 'rgba(59, 130, 246, 0.3)',
-      borderRadius: 16,
-      padding: 14,
-    },
-    trackingIconBox: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    trackingTextWrap: {
-      flex: 1,
-      gap: 3,
-    },
-    trackingTitle: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.blue,
-    },
-    trackingSubtitle: {
-      fontSize: 11,
-      color: theme.tertiary,
-      lineHeight: 15,
     },
 
     // List cards

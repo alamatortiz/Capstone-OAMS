@@ -489,7 +489,11 @@ export default function AdminQueueHostingScreen() {
               <Text style={styles.sectionTitle}>Active Queue Lines</Text>
               <View style={styles.queueList}>
                 {activeQueues.map((queue) => (
-                  <View key={queue.id} style={[styles.queueCard, styles.queueCardActive]}>
+                  <Pressable
+                    key={queue.id}
+                    style={[styles.queueCard, styles.queueCardActive]}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                  >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
@@ -545,20 +549,20 @@ export default function AdminQueueHostingScreen() {
                     <View style={styles.queueActionsRow}>
                       <Pressable
                         style={[styles.queueActionBtn, styles.queueActionBtnWarning]}
-                        onPress={() => handlePauseQueue(queue.id)}
+                        onPress={(e) => { e.stopPropagation(); handlePauseQueue(queue.id); }}
                       >
                         <Ionicons name="pause-outline" size={14} color="#f59e0b" />
                         <Text style={[styles.queueActionBtnText, { color: '#f59e0b' }]}>Pause</Text>
                       </Pressable>
                       <Pressable
                         style={[styles.queueActionBtn, styles.queueActionBtnDanger]}
-                        onPress={() => handleCloseQueue(queue.id)}
+                        onPress={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                       >
                         <Ionicons name="close-outline" size={14} color="#ef4444" />
                         <Text style={[styles.queueActionBtnText, { color: '#ef4444' }]}>Close</Text>
                       </Pressable>
                     </View>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -570,7 +574,11 @@ export default function AdminQueueHostingScreen() {
               <Text style={styles.sectionTitle}>Paused Queue Lines</Text>
               <View style={styles.queueList}>
                 {pausedQueues.map((queue) => (
-                  <View key={queue.id} style={[styles.queueCard, styles.queueCardPaused]}>
+                  <Pressable
+                    key={queue.id}
+                    style={[styles.queueCard, styles.queueCardPaused]}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                  >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
@@ -615,20 +623,20 @@ export default function AdminQueueHostingScreen() {
                     <View style={styles.queueActionsRow}>
                       <Pressable
                         style={[styles.queueActionBtn, styles.queueActionBtnSuccess]}
-                        onPress={() => handleResumeQueue(queue.id)}
+                        onPress={(e) => { e.stopPropagation(); handleResumeQueue(queue.id); }}
                       >
                         <Ionicons name="play-outline" size={14} color="#3b82f6" />
                         <Text style={[styles.queueActionBtnText, { color: '#3b82f6' }]}>Resume</Text>
                       </Pressable>
                       <Pressable
                         style={[styles.queueActionBtn, styles.queueActionBtnDanger]}
-                        onPress={() => handleCloseQueue(queue.id)}
+                        onPress={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                       >
                         <Ionicons name="close-outline" size={14} color="#ef4444" />
                         <Text style={[styles.queueActionBtnText, { color: '#ef4444' }]}>Close</Text>
                       </Pressable>
                     </View>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -642,7 +650,11 @@ export default function AdminQueueHostingScreen() {
                 {stillServingQueues.map((queue: any) => {
                   const tint = STATUS_TINTS[queue.status as QueueStatus];
                   return (
-                    <View key={queue.id} style={[styles.queueCard, styles.queueCardStillServing]}>
+                    <Pressable
+                      key={queue.id}
+                      style={[styles.queueCard, styles.queueCardStillServing]}
+                      onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                    >
                       <View style={styles.queueCardTopRow}>
                         <View style={styles.queueCardTitleRow}>
                           <Image
@@ -684,13 +696,13 @@ export default function AdminQueueHostingScreen() {
                       <View style={styles.queueActionsRow}>
                         <Pressable
                           style={[styles.queueActionBtn, styles.queueActionBtnDanger, { flex: 1 }]}
-                          onPress={() => handleCloseQueue(queue.id)}
+                          onPress={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                         >
                           <Ionicons name="close-outline" size={14} color="#ef4444" />
                           <Text style={[styles.queueActionBtnText, { color: '#ef4444' }]}>Stop Queue</Text>
                         </Pressable>
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -703,7 +715,11 @@ export default function AdminQueueHostingScreen() {
               <Text style={styles.sectionTitle}>Completed Queue Lines (Today)</Text>
               <View style={styles.queueList}>
                 {completedQueues.map((queue) => (
-                  <View key={queue.id} style={[styles.queueCard, styles.queueCardCompleted]}>
+                  <Pressable
+                    key={queue.id}
+                    style={[styles.queueCard, styles.queueCardCompleted]}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                  >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
@@ -730,7 +746,7 @@ export default function AdminQueueHostingScreen() {
                     <Text style={styles.closedMeta}>
                       Served {queue.servedCount} student(s), capacity {queue.maxCapacity}
                     </Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -742,7 +758,11 @@ export default function AdminQueueHostingScreen() {
               <Text style={styles.sectionTitle}>Manually Closed Queue Lines (Today)</Text>
               <View style={styles.queueList}>
                 {closedQueues.map((queue) => (
-                  <View key={queue.id} style={[styles.queueCard, styles.queueCardClosed]}>
+                  <Pressable
+                    key={queue.id}
+                    style={[styles.queueCard, styles.queueCardClosed]}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                  >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
@@ -767,7 +787,7 @@ export default function AdminQueueHostingScreen() {
                     <Text style={styles.closedMeta}>
                       Served {queue.servedCount} student(s), capacity {queue.maxCapacity}
                     </Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </View>

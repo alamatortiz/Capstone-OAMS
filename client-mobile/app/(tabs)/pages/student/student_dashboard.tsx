@@ -436,7 +436,6 @@ export default function StudentDashboardScreen() {
   const quickActions: QuickAction[] = [
     { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from all colleges.', icon: 'megaphone-outline', badge: `${allPinnedAnnouncements.length} Pinned`, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
     { key: 'appointment-booking', title: 'Appointment Booking', description: 'Schedule appointments with professors and view available slots.', icon: 'calendar-outline', badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'queue-tracking', title: 'Queue Tracking', description: 'View detailed analytics and history of all your queue activities.', icon: 'pulse-outline', badgeTint: 'violet', gradient: ['#3b82f6', '#6366f1'] },
     { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check faculty consultation hours and room availability.', icon: 'school-outline', badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
   ];
 
@@ -548,8 +547,6 @@ export default function StudentDashboardScreen() {
                   ? () => router.push('/pages/student/student_announcement')
                   : action.key === 'appointment-booking'
                   ? () => router.push('/pages/student/student_appointments')
-                  : action.key === 'queue-tracking'
-                  ? () => router.push('/pages/student/student_queue_tracking')
                   : action.key === 'professor-schedules'
                   ? () => router.push('/pages/student/student_professor_schedules')
                   : comingSoon;

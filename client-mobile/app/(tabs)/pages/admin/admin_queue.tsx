@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
@@ -194,6 +194,7 @@ export default function AdminQueueScreen() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
   const router = useRouter();
+  const { monitorQueueId } = useLocalSearchParams<{ monitorQueueId?: string }>();
   const { user, logout } = useAuth();
   const {
     queues: queueDetails,
@@ -339,6 +340,17 @@ export default function AdminQueueScreen() {
     setMonitoringQueueId(id);
     setEntriesPage(0);
   };
+
+  // Lets admin_queue_hosting.tsx's cards jump straight into the monitor view
+  // for a specific queue (mirrors adm-queue.jsx's location.state handling).
+  // Clears the param after consuming it so navigating back and forward again
+  // doesn't silently re-trigger the monitor view.
+  useEffect(() => {
+    if (!monitorQueueId) return;
+    openMonitor(Number(monitorQueueId));
+    router.setParams({ monitorQueueId: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monitorQueueId]);
 
   // ── Queue actions — real API calls against the admin's own department ──
   const handleCallNext = async (id: number) => {
