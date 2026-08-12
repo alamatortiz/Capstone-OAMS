@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 
-import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, Activity, MapPin, FileText } from 'lucide-react';
+import { Clock, Users, CheckCircle2, XCircle, AlertCircle, ChevronLeft, Loader2, ChevronDown, HelpCircle, MapPin, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
@@ -335,25 +335,6 @@ export default function QueuePage() {
             title={selectedSlot ? 'Queue Details' : 'Queues'}
             subtitle="Join queues and track your position in real-time"
           />
-
-          {!selectedSlot && (
-            <Link
-              to="/student/queue-tracking"
-              state={{ from: 'queue' }}
-              className="qp-tracking-link-btn"
-            >
-              <div className="qp-tracking-link-btn-icon-box">
-                <Activity />
-              </div>
-              <div className="qp-tracking-link-btn-text">
-                <span className="qp-tracking-link-btn-title">Queue Tracking</span>
-                <span className="qp-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities</span>
-              </div>
-              <svg className="qp-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </Link>
-          )}
 
           {/* ── DETAIL VIEW ── */}
           {selectedSlot && (

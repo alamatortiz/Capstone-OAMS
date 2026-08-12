@@ -109,17 +109,6 @@ const ListIcon = () => (
     <line x1="3" y1="18" x2="3.01" y2="18"></line>
   </svg>
 );
-const ActivityIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-  </svg>
-);
 const GraduationCapIcon = () => <LucideGraduationCap className="icon" />;
 const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
 
@@ -409,7 +398,7 @@ export default function StudentDashboard() {
       description: "Stay updated with the latest notices from your department",
       icon: MegaphoneIcon,
       link: "/student/announcements",
-      gradient: "from-violet-500 to-purple-600",
+      gradientIndex: 1,
       badge: `${allPinnedAnnouncements.length} Pinned`,
     },
     {
@@ -418,22 +407,14 @@ export default function StudentDashboard() {
         "Schedule appointments with professors and view available slots",
       icon: CalendarIcon,
       link: "/student/appointments",
-      gradient: "from-indigo-500 to-purple-600",
-    },
-    {
-      title: "Queue Tracking",
-      description:
-        "View detailed analytics and history of all your queue activities",
-      icon: ActivityIcon,
-      link: "/student/queue-tracking",
-      gradient: "from-cyan-500 to-blue-600",
+      gradientIndex: 2,
     },
     {
       title: "Professor Schedules",
       description: "Check professor consultation hours and availability across all departments",
       icon: GraduationCapIcon,
       link: "/student/professor-schedules",
-      gradient: "from-sky-500 to-blue-600",
+      gradientIndex: 4,
       badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`,
     },
   ];
@@ -510,7 +491,7 @@ export default function StudentDashboard() {
               <h2>Quick Actions</h2>
             </div>
             <div className="quick-actions-grid">
-              {quickActions.map((action, index) => (
+              {quickActions.map((action) => (
                 <Link
                   key={action.title}
                   to={action.link}
@@ -519,7 +500,7 @@ export default function StudentDashboard() {
                   <div className="quick-action-card">
                     <div className="action-main">
                       <div
-                        className={`action-icon action-gradient-${index + 1}`}
+                        className={`action-icon action-gradient-${action.gradientIndex}`}
                       >
                         <action.icon />
                       </div>

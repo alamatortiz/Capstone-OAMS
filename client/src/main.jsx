@@ -34,9 +34,6 @@ const DocumentStatusPage = React.lazy(
 const AppointmentStatusPage = React.lazy(
   () => import("./pages/student/stud-appointment-status.jsx"),
 );
-const QueueTrackingPage = React.lazy(
-  () => import("./pages/student/stud-queue-tracking.jsx"),
-);
 const AnnouncementsPage = React.lazy(
   () => import("./pages/student/stud-announcements.jsx"),
 );
@@ -135,14 +132,6 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <QueueStatusPage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/student/queue-tracking"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <QueueTrackingPage />
                   </Suspense>
                 }
               />

@@ -9,7 +9,6 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Activity,
   MapPin,
   FileText,
   HelpCircle,
@@ -625,7 +624,6 @@ export default function QueueStatusPage() {
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const fromQueue = location.state?.fromQueue ?? false;
-  const fromTracking = location.state?.fromTracking ?? false;
   const [selectedQueueId, setSelectedQueueId] = useState(
     () => location.state?.queueId ?? null
   );
@@ -663,8 +661,8 @@ export default function QueueStatusPage() {
         {selectedQueue ? (
           <QueueDetail
             queue={selectedQueue}
-            backLabel={fromTracking ? 'Queue Tracking' : fromQueue ? 'Queues' : 'My Queues'}
-            onBack={() => fromTracking ? navigate('/student/queue-tracking') : fromQueue ? navigate('/student/queue', { state: { activeTab: 'active' } }) : setSelectedQueueId(null)}
+            backLabel={fromQueue ? 'Queues' : 'My Queues'}
+            onBack={() => fromQueue ? navigate('/student/queue', { state: { activeTab: 'active' } }) : setSelectedQueueId(null)}
             onCancel={handleCancel}
             onSaveNotes={updateQueueNotes}
             cancelling={cancelling}
@@ -674,12 +672,7 @@ export default function QueueStatusPage() {
             {/* Page Header */}
             <PageHeader
               breadcrumb={
-                fromTracking ? (
-                  <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue-tracking')}>
-                    <ChevronLeft className="breadcrumb-icon" />
-                    Queue Tracking
-                  </button>
-                ) : fromQueue ? (
+                fromQueue ? (
                   <button type="button" className="breadcrumb-link" onClick={() => navigate('/student/queue', { state: { activeTab: 'active' } })}>
                     <ChevronLeft className="breadcrumb-icon" />
                     Queue Management
@@ -695,25 +688,6 @@ export default function QueueStatusPage() {
               title="My Queue Status"
               subtitle="Track all the queues you are in"
             />
-
-            {!fromTracking && (
-              <Link
-                to="/student/queue-tracking"
-                state={{ from: 'queue-status' }}
-                className="qsl-tracking-link-btn"
-              >
-                <div className="qsl-tracking-link-btn-icon-box">
-                  <Activity />
-                </div>
-                <div className="qsl-tracking-link-btn-text">
-                  <span className="qsl-tracking-link-btn-title">Queue Tracking</span>
-                  <span className="qsl-tracking-link-btn-subtitle">View detailed analytics and history of all your queue activities</span>
-                </div>
-                <svg className="qsl-tracking-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </Link>
-            )}
 
             {/* Error */}
             {activeQueuesError && (
