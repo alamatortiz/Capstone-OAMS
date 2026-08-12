@@ -462,7 +462,6 @@ function createStyles(theme: typeof lightPalette) {
     // CTA
     ctaSection: {
       alignItems: 'center',
-      textAlign: 'center',
       backgroundColor: greenGradientTop,
       borderRadius: 18,
       marginHorizontal: 20,
