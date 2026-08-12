@@ -19,11 +19,11 @@ import { useRouter } from 'expo-router';
 import { useAuth, getRouteRole } from '@/context/AuthContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
-const oamsLogo = require('@/assets/coams_logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
-function CoamsLogo({
+function OamsLogo({
   style,
   outline,
 }: {
@@ -146,7 +146,7 @@ export default function LoginScreen() {
             <View style={styles.branding}>
               <View style={styles.logosRow}>
                 <Image source={pncLogo} style={styles.pncLogo} resizeMode="contain" />
-                <CoamsLogo style={styles.oamsLogo} outline />
+                <OamsLogo style={styles.oamsLogo} outline />
               </View>
               <Text style={styles.universityName}>University of Cabuyao</Text>
               <Text style={styles.universitySub}>(Pamantasan ng Cabuyao)</Text>

@@ -26,13 +26,13 @@ import { connectSocket } from '@/utils/socket';
 import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
-const oamsLogo = require('@/assets/coams_logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
-function CoamsLogo({
+function OamsLogo({
   style,
   outline,
 }: {
@@ -417,7 +417,7 @@ export default function StudentDocumentsScreen() {
         <View style={styles.header}>
           <View style={styles.headerBrand}>
             <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
-            <CoamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+            <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
           </View>
           <View style={styles.headerActions}>
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>

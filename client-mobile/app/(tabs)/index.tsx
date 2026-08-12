@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
-const oamsLogo = require('@/assets/coams_logo.png');
+const oamsLogo = require('@/assets/oams_logo.png');
 const ccsLogo = require('@/assets/CCS.png');
 const cbaaLogo = require('@/assets/CBAA.png');
 const coedLogo = require('@/assets/COED.png');
@@ -61,7 +61,7 @@ const features = [
   },
 ];
 
-function CoamsLogo({
+function OamsLogo({
   style,
   outline,
 }: {
@@ -124,7 +124,7 @@ export default function WelcomeScreen() {
           <View style={styles.headerBrand}>
             <View style={styles.headerBrandLogos}>
               <Image source={pncLogo} style={styles.headerPncLogo} resizeMode="contain" />
-              <CoamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
+              <OamsLogo style={styles.headerOamsLogo} outline={isDarkMode} />
             </View>
             <View style={styles.headerActionsGroup}>
               <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
@@ -146,11 +146,11 @@ export default function WelcomeScreen() {
         <View style={styles.heroSection}>
           <View style={styles.heroLogosRow}>
             <Image source={pncLogo} style={styles.heroPncLogoImg} resizeMode="contain" />
-            <CoamsLogo style={styles.heroLogoImg} outline={isDarkMode} />
+            <OamsLogo style={styles.heroLogoImg} outline={isDarkMode} />
           </View>
-          <Text style={styles.heroTitle}>College Office Automation{'\n'}Management System</Text>
+          <Text style={styles.heroTitle}>Office Automation{'\n'}Management System{'\n'}for the College Offices{'\n'}of University of Cabuyao</Text>
           <Text style={styles.heroSubtitle}>
-            A centralized platform for students, professors, and administrators to
+            A centralized college offices platform for students, professors, and administrators to
             streamline university services and enhance productivity.
           </Text>
           <Pressable style={styles.btnHero} onPress={goToLogin}>
@@ -213,7 +213,7 @@ export default function WelcomeScreen() {
         <View style={styles.footer}>
           <View style={styles.footerLogosLeft}>
             <Image source={pncLogo} style={styles.footerPncLogoImg} resizeMode="contain" />
-            <CoamsLogo style={styles.footerLogoImg} outline={isDarkMode} />
+            <OamsLogo style={styles.footerLogoImg} outline={isDarkMode} />
           </View>
           <View style={styles.footerRight}>
             <Text style={styles.footerTagline}>
