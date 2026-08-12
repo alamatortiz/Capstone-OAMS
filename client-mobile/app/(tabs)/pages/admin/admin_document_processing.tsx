@@ -23,6 +23,7 @@ import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+import { getHubStatusMeta } from '@/utils/documentStatus';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -134,16 +135,6 @@ const WEEK_FILTER_OPTIONS: { value: WeekFilter; label: string }[] = [
   { value: 'this-month', label: 'This Month' },
   { value: 'all', label: 'All' },
 ];
-
-const STATUS_TINTS: Record<DocumentStatus, { bg: string; border: string; color: string; icon: IoniconName }> = {
-  pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: 'alert-circle-outline' },
-  processing: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6', icon: 'time-outline' },
-  ready: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e', icon: 'checkmark-circle-outline' },
-  released: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
-  claimed: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
-  rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
-  cancelled: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close-circle-outline' },
-};
 
 const DONE_STATUSES: DocumentStatus[] = ['claimed', 'rejected', 'cancelled'];
 
@@ -572,7 +563,7 @@ export default function AdminDocumentProcessingScreen() {
             ) : (
               <View style={styles.cardsList}>
                 {visibleDocuments.map((doc) => {
-                  const statusTint = STATUS_TINTS[doc.status];
+                  const statusTint = getHubStatusMeta(doc.status);
                   const isOverdue = !!doc.neededBy && !DONE_STATUSES.includes(doc.status) && doc.neededBy < weekDates.todayStr;
                   const label = deadlineLabel(doc.neededBy);
                   return (
@@ -594,7 +585,7 @@ export default function AdminDocumentProcessingScreen() {
                         <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
                           <Ionicons name={statusTint.icon} size={12} color={statusTint.color} />
                           <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
-                            {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                            {statusTint.label}
                           </Text>
                         </View>
                       </View>
@@ -694,12 +685,12 @@ export default function AdminDocumentProcessingScreen() {
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: STATUS_TINTS[selectedDocument.status].bg, borderColor: STATUS_TINTS[selectedDocument.status].border },
+                      { backgroundColor: getHubStatusMeta(selectedDocument.status).bg, borderColor: getHubStatusMeta(selectedDocument.status).border },
                     ]}
                   >
-                    <Ionicons name={STATUS_TINTS[selectedDocument.status].icon} size={12} color={STATUS_TINTS[selectedDocument.status].color} />
-                    <Text style={[styles.statusBadgeText, { color: STATUS_TINTS[selectedDocument.status].color }]}>
-                      {selectedDocument.status.charAt(0).toUpperCase() + selectedDocument.status.slice(1)}
+                    <Ionicons name={getHubStatusMeta(selectedDocument.status).icon} size={12} color={getHubStatusMeta(selectedDocument.status).color} />
+                    <Text style={[styles.statusBadgeText, { color: getHubStatusMeta(selectedDocument.status).color }]}>
+                      {getHubStatusMeta(selectedDocument.status).label}
                     </Text>
                   </View>
                   <Text style={styles.detailsTracking}>{selectedDocument.trackingNumber}</Text>

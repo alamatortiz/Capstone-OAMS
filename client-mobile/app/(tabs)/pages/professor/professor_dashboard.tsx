@@ -137,10 +137,26 @@ interface ActivityEntry {
   time: string;
 }
 
-const officeHours = [
-  { label: 'Weekdays', time: 'Monday – Friday: 8:00 AM – 5:00 PM' },
-  { label: 'Weekend', time: 'Saturday: 8:00 AM – 12:00 PM\nSunday: Closed' },
-];
+interface OfficeHoursData {
+  departmentName: string;
+  departmentAbbrev: string;
+  schedule: { day: string; time: string }[];
+  location: string;
+}
+
+// Splits only on a comma followed by a weekday name -- mirrors both the web
+// parser (dateTime.js's parseOfficeHoursSchedule) and student_dashboard.tsx's
+// own local copy, so free-text office hours strings render the same way
+// everywhere.
+function parseSchedule(hoursStr?: string): { day: string; time: string }[] {
+  if (!hoursStr) return [];
+  const weekdayNames = 'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+  return hoursStr.split(new RegExp(`,\\s*(?=(?:${weekdayNames})\\b)`)).map((entry) => {
+    const colonIdx = entry.indexOf(': ');
+    if (colonIdx === -1) return { day: entry.trim(), time: '' };
+    return { day: entry.substring(0, colonIdx).trim(), time: entry.substring(colonIdx + 2).trim() };
+  });
+}
 
 interface NavItem {
   key: string;
@@ -168,6 +184,10 @@ export default function ProfessorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<{ isPinned: boolean }[]>([]);
+
+  const [officeHours, setOfficeHours] = useState<OfficeHoursData | null>(null);
+  const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
+  const [officeHoursError, setOfficeHoursError] = useState<string | null>(null);
 
   // Mirrors `dashData` for the catch block below, without making fetchStats
   // depend on (and change identity with) the state itself.
@@ -204,10 +224,30 @@ export default function ProfessorDashboardScreen() {
     }
   }, []);
 
+  const fetchOfficeHours = useCallback(async () => {
+    setOfficeHoursLoading(true);
+    try {
+      const { data } = await api.get('/faculty/office-hours');
+      setOfficeHours({
+        departmentName: data.departmentName,
+        departmentAbbrev: data.departmentAbbrev,
+        schedule: parseSchedule(data.officeHours),
+        location: data.officeLocation ?? '',
+      });
+      setOfficeHoursError(null);
+    } catch (err) {
+      console.error('Failed to fetch office hours:', err);
+      setOfficeHoursError('Could not load office hours.');
+    } finally {
+      setOfficeHoursLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
     fetchAnnouncements();
-  }, [fetchStats, fetchAnnouncements]);
+    fetchOfficeHours();
+  }, [fetchStats, fetchAnnouncements, fetchOfficeHours]);
 
   useEffect(() => {
     if (!user || !token) return;
@@ -549,14 +589,30 @@ export default function ProfessorDashboardScreen() {
               <Ionicons name="time-outline" size={18} color="#ffffff" />
               <Text style={styles.hoursTitle}>Office Hours</Text>
             </View>
-            <View style={styles.hoursGrid}>
-              {officeHours.map((entry) => (
-                <View key={entry.label} style={styles.hoursItem}>
-                  <Text style={styles.hoursLabel}>{entry.label}</Text>
-                  <Text style={styles.hoursTime}>{entry.time}</Text>
+            {officeHoursLoading ? (
+              <Text style={styles.hoursTime}>Loading office hours...</Text>
+            ) : officeHoursError ? (
+              <Text style={styles.hoursTime}>{officeHoursError}</Text>
+            ) : !officeHours ? (
+              <Text style={styles.hoursTime}>No office hours available.</Text>
+            ) : (
+              <>
+                <View style={styles.hoursGrid}>
+                  {officeHours.schedule.map((entry, i) => (
+                    <View key={i} style={styles.hoursItem}>
+                      <Text style={styles.hoursLabel}>{entry.day}</Text>
+                      <Text style={styles.hoursTime}>{entry.time}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
+                {officeHours.location && (
+                  <View style={styles.hoursLocationRow}>
+                    <Text style={styles.hoursLocationLabel}>Location:</Text>
+                    <Text style={styles.hoursLocationValue}>{officeHours.location}</Text>
+                  </View>
+                )}
+              </>
+            )}
           </LinearGradient>
         </ScrollView>
       </SafeAreaView>
@@ -1075,6 +1131,25 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '600',
       color: '#ffffff',
       lineHeight: 20,
+    },
+    hoursLocationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'wrap',
+      marginTop: 14,
+    },
+    hoursLocationLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: 'rgba(255,255,255,0.65)',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    hoursLocationValue: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: 'rgba(255,255,255,0.9)',
     },
 
     // Nav drawer
