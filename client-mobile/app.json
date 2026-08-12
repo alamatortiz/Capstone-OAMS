@@ -62,9 +62,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "c477c335-452b-4a9f-9753-4ad1c5f221f3"
+        "projectId": "48def5ce-8755-4257-91ff-2187f8940f79"
       }
-    },
-    "owner": "joronski"
+    }
   }
 }
