@@ -520,6 +520,20 @@
   box-shadow: none;
 }
 
+/* Clickable-card affordance -- placed after the per-status hover rules
+   above (including the closed/completed ones that suppress box-shadow) so
+   it wins the source-order tie at equal specificity. Only touches
+   transform/box-shadow, leaving each status's own background/border hover
+   tint intact. */
+.aqh-queue-card--clickable {
+  cursor: pointer;
+}
+
+.aqh-queue-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
 .aqh-queue-card-top {
   display: flex;
   align-items: flex-start;

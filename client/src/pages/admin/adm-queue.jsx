@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-queue.css";
 import { toast } from "sonner";
@@ -141,6 +141,8 @@ const ChevronDownIcon = () => (
 );
 
 export default function AdminQueue() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const user = authUser
     ? {
@@ -165,6 +167,20 @@ export default function AdminQueue() {
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [entriesPage, setEntriesPage] = useState(0);
   const ENTRIES_PER_PAGE = 5;
+
+  // Lets other pages (e.g. Queue Hosting Management) jump straight into this
+  // queue's monitor view instead of requiring the in-page Monitor button.
+  // Clears the consumed nav state afterward -- unlike a route change, "Back
+  // to Queue List" below stays on this same URL, so an uncleared state would
+  // silently re-trigger the monitor view on a page refresh after backing out.
+  useEffect(() => {
+    const id = location.state?.monitorQueueId;
+    if (id) {
+      setMonitoringQueueId(id);
+      setEntriesPage(0);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const fetchQueueEntries = useCallback(async () => {
     if (!monitoringQueueId) {

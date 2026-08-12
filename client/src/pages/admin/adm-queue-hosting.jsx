@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-queue-hosting.css";
 import { toast } from "sonner";
@@ -81,6 +81,7 @@ const getCollegeLogo = (code) =>
   ).href;
 
 export default function AdminQueueHosting() {
+  const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const user = authUser
     ? {
@@ -572,7 +573,8 @@ export default function AdminQueueHosting() {
                 {activeQueues.map((queue) => (
                   <div
                     key={queue.id}
-                    className="aqh-queue-card aqh-card-active"
+                    className="aqh-queue-card aqh-card-active aqh-queue-card--clickable"
+                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -609,14 +611,14 @@ export default function AdminQueueHosting() {
                         <div className="aqh-queue-card-actions">
                           <button
                             className="aqh-action-btn aqh-action-pause"
-                            onClick={() => handlePauseQueue(queue.id)}
+                            onClick={(e) => { e.stopPropagation(); handlePauseQueue(queue.id); }}
                           >
                             <PauseIcon />
                             <span>Pause</span>
                           </button>
                           <button
                             className="aqh-action-btn aqh-action-close"
-                            onClick={() => handleCloseQueue(queue.id)}
+                            onClick={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                           >
                             <CloseIcon />
                             <span>Close</span>
@@ -675,7 +677,8 @@ export default function AdminQueueHosting() {
                 {pausedQueues.map((queue) => (
                   <div
                     key={queue.id}
-                    className="aqh-queue-card aqh-card-paused"
+                    className="aqh-queue-card aqh-card-paused aqh-queue-card--clickable"
+                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -707,14 +710,14 @@ export default function AdminQueueHosting() {
                         <div className="aqh-queue-card-actions">
                           <button
                             className="aqh-action-btn aqh-action-resume"
-                            onClick={() => handleResumeQueue(queue.id)}
+                            onClick={(e) => { e.stopPropagation(); handleResumeQueue(queue.id); }}
                           >
                             <PlayIcon />
                             <span>Resume</span>
                           </button>
                           <button
                             className="aqh-action-btn aqh-action-close"
-                            onClick={() => handleCloseQueue(queue.id)}
+                            onClick={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                           >
                             <CloseIcon />
                             <span>Close</span>
@@ -757,7 +760,8 @@ export default function AdminQueueHosting() {
                 {stillServingQueues.map((queue) => (
                   <div
                     key={queue.id}
-                    className="aqh-queue-card aqh-card-still-serving"
+                    className="aqh-queue-card aqh-card-still-serving aqh-queue-card--clickable"
+                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -794,7 +798,7 @@ export default function AdminQueueHosting() {
                         <div className="aqh-queue-card-actions">
                           <button
                             className="aqh-action-btn aqh-action-close"
-                            onClick={() => handleCloseQueue(queue.id)}
+                            onClick={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                           >
                             <CloseIcon />
                             <span>Stop Queue</span>
@@ -836,7 +840,8 @@ export default function AdminQueueHosting() {
                 {completedQueues.map((queue) => (
                   <div
                     key={queue.id}
-                    className="aqh-queue-card aqh-card-completed"
+                    className="aqh-queue-card aqh-card-completed aqh-queue-card--clickable"
+                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -883,7 +888,8 @@ export default function AdminQueueHosting() {
                 {closedQueues.map((queue) => (
                   <div
                     key={queue.id}
-                    className="aqh-queue-card aqh-card-closed"
+                    className="aqh-queue-card aqh-card-closed aqh-queue-card--clickable"
+                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
