@@ -9,7 +9,7 @@ import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
 import NotificationBell from "./NotificationBell";
 
 import ucLogo from "../assets/Pnc-Logo.png";
-import oamsLogo from "../assets/coams_logo.png";
+import oamsLogo from "../assets/oams_logo.png";
 
 import "./StudentSidebar.css";
 

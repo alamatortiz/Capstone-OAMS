@@ -10,7 +10,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import "./Login.css";
 
 import pncLogo from "../assets/Pnc-Logo.png";
-import oamsLogo from "../assets/coams_logo.png";
+import oamsLogo from "../assets/oams_logo.png";
 import darkModeIcon from "../assets/darkmode_icon.png";
 import sunIcon from "../assets/sun_icon.png";
 

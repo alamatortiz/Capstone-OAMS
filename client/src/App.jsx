@@ -5,7 +5,7 @@ import { applyTheme, getSavedTheme } from "./utils/theme";
 import { useAuth } from "./context/AuthContext";
 
 // Logo imports — copy these files into src/assets/
-import oamsLogo from "./assets/coams_logo.png";
+import oamsLogo from "./assets/oams_logo.png";
 import pncLogo from "./assets/Pnc-Logo.png";
 import ccsLogo from "./assets/CCS.png";
 import cbaaLogo from "./assets/CBAA.png";
@@ -87,7 +87,7 @@ function App() {
   };
 
   return (
-    <div className="coams-root">
+    <div className="oams-root">
       {/* ── Navbar ── */}
       <nav className="navbar">
         <div className="navbar-brand">
@@ -132,12 +132,14 @@ function App() {
           </div>
         </div>
         <h1 className="hero-title">
-          College Office Automation
+          Office Automation
           <br />
-          Management System
+          Management System for the College Offices
+          <br />
+          of University of Cabuyao
         </h1>
         <p className="hero-subtitle">
-          A centralized platform for students, professors, and administrators to
+          A centralized college offices platform for students, professors, and administrators to
           streamline university services and enhance productivity.
         </p>
         <button
@@ -190,7 +192,7 @@ function App() {
         </div>
         <h2 className="cta-title">Ready to Get Started?</h2>
         <p className="cta-subtitle">
-          Join thousands of students, professors, and staff using COAMS to
+          Join thousands of students, professors, and staff using OAMS to
           streamline their university experience.
         </p>
         <button
