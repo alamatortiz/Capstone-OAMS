@@ -94,6 +94,7 @@ const formatTimestamp = (iso: string) => {
     timeZone: 'Asia/Manila',
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   });
@@ -310,7 +311,7 @@ export default function StudentNotificationsScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Notifications</Text>
-              <Text style={styles.pageSubtitle}>Stay updated on queue, document, appointment, and announcement activity</Text>
+              <Text style={styles.pageSubtitle}>Stay updated on queue, document, appointment, and announcement activity.</Text>
             </View>
           </View>
 
@@ -359,11 +360,17 @@ export default function StudentNotificationsScreen() {
                       <Ionicons name={meta.icon as IoniconName} size={18} color={meta.color} />
                     </View>
                     <View style={styles.notifBody}>
+                      <Text style={styles.notifUpdateTitle}>{meta.label} Update</Text>
                       <View style={styles.notifBadgeRow}>
                         <View style={[styles.notifBadge, { backgroundColor: `${meta.color}26`, borderColor: `${meta.color}55` }]}>
                           <Text style={[styles.notifBadgeText, { color: meta.color }]}>{meta.label}</Text>
                         </View>
-                        {!n.is_read && <View style={styles.unreadDot} />}
+                        {!n.is_read && (
+                          <View style={styles.unreadBadge}>
+                            <View style={styles.unreadDot} />
+                            <Text style={styles.unreadBadgeText}>Unread</Text>
+                          </View>
+                        )}
                       </View>
                       <Text style={styles.notifMessage}>{n.message}</Text>
                       <Text style={styles.notifTime}>{formatTimestamp(n.created_at)}</Text>
@@ -402,7 +409,7 @@ export default function StudentNotificationsScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -671,7 +678,10 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 8,
     },
     notifBadgeText: { fontSize: 10, fontWeight: '700' },
+    notifUpdateTitle: { fontSize: 13, fontWeight: '700', color: theme.text, marginBottom: 2 },
+    unreadBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     unreadDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#ef4444' },
+    unreadBadgeText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
     notifMessage: { fontSize: 13, color: theme.text, lineHeight: 18 },
     notifTime: { fontSize: 11, color: theme.tertiary, fontWeight: '600' },
 

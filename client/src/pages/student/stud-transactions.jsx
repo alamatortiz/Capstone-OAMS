@@ -315,7 +315,7 @@ export default function TransactionsPage() {
             }
             icon={<ClipboardListIcon />}
             title="Transaction History"
-            subtitle="View all your activities and transactions"
+            subtitle="View all your activities and transactions."
           />
 
           {/* Stats Grid */}
@@ -339,7 +339,7 @@ export default function TransactionsPage() {
             <div className="filters-header">
               <h3 className="filters-title">Transaction Filter</h3>
               <p className="filters-description">
-                Search and filter your transactions
+                Search and filter your transactions.
               </p>
             </div>
             <div className="filters-grid">
@@ -407,7 +407,7 @@ export default function TransactionsPage() {
               <div className="tx-empty-state">
                 <ClipboardListIcon />
                 <h3>No Transactions Found</h3>
-                <p>You have no transaction records yet</p>
+                <p>You have no transaction records yet.</p>
               </div>
             ) : (
               transactions.map((transaction) => (

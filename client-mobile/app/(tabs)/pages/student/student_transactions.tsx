@@ -353,7 +353,7 @@ export default function StudentTransactionsScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Transaction History</Text>
-              <Text style={styles.pageSubtitle}>View all your activities and transactions</Text>
+              <Text style={styles.pageSubtitle}>View all your activities and transactions.</Text>
             </View>
           </View>
 
@@ -373,7 +373,7 @@ export default function StudentTransactionsScreen() {
           {/* Filters */}
           <View style={styles.filtersCard}>
             <Text style={styles.filtersTitle}>Transaction Filter</Text>
-            <Text style={styles.filtersDescription}>Search and filter your transactions</Text>
+            <Text style={styles.filtersDescription}>Search and filter your transactions.</Text>
 
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>Search</Text>
@@ -465,7 +465,7 @@ export default function StudentTransactionsScreen() {
             <View style={styles.emptyCard}>
               <Ionicons name="search-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No transactions found</Text>
-              <Text style={styles.emptyDescription}>Try adjusting your search or filters</Text>
+              <Text style={styles.emptyDescription}>You have no transaction records yet.</Text>
             </View>
           )}
 
@@ -491,7 +491,7 @@ export default function StudentTransactionsScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>

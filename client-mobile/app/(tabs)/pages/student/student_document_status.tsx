@@ -99,6 +99,7 @@ interface DocumentRecord {
   trackingNumber: string;
   notes?: string;
   estimatedCompletion?: string;
+  neededBy?: string;
   claimedDate?: string;
   releasedDate?: string;
 }
@@ -343,7 +344,7 @@ export default function StudentDocumentStatusScreen() {
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>My Document Requests</Text>
-                  <Text style={styles.pageSubtitle}>Track and manage all your document requests</Text>
+                  <Text style={styles.pageSubtitle}>Track all of your document requests.</Text>
                 </View>
               </View>
 
@@ -504,7 +505,7 @@ export default function StudentDocumentStatusScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -618,20 +619,27 @@ function DocumentListItem({
       </View>
 
       <View style={styles.listFieldsGrid}>
-        <View style={styles.listField}>
-          <Text style={styles.listFieldLabel}>{completed ? 'Date Requested' : 'Request Date'}</Text>
-          <Text style={styles.listFieldValue}>{formatDateShort(doc.requestDate)}</Text>
-        </View>
-        {completed && doc.claimedDate && (
-          <View style={styles.listField}>
-            <Text style={styles.listFieldLabel}>Date Acquired</Text>
-            <Text style={styles.listFieldValue}>{formatDateShort(doc.claimedDate)}</Text>
-          </View>
+        {doc.status === 'claimed' ? (
+          doc.claimedDate && (
+            <View style={styles.listField}>
+              <Text style={styles.listFieldLabel}>Date Acquired</Text>
+              <Text style={styles.listFieldValue}>{formatDateShort(doc.claimedDate)}</Text>
+            </View>
+          )
+        ) : (
+          <>
+            <View style={styles.listField}>
+              <Text style={styles.listFieldLabel}>{completed ? 'Date Requested' : 'Request Date'}</Text>
+              <Text style={styles.listFieldValue}>{formatDateShort(doc.requestDate)}</Text>
+            </View>
+            {!completed && (
+              <View style={styles.listFieldFull}>
+                <Text style={styles.listFieldLabel}>Purpose</Text>
+                <Text style={styles.listFieldValueMuted} numberOfLines={2}>{doc.purpose}</Text>
+              </View>
+            )}
+          </>
         )}
-        <View style={styles.listFieldFull}>
-          <Text style={styles.listFieldLabel}>Purpose</Text>
-          <Text style={styles.listFieldValueMuted} numberOfLines={2}>{doc.purpose}</Text>
-        </View>
       </View>
     </Pressable>
   );
@@ -675,7 +683,7 @@ function DocumentDetail({
         </LinearGradient>
         <View style={styles.titleTextWrap}>
           <Text style={styles.pageTitle}>Document Details</Text>
-          <Text style={styles.pageSubtitle}>Track your document request status</Text>
+          <Text style={styles.pageSubtitle}>Your document request details and status.</Text>
         </View>
       </View>
 
@@ -702,7 +710,7 @@ function DocumentDetail({
         <View style={styles.readyBanner}>
           <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
-            Your document is ready for pickup — please proceed to the designated location
+            Your document is ready for pickup — please proceed to the designated location.
           </Text>
         </View>
       )}
@@ -733,6 +741,12 @@ function DocumentDetail({
           <Text style={styles.detailLabel}>Request Date</Text>
           <Text style={styles.detailValue}>{formatDateLong(doc.requestDate)}</Text>
         </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Date Needed</Text>
+          <Text style={styles.detailValue}>
+            {doc.neededBy ? formatDateLong(doc.neededBy) : 'No date requested for the document to be claimable.'}
+          </Text>
+        </View>
         {doc.status === 'claimed' && doc.claimedDate ? (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date Acquired</Text>
@@ -762,7 +776,6 @@ function DocumentDetail({
             <Text style={styles.cardTitleText}>Requirements</Text>
           </View>
         </View>
-        <Text style={styles.reqSubtext}>Documents and items you need to bring</Text>
         {reqLoading ? (
           <View style={styles.reqLoadingRow}>
             <ActivityIndicator size="small" color={theme.orange} />
@@ -807,20 +820,6 @@ function DocumentDetail({
         </View>
       )}
 
-      {/* Tracking number */}
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <View style={styles.cardTitleRow}>
-            <Ionicons name="pricetag-outline" size={18} color={theme.orange} />
-            <Text style={styles.cardTitleText}>Tracking Number</Text>
-          </View>
-        </View>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={styles.trackingBig}>{doc.trackingNumber}</Text>
-          <Text style={styles.trackingCaption}>{doc.college}</Text>
-        </View>
-      </View>
-
       {/* Cancel request */}
       {canCancel && (
         <View style={[styles.card, styles.cancelCard]}>
@@ -831,7 +830,7 @@ function DocumentDetail({
             </View>
           </View>
           <Text style={styles.cancelDescription}>
-            Cancelling will move this request to your Completed requests. You&apos;re welcome to submit a new one if you change your mind.
+            Cancelling will move this request to your Cancelled requests. You&apos;re welcome to submit a new one if you change your mind.
           </Text>
           <Pressable style={styles.cancelBtn} onPress={onCancel}>
             <Text style={styles.cancelBtnText}>Cancel Request</Text>

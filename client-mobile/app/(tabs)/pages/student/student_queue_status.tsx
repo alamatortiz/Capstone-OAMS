@@ -329,7 +329,7 @@ export default function StudentQueueStatusScreen() {
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>My Queue Status</Text>
-                  <Text style={styles.pageSubtitle}>View and manage your active queues</Text>
+                  <Text style={styles.pageSubtitle}>Track all the queues you are in.</Text>
                 </View>
               </View>
 
@@ -408,7 +408,7 @@ export default function StudentQueueStatusScreen() {
                   <Ionicons name="people-outline" size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Active Queues</Text>
                   <Text style={styles.emptyDescription}>
-                    You&apos;re not currently in any queues. Browse available queues to join one.
+                    You are not participating in any active queues.
                   </Text>
                   <Pressable
                     style={styles.emptyJoinBtn}
@@ -442,7 +442,7 @@ export default function StudentQueueStatusScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -693,7 +693,7 @@ function QueueDetail({
         </LinearGradient>
         <View style={styles.titleTextWrap}>
           <Text style={styles.pageTitle}>Queue Details</Text>
-          <Text style={styles.pageSubtitle}>View your position and estimated wait time</Text>
+          <Text style={styles.pageSubtitle}>Your queue details and status.</Text>
         </View>
       </View>
 
@@ -730,7 +730,7 @@ function QueueDetail({
           <Text style={styles.turnBannerText}>
             {queue.arrivedAt
               ? 'You are now being served.'
-              : "Please proceed to the designated location — it's your turn!"}
+              : "It's your turn — please proceed to the designated location."}
           </Text>
         </View>
       )}
@@ -791,7 +791,7 @@ function QueueDetail({
                 : "You've been called — please proceed!"
               : queue.position === 1
                 ? "You're next!"
-                : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`}
+                : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you.`}
           </Text>
         </View>
 
@@ -920,22 +920,6 @@ function QueueDetail({
             ? queue.notes
             : 'No concern noted yet. Tap Edit to describe your request.'}
         </Text>
-      </View>
-
-      {/* Queue number */}
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <View style={styles.cardTitleRow}>
-            <Ionicons name="ticket-outline" size={18} color={theme.blue} />
-            <Text style={styles.cardTitleText}>Queue Number</Text>
-          </View>
-        </View>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={styles.queueNumberText}>{queue.queueNumberBadge}</Text>
-          <Text style={styles.queueNumberCaption}>
-            {queue.departmentAbbrev} • {queue.serviceName}
-          </Text>
-        </View>
       </View>
 
       {/* Service hours */}

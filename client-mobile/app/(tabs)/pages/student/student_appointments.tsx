@@ -428,7 +428,7 @@ export default function StudentAppointmentsScreen() {
     ? { key: 'this-week', label: 'This Week' }
     : { key: 'next-week', label: 'Next Week' });
 
-  const collegeFilterOptions = collegeOptions.map((c) => ({ value: c.abbrev, label: c.name }));
+  const collegeFilterOptions = collegeOptions.map((c) => ({ value: c.abbrev, label: `${c.abbrev} - ${c.name}` }));
   const professorOptions = [
     { value: '', label: availableProfessors.length === 0 ? 'No professors available' : 'All Professors' },
     ...availableProfessors.map((p) => ({ value: p.id, label: p.name })),
@@ -616,7 +616,7 @@ export default function StudentAppointmentsScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Appointments</Text>
-              <Text style={styles.pageSubtitle}>Schedule consultations with professors</Text>
+              <Text style={styles.pageSubtitle}>Schedule appointments with professors and view available slots.</Text>
             </View>
           </View>
 
@@ -635,7 +635,7 @@ export default function StudentAppointmentsScreen() {
             </LinearGradient>
             <View style={styles.profSchedText}>
               <Text style={styles.profSchedTitle}>Professor Schedules</Text>
-              <Text style={styles.profSchedSubtitle}>Browse when your professors are available before booking</Text>
+              <Text style={styles.profSchedSubtitle}>Check professor consultation hours and availability across all departments.</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.purple} />
           </Pressable>
@@ -643,13 +643,16 @@ export default function StudentAppointmentsScreen() {
           {/* Filters */}
           <View style={styles.filtersCard}>
             <Text style={styles.filtersTitle}>Filter & Search</Text>
-            <Text style={styles.filtersDescription}>Optionally filter by college, professor, or date</Text>
+            <Text style={styles.filtersDescription}>Optionally filter by college, professor, or date.</Text>
 
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>College</Text>
               <Pressable style={styles.filterSelect} onPress={() => setActiveFilter('college')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>
-                  {collegeOptions.find((c) => c.abbrev === selectedCollege)?.name ?? 'Select college'}
+                  {(() => {
+                    const c = collegeOptions.find((c) => c.abbrev === selectedCollege);
+                    return c ? `${c.abbrev} - ${c.name}` : 'Select college';
+                  })()}
                 </Text>
                 <Ionicons name="chevron-down" size={16} color={theme.purple} />
               </Pressable>
@@ -733,7 +736,7 @@ export default function StudentAppointmentsScreen() {
                   <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Available Slots</Text>
                   <Text style={styles.emptyDescription}>
-                    {selectedDate || selectedProfessorId ? 'Try adjusting your filters to see more results' : 'No professors have published consultation hours yet'}
+                    {selectedDate || selectedProfessorId ? 'Try adjusting your filters to see more results.' : 'No professors have published their consultation hours yet.'}
                   </Text>
                 </View>
               ) : selectedDate ? (
@@ -767,17 +770,6 @@ export default function StudentAppointmentsScreen() {
           {/* My Bookings */}
           {activeTab === 'bookings' && (
             <View style={styles.tabPanel}>
-              <View style={styles.bookingsHeaderRow}>
-                <View>
-                  <Text style={styles.bookingsHeaderTitle}>My Appointments</Text>
-                  <Text style={styles.bookingsHeaderSubtitle}>Your scheduled consultations</Text>
-                </View>
-                <Pressable style={styles.statusLink} onPress={() => router.push('/pages/student/student_appointment_status')}>
-                  <Text style={styles.statusLinkText}>View All Status</Text>
-                  <Ionicons name="chevron-forward" size={13} color={theme.purple} />
-                </Pressable>
-              </View>
-
               {bookingsLoading ? (
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyDescription}>Loading your appointments…</Text>
@@ -795,7 +787,7 @@ export default function StudentAppointmentsScreen() {
                 <View style={styles.emptyCard}>
                   <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Appointments Booked</Text>
-                  <Text style={styles.emptyDescription}>Browse available slots to schedule your first consultation</Text>
+                  <Text style={styles.emptyDescription}>You have no active appointments yet.</Text>
                 </View>
               ) : (
                 sortedActiveBookings.map((booking) => {
@@ -881,7 +873,7 @@ export default function StudentAppointmentsScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>

@@ -73,6 +73,7 @@ function formatTimestamp(iso: string) {
     timeZone: 'Asia/Manila',
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   });

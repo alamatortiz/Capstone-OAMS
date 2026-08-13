@@ -162,7 +162,7 @@ export default function DocumentsPage() {
   const handleSubmitRequest = async () => {
     if (submitting) return;
     if (!formData.type || !formData.college || !formData.purpose) {
-      toast.error("Please fill in all required fields");
+      toast.error("Please fill in all required fields.");
       return;
     }
 
@@ -435,7 +435,7 @@ export default function DocumentsPage() {
             icon={<FileText />}
             iconClassName="doc-title-icon"
             title="Document Requests"
-            subtitle="Request documents and track their status"
+            subtitle="Request documents and track their status."
           />
 
           <button
@@ -586,7 +586,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <FileText />
                     <h3>No Active Requests</h3>
-                    <p>You have no active document requests</p>
+                    <p>You have no active document requests.</p>
                   </div>
                 )}
               </div>
@@ -651,7 +651,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <CheckCircle2 />
                     <h3>No Completed Requests</h3>
-                    <p>You have no records of claimed documents</p>
+                    <p>You have no records of claimed documents.</p>
                   </div>
                 )}
               </div>
@@ -709,7 +709,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <XCircleIcon />
                     <h3>No Rejected Requests</h3>
-                    <p>You have no records of rejected document requests</p>
+                    <p>You have no records of rejected document requests.</p>
                   </div>
                 )}
               </div>
@@ -767,7 +767,7 @@ export default function DocumentsPage() {
                   <div className="doc-empty-state">
                     <XCircleIcon />
                     <h3>No Cancelled Requests</h3>
-                    <p>You have no records of cancelled document requests</p>
+                    <p>You have no records of cancelled document requests.</p>
                   </div>
                 )}
               </div>

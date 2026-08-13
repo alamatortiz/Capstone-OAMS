@@ -338,7 +338,7 @@ export default function AppointmentsPage() {
   const handleBookSlot = async () => {
     if (!selectedSlot || submitting) return;
     if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
-      toast.error("Please select an appointment type"); return;
+      toast.error("Please select an appointment type."); return;
     }
     setSubmitting(true);
     try {
@@ -367,7 +367,7 @@ export default function AppointmentsPage() {
     setCancellingId(appointmentId);
     try {
       await api.delete(`/student/appointments/${appointmentId}`);
-      toast.success("Appointment cancelled successfully");
+      toast.success("Appointment cancelled successfully.");
       await Promise.all([fetchSlots(), fetchMyBookings()]);
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to cancel the appointment.");
@@ -521,7 +521,7 @@ export default function AppointmentsPage() {
             icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
             iconClassName="ab-title-icon"
             title="Appointments"
-            subtitle="Schedule appointments with professors and view available slots"
+            subtitle="Schedule appointments with professors and view available slots."
           />
 
           {/* Professor Schedules card */}
@@ -535,7 +535,7 @@ export default function AppointmentsPage() {
             </div>
             <div className="ab-prof-sched-card-text">
               <span className="ab-prof-sched-card-title">Professor Schedules</span>
-              <span className="ab-prof-sched-card-subtitle">Check professor consultation hours and availability across all departments</span>
+              <span className="ab-prof-sched-card-subtitle">Check professor consultation hours and availability across all departments.</span>
             </div>
             <ChevronRightIcon />
           </Link>
@@ -544,7 +544,7 @@ export default function AppointmentsPage() {
           <div className="filters-card">
             <div className="filters-header">
               <h2>Filter & Search</h2>
-              <p>Optionally filter by college, professor, or date</p>
+              <p>Optionally filter by college, professor, or date.</p>
             </div>
             <div className="filters-top-row">
               <FilterSelect
@@ -615,7 +615,7 @@ export default function AppointmentsPage() {
               ) : slotsError ? (
                 <div className="appt-empty-state"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
               ) : availableSlots.length === 0 ? (
-                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results" : "No professors have published their consultation hours yet"}</p></div>
+                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results." : "No professors have published their consultation hours yet."}</p></div>
               ) : selectedDate ? (
                 <div className="week-section">
                   <div className="week-section-header">
@@ -650,7 +650,7 @@ export default function AppointmentsPage() {
               ) : bookingsError ? (
                 <div className="appt-empty-state appt-empty-state--card"><CheckCircle2 className="appointment-icon" /><h3>Could not load your appointments</h3><p>{bookingsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchMyBookings}>Retry</button></div>
               ) : activeBookings.length === 0 ? (
-                <div className="appt-empty-state appt-empty-state--card"><CheckCircle2 className="appointment-icon" /><h3>No Appointments Booked</h3><p>You have no active appointments yet</p></div>
+                <div className="appt-empty-state appt-empty-state--card"><CheckCircle2 className="appointment-icon" /><h3>No Appointments Booked</h3><p>You have no active appointments yet.</p></div>
               ) : (
                 <div className="bookings-list">
                   {sortedActiveBookings.map((booking) => (

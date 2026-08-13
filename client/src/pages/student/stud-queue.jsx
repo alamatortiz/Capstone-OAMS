@@ -204,7 +204,7 @@ export default function QueuePage() {
       setLeavingQueueId(queueId);
       try {
         await leaveQueue(queueId);
-        toast.info('You have left the queue');
+        toast.info('You have left the queue.');
       } catch (err) {
         toast.error(err.message);
       } finally {
@@ -333,7 +333,7 @@ export default function QueuePage() {
             }
             icon={<Users className="icon" />}
             title={selectedSlot ? 'Queue Details' : 'Queues'}
-            subtitle="Join queues and track your position in real-time"
+            subtitle="Join queues and track your position in real-time."
           />
 
           {/* ── DETAIL VIEW ── */}
@@ -367,7 +367,7 @@ export default function QueuePage() {
                       {selectedSlot.voidTimeoutMinutes != null && (
                         <div className="avail-services-service-hero-meta">
                           <AlertCircle className="avail-services-service-hero-icon" />
-                          <span>Void after {selectedSlot.voidTimeoutMinutes} min if you don't show up when called</span>
+                          <span>Void after {selectedSlot.voidTimeoutMinutes} min if you don't show up when called.</span>
                         </div>
                       )}
                     </div>
@@ -379,7 +379,7 @@ export default function QueuePage() {
               <div className="avail-services-cta-card">
                 <div className="avail-services-cta-content">
                   <h3>Ready to join this queue?</h3>
-                  <p>Make sure you have all the requirements before joining the queue</p>
+                  <p>Make sure you have all the requirements before joining the queue.</p>
                 </div>
                 <button
                   className="avail-services-queue-btn"
@@ -615,7 +615,7 @@ export default function QueuePage() {
                                   }}
                                 >
                                   <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
-                                  Queue Full: No longer accepting students but students within the queue will still be served
+                                  Queue Full: No longer accepting students but students within the queue will still be served.
                                 </div>
                               )}
                               <div className="qp-stats-grid">
@@ -674,8 +674,8 @@ export default function QueuePage() {
                                   <AlertCircle className="qp-void-warning-icon" />
                                   <span>
                                     {queue.status === 'serving'
-                                      ? `Arrive within ${queue.voidTimeoutMinutes} min of being called or your ticket will be voided`
-                                      : `If called, arrive within ${queue.voidTimeoutMinutes} min or your ticket will be voided`}
+                                      ? `Arrive within ${queue.voidTimeoutMinutes} min of being called or your ticket will be voided.`
+                                      : `If called, arrive within ${queue.voidTimeoutMinutes} min or your ticket will be voided.`}
                                   </span>
                                 </div>
                               )}
@@ -690,7 +690,7 @@ export default function QueuePage() {
                       <CheckCircle2 className="no-queues-icon" />
                       <h3 className="no-queues-title">Not Participating in Any Queues</h3>
                       <p className="no-queues-description">
-                        You are not participating in any active queues
+                        You are not participating in any active queues.
                       </p>
                     </div>
                   )}
@@ -711,7 +711,7 @@ export default function QueuePage() {
                     <div className="filters-header">
                       <h3 className="filters-title">Queues Filter</h3>
                       <p className="filters-description">
-                        Select a queue to view service details and join
+                        Select a queue to view service details and join.
                       </p>
                     </div>
                     <div className="filters-grid">
@@ -855,8 +855,8 @@ export default function QueuePage() {
                       <h3 className="no-queues-title">No Active Queues</h3>
                       <p className="no-queues-description">
                         {(selectedCollege !== 'all' || selectedService !== 'all')
-                          ? 'Try adjusting your filters'
-                          : 'There are no open queues yet'}
+                          ? 'Try adjusting your filters.'
+                          : 'There are no open queues yet.'}
                       </p>
                     </div>
                   )}

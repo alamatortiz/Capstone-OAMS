@@ -151,13 +151,13 @@ export default function StudentNotifications() {
           }
           icon={<Bell />}
           title="Notifications"
-          subtitle="Stay updated on queue, document, appointment, and announcement activity"
+          subtitle="Stay updated on queue, document, appointment, and announcement activity."
         />
 
         <div className="filters-card">
           <div className="filters-header">
             <h3 className="filters-title">Notification Filter</h3>
-            <p className="filters-description">Filter your notifications by category</p>
+            <p className="filters-description">Filter your notifications by category.</p>
           </div>
           <div className="filters-row">
             <div className="filters-grid">
@@ -194,7 +194,7 @@ export default function StudentNotifications() {
             <div className="notif-empty-state">
               <Bell />
               <h3>No Notifications</h3>
-              <p>You're all caught up</p>
+              <p>You're all caught up.</p>
             </div>
           ) : (
             notifications.map((n) => {

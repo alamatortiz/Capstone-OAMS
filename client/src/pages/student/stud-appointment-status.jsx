@@ -68,7 +68,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
         icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
         iconClassName="apst-title-icon"
         title="Appointment Details"
-        subtitle="Your appointment details and status"
+        subtitle="Your appointment details and status."
       />
 
       {/* Hero */}
@@ -274,7 +274,7 @@ export default function AppointmentStatusPage() {
     setCancelling(id);
     try {
       await api.delete(`/student/appointments/${id}`);
-      toast.success("Appointment cancelled successfully");
+      toast.success("Appointment cancelled successfully.");
       setSelectedId(null);
       await fetchAppointments();
     } catch (err) {
@@ -348,7 +348,7 @@ export default function AppointmentStatusPage() {
               icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
               iconClassName="apst-title-icon"
               title="My Appointments"
-              subtitle="Track all of your appointments"
+              subtitle="Track all of your appointments."
             />
 
             {/* Professor Schedules card */}
@@ -362,7 +362,7 @@ export default function AppointmentStatusPage() {
               </div>
               <div className="apst-prof-sched-card-text">
                 <span className="apst-prof-sched-card-title">Professor Schedules</span>
-                <span className="apst-prof-sched-card-subtitle">Check professor consultation hours and availability across all departments</span>
+                <span className="apst-prof-sched-card-subtitle">Check professor consultation hours and availability across all departments.</span>
               </div>
               <ChevronRight style={{ width: "1.375rem", height: "1.375rem", color: "#a855f7", opacity: 0.7, flexShrink: 0 }} />
             </Link>
@@ -456,10 +456,10 @@ export default function AppointmentStatusPage() {
                       </h3>
                       <p className="apst-empty-text">
                         {activeTab === "all"
-                          ? "You have no active appointments yet"
+                          ? "You have no active appointments yet."
                           : activeTab === "pending"
-                            ? "You have no records of pending appointments"
-                            : `You have no records of ${activeTab} appointments`}
+                            ? "You have no records of pending appointments."
+                            : `You have no records of ${activeTab} appointments.`}
                       </p>
                       {(activeTab === "all" || activeTab === "pending") && (
                         <button

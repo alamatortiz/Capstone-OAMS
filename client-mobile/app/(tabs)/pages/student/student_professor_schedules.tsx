@@ -300,7 +300,7 @@ export default function StudentProfessorSchedulesScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Professor Schedules</Text>
-              <Text style={styles.pageSubtitle}>View faculty consultation hours and availability</Text>
+              <Text style={styles.pageSubtitle}>Check professor consultation hours and availability across all departments.</Text>
             </View>
           </View>
 
@@ -374,9 +374,6 @@ export default function StudentProfessorSchedulesScreen() {
                   </View>
                   <View style={styles.departmentHeaderTextWrap}>
                     <Text style={styles.departmentHeaderTitle}>{selectedDepartment.departmentName}</Text>
-                    <Text style={styles.departmentHeaderSubtitle}>
-                      Faculty consultation schedules and availability
-                    </Text>
                   </View>
                 </View>
               </LinearGradient>
@@ -480,7 +477,7 @@ export default function StudentProfessorSchedulesScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>

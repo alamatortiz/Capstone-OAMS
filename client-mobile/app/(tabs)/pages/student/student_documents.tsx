@@ -351,7 +351,7 @@ export default function StudentDocumentsScreen() {
             <Text style={styles.docCollege}>{doc.college}</Text>
             {completed ? (
               <Text style={styles.docTracking}>
-                {formatDateShort(doc.requestDate)} • {doc.trackingNumber}
+                {formatDateShort(doc.status === 'claimed' ? doc.claimedDate : doc.requestDate)} • {doc.trackingNumber}
               </Text>
             ) : (
               <Text style={styles.docTracking}>
@@ -371,6 +371,16 @@ export default function StudentDocumentsScreen() {
               <View style={styles.docField}>
                 <Text style={styles.docFieldLabel}>Request Date</Text>
                 <Text style={styles.docFieldValue}>{formatDateLong(doc.requestDate)}</Text>
+              </View>
+              {doc.neededBy && (
+                <View style={styles.docField}>
+                  <Text style={styles.docFieldLabel}>Needed By</Text>
+                  <Text style={styles.docFieldValue}>{formatDateLong(doc.neededBy)}</Text>
+                </View>
+              )}
+              <View style={styles.docField}>
+                <Text style={styles.docFieldLabel}>Number of Copies</Text>
+                <Text style={styles.docFieldValue}>{doc.copies ?? 1}</Text>
               </View>
               <View style={styles.docFieldFull}>
                 <Text style={styles.docFieldLabel}>Purpose</Text>
@@ -449,7 +459,7 @@ export default function StudentDocumentsScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Document Requests</Text>
-              <Text style={styles.pageSubtitle}>Request and track your documents</Text>
+              <Text style={styles.pageSubtitle}>Request documents and track their status.</Text>
             </View>
           </View>
 
@@ -501,8 +511,8 @@ export default function StudentDocumentsScreen() {
               {activeDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
-                  <Text style={styles.emptyTitle}>No active requests</Text>
-                  <Text style={styles.emptyDescription}>Start by requesting a document</Text>
+                  <Text style={styles.emptyTitle}>No Active Requests</Text>
+                  <Text style={styles.emptyDescription}>You have no active document requests.</Text>
                 </View>
               ) : (
                 <View style={styles.docsList}>
@@ -562,29 +572,6 @@ export default function StudentDocumentsScreen() {
               )}
             </View>
           )}
-
-          {/* Processing Times info card */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoHeaderRow}>
-              <Ionicons name="information-circle-outline" size={18} color={theme.orange} />
-              <Text style={styles.infoTitle}>Processing Times</Text>
-            </View>
-            <Text style={styles.infoSubtitle}>Estimated completion times for documents</Text>
-
-            <View style={styles.infoSection}>
-              <Text style={styles.infoSectionTitle}>Regular Processing</Text>
-              <Text style={styles.infoBullet}>• Certificates: 3-5 business days</Text>
-              <Text style={styles.infoBullet}>• Transcript of Records: 5-7 business days</Text>
-              <Text style={styles.infoBullet}>• Diploma: 7-10 business days</Text>
-            </View>
-
-            <View style={styles.infoSection}>
-              <Text style={styles.infoSectionTitle}>Rush Processing</Text>
-              <Text style={styles.infoBullet}>• Additional fee applies</Text>
-              <Text style={styles.infoBullet}>• 1-2 business days</Text>
-              <Text style={styles.infoBullet}>• Subject to availability</Text>
-            </View>
-          </View>
         </ScrollView>
       </SafeAreaView>
 
@@ -602,7 +589,7 @@ export default function StudentDocumentsScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -637,7 +624,6 @@ export default function StudentDocumentsScreen() {
             <View style={styles.dialogHeaderRow}>
               <View>
                 <Text style={styles.dialogHeaderTitle}>New Document Request</Text>
-                <Text style={styles.dialogHeaderSubtitle}>Submit a request for official documents</Text>
               </View>
               <Pressable onPress={() => setDialogOpen(false)} hitSlop={8}>
                 <Ionicons name="close" size={20} color={theme.subtext} />

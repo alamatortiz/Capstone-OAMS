@@ -281,7 +281,7 @@ export default function StudentQueueScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Queue Management</Text>
-              <Text style={styles.pageSubtitle}>Join queues and track your position in real-time</Text>
+              <Text style={styles.pageSubtitle}>Join queues and track your position in real-time.</Text>
             </View>
           </View>
 
@@ -373,7 +373,7 @@ export default function StudentQueueScreen() {
               <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No Active Queues</Text>
               <Text style={styles.emptyDescription}>
-                You&apos;re not currently in any queues. Browse available queues below to join one.
+                You are not participating in any active queues.
               </Text>
             </View>
           )}
@@ -520,7 +520,7 @@ export default function StudentQueueScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>

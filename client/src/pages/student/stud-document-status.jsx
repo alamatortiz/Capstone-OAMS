@@ -66,7 +66,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
         icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
         iconClassName="dss-title-icon"
         title="Document Details"
-        subtitle="Your document request details and status"
+        subtitle="Your document request details and status."
       />
 
       {/* Hero */}
@@ -104,7 +104,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
           }}
         >
           <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document is ready for pickup — please proceed to the designated location
+          Your document is ready for pickup — please proceed to the designated location.
         </div>
       )}
 
@@ -462,7 +462,7 @@ export default function DocumentStatusPage() {
               icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
               iconClassName="dss-title-icon"
               title="My Document Requests"
-              subtitle="Track all of your document requests"
+              subtitle="Track all of your document requests."
             />
 
             {/* Error */}
@@ -569,7 +569,7 @@ export default function DocumentStatusPage() {
                         <FileText className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Active Requests</h3>
                         <p className="dss-empty-text">
-                          You have no active document requests
+                          You have no active document requests.
                         </p>
                         <button
                           onClick={() => navigate("/student/documents")}
@@ -637,7 +637,7 @@ export default function DocumentStatusPage() {
                         <CheckCircle2 className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Completed Requests</h3>
                         <p className="dss-empty-text">
-                          You have no records of claimed documents
+                          You have no records of claimed documents.
                         </p>
                       </div>
                     )}
@@ -681,7 +681,7 @@ export default function DocumentStatusPage() {
                         <XCircle className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Rejected Requests</h3>
                         <p className="dss-empty-text">
-                          You have no records of rejected document requests
+                          You have no records of rejected document requests.
                         </p>
                       </div>
                     )}
@@ -725,7 +725,7 @@ export default function DocumentStatusPage() {
                         <XCircle className="dss-empty-icon" />
                         <h3 className="dss-empty-title">No Cancelled Requests</h3>
                         <p className="dss-empty-text">
-                          You have no records of cancelled document requests
+                          You have no records of cancelled document requests.
                         </p>
                       </div>
                     )}

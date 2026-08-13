@@ -106,7 +106,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
     setSavingNotes(true);
     try {
       await onSaveNotes(queue.queueId, notesText.trim());
-      toast.success("Notes updated");
+      toast.success("Notes updated.");
       setShowNotesDialog(false);
     } catch (err) {
       toast.error(err.message);
@@ -127,7 +127,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
         }
         icon={<Clock className="icon" />}
         title="Queue Details"
-        subtitle="Your queue details and status"
+        subtitle="Your queue details and status."
       />
 
       {/* Hero */}
@@ -180,7 +180,7 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
           />
           {queue.arrivedAt
             ? "Service being processed"
-            : "It's your turn — please proceed to the designated location"}
+            : "It's your turn — please proceed to the designated location."}
         </div>
       )}
 
@@ -686,7 +686,7 @@ export default function QueueStatusPage() {
               }
               icon={<Clock className="icon" />}
               title="My Queue Status"
-              subtitle="Track all the queues you are in"
+              subtitle="Track all the queues you are in."
             />
 
             {/* Error */}
@@ -778,7 +778,7 @@ export default function QueueStatusPage() {
                                   }}
                                 >
                                   <AlertCircle style={{ width: "0.9rem", height: "0.9rem" }} />
-                                  {queue.slotStatus === "full" ? "Queue Full: No longer accepting students but students within the queue will still be served" : "Hours ended — still serving"}
+                                  {queue.slotStatus === "full" ? "Queue Full: No longer accepting students but students within the queue will still be served." : "Hours ended — still serving"}
                                 </div>
                               )}
                               <div className="qsl-stats-grid">
@@ -826,7 +826,7 @@ export default function QueueStatusPage() {
                     <Users className="queue-empty-icon" />
                     <h3 className="queue-empty-title">Not Participating in Any Queues</h3>
                     <p className="queue-empty-text">
-                      You are not participating in any active queues
+                      You are not participating in any active queues.
                     </p>
                     <button
                       onClick={() => navigate("/student/queue")}

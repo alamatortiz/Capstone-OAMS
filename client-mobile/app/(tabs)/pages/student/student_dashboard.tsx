@@ -434,9 +434,9 @@ export default function StudentDashboardScreen() {
   const morePinnedCount = allPinnedAnnouncements.length - pinnedPreview.length;
 
   const quickActions: QuickAction[] = [
-    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from all colleges.', icon: 'megaphone-outline', badge: `${allPinnedAnnouncements.length} Pinned`, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
+    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: 'megaphone-outline', badge: `${allPinnedAnnouncements.length} Pinned`, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
     { key: 'appointment-booking', title: 'Appointment Booking', description: 'Schedule appointments with professors and view available slots.', icon: 'calendar-outline', badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check faculty consultation hours and room availability.', icon: 'school-outline', badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check professor consultation hours and availability across all departments.', icon: 'school-outline', badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
   ];
 
   const recentActivity: ActivityEntry[] = dashStats?.recentActivity ?? [];
@@ -535,9 +535,6 @@ export default function StudentDashboardScreen() {
           {/* Quick Actions */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.sectionCountPill}>
-              <Text style={styles.sectionCountText}>{quickActions.length} features available</Text>
-            </View>
           </View>
           <View style={styles.actionsGrid}>
             {quickActions.map((action) => {
@@ -614,7 +611,7 @@ export default function StudentDashboardScreen() {
                 <View style={styles.emptyIcon}>
                   <Ionicons name="time-outline" size={22} color={theme.blue} />
                 </View>
-                <Text style={styles.emptyText}>No Active Queues</Text>
+                <Text style={styles.emptyText}>No Active Queues.</Text>
               </View>
             )}
           </Pressable>
@@ -657,6 +654,11 @@ export default function StudentDashboardScreen() {
                           <Text style={styles.announcementTitle} numberOfLines={2}>
                             {ann.title}
                           </Text>
+                          {ann.description && (
+                            <Text style={styles.announcementDescription} numberOfLines={2}>
+                              {ann.description}
+                            </Text>
+                          )}
                           <View style={styles.announcementMeta}>
                             <Text style={styles.announcementMetaText}>{ann.college}</Text>
                             <Text style={styles.announcementMetaText}>
@@ -764,7 +766,12 @@ export default function StudentDashboardScreen() {
             {officeHoursLoading ? (
               <Text style={styles.hoursTime}>Loading office hours...</Text>
             ) : officeHoursError ? (
-              <Text style={styles.hoursTime}>{officeHoursError}</Text>
+              <View>
+                <Text style={styles.hoursTime}>{officeHoursError}</Text>
+                <Pressable onPress={fetchOfficeHours} hitSlop={8}>
+                  <Text style={styles.viewAllText}>Retry</Text>
+                </Pressable>
+              </View>
             ) : !officeHours ? (
               <Text style={styles.hoursTime}>No office hours available.</Text>
             ) : (
@@ -808,7 +815,7 @@ export default function StudentDashboardScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -1272,6 +1279,12 @@ function createStyles(theme: ThemePalette) {
     announcementMetaText: {
       fontSize: 11,
       color: theme.tertiary,
+    },
+    announcementDescription: {
+      fontSize: 12,
+      color: theme.tertiary,
+      marginTop: 2,
+      marginBottom: 2,
     },
     announcementBadge: {
       borderWidth: 1,

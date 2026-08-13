@@ -145,6 +145,15 @@ const FILTER_TABS: { key: FilterTabKey; label: string }[] = [
   { key: 'general', label: 'General' },
 ];
 
+const EMPTY_STATE_COPY: Record<FilterTabKey, { title: string; description: string }> = {
+  pinned: { title: 'No Pinned Announcements', description: 'There are no pinned announcements yet.' },
+  all: { title: 'No Announcements Found', description: 'There are no announcements yet.' },
+  important: { title: 'No Important Announcements Found', description: 'There are no important announcements yet.' },
+  event: { title: 'No Event Announcements Found', description: 'There are no event announcements yet.' },
+  reminder: { title: 'No Reminder Announcements Found', description: 'There are no reminder announcements yet.' },
+  general: { title: 'No General Announcements Found', description: 'There are no general announcements yet.' },
+};
+
 interface NavItem {
   key: string;
   label: string;
@@ -336,13 +345,7 @@ export default function StudentAnnouncementScreen() {
   // The backend now returns exactly this tab's items, paginated
   // (mirrors stud-announcements.jsx (web)), so `announcements` itself is
   // already the correct list to render -- no client-side filtering needed.
-  const isPinnedTab = selectedFilter === 'pinned';
   const hasMore = page < totalPages;
-  const sectionTitle = isPinnedTab
-    ? 'Pinned Announcements'
-    : selectedFilter === 'all'
-      ? 'All Announcements'
-      : `${capitalize(selectedFilter)} Announcements`;
 
   const renderCard = (announcement: Announcement) => {
     const style = announcement.isPinned
@@ -357,6 +360,12 @@ export default function StudentAnnouncementScreen() {
           <View style={styles.cardBody}>
             <View style={styles.cardTitleRow}>
               <Text style={styles.cardTitle}>{announcement.title}</Text>
+              {announcement.isPinned && (
+                <View style={styles.pinnedPill}>
+                  <Ionicons name="megaphone-outline" size={11} color={PINNED_STYLE.badgeColor} />
+                  <Text style={[styles.pinnedPillText, { color: PINNED_STYLE.badgeColor }]}>Pinned</Text>
+                </View>
+              )}
               <View style={[styles.badge, { backgroundColor: style.badgeBg, borderColor: style.badgeBorder }]}>
                 <Text style={[styles.badgeText, { color: style.badgeColor }]}>
                   {capitalize(announcement.category)}
@@ -440,7 +449,7 @@ export default function StudentAnnouncementScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Announcements</Text>
-              <Text style={styles.pageSubtitle}>Stay updated with the latest notices</Text>
+              <Text style={styles.pageSubtitle}>Stay updated with the latest notices from your department.</Text>
             </View>
           </View>
 
@@ -481,17 +490,14 @@ export default function StudentAnnouncementScreen() {
           {/* Announcement List */}
           {!loading && !error && (
           <View>
-            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
             {announcements.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="notifications-off-outline" size={32} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>
-                  {isPinnedTab ? 'No Pinned Announcements' : 'No Announcements Found'}
+                  {EMPTY_STATE_COPY[selectedFilter].title}
                 </Text>
                 <Text style={styles.emptyDescription}>
-                  {isPinnedTab
-                    ? 'Announcements marked as important will appear here.'
-                    : 'Try adjusting your filters to see more results.'}
+                  {EMPTY_STATE_COPY[selectedFilter].description}
                 </Text>
               </View>
             ) : (
@@ -528,7 +534,7 @@ export default function StudentAnnouncementScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -885,6 +891,18 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 5,
       paddingHorizontal: 12,
       flexShrink: 0,
+    },
+    pinnedPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      flexShrink: 0,
+    },
+    pinnedPillText: {
+      fontSize: 10,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
     },
     badgeText: {
       fontSize: 10,

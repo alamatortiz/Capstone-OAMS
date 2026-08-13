@@ -395,7 +395,7 @@ export default function StudentDashboard() {
   const quickActions = [
     {
       title: "Announcements",
-      description: "Stay updated with the latest notices from your department",
+      description: "Stay updated with the latest notices from your department.",
       icon: MegaphoneIcon,
       link: "/student/announcements",
       gradientIndex: 1,
@@ -404,14 +404,14 @@ export default function StudentDashboard() {
     {
       title: "Appointment Booking",
       description:
-        "Schedule appointments with professors and view available slots",
+        "Schedule appointments with professors and view available slots.",
       icon: CalendarIcon,
       link: "/student/appointments",
       gradientIndex: 2,
     },
     {
       title: "Professor Schedules",
-      description: "Check professor consultation hours and availability across all departments",
+      description: "Check professor consultation hours and availability across all departments.",
       icon: GraduationCapIcon,
       link: "/student/professor-schedules",
       gradientIndex: 4,
@@ -626,7 +626,7 @@ export default function StudentDashboard() {
                   <div className="empty-icon">
                     <QueueIconNav />
                   </div>
-                  <p>No Active Queues</p>
+                  <p>No Active Queues.</p>
                 </div>
               </div>
             )}
@@ -654,7 +654,7 @@ export default function StudentDashboard() {
                     <div className="empty-icon">
                       <MegaphoneIcon />
                     </div>
-                    <p>No pinned announcements</p>
+                    <p>No pinned announcements.</p>
                   </div>
                 ) : (
                   pinnedPreview.map((ann) => (
@@ -717,7 +717,7 @@ export default function StudentDashboard() {
                 </div>
               ) : recentActivity.length === 0 ? (
                 <div className="activity-list">
-                  <p className="activity-empty">No recent activity yet</p>
+                  <p className="activity-empty">No recent activity yet.</p>
                 </div>
               ) : (
                 <div className="activity-list">
@@ -779,7 +779,7 @@ export default function StudentDashboard() {
                   </button>
                 </p>
               ) : !officeHours ? (
-                <p className="stud-hours-empty">No office hours available</p>
+                <p className="stud-hours-empty">No office hours available.</p>
               ) : (
                 <>
                   <div className="stud-hours-schedule">

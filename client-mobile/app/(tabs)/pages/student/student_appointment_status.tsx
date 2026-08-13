@@ -99,6 +99,7 @@ interface Appointment {
   purpose: string;
   status: BookingStatus;
   createdAt: string;
+  appointmentType?: string;
 }
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -229,6 +230,7 @@ export default function StudentAppointmentStatusScreen() {
           purpose: a.purpose ?? '',
           status: a.status,
           createdAt: a.createdAt,
+          appointmentType: a.appointmentType ?? undefined,
         })),
       );
       setError(null);
@@ -367,7 +369,7 @@ export default function StudentAppointmentStatusScreen() {
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>Appointment Details</Text>
-                  <Text style={styles.pageSubtitle}>View the status of your appointment</Text>
+                  <Text style={styles.pageSubtitle}>Your appointment details and status.</Text>
                 </View>
               </View>
 
@@ -395,6 +397,12 @@ export default function StudentAppointmentStatusScreen() {
                     <Text style={styles.detailLabel}>Professor</Text>
                     <Text style={styles.detailValue}>{selectedAppt.person}</Text>
                   </View>
+                  {selectedAppt.appointmentType ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Appointment Type</Text>
+                      <Text style={styles.detailValue}>{selectedAppt.appointmentType}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>College / Department</Text>
                     <Text style={styles.detailValue}>{selectedAppt.college}</Text>
@@ -479,7 +487,7 @@ export default function StudentAppointmentStatusScreen() {
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>My Appointments</Text>
-                  <Text style={styles.pageSubtitle}>Track and manage all your appointment bookings</Text>
+                  <Text style={styles.pageSubtitle}>Track all of your appointments.</Text>
                 </View>
               </View>
 
@@ -498,7 +506,7 @@ export default function StudentAppointmentStatusScreen() {
                 </LinearGradient>
                 <View style={styles.profSchedText}>
                   <Text style={styles.profSchedTitle}>Professor Schedules</Text>
-                  <Text style={styles.profSchedSubtitle}>Browse when your professors are available before booking</Text>
+                  <Text style={styles.profSchedSubtitle}>Check professor consultation hours and availability across all departments.</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={theme.purple} />
               </Pressable>
@@ -591,6 +599,12 @@ export default function StudentAppointmentStatusScreen() {
                               {appt.windowStart && appt.windowEnd ? `${formatTime(appt.windowStart)} – ${formatTime(appt.windowEnd)}` : '—'}
                             </Text>
                           </View>
+                          {appt.appointmentType && (
+                            <View style={styles.listItemFieldFull}>
+                              <Text style={styles.listItemFieldLabel}>Appointment Type</Text>
+                              <Text style={styles.listItemFieldValue}>{appt.appointmentType}</Text>
+                            </View>
+                          )}
                           <View style={styles.listItemFieldFull}>
                             <Text style={styles.listItemFieldLabel}>Location</Text>
                             <Text style={styles.listItemFieldValue}>{appt.location}</Text>
@@ -613,9 +627,11 @@ export default function StudentAppointmentStatusScreen() {
                     {activeTab === 'all' ? 'No Appointments Yet' : `No ${TABS.find((t) => t.key === activeTab)?.label} Appointments`}
                   </Text>
                   <Text style={styles.emptyDescription}>
-                    {activeTab === 'all' || activeTab === 'pending'
-                      ? 'Book an appointment to get started.'
-                      : `You have no ${activeTab} appointments.`}
+                    {activeTab === 'all'
+                      ? 'You have no active appointments yet.'
+                      : activeTab === 'pending'
+                        ? 'You have no records of pending appointments.'
+                        : `You have no records of ${activeTab} appointments.`}
                   </Text>
                   {(activeTab === 'all' || activeTab === 'pending') && (
                     <Pressable style={styles.bookCtaBtn} onPress={goToBooking}>
@@ -645,7 +661,7 @@ export default function StudentAppointmentStatusScreen() {
               <View style={styles.drawerRoleBadge}>
                 <Text style={styles.drawerRoleBadgeText}>Student</Text>
               </View>
-              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.drawerCollege}>{user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})</Text>
             </View>
 
             <View style={styles.drawerNav}>
@@ -682,7 +698,9 @@ export default function StudentAppointmentStatusScreen() {
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Appointment?</Text>
             <Text style={styles.logoutModalDescription}>
-              Are you sure you want to cancel this appointment? This action cannot be undone.
+              {selectedAppt
+                ? `You are about to cancel your appointment with ${selectedAppt.person} on ${formatDate(selectedAppt.date)}. This will permanently remove it — you'll need to book a new one if you change your mind.`
+                : 'Are you sure you want to cancel this appointment? This action cannot be undone.'}
             </Text>
             <View style={styles.logoutModalActions}>
               <Pressable style={styles.logoutCancelBtn} onPress={() => setCancelConfirmId(null)}>
