@@ -106,6 +106,8 @@ interface StatItem {
 const BADGE_TINTS = {
   green: { bg: 'rgba(22, 163, 74, 0.15)', border: 'rgba(22, 163, 74, 0.25)', color: '#4ade80' },
   violet: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.25)', color: '#d8b4fe' },
+  blue: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.25)', color: '#93c5fd' },
+  orange: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.25)', color: '#fcd34d' },
 } as const;
 
 interface QuickAction {
@@ -435,8 +437,11 @@ export default function StudentDashboardScreen() {
 
   const quickActions: QuickAction[] = [
     { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: 'megaphone-outline', badge: `${allPinnedAnnouncements.length} Pinned`, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
-    { key: 'appointment-booking', title: 'Appointment Booking', description: 'Schedule appointments with professors and view available slots.', icon: 'calendar-outline', badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
     { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check professor consultation hours and availability across all departments.', icon: 'school-outline', badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'queues', title: 'Queues', description: 'Join queues and track your position in real-time.', icon: 'time-outline', badge: `${activeQueueCount} Participating Queues`, badgeTint: 'blue', gradient: ['#3b82f6', '#6366f1'] },
+    { key: 'appointments', title: 'Appointments', description: 'Schedule appointments with professors and view available slots.', icon: 'calendar-outline', badge: `${dashStats?.stats?.appointments?.active ?? 0} Active Bookings`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'document-requests', title: 'Document Requests', description: 'Request documents and track their status.', icon: 'document-text-outline', badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`, badgeTint: 'orange', gradient: ['#f59e0b', '#d97706'] },
+    { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: 'swap-horizontal-outline', badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
   ];
 
   const recentActivity: ActivityEntry[] = dashStats?.recentActivity ?? [];
@@ -542,10 +547,16 @@ export default function StudentDashboardScreen() {
               const onPress =
                 action.key === 'announcements'
                   ? () => router.push('/pages/student/student_announcement')
-                  : action.key === 'appointment-booking'
+                  : action.key === 'appointments'
                   ? () => router.push('/pages/student/student_appointments')
                   : action.key === 'professor-schedules'
                   ? () => router.push('/pages/student/student_professor_schedules')
+                  : action.key === 'queues'
+                  ? () => router.push('/pages/student/student_queue')
+                  : action.key === 'document-requests'
+                  ? () => router.push('/pages/student/student_documents')
+                  : action.key === 'transactions'
+                  ? () => router.push('/pages/student/student_transactions')
                   : comingSoon;
               return (
                 <Pressable key={action.key} style={styles.actionCard} onPress={onPress}>
@@ -708,7 +719,7 @@ export default function StudentDashboardScreen() {
             {dashLoading ? (
               <Text style={styles.emptyText}>Loading activity...</Text>
             ) : recentActivity.length === 0 ? (
-              <Text style={styles.emptyText}>No recent activity yet.</Text>
+              <Text style={styles.activityEmptyText}>No recent activity yet.</Text>
             ) : (
               recentActivity.map((activity, index) => {
                 const meta = ACTIVITY_META[activity.type] ?? ACTIVITY_META.queue;
@@ -1221,6 +1232,11 @@ function createStyles(theme: ThemePalette) {
     emptyText: {
       fontSize: 13,
       color: theme.subtext,
+    },
+    activityEmptyText: {
+      fontSize: 13,
+      color: theme.subtext,
+      textAlign: 'center',
     },
     pausedBadge: {
       flexDirection: 'row',

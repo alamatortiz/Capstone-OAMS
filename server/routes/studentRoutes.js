@@ -82,13 +82,12 @@ router.get(
 
       const [[apptRow]] = await pool.query(
         `SELECT
-           SUM(CASE WHEN status = 'pending'  THEN 1 ELSE 0 END) AS pending_count,
-           SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved_count
+           SUM(CASE WHEN status = 'pending'  AND appointment_date >= ? THEN 1 ELSE 0 END) AS pending_count,
+           SUM(CASE WHEN status = 'approved' AND appointment_date >= ? THEN 1 ELSE 0 END) AS approved_count,
+           SUM(CASE WHEN status IN ('pending', 'approved') THEN 1 ELSE 0 END) AS active_count
          FROM appointments
-         WHERE student_id = ?
-           AND status IN ('pending', 'approved')
-           AND appointment_date >= ?`,
-        [studentId, getManilaDateString()],
+         WHERE student_id = ?`,
+        [getManilaDateString(), getManilaDateString(), studentId],
       );
 
       const [[docRow]] = await pool.query(
@@ -216,6 +215,7 @@ router.get(
             upcoming: Number(apptRow.pending_count || 0) + Number(apptRow.approved_count || 0),
             pending: Number(apptRow.pending_count || 0),
             approved: Number(apptRow.approved_count || 0),
+            active: Number(apptRow.active_count || 0),
           },
           documents: (() => {
             const pendingOnly = Number(docRow.pending_only_count || 0);

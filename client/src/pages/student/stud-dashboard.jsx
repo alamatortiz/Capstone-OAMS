@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { FileText, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { FileText, Megaphone as LucideMegaphone, GraduationCap as LucideGraduationCap, Users as LucideUsers, ClipboardList as LucideClipboardList } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import { useQueue } from "../../contexts/QueueContext";
@@ -111,6 +111,9 @@ const ListIcon = () => (
 );
 const GraduationCapIcon = () => <LucideGraduationCap className="icon" />;
 const MegaphoneIcon = () => <LucideMegaphone className="icon" />;
+const QueueIcon = () => <LucideUsers className="icon" />;
+const DocumentsIcon = () => <FileText className="icon" />;
+const TransactionsIcon = () => <LucideClipboardList className="icon" />;
 
 const formatActivityStatus = (status, type) => {
   if (!status) return "";
@@ -391,7 +394,8 @@ export default function StudentDashboard() {
     },
   ];
 
-  // ── Quick actions (badge for active queues is now live) ───────────────────
+  // ── Quick actions (badges are live, sourced from the same status
+  // definitions each destination page uses for its own counts) ─────────────
   const quickActions = [
     {
       title: "Announcements",
@@ -402,20 +406,44 @@ export default function StudentDashboard() {
       badge: `${allPinnedAnnouncements.length} Pinned`,
     },
     {
-      title: "Appointment Booking",
-      description:
-        "Schedule appointments with professors and view available slots.",
-      icon: CalendarIcon,
-      link: "/student/appointments",
-      gradientIndex: 2,
-    },
-    {
       title: "Professor Schedules",
       description: "Check professor consultation hours and availability across all departments.",
       icon: GraduationCapIcon,
       link: "/student/professor-schedules",
       gradientIndex: 4,
       badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`,
+    },
+    {
+      title: "Queues",
+      description: "Join queues and track your position in real-time.",
+      icon: QueueIcon,
+      link: "/student/queue",
+      gradientIndex: 3,
+      badge: `${activeQueueCount} Participating Queues`,
+    },
+    {
+      title: "Appointments",
+      description:
+        "Schedule appointments with professors and view available slots.",
+      icon: CalendarIcon,
+      link: "/student/appointments",
+      gradientIndex: 2,
+      badge: `${dashStats?.stats?.appointments?.active ?? 0} Active Bookings`,
+    },
+    {
+      title: "Document Requests",
+      description: "Request documents and track their status.",
+      icon: DocumentsIcon,
+      link: "/student/documents",
+      gradientIndex: 6,
+      badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`,
+    },
+    {
+      title: "Transactions",
+      description: "View all your activities and transactions.",
+      icon: TransactionsIcon,
+      link: "/student/transactions",
+      gradientIndex: 1,
     },
   ];
 

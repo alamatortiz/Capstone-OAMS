@@ -291,7 +291,7 @@ export default function ProfessorAnnouncementsPage() {
             }
             icon={<MegaphoneIcon />}
             title="Announcements"
-            subtitle="Notices and updates for faculty in your department"
+            subtitle="Stay updated with the latest notices from your department."
           />
 
           {/* Error banner */}

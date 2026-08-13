@@ -169,7 +169,7 @@ export default function ProfessorDocumentRequest() {
   const handleSubmitRequest = async () => {
     if (submitting) return;
     if (!formData.type || !formData.purpose) {
-      toast.error("Please fill in all required fields");
+      toast.error("Please fill in all required fields.");
       return;
     }
     const selectedService = documentTypes.find((d) => d.name === formData.type);
@@ -234,8 +234,7 @@ export default function ProfessorDocumentRequest() {
               <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
                 <div className="doc-dialog-header">
                   <div>
-                    <h2>New Document Request</h2>
-                    <p>Submit a request for an official HR/Records document</p>
+                    <h2>Request a Document</h2>
                   </div>
                   <button
                     className="doc-dialog-close"
@@ -320,7 +319,7 @@ export default function ProfessorDocumentRequest() {
                   </div>
 
                   <div className="doc-form-group">
-                    <label htmlFor="neededBy">Needed By (optional)</label>
+                    <label htmlFor="neededBy">Date Needed (Optional)</label>
                     <input
                       id="neededBy"
                       type="date"
@@ -405,7 +404,7 @@ export default function ProfessorDocumentRequest() {
           icon={<FileText />}
           iconClassName="doc-title-icon"
           title="Document Requests"
-          subtitle="Request official documents and track your submissions"
+          subtitle="Request documents and track their status."
         />
 
         <button
