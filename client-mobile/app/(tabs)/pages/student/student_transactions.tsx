@@ -464,7 +464,7 @@ export default function StudentTransactionsScreen() {
           ) : (
             <View style={styles.emptyCard}>
               <Ionicons name="search-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>No transactions found</Text>
+              <Text style={styles.emptyTitle}>No Transactions Found</Text>
               <Text style={styles.emptyDescription}>You have no transaction records yet.</Text>
             </View>
           )}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useQueue } from '@/context/QueueContext';
+import api from '@/utils/api';
 import QueueConcernModal from '@/components/QueueConcernModal';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -117,9 +118,71 @@ export default function StudentQueueScreen() {
   const [concernModal, setConcernModal] = useState<{ slotId: number; serviceName: string } | null>(null);
   const [concernText, setConcernText] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [detailSlot, setDetailSlot] = useState<any | null>(null);
+  const [servicesByDept, setServicesByDept] = useState<any[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
   const router = useRouter();
   const { user, logout } = useAuth();
   const { queues: myQueues, availableSlots, joinQueue, leaveQueue, isAlreadyInQueue: isSlotJoined } = useQueue();
+
+  // Requirements/Procedure aren't on the availableSlots payload -- mirrors
+  // stud-queue.jsx's fetchServices(), called once on mount and again every
+  // time a Service Detail view opens so newly-added requirements/procedure
+  // never show stale.
+  const fetchServices = useCallback(async () => {
+    setServicesLoading(true);
+    try {
+      const { data } = await api.get('/student/services/by-department');
+      setServicesByDept(data.departments ?? []);
+    } catch (err) {
+      console.error('Failed to fetch services:', err);
+    } finally {
+      setServicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  // Matched client-side by case-insensitive service name, same as web's
+  // getServiceRequirements/getProcedureSteps -- there's no serviceId on the
+  // availableSlots payload to join on directly.
+  const findServiceMeta = (serviceName?: string) => {
+    if (!serviceName) return null;
+    const lower = serviceName.toLowerCase();
+    for (const dept of servicesByDept) {
+      const match = (dept.services ?? []).find((s: any) => s.serviceName?.toLowerCase() === lower);
+      if (match) return match;
+    }
+    return null;
+  };
+
+  const openServiceDetail = (slot: any) => {
+    setDetailSlot(slot);
+    fetchServices();
+  };
+
+  // Shared by both the list card and the detail modal's CTA so they can
+  // never disagree about whether a queue is joinable right now.
+  const getJoinState = (q: any) => {
+    const alreadyIn = isSlotJoined(q.slotId);
+    const isPaused = q.status === 'paused';
+    const atCapacity = !q.hasCapacity;
+    const outsideHours = !q.isWithinHours;
+    const canJoin = !alreadyIn && !isPaused && !outsideHours && !atCapacity;
+    const badgeLabel = isPaused ? 'Paused' : outsideHours ? 'Closed' : atCapacity ? 'Full' : 'Open';
+    const joinLabel = alreadyIn
+      ? 'Already in Queue'
+      : isPaused
+        ? 'Queue Paused'
+        : outsideHours
+          ? 'Currently Closed'
+          : atCapacity
+            ? 'Queue Full'
+            : 'Join Queue';
+    return { alreadyIn, isPaused, atCapacity, outsideHours, canJoin, badgeLabel, joinLabel };
+  };
 
   const COLLEGES: College[] = useMemo(() => {
     const seen = new Map<string, string>();
@@ -408,23 +471,13 @@ export default function StudentQueueScreen() {
           {filteredQueues.length > 0 ? (
             <View style={styles.queueList}>
               {filteredQueues.map((q: any) => {
-                const alreadyIn = isSlotJoined(q.slotId);
-                const isPaused = q.status === 'paused';
-                const atCapacity = !q.hasCapacity;
-                const outsideHours = !q.isWithinHours;
-                const canJoin = !alreadyIn && !isPaused && !outsideHours && !atCapacity;
-                const badgeLabel = isPaused ? 'Paused' : outsideHours ? 'Closed' : atCapacity ? 'Full' : 'Open';
-                const joinLabel = alreadyIn
-                  ? 'Already in Queue'
-                  : isPaused
-                    ? 'Queue Paused'
-                    : outsideHours
-                      ? 'Currently Closed'
-                      : atCapacity
-                        ? 'Queue Full'
-                        : 'Join Queue';
+                const { canJoin, badgeLabel, joinLabel } = getJoinState(q);
                 return (
-                  <View key={q.slotId} style={styles.availableQueueCard}>
+                  <Pressable
+                    key={q.slotId}
+                    style={styles.availableQueueCard}
+                    onPress={() => openServiceDetail(q)}
+                  >
                     <View style={styles.availableQueueLeft}>
                       <View style={styles.logoCircle}>
                         <Image
@@ -476,14 +529,17 @@ export default function StudentQueueScreen() {
 
                     <Pressable
                       style={[styles.joinBtn, !canJoin && styles.joinBtnDisabled]}
-                      onPress={() => setConcernModal({ slotId: q.slotId, serviceName: q.serviceName })}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setConcernModal({ slotId: q.slotId, serviceName: q.serviceName });
+                      }}
                       disabled={!canJoin}
                     >
                       <Text style={[styles.joinBtnText, !canJoin && styles.joinBtnTextDisabled]}>
                         {joinLabel}
                       </Text>
                     </Pressable>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -547,6 +603,121 @@ export default function StudentQueueScreen() {
             </Pressable>
           </SafeAreaView>
           <Pressable style={styles.drawerBackdrop} onPress={() => setMenuOpen(false)} />
+        </View>
+      </Modal>
+
+      {/* Service Detail Modal */}
+      <Modal visible={detailSlot !== null} animationType="fade" transparent onRequestClose={() => setDetailSlot(null)}>
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <View style={styles.dialogHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dialogHeaderTitle}>{detailSlot?.serviceName}</Text>
+                <Text style={styles.dialogHeaderSubtitle}>{detailSlot?.departmentName}</Text>
+              </View>
+              <Pressable onPress={() => setDetailSlot(null)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.dialogBody}>
+              <View style={styles.detailHeroRow}>
+                <View style={styles.detailHeroStat}>
+                  <Ionicons name="people-outline" size={16} color={theme.blue} />
+                  <Text style={styles.detailHeroStatText}>{detailSlot?.waitingCount ?? 0} currently waiting</Text>
+                </View>
+                {!!detailSlot?.location && (
+                  <View style={styles.detailHeroStat}>
+                    <Ionicons name="location-outline" size={16} color={theme.purple} />
+                    <Text style={styles.detailHeroStatText}>{detailSlot.location}</Text>
+                  </View>
+                )}
+              </View>
+
+              {detailSlot?.voidTimeoutMinutes != null && (
+                <View style={styles.voidWarningBox}>
+                  <Ionicons name="alert-circle-outline" size={14} color={theme.tertiary} />
+                  <Text style={styles.voidWarningText}>
+                    Void after {detailSlot.voidTimeoutMinutes} min if you don&apos;t show up when called.
+                  </Text>
+                </View>
+              )}
+
+              {!!detailSlot?.description && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>About this Service</Text>
+                  <Text style={styles.detailSectionText}>{detailSlot.description}</Text>
+                </View>
+              )}
+
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Requirements</Text>
+                {servicesLoading ? (
+                  <Text style={styles.detailSectionText}>Loading…</Text>
+                ) : !findServiceMeta(detailSlot?.serviceName) ? (
+                  <Text style={styles.detailSectionText}>No requirements information available.</Text>
+                ) : (findServiceMeta(detailSlot?.serviceName)?.requirements ?? []).length === 0 ? (
+                  <Text style={styles.detailSectionText}>No specific requirements listed.</Text>
+                ) : (
+                  <View style={styles.hintRequirements}>
+                    {(findServiceMeta(detailSlot?.serviceName)?.requirements ?? []).map((req: any) => (
+                      <View key={req.id ?? req.name} style={styles.hintRequirementRow}>
+                        <View style={styles.hintRequirementNameRow}>
+                          <Text style={styles.hintText}>{req.name}</Text>
+                          <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                            <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                              {req.isMandatory ? 'Required' : 'Optional'}
+                            </Text>
+                          </View>
+                        </View>
+                        {req.description && <Text style={styles.hintRequirementDesc}>{req.description}</Text>}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Procedure</Text>
+                {servicesLoading ? (
+                  <Text style={styles.detailSectionText}>Loading…</Text>
+                ) : (findServiceMeta(detailSlot?.serviceName)?.procedureSteps ?? []).length === 0 ? (
+                  <Text style={styles.detailSectionText}>No procedure information available.</Text>
+                ) : (
+                  <View style={styles.procedureList}>
+                    {(findServiceMeta(detailSlot?.serviceName)?.procedureSteps ?? []).map((step: any) => (
+                      <View key={step.id ?? step.stepNumber} style={styles.procedureStepRow}>
+                        <View style={styles.procedureStepBadge}>
+                          <Text style={styles.procedureStepBadgeText}>{step.stepNumber}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.procedureStepTitle}>{step.title}</Text>
+                          {step.description && <Text style={styles.procedureStepDesc}>{step.description}</Text>}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+            <View style={styles.dialogActions}>
+              <Pressable style={styles.btnSecondary} onPress={() => setDetailSlot(null)}>
+                <Text style={styles.btnSecondaryText}>Close</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.btnPrimary, detailSlot && !getJoinState(detailSlot).canJoin && styles.joinBtnDisabled]}
+                disabled={!!detailSlot && !getJoinState(detailSlot).canJoin}
+                onPress={() => {
+                  if (!detailSlot) return;
+                  setConcernModal({ slotId: detailSlot.slotId, serviceName: detailSlot.serviceName });
+                  setDetailSlot(null);
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>
+                  {detailSlot ? getJoinState(detailSlot).joinLabel : 'Join Queue'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -1413,5 +1584,68 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4,
     },
     filterModalCloseText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
+
+    // Service Detail dialog (mirrors student_documents.tsx's request dialog chrome)
+    dialogOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 20 },
+    dialogCard: {
+      width: '100%', maxWidth: 400, maxHeight: '85%', backgroundColor: theme.card,
+      borderWidth: 1, borderColor: theme.border, borderRadius: 20, overflow: 'hidden',
+    },
+    dialogHeaderRow: {
+      flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+      padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border,
+    },
+    dialogHeaderTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+    dialogHeaderSubtitle: { fontSize: 12, color: theme.tertiary, marginTop: 4 },
+    dialogBody: { padding: 18 },
+    dialogActions: {
+      flexDirection: 'row', gap: 10, justifyContent: 'flex-end',
+      padding: 18, borderTopWidth: 1, borderTopColor: theme.border,
+    },
+    btnPrimary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12, backgroundColor: theme.blue },
+    btnPrimaryText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    btnSecondary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12, borderWidth: 1, borderColor: theme.border },
+    btnSecondaryText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
+
+    detailHeroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 12 },
+    detailHeroStat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    detailHeroStatText: { fontSize: 12.5, fontWeight: '600', color: theme.text },
+    voidWarningBox: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+      backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 10,
+      padding: 12, marginBottom: 16,
+    },
+    voidWarningText: { flex: 1, fontSize: 11.5, color: theme.tertiary, lineHeight: 16 },
+    detailSection: { marginBottom: 18 },
+    detailSectionTitle: { fontSize: 13, fontWeight: '700', color: theme.text, marginBottom: 8 },
+    detailSectionText: { fontSize: 12.5, color: theme.subtext, lineHeight: 18 },
+
+    // Requirements list (mirrors student_documents.tsx's hint/req-tag pattern)
+    hintRequirements: { gap: 10 },
+    hintRequirementRow: { gap: 2 },
+    hintRequirementNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    hintText: { fontSize: 12.5, color: theme.subtext, lineHeight: 18 },
+    hintRequirementDesc: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
+    reqTagRequired: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.35)',
+    },
+    reqTagRequiredText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    reqTagOptional: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+      backgroundColor: 'rgba(107, 114, 128, 0.15)', borderWidth: 1, borderColor: 'rgba(107, 114, 128, 0.35)',
+    },
+    reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
+
+    // Procedure list
+    procedureList: { gap: 12 },
+    procedureStepRow: { flexDirection: 'row', gap: 10 },
+    procedureStepBadge: {
+      width: 24, height: 24, borderRadius: 12, backgroundColor: theme.blue,
+      alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+    },
+    procedureStepBadgeText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
+    procedureStepTitle: { fontSize: 12.5, fontWeight: '700', color: theme.text },
+    procedureStepDesc: { fontSize: 11.5, color: theme.tertiary, lineHeight: 16, marginTop: 2 },
   });
 }

@@ -382,11 +382,17 @@ export default function StudentDashboardScreen() {
       })[0]
     : null;
 
-  const activeQueueCount = dashStats?.stats?.activeQueueCount ?? 0;
+  // Sourced from the same live contextQueues/closestQueue above (not
+  // dashStats) so this tile can't disagree with the Active Queue Preview
+  // card below or the Queues quick-action badge -- mirrors stud-dashboard.jsx's
+  // identical migration away from the poll-based dashStats.activeQueue fields.
+  const activeQueueCount = contextQueues.length;
   const queuePositionValue = dashLoading
     ? '—'
-    : dashStats?.stats?.queuePosition != null
-      ? String(dashStats.stats.queuePosition)
+    : closestQueue
+      ? closestQueue.status === 'serving'
+        ? (closestQueue.arrivedAt ? 'Being Served' : 'Called')
+        : String(closestQueue.position ?? 0)
       : '0';
 
   const stats: StatItem[] = [

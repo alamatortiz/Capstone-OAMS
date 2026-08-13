@@ -360,12 +360,6 @@ export default function StudentAnnouncementScreen() {
           <View style={styles.cardBody}>
             <View style={styles.cardTitleRow}>
               <Text style={styles.cardTitle}>{announcement.title}</Text>
-              {announcement.isPinned && (
-                <View style={styles.pinnedPill}>
-                  <Ionicons name="megaphone-outline" size={11} color={PINNED_STYLE.badgeColor} />
-                  <Text style={[styles.pinnedPillText, { color: PINNED_STYLE.badgeColor }]}>Pinned</Text>
-                </View>
-              )}
               <View style={[styles.badge, { backgroundColor: style.badgeBg, borderColor: style.badgeBorder }]}>
                 <Text style={[styles.badgeText, { color: style.badgeColor }]}>
                   {capitalize(announcement.category)}
@@ -891,18 +885,6 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 5,
       paddingHorizontal: 12,
       flexShrink: 0,
-    },
-    pinnedPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-      flexShrink: 0,
-    },
-    pinnedPillText: {
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
     },
     badgeText: {
       fontSize: 10,
