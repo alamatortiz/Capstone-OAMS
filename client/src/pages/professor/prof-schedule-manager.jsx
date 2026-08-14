@@ -84,7 +84,7 @@ export default function ProfessorScheduleManager() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/faculty/availability");
+      const res = await api.get("/professor/availability");
       const map = {};
       res.data.forEach((slot) => {
         if (!map[slot.day_of_week]) map[slot.day_of_week] = [];
@@ -92,7 +92,7 @@ export default function ProfessorScheduleManager() {
       });
       setSlotsByDay(map);
     } catch {
-      toast.error("Failed to load schedule data");
+      toast.error("Failed to load schedule data.");
     } finally {
       setLoading(false);
     }
@@ -101,9 +101,9 @@ export default function ProfessorScheduleManager() {
   useEffect(() => { fetchAll(); }, []);
 
   useEffect(() => {
-    api.get("/faculty/locations")
+    api.get("/professor/locations")
       .then(({ data }) => setLocations(data.locations || []))
-      .catch(() => toast.error("Failed to load locations"));
+      .catch(() => toast.error("Failed to load locations."));
   }, []);
 
   const handleDayClick = (day) => {
@@ -168,18 +168,18 @@ export default function ProfessorScheduleManager() {
   // ── Save (add or edit) slot ─────────────────────────────────────────────────
   const handleSaveSlot = async () => {
     if (addDays.length === 0 || !addStart || !addEnd || !addLocation.trim()) {
-      toast.error("Please select at least one day, times, and location");
+      toast.error("Please select at least one day, times, and location.");
       return;
     }
-    if (addEnd <= addStart) { toast.error("End time must be after start time"); return; }
+    if (addEnd <= addStart) { toast.error("End time must be after start time."); return; }
 
     if (!addMaxStudents.trim()) {
-      toast.error("Max students is required");
+      toast.error("Max students is required.");
       return;
     }
     const maxStu = parseInt(addMaxStudents, 10);
     if (isNaN(maxStu) || maxStu < 1) {
-      toast.error("Max students must be a positive number");
+      toast.error("Max students must be a positive number.");
       return;
     }
     if (editingId && maxStu < editingCurrentMaxBooked) {
@@ -197,7 +197,7 @@ export default function ProfessorScheduleManager() {
     try {
       if (showOtherLocation && !locations.some((loc) => loc.name === addLocation.trim())) {
         try {
-          const { data } = await api.post("/faculty/locations", { name: addLocation.trim() });
+          const { data } = await api.post("/professor/locations", { name: addLocation.trim() });
           setLocations((prev) => [...prev, data]);
         } catch {
           // Non-fatal: the slot can still be saved with the typed location text.
@@ -205,7 +205,7 @@ export default function ProfessorScheduleManager() {
       }
 
       if (editingId) {
-        await api.patch(`/faculty/availability/${editingId}`, {
+        await api.patch(`/professor/availability/${editingId}`, {
           day_of_week: addDays[0],
           start_time: addStart,
           end_time: addEnd,
@@ -213,13 +213,13 @@ export default function ProfessorScheduleManager() {
           max_students: maxStu,
           appointmentTypes: addApptTypes,
         });
-        toast.success("Time slot updated");
+        toast.success("Time slot updated.");
         setShowAddSlot(false);
         setSelectedDay(addDays[0]);
       } else {
         const results = await Promise.allSettled(
           addDays.map((day) =>
-            api.post("/faculty/availability", {
+            api.post("/professor/availability", {
               day_of_week: day,
               start_time: addStart,
               end_time: addEnd,
@@ -231,20 +231,20 @@ export default function ProfessorScheduleManager() {
         );
         const failed = results.filter((r) => r.status === "rejected");
         if (failed.length === 0) {
-          toast.success(addDays.length > 1 ? "Time slots added" : "Time slot added");
+          toast.success(addDays.length > 1 ? "Time slots added." : "Time slot added.");
           setShowAddSlot(false);
           if (!selectedDay) setSelectedDay(addDays[0]);
         } else if (failed.length < addDays.length) {
-          toast.error(`${failed.length} of ${addDays.length} day(s) failed to save`);
+          toast.error(`${failed.length} of ${addDays.length} day(s) failed to save.`);
           setShowAddSlot(false);
         } else {
-          const msg = failed[0].reason?.response?.data?.message ?? "Failed to add time slot";
+          const msg = failed[0].reason?.response?.data?.message ?? "Failed to add time slot.";
           toast.error(msg);
         }
       }
       await fetchAll();
     } catch (err) {
-      const msg = err?.response?.data?.message ?? "Failed to save time slot";
+      const msg = err?.response?.data?.message ?? "Failed to save time slot.";
       toast.error(msg);
     } finally { setAddSaving(false); }
   };
@@ -257,14 +257,14 @@ export default function ProfessorScheduleManager() {
     const { id, day } = deleteTarget;
     setDeleteSaving(true);
     try {
-      await api.delete(`/faculty/availability/${id}`);
-      toast.success("Time slot removed");
+      await api.delete(`/professor/availability/${id}`);
+      toast.success("Time slot removed.");
       await fetchAll();
       // If this was the last slot for the selected day, deselect it
       const remaining = (slotsByDay[day] ?? []).filter((s) => s.availability_id !== id);
       if (remaining.length === 0 && selectedDay === day) setSelectedDay(null);
       setDeleteTarget(null);
-    } catch { toast.error("Failed to remove time slot"); }
+    } catch { toast.error("Failed to remove time slot."); }
     finally { setDeleteSaving(false); }
   };
 

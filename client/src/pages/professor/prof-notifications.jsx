@@ -72,7 +72,7 @@ export default function ProfessorNotifications() {
     const requestId = ++requestIdRef.current;
     try {
       setError(null);
-      const res = await api.get("/faculty/notifications", {
+      const res = await api.get("/professor/notifications", {
         params: { type: filterType !== "all" ? filterType : undefined, page },
       });
       if (requestId !== requestIdRef.current) return;
@@ -118,7 +118,7 @@ export default function ProfessorNotifications() {
   const markRead = async (id) => {
     setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
     try {
-      await api.patch(`/faculty/notifications/${id}/read`);
+      await api.patch(`/professor/notifications/${id}/read`);
       broadcastNotificationsChanged();
     } catch {
       setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)));
@@ -129,7 +129,7 @@ export default function ProfessorNotifications() {
     const previous = notifications;
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
-      await api.patch("/faculty/notifications/read-all");
+      await api.patch("/professor/notifications/read-all");
       broadcastNotificationsChanged();
     } catch {
       setNotifications(previous);
@@ -153,13 +153,13 @@ export default function ProfessorNotifications() {
           }
           icon={<Bell />}
           title="Notifications"
-          subtitle="Stay updated on document and appointment activity"
+          subtitle="Stay updated on document and appointment activity."
         />
 
         <div className="filters-card">
           <div className="filters-header">
             <h3 className="filters-title">Notification Filter</h3>
-            <p className="filters-description">Filter your notifications by category</p>
+            <p className="filters-description">Filter your notifications by category.</p>
           </div>
           <div className="filters-row">
             <div className="filters-grid">

@@ -3,20 +3,15 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
+import FilterSelect from "../../components/FilterSelect";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
-import { formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
 const ActivityIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -43,6 +38,31 @@ const SearchIcon = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
+const ClipboardListIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    <line x1="8" y1="11" x2="16" y2="11"></line>
+    <line x1="8" y1="15" x2="12" y2="15"></line>
+  </svg>
+);
+const CheckCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+  </svg>
+);
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12 6 12 12 16 14"></polyline>
+  </svg>
+);
+const ChevronDownIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
 
 // ── Transactions data ─────────────────────────────────────────────────────────
 
@@ -51,21 +71,22 @@ export default function ProfessorTransactionsPage() {
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
 
   // ── Badge helpers ─────────────────────────────────────────────────────────
   const typeBadgeClass = (type) =>
     ({
-      queue: "txn-badge txn-badge-queue",
       appointment: "txn-badge txn-badge-appointment",
       document: "txn-badge txn-badge-document",
     }[type] ?? "txn-badge");
 
   const typeLabel = (type) =>
-    ({ queue: "Queue", appointment: "Appointment", document: "Document" }[type] ?? type);
+    ({ appointment: "Appointment", document: "Document" }[type] ?? type);
 
   const statusBadgeClass = (status) =>
     ({
@@ -92,15 +113,14 @@ export default function ProfessorTransactionsPage() {
   const fetchTransactions = async () => {
     try {
       const params = {};
-      if (searchQuery) params.search = searchQuery;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (filterType !== "all") params.filterType = filterType;
       if (filterStatus !== "all") params.filterStatus = filterStatus;
-      const res = await api.get("/faculty/transactions", { params });
+      const res = await api.get("/professor/transactions", { params });
       setTransactions(res.data.map((t) => ({
         ...t,
-        action: `${statusLabel(t.status)} ${typeLabel(t.type)}`,
-        details: t.description ?? "",
-        timestamp: t.date ? formatManilaDateTime(t.date) : "",
+        dateLabel: t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
+        timeLabel: t.date ? formatManilaTime(t.date) : "",
       })));
     } catch {
       // silently fail — table might be empty
@@ -109,7 +129,30 @@ export default function ProfessorTransactionsPage() {
     }
   };
 
-  useEffect(() => { fetchTransactions(); }, [searchQuery, filterType, filterStatus]);
+  // Debounced 400ms, mirroring stud-transactions.jsx's own search debounce,
+  // so typing doesn't fire a request on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => { fetchTransactions(); }, [debouncedSearch, filterType, filterStatus]);
+
+  // Stats are fetched separately, over the faculty member's FULL unfiltered
+  // history server-side -- so the stat cards never reflect whatever
+  // search/type/status filter happens to be active (mirrors student's own
+  // stat-card behavior). Refetched on the same live-update events as the
+  // transaction list below.
+  const fetchStats = async () => {
+    try {
+      const res = await api.get("/professor/transactions/stats");
+      setTxStats(res.data);
+    } catch {
+      // silently fail — cards just keep their last known values
+    }
+  };
+
+  useEffect(() => { fetchStats(); }, []);
 
   // ── Live updates: previously fetch-once-per-filter-change only, so
   // activity elsewhere (e.g. a document status change) wouldn't show up
@@ -127,23 +170,41 @@ export default function ProfessorTransactionsPage() {
       "queue:served",
       "queue:no-show",
     ];
-    events.forEach((event) => socket.on(event, fetchTransactions));
+    const refetchAll = () => { fetchTransactions(); fetchStats(); };
+    events.forEach((event) => socket.on(event, refetchAll));
     return () => {
-      events.forEach((event) => socket.off(event, fetchTransactions));
+      events.forEach((event) => socket.off(event, refetchAll));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, token]);
 
-  // ── Derived stats ─────────────────────────────────────────────────────────
-  const stats = {
-    total: transactions.length,
-    queue: transactions.filter((t) => t.type === "queue").length,
-    appointments: transactions.filter((t) => t.type === "appointment").length,
-    documents: transactions.filter((t) => t.type === "document").length,
-  };
-
   // Server already handles filtering; just use transactions directly
   const filtered = transactions;
+
+  // Exports exactly what's currently on screen (the server-filtered list
+  // already held in state) — no new backend endpoint needed.
+  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+  const handleExport = () => {
+    const header = ["Type", "Title", "Details", "Status", "Student/Tracking", "Date", "Time"];
+    const rows = filtered.map((t) => [
+      typeLabel(t.type),
+      t.title,
+      t.details,
+      statusLabel(t.status),
+      t.type === "document" ? t.trackingNumber : `${t.studentName ?? ""} (${t.studentId ?? ""})`,
+      t.dateLabel,
+      t.timeLabel,
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `transactions-${getManilaDateString()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <ProfessorPageShell
@@ -160,88 +221,96 @@ export default function ProfessorTransactionsPage() {
                 Home
               </Link>
             }
-            icon={<ActivityIcon />}
+            icon={<ClipboardListIcon />}
             iconClassName="txn-title-icon"
             title="Transaction History"
-            subtitle="View all your activities and transactions"
+            subtitle="View all your activities and transactions."
           />
 
           {/* Stats */}
           <div className="transactions-stats-grid">
             <div className="txn-stat-card">
-              <div className="txn-stat-icon-box txn-icon-box-blue"><ActivityIcon /></div>
-              <p className="txn-stat-label">Total Transactions</p>
-              <p className="txn-stat-value txn-val-blue">{stats.total}</p>
+              <div className="txn-stat-icon-box txn-icon-box-blue"><ClipboardListIcon /></div>
+              <p className="txn-stat-label">Total</p>
+              <p className="txn-stat-value txn-val-blue">{txStats.total}</p>
             </div>
             <div className="txn-stat-card">
-              <div className="txn-stat-icon-box txn-icon-box-green"><CalendarSmIcon /></div>
-              <p className="txn-stat-label">Appointments</p>
-              <p className="txn-stat-value txn-val-green">{stats.appointments}</p>
+              <div className="txn-stat-icon-box txn-icon-box-green"><CheckCircleIcon /></div>
+              <p className="txn-stat-label">Completed</p>
+              <p className="txn-stat-value txn-val-green">{txStats.completed}</p>
             </div>
             <div className="txn-stat-card">
-              <div className="txn-stat-icon-box txn-icon-box-orange"><FileText /></div>
-              <p className="txn-stat-label">Documents</p>
-              <p className="txn-stat-value txn-val-orange">{stats.documents}</p>
+              <div className="txn-stat-icon-box txn-icon-box-orange"><ClockIcon /></div>
+              <p className="txn-stat-label">Ongoing</p>
+              <p className="txn-stat-value txn-val-orange">{txStats.ongoing}</p>
+            </div>
+            <div className="txn-stat-card">
+              <div className="txn-stat-icon-box txn-icon-box-primary"><CalendarSmIcon /></div>
+              <p className="txn-stat-label">This Month</p>
+              <p className="txn-stat-value txn-val-primary">{txStats.thisMonth}</p>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="txn-filter-card">
-            <div className="txn-filters-header">
-              <div>
-                <h3 className="txn-filters-title">Transaction Filter</h3>
-                <p className="txn-filters-desc">Search and filter transactions</p>
+          <div className="filters-card">
+            <div className="filters-header">
+              <div className="filters-header-text">
+                <h3 className="filters-title">Transaction Filter</h3>
+                <p className="filters-description">Search and filter your transactions.</p>
               </div>
-              <button className="txn-export-btn">
+              <button className="txn-export-btn" onClick={handleExport} disabled={filtered.length === 0}>
                 <DownloadIcon />
                 Export
               </button>
             </div>
-            <div className="txn-filters-grid">
-              <div className="txn-filter-group">
-                <label className="txn-filter-label">Search</label>
-                <div className="txn-search-wrapper">
-                  <span className="txn-search-icon"><SearchIcon /></span>
+            <div className="filters-grid">
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="txn-search">Search</label>
+                <div className="filter-search-wrapper">
+                  <SearchIcon />
                   <input
+                    id="txn-search"
                     type="text"
-                    className="txn-search-input"
                     placeholder="Search by student name, ID, or details..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    className="filter-search-input"
                   />
                 </div>
               </div>
-              <div className="txn-filter-group">
-                <label className="txn-filter-label">Type</label>
-                <select
-                  className="txn-select"
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                >
-                  <option value="all">All Types</option>
-                  <option value="appointment">Appointment</option>
-                  <option value="document">Document</option>
-                </select>
-              </div>
-              <div className="txn-filter-group">
-                <label className="txn-filter-label">Status</label>
-                <select
-                  className="txn-select"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="processing">Processing</option>
-                  <option value="generated">Ready for Pickup</option>
-                  <option value="released">Released</option>
-                  <option value="claimed">Claimed</option>
-                  <option value="completed">Completed</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
+
+              <FilterSelect
+                id="txn-type-select"
+                label="Type"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                options={[
+                  { value: "all", label: "All Types" },
+                  { value: "appointment", label: "Appointment" },
+                  { value: "document", label: "Document" },
+                ]}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+
+              <FilterSelect
+                id="txn-status-select"
+                label="Status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                options={[
+                  { value: "all", label: "All Status" },
+                  { value: "pending", label: "Pending" },
+                  { value: "approved", label: "Approved" },
+                  { value: "processing", label: "Processing" },
+                  { value: "generated", label: "Ready for Pickup" },
+                  { value: "released", label: "Released" },
+                  { value: "claimed", label: "Claimed" },
+                  { value: "completed", label: "Completed" },
+                  { value: "rejected", label: "Rejected" },
+                  { value: "cancelled", label: "Cancelled" },
+                ]}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
             </div>
           </div>
 
@@ -254,20 +323,21 @@ export default function ProfessorTransactionsPage() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="txn-empty">
-                <ActivityIcon />
-                <p>No transactions found</p>
+                <ClipboardListIcon />
+                <h3>No Transactions Found</h3>
+                <p>You have no transaction records yet.</p>
               </div>
             ) : (
               filtered.map((txn) => (
                 <div key={`${txn.type}-${txn.id}`} className={`txn-item txn-type-${txn.type}`}>
                   <div className="txn-item-icon">
                     <span className={`txn-icon-wrap txn-icon-${txn.type}`}>
-                      {txn.type === "queue" ? <UserIcon /> : txn.type === "appointment" ? <CalendarSmIcon /> : <FileText />}
+                      {txn.type === "appointment" ? <CalendarSmIcon /> : <FileText />}
                     </span>
                   </div>
                   <div className="txn-item-content">
                     <div className="txn-item-header">
-                      <span className="txn-item-title">{txn.action}</span>
+                      <span className="txn-item-title">{txn.title}</span>
                       <div className="txn-item-badges">
                         <span className={typeBadgeClass(txn.type)}>{typeLabel(txn.type)}</span>
                         <span className={statusBadgeClass(txn.status)}>{statusLabel(txn.status)}</span>
@@ -276,16 +346,16 @@ export default function ProfessorTransactionsPage() {
                     {txn.type === "document" ? (
                       txn.trackingNumber && (
                         <div className="txn-item-student">
-                          <FileText />
                           <span className="txn-tracking-pill">{txn.trackingNumber}</span>
                         </div>
                       )
                     ) : (
                       txn.studentName && (
                         <div className="txn-item-student">
-                          <UserIcon />
                           <span className="txn-item-student-name">{txn.studentName}</span>
-                          <span>({txn.studentId})</span>
+                          {txn.studentId && (
+                            <span className="txn-student-id-badge">{txn.studentId}</span>
+                          )}
                         </div>
                       )
                     )}
@@ -294,7 +364,11 @@ export default function ProfessorTransactionsPage() {
                   <div className="txn-item-meta">
                     <div className="txn-item-date">
                       <CalendarSmIcon />
-                      {txn.timestamp}
+                      {txn.dateLabel}
+                    </div>
+                    <div className="txn-item-time">
+                      <ClockIcon />
+                      {txn.timeLabel}
                     </div>
                   </div>
                 </div>

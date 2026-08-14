@@ -70,7 +70,7 @@ function OamsLogo({
 }
 
 // ─── Field shapes documented here mirror what Field shapes mirror what
-// GET /faculty/transactions really returns (type, status, studentName/studentId
+// GET /professor/transactions really returns (type, status, studentName/studentId
 // for queue+appointment rows, trackingNumber for document rows, description,
 // date) — this screen ports the actual wired prof-transactions.jsx/.css 1:1:
 // stat tiles derived from the *filtered* list (matching the web page, which
@@ -192,7 +192,7 @@ export default function ProfessorTransactionsScreen() {
       if (searchQuery) params.search = searchQuery;
       if (filterType !== 'all') params.filterType = filterType;
       if (filterStatus !== 'all') params.filterStatus = filterStatus;
-      const { data } = await api.get('/faculty/transactions', { params });
+      const { data } = await api.get('/professor/transactions', { params });
       setTransactions(
         (data ?? []).map((t: any) => ({
           id: String(t.id),

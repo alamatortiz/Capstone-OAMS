@@ -163,7 +163,7 @@ export default function ProfessorAnnouncementScreen() {
     setError(null);
     if (pageNum > 1) setLoadingMore(true);
     try {
-      const { data } = await api.get('/faculty/announcements', {
+      const { data } = await api.get('/professor/announcements', {
         params: { page: pageNum },
       });
       if (requestId !== requestIdRef.current) return;
@@ -227,7 +227,7 @@ export default function ProfessorAnnouncementScreen() {
       const safeName = attachment.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
       const uri = `${FileSystem.cacheDirectory}announcement-${announcement.id}-${attachment.id}-${safeName}`;
       const result = await FileSystem.downloadAsync(
-        `${api.defaults.baseURL}/faculty/announcements/${announcement.id}/attachments/${attachment.id}`,
+        `${api.defaults.baseURL}/professor/announcements/${announcement.id}/attachments/${attachment.id}`,
         uri,
         { headers: { Authorization: `Bearer ${token}` } },
       );

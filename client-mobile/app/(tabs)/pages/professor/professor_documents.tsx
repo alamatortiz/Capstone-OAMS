@@ -73,7 +73,7 @@ function OamsLogo({
 }
 
 // ─── Field shapes documented here mirror what Field shapes mirror what
-// GET /faculty/my-document-requests and GET /faculty/document-services really
+// GET /professor/documents and GET /professor/documents/service-types really
 // return (service_name, college, purpose, created_at, status, tracking_number,
 // notes, estimated_completion, needed_by) — this screen ports the actual wired
 // prof-documents.jsx/.css 1:1: Request Document dialog (type/purpose/needed-by/
@@ -178,7 +178,7 @@ export default function ProfessorDocumentsScreen() {
     const fetchTypes = async () => {
       setTypesLoading(true);
       try {
-        const { data } = await api.get('/faculty/document-services');
+        const { data } = await api.get('/professor/documents/service-types');
         setDocumentTypes(
           (data ?? []).map((s: any) => ({
             id: s.service_id,
@@ -203,7 +203,7 @@ export default function ProfessorDocumentsScreen() {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const { data } = await api.get('/faculty/my-document-requests');
+      const { data } = await api.get('/professor/documents');
       setRequests(
         (data ?? []).map((r: any) => ({
           id: String(r.request_id),
@@ -301,7 +301,7 @@ export default function ProfessorDocumentsScreen() {
     if (!canSubmit || !selectedType) return;
     setSubmitting(true);
     try {
-      await api.post('/faculty/my-document-requests', {
+      await api.post('/professor/documents', {
         service_id: selectedType.id,
         request_type: selectedType.name,
         purpose: formData.purpose.trim(),
@@ -323,7 +323,7 @@ export default function ProfessorDocumentsScreen() {
     if (!cancelTarget) return;
     setCancellingId(cancelTarget.id);
     try {
-      await api.delete(`/faculty/my-document-requests/${cancelTarget.id}`);
+      await api.delete(`/professor/documents/${cancelTarget.id}`);
       setRequests((prev) =>
         prev.map((r) => (r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r)),
       );

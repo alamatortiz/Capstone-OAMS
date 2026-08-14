@@ -107,7 +107,7 @@ export default function ProfessorAnnouncementsPage() {
   const openAttachment = async (announcementId, attachment) => {
     try {
       const res = await api.get(
-        `/faculty/announcements/${announcementId}/attachments/${attachment.id}`,
+        `/professor/announcements/${announcementId}/attachments/${attachment.id}`,
         { responseType: "blob" },
       );
       const url = URL.createObjectURL(res.data);
@@ -147,7 +147,7 @@ export default function ProfessorAnnouncementsPage() {
     setAnnError(null);
     if (pageNum > 1) setLoadingMore(true);
     try {
-      const { data } = await api.get("/faculty/announcements", {
+      const { data } = await api.get("/professor/announcements", {
         params: { page: pageNum },
       });
       if (requestId !== requestIdRef.current) return;
@@ -320,7 +320,7 @@ export default function ProfessorAnnouncementsPage() {
                 <div className="ann-empty-state">
                   <MegaphoneIcon />
                   <h3>No Announcements Yet</h3>
-                  <p>Announcements for faculty in your department will appear here.</p>
+                  <p>There are no announcements yet.</p>
                 </div>
               ) : (
                 <>

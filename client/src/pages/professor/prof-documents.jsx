@@ -81,7 +81,7 @@ export default function ProfessorDocumentRequest() {
     const fetchDocumentTypes = async () => {
       setTypesLoading(true);
       try {
-        const res = await api.get("/faculty/document-services");
+        const res = await api.get("/professor/documents/service-types");
         setDocumentTypes(
           res.data.map((s) => ({
             id: s.service_id,
@@ -107,7 +107,7 @@ export default function ProfessorDocumentRequest() {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const res = await api.get("/faculty/my-document-requests");
+      const res = await api.get("/professor/documents");
       setRequests(
         res.data.map((r) => ({
           id: String(r.request_id),
@@ -176,7 +176,7 @@ export default function ProfessorDocumentRequest() {
 
     setSubmitting(true);
     try {
-      await api.post("/faculty/my-document-requests", {
+      await api.post("/professor/documents", {
         service_id: selectedService?.id,
         request_type: formData.type,
         purpose: formData.purpose,
@@ -189,7 +189,7 @@ export default function ProfessorDocumentRequest() {
       toast.success("Document request submitted successfully!");
     } catch (err) {
       console.error("Failed to submit document request:", err);
-      toast.error(err?.response?.data?.message ?? "Failed to submit document request");
+      toast.error(err?.response?.data?.message ?? "Failed to submit document request.");
     } finally {
       setSubmitting(false);
     }
@@ -198,7 +198,7 @@ export default function ProfessorDocumentRequest() {
   const handleCancelRequest = async (requestId) => {
     setCancellingId(requestId);
     try {
-      await api.delete(`/faculty/my-document-requests/${requestId}`);
+      await api.delete(`/professor/documents/${requestId}`);
       setRequests((prev) =>
         prev.map((r) => (r.id === requestId ? { ...r, status: "cancelled" } : r)),
       );
@@ -206,7 +206,7 @@ export default function ProfessorDocumentRequest() {
       toast.success("Document request cancelled.");
     } catch (err) {
       console.error("Failed to cancel document request:", err);
-      toast.error(err?.response?.data?.message ?? "Failed to cancel document request");
+      toast.error(err?.response?.data?.message ?? "Failed to cancel document request.");
     } finally {
       setCancellingId(null);
     }

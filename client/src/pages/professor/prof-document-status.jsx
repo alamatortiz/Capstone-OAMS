@@ -66,7 +66,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
         icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
         iconClassName="dss-title-icon"
         title="Document Details"
-        subtitle="Your document request details and status"
+        subtitle="Your document request details and status."
       />
 
       {/* Hero */}
@@ -342,7 +342,7 @@ export default function ProfessorDocumentStatus() {
 
   const fetchDocuments = useCallback(async () => {
     try {
-      const res = await api.get("/faculty/my-document-requests");
+      const res = await api.get("/professor/documents");
       setDocuments(
         res.data.map((r) => ({
           id: String(r.request_id),
@@ -381,7 +381,7 @@ export default function ProfessorDocumentStatus() {
     const fetchDocumentTypes = async () => {
       setReqLoading(true);
       try {
-        const res = await api.get("/faculty/document-services");
+        const res = await api.get("/professor/documents/service-types");
         setDocumentTypes(
           res.data.map((s) => ({
             id: s.service_id,
@@ -425,7 +425,7 @@ export default function ProfessorDocumentStatus() {
   const handleCancel = async (docId) => {
     setCancelling(true);
     try {
-      await api.delete(`/faculty/my-document-requests/${docId}`);
+      await api.delete(`/professor/documents/${docId}`);
       setDocuments((prev) =>
         prev.map((d) => (d.id === docId ? { ...d, status: "cancelled" } : d)),
       );
@@ -481,7 +481,7 @@ export default function ProfessorDocumentStatus() {
               icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
               iconClassName="dss-title-icon"
               title="My Document Requests"
-              subtitle="Track all of your document requests"
+              subtitle="Track all of your document requests."
             />
 
             {/* Error */}

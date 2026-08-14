@@ -37,7 +37,7 @@ describe("computeIsBusy", () => {
 
   test("does not guess when the matching availability window no longer exists", () => {
     // e.g. the professor deleted/edited the schedule slot this appointment
-    // was booked into (see facultyRoutes.js DELETE/PATCH /availability/:id)
+    // was booked into (see professorRoutes.js DELETE/PATCH /availability/:id)
     const avails = [];
     const appts = [{ appointment_time: "13:00:00", status: "approved" }];
 

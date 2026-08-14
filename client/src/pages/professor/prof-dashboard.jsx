@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { FileText, Megaphone } from "lucide-react";
+import { FileText, Megaphone, Calendar } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
@@ -61,6 +61,29 @@ const ClockIcon = () => (
   </svg>
 );
 const MegaphoneIcon = () => <Megaphone className="icon" />;
+const ClipboardListIcon = () => (
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    <line x1="8" y1="11" x2="16" y2="11"></line>
+    <line x1="8" y1="15" x2="12" y2="15"></line>
+  </svg>
+);
+
+// Mirrors stud-dashboard.jsx's own formatActivityStatus: title-cases the raw
+// status and special-cases the same two words, so Recent Activity's badge
+// text reads the same way on both dashboards ("No Show" not "NO_SHOW").
+function formatActivityStatus(status, type) {
+  if (status === "no_show") return "No Show";
+  if (type === "document" && status === "generated") return "Ready";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
 
 export default function ProfessorDashboard() {
   const { user: authUser } = useAuth();
@@ -91,7 +114,7 @@ export default function ProfessorDashboard() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await api.get("/faculty/dashboard-stats");
+      const res = await api.get("/professor/dashboard-stats");
       setDashStats(res.data);
     } catch (err) {
       console.error("Failed to fetch faculty dashboard stats:", err);
@@ -132,7 +155,7 @@ export default function ProfessorDashboard() {
 
   const fetchAnnouncements = useCallback(async () => {
     try {
-      const { data } = await api.get("/faculty/announcements");
+      const { data } = await api.get("/professor/announcements");
       setAnnouncements(data?.announcements ?? []);
     } catch (err) {
       console.error("Failed to fetch announcements:", err);
@@ -164,7 +187,7 @@ export default function ProfessorDashboard() {
   const fetchOfficeHours = useCallback(async () => {
     try {
       setOfficeHoursLoading(true);
-      const res = await api.get("/faculty/office-hours");
+      const res = await api.get("/professor/office-hours");
       setOfficeHours(res.data);
       setOfficeHoursError(null);
     } catch (err) {
@@ -187,21 +210,36 @@ export default function ProfessorDashboard() {
     {
       title: "Pending Appointments",
       value: loading ? "—" : String(s?.pendingAppointments ?? 0),
-      // This card always counts every upcoming pending/approved appointment,
-      // not just this week -- the Appointment Manager page now defaults to a
-      // "This Week" view, so the caption keeps the two numbers from looking
-      // like a mismatch/bug.
-      description: loading
-        ? "Loading..."
-        : `${s?.todayAppointments ?? 0} for today · All upcoming`,
+      // Same conditional-list-building pattern as stud-dashboard.jsx's own
+      // Appointments card description, over s.appointments.{pending,approved}.
+      description: (() => {
+        if (loading) return "Loading...";
+        const parts = [];
+        const pending = s?.appointments?.pending ?? 0;
+        const approved = s?.appointments?.approved ?? 0;
+        if (pending > 0) parts.push(`${pending} pending`);
+        if (approved > 0) parts.push(`${approved} approved`);
+        return parts.length ? parts.join(", ") : "No pending appointments";
+      })(),
       icon: CalendarIcon,
       bgColor: "bg-violet-50",
       link: "/professor/appointments",
     },
     {
       title: "Documents",
-      value: loading ? "—" : String(s?.documentsToReview ?? 0),
-      description: "Pending requests",
+      value: loading ? "—" : String(s?.documents?.total ?? 0),
+      // Same conditional-list-building pattern as stud-dashboard.jsx's own
+      // Documents card description, over s.documents.{pendingOnly,processing,ready,released}.
+      description: (() => {
+        if (loading) return "Loading...";
+        const parts = [];
+        const docs = s?.documents ?? {};
+        if (docs.pendingOnly > 0) parts.push(`${docs.pendingOnly} pending`);
+        if (docs.processing > 0) parts.push(`${docs.processing} processing`);
+        if (docs.ready > 0) parts.push(`${docs.ready} ready`);
+        if (docs.released > 0) parts.push(`${docs.released} released`);
+        return parts.length ? parts.join(", ") : "No pending documents";
+      })(),
       icon: FileText,
       bgColor: "bg-orange-50",
       link: "/professor/document-status",
@@ -225,36 +263,50 @@ export default function ProfessorDashboard() {
   const pinnedPreview = allPinnedAnnouncements.slice(0, 2);
   const morePinnedCount = allPinnedAnnouncements.length - pinnedPreview.length;
 
-  // Position in this array is load-bearing: quick-actions-grid renders cards
-  // via a positional `action-gradient-${index+1}` CSS class (prof-dashboard.css).
+  // Each tile carries its own stable `gradientIndex` (rather than deriving
+  // color from array position) so reordering this array never silently
+  // changes a tile's color — mirrors stud-dashboard.jsx's own approach.
   const quickActions = [
     {
       label: "Announcements",
-      description: "Notices and updates for faculty in your department",
+      description: "Stay updated with the latest notices from your department.",
       icon: MegaphoneIcon,
       path: "/professor/announcements",
+      gradientIndex: 1,
       badge: `${allPinnedAnnouncements.length} Pinned`,
+    },
+    {
+      label: "Schedule Manager",
+      description: "Set your weekly recurring availability by day. It repeats every week until you edit or remove it.",
+      icon: CalendarIcon,
+      path: "/professor/schedule-manager",
+      gradientIndex: 3,
+      // no badge — the professor's schedule doesn't have a single live count
+      // worth surfacing here the way pending appointments/documents do
     },
     {
       label: "Appointments",
       description: "Review and manage student appointment requests.",
-      icon: CalendarIcon,
+      icon: Calendar,
       path: "/professor/appointments",
-      // no badge — matches the student dashboard's badge-less "Appointment Booking" tile
+      gradientIndex: 2,
+      badge: `${s?.pendingAppointments ?? 0} Pending`,
     },
     {
-      label: "Schedule Manager",
-      description: "Set your consultation hours",
-      icon: CalendarIcon,
-      path: "/professor/schedule-manager",
-      badge: "Schedule",
-    },
-    {
-      label: "Document Request",
-      description: "Submit a new document request",
+      label: "Document Requests",
+      description: "Request documents and track their status.",
       icon: FileText,
       path: "/professor/document-request",
-      badge: "Documents",
+      gradientIndex: 4,
+      badge: `${s?.documentsToReview ?? 0} Pending`,
+    },
+    {
+      label: "Transactions",
+      description: "View all your activities and transactions.",
+      icon: ClipboardListIcon,
+      path: "/professor/transactions",
+      gradientIndex: 1,
+      // no badge — matches the student dashboard's badge-less Transactions tile
     },
   ];
 
@@ -289,14 +341,14 @@ export default function ProfessorDashboard() {
           </div>
 
           {/* Stats Grid */}
-          <div className="stats-grid">
+          <div className="dash-stats-grid">
             {stats.map((stat) => (
-              <Link key={stat.title} to={stat.link} className="stat-card-link">
-                <div className="stat-card">
+              <Link key={stat.title} to={stat.link} className="dash-stat-card-link">
+                <div className="dash-stat-card">
                   <div className={`stat-icon ${stat.bgColor}`}>
                     <stat.icon />
                   </div>
-                  <p className={`stat-value ${loading ? "stat-loading" : ""}`}>
+                  <p className={`dash-stat-value ${loading ? "stat-loading" : ""}`}>
                     {stat.value}
                   </p>
                   <p className="stat-title">{stat.title}</p>
@@ -313,11 +365,11 @@ export default function ProfessorDashboard() {
               <h2>Quick Actions</h2>
             </div>
             <div className="quick-actions-grid">
-              {quickActions.map((action, index) => (
+              {quickActions.map((action) => (
                 <Link key={action.path} to={action.path} className="quick-action-link">
                   <div className="quick-action-card">
                     <div className="action-main">
-                      <div className={`action-icon action-gradient-${index + 1}`}>
+                      <div className={`action-icon action-gradient-${action.gradientIndex}`}>
                         <action.icon />
                       </div>
                       <div className="action-body">
@@ -372,7 +424,8 @@ export default function ProfessorDashboard() {
                         </div>
                         <div className="appointment-details">
                           <p className="appointment-student">{apt.student}</p>
-                          <p className="appointment-purpose">{apt.purpose}</p>
+                          <span className="appointment-student-id-badge">{apt.studentNumber}</span>
+                          <p className="appointment-consult-type">{apt.appointmentType}</p>
                         </div>
                         <div className="appointment-time-status">
                           <p className="appointment-time">{apt.time}</p>
@@ -471,17 +524,21 @@ export default function ProfessorDashboard() {
                 ) : (
                   recentActivity.map((item) => (
                     <div key={item.id} className="activity-item">
-                      <div className="activity-icon activity-appointment">
-                        <CalendarIcon />
+                      <div className={`activity-icon ${item.type === "document" ? "activity-document" : "activity-appointment"}`}>
+                        {item.type === "document" ? <FileText /> : <CalendarIcon />}
                       </div>
                       <div className="activity-details">
                         <p className="activity-title">{item.title}</p>
                         <p className="activity-time">{item.time}</p>
                       </div>
                       <span
-                        className={`appt-status-badge appt-status-badge--${item.status}`}
+                        className={
+                          item.type === "document"
+                            ? `appt-status-badge activity-status-doc-${item.status}`
+                            : `appt-status-badge appt-status-badge--${item.status}`
+                        }
                       >
-                        {item.status}
+                        {formatActivityStatus(item.status, item.type)}
                       </span>
                     </div>
                   ))

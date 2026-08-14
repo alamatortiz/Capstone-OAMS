@@ -71,7 +71,7 @@ function OamsLogo({
 }
 
 // ─── Field shapes documented here mirror what Field shapes mirror what
-// GET /faculty/availability and GET /faculty/locations really return
+// GET /professor/availability and GET /professor/locations really return
 // (availability_id, day_of_week, start_time, end_time, location, max_students,
 // appointmentTypes) — this screen ports the actual wired
 // prof-schedule-manager.jsx/.css 1:1: weekly day list + detail panel (stacked
@@ -161,7 +161,7 @@ export default function ProfessorScheduleManagerScreen() {
   const fetchSlots = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/faculty/availability');
+      const { data } = await api.get('/professor/availability');
       setSlots(data ?? []);
     } catch (err) {
       console.error('Fetch availability error:', err);
@@ -177,7 +177,7 @@ export default function ProfessorScheduleManagerScreen() {
 
   useEffect(() => {
     api
-      .get('/faculty/locations')
+      .get('/professor/locations')
       .then(({ data }) => setLocations(data.locations ?? []))
       .catch((err) => console.error('Fetch locations error:', err));
   }, []);
@@ -286,7 +286,7 @@ export default function ProfessorScheduleManagerScreen() {
     try {
       if (showOtherLocation && !locations.some((loc) => loc.name === trimmedLocation)) {
         try {
-          const { data } = await api.post('/faculty/locations', { name: trimmedLocation });
+          const { data } = await api.post('/professor/locations', { name: trimmedLocation });
           setLocations((prev) => [...prev, data]);
         } catch {
           // Non-fatal: the slot can still be saved with the typed location text.
@@ -294,7 +294,7 @@ export default function ProfessorScheduleManagerScreen() {
       }
 
       if (editingId) {
-        await api.patch(`/faculty/availability/${editingId}`, {
+        await api.patch(`/professor/availability/${editingId}`, {
           day_of_week: addDays[0],
           start_time: addStart,
           end_time: addEnd,
@@ -307,7 +307,7 @@ export default function ProfessorScheduleManagerScreen() {
       } else {
         const results = await Promise.allSettled(
           addDays.map((day) =>
-            api.post('/faculty/availability', {
+            api.post('/professor/availability', {
               day_of_week: day,
               start_time: addStart,
               end_time: addEnd,
@@ -343,7 +343,7 @@ export default function ProfessorScheduleManagerScreen() {
     if (!deleteTarget) return;
     const { slot, day } = deleteTarget;
     try {
-      await api.delete(`/faculty/availability/${slot.availability_id}`);
+      await api.delete(`/professor/availability/${slot.availability_id}`);
       await fetchSlots();
       const remaining = (slotsByDay[day] ?? []).filter((s) => s.availability_id !== slot.availability_id);
       if (remaining.length === 0 && selectedDay === day) setSelectedDay(null);

@@ -17,7 +17,7 @@ const { getAttachmentsMap, serveAnnouncementAttachment } = require("../utils/ann
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const VALID_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-// GET /api/faculty/dashboard-stats
+// GET /api/professor/dashboard-stats
 router.get(
   "/dashboard-stats",
   authenticateToken,
@@ -33,10 +33,14 @@ router.get(
         [facultyId],
       );
 
-      // 1. Pending + today's appointments
+      // 1. Pending + today's appointments, plus the pending/approved split
+      // that powers the "Pending Appointments" stat card's description
+      // (mirrors student's own appointments.{pending,approved} breakdown).
       const [[apptRow]] = await pool.query(
         `SELECT
            COUNT(*) AS pending_count,
+           SUM(CASE WHEN status = 'pending'  THEN 1 ELSE 0 END) AS pending_only,
+           SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved_only,
            SUM(CASE WHEN appointment_date = ? AND status IN ('pending','approved') THEN 1 ELSE 0 END) AS today_count
          FROM appointments
          WHERE faculty_id = ?
@@ -53,13 +57,27 @@ router.get(
         [facultyId],
       );
 
-      // 3. Faculty's own pending document requests
+      // 3. Faculty's own document requests, broken down by status -- mirrors
+      // student's stats.documents.{pendingOnly,processing,ready,released}
+      // breakdown so the "Documents" stat card's description can be built
+      // the same way. `doc_count` (pending+processing only) is kept for the
+      // Document Requests quick-action badge, which still wants "needs
+      // attention" semantics, not the full active-document total below.
       const [[docRow]] = await pool.query(
-        `SELECT COUNT(*) AS doc_count
+        `SELECT
+           SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_only,
+           SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count,
+           SUM(CASE WHEN status = 'generated'  THEN 1 ELSE 0 END) AS ready_count,
+           SUM(CASE WHEN status = 'released'   THEN 1 ELSE 0 END) AS released_count
          FROM faculty_document_requests
-         WHERE faculty_id = ? AND status IN ('pending', 'processing')`,
+         WHERE faculty_id = ?`,
         [facultyId],
       );
+      const docPendingOnly = docRow.pending_only || 0;
+      const docProcessing = docRow.processing_count || 0;
+      const docReady = docRow.ready_count || 0;
+      const docReleased = docRow.released_count || 0;
+      const docCount = docPendingOnly + docProcessing;
 
       // 4. Completed this month
       const [[completedRow]] = await pool.query(
@@ -82,9 +100,11 @@ router.get(
            s.first_name,
            s.last_name,
            s.student_number,
-           s.course
+           s.course,
+           COALESCE(svc.service_name, a.notes, 'Consultation') AS appointment_type
          FROM appointments a
          JOIN students s ON a.student_id = s.student_id
+         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
          WHERE a.faculty_id = ?
            AND a.appointment_date = ?
            AND a.status IN ('pending', 'approved')
@@ -92,30 +112,62 @@ router.get(
         [facultyId, manilaToday],
       );
 
-      // 6. Recent activity (last 5)
+      // 6. Recent activity (last 5) — union of appointment events and the
+      // faculty member's own document-request events. Both branches select a
+      // literal `type` column so buildActivityTitle/buildDocumentActivityTitle
+      // know which one they're formatting; the document branch has no
+      // cancelled_by/student_name equivalent, so those are NULL placeholders
+      // kept only to line up the two branches' column counts for the UNION.
       const [recentActivity] = await pool.query(
-        `SELECT
-           a.appointment_id,
-           a.status,
-           a.cancelled_by,
-           a.created_at AS event_time,
-           CONCAT(s.first_name, ' ', s.last_name) AS student_name,
-           a.notes AS purpose
-         FROM appointments a
-         JOIN students s ON a.student_id = s.student_id
-         WHERE a.faculty_id = ?
-         ORDER BY a.created_at DESC
+        `(
+           SELECT
+             'appointment' AS type,
+             a.status,
+             a.cancelled_by,
+             a.created_at AS event_time,
+             CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+             a.notes AS purpose,
+             NULL AS request_type
+           FROM appointments a
+           JOIN students s ON a.student_id = s.student_id
+           WHERE a.faculty_id = ?
+         )
+         UNION ALL
+         (
+           SELECT
+             'document' AS type,
+             fdr.status,
+             NULL AS cancelled_by,
+             fdr.created_at AS event_time,
+             NULL AS student_name,
+             fdr.purpose,
+             fdr.request_type
+           FROM faculty_document_requests fdr
+           WHERE fdr.faculty_id = ?
+         )
+         ORDER BY event_time DESC
          LIMIT 5`,
-        [facultyId],
+        [facultyId, facultyId],
       );
 
       res.json({
         availabilityStatus: statusRow?.availability_status ?? "available",
         stats: {
           pendingAppointments: apptRow.pending_count || 0,
+          appointments: {
+            pending: apptRow.pending_only || 0,
+            approved: apptRow.approved_only || 0,
+          },
           todayAppointments: apptRow.today_count || 0,
           studentRequests: studentRow.student_count || 0,
-          documentsToReview: docRow.doc_count || 0,
+          documentsToReview: docCount,
+          documents: {
+            total: docCount + docReady + docReleased,
+            pendingOnly: docPendingOnly,
+            processing: docProcessing,
+            ready: docReady,
+            released: docReleased,
+          },
           completedThisMonth: completedRow.completed_count || 0,
         },
         todayAppointments: todayAppointments.map((a) => ({
@@ -124,14 +176,15 @@ router.get(
           studentNumber: a.student_number,
           course: a.course,
           purpose: a.notes ?? "No notes provided",
+          appointmentType: a.appointment_type,
           time: formatTime(a.appointment_time),
           status: a.status,
         })),
         recentActivity: recentActivity.map((row, i) => ({
           id: i + 1,
-          title: buildActivityTitle(row),
+          type: row.type,
+          title: row.type === "document" ? buildDocumentActivityTitle(row) : buildActivityTitle(row),
           status: row.status,
-          dot: statusToDot(row.status),
           time: formatRelativeTime(new Date(row.event_time)),
         })),
       });
@@ -141,7 +194,7 @@ router.get(
   },
 );
 
-// GET /api/faculty/availability-status
+// GET /api/professor/availability-status
 // Lightweight lookup for the global Available/Unavailable toggle, used by the
 // sidebar on every faculty page (avoids pulling the full dashboard-stats payload).
 router.get(
@@ -162,7 +215,7 @@ router.get(
   },
 );
 
-// GET /api/faculty/office-hours
+// GET /api/professor/office-hours
 // The logged-in faculty member's own department office hours/location --
 // mirrors GET /api/student/office-hours (studentRoutes.js), just joined
 // through the faculty table instead of students.
@@ -193,7 +246,7 @@ router.get(
   },
 );
 
-// PATCH /api/faculty/availability-status
+// PATCH /api/professor/availability-status
 // Global Available/Unavailable toggle. When 'unavailable', the professor's
 // weekly slots are hidden from student browsing/booking without deleting them.
 // Body: { status: 'available' | 'unavailable' }
@@ -246,23 +299,24 @@ function buildActivityTitle(row) {
   return map[row.status] ?? `Appointment update for ${row.student_name}`;
 }
 
-function statusToDot(status) {
-  return (
-    {
-      pending: "dot-amber",
-      approved: "dot-green",
-      completed: "dot-green",
-      rejected: "dot-red",
-      cancelled: "dot-gray",
-    }[status] ?? "dot-gray"
-  );
+function buildDocumentActivityTitle(row) {
+  const map = {
+    pending: `Document request submitted: ${row.request_type}`,
+    processing: `Document request being processed: ${row.request_type}`,
+    generated: `Document ready for pickup: ${row.request_type}`,
+    released: `Document released: ${row.request_type}`,
+    claimed: `Document claimed: ${row.request_type}`,
+    rejected: `Document request rejected: ${row.request_type}`,
+    cancelled: `You cancelled the document request: ${row.request_type}`,
+  };
+  return map[row.status] ?? `Document request update: ${row.request_type}`;
 }
 
 // ─────────────────────────────────────────────────────────────
 // APPOINTMENTS
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/faculty/appointments
+// GET /api/professor/appointments
 router.get(
   "/appointments",
   authenticateToken,
@@ -317,7 +371,7 @@ router.get(
   }
 );
 
-// PATCH /api/faculty/appointments/:id/status
+// PATCH /api/professor/appointments/:id/status
 router.patch(
   "/appointments/:id/status",
   authenticateToken,
@@ -415,7 +469,13 @@ router.patch(
 // TRANSACTIONS (combined appointment + document history)
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/faculty/transactions
+// GET /api/professor/transactions
+// NOTE: `description` is kept computing its original value (unchanged) even
+// though the web page now prefers `title`/`details` below -- client-mobile's
+// professor transactions screen reads `description` directly, and this
+// endpoint's response shape must stay backward-compatible for it (only the
+// URL path itself was renamed for mobile; no payload/shape changes are in
+// scope there). `title`/`details` are purely additive fields for web.
 router.get(
   "/transactions",
   authenticateToken,
@@ -433,7 +493,9 @@ router.get(
             CONCAT(s.first_name,' ',s.last_name) AS studentName,
             s.student_number AS studentId,
             COALESCE(svc.service_name, a.notes, 'Consultation') AS description,
-            a.status, a.appointment_date AS date, a.updated_at AS event_time
+            CONCAT('Student Appointment with ', s.student_number) AS title,
+            COALESCE(svc.service_name, a.notes, 'Consultation') AS details,
+            a.status, a.updated_at AS date, a.updated_at AS event_time
           FROM appointments a
           JOIN students s ON a.student_id = s.student_id
           LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
@@ -452,6 +514,8 @@ router.get(
           SELECT
             fdr.request_id AS id, 'document' AS type,
             ds.service_name AS description,
+            CONCAT(fdr.request_type, ' Request') AS title,
+            fdr.purpose AS details,
             fdr.status, fdr.updated_at AS date, fdr.updated_at AS event_time,
             fdr.tracking_number AS trackingNumber,
             fdr.purpose, fdr.copies
@@ -473,6 +537,69 @@ router.get(
   }
 );
 
+// GET /api/professor/transactions/stats
+// Full-history (unfiltered) transaction stats for the web transactions
+// page's stat cards, computed server-side over ALL of the faculty member's
+// appointments + own document requests -- mirrors studentRoutes.js's
+// STATUS_MAP/STATUS_GROUPS "this month" pattern so the stat cards never
+// reflect whatever search/type/status filter happens to be active client-side.
+// Shipped as a separate, additive endpoint (rather than folding stats into
+// GET /transactions above) specifically so that endpoint's existing bare-array
+// response shape never changes -- client-mobile's professor transactions
+// screen depends on that shape and isn't otherwise being touched in this pass.
+const TXN_STATUS_BUCKET = {
+  completed: "completed",
+  claimed: "completed",
+  pending: "ongoing",
+  approved: "ongoing",
+  processing: "ongoing",
+  generated: "ongoing",
+  released: "ongoing",
+  rejected: "cancelled",
+  cancelled: "cancelled",
+  no_show: "cancelled",
+};
+const TXN_STATUS_GROUPS = { completed: [], ongoing: [], cancelled: [] };
+for (const [raw, mapped] of Object.entries(TXN_STATUS_BUCKET)) {
+  TXN_STATUS_GROUPS[mapped].push(raw);
+}
+
+router.get(
+  "/transactions/stats",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [manilaYear, manilaMonth] = getManilaDateString().split("-").map(Number);
+      const monthStartUTC = new Date(
+        `${manilaYear}-${String(manilaMonth).padStart(2, "0")}-01T00:00:00+08:00`,
+      );
+      const [[statsRow]] = await pool.query(
+        `SELECT
+           COUNT(*) AS total,
+           COALESCE(SUM(raw_status IN (?)), 0) AS completed,
+           COALESCE(SUM(raw_status IN (?)), 0) AS ongoing,
+           COALESCE(SUM(event_time >= ?), 0) AS thisMonth
+         FROM (
+           (SELECT a.status AS raw_status, a.updated_at AS event_time FROM appointments a WHERE a.faculty_id = ?)
+           UNION ALL
+           (SELECT fdr.status AS raw_status, fdr.updated_at AS event_time FROM faculty_document_requests fdr WHERE fdr.faculty_id = ?)
+         ) AS combined`,
+        [TXN_STATUS_GROUPS.completed, TXN_STATUS_GROUPS.ongoing, monthStartUTC, facultyId, facultyId],
+      );
+      res.json({
+        total: statsRow.total || 0,
+        completed: statsRow.completed || 0,
+        ongoing: statsRow.ongoing || 0,
+        thisMonth: statsRow.thisMonth || 0,
+      });
+    } catch (err) {
+      sendServerError(res, err, "GET /transactions/stats error:");
+    }
+  },
+);
+
 // ─────────────────────────────────────────────────────────────
 // SCHEDULE / AVAILABILITY
 // Recurring weekly schedule: faculty sets a day-of-week + time
@@ -480,7 +607,7 @@ router.get(
 // repeats every week until edited or removed.
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/faculty/locations
+// GET /api/professor/locations
 // Fixed premises the faculty can pick from for their availability slots:
 // their own department's locations plus shared/global ones.
 router.get(
@@ -514,7 +641,7 @@ router.get(
   },
 );
 
-// POST /api/faculty/locations
+// POST /api/professor/locations
 // Body: { name }
 // Lets a faculty member add a one-off premise not yet in the fixed list,
 // scoped to their own department. Idempotent via uq_location_dept_name.
@@ -551,7 +678,7 @@ router.post(
   },
 );
 
-// GET /api/faculty/availability
+// GET /api/professor/availability
 router.get(
   "/availability",
   authenticateToken,
@@ -609,7 +736,7 @@ router.get(
   }
 );
 
-// POST /api/faculty/availability
+// POST /api/professor/availability
 // Body: { day_of_week, start_time, end_time, location, max_students, appointmentTypes? }
 router.post(
   "/availability",
@@ -717,7 +844,7 @@ router.post(
   }
 );
 
-// PATCH /api/faculty/availability/:id
+// PATCH /api/professor/availability/:id
 // Body: { day_of_week?, start_time?, end_time?, location?, max_students?, appointmentTypes? }
 router.patch(
   "/availability/:id",
@@ -912,7 +1039,7 @@ router.patch(
   }
 );
 
-// DELETE /api/faculty/availability/:id
+// DELETE /api/professor/availability/:id
 router.delete(
   "/availability/:id",
   authenticateToken,
@@ -999,9 +1126,9 @@ router.delete(
 // FACULTY'S OWN DOCUMENT REQUESTS
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/faculty/document-services — available services for faculty's department
+// GET /api/professor/documents/service-types — available services for faculty's department
 router.get(
-  "/document-services",
+  "/documents/service-types",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
@@ -1035,14 +1162,14 @@ router.get(
 
       res.json(rows.map((r) => ({ ...r, requirements: requirementsMap[r.service_id] ?? [] })));
     } catch (err) {
-      sendServerError(res, err, "GET /document-services error:");
+      sendServerError(res, err, "GET /documents/service-types error:");
     }
   }
 );
 
-// GET /api/faculty/my-document-requests
+// GET /api/professor/documents
 router.get(
-  "/my-document-requests",
+  "/documents",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
@@ -1060,15 +1187,15 @@ router.get(
       );
       res.json(rows);
     } catch (err) {
-      sendServerError(res, err, "GET /my-document-requests error:");
+      sendServerError(res, err, "GET /documents error:");
     }
   }
 );
 
-// POST /api/faculty/my-document-requests
+// POST /api/professor/documents
 // Body: { service_id, request_type, purpose, notes, needed_by, copies }
 router.post(
-  "/my-document-requests",
+  "/documents",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
@@ -1139,18 +1266,18 @@ router.post(
         message: "Request submitted",
       });
     } catch (err) {
-      sendServerError(res, err, "POST /my-document-requests error:");
+      sendServerError(res, err, "POST /documents error:");
     }
   }
 );
 
-// DELETE /api/faculty/my-document-requests/:requestId
+// DELETE /api/professor/documents/:requestId
 // Cancels a pending or processing document request owned by the faculty member.
 // Soft-cancel (status = 'cancelled'), not a real delete, so it stays visible
 // in the faculty member's transaction history the same way a cancelled queue
 // ticket or appointment does.
 router.delete(
-  "/my-document-requests/:requestId",
+  "/documents/:requestId",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
@@ -1181,7 +1308,7 @@ router.delete(
       });
     } catch (err) {
       await conn.rollback();
-      sendServerError(res, err, "DELETE /my-document-requests/:requestId error:");
+      sendServerError(res, err, "DELETE /documents/:requestId error:");
     } finally {
       conn.release();
     }
@@ -1192,7 +1319,7 @@ router.delete(
 // NOTIFICATIONS
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/faculty/notifications
+// GET /api/professor/notifications
 router.get(
   "/notifications",
   authenticateToken,
@@ -1210,7 +1337,7 @@ router.get(
   },
 );
 
-// PATCH /api/faculty/notifications/:id/read
+// PATCH /api/professor/notifications/:id/read
 router.patch(
   "/notifications/:id/read",
   authenticateToken,
@@ -1236,7 +1363,7 @@ router.patch(
   },
 );
 
-// PATCH /api/faculty/notifications/read-all
+// PATCH /api/professor/notifications/read-all
 router.patch(
   "/notifications/read-all",
   authenticateToken,
@@ -1255,7 +1382,7 @@ router.patch(
 // ANNOUNCEMENTS ENDPOINT (faculty-audience only)
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/faculty/announcements
+// GET /api/professor/announcements
 // Returns only the faculty member's own department's faculty-audience
 // announcements (audience='faculty'). There's no category/type filter here
 // the way the student endpoint has one -- the professor screen has no tabs,
@@ -1345,7 +1472,7 @@ router.get(
   },
 );
 
-// GET /api/faculty/announcements/:id/attachments/:attachmentId
+// GET /api/professor/announcements/:id/attachments/:attachmentId
 // Serves one specific attachment inline (image/PDF/etc.), visibility-scoped
 // exactly like the list route above (own department, faculty audience only).
 router.get(

@@ -316,27 +316,33 @@ body {
 }
 
 /* ===== Stats Grid ===== */
-.professor-dashboard .stats-grid {
+.professor-dashboard .dash-stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: 1.25rem;
   width: 100%;
 }
 
+@media (min-width: 640px) {
+  .professor-dashboard .dash-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (min-width: 1024px) {
-  .professor-dashboard .stats-grid {
+  .professor-dashboard .dash-stats-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
-.professor-dashboard .stat-card-link {
+.professor-dashboard .dash-stat-card-link {
   text-decoration: none;
   color: inherit;
   display: flex;
   width: 100%;
 }
 
-.professor-dashboard .stat-card {
+.professor-dashboard .dash-stat-card {
   background: var(--card-bg);
   border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 1.125rem;
@@ -355,7 +361,7 @@ body {
   overflow: hidden;
 }
 
-.professor-dashboard .stat-card::before {
+.professor-dashboard .dash-stat-card::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -365,13 +371,13 @@ body {
   transition: opacity 0.3s ease;
 }
 
-.professor-dashboard .stat-card:hover {
+.professor-dashboard .dash-stat-card:hover {
   box-shadow: 0 12px 28px rgba(34, 197, 94, 0.15);
   transform: translateY(-4px);
   border-color: rgba(34, 197, 94, 0.4);
 }
 
-.professor-dashboard .stat-card:hover::before {
+.professor-dashboard .dash-stat-card:hover::before {
   opacity: 1;
 }
 
@@ -439,20 +445,51 @@ body {
   fill: none;
 }
 
-.professor-dashboard .stat-value {
+.professor-dashboard .dash-stat-value {
   font-size: 2.25rem;
   font-weight: 800;
   color: var(--text-primary);
   transition: color 0.3s ease;
 }
 
-.professor-dashboard .stat-value.stat-loading {
+.professor-dashboard .dash-stat-value.stat-loading {
   animation: statPulse 1.5s ease-in-out infinite;
 }
 
 @keyframes statPulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.45; }
+}
+
+/* Ported from stud-dashboard.css for structural parity — no current
+   professor stat needs a badge value, but the class exists so a future
+   stat card can use one without a separate CSS pass. */
+.professor-dashboard .stat-queue-number-badge {
+  display: inline-block;
+  background: var(--blue);
+  color: white;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-family: "Inter", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+
+  flex: none;
+  flex-shrink: 0;
+  flex-grow: 0;
+
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    opacity 0.3s ease;
+
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  align-self: flex-start;
+  width: fit-content;
+  white-space: nowrap;
+  margin-top: 0.75rem;
 }
 
 .professor-dashboard .stat-title {
@@ -471,6 +508,8 @@ body {
   transition: color 0.3s ease;
   line-height: 1.5;
   margin-top: 0.75rem;
+  text-align: left;
+  width: 100%;
 }
 
 .professor-dashboard .recent-activity-section {
@@ -667,24 +706,50 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0.35rem;
 }
 
 .professor-dashboard .appointment-student {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 1rem;
   color: var(--text-primary);
   margin: 0;
   transition: color 0.3s ease;
   line-height: 1.2;
+  text-align: left;
 }
 
-.professor-dashboard .appointment-purpose {
+/* Purple pill for the student ID, shape borrowed from prof-documents.css's
+   .doc-badge (padding/border-radius/font-size/weight), recolored to match
+   this card's own purple theme instead of doc-badge's default green. */
+.professor-dashboard .appointment-student-id-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--purple);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .professor-dashboard .appointment-student-id-badge {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+.professor-dashboard .appointment-consult-type {
   font-size: 0.8rem;
   color: var(--text-secondary);
   margin: 0;
   transition: color 0.3s ease;
   line-height: 1.2;
+  text-align: left;
 }
 
 .professor-dashboard .appointment-time-status {
@@ -727,15 +792,46 @@ body {
 
 .professor-dashboard .appt-status-badge--pending   { background: rgba(251, 191, 36, 0.2);  color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.4); }
 .professor-dashboard .appt-status-badge--approved  { background: rgba(34, 197, 94, 0.18);  color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
-.professor-dashboard .appt-status-badge--completed { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+/* completed/cancelled/no_show match stud-dashboard.css's .activity-status-*
+   formula exactly (Recent Activity is the only place these three statuses
+   actually render on this page -- Today's Appointments only ever shows
+   pending/approved), including student's own choice not to define a
+   [data-theme="light"] override for any of the three: completed's color
+   already adapts via the var(--success) token, and the red used for
+   cancelled/no_show is intentionally theme-invariant. */
+.professor-dashboard .appt-status-badge--completed { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
 .professor-dashboard .appt-status-badge--rejected  { background: rgba(239, 68, 68, 0.18);  color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
-.professor-dashboard .appt-status-badge--cancelled { background: rgba(107, 114, 128, 0.15); color: #d1d5db; border: 1px solid rgba(107, 114, 128, 0.35); }
+.professor-dashboard .appt-status-badge--cancelled { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+.professor-dashboard .appt-status-badge--no_show   { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
 
 [data-theme="light"] .professor-dashboard .appt-status-badge--pending   { background: rgba(217, 119, 6, 0.1);  color: #92400e; border-color: rgba(217, 119, 6, 0.3); }
 [data-theme="light"] .professor-dashboard .appt-status-badge--approved  { background: rgba(5, 150, 105, 0.1);  color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
-[data-theme="light"] .professor-dashboard .appt-status-badge--completed { background: rgba(5, 150, 105, 0.1);  color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
 [data-theme="light"] .professor-dashboard .appt-status-badge--rejected  { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
-[data-theme="light"] .professor-dashboard .appt-status-badge--cancelled { background: rgba(107, 114, 128, 0.08); color: #374151; border-color: rgba(107, 114, 128, 0.2); }
+
+/* Document-only Recent Activity badges, namespaced separately from
+   appt-status-badge--* above so document statuses (processing/generated/
+   claimed/etc.) don't collide with appointment statuses that happen to
+   share some of the same words but different color meanings. Colors for
+   pending/processing/generated/released/claimed/rejected copied verbatim
+   from stud-dashboard.css's own .activity-status-doc-* set; cancelled has
+   no student-side precedent (faculty_document_requests-only status), so
+   its color is sourced from prof-documents.css's .doc-badge-cancelled --
+   the module's own authoritative palette for this exact status. */
+.professor-dashboard .activity-status-doc-pending { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+.professor-dashboard .activity-status-doc-processing { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+.professor-dashboard .activity-status-doc-generated { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 1px solid rgba(34, 197, 94, 0.35); }
+.professor-dashboard .activity-status-doc-released { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 1px solid rgba(34, 197, 94, 0.35); }
+.professor-dashboard .activity-status-doc-claimed { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 1px solid rgba(34, 197, 94, 0.35); }
+.professor-dashboard .activity-status-doc-rejected { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+.professor-dashboard .activity-status-doc-cancelled { background: rgba(239, 68, 68, 0.18); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.35); }
+
+[data-theme="light"] .professor-dashboard .activity-status-doc-pending { background: rgba(217, 119, 6, 0.1); color: #92400e; border-color: rgba(217, 119, 6, 0.3); }
+[data-theme="light"] .professor-dashboard .activity-status-doc-processing { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; border-color: rgba(37, 99, 235, 0.25); }
+[data-theme="light"] .professor-dashboard .activity-status-doc-generated { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
+[data-theme="light"] .professor-dashboard .activity-status-doc-released { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
+[data-theme="light"] .professor-dashboard .activity-status-doc-claimed { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
+[data-theme="light"] .professor-dashboard .activity-status-doc-rejected { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .professor-dashboard .activity-status-doc-cancelled { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
 
 /* "+N more" link, mirrors stud-dashboard.css's .pinned-more-link, reused by
    both the Today's Appointments and Pinned Announcements preview cards. */
@@ -884,25 +980,31 @@ body {
   background: rgba(22, 163, 74, 0.25);
 }
 
-/* Violet badge — Schedule Manager (gradient-3), matches Appointments'
-   violet theme now that both share the same gradient. Values copied
-   verbatim from stud-dashboard.css's gradient-2/4 violet badge formula. */
+/* Violet badge — Appointments (gradient-2) and Schedule Manager (gradient-3)
+   share one violet theme. Values copied verbatim from stud-dashboard.css's
+   gradient-2/4 violet badge formula. Schedule Manager itself has no badge
+   (removed per an explicit request), but the selector stays combined so any
+   future violet-gradient tile automatically gets the right badge color. */
+.professor-dashboard .quick-action-card:has(.action-gradient-2) .action-badge,
 .professor-dashboard .quick-action-card:has(.action-gradient-3) .action-badge {
   background: rgba(168, 85, 247, 0.15);
   color: #d8b4fe;
   border-color: rgba(168, 85, 247, 0.25);
 }
 
+.professor-dashboard .quick-action-card:has(.action-gradient-2):hover .action-badge,
 .professor-dashboard .quick-action-card:has(.action-gradient-3):hover .action-badge {
   background: rgba(168, 85, 247, 0.25);
 }
 
+[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-2) .action-badge,
 [data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-3) .action-badge {
   background: rgba(147, 51, 234, 0.1);
   color: #7c3aed;
   border-color: rgba(147, 51, 234, 0.25);
 }
 
+[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-2):hover .action-badge,
 [data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-3):hover .action-badge {
   background: rgba(147, 51, 234, 0.2);
 }
@@ -1093,6 +1195,11 @@ body {
 .professor-dashboard .activity-appointment {
   background: rgba(168, 85, 247, 0.15);
   color: var(--purple);
+}
+
+.professor-dashboard .activity-document {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
 }
 
 .professor-dashboard .activity-details {
@@ -1431,7 +1538,7 @@ body {
     font-size: 1.5rem;
   }
 
-  .professor-dashboard .stats-grid {
+  .professor-dashboard .dash-stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -1453,7 +1560,7 @@ body {
     font-size: 1.75rem;
   }
 
-  .professor-dashboard .stats-grid {
+  .professor-dashboard .dash-stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }

@@ -220,10 +220,10 @@ export default function ProfessorAppointmentsPage() {
 
   const fetchAppointments = useCallback(async () => {
     try {
-      const res = await api.get("/faculty/appointments");
+      const res = await api.get("/professor/appointments");
       setAppointments(res.data);
     } catch (err) {
-      toast.error("Failed to load appointments");
+      toast.error("Failed to load appointments.");
     } finally {
       setLoading(false);
     }
@@ -264,12 +264,12 @@ export default function ProfessorAppointmentsPage() {
   const updateStatus = async (id, status, successMsg, errorMsg) => {
     const apt = appointments.find((a) => a.id === id);
     try {
-      await api.patch(`/faculty/appointments/${id}/status`, { status });
+      await api.patch(`/professor/appointments/${id}/status`, { status });
       await fetchAppointments();
       if (successMsg)
         toast.success(successMsg.replace("{name}", apt?.studentName ?? ""));
     } catch (err) {
-      toast.error(err?.response?.data?.error ?? errorMsg ?? "Failed to update appointment");
+      toast.error(err?.response?.data?.error ?? errorMsg ?? "Failed to update appointment.");
     }
   };
 
@@ -284,10 +284,10 @@ export default function ProfessorAppointmentsPage() {
   const handleCancel = (id) => requestAction("cancel", id);
 
   const STATUS_BY_ACTION = {
-    approve: ["approved", "Approved appointment with {name}"],
+    approve: ["approved", "Approved appointment with {name}."],
     reject: ["rejected", null],
-    complete: ["completed", "Appointment marked as completed"],
-    cancel: ["cancelled", "Appointment cancelled"],
+    complete: ["completed", "Appointment marked as completed."],
+    cancel: ["cancelled", "Appointment cancelled."],
   };
 
   const runConfirmAction = async () => {
@@ -335,7 +335,7 @@ export default function ProfessorAppointmentsPage() {
             icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
             iconClassName="appt-title-icon"
             title="Appointment Manager"
-            subtitle="Review and manage student appointment requests"
+            subtitle="Review and manage student appointment requests."
           />
 
           {/* Schedule Manager card */}
@@ -349,7 +349,7 @@ export default function ProfessorAppointmentsPage() {
             </div>
             <div className="appt-sched-avail-card-text">
               <span className="appt-sched-avail-card-title">Schedule Manager</span>
-              <span className="appt-sched-avail-card-subtitle">Set your weekly consultation hours so students can book with you</span>
+              <span className="appt-sched-avail-card-subtitle">Set your weekly consultation hours so students can book with you.</span>
             </div>
             <ChevronRight className="appt-sched-avail-card-chevron" />
           </Link>

@@ -139,7 +139,7 @@ export default function ProfessorSidebar() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await api.get("/faculty/availability-status");
+        const res = await api.get("/professor/availability-status");
         setProfStatus(res.data?.availabilityStatus ?? "available");
       } catch (err) {
         console.error("Failed to fetch faculty availability status:", err);
@@ -154,7 +154,7 @@ export default function ProfessorSidebar() {
     setProfStatus(next); // optimistic
     setStatusSaving(true);
     try {
-      await api.patch("/faculty/availability-status", { status: next });
+      await api.patch("/professor/availability-status", { status: next });
       toast.success(
         next === "available"
           ? "You're marked Available to students"
@@ -209,7 +209,7 @@ export default function ProfessorSidebar() {
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
             <NotificationBell
-              endpointBase="faculty"
+              endpointBase="professor"
               viewAllPath="/professor/notifications"
               typePaths={NOTIFICATION_TYPE_PATHS}
             />
@@ -296,7 +296,7 @@ export default function ProfessorSidebar() {
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
             <NotificationBell
-              endpointBase="faculty"
+              endpointBase="professor"
               viewAllPath="/professor/notifications"
               onOpen={() => setSidebarOpen(false)}
               typePaths={NOTIFICATION_TYPE_PATHS}

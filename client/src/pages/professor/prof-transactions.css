@@ -66,7 +66,7 @@ html, body {
 /* ── Stats grid ──────────────────────────────────────────── */
 .transactions-stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
 }
 
@@ -74,7 +74,7 @@ html, body {
   background: var(--card);
   border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 0.875rem;
-  padding: 1.25rem 1rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -84,8 +84,8 @@ html, body {
 
 .txn-stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.45);
 }
 
 [data-theme="light"] .txn-stat-card { border-color: rgba(21, 128, 61, 0.18); }
@@ -101,7 +101,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.625rem;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
 }
 
@@ -116,20 +116,20 @@ html, body {
   border: 1px solid rgba(59,130,246,0.2);
   color: var(--blue, #3b82f6);
 }
-.txn-icon-box-cyan {
-  background: linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.08) 100%);
-  border: 1px solid rgba(6,182,212,0.2);
-  color: #06b6d4;
-}
 .txn-icon-box-green {
   background: linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.08) 100%);
   border: 1px solid rgba(16,185,129,0.2);
   color: var(--success, #10b981);
 }
 .txn-icon-box-orange {
-  background: linear-gradient(135deg, rgba(249,115,22,0.2) 0%, rgba(249,115,22,0.08) 100%);
-  border: 1px solid rgba(249,115,22,0.2);
-  color: #f97316;
+  background: linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(245,158,11,0.08) 100%);
+  border: 1px solid rgba(245,158,11,0.2);
+  color: var(--warning);
+}
+.txn-icon-box-primary {
+  background: linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.08) 100%);
+  border: 1px solid rgba(34,197,94,0.2);
+  color: var(--primary-color, #22c55e);
 }
 
 .txn-stat-label {
@@ -150,60 +150,76 @@ html, body {
   transition: color 0.3s ease;
 }
 
-.txn-val-blue   { color: var(--blue, #3b82f6); }
-.txn-val-cyan   { color: #06b6d4; }
-.txn-val-green  { color: var(--success, #10b981); }
-.txn-val-orange { color: #f97316; }
+.txn-val-blue    { color: var(--blue, #3b82f6); }
+.txn-val-green   { color: var(--success, #10b981); }
+.txn-val-orange  { color: var(--warning); }
+.txn-val-primary { color: var(--primary-color, #22c55e); }
 
-/* ── Filter card ─────────────────────────────────────────── */
-.txn-filter-card {
+/* ── Filter card ─────────────────────────────────────────────────────────
+   Bare filter-* and filters-card class names, scoped under .transactions-page.
+   This mirrors prof-notifications.css's own filters-card/filter-* scoping
+   (which in turn mirrors stud-notifications.css) rather than inventing a
+   third naming scheme — keeps the professor pages internally consistent. */
+.transactions-page .filters-card {
   background: var(--card);
   border: 1px solid rgba(34, 197, 94, 0.15);
   border-radius: 1rem;
-  padding: 1.25rem 1.5rem 1.5rem;
+  padding: 1rem 1.5rem 1.5rem;
   transition: all 0.3s ease;
 }
 
-[data-theme="light"] .txn-filter-card { border-color: rgba(21, 128, 61, 0.15); }
+[data-theme="light"] .transactions-page .filters-card { border-color: rgba(21, 128, 61, 0.15); }
 
-.txn-filters-header {
+.transactions-page .filters-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 
-.txn-filters-title {
-  font-size: 1.125rem;
+.transactions-page .filters-header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.transactions-page .filters-title {
+  font-size: 1.375rem;
   font-weight: 700;
+  font-family: "Inter", sans-serif;
   color: var(--text-primary);
-  margin: 0 0 0.25rem;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.txn-filters-desc {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
   margin: 0;
   text-align: left;
   transition: color 0.3s ease;
 }
 
-.txn-filters-grid {
+.transactions-page .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.transactions-page .filters-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
 }
 
-.txn-filter-group {
+@media (min-width: 768px) {
+  .transactions-page .filters-grid {
+    gap: 1.5rem;
+  }
+}
+
+.transactions-page .filter-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.txn-filter-label {
+.transactions-page .filter-label {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -211,30 +227,31 @@ html, body {
   transition: color 0.3s ease;
 }
 
+.transactions-page .filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
 /* ── Search input ────────────────────────────────────────── */
-.txn-search-wrapper {
-  flex: 1;
+.transactions-page .filter-search-wrapper {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
-.txn-search-icon {
+.transactions-page .filter-search-wrapper svg {
   position: absolute;
   left: 0.875rem;
-  display: flex;
-  align-items: center;
-  color: var(--text-tertiary);
-  pointer-events: none;
-}
-
-.txn-search-icon svg {
   width: 1rem;
   height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
   stroke: currentColor;
+  z-index: 1;
 }
 
-.txn-search-input {
+.transactions-page .filter-search-input {
   width: 100%;
   padding: 0.75rem 1.25rem 0.75rem 2.5rem;
   background: var(--input-background, var(--card));
@@ -248,17 +265,18 @@ html, body {
   box-sizing: border-box;
 }
 
-.txn-search-input::placeholder { color: var(--text-tertiary); }
-.txn-search-input:hover { border-color: rgba(34, 197, 94, 0.3); }
-.txn-search-input:focus {
+.transactions-page .filter-search-input::placeholder { color: var(--text-tertiary); }
+.transactions-page .filter-search-input:hover { border-color: rgba(34, 197, 94, 0.3); }
+.transactions-page .filter-search-input:focus {
   border-color: #22c55e;
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
 }
 
 /* ── Select ──────────────────────────────────────────────── */
-.txn-select {
+.transactions-page .filter-select {
   width: 100%;
   padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
   background: var(--input-background, var(--card));
   border: 1px solid var(--card-border);
   border-radius: 0.75rem;
@@ -270,12 +288,46 @@ html, body {
   transition: all 0.2s ease;
   appearance: none;
   -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
-.txn-select:hover { border-color: rgba(34, 197, 94, 0.3); }
-.txn-select:focus {
+.transactions-page .filter-select:hover { border-color: rgba(34, 197, 94, 0.3); }
+.transactions-page .filter-select:focus {
   border-color: #22c55e;
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.transactions-page .filter-select option {
+  background: var(--card);
+  color: var(--text-primary);
+}
+
+.transactions-page .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.transactions-page .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.transactions-page .filter-select:focus + .filter-chevron {
+  color: #22c55e;
 }
 
 /* ── Export button ───────────────────────────────────────── */
@@ -333,14 +385,23 @@ html, body {
 .txn-empty svg {
   width: 3rem;
   height: 3rem;
-  opacity: 0.35;
+  color: var(--text-tertiary);
   stroke: currentColor;
 }
 
-.txn-empty p {
-  font-size: 0.9375rem;
-  font-weight: 600;
+.txn-empty h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
+  transition: color 0.3s ease;
+}
+
+.txn-empty p {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  transition: color 0.3s ease;
 }
 
 /* ── Individual transaction item ─────────────────────────── */
@@ -373,22 +434,13 @@ html, body {
 
 .txn-item:hover::before { opacity: 1; }
 
-/* Queue — blue */
-.txn-type-queue::before {
-  background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, transparent 100%);
-}
-.txn-type-queue:hover {
-  border-color: rgba(59,130,246,0.35);
-  box-shadow: 0 8px 24px rgba(59,130,246,0.1);
-}
-
-/* Appointment — green */
+/* Appointment — purple, matching its icon/badge color */
 .txn-type-appointment::before {
-  background: linear-gradient(135deg, rgba(16,185,129,0.06) 0%, transparent 100%);
+  background: linear-gradient(135deg, rgba(168,85,247,0.06) 0%, transparent 100%);
 }
 .txn-type-appointment:hover {
-  border-color: rgba(16,185,129,0.35);
-  box-shadow: 0 8px 24px rgba(16,185,129,0.1);
+  border-color: rgba(168,85,247,0.35);
+  box-shadow: 0 8px 24px rgba(168,85,247,0.1);
 }
 
 /* Document — orange */
@@ -424,10 +476,6 @@ html, body {
   fill: none;
 }
 
-.txn-icon-queue {
-  background: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.08) 100%);
-  color: var(--blue, #3b82f6);
-}
 .txn-icon-appointment {
   background: linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.08) 100%);
   color: var(--purple, #a855f7);
@@ -477,12 +525,11 @@ html, body {
   border-radius: 0.375rem;
   font-size: 0.65rem;
   font-weight: 700;
-  text-transform: capitalize;
+  text-transform: uppercase;
   white-space: nowrap;
   transition: all 0.3s ease;
 }
 
-.txn-badge-queue       { background: rgba(59,130,246,0.15);  color: #60a5fa;  border: 0.5px solid rgba(59,130,246,0.3); }
 .txn-badge-appointment { background: rgba(168,85,247,0.15);  color: var(--purple);  border: 0.5px solid rgba(168,85,247,0.3); }
 .txn-badge-document    { background: rgba(249,115,22,0.15);  color: #fb923c;  border: 0.5px solid rgba(249,115,22,0.3); }
 .txn-badge-completed   { background: rgba(16,185,129,0.15);  color: #34d399;  border: 0.5px solid rgba(16,185,129,0.3); }
@@ -496,7 +543,6 @@ html, body {
 .txn-badge-claimed     { background: rgba(16,185,129,0.15);  color: #34d399;  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-noshow      { background: rgba(239,68,68,0.15);   color: #f87171;  border: 0.5px solid rgba(239,68,68,0.3); }
 
-[data-theme="light"] .txn-badge-queue       { background: rgba(37,99,235,0.08);  color: #1d4ed8;  border-color: rgba(37,99,235,0.2); }
 [data-theme="light"] .txn-badge-appointment { background: rgba(147,51,234,0.08); color: #6b21a8;  border-color: rgba(147,51,234,0.2); }
 [data-theme="light"] .txn-badge-document    { background: rgba(234,88,12,0.08);  color: #9a3412;  border-color: rgba(234,88,12,0.2); }
 [data-theme="light"] .txn-badge-completed   { background: rgba(5,150,105,0.08);  color: #065f46;  border-color: rgba(5,150,105,0.2); }
@@ -511,20 +557,18 @@ html, body {
 [data-theme="light"] .txn-badge-noshow      { background: rgba(220,38,38,0.08);  color: #991b1b;  border-color: rgba(220,38,38,0.2); }
 
 /* ── Item student line ───────────────────────────────────── */
+/* Column, not row: the appointment branch stacks the name above the ID
+   badge; the document branch renders a single child (the tracking pill), so
+   the direction change is a no-op there. No icon renders inside this
+   container in either branch anymore, so there's no icon-sizing rule to keep. */
 .txn-item-student {
   display: flex;
-  align-items: center;
-  gap: 0.375rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
   font-size: 0.875rem;
   color: var(--text-tertiary);
   transition: color 0.3s ease;
-}
-
-.txn-item-student svg {
-  width: 0.875rem;
-  height: 0.875rem;
-  flex-shrink: 0;
-  stroke: currentColor;
 }
 
 .txn-item-student-name {
@@ -533,9 +577,31 @@ html, body {
   transition: color 0.3s ease;
 }
 
+/* Purple pill, copied verbatim from prof-dashboard.css's
+   .appointment-student-id-badge (same template used for this exact concept
+   on the dashboard's Today's Appointments preview card). */
+.txn-student-id-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--purple);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .txn-student-id-badge {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
 .txn-tracking-pill {
   padding: 0.375rem 0.875rem;
-  border-radius: 0.5rem;
+  border-radius: 0.625rem;
   font-size: 0.75rem;
   font-weight: 700;
   background: #f97316;
@@ -583,17 +649,31 @@ html, body {
   stroke: currentColor;
 }
 
+.txn-item-time {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.txn-item-time svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .transactions-page { padding: 1rem; }
-}
-
-@media (max-width: 900px) {
   .transactions-stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 768px) {
-  .txn-filters-grid { grid-template-columns: 1fr; }
+  .transactions-page .filters-grid { grid-template-columns: 1fr; }
 
   .txn-item {
     grid-template-columns: auto 1fr;
@@ -603,6 +683,7 @@ html, body {
     grid-column: 1 / -1;
     flex-direction: row;
     align-items: center;
+    justify-content: space-between;
     align-self: auto;
     padding-top: 0.75rem;
     border-top: 1px solid var(--card-border);
@@ -612,8 +693,5 @@ html, body {
 
 @media (max-width: 640px) {
   .transactions-page { padding: 1rem; gap: 1rem; }
-}
-
-@media (max-width: 500px) {
-  .transactions-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .transactions-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
 }

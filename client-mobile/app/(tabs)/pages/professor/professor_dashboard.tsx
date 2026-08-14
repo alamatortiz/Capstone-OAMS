@@ -197,7 +197,7 @@ export default function ProfessorDashboardScreen() {
   const fetchStats = useCallback(async () => {
     setError(null);
     try {
-      const { data } = await api.get('/faculty/dashboard-stats');
+      const { data } = await api.get('/professor/dashboard-stats');
       setDashData(data);
       setIsAvailable((data.availabilityStatus ?? 'available') === 'available');
     } catch (err) {
@@ -217,7 +217,7 @@ export default function ProfessorDashboardScreen() {
   // (mirrors student_dashboard.tsx's own separate announcements fetch).
   const fetchAnnouncements = useCallback(async () => {
     try {
-      const { data } = await api.get('/faculty/announcements');
+      const { data } = await api.get('/professor/announcements');
       setAnnouncements(data?.announcements ?? []);
     } catch (err) {
       console.error('Failed to fetch announcements:', err);
@@ -227,7 +227,7 @@ export default function ProfessorDashboardScreen() {
   const fetchOfficeHours = useCallback(async () => {
     setOfficeHoursLoading(true);
     try {
-      const { data } = await api.get('/faculty/office-hours');
+      const { data } = await api.get('/professor/office-hours');
       setOfficeHours({
         departmentName: data.departmentName,
         departmentAbbrev: data.departmentAbbrev,
@@ -293,7 +293,7 @@ export default function ProfessorDashboardScreen() {
     const prev = isAvailable;
     setIsAvailable(value);
     try {
-      await api.patch('/faculty/availability-status', {
+      await api.patch('/professor/availability-status', {
         status: value ? 'available' : 'unavailable',
       });
     } catch (err) {

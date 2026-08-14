@@ -70,7 +70,7 @@ function OamsLogo({
 }
 
 // ─── Field shapes documented here mirror what Field shapes mirror what
-// GET /faculty/appointments really returns (studentName, studentId,
+// GET /professor/appointments really returns (studentName, studentId,
 // appointmentType, date, time, location, purpose, status, requestedAt) — this
 // screen otherwise ports the actual wired prof-appointments.jsx/.css 1:1
 // (no stat cards — that's a design-mockup-only feature, not part of the real
@@ -222,7 +222,7 @@ export default function ProfessorAppointmentScreen() {
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/faculty/appointments');
+      const { data } = await api.get('/professor/appointments');
       setAppointments(data ?? []);
     } catch (err) {
       console.error('Fetch appointments error:', err);
@@ -322,7 +322,7 @@ export default function ProfessorAppointmentScreen() {
     const status = STATUS_BY_ACTION[type];
     setConfirmSaving(true);
     try {
-      await api.patch(`/faculty/appointments/${apt.id}/status`, { status });
+      await api.patch(`/professor/appointments/${apt.id}/status`, { status });
       await fetchAppointments();
     } catch (err) {
       console.error('Update appointment status error:', err);

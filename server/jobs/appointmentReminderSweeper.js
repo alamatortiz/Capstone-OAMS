@@ -76,7 +76,7 @@ async function sweepAppointmentReminders() {
 // auto-resolving stale approved appointments to 'completed' avoids the
 // alternative of a permanently-stuck, obviously-past-due record. Mirrors the
 // exact notify+emit shape of the manual status-update route in
-// facultyRoutes.js so a transaction feed can't tell the two apart.
+// professorRoutes.js so a transaction feed can't tell the two apart.
 async function sweepStaleApproved() {
   const [stale] = await pool.query(
     `SELECT appointment_id, student_id, department_id

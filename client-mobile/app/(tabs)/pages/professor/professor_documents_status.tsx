@@ -100,7 +100,7 @@ function OamsLogo({
 }
 
 // ─── Field shapes documented here mirror what Field shapes mirror what
-// GET /faculty/my-document-requests really returns (service_name, college,
+// GET /professor/documents really returns (service_name, college,
 // purpose, created_at, status, tracking_number, notes, estimated_completion,
 // released_at, claimed_at) — this screen ports the actual wired
 // prof-document-status.jsx/.css 1:1: Active/Completed tabs, tap-through to a
@@ -215,7 +215,7 @@ export default function ProfessorDocumentsStatusScreen() {
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/faculty/my-document-requests');
+      const { data } = await api.get('/professor/documents');
       setDocuments(
         (data ?? []).map((r: any) => ({
           id: String(r.request_id),
@@ -252,7 +252,7 @@ export default function ProfessorDocumentsStatusScreen() {
     const fetchDocumentTypes = async () => {
       setReqLoading(true);
       try {
-        const { data } = await api.get('/faculty/document-services');
+        const { data } = await api.get('/professor/documents/service-types');
         setDocumentTypes(
           (data ?? []).map((s: any) => ({
             name: s.service_name,
@@ -340,7 +340,7 @@ export default function ProfessorDocumentsStatusScreen() {
     if (!selectedDoc) return;
     setCancelling(true);
     try {
-      await api.delete(`/faculty/my-document-requests/${selectedDoc.id}`);
+      await api.delete(`/professor/documents/${selectedDoc.id}`);
       setDocuments((prev) =>
         prev.map((d) => (d.id === selectedDoc.id ? { ...d, status: 'cancelled' } : d)),
       );

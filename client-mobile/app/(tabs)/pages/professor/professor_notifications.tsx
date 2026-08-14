@@ -154,7 +154,7 @@ export default function ProfessorNotificationsScreen() {
     const requestId = ++requestIdRef.current;
     try {
       if (pageNum > 1) setLoadingMore(true);
-      const { data } = await api.get('/faculty/notifications', {
+      const { data } = await api.get('/professor/notifications', {
         params: { type: filterType !== 'all' ? filterType : undefined, page: pageNum },
       });
       if (requestId !== requestIdRef.current) return;
@@ -226,7 +226,7 @@ export default function ProfessorNotificationsScreen() {
   const markRead = async (id: number) => {
     setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n)));
     try {
-      await api.patch(`/faculty/notifications/${id}/read`);
+      await api.patch(`/professor/notifications/${id}/read`);
       broadcastNotificationsChanged();
     } catch {
       setNotifications((prev) => prev.map((n) => (n.notification_id === id ? { ...n, is_read: false } : n)));
@@ -237,7 +237,7 @@ export default function ProfessorNotificationsScreen() {
     const previous = notificationsRef.current;
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
-      await api.patch('/faculty/notifications/read-all');
+      await api.patch('/professor/notifications/read-all');
       broadcastNotificationsChanged();
     } catch {
       setNotifications(previous);

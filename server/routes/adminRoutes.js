@@ -1295,7 +1295,7 @@ router.get(
       const [rows] = await pool.query(unionSql, unionParams);
 
       // Map raw per-table statuses -> the badge vocabulary the UI uses.
-      // Document statuses stay granular (matching /faculty/transactions'
+      // Document statuses stay granular (matching /professor/transactions'
       // vocabulary) instead of collapsing pending/processing/generated/
       // released into "approved" — that used to render an untouched
       // "pending" request with a green "Approved" badge.

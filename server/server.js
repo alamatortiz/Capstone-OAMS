@@ -32,7 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 const authRoutes = require("./routes/auth");
 const studentRoutes = require("./routes/studentRoutes");
-const facultyRoutes = require("./routes/facultyRoutes");
+const professorRoutes = require("./routes/professorRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { sendServerError } = require("./utils/errorResponse");
 const { startNoShowSweeper } = require("./jobs/queueNoShowSweeper");
@@ -43,7 +43,7 @@ const { initSocketServer } = require("./sockets");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/student", studentRoutes);
-app.use("/api/faculty", facultyRoutes);
+app.use("/api/professor", professorRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Surfaces multer upload failures (file too large, too many files, or an

@@ -474,7 +474,7 @@ INSERT INTO document_services (service_id, service_name, description, department
 -- SECTION 5c-REQ · DOCUMENT REQUIREMENTS
 -- Documents/items required for document (non-queue) service requests.
 -- Queried by GET /api/student/documents/service-types and
--- GET /api/faculty/document-services for their respective service_ids.
+-- GET /api/professor/documents/service-types for their respective service_ids.
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES
 -- Good Moral Certificate (service_id 1, students)
@@ -564,4 +564,4 @@ INSERT INTO document_requests (student_id, service_id, request_type, purpose, st
 (104, 1, 'Good Moral Certificate', 'For scholarship application', 'processing'), -- ongoing
 (104, 2, 'Transcript of Records',  'For further studies',         'claimed'),    -- completed
 (104, 1, 'Good Moral Certificate', 'For employment',               'rejected');  -- cancelled
-
+
