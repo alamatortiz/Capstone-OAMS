@@ -106,14 +106,16 @@ interface QuickAction {
   title: string;
   description: string;
   icon: IoniconName;
-  badge: string;
+  badge?: string;
   gradient: readonly [string, string];
 }
 
 interface TodayAppointment {
   id: number;
   student: string;
+  studentNumber?: string;
   purpose: string;
+  appointmentType?: string;
   time: string;
   status: string;
 }
@@ -123,17 +125,35 @@ const STATUS_META: Record<string, { bg: string; border: string; color: string }>
   pending: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
 };
 
-const DOT_COLORS: Record<string, string> = {
-  'dot-green': '#22c55e',
-  'dot-amber': '#f59e0b',
-  'dot-red': '#ef4444',
-  'dot-gray': '#94a3b8',
+// Mirrors prof-dashboard.jsx's formatActivityStatus: title-cases the raw
+// status and special-cases the same two words, so Recent Activity's badge
+// text reads the same way on both dashboards ("No Show" not "no_show").
+function formatActivityStatus(status: string, type: string) {
+  if (status === 'no_show') return 'No Show';
+  if (type === 'document' && status === 'generated') return 'Ready';
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+const ACTIVITY_STATUS_META: Record<string, { bg: string; border: string; color: string }> = {
+  approved: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
+  completed: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
+  ready: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
+  generated: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
+  released: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
+  claimed: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
+  pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
+  processing: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
+  rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' },
+  no_show: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
 };
+const DEFAULT_ACTIVITY_STATUS_META = { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#9ca3af' };
 
 interface ActivityEntry {
   id: number;
-  dot: string;
+  type: string;
   title: string;
+  status: string;
   time: string;
 }
 
@@ -272,9 +292,36 @@ export default function ProfessorDashboardScreen() {
   }, [user, token, fetchAnnouncements]);
 
   const s = dashData?.stats;
+
+  // Same conditional-list-building pattern as prof-dashboard.jsx's own stat
+  // card descriptions, over stats.appointments.{pending,approved} and
+  // stats.documents.{pendingOnly,processing,ready,released}.
+  const appointmentsDescription = loading
+    ? 'Loading...'
+    : (() => {
+        const parts: string[] = [];
+        const pending = s?.appointments?.pending ?? 0;
+        const approved = s?.appointments?.approved ?? 0;
+        if (pending > 0) parts.push(`${pending} pending`);
+        if (approved > 0) parts.push(`${approved} approved`);
+        return parts.length ? parts.join(', ') : 'No pending appointments';
+      })();
+
+  const documentsDescription = loading
+    ? 'Loading...'
+    : (() => {
+        const parts: string[] = [];
+        const docs = s?.documents ?? {};
+        if (docs.pendingOnly > 0) parts.push(`${docs.pendingOnly} pending`);
+        if (docs.processing > 0) parts.push(`${docs.processing} processing`);
+        if (docs.ready > 0) parts.push(`${docs.ready} ready`);
+        if (docs.released > 0) parts.push(`${docs.released} released`);
+        return parts.length ? parts.join(', ') : 'No pending documents';
+      })();
+
   const stats: StatItem[] = [
-    { key: 'appointments', title: 'Pending Appointments', value: loading ? '—' : String(s?.pendingAppointments ?? 0), description: loading ? 'Loading...' : `${s?.todayAppointments ?? 0} for today`, icon: 'calendar-outline', tint: 'violet' },
-    { key: 'documents', title: 'Documents', value: loading ? '—' : String(s?.documentsToReview ?? 0), description: 'Pending requests', icon: 'document-text-outline', tint: 'orange' },
+    { key: 'appointments', title: 'Pending Appointments', value: loading ? '—' : String(s?.pendingAppointments ?? 0), description: appointmentsDescription, icon: 'calendar-outline', tint: 'violet' },
+    { key: 'documents', title: 'Documents', value: loading ? '—' : String(s?.documentsToReview ?? 0), description: documentsDescription, icon: 'document-text-outline', tint: 'orange' },
     { key: 'completed', title: 'Completed', value: loading ? '—' : String(s?.completedThisMonth ?? 0), description: 'This month', icon: 'checkmark-circle-outline', tint: 'green' },
   ];
 
@@ -322,16 +369,15 @@ export default function ProfessorDashboardScreen() {
     comingSoon();
   };
 
-  // Position in this array is load-bearing: styles.actionsGrid renders cards
-  // in a single vertical stack (no width/flexBasis constraint), so this is
-  // just render order, not a CSS-column dependency the way the web
-  // dashboard's positional gradient classes are -- but keep Announcements
-  // last regardless, matching the web dashboard's own append convention.
+  // Mirrors prof-dashboard.jsx's own quickActions array exactly (order,
+  // copy, and which tiles carry a live badge vs none).
   const pinnedAnnouncementsCount = announcements.filter((a) => a.isPinned).length;
   const quickActions: QuickAction[] = [
-    { key: 'document-request', title: 'Document Request', description: 'Submit a new document request', icon: 'create-outline', badge: 'Documents', gradient: ['#f97316', '#ea580c'] },
-    { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your consultation hours', icon: 'time-outline', badge: 'Schedule', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'announcements', title: 'Announcements', description: 'Notices and updates for faculty in your department.', icon: 'megaphone-outline', badge: `${pinnedAnnouncementsCount} Pinned`, gradient: ['#22c55e', '#16a34a'] },
+    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: 'megaphone-outline', badge: `${pinnedAnnouncementsCount} Pinned`, gradient: ['#22c55e', '#16a34a'] },
+    { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your weekly recurring availability by day. It repeats every week until you edit or remove it.', icon: 'time-outline', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'appointments', title: 'Appointments', description: 'Review and manage student appointment requests.', icon: 'calendar-outline', badge: `${s?.pendingAppointments ?? 0} Pending`, gradient: ['#3b82f6', '#2563eb'] },
+    { key: 'document-request', title: 'Document Requests', description: 'Request documents and track their status.', icon: 'create-outline', badge: `${s?.documentsToReview ?? 0} Pending`, gradient: ['#f97316', '#ea580c'] },
+    { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: 'swap-horizontal-outline', gradient: ['#06b6d4', '#0e7490'] },
   ];
 
   const handleNavPress = (key: string) => {
@@ -389,7 +435,7 @@ export default function ProfessorDashboardScreen() {
               />
             </Pressable>
             <NotificationBell
-              endpointBase="faculty"
+              endpointBase="professor"
               theme={theme}
               typePaths={PROFESSOR_NOTIFICATION_PATHS}
               viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
@@ -475,6 +521,14 @@ export default function ProfessorDashboardScreen() {
                     router.push('/pages/professor/professor_announcement');
                     return;
                   }
+                  if (action.key === 'appointments') {
+                    router.push('/pages/professor/professor_appointment');
+                    return;
+                  }
+                  if (action.key === 'transactions') {
+                    router.push('/pages/professor/professor_transactions');
+                    return;
+                  }
                   comingSoon();
                 }}
               >
@@ -483,9 +537,11 @@ export default function ProfessorDashboardScreen() {
                     <Ionicons name={action.icon} size={22} color="#ffffff" />
                   </LinearGradient>
                   <View style={styles.actionBody}>
-                    <View style={styles.actionBadge}>
-                      <Text style={styles.actionBadgeText}>{action.badge}</Text>
-                    </View>
+                    {action.badge && (
+                      <View style={styles.actionBadge}>
+                        <Text style={styles.actionBadgeText}>{action.badge}</Text>
+                      </View>
+                    )}
                     <Text style={styles.actionTitle}>{action.title}</Text>
                     <Text style={styles.actionDescription}>{action.description}</Text>
                     <View style={styles.actionCta}>
@@ -525,8 +581,15 @@ export default function ProfessorDashboardScreen() {
                       <Ionicons name="people-outline" size={20} color={theme.primary} />
                     </View>
                     <View style={styles.appointmentBody}>
-                      <Text style={styles.appointmentStudent}>{apt.student}</Text>
-                      <Text style={styles.appointmentPurpose}>{apt.purpose}</Text>
+                      <View style={styles.appointmentStudentRow}>
+                        <Text style={styles.appointmentStudent}>{apt.student}</Text>
+                        {apt.studentNumber && (
+                          <View style={styles.studentIdBadge}>
+                            <Text style={styles.studentIdBadgeText}>{apt.studentNumber}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.appointmentPurpose}>{apt.appointmentType || apt.purpose}</Text>
                     </View>
                     <View style={styles.appointmentTimeStatus}>
                       <Text style={styles.appointmentTime}>{apt.time}</Text>
@@ -560,21 +623,36 @@ export default function ProfessorDashboardScreen() {
             ) : recentActivity.length === 0 ? (
               <Text style={styles.emptyText}>No recent activity.</Text>
             ) : (
-              recentActivity.map((activity, index) => (
-                <View
-                  key={activity.id}
-                  style={[
-                    styles.activityItem,
-                    index === recentActivity.length - 1 && styles.activityItemLast,
-                  ]}
-                >
-                  <View style={[styles.activityDot, { backgroundColor: DOT_COLORS[activity.dot] ?? '#94a3b8' }]} />
-                  <View>
-                    <Text style={styles.activityText}>{activity.title}</Text>
-                    <Text style={styles.appointmentPurpose}>{activity.time}</Text>
+              recentActivity.map((activity, index) => {
+                const isDocument = activity.type === 'document';
+                const statusMeta = ACTIVITY_STATUS_META[activity.status] ?? DEFAULT_ACTIVITY_STATUS_META;
+                return (
+                  <View
+                    key={activity.id}
+                    style={[
+                      styles.activityItem,
+                      index === recentActivity.length - 1 && styles.activityItemLast,
+                    ]}
+                  >
+                    <View style={[styles.activityIconWrap, isDocument ? styles.activityIconDocument : styles.activityIconAppointment]}>
+                      <Ionicons
+                        name={isDocument ? 'document-text-outline' : 'calendar-outline'}
+                        size={15}
+                        color={isDocument ? '#f59e0b' : theme.primary}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.activityText}>{activity.title}</Text>
+                      <Text style={styles.appointmentPurpose}>{activity.time}</Text>
+                    </View>
+                    <View style={[styles.activityStatusBadge, { backgroundColor: statusMeta.bg, borderColor: statusMeta.border }]}>
+                      <Text style={[styles.activityStatusBadgeText, { color: statusMeta.color }]}>
+                        {formatActivityStatus(activity.status, activity.type)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
 
@@ -1041,10 +1119,28 @@ function createStyles(theme: ThemePalette) {
       flex: 1,
       gap: 3,
     },
+    appointmentStudentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
     appointmentStudent: {
       fontSize: 14,
       fontWeight: '700',
       color: theme.text,
+    },
+    studentIdBadge: {
+      backgroundColor: 'rgba(34, 197, 94, 0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.3)',
+      borderRadius: 6,
+      paddingVertical: 2,
+      paddingHorizontal: 6,
+    },
+    studentIdBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: theme.primary,
     },
     appointmentPurpose: {
       fontSize: 12,
@@ -1084,11 +1180,33 @@ function createStyles(theme: ThemePalette) {
       borderBottomWidth: 0,
       paddingBottom: 0,
     },
-    activityDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      marginTop: 5,
+    activityIconWrap: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      flexShrink: 0,
+    },
+    activityIconAppointment: {
+      backgroundColor: 'rgba(34, 197, 94, 0.15)',
+      borderColor: 'rgba(34, 197, 94, 0.3)',
+    },
+    activityIconDocument: {
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    activityStatusBadge: {
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      alignSelf: 'flex-start',
+    },
+    activityStatusBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
     },
     activityText: {
       flex: 1,

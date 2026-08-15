@@ -368,7 +368,7 @@ export default function ProfessorDocumentsScreen() {
               />
             </Pressable>
             <NotificationBell
-              endpointBase="faculty"
+              endpointBase="professor"
               theme={theme}
               typePaths={PROFESSOR_NOTIFICATION_PATHS}
               viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}

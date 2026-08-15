@@ -85,7 +85,7 @@ export default function NotificationBell({
   typePaths,
   viewAllPath,
 }: {
-  endpointBase: 'student' | 'faculty' | 'admin';
+  endpointBase: 'student' | 'professor' | 'admin';
   theme: NotificationBellTheme;
   typePaths: Partial<Record<NotificationType, string>>;
   viewAllPath: string;

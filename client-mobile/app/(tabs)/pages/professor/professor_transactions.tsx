@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -69,15 +72,18 @@ function OamsLogo({
   );
 }
 
-// ─── Field shapes documented here mirror what Field shapes mirror what
-// GET /professor/transactions really returns (type, status, studentName/studentId
-// for queue+appointment rows, trackingNumber for document rows, description,
-// date) — this screen ports the actual wired prof-transactions.jsx/.css 1:1:
-// stat tiles derived from the *filtered* list (matching the web page, which
-// derives stats from the already-filtered API response), search + type/status
-// filters, and per-item type+status badges. On mobile the two <select>
-// dropdowns become modal pickers, same pattern as the other professor screens. ───
-type TxnType = 'queue' | 'appointment' | 'document';
+// ─── Field shapes documented here mirror what GET /professor/transactions
+// really returns (type, status, studentName/studentId for appointment rows,
+// trackingNumber for document rows, description, date) — this screen ports
+// the actual wired prof-transactions.jsx/.css 1:1: stat tiles now come from
+// the separate, unfiltered GET /professor/transactions/stats endpoint
+// (matching web's post-370fb32 behavior), search + type/status filters, and
+// per-item type+status badges. Queue was dropped from the type union
+// entirely -- the backend's /professor/transactions handler only ever
+// queries appointments + faculty_document_requests, it never returns a
+// queue-type row for this role. On mobile the two <select> dropdowns become
+// modal pickers, same pattern as the other professor screens. ───
+type TxnType = 'appointment' | 'document';
 type TxnStatus =
   | 'pending'
   | 'approved'
@@ -116,7 +122,6 @@ const navItems: NavItem[] = [
 ];
 
 const TYPE_META: Record<TxnType, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
-  queue: { label: 'Queue', icon: 'people-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#60a5fa' },
   appointment: { label: 'Appointment', icon: 'calendar-outline', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
   document: { label: 'Document', icon: 'document-text-outline', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#fb923c' },
 };
@@ -140,7 +145,6 @@ type SelectField = 'type' | 'status' | null;
 
 const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'all', label: 'All Types' },
-  { value: 'queue', label: 'Queue' },
   { value: 'appointment', label: 'Appointment' },
   { value: 'document', label: 'Document' },
 ];
@@ -158,22 +162,34 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-const formatDateTime = (dateStr: string) => {
+// Split into two labels (mirrors prof-transactions.jsx's dateLabel/timeLabel
+// fields, rendered as two separate meta rows instead of one combined string).
+const formatDateOnly = (dateStr: string) => {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
+const formatTimeOnly = (dateStr: string) => {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+
+const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 export default function ProfessorTransactionsScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
+  const [exporting, setExporting] = useState(false);
   const router = useRouter();
   const { user, logout, token } = useAuth();
 
@@ -182,14 +198,19 @@ export default function ProfessorTransactionsScreen() {
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
-  const showExportComingSoon = () =>
-    Alert.alert('Coming soon', 'Export is not wired up yet on mobile.');
+
+  // Debounced 400ms, mirroring prof-transactions.jsx's own search debounce,
+  // so typing doesn't fire a request on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string> = {};
-      if (searchQuery) params.search = searchQuery;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (filterType !== 'all') params.filterType = filterType;
       if (filterStatus !== 'all') params.filterStatus = filterStatus;
       const { data } = await api.get('/professor/transactions', { params });
@@ -210,17 +231,33 @@ export default function ProfessorTransactionsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filterType, filterStatus]);
+  }, [debouncedSearch, filterType, filterStatus]);
+
+  // Stats come from the professor's FULL unfiltered history, computed
+  // server-side, so the stat cards never reflect whatever search/type/status
+  // filter happens to be active (mirrors prof-transactions.jsx's own split).
+  const fetchStats = useCallback(async () => {
+    try {
+      const { data } = await api.get('/professor/transactions/stats');
+      setTxStats(data);
+    } catch (err) {
+      console.error('Fetch transaction stats error:', err);
+    }
+  }, []);
 
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
 
   useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
     if (!user || !token) return;
     const socket = connectSocket(token);
     if (!socket) return;
-    const refetch = () => fetchTransactions();
+    const refetchAll = () => { fetchTransactions(); fetchStats(); };
     const events = [
       'appointment:status-updated',
       'document:status-updated',
@@ -229,11 +266,42 @@ export default function ProfessorTransactionsScreen() {
       'queue:served',
       'queue:no-show',
     ];
-    events.forEach((event) => socket.on(event, refetch));
+    events.forEach((event) => socket.on(event, refetchAll));
     return () => {
-      events.forEach((event) => socket.off(event, refetch));
+      events.forEach((event) => socket.off(event, refetchAll));
     };
-  }, [user, token, fetchTransactions]);
+  }, [user, token, fetchTransactions, fetchStats]);
+
+  const handleExport = async () => {
+    if (filtered.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const header = ['Type', 'Status', 'Details', 'Student/Tracking', 'Date', 'Time'];
+      const rows = filtered.map((t) => [
+        TYPE_META[t.type].label,
+        STATUS_META[t.status].label,
+        t.details,
+        t.type === 'document' ? t.trackingNumber ?? '' : `${t.studentName ?? ''} (${t.studentId ?? ''})`,
+        formatDateOnly(t.date),
+        formatTimeOnly(t.date),
+      ]);
+      const csv = [header, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+      const uri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(uri, csv);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text' });
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Toast.show({ type: 'error', text1: 'Could not export transactions.' });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
@@ -249,12 +317,6 @@ export default function ProfessorTransactionsScreen() {
 
   // Server already applies search/type/status filtering.
   const filtered = transactions;
-
-  const stats = {
-    total: filtered.length,
-    appointments: filtered.filter((t) => t.type === 'appointment').length,
-    documents: filtered.filter((t) => t.type === 'document').length,
-  };
 
   const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
   const selectTitle = selectField === 'type' ? 'Filter by Type' : 'Filter by Status';
@@ -284,7 +346,7 @@ export default function ProfessorTransactionsScreen() {
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
             <NotificationBell
-              endpointBase="faculty"
+              endpointBase="professor"
               theme={theme}
               typePaths={PROFESSOR_NOTIFICATION_PATHS}
               viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
@@ -313,28 +375,35 @@ export default function ProfessorTransactionsScreen() {
             </View>
           </View>
 
-          {/* Stats Grid */}
+          {/* Stats Grid -- unfiltered, server-computed via /transactions/stats */}
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
               <View style={[styles.statIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: 'rgba(59, 130, 246, 0.3)' }]}>
                 <Ionicons name="pulse-outline" size={18} color="#3b82f6" />
               </View>
-              <Text style={[styles.statValue, { color: '#3b82f6' }]}>{stats.total}</Text>
-              <Text style={styles.statLabel}>Total Transactions</Text>
+              <Text style={[styles.statValue, { color: '#3b82f6' }]}>{txStats.total}</Text>
+              <Text style={styles.statLabel}>Total</Text>
             </View>
             <View style={styles.statCard}>
               <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
-                <Ionicons name="calendar-outline" size={18} color="#10b981" />
+                <Ionicons name="checkmark-circle-outline" size={18} color="#10b981" />
               </View>
-              <Text style={[styles.statValue, { color: '#10b981' }]}>{stats.appointments}</Text>
-              <Text style={styles.statLabel}>Appointments</Text>
+              <Text style={[styles.statValue, { color: '#10b981' }]}>{txStats.completed}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
             </View>
             <View style={styles.statCard}>
               <View style={[styles.statIcon, { backgroundColor: 'rgba(249, 115, 22, 0.15)', borderColor: 'rgba(249, 115, 22, 0.3)' }]}>
-                <Ionicons name="document-text-outline" size={18} color="#f97316" />
+                <Ionicons name="time-outline" size={18} color="#f97316" />
               </View>
-              <Text style={[styles.statValue, { color: '#f97316' }]}>{stats.documents}</Text>
-              <Text style={styles.statLabel}>Documents</Text>
+              <Text style={[styles.statValue, { color: '#f97316' }]}>{txStats.ongoing}</Text>
+              <Text style={styles.statLabel}>Ongoing</Text>
+            </View>
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: 'rgba(34, 197, 94, 0.15)', borderColor: 'rgba(34, 197, 94, 0.3)' }]}>
+                <Ionicons name="calendar-outline" size={18} color="#22c55e" />
+              </View>
+              <Text style={[styles.statValue, { color: '#22c55e' }]}>{txStats.thisMonth}</Text>
+              <Text style={styles.statLabel}>This Month</Text>
             </View>
           </View>
 
@@ -345,9 +414,13 @@ export default function ProfessorTransactionsScreen() {
                 <Text style={styles.filtersTitle}>Transaction Filter</Text>
                 <Text style={styles.filtersDescription}>Search and filter transactions</Text>
               </View>
-              <Pressable style={styles.exportBtn} onPress={showExportComingSoon}>
+              <Pressable
+                style={[styles.exportBtn, filtered.length === 0 && styles.exportBtnDisabled]}
+                onPress={handleExport}
+                disabled={filtered.length === 0 || exporting}
+              >
                 <Ionicons name="download-outline" size={14} color={theme.text} />
-                <Text style={styles.exportBtnText}>Export</Text>
+                <Text style={styles.exportBtnText}>{exporting ? 'Exporting…' : 'Export'}</Text>
               </Pressable>
             </View>
 
@@ -432,8 +505,14 @@ export default function ProfessorTransactionsScreen() {
                     {txn.details && <Text style={styles.txnDetails}>{txn.details}</Text>}
 
                     <View style={styles.txnMetaRow}>
-                      <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
-                      <Text style={styles.txnMetaText}>{formatDateTime(txn.date)}</Text>
+                      <View style={styles.txnMetaItem}>
+                        <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                        <Text style={styles.txnMetaText}>{formatDateOnly(txn.date)}</Text>
+                      </View>
+                      <View style={styles.txnMetaItem}>
+                        <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                        <Text style={styles.txnMetaText}>{formatTimeOnly(txn.date)}</Text>
+                      </View>
                     </View>
                   </View>
                 );
@@ -442,8 +521,8 @@ export default function ProfessorTransactionsScreen() {
           ) : (
             <View style={styles.emptyCard}>
               <Ionicons name="pulse-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>No transactions found</Text>
-              <Text style={styles.emptyDescription}>Try adjusting your search or filters</Text>
+              <Text style={styles.emptyTitle}>No Transactions Found</Text>
+              <Text style={styles.emptyDescription}>You have no transaction records yet.</Text>
             </View>
           )}
         </ScrollView>
@@ -688,6 +767,7 @@ function createStyles(theme: ThemePalette) {
       flexShrink: 0,
     },
     exportBtnText: { fontSize: 12, fontWeight: '700', color: theme.text },
+    exportBtnDisabled: { opacity: 0.5 },
     filterField: { gap: 6 },
     filterLabel: { fontSize: 12, fontWeight: '700', color: theme.text },
     searchWrapper: {
@@ -761,12 +841,13 @@ function createStyles(theme: ThemePalette) {
     txnMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 16,
       marginTop: 4,
       paddingTop: 10,
       borderTopWidth: 1,
       borderTopColor: theme.border,
     },
+    txnMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     txnMetaText: { fontSize: 11.5, color: theme.tertiary, fontWeight: '600' },
 
     // Empty state

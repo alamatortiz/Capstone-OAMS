@@ -372,7 +372,7 @@ export default function ProfessorScheduleManagerScreen() {
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
             <NotificationBell
-              endpointBase="faculty"
+              endpointBase="professor"
               theme={theme}
               typePaths={PROFESSOR_NOTIFICATION_PATHS}
               viewAllPath={PROFESSOR_NOTIFICATIONS_VIEW_ALL}
