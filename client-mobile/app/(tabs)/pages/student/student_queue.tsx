@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   ImageSourcePropType,
   Modal,
@@ -15,6 +17,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, Clock, FileText, HelpCircle,
+  Home as HomeIcon, Loader2, Megaphone, MapPin, Users, X, XCircle, ClipboardList,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useQueue } from '@/context/QueueContext';
@@ -22,6 +28,26 @@ import api from '@/utils/api';
 import QueueConcernModal from '@/components/QueueConcernModal';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+
+type LucideIconType = typeof Users;
+
+// Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
+function SpinningLoader({ size, color }: { size: number; color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -93,16 +119,16 @@ interface College {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 type FilterKind = 'college' | 'service' | null;
@@ -123,7 +149,10 @@ export default function StudentQueueScreen() {
   const [servicesLoading, setServicesLoading] = useState(true);
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { queues: myQueues, availableSlots, joinQueue, leaveQueue, isAlreadyInQueue: isSlotJoined } = useQueue();
+  const {
+    queues: myQueues, availableSlots, joinQueue, leaveQueue, isAlreadyInQueue: isSlotJoined,
+    isLoading: queuesLoading, activeQueuesError, availableSlotsError,
+  } = useQueue();
 
   // Requirements/Procedure aren't on the availableSlots payload -- mirrors
   // stud-queue.jsx's fetchServices(), called once on mount and again every
@@ -333,17 +362,17 @@ export default function StudentQueueScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#3b82f6', '#6366f1']} style={styles.titleIcon}>
-              <Ionicons name="people-outline" size={22} color="#ffffff" />
+              <Users size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
-              <Text style={styles.pageTitle}>Queue Management</Text>
+              <Text style={styles.pageTitle}>Queues</Text>
               <Text style={styles.pageSubtitle}>Join queues and track your position in real-time.</Text>
             </View>
           </View>
@@ -351,7 +380,7 @@ export default function StudentQueueScreen() {
           {/* My Active Queues */}
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="time-outline" size={16} color={theme.primary} />
+              <Clock size={16} color={theme.primary} />
               <Text style={styles.sectionTitle}>My Active Queues</Text>
             </View>
             <View style={styles.sectionCountPill}>
@@ -359,7 +388,17 @@ export default function StudentQueueScreen() {
             </View>
           </View>
 
-          {myQueues.length > 0 ? (
+          {queuesLoading ? (
+            <View style={styles.emptyCard}>
+              <SpinningLoader size={28} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Loading your queues…</Text>
+            </View>
+          ) : activeQueuesError ? (
+            <View style={styles.emptyCard}>
+              <AlertCircle size={32} color="#ef4444" />
+              <Text style={styles.emptyDescription}>{activeQueuesError}</Text>
+            </View>
+          ) : myQueues.length > 0 ? (
             <View style={styles.queueList}>
               {myQueues.map((queue: any) => {
                 const percent = queue.totalWaiting > 0
@@ -388,6 +427,23 @@ export default function StudentQueueScreen() {
                       </View>
                     </View>
 
+                    {queue.slotStatus === 'paused' && (
+                      <View style={styles.inlineWarningBanner}>
+                        <AlertCircle size={14} color="#f59e0b" />
+                        <Text style={styles.inlineWarningText}>
+                          Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ''}
+                        </Text>
+                      </View>
+                    )}
+                    {queue.slotStatus === 'full' && (
+                      <View style={styles.inlineWarningBanner}>
+                        <AlertCircle size={14} color="#f59e0b" />
+                        <Text style={styles.inlineWarningText}>
+                          Queue Full: No longer accepting students but students within the queue will still be served.
+                        </Text>
+                      </View>
+                    )}
+
                     <View style={styles.statsGrid2}>
                       <View style={styles.statBox}>
                         <Text style={styles.statLabel}>Your Position</Text>
@@ -407,6 +463,15 @@ export default function StudentQueueScreen() {
                       </View>
                     </View>
 
+                    {queue.voidTimeoutMinutes != null && (
+                      <View style={styles.activeVoidWarningBox}>
+                        <AlertCircle size={14} color={theme.tertiary} />
+                        <Text style={styles.activeVoidWarningText}>
+                          Void after {queue.voidTimeoutMinutes} min if you don&apos;t show up when called.
+                        </Text>
+                      </View>
+                    )}
+
                     <View style={styles.progressWrap}>
                       <View style={styles.progressLabelRow}>
                         <Text style={styles.progressLabel}>Queue Progress</Text>
@@ -424,7 +489,7 @@ export default function StudentQueueScreen() {
                         setLeaveTarget(queue);
                       }}
                     >
-                      <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+                      <XCircle size={16} color="#ef4444" />
                       <Text style={styles.leaveBtnText}>Leave Queue</Text>
                     </Pressable>
                   </Pressable>
@@ -433,8 +498,8 @@ export default function StudentQueueScreen() {
             </View>
           ) : (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>No Active Queues</Text>
+              <CheckCircle size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Not Participating in Any Queues</Text>
               <Text style={styles.emptyDescription}>
                 You are not participating in any active queues.
               </Text>
@@ -443,8 +508,8 @@ export default function StudentQueueScreen() {
 
           {/* Filters */}
           <View style={styles.filtersCard}>
-            <Text style={styles.filtersTitle}>Available Queues</Text>
-            <Text style={styles.filtersDescription}>Select a college and service to join a queue</Text>
+            <Text style={styles.filtersTitle}>Queues Filter</Text>
+            <Text style={styles.filtersDescription}>Select a queue to view service details and join.</Text>
 
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>College</Text>
@@ -452,7 +517,7 @@ export default function StudentQueueScreen() {
                 <Text style={styles.filterSelectText} numberOfLines={1}>
                   {selectLabel(selectedCollege, 'All Colleges')}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.tertiary} />
+                <ChevronDown size={16} color={theme.tertiary} />
               </Pressable>
             </View>
 
@@ -462,13 +527,23 @@ export default function StudentQueueScreen() {
                 <Text style={styles.filterSelectText} numberOfLines={1}>
                   {selectLabel(selectedService, 'All Services')}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.tertiary} />
+                <ChevronDown size={16} color={theme.tertiary} />
               </Pressable>
             </View>
           </View>
 
           {/* Available Queues List */}
-          {filteredQueues.length > 0 ? (
+          {queuesLoading ? (
+            <View style={styles.emptyCard}>
+              <SpinningLoader size={28} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Loading queues…</Text>
+            </View>
+          ) : availableSlotsError ? (
+            <View style={styles.emptyCard}>
+              <AlertCircle size={32} color="#ef4444" />
+              <Text style={styles.emptyDescription}>{availableSlotsError}</Text>
+            </View>
+          ) : filteredQueues.length > 0 ? (
             <View style={styles.queueList}>
               {filteredQueues.map((q: any) => {
                 const { canJoin, badgeLabel, joinLabel } = getJoinState(q);
@@ -491,8 +566,14 @@ export default function StudentQueueScreen() {
                           <Text style={styles.serviceName}>{q.serviceName}</Text>
                           <Text style={styles.collegeNameText}>{q.departmentName}</Text>
                         </View>
-                        <View style={styles.statusBadge}>
-                          <Text style={styles.statusBadgeText}>{badgeLabel}</Text>
+                        <View style={[
+                          styles.statusBadge,
+                          badgeLabel !== 'Open' && styles.statusBadgeWarning,
+                        ]}>
+                          <Text style={[
+                            styles.statusBadgeText,
+                            badgeLabel !== 'Open' && styles.statusBadgeTextWarning,
+                          ]}>{badgeLabel}</Text>
                         </View>
                       </View>
                     </View>
@@ -500,7 +581,7 @@ export default function StudentQueueScreen() {
                     <View style={styles.detailsRow}>
                       <View style={styles.detailItem}>
                         <View style={[styles.detailIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-                          <Ionicons name="people-outline" size={16} color={theme.blue} />
+                          <Users size={16} color={theme.blue} />
                         </View>
                         <View>
                           <Text style={styles.detailLabel}>Waiting</Text>
@@ -508,8 +589,8 @@ export default function StudentQueueScreen() {
                         </View>
                       </View>
                       <View style={styles.detailItem}>
-                        <View style={[styles.detailIcon, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
-                          <Ionicons name="time-outline" size={16} color={theme.purple} />
+                        <View style={[styles.detailIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+                          <Clock size={16} color={theme.blue} />
                         </View>
                         <View>
                           <Text style={styles.detailLabel}>Avg Wait</Text>
@@ -518,8 +599,8 @@ export default function StudentQueueScreen() {
                       </View>
                     </View>
                     <View style={styles.detailItemFull}>
-                      <View style={[styles.detailIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-                        <Ionicons name="checkmark-circle-outline" size={16} color={theme.success} />
+                      <View style={[styles.detailIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+                        <CheckCircle size={16} color={theme.blue} />
                       </View>
                       <View>
                         <Text style={styles.detailLabel}>Now Serving</Text>
@@ -545,12 +626,12 @@ export default function StudentQueueScreen() {
             </View>
           ) : (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>No queues found</Text>
+              <Users size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>No Active Queues</Text>
               <Text style={styles.emptyDescription}>
                 {selectedCollege !== 'all' || selectedService !== 'all'
                   ? 'Try adjusting your filters.'
-                  : 'No queues are open today. Check back later.'}
+                  : 'There are no open queues yet.'}
               </Text>
             </View>
           )}
@@ -588,7 +669,7 @@ export default function StudentQueueScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
                       {item.label}
                     </Text>
@@ -616,18 +697,18 @@ export default function StudentQueueScreen() {
                 <Text style={styles.dialogHeaderSubtitle}>{detailSlot?.departmentName}</Text>
               </View>
               <Pressable onPress={() => setDetailSlot(null)} hitSlop={8}>
-                <Ionicons name="close" size={20} color={theme.subtext} />
+                <X size={20} color={theme.subtext} />
               </Pressable>
             </View>
             <ScrollView style={styles.dialogBody}>
               <View style={styles.detailHeroRow}>
                 <View style={styles.detailHeroStat}>
-                  <Ionicons name="people-outline" size={16} color={theme.blue} />
+                  <Users size={16} color={theme.blue} />
                   <Text style={styles.detailHeroStatText}>{detailSlot?.waitingCount ?? 0} currently waiting</Text>
                 </View>
                 {!!detailSlot?.location && (
                   <View style={styles.detailHeroStat}>
-                    <Ionicons name="location-outline" size={16} color={theme.purple} />
+                    <MapPin size={16} color={theme.purple} />
                     <Text style={styles.detailHeroStatText}>{detailSlot.location}</Text>
                   </View>
                 )}
@@ -635,7 +716,7 @@ export default function StudentQueueScreen() {
 
               {detailSlot?.voidTimeoutMinutes != null && (
                 <View style={styles.voidWarningBox}>
-                  <Ionicons name="alert-circle-outline" size={14} color={theme.tertiary} />
+                  <AlertCircle size={14} color={theme.tertiary} />
                   <Text style={styles.voidWarningText}>
                     Void after {detailSlot.voidTimeoutMinutes} min if you don&apos;t show up when called.
                   </Text>
@@ -644,13 +725,19 @@ export default function StudentQueueScreen() {
 
               {!!detailSlot?.description && (
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>About this Service</Text>
+                  <View style={styles.detailSectionTitleRow}>
+                    <FileText size={15} color={theme.text} />
+                    <Text style={styles.detailSectionTitle}>About this Service</Text>
+                  </View>
                   <Text style={styles.detailSectionText}>{detailSlot.description}</Text>
                 </View>
               )}
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailSectionTitle}>Requirements</Text>
+                <View style={styles.detailSectionTitleRow}>
+                  <CheckCircle size={15} color={theme.text} />
+                  <Text style={styles.detailSectionTitle}>Requirements</Text>
+                </View>
                 {servicesLoading ? (
                   <Text style={styles.detailSectionText}>Loading…</Text>
                 ) : !findServiceMeta(detailSlot?.serviceName) ? (
@@ -677,7 +764,10 @@ export default function StudentQueueScreen() {
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailSectionTitle}>Procedure</Text>
+                <View style={styles.detailSectionTitleRow}>
+                  <HelpCircle size={15} color={theme.text} />
+                  <Text style={styles.detailSectionTitle}>Procedure</Text>
+                </View>
                 {servicesLoading ? (
                   <Text style={styles.detailSectionText}>Loading…</Text>
                 ) : (findServiceMeta(detailSlot?.serviceName)?.procedureSteps ?? []).length === 0 ? (
@@ -748,19 +838,18 @@ export default function StudentQueueScreen() {
         <View style={styles.logoutOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconCircle}>
-              <Ionicons name="close-circle-outline" size={26} color="#ef4444" />
+              <XCircle size={26} color="#ef4444" />
             </View>
             <Text style={styles.logoutModalTitle}>Leave Queue?</Text>
             <Text style={styles.logoutModalDescription}>
-              You are about to leave the {leaveTarget?.serviceName} queue. You will need to rejoin
-              and wait from the back of the line if you change your mind.
+              Leaving will permanently remove your spot in the {leaveTarget?.serviceName} queue —
+              you will need to rejoin and wait from the back of the line if you change your mind.
             </Text>
             <View style={styles.logoutModalActions}>
               <Pressable style={styles.logoutCancelBtn} onPress={() => setLeaveTarget(null)}>
                 <Text style={styles.logoutCancelBtnText}>Stay in Queue</Text>
               </Pressable>
               <Pressable style={styles.logoutConfirmBtn} onPress={confirmLeaveQueue}>
-                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
                 <Text style={styles.logoutConfirmBtnText}>Leave Queue</Text>
               </Pressable>
             </View>
@@ -1058,7 +1147,7 @@ function createStyles(theme: ThemePalette) {
       marginTop: 2,
     },
     numberBadge: {
-      backgroundColor: theme.primary,
+      backgroundColor: theme.blue,
       borderRadius: 8,
       paddingVertical: 4,
       paddingHorizontal: 10,
@@ -1109,6 +1198,31 @@ function createStyles(theme: ThemePalette) {
       color: theme.text,
       marginTop: 4,
     },
+
+    inlineWarningBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(245, 158, 11, 0.4)',
+      borderRadius: 999,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      alignSelf: 'flex-start',
+    },
+    inlineWarningText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: '#f59e0b',
+      flexShrink: 1,
+    },
+    activeVoidWarningBox: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+      backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 10,
+      padding: 10,
+    },
+    activeVoidWarningText: { flex: 1, fontSize: 11, color: theme.tertiary, lineHeight: 15 },
 
     progressWrap: {
       gap: 6,
@@ -1269,6 +1383,13 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '700',
       color: theme.success,
       textTransform: 'uppercase',
+    },
+    statusBadgeWarning: {
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+      borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    statusBadgeTextWarning: {
+      color: '#f59e0b',
     },
 
     detailsRow: {
@@ -1617,7 +1738,8 @@ function createStyles(theme: ThemePalette) {
     },
     voidWarningText: { flex: 1, fontSize: 11.5, color: theme.tertiary, lineHeight: 16 },
     detailSection: { marginBottom: 18 },
-    detailSectionTitle: { fontSize: 13, fontWeight: '700', color: theme.text, marginBottom: 8 },
+    detailSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+    detailSectionTitle: { fontSize: 13, fontWeight: '700', color: theme.text },
     detailSectionText: { fontSize: 12.5, color: theme.subtext, lineHeight: 18 },
 
     // Requirements list (mirrors student_documents.tsx's hint/req-tag pattern)

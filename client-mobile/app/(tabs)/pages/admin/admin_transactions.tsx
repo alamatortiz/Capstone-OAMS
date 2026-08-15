@@ -15,6 +15,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Activity,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Search,
+  Users,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
@@ -26,8 +40,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -92,24 +104,26 @@ interface Transaction {
   timestamp: string;
 }
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
-const TYPE_META: Record<TxType, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
-  queue: { label: 'Queue', icon: 'time-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
-  appointment: { label: 'Appointment', icon: 'calendar-outline', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
-  document: { label: 'Document', icon: 'document-text-outline', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
+const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
+  queue: { label: 'Queue', icon: Clock, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
+  appointment: { label: 'Appointment', icon: Calendar, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
+  document: { label: 'Document', icon: FileText, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
 };
 
 const STATUS_META: Record<string, { label: string; bg: string; border: string; color: string }> = {
@@ -119,7 +133,7 @@ const STATUS_META: Record<string, { label: string; bg: string; border: string; c
   cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
   pending: { label: 'Pending', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
   processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
-  generated: { label: 'Generated', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
+  generated: { label: 'Ready', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   released: { label: 'Released', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   no_show: { label: 'No Show', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
@@ -295,11 +309,11 @@ export default function AdminTransactionsScreen() {
     documents: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
   } as const;
 
-  const statCards: { key: keyof typeof stats; label: string; icon: IoniconName }[] = [
-    { key: 'total', label: 'Total Transactions', icon: 'pulse-outline' },
-    { key: 'queue', label: 'Queue Services', icon: 'people-outline' },
-    { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-    { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
+  const statCards: { key: keyof typeof stats; label: string; icon: LucideIconType }[] = [
+    { key: 'total', label: 'Total Transactions', icon: Activity },
+    { key: 'queue', label: 'Queue Services', icon: Users },
+    { key: 'appointments', label: 'Appointments', icon: Calendar },
+    { key: 'documents', label: 'Documents', icon: FileText },
   ];
 
   const selectOptions =
@@ -353,14 +367,14 @@ export default function AdminTransactionsScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.titleIcon}>
-              <Ionicons name="pulse-outline" size={22} color="#ffffff" />
+              <Activity size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Transaction Logs</Text>
@@ -378,7 +392,7 @@ export default function AdminTransactionsScreen() {
                 <View key={stat.key} style={[styles.statCard, { borderColor: tint.border }]}>
                   <View style={styles.statCardTop}>
                     <Text style={styles.statCardLabel}>{stat.label}</Text>
-                    <Ionicons name={stat.icon} size={18} color={tint.color} />
+                    <stat.icon size={18} color={tint.color} />
                   </View>
                   <Text style={[styles.statCardValue, { color: tint.color }]}>{stats[stat.key]}</Text>
                 </View>
@@ -395,7 +409,7 @@ export default function AdminTransactionsScreen() {
 
             <View style={styles.filterField}>
               <View style={styles.searchWrapper}>
-                <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
+                <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search by student, processor, or details..."
@@ -409,17 +423,17 @@ export default function AdminTransactionsScreen() {
             <View style={styles.filterRow}>
               <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setSelectField('type')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{typeLabel}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
               <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setSelectField('status')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{statusLabel}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
             </View>
 
             <Pressable style={styles.filterSelect} onPress={() => setSelectField('date')}>
               <Text style={styles.filterSelectText} numberOfLines={1}>{dateLabel}</Text>
-              <Ionicons name="chevron-down" size={16} color={theme.primary} />
+              <ChevronDown size={16} color={theme.primary} />
             </Pressable>
           </View>
 
@@ -431,7 +445,7 @@ export default function AdminTransactionsScreen() {
             </View>
           ) : error ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Activity size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>{error}</Text>
               <Pressable style={styles.filterSelect} onPress={fetchTransactions}>
                 <Text style={styles.filterSelectText}>Retry</Text>
@@ -456,7 +470,7 @@ export default function AdminTransactionsScreen() {
                     <Text style={styles.txAction}>{t.action}</Text>
 
                     <View style={styles.txStudentRow}>
-                      <Ionicons name="person-outline" size={14} color={theme.tertiary} />
+                      <Users size={14} color={theme.tertiary} />
                       <Text style={styles.txStudentName}>{t.studentName}</Text>
                       <Text style={styles.txStudentId}>({t.studentId})</Text>
                       {t.requesterType === 'faculty' && (
@@ -470,7 +484,7 @@ export default function AdminTransactionsScreen() {
                     <Text style={styles.txProcessor}>Processed by: {t.processor}</Text>
 
                     <View style={styles.txMetaRow}>
-                      <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                      <Calendar size={13} color={theme.tertiary} />
                       <Text style={styles.txMetaText}>{t.timestamp}</Text>
                     </View>
                   </View>
@@ -484,7 +498,7 @@ export default function AdminTransactionsScreen() {
                     onPress={() => setPage((p) => Math.max(0, p - 1))}
                     disabled={safePage === 0}
                   >
-                    <Ionicons name="chevron-back" size={16} color={safePage === 0 ? theme.tertiary : theme.text} />
+                    <ChevronLeft size={16} color={safePage === 0 ? theme.tertiary : theme.text} />
                     <Text style={[styles.pagerBtnText, safePage === 0 && styles.pagerBtnTextDisabled]}>Prev</Text>
                   </Pressable>
                   <Text style={styles.pagerLabel}>
@@ -496,8 +510,7 @@ export default function AdminTransactionsScreen() {
                     disabled={safePage >= totalPages - 1}
                   >
                     <Text style={[styles.pagerBtnText, safePage >= totalPages - 1 && styles.pagerBtnTextDisabled]}>Next</Text>
-                    <Ionicons
-                      name="chevron-forward"
+                    <ChevronRight
                       size={16}
                       color={safePage >= totalPages - 1 ? theme.tertiary : theme.text}
                     />
@@ -507,7 +520,7 @@ export default function AdminTransactionsScreen() {
             </View>
           ) : (
             <View style={styles.emptyCard}>
-              <Ionicons name="pulse-outline" size={32} color={theme.tertiary} />
+              <Activity size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No transactions found</Text>
               <Text style={styles.emptyDescription}>Try adjusting your search or filters</Text>
             </View>
@@ -613,7 +626,7 @@ function NavDrawer({
                   style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                   onPress={() => onNavPress(item.key)}
                 >
-                  <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                  <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                   <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                 </Pressable>
               );

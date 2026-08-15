@@ -19,6 +19,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle,
+  ChevronLeft,
+  Clock,
+  Download,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Printer,
+  QrCode,
+  X,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
@@ -29,8 +43,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -118,18 +130,20 @@ const STATUS_TINTS: Record<DocStatus, { bg: string; border: string; color: strin
   EXPIRED: { bg: 'rgba(248, 113, 113, 0.15)', border: 'rgba(248, 113, 113, 0.35)', color: '#f87171' },
 };
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 export default function AdminScanDocumentScreen() {
@@ -363,13 +377,13 @@ export default function AdminScanDocumentScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
             <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
-              <Ionicons name="qr-code-outline" size={22} color="#ffffff" />
+              <QrCode size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Document Scanner</Text>
@@ -380,7 +394,7 @@ export default function AdminScanDocumentScreen() {
           {/* QR Code Scanner */}
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
-              <Ionicons name="qr-code-outline" size={19} color={theme.primary} />
+              <QrCode size={19} color={theme.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitleText}>QR Code Scanner</Text>
                 <Text style={styles.cardSubtitleText}>Position the QR code within the scanner area</Text>
@@ -398,7 +412,7 @@ export default function AdminScanDocumentScreen() {
               ) : (
                 <View style={styles.scannerCenter}>
                   <View style={styles.scannerFrame}>
-                    <Ionicons name="qr-code-outline" size={64} color={theme.tertiary} style={{ opacity: 0.5 }} />
+                    <QrCode size={64} color={theme.tertiary} style={{ opacity: 0.5 }} />
                   </View>
                   <Text style={styles.scannerHint}>Click the button below to start scanning</Text>
                   <Text style={styles.scannerHintSmall}>Or enter the QR code manually</Text>
@@ -414,7 +428,7 @@ export default function AdminScanDocumentScreen() {
           {/* Manual QR Code Entry */}
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
-              <Ionicons name="document-text-outline" size={19} color={theme.primary} />
+              <FileText size={19} color={theme.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitleText}>Manual QR Code Entry</Text>
                 <Text style={styles.cardSubtitleText}>Enter the QR code manually if scanner is unavailable</Text>
@@ -453,7 +467,7 @@ export default function AdminScanDocumentScreen() {
           {/* Recent Scans */}
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
-              <Ionicons name="time-outline" size={19} color="#22c55e" />
+              <Clock size={19} color="#22c55e" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitleText}>Recent Scans</Text>
                 <Text style={styles.cardSubtitleText}>Recently scanned documents</Text>
@@ -512,7 +526,7 @@ export default function AdminScanDocumentScreen() {
           />
           <SafeAreaView style={styles.cameraOverlay} edges={['top', 'bottom']}>
             <Pressable style={styles.cameraCloseBtn} onPress={() => setShowCamera(false)} hitSlop={10}>
-              <Ionicons name="close" size={22} color="#ffffff" />
+              <X size={22} color="#ffffff" />
             </Pressable>
             <View style={styles.cameraFrameGuide} />
             <Text style={styles.cameraHintText}>Position the QR code within the frame</Text>
@@ -531,7 +545,7 @@ export default function AdminScanDocumentScreen() {
                   <Text style={styles.docModalSubtitle}>Scanned document details and softcopy content</Text>
                 </View>
                 <Pressable onPress={handleCloseModal} hitSlop={8}>
-                  <Ionicons name="close-outline" size={22} color={theme.text} />
+                  <X size={22} color={theme.text} />
                 </Pressable>
               </View>
 
@@ -542,11 +556,11 @@ export default function AdminScanDocumentScreen() {
                     scannedDocument.status === 'VALID' ? styles.verifiedBannerValid : styles.verifiedBannerExpired,
                   ]}
                 >
-                  <Ionicons
-                    name={scannedDocument.status === 'VALID' ? 'checkmark-circle' : 'alert-circle'}
-                    size={26}
-                    color={scannedDocument.status === 'VALID' ? '#22c55e' : '#f87171'}
-                  />
+                  {scannedDocument.status === 'VALID' ? (
+                    <CheckCircle size={26} color="#22c55e" />
+                  ) : (
+                    <AlertCircle size={26} color="#f87171" />
+                  )}
                   <Text
                     style={[
                       styles.verifiedTitle,
@@ -630,16 +644,16 @@ export default function AdminScanDocumentScreen() {
               <View style={styles.docModalActions}>
                 {scannedDocument.documentStatus === 'released' && (
                   <Pressable style={styles.claimBtn} onPress={handleMarkClaimed} disabled={claiming}>
-                    <Ionicons name="checkmark-circle-outline" size={15} color="#10b981" />
+                    <CheckCircle size={15} color="#10b981" />
                     <Text style={styles.claimBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
                   </Pressable>
                 )}
                 <Pressable style={styles.printBtn} onPress={handlePrintDocument}>
-                  <Ionicons name="print-outline" size={15} color={theme.text} />
+                  <Printer size={15} color={theme.text} />
                   <Text style={styles.printBtnText}>Print</Text>
                 </Pressable>
                 <Pressable style={styles.printBtn} onPress={comingSoon}>
-                  <Ionicons name="download-outline" size={15} color={theme.text} />
+                  <Download size={15} color={theme.text} />
                   <Text style={styles.printBtnText}>Download</Text>
                 </Pressable>
                 <Pressable style={styles.closeModalBtn} onPress={handleCloseModal}>
@@ -654,7 +668,7 @@ export default function AdminScanDocumentScreen() {
       {/* Toast */}
       {scanToast && (
         <View style={styles.toast}>
-          <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
+          <CheckCircle size={16} color={theme.primary} />
           <Text style={styles.toastText}>QR Code scanned successfully!</Text>
         </View>
       )}
@@ -724,7 +738,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}

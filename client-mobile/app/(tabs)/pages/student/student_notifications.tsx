@@ -16,6 +16,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Bell, Calendar, ChevronDown, ChevronLeft, Clock, FileText, Home as HomeIcon, Megaphone, Users,
+  ClipboardList,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -31,6 +35,18 @@ import {
   STUDENT_NOTIFICATIONS_VIEW_ALL,
   type NotificationType,
 } from '@/utils/notificationRoutes';
+
+type LucideIconType = typeof Bell;
+
+// Local icon mapping -- matches web's actual per-type icons (Clock/FileText/
+// Calendar/Megaphone). NOTIFICATION_TYPE_META itself stays untouched since
+// it's shared with the professor/admin notifications screens.
+const TYPE_ICON: Record<NotificationType, LucideIconType> = {
+  queue: Clock,
+  document: FileText,
+  appointment: Calendar,
+  announcement: Megaphone,
+};
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -103,16 +119,16 @@ const formatTimestamp = (iso: string) => {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 type TypeFilter = 'all' | NotificationType;
@@ -300,14 +316,14 @@ export default function StudentNotificationsScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.titleIcon}>
-              <Ionicons name="notifications-outline" size={22} color="#ffffff" />
+              <Bell size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Notifications</Text>
@@ -317,16 +333,19 @@ export default function StudentNotificationsScreen() {
 
           {/* Filter + Mark all read */}
           <View style={styles.filtersCard}>
+            <View style={styles.filtersHeader}>
+              <Text style={styles.filtersTitle}>Notification Filter</Text>
+              <Text style={styles.filtersDescription}>Filter your notifications by category.</Text>
+            </View>
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>Type</Text>
               <Pressable style={styles.filterSelect} onPress={() => setTypeFilterOpen(true)}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{typeLabel}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
             </View>
             {unreadCount > 0 && (
               <Pressable style={styles.markAllBtn} onPress={markAllRead}>
-                <Ionicons name="checkmark-done-outline" size={16} color={theme.primary} />
                 <Text style={styles.markAllBtnText}>Mark all read ({unreadCount})</Text>
               </Pressable>
             )}
@@ -335,29 +354,28 @@ export default function StudentNotificationsScreen() {
           {/* Notifications list */}
           {loading ? (
             <View style={styles.emptyCard}>
+              <Bell size={32} color={theme.tertiary} />
               <Text style={styles.emptyDescription}>Loading notifications…</Text>
             </View>
           ) : error ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Bell size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>Could not load notifications</Text>
               <Text style={styles.emptyDescription}>{error}</Text>
-              <Pressable style={styles.filterSelect} onPress={() => fetchNotifications(1)}>
-                <Text style={styles.filterSelectText}>Retry</Text>
-              </Pressable>
             </View>
           ) : notifications.length > 0 ? (
             <View style={styles.notifList}>
               {notifications.map((n) => {
                 const meta = NOTIFICATION_TYPE_META[n.type] ?? NOTIFICATION_TYPE_META.queue;
+                const TypeIcon = TYPE_ICON[n.type] ?? Clock;
                 return (
                   <Pressable
                     key={n.notification_id}
                     style={[styles.notifCard, !n.is_read && styles.notifCardUnread]}
                     onPress={() => goToNotification(n)}
                   >
-                    <View style={[styles.notifIconWrap, { backgroundColor: `${meta.color}26`, borderColor: `${meta.color}55` }]}>
-                      <Ionicons name={meta.icon as IoniconName} size={18} color={meta.color} />
+                    <View style={[styles.notifIconWrap, { backgroundColor: meta.color }]}>
+                      <TypeIcon size={18} color="#ffffff" />
                     </View>
                     <View style={styles.notifBody}>
                       <Text style={styles.notifUpdateTitle}>{meta.label} Update</Text>
@@ -367,13 +385,15 @@ export default function StudentNotificationsScreen() {
                         </View>
                         {!n.is_read && (
                           <View style={styles.unreadBadge}>
-                            <View style={styles.unreadDot} />
                             <Text style={styles.unreadBadgeText}>Unread</Text>
                           </View>
                         )}
                       </View>
                       <Text style={styles.notifMessage}>{n.message}</Text>
-                      <Text style={styles.notifTime}>{formatTimestamp(n.created_at)}</Text>
+                      <View style={styles.notifTimeRow}>
+                        <Clock size={11} color={theme.tertiary} />
+                        <Text style={styles.notifTime}>{formatTimestamp(n.created_at)}</Text>
+                      </View>
                     </View>
                   </Pressable>
                 );
@@ -381,7 +401,7 @@ export default function StudentNotificationsScreen() {
             </View>
           ) : (
             <View style={styles.emptyCard}>
-              <Ionicons name="notifications-outline" size={32} color={theme.tertiary} />
+              <Bell size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No Notifications</Text>
               <Text style={styles.emptyDescription}>You're all caught up.</Text>
             </View>
@@ -419,7 +439,7 @@ export default function StudentNotificationsScreen() {
                   style={styles.drawerNavItem}
                   onPress={() => handleNavPress(item.key)}
                 >
-                  <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                  <item.icon size={18} color={theme.subtext} />
                   <Text style={styles.drawerNavLabel}>{item.label}</Text>
                 </Pressable>
               ))}
@@ -611,6 +631,9 @@ function createStyles(theme: ThemePalette) {
       padding: 18,
       gap: 14,
     },
+    filtersHeader: { gap: 2, marginBottom: -6 },
+    filtersTitle: { fontSize: 15, fontWeight: '800', color: theme.text, textAlign: 'center' },
+    filtersDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center' },
     filterField: { gap: 6 },
     filterLabel: { fontSize: 12, fontWeight: '700', color: theme.text },
     filterSelect: {
@@ -664,7 +687,6 @@ function createStyles(theme: ThemePalette) {
       width: 40,
       height: 40,
       borderRadius: 12,
-      borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
@@ -679,10 +701,17 @@ function createStyles(theme: ThemePalette) {
     },
     notifBadgeText: { fontSize: 10, fontWeight: '700' },
     notifUpdateTitle: { fontSize: 13, fontWeight: '700', color: theme.text, marginBottom: 2 },
-    unreadBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    unreadDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#ef4444' },
-    unreadBadgeText: { fontSize: 10, fontWeight: '700', color: '#ef4444' },
+    unreadBadge: {
+      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+      borderWidth: 0.5,
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+      borderRadius: 6,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+    },
+    unreadBadgeText: { fontSize: 10, fontWeight: '700', color: theme.success },
     notifMessage: { fontSize: 13, color: theme.text, lineHeight: 18 },
+    notifTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     notifTime: { fontSize: 11, color: theme.tertiary, fontWeight: '600' },
 
     // Empty state

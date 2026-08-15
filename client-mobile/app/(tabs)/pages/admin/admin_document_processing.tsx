@@ -16,6 +16,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  Eye,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Search,
+  User,
+  X,
+  XCircle,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -23,14 +39,32 @@ import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
-import { getHubStatusMeta } from '@/utils/documentStatus';
+import { getHubStatusMeta, normalizeDocStatus, type DocStatus } from '@/utils/documentStatus';
+
+type LucideIconType = typeof Clock;
+
+// Mirrors adm-document-processing.jsx's getStatusMeta() icon choices exactly
+// (kept local rather than added to the shared documentStatus.ts util, since
+// that util's icon field is still Ionicons-typed and consumed by student/
+// professor screens not yet converted to lucide).
+const STATUS_ICON: Record<ReturnType<typeof normalizeDocStatus>, LucideIconType> = {
+  pending: AlertCircle,
+  processing: Clock,
+  ready: CheckCircle,
+  released: CheckCircle,
+  claimed: CheckCircle,
+  rejected: XCircle,
+  cancelled: XCircle,
+};
+
+function getStatusIcon(status: DocStatus): LucideIconType {
+  return STATUS_ICON[normalizeDocStatus(status)];
+}
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -109,15 +143,15 @@ interface DocumentRequest {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 const SOURCES: { id: RequestSource; label: string }[] = [
@@ -396,34 +430,34 @@ export default function AdminDocumentProcessingScreen() {
     setConfirmStatus('ready');
   };
 
-  const confirmMeta: Record<ConfirmStatus, { title: string; description: string; confirmLabel: string; icon: IoniconName; color: string }> | null =
+  const confirmMeta: Record<ConfirmStatus, { title: string; description: string; confirmLabel: string; icon: LucideIconType; color: string }> | null =
     selectedDocument && {
       processing: {
         title: 'Start Processing?',
         description: `Start processing the ${selectedDocument.documentType} request for ${selectedDocument.requesterName}?`,
         confirmLabel: 'Start Processing',
-        icon: 'time-outline',
+        icon: Clock,
         color: '#3b82f6',
       },
       ready: {
         title: 'Mark as Ready?',
         description: `Mark the ${selectedDocument.documentType} request for ${selectedDocument.requesterName} as ready for pickup?`,
         confirmLabel: 'Mark as Ready',
-        icon: 'checkmark-circle-outline',
+        icon: CheckCircle,
         color: '#22c55e',
       },
       rejected: {
         title: 'Reject Request?',
         description: `Reject the ${selectedDocument.documentType} request from ${selectedDocument.requesterName}? This action cannot be undone.`,
         confirmLabel: 'Reject Request',
-        icon: 'close-circle-outline',
+        icon: XCircle,
         color: '#ef4444',
       },
       claimed: {
         title: 'Mark as Claimed?',
         description: `Confirm that the ${selectedDocument.documentType} request for ${selectedDocument.requesterName} has been handed to the correct recipient, per office procedure?`,
         confirmLabel: 'Mark as Claimed',
-        icon: 'checkmark-circle-outline',
+        icon: CheckCircle,
         color: '#10b981',
       },
     };
@@ -462,13 +496,13 @@ export default function AdminDocumentProcessingScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
             <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
-              <Ionicons name="document-text-outline" size={22} color="#ffffff" />
+              <FileText size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Document Processing</Text>
@@ -495,7 +529,7 @@ export default function AdminDocumentProcessingScreen() {
           {/* Search + Week filter */}
           <View style={styles.card}>
             <View style={styles.searchWrapper}>
-              <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
+              <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by tracking number, name, or ID..."
@@ -505,11 +539,11 @@ export default function AdminDocumentProcessingScreen() {
               />
             </View>
             <Pressable style={styles.filterSelect} onPress={() => setWeekFilterModalVisible(true)}>
-              <Ionicons name="calendar-outline" size={14} color={theme.tertiary} />
+              <Calendar size={14} color={theme.tertiary} />
               <Text style={styles.filterSelectText}>
                 {WEEK_FILTER_OPTIONS.find((o) => o.value === weekFilter)?.label ?? 'All'}
               </Text>
-              <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+              <ChevronDown size={14} color={theme.tertiary} />
             </Pressable>
           </View>
 
@@ -549,7 +583,7 @@ export default function AdminDocumentProcessingScreen() {
               </View>
             ) : error ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <AlertCircle size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>{error}</Text>
                 <Pressable style={styles.viewProcessBtn} onPress={fetchDocuments}>
                   <Text style={styles.viewProcessBtnText}>Retry</Text>
@@ -557,13 +591,14 @@ export default function AdminDocumentProcessingScreen() {
               </View>
             ) : visibleDocuments.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="document-text-outline" size={28} color={theme.tertiary} />
+                <FileText size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No documents found</Text>
               </View>
             ) : (
               <View style={styles.cardsList}>
                 {visibleDocuments.map((doc) => {
                   const statusTint = getHubStatusMeta(doc.status);
+                  const StatusIcon = getStatusIcon(doc.status);
                   const isOverdue = !!doc.neededBy && !DONE_STATUSES.includes(doc.status) && doc.neededBy < weekDates.todayStr;
                   const label = deadlineLabel(doc.neededBy);
                   return (
@@ -571,19 +606,19 @@ export default function AdminDocumentProcessingScreen() {
                       <View style={styles.docCardHeaderRow}>
                         <View style={{ flex: 1, gap: 6 }}>
                           <View style={styles.collegeBadge}>
-                            <Ionicons name="business-outline" size={13} color="#f97316" />
+                            <HomeIcon size={13} color="#f97316" />
                             <Text style={styles.collegeBadgeText}>{doc.college}</Text>
                             <Text style={styles.trackingText}>{doc.trackingNumber}</Text>
                           </View>
                           <View style={styles.requesterInfoRow}>
-                            <Ionicons name="person-outline" size={15} color={theme.tertiary} />
+                            <User size={15} color={theme.tertiary} />
                             <Text style={styles.requesterName}>{doc.requesterName}</Text>
                             <Text style={styles.requesterId}>({doc.requesterIdValue})</Text>
                           </View>
                           <Text style={styles.docTypeText}>{doc.documentType}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
-                          <Ionicons name={statusTint.icon} size={12} color={statusTint.color} />
+                          <StatusIcon size={12} color={statusTint.color} />
                           <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
                             {statusTint.label}
                           </Text>
@@ -612,7 +647,7 @@ export default function AdminDocumentProcessingScreen() {
 
                       <View style={styles.docCardFooter}>
                         <Pressable style={styles.viewProcessBtn} onPress={() => handleViewDetails(doc)}>
-                          <Ionicons name="eye-outline" size={14} color="#ffffff" />
+                          <Eye size={14} color="#ffffff" />
                           <Text style={styles.viewProcessBtnText}>View & Process</Text>
                         </Pressable>
                       </View>
@@ -676,23 +711,22 @@ export default function AdminDocumentProcessingScreen() {
                   <Text style={styles.detailsModalSubtitle}>Review and process this request</Text>
                 </View>
                 <Pressable onPress={handleCloseDetails} hitSlop={8}>
-                  <Ionicons name="close-outline" size={22} color={theme.text} />
+                  <X size={22} color={theme.text} />
                 </Pressable>
               </View>
 
               <ScrollView style={styles.detailsModalBody}>
                 <View style={styles.detailsStatusRow}>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: getHubStatusMeta(selectedDocument.status).bg, borderColor: getHubStatusMeta(selectedDocument.status).border },
-                    ]}
-                  >
-                    <Ionicons name={getHubStatusMeta(selectedDocument.status).icon} size={12} color={getHubStatusMeta(selectedDocument.status).color} />
-                    <Text style={[styles.statusBadgeText, { color: getHubStatusMeta(selectedDocument.status).color }]}>
-                      {getHubStatusMeta(selectedDocument.status).label}
-                    </Text>
-                  </View>
+                  {(() => {
+                    const meta = getHubStatusMeta(selectedDocument.status);
+                    const StatusIcon = getStatusIcon(selectedDocument.status);
+                    return (
+                      <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                        <StatusIcon size={12} color={meta.color} />
+                        <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                      </View>
+                    );
+                  })()}
                   <Text style={styles.detailsTracking}>{selectedDocument.trackingNumber}</Text>
                 </View>
 
@@ -824,7 +858,7 @@ export default function AdminDocumentProcessingScreen() {
           {activeConfirmMeta && (
             <View style={styles.confirmModalCard}>
               <View style={[styles.confirmIconCircle, { backgroundColor: `${activeConfirmMeta.color}26` }]}>
-                <Ionicons name={activeConfirmMeta.icon} size={26} color={activeConfirmMeta.color} />
+                <activeConfirmMeta.icon size={26} color={activeConfirmMeta.color} />
               </View>
               <Text style={styles.confirmTitle}>{activeConfirmMeta.title}</Text>
               <Text style={styles.confirmDescription}>{activeConfirmMeta.description}</Text>
@@ -904,7 +938,7 @@ function NavDrawer({
                   style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                   onPress={() => onNavPress(item.key)}
                 >
-                  <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                  <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                   <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                 </Pressable>
               );

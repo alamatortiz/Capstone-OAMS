@@ -14,6 +14,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertTriangle,
+  BarChart3,
+  Calendar,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  Download,
+  FileText,
+  History,
+  Home as HomeIcon,
+  RefreshCw,
+  Smile,
+  TrendingUp,
+  Users,
+  Activity,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
@@ -26,8 +44,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -117,10 +133,12 @@ const STAT_TINTS = {
 const ANALYTICS_TABS = ['performance', 'trends', 'insights'] as const;
 type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
 
-const TAB_META: Record<AnalyticsTab, { label: string; icon: IoniconName }> = {
-  performance: { label: 'Performance', icon: 'trending-up-outline' },
-  trends: { label: 'Trends', icon: 'calendar-outline' },
-  insights: { label: 'Insights', icon: 'warning-outline' },
+type LucideIconType = typeof Clock;
+
+const TAB_META: Record<AnalyticsTab, { label: string; icon: LucideIconType }> = {
+  performance: { label: 'Performance', icon: TrendingUp },
+  trends: { label: 'Trends', icon: Calendar },
+  insights: { label: 'Insights', icon: AlertTriangle },
 };
 
 interface WeeklyComparisonRow {
@@ -141,15 +159,15 @@ const DEFAULT_TRENDS: Trends = { peakActivityTime: 'N/A', bestServiceTime: 'N/A'
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 export default function AdminQueueAnalyticsScreen() {
@@ -315,13 +333,13 @@ export default function AdminQueueAnalyticsScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
-            <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.titleIcon}>
-              <Ionicons name="bar-chart-outline" size={22} color="#ffffff" />
+            <LinearGradient colors={[theme.primary, theme.success]} style={styles.titleIcon}>
+              <BarChart3 size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Queue Analytics</Text>
@@ -339,11 +357,11 @@ export default function AdminQueueAnalyticsScreen() {
             </View>
             <View style={styles.filtersActionsRow}>
               <Pressable style={styles.outlineBtn} onPress={handleExportReport}>
-                <Ionicons name="download-outline" size={14} color={theme.text} />
+                <Download size={14} color={theme.text} />
                 <Text style={styles.outlineBtnText}>Export Report</Text>
               </Pressable>
               <Pressable style={styles.outlineBtn} onPress={fetchAnalytics}>
-                <Ionicons name="refresh-outline" size={14} color={theme.text} />
+                <RefreshCw size={14} color={theme.text} />
                 <Text style={styles.outlineBtnText}>Refresh</Text>
               </Pressable>
             </View>
@@ -359,7 +377,7 @@ export default function AdminQueueAnalyticsScreen() {
               <Text style={styles.filterLabel}>Time Period</Text>
               <Pressable style={styles.filterSelect} onPress={() => setSelectField('period')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{timePeriod}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.text} />
               </Pressable>
             </View>
 
@@ -367,7 +385,7 @@ export default function AdminQueueAnalyticsScreen() {
               <Text style={styles.filterLabel}>Service Type</Text>
               <Pressable style={styles.filterSelect} onPress={() => setSelectField('service')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{serviceType}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.text} />
               </Pressable>
             </View>
           </View>
@@ -376,7 +394,7 @@ export default function AdminQueueAnalyticsScreen() {
           <View style={styles.statsGrid}>
             <View style={[styles.statCard, { borderColor: STAT_TINTS.served.border }]}>
               <View style={styles.statCardTop}>
-                <Ionicons name="people-outline" size={16} color={STAT_TINTS.served.color} />
+                <Users size={16} color={theme.subtext} />
                 <Text style={styles.statCardLabel}>Total Served</Text>
               </View>
               <Text style={[styles.statCardValue, { color: STAT_TINTS.served.color }]}>{totalServed}</Text>
@@ -384,7 +402,7 @@ export default function AdminQueueAnalyticsScreen() {
             </View>
             <View style={[styles.statCard, { borderColor: STAT_TINTS.wait.border }]}>
               <View style={styles.statCardTop}>
-                <Ionicons name="time-outline" size={16} color={STAT_TINTS.wait.color} />
+                <Clock size={16} color={theme.subtext} />
                 <Text style={styles.statCardLabel}>Avg Wait Time</Text>
               </View>
               <Text style={[styles.statCardValue, { color: STAT_TINTS.wait.color }]}>
@@ -394,7 +412,7 @@ export default function AdminQueueAnalyticsScreen() {
             </View>
             <View style={[styles.statCard, { borderColor: STAT_TINTS.satisfaction.border }]}>
               <View style={styles.statCardTop}>
-                <Ionicons name="happy-outline" size={16} color={STAT_TINTS.satisfaction.color} />
+                <Smile size={16} color={theme.subtext} />
                 <Text style={styles.statCardLabel}>Satisfaction</Text>
               </View>
               <Text style={[styles.statCardValue, { color: STAT_TINTS.satisfaction.color }]}>
@@ -404,7 +422,7 @@ export default function AdminQueueAnalyticsScreen() {
             </View>
             <View style={[styles.statCard, { borderColor: STAT_TINTS.services.border }]}>
               <View style={styles.statCardTop}>
-                <Ionicons name="apps-outline" size={16} color={STAT_TINTS.services.color} />
+                <Activity size={16} color={theme.subtext} />
                 <Text style={styles.statCardLabel}>Services Tracked</Text>
               </View>
               <Text style={[styles.statCardValue, { color: STAT_TINTS.services.color }]}>{filteredPerformance.length}</Text>
@@ -423,7 +441,7 @@ export default function AdminQueueAnalyticsScreen() {
                   style={[styles.tabPill, active && styles.tabPillActive]}
                   onPress={() => setActiveTab(tab)}
                 >
-                  <Ionicons name={meta.icon} size={14} color={active ? theme.primary : theme.subtext} />
+                  <meta.icon size={14} color={active ? theme.primary : theme.subtext} />
                   <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>{meta.label}</Text>
                 </Pressable>
               );
@@ -437,7 +455,7 @@ export default function AdminQueueAnalyticsScreen() {
               <Text style={styles.cardSubtitleText}>Detailed breakdown by service and college</Text>
               {filteredPerformance.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="bar-chart-outline" size={28} color={theme.tertiary} />
+                  <BarChart3 size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No completed queue data</Text>
                   <Text style={styles.emptyText}>Try a different filter.</Text>
                 </View>
@@ -531,7 +549,7 @@ export default function AdminQueueAnalyticsScreen() {
             <>
               <View style={[styles.card, styles.insightsCardPositive]}>
                 <View style={styles.insightsHeaderRow}>
-                  <Ionicons name="trending-up-outline" size={18} color="#22c55e" />
+                  <TrendingUp size={18} color="#22c55e" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitleText}>Positive Insights</Text>
                     <Text style={styles.cardSubtitleText}>What&apos;s working well</Text>
@@ -553,7 +571,7 @@ export default function AdminQueueAnalyticsScreen() {
 
               <View style={[styles.card, styles.insightsCardWarning]}>
                 <View style={styles.insightsHeaderRow}>
-                  <Ionicons name="warning-outline" size={18} color="#f97316" />
+                  <AlertTriangle size={18} color="#f97316" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitleText}>Areas for Improvement</Text>
                     <Text style={styles.cardSubtitleText}>Recommendations and action items</Text>
@@ -668,7 +686,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}

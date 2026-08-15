@@ -17,6 +17,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle,
+  ChevronLeft,
+  Clock,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Search,
+  User,
+  X,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -28,8 +41,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -98,18 +109,20 @@ interface Appointment {
   isToday: boolean;
 }
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 const TABS = ['all', 'pending', 'approved', 'completed', 'rejected'] as const;
@@ -122,12 +135,12 @@ const STAT_TINTS = {
   today: { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.25)', color: '#3b82f6' },
 } as const;
 
-const STATUS_TINTS: Record<AppointmentStatus, { bg: string; border: string; color: string; icon: IoniconName }> = {
-  pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: 'alert-circle-outline' },
-  approved: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
-  rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'alert-circle-outline' },
-  completed: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' },
-  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#6b7280', icon: 'alert-circle-outline' },
+const STATUS_TINTS: Record<AppointmentStatus, { bg: string; border: string; color: string; icon: LucideIconType }> = {
+  pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: AlertCircle },
+  approved: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: CheckCircle },
+  rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: AlertCircle },
+  completed: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: CheckCircle },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#6b7280', icon: AlertCircle },
 };
 
 function formatDate(dateStr: string) {
@@ -295,13 +308,13 @@ export default function AdminAppointmentScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
             <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
-              <Ionicons name="calendar-outline" size={22} color="#ffffff" />
+              <Calendar size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Centralized Appointment Management</Text>
@@ -315,10 +328,10 @@ export default function AdminAppointmentScreen() {
           <View style={styles.statsGrid}>
             {(
               [
-                { key: 'total', label: 'Total Appointments', value: String(stats.total), icon: 'calendar-outline' as IoniconName },
-                { key: 'pending', label: 'Pending', value: String(stats.pending), icon: 'alert-circle-outline' as IoniconName },
-                { key: 'approved', label: 'Approved', value: String(stats.approved), icon: 'checkmark-circle-outline' as IoniconName },
-                { key: 'today', label: 'Today', value: String(stats.today), icon: 'time-outline' as IoniconName },
+                { key: 'total', label: 'Total Appointments', value: String(stats.total), icon: Calendar },
+                { key: 'pending', label: 'Pending', value: String(stats.pending), icon: AlertCircle },
+                { key: 'approved', label: 'Approved', value: String(stats.approved), icon: CheckCircle },
+                { key: 'today', label: 'Today', value: String(stats.today), icon: Clock },
               ] as const
             ).map((stat) => {
               const tint = STAT_TINTS[stat.key];
@@ -326,7 +339,7 @@ export default function AdminAppointmentScreen() {
                 <View key={stat.key} style={[styles.statCard, { borderColor: tint.border }]}>
                   <View style={styles.statCardTop}>
                     <Text style={styles.statCardLabel}>{stat.label}</Text>
-                    <Ionicons name={stat.icon} size={18} color={tint.color} />
+                    <stat.icon size={18} color={tint.color} />
                   </View>
                   <Text style={[styles.statCardValue, { color: tint.color }]}>{stat.value}</Text>
                 </View>
@@ -337,7 +350,7 @@ export default function AdminAppointmentScreen() {
           {/* Search */}
           <View style={styles.card}>
             <View style={styles.searchWrapper}>
-              <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
+              <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by student name, ID, or professor..."
@@ -386,7 +399,7 @@ export default function AdminAppointmentScreen() {
               </View>
             ) : error ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <AlertCircle size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>{error}</Text>
                 <Pressable style={styles.viewDetailsBtn} onPress={fetchAppointments}>
                   <Text style={styles.viewDetailsBtnText}>Retry</Text>
@@ -394,7 +407,7 @@ export default function AdminAppointmentScreen() {
               </View>
             ) : visibleAppointments.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="calendar-outline" size={28} color={theme.tertiary} />
+                <Calendar size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No appointments found</Text>
               </View>
             ) : (
@@ -406,18 +419,18 @@ export default function AdminAppointmentScreen() {
                       <View style={styles.apptCardHeaderRow}>
                         <View style={{ flex: 1, gap: 6 }}>
                           <View style={styles.collegeBadge}>
-                            <Ionicons name="business-outline" size={13} color="#a855f7" />
+                            <HomeIcon size={13} color="#a855f7" />
                             <Text style={styles.collegeBadgeText}>{adminDepartmentAbbrev}</Text>
                           </View>
                           <View style={styles.studentInfoRow}>
-                            <Ionicons name="person-outline" size={15} color={theme.tertiary} />
+                            <User size={15} color={theme.tertiary} />
                             <Text style={styles.studentName}>{appointment.studentName}</Text>
                             <Text style={styles.studentId}>({appointment.studentId})</Text>
                           </View>
                           <Text style={styles.purposeText}>{appointment.purpose}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
-                          <Ionicons name={statusTint.icon} size={12} color={statusTint.color} />
+                          <statusTint.icon size={12} color={statusTint.color} />
                           <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
                             {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
                           </Text>
@@ -516,14 +529,14 @@ function AppointmentDetailsModal({
               <Text style={styles.detailsModalSubtitle}>Read-only — monitoring view</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8}>
-              <Ionicons name="close-outline" size={22} color={theme.text} />
+              <X size={22} color={theme.text} />
             </Pressable>
           </View>
 
           <ScrollView style={styles.detailsModalBody}>
             <View style={styles.detailsStatusRow}>
               <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
-                <Ionicons name={statusTint.icon} size={12} color={statusTint.color} />
+                <statusTint.icon size={12} color={statusTint.color} />
                 <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
                   {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
                 </Text>
@@ -637,7 +650,7 @@ function NavDrawer({
                   style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                   onPress={() => onNavPress(item.key)}
                 >
-                  <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                  <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                   <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                 </Pressable>
               );

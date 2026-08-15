@@ -16,12 +16,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Bell, Calendar, CheckCircle, ChevronDown, ChevronLeft, Clock, Eye, FileText,
+  History, Home as HomeIcon, Info, Megaphone, Paperclip, Pin, Plus, Search, Trash2, X,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+
+type LucideIconType = typeof Calendar;
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -126,7 +132,7 @@ const TYPE_META: Record<
   AnnouncementType,
   {
     label: string;
-    icon: IoniconName;
+    icon: LucideIconType;
     iconBg: string;
     iconColor: string;
     badgeBg: string;
@@ -137,41 +143,41 @@ const TYPE_META: Record<
 > = {
   important: {
     label: 'Important',
-    icon: 'alert-circle-outline',
-    iconBg: 'rgba(239, 68, 68, 0.15)',
+    icon: AlertCircle,
+    iconBg: 'rgba(239, 68, 68, 0.18)',
     iconColor: '#ef4444',
-    badgeBg: 'rgba(239, 68, 68, 0.15)',
-    badgeBorder: 'rgba(239, 68, 68, 0.35)',
+    badgeBg: 'rgba(239, 68, 68, 0.18)',
+    badgeBorder: 'rgba(239, 68, 68, 0.4)',
     badgeColor: '#ef4444',
     gradient: ['#ef4444', '#dc2626'],
   },
   event: {
     label: 'Event',
-    icon: 'calendar-outline',
-    iconBg: 'rgba(249, 115, 22, 0.15)',
+    icon: Calendar,
+    iconBg: 'rgba(249, 115, 22, 0.18)',
     iconColor: '#f97316',
-    badgeBg: 'rgba(249, 115, 22, 0.15)',
-    badgeBorder: 'rgba(249, 115, 22, 0.35)',
+    badgeBg: 'rgba(249, 115, 22, 0.18)',
+    badgeBorder: 'rgba(249, 115, 22, 0.4)',
     badgeColor: '#f97316',
     gradient: ['#f97316', '#ea580c'],
   },
   reminder: {
     label: 'Reminder',
-    icon: 'notifications-outline',
-    iconBg: 'rgba(59, 130, 246, 0.15)',
+    icon: Bell,
+    iconBg: 'rgba(59, 130, 246, 0.18)',
     iconColor: '#3b82f6',
-    badgeBg: 'rgba(59, 130, 246, 0.15)',
-    badgeBorder: 'rgba(59, 130, 246, 0.35)',
+    badgeBg: 'rgba(59, 130, 246, 0.18)',
+    badgeBorder: 'rgba(59, 130, 246, 0.4)',
     badgeColor: '#3b82f6',
     gradient: ['#3b82f6', '#2563eb'],
   },
   general: {
     label: 'General',
-    icon: 'information-circle-outline',
-    iconBg: 'rgba(148, 163, 184, 0.15)',
+    icon: Info,
+    iconBg: 'rgba(148, 163, 184, 0.18)',
     iconColor: '#94a3b8',
-    badgeBg: 'rgba(148, 163, 184, 0.15)',
-    badgeBorder: 'rgba(148, 163, 184, 0.35)',
+    badgeBg: 'rgba(148, 163, 184, 0.18)',
+    badgeBorder: 'rgba(148, 163, 184, 0.4)',
     badgeColor: '#94a3b8',
     gradient: ['#94a3b8', '#64748b'],
   },
@@ -180,10 +186,10 @@ const TYPE_META: Record<
 // Applied instead of TYPE_META when an announcement is pinned -- pinned
 // status takes visual priority over type.
 const PINNED_META = {
-  iconBg: 'rgba(34, 197, 94, 0.15)',
+  iconBg: 'rgba(34, 197, 94, 0.18)',
   iconColor: '#22c55e',
-  badgeBg: 'rgba(34, 197, 94, 0.15)',
-  badgeBorder: 'rgba(34, 197, 94, 0.35)',
+  badgeBg: 'rgba(34, 197, 94, 0.18)',
+  badgeBorder: 'rgba(34, 197, 94, 0.4)',
   badgeColor: '#22c55e',
   gradient: ['#22c55e', '#16a34a'] as const,
 };
@@ -255,17 +261,17 @@ const formatPostedLabel = (announcement: { date: string; isReposted: boolean }) 
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 // Same drawer list every existing admin screen uses — Announcements is reached
 // only via the dashboard stat tile for now, so it isn't added here.
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 interface PickerOption {
@@ -410,11 +416,11 @@ export default function AdminAnnouncementScreen() {
 
   const list = getFiltered(activeTab);
 
-  const STAT_CARDS: { key: keyof typeof stats; label: string; icon: IoniconName; border: string; color: string }[] = [
-    { key: 'total', label: 'Total Active', icon: 'megaphone-outline', border: 'rgba(34, 197, 94, 0.35)', color: theme.primary },
-    { key: 'pinned', label: 'Pinned', icon: 'pin-outline', border: 'rgba(34, 197, 94, 0.35)', color: theme.primary },
-    { key: 'important', label: 'Important', icon: 'alert-circle-outline', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-    { key: 'archived', label: 'Archived', icon: 'close-outline', border: 'rgba(148, 163, 184, 0.3)', color: theme.tertiary },
+  const STAT_CARDS: { key: keyof typeof stats; label: string; icon: LucideIconType; border: string; color: string }[] = [
+    { key: 'total', label: 'Total Active', icon: Megaphone, border: 'rgba(34, 197, 94, 0.35)', color: theme.primary },
+    { key: 'pinned', label: 'Pinned', icon: Pin, border: 'rgba(34, 197, 94, 0.35)', color: theme.primary },
+    { key: 'important', label: 'Important', icon: AlertCircle, border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
+    { key: 'archived', label: 'Archived', icon: X, border: 'rgba(148, 163, 184, 0.3)', color: theme.tertiary },
   ];
 
   // ── CRUD handlers (wired to /admin/announcements) ──
@@ -643,14 +649,14 @@ export default function AdminAnnouncementScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={[theme.primary, theme.success]} style={styles.titleIcon}>
-              <Ionicons name="megaphone-outline" size={22} color="#ffffff" />
+              <Megaphone size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Announcements Management</Text>
@@ -666,7 +672,7 @@ export default function AdminAnnouncementScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.newBtn}
             >
-              <Ionicons name="add" size={16} color="#ffffff" />
+              <Plus size={16} color="#ffffff" />
               <Text style={styles.newBtnText}>New Announcement</Text>
             </LinearGradient>
           </Pressable>
@@ -693,7 +699,7 @@ export default function AdminAnnouncementScreen() {
               <View key={stat.key} style={[styles.statCard, { borderColor: stat.border }]}>
                 <View style={styles.statCardTop}>
                   <Text style={styles.statCardLabel}>{stat.label}</Text>
-                  <Ionicons name={stat.icon} size={18} color={stat.color} />
+                  <stat.icon size={18} color={stat.color} />
                 </View>
                 <Text style={[styles.statCardValue, { color: stat.color }]}>{stats[stat.key]}</Text>
               </View>
@@ -703,7 +709,7 @@ export default function AdminAnnouncementScreen() {
           {/* Filters */}
           <View style={styles.card}>
             <View style={styles.searchWrapper}>
-              <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
+              <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search announcements by title, content, or creator..."
@@ -730,7 +736,7 @@ export default function AdminAnnouncementScreen() {
                 <Text style={styles.filterSelectText} numberOfLines={1}>
                   {typeFilterLabel}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
             )}
           </View>
@@ -756,7 +762,7 @@ export default function AdminAnnouncementScreen() {
             </View>
           ) : error ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <AlertCircle size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>{error}</Text>
               <Pressable style={styles.actionBtn} onPress={fetchAnnouncements}>
                 <Text style={styles.actionBtnText}>Retry</Text>
@@ -764,7 +770,7 @@ export default function AdminAnnouncementScreen() {
             </View>
           ) : list.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="megaphone-outline" size={32} color={theme.tertiary} />
+              <Megaphone size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No {activeTab} announcements found.</Text>
             </View>
           ) : (
@@ -775,13 +781,13 @@ export default function AdminAnnouncementScreen() {
                   <View key={a.id} style={[styles.itemCard, a.isPinned && styles.itemCardPinned]}>
                     <View style={styles.itemTop}>
                       <View style={[styles.itemIcon, { backgroundColor: meta.iconBg }]}>
-                        <Ionicons name={meta.icon} size={18} color={meta.iconColor} />
+                        <meta.icon size={18} color={meta.iconColor} />
                       </View>
                       <View style={styles.itemBody}>
-                        <Text style={styles.itemTitle}>
-                          {a.isPinned ? '📌 ' : ''}
-                          {a.title}
-                        </Text>
+                        <View style={styles.itemTitleRow}>
+                          <Text style={styles.itemTitle}>{a.title}</Text>
+                          {a.isPinned && <Pin size={14} color={theme.primary} />}
+                        </View>
                         <View style={styles.itemBadgeRow}>
                           {audienceView === 'students' && (
                             <View style={[styles.badge, { backgroundColor: meta.badgeBg, borderColor: meta.badgeBorder }]}>
@@ -790,7 +796,7 @@ export default function AdminAnnouncementScreen() {
                           )}
                           {a.attachments?.length > 0 && (
                             <View style={[styles.countBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                              <Ionicons name="attach-outline" size={11} color={theme.primary} />
+                              <Paperclip size={11} color={theme.primary} />
                               <Text style={styles.countBadgeText}>
                                 {a.attachments.length > 1 ? `${a.attachments.length} Attachments` : 'Attachment'}
                               </Text>
@@ -805,7 +811,7 @@ export default function AdminAnnouncementScreen() {
                     </Text>
 
                     <View style={styles.itemMetaRow}>
-                      <Ionicons name="calendar-outline" size={12} color={theme.tertiary} />
+                      <Calendar size={12} color={theme.tertiary} />
                       <Text style={styles.itemMetaText}>{formatPostedLabel(a)}</Text>
                       <Text style={styles.itemMetaText}>•</Text>
                       <Text style={styles.itemMetaText}>By: {a.createdBy}</Text>
@@ -813,7 +819,7 @@ export default function AdminAnnouncementScreen() {
 
                     <View style={styles.itemActionsRow}>
                       <Pressable style={styles.actionBtn} onPress={() => setViewingAnnouncement(a)}>
-                        <Ionicons name="eye-outline" size={13} color={theme.text} />
+                        <Eye size={13} color={theme.text} />
                         <Text style={styles.actionBtnText}>View</Text>
                       </Pressable>
                       <Pressable style={styles.actionBtn} onPress={() => openEdit(a)}>
@@ -898,14 +904,14 @@ export default function AdminAnnouncementScreen() {
                     <Text style={styles.modalDesc}>View complete information about this announcement</Text>
                   </View>
                   <Pressable onPress={() => setViewingAnnouncement(null)} hitSlop={8}>
-                    <Ionicons name="close" size={20} color={theme.subtext} />
+                    <X size={20} color={theme.subtext} />
                   </Pressable>
                 </View>
 
                 <LinearGradient colors={[theme.primary, theme.success]} style={styles.viewBanner}>
                   <Text style={styles.viewBannerTitle}>{viewingAnnouncement.title}</Text>
                   <View style={styles.viewBannerDateRow}>
-                    <Ionicons name="calendar-outline" size={13} color="#ffffff" />
+                    <Calendar size={13} color="#ffffff" />
                     <Text style={styles.viewBannerDate}>{formatPostedLabel(viewingAnnouncement)}</Text>
                   </View>
                   <View style={styles.viewBannerBadges}>
@@ -925,8 +931,9 @@ export default function AdminAnnouncementScreen() {
                       </View>
                     )}
                     {viewingAnnouncement.isPinned && (
-                      <View style={styles.pinnedPill}>
-                        <Text style={styles.pinnedPillText}>📌 Pinned</Text>
+                      <View style={[styles.pinnedPill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                        <Pin size={11} color="#ffffff" />
+                        <Text style={styles.pinnedPillText}>Pinned</Text>
                       </View>
                     )}
                   </View>
@@ -1000,7 +1007,7 @@ export default function AdminAnnouncementScreen() {
               <View style={styles.modalHeaderRow}>
                 <Text style={styles.modalTitle}>Edit Announcement</Text>
                 <Pressable onPress={closeEdit} hitSlop={8}>
-                  <Ionicons name="close" size={20} color={theme.subtext} />
+                  <X size={20} color={theme.subtext} />
                 </Pressable>
               </View>
 
@@ -1043,7 +1050,7 @@ export default function AdminAnnouncementScreen() {
                   <Text style={styles.filterSelectText} numberOfLines={1}>
                     {TYPE_META[editForm.type].label}
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                  <ChevronDown size={16} color={theme.primary} />
                 </Pressable>
               )}
 
@@ -1055,7 +1062,7 @@ export default function AdminAnnouncementScreen() {
                   <View key={att.id} style={[styles.filterSelect, { marginBottom: 8 }]}>
                     <Text style={styles.filterSelectText} numberOfLines={1}>{att.filename}</Text>
                     <Pressable onPress={() => removeAttachment(editingAnnouncement.id, att.id)} hitSlop={8}>
-                      <Ionicons name="close" size={16} color="#ef4444" />
+                      <X size={16} color="#ef4444" />
                     </Pressable>
                   </View>
                 ))}
@@ -1072,7 +1079,7 @@ export default function AdminAnnouncementScreen() {
                   <Text style={styles.filterSelectText} numberOfLines={1}>
                     {editAttachment ? editAttachment.name : 'Attach a file'}
                   </Text>
-                  <Ionicons name="attach-outline" size={16} color={theme.primary} />
+                  <Paperclip size={16} color={theme.primary} />
                 </Pressable>
                 {editAttachment && (
                   <Pressable onPress={() => setEditAttachment(null)}>
@@ -1086,7 +1093,7 @@ export default function AdminAnnouncementScreen() {
                   <Text style={styles.secondaryBtnText}>Cancel</Text>
                 </Pressable>
                 <Pressable style={styles.primaryBtn} onPress={saveEdit}>
-                  <Ionicons name="checkmark-circle-outline" size={15} color="#ffffff" />
+                  <CheckCircle size={15} color="#ffffff" />
                   <Text style={styles.primaryBtnText}>Save Changes</Text>
                 </Pressable>
               </View>
@@ -1103,7 +1110,7 @@ export default function AdminAnnouncementScreen() {
               <View style={styles.modalHeaderRow}>
                 <Text style={styles.modalTitle}>New Announcement</Text>
                 <Pressable onPress={closeCreate} hitSlop={8}>
-                  <Ionicons name="close" size={20} color={theme.subtext} />
+                  <X size={20} color={theme.subtext} />
                 </Pressable>
               </View>
 
@@ -1151,7 +1158,7 @@ export default function AdminAnnouncementScreen() {
                 <Text style={styles.filterSelectText} numberOfLines={1}>
                   {AUDIENCE_FORM_OPTIONS.find((o) => o.value === createForm.audience)?.label}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
 
               <View style={styles.formRow}>
@@ -1173,7 +1180,7 @@ export default function AdminAnnouncementScreen() {
                     <Text style={styles.filterSelectText} numberOfLines={1}>
                       {TYPE_META[createForm.type].label}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                    <ChevronDown size={16} color={theme.primary} />
                   </Pressable>
                 )}
                 <Pressable
@@ -1193,7 +1200,7 @@ export default function AdminAnnouncementScreen() {
                   <Text style={styles.filterSelectText} numberOfLines={1}>
                     {createForm.isPinned ? 'Pinned: Yes' : 'Pinned: No'}
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                  <ChevronDown size={16} color={theme.primary} />
                 </Pressable>
               </View>
 
@@ -1203,7 +1210,7 @@ export default function AdminAnnouncementScreen() {
                   <Text style={styles.filterSelectText} numberOfLines={1}>
                     {createAttachment ? createAttachment.name : 'Attach a file'}
                   </Text>
-                  <Ionicons name="attach-outline" size={16} color={theme.primary} />
+                  <Paperclip size={16} color={theme.primary} />
                 </Pressable>
                 {createAttachment && (
                   <Pressable onPress={() => setCreateAttachment(null)}>
@@ -1217,7 +1224,7 @@ export default function AdminAnnouncementScreen() {
                   <Text style={styles.secondaryBtnText}>Cancel</Text>
                 </Pressable>
                 <Pressable style={styles.primaryBtn} onPress={saveCreate}>
-                  <Ionicons name="checkmark-circle-outline" size={15} color="#ffffff" />
+                  <CheckCircle size={15} color="#ffffff" />
                   <Text style={styles.primaryBtnText}>Save Announcement</Text>
                 </Pressable>
               </View>
@@ -1231,7 +1238,7 @@ export default function AdminAnnouncementScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.confirmModalCard}>
             <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-              <Ionicons name="trash-outline" size={26} color="#ef4444" />
+              <Trash2 size={26} color="#ef4444" />
             </View>
             <Text style={styles.confirmTitle}>Delete Announcement?</Text>
             <Text style={styles.confirmDescription}>
@@ -1242,7 +1249,7 @@ export default function AdminAnnouncementScreen() {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
               <Pressable style={styles.deleteConfirmBtn} onPress={confirmDelete}>
-                <Ionicons name="trash-outline" size={16} color="#ffffff" />
+                <Trash2 size={16} color="#ffffff" />
                 <Text style={styles.confirmBtnText}>Delete</Text>
               </Pressable>
             </View>
@@ -1330,7 +1337,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}
@@ -1604,7 +1611,8 @@ function createStyles(theme: ThemePalette) {
       flexShrink: 0,
     },
     itemBody: { flex: 1, gap: 6 },
-    itemTitle: { fontSize: 15, fontWeight: '700', color: theme.text, lineHeight: 20 },
+    itemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    itemTitle: { fontSize: 15, fontWeight: '700', color: theme.text, lineHeight: 20, flexShrink: 1 },
     itemBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     badge: { borderWidth: 1, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 9 },
     badgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },

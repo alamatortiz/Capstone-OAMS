@@ -16,6 +16,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Bell,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Megaphone,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -32,12 +43,19 @@ import {
   type NotificationType,
 } from '@/utils/notificationRoutes';
 
+type LucideIconType = typeof Clock;
+
+const TYPE_ICON: Record<NotificationType, LucideIconType> = {
+  queue: Clock,
+  document: FileText,
+  appointment: Calendar,
+  announcement: Megaphone,
+};
+
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -102,15 +120,15 @@ const formatTimestamp = (iso: string) => {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 type TypeFilter = 'all' | NotificationType;
@@ -297,14 +315,14 @@ export default function AdminNotificationsScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={[theme.primary, theme.success]} style={styles.titleIcon}>
-              <Ionicons name="notifications-outline" size={22} color="#ffffff" />
+              <Bell size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Notifications</Text>
@@ -318,12 +336,11 @@ export default function AdminNotificationsScreen() {
               <Text style={styles.filterLabel}>Type</Text>
               <Pressable style={styles.filterSelect} onPress={() => setTypeFilterOpen(true)}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{typeLabel}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
             </View>
             {unreadCount > 0 && (
               <Pressable style={styles.markAllBtn} onPress={markAllRead}>
-                <Ionicons name="checkmark-done-outline" size={16} color={theme.primary} />
                 <Text style={styles.markAllBtnText}>Mark all read ({unreadCount})</Text>
               </Pressable>
             )}
@@ -336,7 +353,7 @@ export default function AdminNotificationsScreen() {
             </View>
           ) : error ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <Bell size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>Could not load notifications</Text>
               <Text style={styles.emptyDescription}>{error}</Text>
               <Pressable style={styles.filterSelect} onPress={() => fetchNotifications(1)}>
@@ -347,6 +364,7 @@ export default function AdminNotificationsScreen() {
             <View style={styles.notifList}>
               {notifications.map((n) => {
                 const meta = NOTIFICATION_TYPE_META[n.type] ?? NOTIFICATION_TYPE_META.queue;
+                const TypeIcon = TYPE_ICON[n.type] ?? Clock;
                 return (
                   <Pressable
                     key={n.notification_id}
@@ -354,7 +372,7 @@ export default function AdminNotificationsScreen() {
                     onPress={() => goToNotification(n)}
                   >
                     <View style={[styles.notifIconWrap, { backgroundColor: `${meta.color}26`, borderColor: `${meta.color}55` }]}>
-                      <Ionicons name={meta.icon as IoniconName} size={18} color={meta.color} />
+                      <TypeIcon size={18} color={meta.color} />
                     </View>
                     <View style={styles.notifBody}>
                       <View style={styles.notifBadgeRow}>
@@ -372,7 +390,7 @@ export default function AdminNotificationsScreen() {
             </View>
           ) : (
             <View style={styles.emptyCard}>
-              <Ionicons name="notifications-outline" size={32} color={theme.tertiary} />
+              <Bell size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No Notifications</Text>
               <Text style={styles.emptyDescription}>You're all caught up.</Text>
             </View>
@@ -410,7 +428,7 @@ export default function AdminNotificationsScreen() {
                   style={styles.drawerNavItem}
                   onPress={() => handleNavPress(item.key)}
                 >
-                  <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                  <item.icon size={18} color={theme.subtext} />
                   <Text style={styles.drawerNavLabel}>{item.label}</Text>
                 </Pressable>
               ))}

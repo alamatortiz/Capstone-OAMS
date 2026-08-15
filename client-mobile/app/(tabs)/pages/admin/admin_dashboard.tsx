@@ -16,6 +16,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  Calendar,
+  Check,
+  ChevronRight,
+  Clock,
+  Database,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Plus,
+  QrCode,
+  RefreshCw,
+  UserCog,
+  Users,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -35,8 +53,6 @@ const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
 const editIcon = require('@/assets/edit_icon.png');
 const deleteIcon = require('@/assets/delete_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -94,12 +110,14 @@ const STAT_TINTS = {
   purple: { bg: 'rgba(168, 85, 247, 0.16)', border: 'rgba(168, 85, 247, 0.25)', color: '#a855f7' },
 } as const;
 
+type LucideIconType = typeof Clock;
+
 interface StatItem {
   key: string;
   title: string;
   value: string;
   description: string;
-  icon: IoniconName;
+  icon: LucideIconType;
   tint: keyof typeof STAT_TINTS;
 }
 
@@ -107,22 +125,22 @@ interface ToolItem {
   key: string;
   title: string;
   description: string;
-  icon: IoniconName;
+  icon: LucideIconType;
   gradient: readonly [string, string];
 }
 
 // Icon backgrounds mirror admin-dashboard.css: bg-user-mgmt, bg-data-mgmt, bg-blue-600, bg-cyan-500
 const adminTools: ToolItem[] = [
-  { key: 'user-management', title: 'User Management', description: 'Manage user accounts', icon: 'people-outline', gradient: ['#94a3b8', '#64748b'] },
-  { key: 'data-management', title: 'Data Management', description: 'Configure settings', icon: 'server-outline', gradient: ['#475569', '#334155'] },
-  { key: 'queue-analytics', title: 'Queue Analytics', description: 'Performance metrics', icon: 'bar-chart-outline', gradient: ['#3b82f6', '#2563eb'] },
-  { key: 'pinnacle-sync', title: 'Pinnacle Sync', description: 'Data synchronization', icon: 'sync-outline', gradient: ['#06b6d4', '#0891b2'] },
+  { key: 'user-management', title: 'User Management', description: 'Manage user accounts', icon: UserCog, gradient: ['#94a3b8', '#64748b'] },
+  { key: 'data-management', title: 'Data Management', description: 'Configure settings', icon: Database, gradient: ['#475569', '#334155'] },
+  { key: 'queue-analytics', title: 'Queue Analytics', description: 'Performance metrics', icon: BarChart3, gradient: ['#3b82f6', '#2563eb'] },
+  { key: 'pinnacle-sync', title: 'Pinnacle Sync', description: 'Data synchronization', icon: RefreshCw, gradient: ['#06b6d4', '#0891b2'] },
 ];
 
 // Icon backgrounds mirror admin-dashboard.css: bg-scan-doc, bg-blue-500
 const quickActions: ToolItem[] = [
-  { key: 'scan-document', title: 'Scan Document', description: 'Verify QR codes and view document details', icon: 'qr-code-outline', gradient: ['#34d399', '#10b981'] },
-  { key: 'host-queue', title: 'Host Queue', description: 'Manage and host student queues', icon: 'people-circle-outline', gradient: ['#3b82f6', '#2563eb'] },
+  { key: 'scan-document', title: 'Scan Document', description: 'Verify QR codes and view document details', icon: QrCode, gradient: ['#34d399', '#10b981'] },
+  { key: 'host-queue', title: 'Host Queue', description: 'Manage and host student queues', icon: Users, gradient: ['#3b82f6', '#2563eb'] },
 ];
 
 const ANNOUNCEMENT_TAG_TINTS: Record<string, { bg: string; border: string; color: string }> = {
@@ -194,15 +212,15 @@ interface FacultyMember {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 export default function AdminDashboardScreen() {
@@ -268,10 +286,10 @@ export default function AdminDashboardScreen() {
   const loading = dashLoading;
 
   const stats: StatItem[] = [
-    { key: 'queues', title: 'Active Queues', value: loading ? '—' : String(s?.activeQueues ?? 0), description: `In ${user?.departmentName ?? ''}`, icon: 'time-outline', tint: 'blue' },
-    { key: 'documents', title: 'Pending Documents', value: loading ? '—' : String(s?.pendingDocuments ?? 0), description: 'Awaiting processing', icon: 'document-text-outline', tint: 'orange' },
-    { key: 'faculty', title: 'Faculty Available', value: loading ? '—' : String(s?.facultyAvailable ?? 0), description: 'Today', icon: 'people-outline', tint: 'emerald' },
-    { key: 'announcements', title: 'Announcements', value: loading ? '—' : String(s?.announcements ?? 0), description: 'Published', icon: 'notifications-outline', tint: 'purple' },
+    { key: 'queues', title: 'Active Queues', value: loading ? '—' : String(s?.activeQueues ?? 0), description: `In ${user?.departmentName ?? ''}`, icon: Clock, tint: 'blue' },
+    { key: 'documents', title: 'Pending Documents', value: loading ? '—' : String(s?.pendingDocuments ?? 0), description: 'Awaiting processing', icon: FileText, tint: 'orange' },
+    { key: 'faculty', title: 'Faculty Available', value: loading ? '—' : String(s?.facultyAvailable ?? 0), description: 'Today', icon: Users, tint: 'emerald' },
+    { key: 'announcements', title: 'Announcements', value: loading ? '—' : String(s?.announcements ?? 0), description: 'Published', icon: Bell, tint: 'purple' },
   ];
 
   const announcements: AnnouncementItem[] = dashStats?.announcements ?? [];
@@ -440,7 +458,7 @@ export default function AdminDashboardScreen() {
               return (
                 <Pressable key={stat.key} style={styles.statCard} onPress={() => handleStatPress(stat.key)}>
                   <View style={[styles.statIcon, { backgroundColor: tint.bg, borderColor: tint.border }]}>
-                    <Ionicons name={stat.icon} size={20} color={tint.color} />
+                    <stat.icon size={20} color={tint.color} />
                   </View>
                   <Text style={styles.statValue}>{stat.value}</Text>
                   <Text style={styles.statTitle}>{stat.title}</Text>
@@ -453,7 +471,7 @@ export default function AdminDashboardScreen() {
           {/* Admin Management */}
           <View style={[styles.tintedSection, styles.adminMgmtSection]}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="alert-circle-outline" size={20} color={theme.primary} />
+              <AlertTriangle size={20} color={theme.primary} />
               <View style={styles.sectionTitleText}>
                 <Text style={styles.sectionTitle}>Admin Management</Text>
                 <Text style={styles.sectionSubtitle}>System administration and configuration tools</Text>
@@ -463,7 +481,7 @@ export default function AdminDashboardScreen() {
               {adminTools.map((tool) => (
                 <Pressable key={tool.key} style={styles.adminToolCard} onPress={() => handleToolPress(tool.key)}>
                   <LinearGradient colors={tool.gradient} style={styles.toolIcon}>
-                    <Ionicons name={tool.icon} size={24} color="#ffffff" />
+                    <tool.icon size={24} color="#ffffff" />
                   </LinearGradient>
                   <View style={styles.toolText}>
                     <Text style={styles.toolTitle}>{tool.title}</Text>
@@ -477,7 +495,7 @@ export default function AdminDashboardScreen() {
           {/* Quick Actions */}
           <View style={[styles.tintedSection, styles.quickActionsSection]}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="checkmark-circle-outline" size={20} color={theme.primary} />
+              <Check size={20} color={theme.primary} />
               <View style={styles.sectionTitleText}>
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
                 <Text style={styles.sectionSubtitle}>Access frequently used admin tools</Text>
@@ -487,7 +505,7 @@ export default function AdminDashboardScreen() {
               {quickActions.map((action) => (
                 <Pressable key={action.key} style={styles.quickActionCard} onPress={() => handleQuickActionPress(action.key)}>
                   <LinearGradient colors={action.gradient} style={styles.toolIcon}>
-                    <Ionicons name={action.icon} size={24} color="#ffffff" />
+                    <action.icon size={24} color="#ffffff" />
                   </LinearGradient>
                   <View style={styles.toolText}>
                     <Text style={styles.toolTitle}>{action.title}</Text>
@@ -502,7 +520,7 @@ export default function AdminDashboardScreen() {
           <View style={[styles.tintedSection, styles.announcementSection]}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionTitleRow}>
-                <Ionicons name="notifications-outline" size={20} color="#3b82f6" />
+                <Bell size={20} color="#3b82f6" />
                 <Text style={styles.sectionTitle}>Announcement Management</Text>
               </View>
               <Pressable onPress={() => router.push('/pages/admin/admin_announcement')}>
@@ -512,7 +530,7 @@ export default function AdminDashboardScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.newAnnouncementBtn}
                 >
-                  <Ionicons name="add" size={14} color="#ffffff" />
+                  <Plus size={14} color="#ffffff" />
                   <Text style={styles.newAnnouncementBtnText}>New</Text>
                 </LinearGradient>
               </Pressable>
@@ -570,8 +588,9 @@ export default function AdminDashboardScreen() {
           <View style={[styles.card, styles.pendingDocsCard]}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitleText}>Pending Requested Documents</Text>
-              <Pressable onPress={() => router.push('/pages/admin/admin_document_processing')} hitSlop={8}>
+              <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/admin/admin_document_processing')} hitSlop={8}>
                 <Text style={styles.viewAllText}>View All</Text>
+                <ChevronRight size={14} color={theme.primary} />
               </Pressable>
             </View>
             <View style={styles.listGap}>
@@ -609,8 +628,9 @@ export default function AdminDashboardScreen() {
           <View style={[styles.card, styles.hostedQueuesCard]}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitleText}>Current Hosted Queues</Text>
-              <Pressable onPress={() => router.push('/pages/admin/admin_queue')} hitSlop={8}>
+              <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/admin/admin_queue')} hitSlop={8}>
                 <Text style={styles.viewAllText}>Manage</Text>
+                <ChevronRight size={14} color={theme.primary} />
               </Pressable>
             </View>
             <View style={styles.listGap}>
@@ -634,8 +654,9 @@ export default function AdminDashboardScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitleText}>Faculty Availability Today</Text>
-              <Pressable onPress={() => router.push('/pages/admin/admin_professor_availability')} hitSlop={8}>
+              <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/admin/admin_professor_availability')} hitSlop={8}>
                 <Text style={styles.viewAllText}>View All</Text>
+                <ChevronRight size={14} color={theme.primary} />
               </Pressable>
             </View>
             <View style={styles.facultyGrid}>
@@ -688,7 +709,7 @@ export default function AdminDashboardScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
                       {item.label}
                     </Text>
@@ -1163,6 +1184,7 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '700',
       color: theme.text,
     },
+    viewAllRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     viewAllText: {
       fontSize: 12,
       fontWeight: '700',

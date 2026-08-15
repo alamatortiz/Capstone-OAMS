@@ -14,6 +14,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Calendar,
+  ChevronLeft,
+  Clock,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Mail,
+  MapPin,
+  Users,
+  XCircle,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -25,8 +37,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -115,18 +125,20 @@ const SLOT_TINTS: Record<SlotStatus, { bg: string; border: string }> = {
   unavailable: { bg: 'rgba(107, 114, 128, 0.08)', border: 'rgba(107, 114, 128, 0.45)' },
 };
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 function getInitials(name: string) {
@@ -265,13 +277,13 @@ export default function AdminProfessorAvailabilityScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
             <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
-              <Ionicons name="people-outline" size={22} color="#ffffff" />
+              <Users size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Faculty Availability</Text>
@@ -312,7 +324,7 @@ export default function AdminProfessorAvailabilityScreen() {
             </View>
           ) : error ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+              <XCircle size={28} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>{error}</Text>
               <Pressable onPress={fetchFaculty}>
                 <Text style={styles.emptyText}>Retry</Text>
@@ -320,7 +332,7 @@ export default function AdminProfessorAvailabilityScreen() {
             </View>
           ) : visibleFaculty.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="people-outline" size={28} color={theme.tertiary} />
+              <Users size={28} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No faculty found</Text>
               <Text style={styles.emptyText}>Try adjusting your filter.</Text>
             </View>
@@ -358,12 +370,12 @@ export default function AdminProfessorAvailabilityScreen() {
 
                     <View style={styles.facultyMeta}>
                       <View style={styles.metaRow}>
-                        <Ionicons name="calendar-outline" size={14} color={theme.primary} />
+                        <Calendar size={14} color={theme.primary} />
                         <Text style={styles.metaLabel}>Next Available:</Text>
                         <Text style={styles.metaValue}>{f.nextAvailableSlot}</Text>
                       </View>
                       <View style={styles.metaRow}>
-                        <Ionicons name="mail-outline" size={14} color={theme.tertiary} />
+                        <Mail size={14} color={theme.tertiary} />
                         <Text style={styles.metaEmail}>{f.email}</Text>
                       </View>
                     </View>
@@ -380,12 +392,12 @@ export default function AdminProfessorAvailabilityScreen() {
                                 style={[styles.slot, { backgroundColor: slotTint.bg, borderColor: slotTint.border }]}
                               >
                                 <View style={styles.slotTimeRow}>
-                                  <Ionicons name="time-outline" size={12} color={theme.tertiary} />
+                                  <Clock size={12} color={theme.tertiary} />
                                   <Text style={styles.slotTime}>{slot.time}</Text>
                                 </View>
                                 <Text style={styles.slotActivity}>{slot.activity}</Text>
                                 <View style={styles.slotLocationRow}>
-                                  <Ionicons name="location-outline" size={11} color={theme.tertiary} />
+                                  <MapPin size={11} color={theme.tertiary} />
                                   <Text style={styles.slotLocation}>{slot.location}</Text>
                                 </View>
                               </View>
@@ -467,7 +479,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}

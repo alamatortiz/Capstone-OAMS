@@ -16,6 +16,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  Database,
+  Download,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -26,8 +42,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -156,18 +170,20 @@ const AUDIT_TINTS: Record<AuditAction, string> = {
   READ: '#2dd4bf',
 };
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 const TABS = [
@@ -686,7 +702,7 @@ export default function AdminDataManagementScreen() {
     title: deleteTarget.type === 'document' ? 'Delete Document Type?' : 'Delete Service?',
     description: `Delete ${deleteTarget.name}? This action cannot be undone.`,
     confirmLabel: 'Delete',
-    icon: 'trash-outline' as IoniconName,
+    icon: Trash2,
     color: '#ef4444',
   };
 
@@ -718,14 +734,14 @@ export default function AdminDataManagementScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title (mirrors PageHeader on the web: gradient icon box + title/subtitle, no banner) */}
           <View style={styles.titleRow}>
             <LinearGradient colors={[theme.primary, theme.success]} style={styles.titleIcon}>
-              <Ionicons name="server-outline" size={22} color="#ffffff" />
+              <Database size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Data Management</Text>
@@ -765,7 +781,7 @@ export default function AdminDataManagementScreen() {
               </View>
               <Pressable onPress={openAddDocModal}>
                 <LinearGradient colors={[theme.primary, theme.success]} style={styles.addBtnFull}>
-                  <Ionicons name="add" size={16} color="#ffffff" />
+                  <Plus size={16} color="#ffffff" />
                   <Text style={styles.addBtnFullText}>Add Document Type</Text>
                 </LinearGradient>
               </Pressable>
@@ -792,7 +808,7 @@ export default function AdminDataManagementScreen() {
                 </View>
               ) : docError ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                  <AlertCircle size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>{docError}</Text>
                   <Pressable style={styles.filterPill} onPress={() => fetchDocumentTypes(docStatusFilter)}>
                     <Text style={styles.filterPillTextActive}>Retry</Text>
@@ -800,7 +816,7 @@ export default function AdminDataManagementScreen() {
                 </View>
               ) : filteredDocs.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="document-text-outline" size={28} color={theme.tertiary} />
+                  <FileText size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No document types found. Add one to get started.</Text>
                 </View>
               ) : (
@@ -851,14 +867,14 @@ export default function AdminDataManagementScreen() {
                             onPress={() => openEditDocModal(doc)}
                             hitSlop={6}
                           >
-                            <Ionicons name="create-outline" size={15} color="#3b82f6" />
+                            <Pencil size={15} color="#3b82f6" />
                           </Pressable>
                           <Pressable
                             style={[styles.iconActionBtn, styles.iconActionBtnDelete]}
                             onPress={() => setDeleteTarget({ type: 'document', id: doc.id, name: doc.name })}
                             hitSlop={6}
                           >
-                            <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                            <Trash2 size={15} color="#ef4444" />
                           </Pressable>
                         </View>
                       </View>
@@ -878,7 +894,7 @@ export default function AdminDataManagementScreen() {
               </View>
               <Pressable onPress={openAddServiceModal}>
                 <LinearGradient colors={[theme.primary, theme.success]} style={styles.addBtnFull}>
-                  <Ionicons name="add" size={16} color="#ffffff" />
+                  <Plus size={16} color="#ffffff" />
                   <Text style={styles.addBtnFullText}>Add Service</Text>
                 </LinearGradient>
               </Pressable>
@@ -890,7 +906,7 @@ export default function AdminDataManagementScreen() {
                 </View>
               ) : serviceError ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                  <AlertCircle size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>{serviceError}</Text>
                   <Pressable style={styles.filterPill} onPress={fetchServiceTypes}>
                     <Text style={styles.filterPillTextActive}>Retry</Text>
@@ -898,7 +914,7 @@ export default function AdminDataManagementScreen() {
                 </View>
               ) : serviceTypes.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="time-outline" size={28} color={theme.tertiary} />
+                  <Clock size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No services found. Add one to get started.</Text>
                 </View>
               ) : (
@@ -926,14 +942,14 @@ export default function AdminDataManagementScreen() {
                             onPress={() => openEditServiceModal(s)}
                             hitSlop={6}
                           >
-                            <Ionicons name="create-outline" size={15} color="#3b82f6" />
+                            <Pencil size={15} color="#3b82f6" />
                           </Pressable>
                           <Pressable
                             style={[styles.iconActionBtn, styles.iconActionBtnDelete]}
                             onPress={() => setDeleteTarget({ type: 'service', id: s.id, name: s.name })}
                             hitSlop={6}
                           >
-                            <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                            <Trash2 size={15} color="#ef4444" />
                           </Pressable>
                         </View>
                       </View>
@@ -952,7 +968,7 @@ export default function AdminDataManagementScreen() {
                 <Text style={styles.cardSubtitleText}>Track all administrative actions for {adminDepartmentAbbrev}</Text>
               </View>
               <Pressable style={styles.exportBtn} onPress={handleExportLogs}>
-                <Ionicons name="download-outline" size={14} color={theme.text} />
+                <Download size={14} color={theme.text} />
                 <Text style={styles.exportBtnText}>Export Logs</Text>
               </Pressable>
 
@@ -981,7 +997,7 @@ export default function AdminDataManagementScreen() {
                 </View>
               ) : auditError ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                  <AlertCircle size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>{auditError}</Text>
                   <Pressable style={styles.filterPill} onPress={() => fetchAuditLogs(auditActionFilter)}>
                     <Text style={styles.filterPillTextActive}>Retry</Text>
@@ -989,7 +1005,7 @@ export default function AdminDataManagementScreen() {
                 </View>
               ) : filteredLogs.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="reload-circle-outline" size={28} color={theme.tertiary} />
+                  <History size={28} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No audit log entries found.</Text>
                 </View>
               ) : (
@@ -1045,7 +1061,7 @@ export default function AdminDataManagementScreen() {
                 </Text>
               </View>
               <Pressable onPress={closeDocModal} hitSlop={8}>
-                <Ionicons name="close-outline" size={22} color={theme.text} />
+                <X size={22} color={theme.text} />
               </Pressable>
             </View>
 
@@ -1085,7 +1101,7 @@ export default function AdminDataManagementScreen() {
                 <Text style={styles.formLabel}>Status *</Text>
                 <Pressable style={styles.formSelect} onPress={() => setActivePicker('docStatus')}>
                   <Text style={styles.formSelectText}>{docForm.status === 'active' ? 'Active' : 'Inactive'}</Text>
-                  <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                  <ChevronDown size={14} color={theme.tertiary} />
                 </Pressable>
               </View>
               <Pressable
@@ -1105,7 +1121,7 @@ export default function AdminDataManagementScreen() {
                   <Text style={styles.formSelectText}>
                     {docForm.recipientType === 'students' ? 'Students' : docForm.recipientType === 'faculty' ? 'Faculty' : 'Both'}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                  <ChevronDown size={14} color={theme.tertiary} />
                 </Pressable>
               </View>
               <Pressable
@@ -1143,7 +1159,7 @@ export default function AdminDataManagementScreen() {
                           {!!req.description && <Text style={styles.reqItemDesc}>{req.description}</Text>}
                         </View>
                         <Pressable onPress={() => removeDocRequirement(idx)} hitSlop={6}>
-                          <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                          <Trash2 size={16} color="#ef4444" />
                         </Pressable>
                       </View>
                     ))}
@@ -1177,7 +1193,7 @@ export default function AdminDataManagementScreen() {
                     <Text style={styles.checkboxLabel}>Mandatory</Text>
                   </Pressable>
                   <Pressable style={styles.reqAddBtn} onPress={addDocRequirement}>
-                    <Ionicons name="add" size={14} color={theme.primary} />
+                    <Plus size={14} color={theme.primary} />
                     <Text style={styles.reqAddBtnText}>Add Requirement</Text>
                   </Pressable>
                 </View>
@@ -1208,7 +1224,7 @@ export default function AdminDataManagementScreen() {
                 </Text>
               </View>
               <Pressable onPress={closeServiceModal} hitSlop={8}>
-                <Ionicons name="close-outline" size={22} color={theme.text} />
+                <X size={22} color={theme.text} />
               </Pressable>
             </View>
 
@@ -1242,7 +1258,7 @@ export default function AdminDataManagementScreen() {
                       ? 'Other (type your own)…'
                       : locations.find((l) => l.id === serviceForm.locationId)?.name || 'No specific location'}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                  <ChevronDown size={14} color={theme.tertiary} />
                 </Pressable>
                 {serviceForm.locationId === '__other__' && (
                   <TextInput
@@ -1289,7 +1305,7 @@ export default function AdminDataManagementScreen() {
                           {!!req.description && <Text style={styles.reqItemDesc}>{req.description}</Text>}
                         </View>
                         <Pressable onPress={() => removeServiceRequirement(idx)} hitSlop={6}>
-                          <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                          <Trash2 size={16} color="#ef4444" />
                         </Pressable>
                       </View>
                     ))}
@@ -1323,7 +1339,7 @@ export default function AdminDataManagementScreen() {
                     <Text style={styles.checkboxLabel}>Mandatory</Text>
                   </Pressable>
                   <Pressable style={styles.reqAddBtn} onPress={addServiceRequirement}>
-                    <Ionicons name="add" size={14} color={theme.primary} />
+                    <Plus size={14} color={theme.primary} />
                     <Text style={styles.reqAddBtnText}>Add Requirement</Text>
                   </Pressable>
                 </View>
@@ -1348,7 +1364,7 @@ export default function AdminDataManagementScreen() {
                           {!!step.description && <Text style={styles.reqItemDesc}>{step.description}</Text>}
                         </View>
                         <Pressable onPress={() => removeServiceStep(idx)} hitSlop={6}>
-                          <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                          <Trash2 size={16} color="#ef4444" />
                         </Pressable>
                       </View>
                     ))}
@@ -1371,7 +1387,7 @@ export default function AdminDataManagementScreen() {
                     onChangeText={(v) => setSvcStepForm((p) => ({ ...p, description: v }))}
                   />
                   <Pressable style={styles.reqAddBtn} onPress={addServiceStep}>
-                    <Ionicons name="add" size={14} color={theme.primary} />
+                    <Plus size={14} color={theme.primary} />
                     <Text style={styles.reqAddBtnText}>Add Step</Text>
                   </Pressable>
                 </View>
@@ -1426,7 +1442,7 @@ export default function AdminDataManagementScreen() {
           {confirmMeta && (
             <View style={styles.confirmModalCard}>
               <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-                <Ionicons name={confirmMeta.icon} size={26} color={confirmMeta.color} />
+                <confirmMeta.icon size={26} color={confirmMeta.color} />
               </View>
               <Text style={styles.confirmTitle}>{confirmMeta.title}</Text>
               <Text style={styles.confirmDescription}>{confirmMeta.description}</Text>
@@ -1491,7 +1507,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}

@@ -4,6 +4,8 @@ import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   Image,
   Modal,
   Pressable,
@@ -16,6 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Bell, Calendar, ChevronLeft, Clock, FileText, Home as HomeIcon, Loader2, Megaphone,
+  Paperclip, Users, X, ClipboardList,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -25,6 +31,26 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
+
+type LucideIconType = typeof Megaphone;
+
+// Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
+function SpinningLoader({ size, color }: { size: number; color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -77,12 +103,12 @@ type AnnouncementCategory = 'important' | 'event' | 'reminder' | 'general';
 
 const CATEGORY_STYLE: Record<
   AnnouncementCategory,
-  { icon: IoniconName; gradient: readonly [string, string]; badgeBg: string; badgeBorder: string; badgeColor: string }
+  { icon: LucideIconType; gradient: readonly [string, string]; badgeBg: string; badgeBorder: string; badgeColor: string }
 > = {
-  important: { icon: 'alert-circle-outline', gradient: ['#ef4444', '#dc2626'], badgeBg: 'rgba(239, 68, 68, 0.15)', badgeBorder: 'rgba(239, 68, 68, 0.3)', badgeColor: '#ef4444' },
-  event: { icon: 'calendar-outline', gradient: ['#f97316', '#ea580c'], badgeBg: 'rgba(249, 115, 22, 0.15)', badgeBorder: 'rgba(249, 115, 22, 0.3)', badgeColor: '#f97316' },
-  reminder: { icon: 'notifications-outline', gradient: ['#3b82f6', '#2563eb'], badgeBg: 'rgba(59, 130, 246, 0.15)', badgeBorder: 'rgba(59, 130, 246, 0.3)', badgeColor: '#3b82f6' },
-  general: { icon: 'information-circle-outline', gradient: ['#94a3b8', '#64748b'], badgeBg: 'rgba(148, 163, 184, 0.15)', badgeBorder: 'rgba(148, 163, 184, 0.3)', badgeColor: '#94a3b8' },
+  important: { icon: AlertCircle, gradient: ['#ef4444', '#dc2626'], badgeBg: 'rgba(239, 68, 68, 0.15)', badgeBorder: 'rgba(239, 68, 68, 0.3)', badgeColor: '#ef4444' },
+  event: { icon: Calendar, gradient: ['#f97316', '#ea580c'], badgeBg: 'rgba(249, 115, 22, 0.15)', badgeBorder: 'rgba(249, 115, 22, 0.3)', badgeColor: '#f97316' },
+  reminder: { icon: Bell, gradient: ['#3b82f6', '#2563eb'], badgeBg: 'rgba(59, 130, 246, 0.15)', badgeBorder: 'rgba(59, 130, 246, 0.3)', badgeColor: '#3b82f6' },
+  general: { icon: AlertCircle, gradient: ['#94a3b8', '#64748b'], badgeBg: 'rgba(148, 163, 184, 0.15)', badgeBorder: 'rgba(148, 163, 184, 0.3)', badgeColor: '#94a3b8' },
 };
 
 // Applied instead of CATEGORY_STYLE when an announcement is pinned -- pinned
@@ -157,16 +183,16 @@ const EMPTY_STATE_COPY: Record<FilterTabKey, { title: string; description: strin
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 export default function StudentAnnouncementScreen() {
@@ -355,11 +381,16 @@ export default function StudentAnnouncementScreen() {
       <View key={announcement.id} style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <LinearGradient colors={style.gradient} style={styles.cardIcon}>
-            <Ionicons name={style.icon} size={22} color="#ffffff" />
+            <style.icon size={22} color="#ffffff" />
           </LinearGradient>
           <View style={styles.cardBody}>
             <View style={styles.cardTitleRow}>
-              <Text style={styles.cardTitle}>{announcement.title}</Text>
+              <View style={styles.cardTitleTextRow}>
+                <Text style={styles.cardTitle}>{announcement.title}</Text>
+                {announcement.attachments?.length > 0 && (
+                  <Paperclip size={13} color={theme.tertiary} />
+                )}
+              </View>
               <View style={[styles.badge, { backgroundColor: style.badgeBg, borderColor: style.badgeBorder }]}>
                 <Text style={[styles.badgeText, { color: style.badgeColor }]}>
                   {capitalize(announcement.category)}
@@ -383,7 +414,7 @@ export default function StudentAnnouncementScreen() {
                     {downloadingId === att.id ? (
                       <ActivityIndicator size="small" color={theme.subtext} />
                     ) : (
-                      <Ionicons name="attach-outline" size={14} color={theme.subtext} />
+                      <FileText size={14} color={theme.subtext} />
                     )}
                     <Text style={styles.attachmentRowText} numberOfLines={1}>
                       {downloadingId === att.id ? 'Opening…' : att.filename}
@@ -432,14 +463,14 @@ export default function StudentAnnouncementScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.titleIcon}>
-              <Ionicons name="megaphone-outline" size={22} color="#ffffff" />
+              <Megaphone size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Announcements</Text>
@@ -466,18 +497,18 @@ export default function StudentAnnouncementScreen() {
 
           {error && (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>Something went wrong</Text>
+              <AlertCircle size={32} color="#ef4444" />
               <Text style={styles.emptyDescription}>{error}</Text>
-              <Pressable style={styles.collegeFilterBtn} onPress={() => fetchAnnouncements(1, selectedFilter)}>
-                <Text style={styles.collegeFilterText}>Retry</Text>
+              <Pressable style={styles.retryBtn} onPress={() => fetchAnnouncements(1, selectedFilter)}>
+                <Text style={styles.retryBtnText}>Retry</Text>
               </Pressable>
             </View>
           )}
 
           {loading && !error && (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyDescription}>Loading announcements…</Text>
+              <SpinningLoader size={28} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Loading announcements…</Text>
             </View>
           )}
 
@@ -486,7 +517,7 @@ export default function StudentAnnouncementScreen() {
           <View>
             {announcements.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="notifications-off-outline" size={32} color={theme.tertiary} />
+                <Megaphone size={32} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>
                   {EMPTY_STATE_COPY[selectedFilter].title}
                 </Text>
@@ -540,7 +571,7 @@ export default function StudentAnnouncementScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
                       {item.label}
                     </Text>
@@ -604,6 +635,9 @@ type ThemePalette = {
   tertiary: string;
   primary: string;
   primaryDark: string;
+  // Web's actual --primary-color (used for active tab text, retry/load-more
+  // accents) -- one shade brighter than `primary`, which mirrors --primary-dark.
+  accent: string;
   iconBtnBg: string;
   iconBtnBorder: string;
 };
@@ -619,6 +653,7 @@ const darkPalette: ThemePalette = {
   tertiary: '#94a3b8',
   primary: '#16a34a',
   primaryDark: '#15803d',
+  accent: '#22c55e',
   iconBtnBg: 'rgba(34, 197, 94, 0.1)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
 };
@@ -634,6 +669,7 @@ const lightPalette: ThemePalette = {
   tertiary: '#64748b',
   primary: '#166534',
   primaryDark: '#14532d',
+  accent: '#15803d',
   iconBtnBg: 'rgba(34, 197, 94, 0.08)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
 };
@@ -748,13 +784,13 @@ function createStyles(theme: ThemePalette) {
       letterSpacing: 0.4,
     },
     tabTextActive: {
-      color: theme.primary,
+      color: theme.accent,
     },
     tabIndicator: {
       marginTop: 8,
       height: 2,
       width: '100%',
-      backgroundColor: theme.primary,
+      backgroundColor: theme.accent,
     },
 
     // College filter
@@ -777,6 +813,18 @@ function createStyles(theme: ThemePalette) {
       color: theme.text,
       marginRight: 8,
     },
+    retryBtn: {
+      marginTop: 6,
+      paddingVertical: 10,
+      paddingHorizontal: 22,
+      borderRadius: 10,
+      backgroundColor: theme.accent,
+    },
+    retryBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
 
     // Section title
     sectionTitle: {
@@ -796,11 +844,11 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 13,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.card,
+      borderColor: theme.accent,
+      backgroundColor: 'transparent',
       marginTop: 12,
     },
-    loadMoreBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
+    loadMoreBtnText: { fontSize: 13, fontWeight: '700', color: theme.accent },
 
     // Card
     card: {
@@ -833,8 +881,14 @@ function createStyles(theme: ThemePalette) {
       justifyContent: 'space-between',
       gap: 8,
     },
-    cardTitle: {
+    cardTitleTextRow: {
       flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    cardTitle: {
+      flexShrink: 1,
       fontSize: 15,
       fontWeight: '700',
       color: theme.text,

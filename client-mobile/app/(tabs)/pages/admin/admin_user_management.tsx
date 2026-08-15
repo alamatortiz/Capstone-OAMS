@@ -16,6 +16,29 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle,
+  Ban,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  FileText,
+  Filter,
+  History,
+  Home as HomeIcon,
+  Key,
+  Pencil,
+  RefreshCw,
+  Search,
+  Trash2,
+  Upload,
+  Users,
+  X,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
@@ -26,8 +49,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -128,18 +149,20 @@ const STATUS_BADGE_TINTS: Record<Status, { bg: string; border: string; color: st
   suspended: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
 };
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 const TABS = [
@@ -389,21 +412,21 @@ export default function AdminUserManagementScreen() {
       title: 'Delete User?',
       description: `Delete ${confirmAction.user.name}? This action cannot be undone.`,
       confirmLabel: 'Delete',
-      icon: 'trash-outline' as IoniconName,
+      icon: Trash2,
       color: '#ef4444',
     },
     reset: {
       title: 'Reset Password?',
       description: `Reset password for ${confirmAction.user.name}? A temporary password will be generated for you to relay to them manually.`,
       confirmLabel: 'Reset Password',
-      icon: 'key-outline' as IoniconName,
+      icon: Key,
       color: '#f59e0b',
     },
     suspend: {
       title: confirmSuspending ? 'Suspend Account?' : 'Reactivate Account?',
       description: `${confirmSuspending ? 'Suspend' : 'Reactivate'} ${confirmAction.user.name}'s account?`,
       confirmLabel: confirmSuspending ? 'Suspend' : 'Reactivate',
-      icon: (confirmSuspending ? 'ban-outline' : 'checkmark-circle-outline') as IoniconName,
+      icon: confirmSuspending ? Ban : CheckCircle,
       color: confirmSuspending ? '#f59e0b' : '#22c55e',
     },
   }[confirmAction.type]);
@@ -438,14 +461,14 @@ export default function AdminUserManagementScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={[theme.primary, theme.success]} style={styles.titleIcon}>
-              <Ionicons name="people-outline" size={22} color="#ffffff" />
+              <Users size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>User Account Management</Text>
@@ -457,7 +480,7 @@ export default function AdminUserManagementScreen() {
           <View style={styles.card}>
             <View style={styles.filterHeaderRow}>
               <View style={styles.filterTitleGroup}>
-                <Ionicons name="filter-outline" size={17} color={theme.text} />
+                <Filter size={17} color={theme.text} />
                 <View>
                   <Text style={styles.cardTitleText}>Filter &amp; Search</Text>
                   <Text style={styles.cardSubtitleText}>Find and filter user accounts</Text>
@@ -467,21 +490,21 @@ export default function AdminUserManagementScreen() {
 
             <View style={styles.filterActionsRow}>
               <Pressable style={styles.smBtn} onPress={() => Alert.alert('Export', 'Export started')}>
-                <Ionicons name="download-outline" size={13} color={theme.subtext} />
+                <Download size={13} color={theme.subtext} />
                 <Text style={styles.smBtnText}>Export</Text>
               </Pressable>
               <Pressable style={styles.smBtn} onPress={() => Alert.alert('Import', 'Import feature coming soon')}>
-                <Ionicons name="cloud-upload-outline" size={13} color={theme.subtext} />
+                <Upload size={13} color={theme.subtext} />
                 <Text style={styles.smBtnText}>Import</Text>
               </Pressable>
               <Pressable style={styles.smBtn} onPress={() => { fetchUsers(); Alert.alert('Refreshed', 'Data refreshed'); }}>
-                <Ionicons name="refresh-outline" size={13} color={theme.subtext} />
+                <RefreshCw size={13} color={theme.subtext} />
                 <Text style={styles.smBtnText}>Refresh</Text>
               </Pressable>
             </View>
 
             <View style={styles.searchWrapper}>
-              <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
+              <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by name, email, or ID..."
@@ -494,11 +517,11 @@ export default function AdminUserManagementScreen() {
             <View style={styles.filterSelectsRow}>
               <Pressable style={styles.filterSelect} onPress={() => setActivePicker('filterRole')}>
                 <Text style={styles.filterSelectText}>{FILTER_ROLE_OPTIONS.find((o) => o.value === filterRole)?.label ?? 'All Roles'}</Text>
-                <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                <ChevronDown size={14} color={theme.tertiary} />
               </Pressable>
               <Pressable style={styles.filterSelect} onPress={() => setActivePicker('filterStatus')}>
                 <Text style={styles.filterSelectText}>{FILTER_STATUS_OPTIONS.find((o) => o.value === filterStatus)?.label ?? 'All Statuses'}</Text>
-                <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                <ChevronDown size={14} color={theme.tertiary} />
               </Pressable>
             </View>
           </View>
@@ -533,7 +556,7 @@ export default function AdminUserManagementScreen() {
               </View>
             ) : error ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <AlertCircle size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>{error}</Text>
                 <Pressable style={styles.smBtn} onPress={fetchUsers}>
                   <Text style={styles.smBtnText}>Retry</Text>
@@ -541,7 +564,7 @@ export default function AdminUserManagementScreen() {
               </View>
             ) : displayUsers.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="people-outline" size={28} color={theme.tertiary} />
+                <Users size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No users found matching your filters.</Text>
               </View>
             ) : (
@@ -577,20 +600,24 @@ export default function AdminUserManagementScreen() {
 
                       <View style={styles.userActionsRow}>
                         <Pressable style={[styles.iconActionBtn, styles.iconActionBtnEdit]} onPress={() => openEditModal(u)} hitSlop={6}>
-                          <Ionicons name="create-outline" size={15} color="#3b82f6" />
+                          <Pencil size={15} color="#3b82f6" />
                         </Pressable>
                         <Pressable
                           style={[styles.iconActionBtn, u.status === 'suspended' ? styles.iconActionBtnReactivate : styles.iconActionBtnSuspend]}
                           onPress={() => setConfirmAction({ type: 'suspend', user: u })}
                           hitSlop={6}
                         >
-                          <Ionicons name={u.status === 'suspended' ? 'checkmark-circle-outline' : 'ban-outline'} size={15} color={u.status === 'suspended' ? theme.primary : '#f59e0b'} />
+                          {u.status === 'suspended' ? (
+                            <CheckCircle size={15} color={theme.primary} />
+                          ) : (
+                            <Ban size={15} color="#f59e0b" />
+                          )}
                         </Pressable>
                         <Pressable style={[styles.iconActionBtn, styles.iconActionBtnKey]} onPress={() => setConfirmAction({ type: 'reset', user: u })} hitSlop={6}>
-                          <Ionicons name="key-outline" size={15} color="#f59e0b" />
+                          <Key size={15} color="#f59e0b" />
                         </Pressable>
                         <Pressable style={[styles.iconActionBtn, styles.iconActionBtnDelete]} onPress={() => setConfirmAction({ type: 'delete', user: u })} hitSlop={6}>
-                          <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                          <Trash2 size={15} color="#ef4444" />
                         </Pressable>
                       </View>
                     </View>
@@ -604,7 +631,7 @@ export default function AdminUserManagementScreen() {
                       onPress={() => setPage((p) => Math.max(0, p - 1))}
                       disabled={safePage === 0}
                     >
-                      <Ionicons name="chevron-back" size={16} color={safePage === 0 ? theme.tertiary : theme.text} />
+                      <ChevronLeft size={16} color={safePage === 0 ? theme.tertiary : theme.text} />
                       <Text style={[styles.pagerBtnText, safePage === 0 && styles.pagerBtnTextDisabled]}>Prev</Text>
                     </Pressable>
                     <Text style={styles.pagerLabel}>
@@ -616,8 +643,7 @@ export default function AdminUserManagementScreen() {
                       disabled={safePage >= totalPages - 1}
                     >
                       <Text style={[styles.pagerBtnText, safePage >= totalPages - 1 && styles.pagerBtnTextDisabled]}>Next</Text>
-                      <Ionicons
-                        name="chevron-forward"
+                      <ChevronRight
                         size={16}
                         color={safePage >= totalPages - 1 ? theme.tertiary : theme.text}
                       />
@@ -652,7 +678,7 @@ export default function AdminUserManagementScreen() {
                 <Text style={styles.detailsModalSubtitle}>Update user account information</Text>
               </View>
               <Pressable onPress={closeFormModal} hitSlop={8}>
-                <Ionicons name="close-outline" size={22} color={theme.text} />
+                <X size={22} color={theme.text} />
               </Pressable>
             </View>
 
@@ -693,7 +719,7 @@ export default function AdminUserManagementScreen() {
                   <Text style={[styles.formSelectText, !form.college && { color: theme.tertiary }]}>
                     {form.college ? collegeLabel(form.college) : 'Select college'}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                  <ChevronDown size={14} color={theme.tertiary} />
                 </Pressable>
               </View>
 
@@ -726,7 +752,7 @@ export default function AdminUserManagementScreen() {
                 <Text style={styles.formLabel}>Status *</Text>
                 <Pressable style={styles.formSelect} onPress={() => setActivePicker('formStatus')}>
                   <Text style={styles.formSelectText}>{STATUS_OPTIONS.find((s) => s.value === form.status)?.label}</Text>
-                  <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                  <ChevronDown size={14} color={theme.tertiary} />
                 </Pressable>
               </View>
             </ScrollView>
@@ -779,7 +805,7 @@ export default function AdminUserManagementScreen() {
           {confirmMeta && (
             <View style={styles.confirmModalCard}>
               <View style={[styles.confirmIconCircle, { backgroundColor: `${confirmMeta.color}26` }]}>
-                <Ionicons name={confirmMeta.icon} size={26} color={confirmMeta.color} />
+                <confirmMeta.icon size={26} color={confirmMeta.color} />
               </View>
               <Text style={styles.confirmTitle}>{confirmMeta.title}</Text>
               <Text style={styles.confirmDescription}>{confirmMeta.description}</Text>
@@ -844,7 +870,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}

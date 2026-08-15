@@ -3,6 +3,8 @@ import type { ComponentProps } from 'react';
 import Toast from 'react-native-toast-message';
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   ImageSourcePropType,
   Modal,
@@ -16,12 +18,36 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, ChevronLeft, ChevronRight, Clock, FileText, GraduationCap,
+  Home as HomeIcon, Loader2, MapPin, Megaphone, User, Users, ClipboardList,
+} from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+
+type LucideIconType = typeof GraduationCap;
+
+// Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
+function SpinningLoader({ size, color }: { size: number; color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -122,16 +148,16 @@ function getDaySchedules(faculty: Faculty) {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 type ViewMode = 'departments' | 'schedules';
@@ -289,14 +315,14 @@ export default function StudentProfessorSchedulesScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={breadcrumb.onPress} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>{breadcrumb.label}</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
-              <Ionicons name="school-outline" size={22} color="#ffffff" />
+              <GraduationCap size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Professor Schedules</Text>
@@ -306,13 +332,14 @@ export default function StudentProfessorSchedulesScreen() {
 
           {loading && (
             <View style={styles.emptyCard}>
+              <SpinningLoader size={28} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>Loading professor schedules…</Text>
             </View>
           )}
 
           {!loading && loadError && (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <AlertCircle size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>{loadError}</Text>
               <Pressable style={styles.drawerNavItem} onPress={fetchSchedules}>
                 <Text style={styles.breadcrumbText}>Retry</Text>
@@ -325,7 +352,7 @@ export default function StudentProfessorSchedulesScreen() {
             <View style={styles.departmentsGrid}>
               {departments.length === 0 && (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+                  <AlertCircle size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No faculty schedules are available yet.</Text>
                 </View>
               )}
@@ -351,7 +378,7 @@ export default function StudentProfessorSchedulesScreen() {
                           {professorCount} {professorCount === 1 ? 'Faculty' : 'Faculty Members'}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color={theme.purple} style={{ opacity: 0.7 }} />
+                      <ChevronRight size={18} color={theme.purple} opacity={0.7} />
                     </View>
                   </Pressable>
                 );
@@ -382,7 +409,7 @@ export default function StudentProfessorSchedulesScreen() {
               <View style={styles.professorsList}>
                 {selectedDepartment.faculty.length === 0 ? (
                   <View style={styles.emptyCard}>
-                    <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+                    <AlertCircle size={32} color={theme.tertiary} />
                     <Text style={styles.emptyTitle}>No faculty members found for this department.</Text>
                   </View>
                 ) : (
@@ -396,14 +423,18 @@ export default function StudentProfessorSchedulesScreen() {
                       >
                         <View style={styles.professorHeader}>
                           <View style={styles.professorAvatar}>
-                            <Ionicons name="person-outline" size={20} color={theme.purple} />
+                            <User size={20} color={theme.purple} />
                           </View>
                           <View style={styles.professorInfo}>
                             <View style={styles.professorNameRow}>
                               <Text style={styles.professorName}>{professor.name}</Text>
-                              {isUnavailable && (
+                              {isUnavailable ? (
                                 <View style={styles.unavailableBadge}>
                                   <Text style={styles.unavailableBadgeText}>Unavailable</Text>
+                                </View>
+                              ) : (
+                                <View style={styles.availableBadge}>
+                                  <Text style={styles.availableBadgeText}>Available</Text>
                                 </View>
                               )}
                             </View>
@@ -417,7 +448,7 @@ export default function StudentProfessorSchedulesScreen() {
                           <Text style={styles.consultationTitle}>Consultation Hours</Text>
                           {isUnavailable ? (
                             <View style={styles.unavailableNotice}>
-                              <Ionicons name="alert-circle-outline" size={18} color="#ef4444" />
+                              <AlertCircle size={18} color="#ef4444" />
                               <Text style={styles.unavailableNoticeText}>
                                 This professor is currently unavailable and is not accepting consultations right now.
                               </Text>
@@ -429,20 +460,20 @@ export default function StudentProfessorSchedulesScreen() {
                               {daySchedules.map(({ day, schedules }) => (
                                 <View key={day} style={styles.dayCard}>
                                   <View style={styles.dayHeaderRow}>
-                                    <Ionicons name="calendar-outline" size={15} color={theme.purple} />
+                                    <Calendar size={15} color={theme.purple} />
                                     <Text style={styles.dayName}>{day}</Text>
                                   </View>
                                   <View style={styles.daySlots}>
                                     {schedules.map((schedule, idx) => (
                                       <View key={idx} style={styles.scheduleSlot}>
                                         <View style={styles.slotDetailRow}>
-                                          <Ionicons name="time-outline" size={14} color={theme.tertiary} />
+                                          <Clock size={14} color={theme.tertiary} />
                                           <Text style={styles.timeRange}>
                                             {schedule.timeStart} – {schedule.timeEnd}
                                           </Text>
                                         </View>
                                         <View style={styles.slotDetailRow}>
-                                          <Ionicons name="location-outline" size={14} color={theme.tertiary} />
+                                          <MapPin size={14} color={theme.tertiary} />
                                           <Text style={styles.locationText}>{schedule.location}</Text>
                                         </View>
                                       </View>
@@ -487,7 +518,7 @@ export default function StudentProfessorSchedulesScreen() {
                   style={styles.drawerNavItem}
                   onPress={() => handleNavPress(item.key)}
                 >
-                  <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                  <item.icon size={18} color={theme.subtext} />
                   <Text style={styles.drawerNavLabel}>{item.label}</Text>
                 </Pressable>
               ))}
@@ -544,6 +575,10 @@ type ThemePalette = {
   success: string;
   purple: string;
   purpleDark: string;
+  deptCardTitleColor: string;
+  cardBadgeBg: string;
+  cardBadgeBorder: string;
+  cardBadgeTextColor: string;
   iconBtnBg: string;
   iconBtnBorder: string;
 };
@@ -563,6 +598,10 @@ const darkPalette: ThemePalette = {
   success: '#10b981',
   purple: '#a855f7',
   purpleDark: '#9333ea',
+  deptCardTitleColor: '#a855f7',
+  cardBadgeBg: 'rgba(168, 85, 247, 0.15)',
+  cardBadgeBorder: 'rgba(168, 85, 247, 0.25)',
+  cardBadgeTextColor: '#a855f7',
   iconBtnBg: 'rgba(34, 197, 94, 0.1)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
 };
@@ -582,6 +621,10 @@ const lightPalette: ThemePalette = {
   success: '#059669',
   purple: '#9333ea',
   purpleDark: '#7c3aed',
+  deptCardTitleColor: '#6d28d9',
+  cardBadgeBg: 'rgba(147, 51, 234, 0.08)',
+  cardBadgeBorder: 'rgba(147, 51, 234, 0.2)',
+  cardBadgeTextColor: '#6d28d9',
   iconBtnBg: 'rgba(34, 197, 94, 0.08)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
 };
@@ -630,14 +673,14 @@ function createStyles(theme: ThemePalette) {
     },
     collegeLogoImg: { width: '100%', height: '100%', padding: 6 },
     cardInfo: { flex: 1, gap: 3 },
-    deptCardTitle: { fontSize: 14, fontWeight: '700', color: theme.purple },
+    deptCardTitle: { fontSize: 14, fontWeight: '700', color: theme.deptCardTitleColor },
     cardAbbrev: { fontSize: 12, color: theme.tertiary },
     cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     cardBadge: {
-      backgroundColor: 'rgba(168, 85, 247, 0.15)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.25)',
+      backgroundColor: theme.cardBadgeBg, borderWidth: 1, borderColor: theme.cardBadgeBorder,
       borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10,
     },
-    cardBadgeText: { fontSize: 11, fontWeight: '600', color: theme.purple },
+    cardBadgeText: { fontSize: 11, fontWeight: '600', color: theme.cardBadgeTextColor },
 
     // Schedules view
     schedulesView: { gap: 20 },
@@ -675,6 +718,11 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8,
     },
     unavailableBadgeText: { fontSize: 9, fontWeight: '700', color: '#ef4444', textTransform: 'uppercase', letterSpacing: 0.3 },
+    availableBadge: {
+      backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
+      borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8,
+    },
+    availableBadgeText: { fontSize: 9, fontWeight: '700', color: theme.success, textTransform: 'uppercase', letterSpacing: 0.3 },
     professorPosition: { fontSize: 12, fontWeight: '600', color: theme.purple, textTransform: 'capitalize' },
     professorSpecialization: { fontSize: 12, color: theme.subtext },
     professorEmail: { fontSize: 11, color: theme.tertiary },

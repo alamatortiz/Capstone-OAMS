@@ -15,12 +15,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, Clock, FileText, Home as HomeIcon,
+  Megaphone, Search, Users, ClipboardList,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
+
+type LucideIconType = typeof ClipboardList;
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -83,16 +89,21 @@ interface Transaction {
   details: string;
 }
 
-const TYPE_META: Record<TxType, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
-  queue: { label: 'queue', icon: 'time-outline', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
-  appointment: { label: 'appointment', icon: 'calendar-outline', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.35)', color: '#a855f7' },
-  document: { label: 'document', icon: 'document-text-outline', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
+const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
+  queue: { label: 'queue', icon: Users, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
+  appointment: { label: 'appointment', icon: Calendar, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.35)', color: '#a855f7' },
+  document: { label: 'document', icon: FileText, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
 };
 
-const STATUS_META: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
+const STATUS_META_DARK: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
   completed: { label: 'completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   ongoing: { label: 'ongoing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
   cancelled: { label: 'cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
+};
+const STATUS_META_LIGHT: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
+  completed: { label: 'completed', bg: 'rgba(5, 150, 105, 0.15)', border: 'rgba(5, 150, 105, 0.3)', color: '#059669' },
+  ongoing: { label: 'ongoing', bg: 'rgba(37, 99, 235, 0.15)', border: 'rgba(37, 99, 235, 0.3)', color: '#2563eb' },
+  cancelled: { label: 'cancelled', bg: 'rgba(220, 38, 38, 0.15)', border: 'rgba(220, 38, 38, 0.3)', color: '#dc2626' },
 };
 
 const formatDateShort = (dateString: string) => {
@@ -103,16 +114,16 @@ const formatDateShort = (dateString: string) => {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 type TypeFilter = 'all' | TxType;
@@ -293,11 +304,11 @@ export default function StudentTransactionsScreen() {
 
   // Search/type/status filtering already happened server-side, so `transactions`
   // is the page to render as-is.
-  const stats: { key: string; label: string; value: number; icon: IoniconName; color: string; bg: string; border: string }[] = [
-    { key: 'total', label: 'Total', value: txStats.total, icon: 'list-outline', color: theme.blue, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)' },
-    { key: 'completed', label: 'Completed', value: txStats.completed, icon: 'checkmark-circle-outline', color: theme.success, bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)' },
-    { key: 'ongoing', label: 'Ongoing', value: txStats.ongoing, icon: 'time-outline', color: theme.orange, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' },
-    { key: 'month', label: 'This Month', value: txStats.thisMonth, icon: 'calendar-outline', color: theme.purple, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)' },
+  const stats: { key: string; label: string; value: number; icon: LucideIconType; color: string; bg: string; border: string }[] = [
+    { key: 'total', label: 'Total', value: txStats.total, icon: ClipboardList, color: theme.blue, bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.2)' },
+    { key: 'completed', label: 'Completed', value: txStats.completed, icon: CheckCircle, color: theme.success, bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 0.2)' },
+    { key: 'ongoing', label: 'Ongoing', value: txStats.ongoing, icon: Clock, color: theme.amber, bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.2)' },
+    { key: 'month', label: 'This Month', value: txStats.thisMonth, icon: Calendar, color: theme.success, bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.2)' },
   ];
 
   const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
@@ -342,14 +353,14 @@ export default function StudentTransactionsScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.titleIcon}>
-              <Ionicons name="trending-up-outline" size={22} color="#ffffff" />
+              <ClipboardList size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Transaction History</Text>
@@ -362,7 +373,7 @@ export default function StudentTransactionsScreen() {
             {stats.map((stat) => (
               <View key={stat.key} style={styles.statCard}>
                 <View style={[styles.statIcon, { backgroundColor: stat.bg, borderColor: stat.border }]}>
-                  <Ionicons name={stat.icon} size={18} color={stat.color} />
+                  <stat.icon size={18} color={stat.color} />
                 </View>
                 <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
@@ -378,7 +389,7 @@ export default function StudentTransactionsScreen() {
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>Search</Text>
               <View style={styles.searchWrapper}>
-                <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
+                <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search transactions..."
@@ -393,7 +404,7 @@ export default function StudentTransactionsScreen() {
               <Text style={styles.filterLabel}>Type</Text>
               <Pressable style={styles.filterSelect} onPress={() => setSelectField('type')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{typeLabel}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
             </View>
 
@@ -401,7 +412,7 @@ export default function StudentTransactionsScreen() {
               <Text style={styles.filterLabel}>Status</Text>
               <Pressable style={styles.filterSelect} onPress={() => setSelectField('status')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>{statusLabel}</Text>
-                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+                <ChevronDown size={16} color={theme.primary} />
               </Pressable>
             </View>
           </View>
@@ -409,35 +420,33 @@ export default function StudentTransactionsScreen() {
           {/* Transaction List */}
           {txLoading ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyDescription}>Loading transactions…</Text>
+              <Search size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Loading transactions…</Text>
             </View>
           ) : txError ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
+              <AlertCircle size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>Could not load transactions</Text>
               <Text style={styles.emptyDescription}>{txError}</Text>
-              <Pressable style={styles.filterSelect} onPress={() => fetchTransactions(1)}>
-                <Text style={styles.filterSelectText}>Retry</Text>
-              </Pressable>
             </View>
           ) : transactions.length > 0 ? (
             <View style={styles.txList}>
               {transactions.map((t) => {
                 const typeMeta = TYPE_META[t.type];
-                const statusMeta = STATUS_META[t.status];
+                const statusMeta = isDarkMode ? STATUS_META_DARK[t.status] : STATUS_META_LIGHT[t.status];
                 return (
                   <View key={t.id} style={[styles.txCard, { borderColor: typeMeta.border }]}>
                     <View style={styles.txHeaderRow}>
-                      <View style={[styles.txIconWrap, { backgroundColor: typeMeta.bg, borderColor: typeMeta.border }]}>
-                        <Ionicons name={typeMeta.icon} size={18} color={typeMeta.color} />
+                      <View style={[styles.txIconWrap, { backgroundColor: typeMeta.color }]}>
+                        <typeMeta.icon size={18} color="#ffffff" />
                       </View>
                       <View style={styles.txTitleSection}>
                         <Text style={styles.txTitle}>{t.title}</Text>
                         <View style={styles.txBadgesRow}>
-                          <View style={[styles.txBadge, { backgroundColor: typeMeta.bg, borderColor: typeMeta.border }]}>
+                          <View style={[styles.txBadge, { backgroundColor: typeMeta.bg }]}>
                             <Text style={[styles.txBadgeText, { color: typeMeta.color }]}>{typeMeta.label}</Text>
                           </View>
-                          <View style={[styles.txBadge, { backgroundColor: statusMeta.bg, borderColor: statusMeta.border }]}>
+                          <View style={[styles.txBadge, { backgroundColor: statusMeta.bg }]}>
                             <Text style={[styles.txBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
                           </View>
                         </View>
@@ -449,11 +458,11 @@ export default function StudentTransactionsScreen() {
 
                     <View style={styles.txMetaRow}>
                       <View style={styles.txMetaItem}>
-                        <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                        <Calendar size={13} color={theme.tertiary} />
                         <Text style={styles.txMetaText}>{formatDateShort(t.date)}</Text>
                       </View>
                       <View style={styles.txMetaItem}>
-                        <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                        <Clock size={13} color={theme.tertiary} />
                         <Text style={styles.txMetaText}>{t.time}</Text>
                       </View>
                     </View>
@@ -463,7 +472,7 @@ export default function StudentTransactionsScreen() {
             </View>
           ) : (
             <View style={styles.emptyCard}>
-              <Ionicons name="search-outline" size={32} color={theme.tertiary} />
+              <ClipboardList size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No Transactions Found</Text>
               <Text style={styles.emptyDescription}>You have no transaction records yet.</Text>
             </View>
@@ -503,7 +512,7 @@ export default function StudentTransactionsScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
                       {item.label}
                     </Text>
@@ -594,6 +603,7 @@ type ThemePalette = {
   blue: string;
   purple: string;
   orange: string;
+  amber: string;
   iconBtnBg: string;
   iconBtnBorder: string;
 };
@@ -615,6 +625,7 @@ const darkPalette: ThemePalette = {
   blue: '#3b82f6',
   purple: '#a855f7',
   orange: '#f97316',
+  amber: '#f59e0b',
   iconBtnBg: 'rgba(34, 197, 94, 0.1)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
 };
@@ -636,6 +647,7 @@ const lightPalette: ThemePalette = {
   blue: '#2563eb',
   purple: '#9333ea',
   orange: '#ea580c',
+  amber: '#d97706',
   iconBtnBg: 'rgba(34, 197, 94, 0.08)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
 };
@@ -786,7 +798,6 @@ function createStyles(theme: ThemePalette) {
       width: 42,
       height: 42,
       borderRadius: 12,
-      borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
@@ -795,7 +806,6 @@ function createStyles(theme: ThemePalette) {
     txTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
     txBadgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     txBadge: {
-      borderWidth: 1,
       borderRadius: 6,
       paddingVertical: 3,
       paddingHorizontal: 8,

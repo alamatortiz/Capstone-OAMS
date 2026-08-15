@@ -14,6 +14,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+  CheckCircle,
+  ChevronLeft,
+  Clock,
+  Database,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Info,
+  RefreshCw,
+  Settings,
+  Users,
+  XCircle,
+  Zap,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -24,8 +43,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -73,25 +90,27 @@ type PinnacleTab = (typeof PINNACLE_TABS)[number];
 type SyncMessageType = 'success' | 'error' | 'warning' | 'info';
 type SyncMessage = { type: SyncMessageType; text: string };
 
-const ALERT_TINTS: Record<SyncMessageType, { bg: string; border: string; color: string; icon: IoniconName }> = {
-  success: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.3)', color: '#4ade80', icon: 'checkmark-circle-outline' },
-  error: { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.3)', color: '#f87171', icon: 'close-circle-outline' },
-  warning: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24', icon: 'alert-circle-outline' },
-  info: { bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.3)', color: '#60a5fa', icon: 'information-circle-outline' },
+type LucideIconType = typeof Clock;
+
+const ALERT_TINTS: Record<SyncMessageType, { bg: string; border: string; color: string; icon: LucideIconType }> = {
+  success: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.3)', color: '#4ade80', icon: CheckCircle },
+  error: { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.3)', color: '#f87171', icon: XCircle },
+  warning: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24', icon: AlertTriangle },
+  info: { bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.3)', color: '#60a5fa', icon: Info },
 };
 
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 export default function AdminPinnacleSyncScreen() {
@@ -241,10 +260,10 @@ export default function AdminPinnacleSyncScreen() {
     { key: 'admins', label: 'Admins', value: syncStats.admins, tint: 'orange' as const },
   ];
 
-  const tabMeta: Record<PinnacleTab, { label: string; icon: IoniconName }> = {
-    configuration: { label: 'Configuration', icon: 'settings-outline' },
-    'sync-control': { label: 'Sync Control', icon: 'sync-outline' },
-    'synced-users': { label: `Synced Users (${syncStats.total})`, icon: 'people-outline' },
+  const tabMeta: Record<PinnacleTab, { label: string; icon: LucideIconType }> = {
+    configuration: { label: 'Configuration', icon: Settings },
+    'sync-control': { label: 'Sync Control', icon: RefreshCw },
+    'synced-users': { label: `Synced Users (${syncStats.total})`, icon: Users },
   };
 
   return (
@@ -275,7 +294,7 @@ export default function AdminPinnacleSyncScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
@@ -284,7 +303,7 @@ export default function AdminPinnacleSyncScreen() {
           <View style={styles.pageHeaderRow}>
             <View style={styles.titleRow}>
               <LinearGradient colors={[theme.primary, theme.success]} style={styles.titleIcon}>
-                <Ionicons name="server-outline" size={22} color="#ffffff" />
+                <Database size={22} color="#ffffff" />
               </LinearGradient>
               <View style={styles.titleTextWrap}>
                 <Text style={styles.pageTitle}>Pinnacle Integration</Text>
@@ -311,7 +330,7 @@ export default function AdminPinnacleSyncScreen() {
               return (
                 <View key={s.key} style={styles.statCard}>
                   <View style={[styles.statIcon, { backgroundColor: tint.bg }]}>
-                    <Ionicons name="people-outline" size={18} color={tint.color} />
+                    <Users size={18} color={tint.color} />
                   </View>
                   <Text style={styles.statLabel}>{s.label}</Text>
                   <Text style={[styles.statValue, { color: tint.color }]}>{s.value}</Text>
@@ -331,7 +350,7 @@ export default function AdminPinnacleSyncScreen() {
                   style={[styles.tabBtn, active && styles.tabBtnActive]}
                   onPress={() => setActiveTab(tab)}
                 >
-                  <Ionicons name={meta.icon} size={14} color={active ? '#ffffff' : theme.subtext} />
+                  <meta.icon size={14} color={active ? '#ffffff' : theme.subtext} />
                   <Text style={[styles.tabBtnText, active && styles.tabBtnTextActive]} numberOfLines={1}>
                     {meta.label}
                   </Text>
@@ -341,17 +360,15 @@ export default function AdminPinnacleSyncScreen() {
           </View>
 
           {/* Alert */}
-          {syncMessage && (
-            <View
-              style={[
-                styles.alert,
-                { backgroundColor: ALERT_TINTS[syncMessage.type].bg, borderColor: ALERT_TINTS[syncMessage.type].border },
-              ]}
-            >
-              <Ionicons name={ALERT_TINTS[syncMessage.type].icon} size={18} color={ALERT_TINTS[syncMessage.type].color} />
-              <Text style={[styles.alertText, { color: ALERT_TINTS[syncMessage.type].color }]}>{syncMessage.text}</Text>
-            </View>
-          )}
+          {syncMessage && (() => {
+            const alertTint = ALERT_TINTS[syncMessage.type];
+            return (
+              <View style={[styles.alert, { backgroundColor: alertTint.bg, borderColor: alertTint.border }]}>
+                <alertTint.icon size={18} color={alertTint.color} />
+                <Text style={[styles.alertText, { color: alertTint.color }]}>{syncMessage.text}</Text>
+              </View>
+            );
+          })()}
 
           {/* Tab: Configuration */}
           {activeTab === 'configuration' && (
@@ -421,11 +438,11 @@ export default function AdminPinnacleSyncScreen() {
 
               <View style={styles.panelActions}>
                 <Pressable style={styles.primaryBtn} onPress={handleSaveConfiguration} disabled={isSaving}>
-                  <Ionicons name="settings-outline" size={15} color="#ffffff" />
+                  <Settings size={15} color="#ffffff" />
                   <Text style={styles.primaryBtnText}>{isSaving ? 'Saving…' : 'Save Configuration'}</Text>
                 </Pressable>
                 <Pressable style={styles.secondaryBtn} onPress={handleTestConnection} disabled={isTesting}>
-                  <Ionicons name={isTesting ? 'refresh-outline' : 'flash-outline'} size={15} color={theme.text} />
+                  {isTesting ? <RefreshCw size={15} color={theme.text} /> : <Zap size={15} color={theme.text} />}
                   <Text style={styles.secondaryBtnText}>{isTesting ? 'Testing...' : 'Test Connection'}</Text>
                 </Pressable>
               </View>
@@ -445,13 +462,13 @@ export default function AdminPinnacleSyncScreen() {
                 onPress={handleSyncNow}
                 disabled={isSyncing}
               >
-                <Ionicons name="sync-outline" size={18} color="#ffffff" />
+                <RefreshCw size={18} color="#ffffff" />
                 <Text style={styles.syncNowBtnText}>{isSyncing ? 'Syncing...' : 'Sync Now from PinnaCle'}</Text>
               </Pressable>
 
               {!syncEnabled && (
                 <View style={[styles.alert, { backgroundColor: ALERT_TINTS.warning.bg, borderColor: ALERT_TINTS.warning.border }]}>
-                  <Ionicons name="alert-circle-outline" size={18} color={ALERT_TINTS.warning.color} />
+                  <AlertTriangle size={18} color={ALERT_TINTS.warning.color} />
                   <Text style={[styles.alertText, { color: ALERT_TINTS.warning.color }]}>
                     PinnaCle sync is currently disabled. Enable it in the Configuration tab to sync user data.
                   </Text>
@@ -462,19 +479,19 @@ export default function AdminPinnacleSyncScreen() {
                 <Text style={styles.howTitle}>How PinnaCle Sync Works</Text>
                 <View style={styles.howList}>
                   <View style={styles.howItem}>
-                    <Ionicons name="arrow-up-outline" size={15} color={theme.primary} />
+                    <ArrowUp size={15} color={theme.primary} />
                     <Text style={styles.howText}>Fetches latest user data from PinnaCle microservice</Text>
                   </View>
                   <View style={styles.howItem}>
-                    <Ionicons name="arrow-down-outline" size={15} color={theme.primary} />
+                    <ArrowDown size={15} color={theme.primary} />
                     <Text style={styles.howText}>Updates OAMS user accounts with PinnaCle information</Text>
                   </View>
                   <View style={styles.howItem}>
-                    <Ionicons name="sync-outline" size={15} color={theme.primary} />
+                    <RefreshCw size={15} color={theme.primary} />
                     <Text style={styles.howText}>Automatically syncs every {syncInterval || '60'} minutes when enabled</Text>
                   </View>
                   <View style={styles.howItem}>
-                    <Ionicons name="checkmark-circle-outline" size={15} color={theme.primary} />
+                    <CheckCircle size={15} color={theme.primary} />
                     <Text style={styles.howText}>PinnaCle becomes the single source of truth for user authentication</Text>
                   </View>
                 </View>
@@ -492,11 +509,11 @@ export default function AdminPinnacleSyncScreen() {
 
               {syncStats.total === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="server-outline" size={32} color={theme.tertiary} />
+                  <Database size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Synced Users</Text>
                   <Text style={styles.emptyDesc}>Go to Sync Control and tap &quot;Sync Now&quot; to import users from PinnaCle.</Text>
                   <Pressable style={[styles.primaryBtn, { marginTop: 12 }]} onPress={() => setActiveTab('sync-control')}>
-                    <Ionicons name="sync-outline" size={15} color="#ffffff" />
+                    <RefreshCw size={15} color="#ffffff" />
                     <Text style={styles.primaryBtnText}>Go to Sync Control</Text>
                   </Pressable>
                 </View>
@@ -582,7 +599,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}

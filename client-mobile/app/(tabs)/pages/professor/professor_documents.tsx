@@ -698,10 +698,7 @@ export default function ProfessorDocumentsScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.requestDialogHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.confirmTitle}>New Document Request</Text>
-                  <Text style={styles.requestDialogSubtitle}>
-                    Submit a request for an official HR/Records document
-                  </Text>
+                  <Text style={styles.confirmTitle}>Request a Document</Text>
                 </View>
                 <Pressable onPress={() => setDialogOpen(false)} hitSlop={8}>
                   <Ionicons name="close" size={20} color={theme.subtext} />
@@ -1234,7 +1231,6 @@ function createStyles(theme: ThemePalette) {
       padding: 22,
     },
     requestDialogHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 18 },
-    requestDialogSubtitle: { fontSize: 12.5, color: theme.subtext, marginTop: 4 },
 
     formGroup: { gap: 8, marginBottom: 16 },
     formLabel: { fontSize: 13.5, fontWeight: '700', color: theme.text },

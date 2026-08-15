@@ -16,6 +16,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Bell, Calendar, CheckCircle, ChevronRight, Clock, FileText, GraduationCap,
+  Home as HomeIcon, Megaphone, Users, ClipboardList,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useQueue } from '@/context/QueueContext';
@@ -24,6 +28,8 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
+
+type LucideIconType = typeof Calendar;
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -99,7 +105,7 @@ interface StatItem {
   title: string;
   value: string;
   description: string;
-  icon: IoniconName;
+  icon: LucideIconType;
   tint: keyof typeof STAT_TINTS;
 }
 
@@ -114,7 +120,7 @@ interface QuickAction {
   key: string;
   title: string;
   description: string;
-  icon: IoniconName;
+  icon: LucideIconType;
   badge?: string;
   badgeTint: keyof typeof BADGE_TINTS;
   gradient: readonly [string, string];
@@ -122,12 +128,13 @@ interface QuickAction {
 
 // This widget only ever shows pinned announcements (see pinnedPreview below),
 // so every entry gets the green "pinned" treatment -- only the icon shape and
-// label still vary by category.
+// label still vary by category. Icons mirror web's getAnnouncementIcon exactly
+// (event -> Calendar, reminder -> Bell, everything else -> AlertCircle).
 const ANNOUNCEMENT_META = {
-  important: { icon: 'alert-circle-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Important' },
-  event: { icon: 'calendar-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Event' },
-  reminder: { icon: 'notifications-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Reminder' },
-  general: { icon: 'alert-circle-outline' as IoniconName, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Notice' },
+  important: { icon: AlertCircle as LucideIconType, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Important' },
+  event: { icon: Calendar as LucideIconType, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Event' },
+  reminder: { icon: Bell as LucideIconType, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Reminder' },
+  general: { icon: AlertCircle as LucideIconType, iconBg: ['#22c55e', '#16a34a'] as const, badgeBg: 'rgba(34, 197, 94, 0.15)', badgeBorder: 'rgba(34, 197, 94, 0.3)', badgeColor: '#22c55e', label: 'Notice' },
 } as const;
 
 interface Announcement {
@@ -140,10 +147,12 @@ interface Announcement {
   category: keyof typeof ANNOUNCEMENT_META;
 }
 
+// Icons mirror web's recent-activity rendering exactly: queue -> QueueIconNav
+// (Users), appointment -> CalendarIconNav (Calendar), document -> FileText.
 const ACTIVITY_META = {
-  queue: { icon: 'time-outline' as IoniconName, bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
-  appointment: { icon: 'calendar-outline' as IoniconName, bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
-  document: { icon: 'document-text-outline' as IoniconName, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
+  queue: { icon: Users as LucideIconType, bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
+  appointment: { icon: Calendar as LucideIconType, bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  document: { icon: FileText as LucideIconType, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
 } as const;
 
 const STATUS_TINT_FALLBACK = { bg: 'rgba(107, 114, 128, 0.15)', color: '#9ca3af' };
@@ -194,16 +203,16 @@ function parseSchedule(hoursStr?: string): { day: string; time: string }[] {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 export default function StudentDashboardScreen() {
@@ -399,7 +408,7 @@ export default function StudentDashboardScreen() {
     {
       key: 'queue', title: 'Queue Position', value: queuePositionValue,
       description: dashLoading ? 'Loading...' : activeQueueCount > 0 ? `Waiting in ${activeQueueCount} queue${activeQueueCount > 1 ? 's' : ''}` : 'No active queues',
-      icon: 'time-outline', tint: 'blue',
+      icon: Clock, tint: 'blue',
     },
     {
       key: 'appointments', title: 'Appointments',
@@ -413,7 +422,7 @@ export default function StudentDashboardScreen() {
         if (approved > 0) parts.push(`${approved} approved`);
         return parts.length ? parts.join(', ') : 'No pending appointments';
       })(),
-      icon: 'calendar-outline', tint: 'purple',
+      icon: Calendar, tint: 'purple',
     },
     {
       key: 'documents', title: 'Documents',
@@ -428,12 +437,12 @@ export default function StudentDashboardScreen() {
         if (docs.released > 0) parts.push(`${docs.released} released`);
         return parts.length ? parts.join(', ') : 'No pending documents';
       })(),
-      icon: 'document-text-outline', tint: 'orange',
+      icon: FileText, tint: 'orange',
     },
     {
       key: 'completed', title: 'Completed',
       value: dashLoading ? '—' : String(dashStats?.stats?.completed ?? 0),
-      description: 'Total transactions', icon: 'checkmark-circle-outline', tint: 'green',
+      description: 'Total transactions', icon: CheckCircle, tint: 'green',
     },
   ];
 
@@ -442,12 +451,12 @@ export default function StudentDashboardScreen() {
   const morePinnedCount = allPinnedAnnouncements.length - pinnedPreview.length;
 
   const quickActions: QuickAction[] = [
-    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: 'megaphone-outline', badge: `${allPinnedAnnouncements.length} Pinned`, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
-    { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check professor consultation hours and availability across all departments.', icon: 'school-outline', badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'queues', title: 'Queues', description: 'Join queues and track your position in real-time.', icon: 'time-outline', badge: `${activeQueueCount} Participating Queues`, badgeTint: 'blue', gradient: ['#3b82f6', '#6366f1'] },
-    { key: 'appointments', title: 'Appointments', description: 'Schedule appointments with professors and view available slots.', icon: 'calendar-outline', badge: `${dashStats?.stats?.appointments?.active ?? 0} Active Bookings`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'document-requests', title: 'Document Requests', description: 'Request documents and track their status.', icon: 'document-text-outline', badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`, badgeTint: 'orange', gradient: ['#f59e0b', '#d97706'] },
-    { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: 'swap-horizontal-outline', badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
+    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: Megaphone, badge: `${allPinnedAnnouncements.length} Pinned`, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
+    { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check professor consultation hours and availability across all departments.', icon: GraduationCap, badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'queues', title: 'Queues', description: 'Join queues and track your position in real-time.', icon: Users, badge: `${activeQueueCount} Participating Queues`, badgeTint: 'blue', gradient: ['#3b82f6', '#6366f1'] },
+    { key: 'appointments', title: 'Appointments', description: 'Schedule appointments with professors and view available slots.', icon: Calendar, badge: `${dashStats?.stats?.appointments?.active ?? 0} Active Bookings`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
+    { key: 'document-requests', title: 'Document Requests', description: 'Request documents and track their status.', icon: FileText, badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`, badgeTint: 'orange', gradient: ['#f59e0b', '#d97706'] },
+    { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: ClipboardList, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
   ];
 
   const recentActivity: ActivityEntry[] = dashStats?.recentActivity ?? [];
@@ -533,7 +542,7 @@ export default function StudentDashboardScreen() {
                     : comingSoon}
                 >
                   <View style={[styles.statIcon, { backgroundColor: tint.bg, borderColor: tint.border }]}>
-                    <Ionicons name={stat.icon} size={20} color={tint.color} />
+                    <stat.icon size={20} color={tint.color} />
                   </View>
                   <Text style={styles.statValue}>{stat.value}</Text>
                   <Text style={styles.statTitle}>{stat.title}</Text>
@@ -568,7 +577,7 @@ export default function StudentDashboardScreen() {
                 <Pressable key={action.key} style={styles.actionCard} onPress={onPress}>
                   <View style={styles.actionMain}>
                     <LinearGradient colors={action.gradient} style={styles.actionIcon}>
-                      <Ionicons name={action.icon} size={24} color="#ffffff" />
+                      <action.icon size={24} color="#ffffff" />
                     </LinearGradient>
                     <View style={styles.actionBody}>
                       {action.badge && (
@@ -587,7 +596,7 @@ export default function StudentDashboardScreen() {
                       <Text style={styles.actionDescription}>{action.description}</Text>
                       <View style={styles.actionCta}>
                         <Text style={styles.actionCtaText}>Open</Text>
-                        <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+                        <ChevronRight size={14} color={theme.primary} />
                       </View>
                     </View>
                   </View>
@@ -600,7 +609,7 @@ export default function StudentDashboardScreen() {
           <Pressable style={styles.card} onPress={() => router.push('/pages/student/student_queue_status')}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardTitleRow}>
-                <Ionicons name="timer-outline" size={18} color={theme.blue} />
+                <Users size={18} color={theme.blue} />
                 <Text style={styles.cardTitleText}>Active Queue</Text>
               </View>
             </View>
@@ -616,7 +625,7 @@ export default function StudentDashboardScreen() {
                 </Text>
                 {closestQueue.slotStatus === 'paused' && (
                   <View style={styles.pausedBadge}>
-                    <Ionicons name="alert-circle-outline" size={13} color="#f59e0b" />
+                    <AlertCircle size={13} color="#f59e0b" />
                     <Text style={styles.pausedBadgeText}>
                       Paused{closestQueue.slotPauseReason ? `: ${closestQueue.slotPauseReason}` : ''}
                     </Text>
@@ -626,7 +635,7 @@ export default function StudentDashboardScreen() {
             ) : (
               <View style={styles.emptyState}>
                 <View style={styles.emptyIcon}>
-                  <Ionicons name="time-outline" size={22} color={theme.blue} />
+                  <Users size={22} color={theme.blue} />
                 </View>
                 <Text style={styles.emptyText}>No Active Queues.</Text>
               </View>
@@ -637,7 +646,7 @@ export default function StudentDashboardScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardTitleRow}>
-                <Ionicons name="megaphone-outline" size={18} color={theme.primary} />
+                <Megaphone size={18} color={theme.primary} />
                 <Text style={styles.cardTitleText}>Pinned Announcements</Text>
               </View>
               <Pressable
@@ -665,7 +674,7 @@ export default function StudentDashboardScreen() {
                         onPress={() => router.push('/pages/student/student_announcement')}
                       >
                         <LinearGradient colors={meta.iconBg} style={styles.announcementIcon}>
-                          <Ionicons name={meta.icon} size={18} color="#ffffff" />
+                          <meta.icon size={18} color="#ffffff" />
                         </LinearGradient>
                         <View style={styles.announcementBody}>
                           <Text style={styles.announcementTitle} numberOfLines={2}>
@@ -742,7 +751,7 @@ export default function StudentDashboardScreen() {
                     ]}
                   >
                     <View style={[styles.activityIcon, { backgroundColor: meta.bg }]}>
-                      <Ionicons name={meta.icon} size={16} color={meta.color} />
+                      <meta.icon size={16} color={meta.color} />
                     </View>
                     <View style={styles.activityBody}>
                       <Text style={styles.activityTitle}>{activity.title}</Text>
@@ -769,7 +778,7 @@ export default function StudentDashboardScreen() {
           >
             <View style={styles.hoursHeaderRow}>
               <View style={styles.hoursTitleRow}>
-                <Ionicons name="time-outline" size={18} color="#ffffff" />
+                <Clock size={18} color="#ffffff" />
                 <Text style={styles.hoursTitle}>Office Hours</Text>
               </View>
               {!officeHoursLoading && officeHours && (
@@ -844,7 +853,7 @@ export default function StudentDashboardScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
                       {item.label}
                     </Text>

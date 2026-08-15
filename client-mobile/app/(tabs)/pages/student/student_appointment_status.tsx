@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   ImageSourcePropType,
   Modal,
@@ -15,6 +17,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, FileText, GraduationCap,
+  Home as HomeIcon, LayoutList, Loader2, Megaphone, Users, XCircle, ClipboardList,
+} from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
@@ -22,6 +28,24 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
+
+// Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
+function SpinningLoader({ size, color }: { size: number; color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -35,6 +59,7 @@ const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+type LucideIconType = typeof Calendar;
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -108,10 +133,13 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
 
 type StatusStyle = { bg: string; border: string; color: string };
 
+// Mirrors AppointmentListItem.css's .apst-badge-* (dark) and
+// [data-theme="light"] .apst-badge-* (light) values exactly -- the same
+// shared badge classes student_appointments.tsx's booking cards use.
 const STATUS_STYLES_DARK: Record<BookingStatus, StatusStyle> = {
   pending: { bg: 'rgba(251, 191, 36, 0.2)', border: 'rgba(251, 191, 36, 0.4)', color: '#fcd34d' },
   approved: { bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.35)', color: '#86efac' },
-  completed: { bg: 'rgba(156, 163, 175, 0.15)', border: 'rgba(156, 163, 175, 0.35)', color: '#e5e7eb' },
+  completed: { bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.35)', color: '#34d399' },
   rejected: { bg: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.35)', color: '#fca5a5' },
   cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#d1d5db' },
 };
@@ -119,7 +147,7 @@ const STATUS_STYLES_DARK: Record<BookingStatus, StatusStyle> = {
 const STATUS_STYLES_LIGHT: Record<BookingStatus, StatusStyle> = {
   pending: { bg: 'rgba(217, 119, 6, 0.1)', border: 'rgba(217, 119, 6, 0.3)', color: '#92400e' },
   approved: { bg: 'rgba(5, 150, 105, 0.1)', border: 'rgba(5, 150, 105, 0.25)', color: '#065f46' },
-  completed: { bg: 'rgba(75, 85, 99, 0.1)', border: 'rgba(75, 85, 99, 0.25)', color: '#1f2937' },
+  completed: { bg: 'rgba(5, 150, 105, 0.1)', border: 'rgba(5, 150, 105, 0.25)', color: '#065f46' },
   rejected: { bg: 'rgba(220, 38, 38, 0.08)', border: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' },
   cancelled: { bg: 'rgba(107, 114, 128, 0.08)', border: 'rgba(107, 114, 128, 0.2)', color: '#374151' },
 };
@@ -127,16 +155,16 @@ const STATUS_STYLES_LIGHT: Record<BookingStatus, StatusStyle> = {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 type TabKey = 'all' | BookingStatus;
@@ -164,13 +192,13 @@ function filterByRange<T extends { date: string }>(items: T[], rangeKey: RangeKe
   });
 }
 
-const TABS: { key: TabKey; label: string; icon: IoniconName }[] = [
-  { key: 'all', label: 'All', icon: 'list-outline' },
-  { key: 'pending', label: 'Pending', icon: 'time-outline' },
-  { key: 'approved', label: 'Approved', icon: 'checkmark-circle-outline' },
-  { key: 'completed', label: 'Completed', icon: 'checkmark-circle-outline' },
-  { key: 'rejected', label: 'Rejected', icon: 'close-circle-outline' },
-  { key: 'cancelled', label: 'Cancelled', icon: 'close-circle-outline' },
+const TABS: { key: TabKey; label: string; icon: LucideIconType }[] = [
+  { key: 'all', label: 'All', icon: LayoutList },
+  { key: 'pending', label: 'Pending', icon: Clock },
+  { key: 'approved', label: 'Approved', icon: CheckCircle },
+  { key: 'completed', label: 'Completed', icon: CheckCircle },
+  { key: 'rejected', label: 'Rejected', icon: XCircle },
+  { key: 'cancelled', label: 'Cancelled', icon: XCircle },
 ];
 
 const formatDate = (dateString: string) => {
@@ -359,13 +387,13 @@ export default function StudentAppointmentStatusScreen() {
                 }
                 hitSlop={8}
               >
-                <Ionicons name="chevron-back" size={18} color={theme.subtext} />
-                <Text style={styles.breadcrumbText}>My Appointments</Text>
+                <ChevronLeft size={18} color={theme.subtext} />
+                <Text style={styles.breadcrumbText}>{params.fromBookings === 'true' ? 'Appointments' : 'My Appointments'}</Text>
               </Pressable>
 
               <View style={styles.titleRow}>
                 <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
-                  <Ionicons name="calendar-outline" size={22} color="#ffffff" />
+                  <Calendar size={22} color="#ffffff" />
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>Appointment Details</Text>
@@ -389,8 +417,8 @@ export default function StudentAppointmentStatusScreen() {
               {/* Appointment Information */}
               <View style={styles.infoCard}>
                 <View style={styles.infoCardHeader}>
-                  <Ionicons name="calendar-outline" size={18} color={theme.purple} />
-                  <Text style={styles.infoCardTitle}>Appointment Information</Text>
+                  <Calendar size={18} color={theme.purple} />
+                  <Text style={styles.infoCardTitle}>Appointment Details</Text>
                 </View>
                 <View style={styles.infoCardBody}>
                   <View style={styles.detailRow}>
@@ -440,7 +468,7 @@ export default function StudentAppointmentStatusScreen() {
               {/* Status */}
               <View style={styles.infoCard}>
                 <View style={styles.infoCardHeader}>
-                  <Ionicons name="alert-circle-outline" size={18} color={theme.purple} />
+                  <AlertCircle size={18} color={theme.purple} />
                   <Text style={styles.infoCardTitle}>Status</Text>
                   <View style={{ flex: 1 }} />
                   <View style={[styles.statusBadge, {
@@ -458,7 +486,7 @@ export default function StudentAppointmentStatusScreen() {
               {(selectedAppt.status === 'pending' || selectedAppt.status === 'approved') && (
                 <View style={[styles.infoCard, styles.cancelCard]}>
                   <View style={[styles.infoCardHeader, styles.cancelCardHeader]}>
-                    <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
+                    <XCircle size={18} color="#ef4444" />
                     <Text style={[styles.infoCardTitle, { color: '#ef4444' }]}>Cancel Appointment</Text>
                   </View>
                   <View style={styles.infoCardBody}>
@@ -466,7 +494,7 @@ export default function StudentAppointmentStatusScreen() {
                       Cancelling will permanently remove this appointment. You will need to book a new one if you change your mind.
                     </Text>
                     <Pressable style={styles.cancelBtn} onPress={() => setCancelConfirmId(selectedAppt.id)}>
-                      <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+                      <XCircle size={16} color="#ef4444" />
                       <Text style={styles.cancelBtnText}>Cancel Appointment</Text>
                     </Pressable>
                   </View>
@@ -477,13 +505,13 @@ export default function StudentAppointmentStatusScreen() {
             // ─── List View ───
             <>
               <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-                <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+                <ChevronLeft size={18} color={theme.subtext} />
                 <Text style={styles.breadcrumbText}>Home</Text>
               </Pressable>
 
               <View style={styles.titleRow}>
                 <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
-                  <Ionicons name="calendar-outline" size={22} color="#ffffff" />
+                  <Calendar size={22} color="#ffffff" />
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>My Appointments</Text>
@@ -502,28 +530,25 @@ export default function StudentAppointmentStatusScreen() {
                 }
               >
                 <LinearGradient colors={['#7c3aed', '#a855f7']} style={styles.profSchedIcon}>
-                  <Ionicons name="school-outline" size={22} color="#ffffff" />
+                  <GraduationCap size={22} color="#ffffff" />
                 </LinearGradient>
                 <View style={styles.profSchedText}>
                   <Text style={styles.profSchedTitle}>Professor Schedules</Text>
                   <Text style={styles.profSchedSubtitle}>Check professor consultation hours and availability across all departments.</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={theme.purple} />
+                <ChevronRight size={18} color={theme.purple} opacity={0.7} />
               </Pressable>
 
               {error && (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
-                  <Text style={styles.emptyTitle}>Something went wrong</Text>
+                  <AlertCircle size={32} color="#ef4444" />
                   <Text style={styles.emptyDescription}>{error}</Text>
-                  <Pressable style={styles.bookCtaBtn} onPress={fetchAppointments}>
-                    <Text style={styles.bookCtaBtnText}>Retry</Text>
-                  </Pressable>
                 </View>
               )}
 
               {loading && !error && (
                 <View style={styles.emptyCard}>
+                  <SpinningLoader size={28} color={theme.tertiary} />
                   <Text style={styles.emptyDescription}>Loading your appointments…</Text>
                 </View>
               )}
@@ -537,7 +562,7 @@ export default function StudentAppointmentStatusScreen() {
                     const active = activeTab === tab.key;
                     return (
                       <Pressable key={tab.key} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab.key)}>
-                        <Ionicons name={tab.icon} size={14} color={active ? theme.purple : theme.subtext} />
+                        <tab.icon size={14} color={active ? theme.purple : theme.subtext} />
                         <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
                         <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabLists[tab.key].length}</Text></View>
                       </Pressable>
@@ -578,7 +603,7 @@ export default function StudentAppointmentStatusScreen() {
                       >
                         <View style={styles.listItemHeaderRow}>
                           <View style={[styles.listIconWrap, isDim && styles.listIconWrapDim]}>
-                            <Ionicons name="calendar-outline" size={22} color={isDim ? theme.tertiary : theme.purple} />
+                            <Calendar size={22} color={isDim ? theme.tertiary : theme.purple} />
                           </View>
                           <View style={styles.listItemTitleWrap}>
                             <Text style={[styles.listItemName, isDim && styles.listItemNameDim]}>{appt.person}</Text>
@@ -622,9 +647,9 @@ export default function StudentAppointmentStatusScreen() {
                 </View>
               ) : (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
+                  <Calendar size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>
-                    {activeTab === 'all' ? 'No Appointments Yet' : `No ${TABS.find((t) => t.key === activeTab)?.label} Appointments`}
+                    {activeTab === 'all' ? 'No Appointments Booked' : `No ${TABS.find((t) => t.key === activeTab)?.label} Appointments`}
                   </Text>
                   <Text style={styles.emptyDescription}>
                     {activeTab === 'all'
@@ -634,8 +659,10 @@ export default function StudentAppointmentStatusScreen() {
                         : `You have no records of ${activeTab} appointments.`}
                   </Text>
                   {(activeTab === 'all' || activeTab === 'pending') && (
-                    <Pressable style={styles.bookCtaBtn} onPress={goToBooking}>
-                      <Text style={styles.bookCtaBtnText}>Book an Appointment</Text>
+                    <Pressable onPress={goToBooking}>
+                      <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.bookCtaBtn}>
+                        <Text style={styles.bookCtaBtnText}>Book an Appointment</Text>
+                      </LinearGradient>
                     </Pressable>
                   )}
                 </View>
@@ -673,7 +700,7 @@ export default function StudentAppointmentStatusScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                   </Pressable>
                 );
@@ -694,7 +721,7 @@ export default function StudentAppointmentStatusScreen() {
         <View style={styles.logoutOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconCircle}>
-              <Ionicons name="calendar-outline" size={26} color="#ef4444" />
+              <XCircle size={26} color="#ef4444" />
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Appointment?</Text>
             <Text style={styles.logoutModalDescription}>
@@ -707,7 +734,6 @@ export default function StudentAppointmentStatusScreen() {
                 <Text style={styles.logoutCancelBtnText}>Keep Appointment</Text>
               </Pressable>
               <Pressable style={styles.logoutConfirmBtn} onPress={doCancel} disabled={cancelling === cancelConfirmId}>
-                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
                 <Text style={styles.logoutConfirmBtnText}>{cancelling === cancelConfirmId ? 'Cancelling…' : 'Cancel Appointment'}</Text>
               </Pressable>
             </View>
@@ -874,7 +900,7 @@ function createStyles(theme: ThemePalette) {
     },
     emptyTitle: { fontSize: 15, fontWeight: '700', color: theme.text, textAlign: 'center' },
     emptyDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', lineHeight: 18 },
-    bookCtaBtn: { marginTop: 6, backgroundColor: theme.purple, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
+    bookCtaBtn: { marginTop: 6, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
     bookCtaBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
 
     // List

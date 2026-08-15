@@ -16,6 +16,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, Download, FileText, Home as HomeIcon,
+  Megaphone, Plus, Users, X, XCircle, ClipboardList,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -31,6 +35,7 @@ const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+type LucideIconType = typeof FileText;
 
 function OamsLogo({
   style,
@@ -119,25 +124,25 @@ const formatDateShort = (dateString?: string) => {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
-const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
-  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
-  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
-  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
-  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+const TAB_META: Record<TabKey, { label: string; icon: LucideIconType }> = {
+  active: { label: 'Active Requests', icon: AlertCircle },
+  claimed: { label: 'Claimed', icon: CheckCircle },
+  rejected: { label: 'Rejected', icon: XCircle },
+  cancelled: { label: 'Cancelled', icon: XCircle },
 };
 type SelectField = 'college' | 'type' | null;
 
@@ -158,6 +163,7 @@ export default function StudentDocumentsScreen() {
 
   const [collegesFromDB, setCollegesFromDB] = useState<CollegeOption[]>([]);
   const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, DocumentTypeOption[]>>({});
+  const [formOptionsLoading, setFormOptionsLoading] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -225,12 +231,15 @@ export default function StudentDocumentsScreen() {
 
   useEffect(() => {
     const fetchServiceTypes = async () => {
+      setFormOptionsLoading(true);
       try {
         const { data } = await api.get('/student/documents/service-types');
         setCollegesFromDB(data.departments ?? []);
         setServicesByDepartmentId(data.servicesByDepartmentId ?? {});
       } catch (err) {
         console.error('Failed to fetch document service types:', err);
+      } finally {
+        setFormOptionsLoading(false);
       }
     };
     fetchServiceTypes();
@@ -318,12 +327,19 @@ export default function StudentDocumentsScreen() {
 
   const selectedCollegeId = collegesFromDB.find((c) => c.name === formData.college)?.id;
   const availableTypes = selectedCollegeId != null ? servicesByDepartmentId[selectedCollegeId] ?? [] : [];
+  const hasServicesForCollege = availableTypes.length > 0;
   const selectOptions = selectField === 'college'
     ? collegesFromDB.map((c) => ({ value: c.name, label: `${c.name} (${c.abbrev})` }))
     : availableTypes.map((type) => ({ value: type.name, label: type.name }));
   const selectTitle = selectField === 'college' ? 'Select College' : 'Select Document Type';
   const selectCurrentValue = selectField === 'college' ? formData.college : formData.type;
   const selectedTypeDetails = availableTypes.find((t) => t.name === formData.type);
+  const collegePlaceholder = formOptionsLoading ? 'Loading colleges…' : 'Select college';
+  const typePlaceholder = !formData.college
+    ? 'Select a college first'
+    : !hasServicesForCollege
+      ? 'No Documents Available'
+      : 'Select document type';
 
   const chooseOption = (value: string) => {
     if (selectField === 'college') setFormData((f) => ({ ...f, college: value, type: '' }));
@@ -334,34 +350,35 @@ export default function StudentDocumentsScreen() {
   const goToDocumentStatus = (doc: DocumentRequest) => {
     router.push({
       pathname: '/pages/student/student_document_status',
-      params: { docId: doc.id },
+      params: { docId: doc.id, from: 'documents' },
     });
   };
 
   const renderDocumentCard = (doc: DocumentRequest, completed: boolean) => {
-    const meta = getHubStatusMeta(doc.status);
+    const meta = getHubStatusMeta(doc.status, isDarkMode);
     return (
       <Pressable key={doc.id} onPress={() => goToDocumentStatus(doc)} style={[styles.docCard, completed && styles.docCardCompleted]}>
         <View style={styles.docCardHeader}>
           <View style={[styles.docIconWrap, completed && styles.docIconWrapCompleted]}>
-            <Ionicons name="document-text-outline" size={22} color={completed ? theme.tertiary : theme.orange} />
+            <FileText size={22} color={completed ? theme.tertiary : theme.orange} />
           </View>
           <View style={styles.docTitleSection}>
             <Text style={styles.docTitle}>{doc.type}</Text>
-            <Text style={styles.docCollege}>{doc.college}</Text>
-            {completed ? (
-              <Text style={styles.docTracking}>
-                {formatDateShort(doc.status === 'claimed' ? doc.claimedDate : doc.requestDate)} • {doc.trackingNumber}
-              </Text>
-            ) : (
-              <Text style={styles.docTracking}>
-                Tracking: <Text style={styles.docTrackingValue}>{doc.trackingNumber}</Text>
-              </Text>
+            <Text style={styles.docCollege}>
+              {doc.college}
+              {completed && doc.status !== 'claimed' ? ` • ${formatDateShort(doc.requestDate)}` : ''}
+            </Text>
+            {doc.status === 'claimed' && doc.claimedDate && (
+              <Text style={styles.docCollege}>{formatDateLong(doc.claimedDate)}</Text>
             )}
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-            <Ionicons name={meta.icon} size={12} color={meta.color} />
-            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+          <View style={styles.docHeaderRight}>
+            <View style={styles.trackingPill}>
+              <Text style={styles.trackingPillText}>{doc.trackingNumber}</Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+              <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+            </View>
           </View>
         </View>
 
@@ -397,7 +414,7 @@ export default function StudentDocumentsScreen() {
 
             {(doc.status === 'ready' || doc.status === 'released') && (
               <Pressable style={styles.claimBtn} onPress={(e: any) => { e.stopPropagation?.(); goToDocumentStatus(doc); }}>
-                <Ionicons name="download-outline" size={16} color="#ffffff" />
+                <Download size={16} color={theme.primary} />
                 <Text style={styles.claimBtnText}>View Pickup Details</Text>
               </Pressable>
             )}
@@ -408,7 +425,7 @@ export default function StudentDocumentsScreen() {
                 onPress={(e: any) => { e.stopPropagation?.(); setCancelTarget(doc); }}
                 disabled={cancellingId === doc.id}
               >
-                <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+                <XCircle size={16} color="#ef4444" />
                 <Text style={styles.cancelBtnText}>{cancellingId === doc.id ? 'Cancelling…' : 'Cancel Request'}</Text>
               </Pressable>
             )}
@@ -448,14 +465,20 @@ export default function StudentDocumentsScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
+
+          {docsError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{docsError}</Text>
+            </View>
+          )}
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
-              <Ionicons name="document-text-outline" size={22} color="#ffffff" />
+              <FileText size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Document Requests</Text>
@@ -464,9 +487,11 @@ export default function StudentDocumentsScreen() {
           </View>
 
           {/* Request Document button */}
-          <Pressable style={styles.requestBtn} onPress={openDialog}>
-            <Ionicons name="add-outline" size={18} color="#ffffff" />
-            <Text style={styles.requestBtnText}>Request Document</Text>
+          <Pressable onPress={openDialog}>
+            <LinearGradient colors={['#f97316', '#ea580c']} style={styles.requestBtn}>
+              <Plus size={18} color="#ffffff" />
+              <Text style={styles.requestBtnText}>Request Document</Text>
+            </LinearGradient>
           </Pressable>
 
           {/* Tabs */}
@@ -478,9 +503,10 @@ export default function StudentDocumentsScreen() {
           >
             {TABS.map((tab) => {
               const active = activeTab === tab;
+              const TabIcon = TAB_META[tab].icon;
               return (
                 <Pressable key={tab} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab)}>
-                  <Ionicons name={TAB_META[tab].icon} size={15} color={active ? theme.orange : theme.subtext} />
+                  <TabIcon size={15} color={active ? theme.orange : theme.subtext} />
                   <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_META[tab].label}</Text>
                   <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabCounts[tab]}</Text></View>
                 </Pressable>
@@ -488,29 +514,19 @@ export default function StudentDocumentsScreen() {
             })}
           </ScrollView>
 
-          {docsError && (
+          {docsLoading && (
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>Something went wrong</Text>
-              <Text style={styles.emptyDescription}>{docsError}</Text>
-              <Pressable style={styles.requestBtn} onPress={fetchDocuments}>
-                <Text style={styles.requestBtnText}>Retry</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {docsLoading && !docsError && (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyDescription}>Loading documents…</Text>
+              <FileText size={32} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>Loading documents...</Text>
             </View>
           )}
 
           {/* Active Tab */}
-          {!docsLoading && !docsError && activeTab === 'active' && (
+          {!docsLoading && activeTab === 'active' && (
             <View style={styles.tabPanel}>
               {activeDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                  <FileText size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Active Requests</Text>
                   <Text style={styles.emptyDescription}>You have no active document requests.</Text>
                 </View>
@@ -523,11 +539,11 @@ export default function StudentDocumentsScreen() {
           )}
 
           {/* Claimed Tab */}
-          {!docsLoading && !docsError && activeTab === 'claimed' && (
+          {!docsLoading && activeTab === 'claimed' && (
             <View style={styles.tabPanel}>
               {claimedDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                  <CheckCircle size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Completed Requests</Text>
                   <Text style={styles.emptyDescription}>You have no records of claimed documents.</Text>
                 </View>
@@ -540,11 +556,11 @@ export default function StudentDocumentsScreen() {
           )}
 
           {/* Rejected Tab */}
-          {!docsLoading && !docsError && activeTab === 'rejected' && (
+          {!docsLoading && activeTab === 'rejected' && (
             <View style={styles.tabPanel}>
               {rejectedDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                  <XCircle size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Rejected Requests</Text>
                   <Text style={styles.emptyDescription}>You have no records of rejected document requests.</Text>
                 </View>
@@ -557,11 +573,11 @@ export default function StudentDocumentsScreen() {
           )}
 
           {/* Cancelled Tab */}
-          {!docsLoading && !docsError && activeTab === 'cancelled' && (
+          {!docsLoading && activeTab === 'cancelled' && (
             <View style={styles.tabPanel}>
               {cancelledDocuments.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                  <XCircle size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
                   <Text style={styles.emptyDescription}>You have no records of cancelled document requests.</Text>
                 </View>
@@ -601,7 +617,7 @@ export default function StudentDocumentsScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                   </Pressable>
                 );
@@ -623,30 +639,34 @@ export default function StudentDocumentsScreen() {
           <View style={styles.dialogCard}>
             <View style={styles.dialogHeaderRow}>
               <View>
-                <Text style={styles.dialogHeaderTitle}>New Document Request</Text>
+                <Text style={styles.dialogHeaderTitle}>Request a Document</Text>
               </View>
               <Pressable onPress={() => setDialogOpen(false)} hitSlop={8}>
-                <Ionicons name="close" size={20} color={theme.subtext} />
+                <X size={20} color={theme.subtext} />
               </Pressable>
             </View>
             <ScrollView style={styles.dialogBody}>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>College</Text>
-                <Pressable style={styles.formSelect} onPress={() => setSelectField('college')}>
-                  <Text style={styles.formSelectText} numberOfLines={1}>
-                    {formData.college || 'Select college'}
+                <Pressable style={styles.formSelect} onPress={() => setSelectField('college')} disabled={formOptionsLoading}>
+                  <Text style={formData.college ? styles.formSelectText : styles.formSelectPlaceholder} numberOfLines={1}>
+                    {formData.college || collegePlaceholder}
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color={theme.orange} />
+                  <ChevronDown size={16} color={theme.orange} />
                 </Pressable>
               </View>
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Document Type</Text>
-                <Pressable style={styles.formSelect} onPress={() => setSelectField('type')}>
-                  <Text style={styles.formSelectText} numberOfLines={1}>
-                    {formData.type || 'Select document type'}
+                <Pressable
+                  style={styles.formSelect}
+                  onPress={() => setSelectField('type')}
+                  disabled={formOptionsLoading || !formData.college || !hasServicesForCollege}
+                >
+                  <Text style={formData.type ? styles.formSelectText : styles.formSelectPlaceholder} numberOfLines={1}>
+                    {formData.type || typePlaceholder}
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color={theme.orange} />
+                  <ChevronDown size={16} color={theme.orange} />
                 </Pressable>
               </View>
 
@@ -689,26 +709,12 @@ export default function StudentDocumentsScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Purpose</Text>
-                <TextInput
-                  style={styles.textarea}
-                  placeholder="Specify the purpose of your request"
-                  placeholderTextColor={theme.tertiary}
-                  value={formData.purpose}
-                  onChangeText={(v) => setFormData((f) => ({ ...f, purpose: v }))}
-                  multiline
-                  numberOfLines={3}
-                  maxLength={255}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Needed By (optional)</Text>
+                <Text style={styles.formLabel}>Date Needed (Optional)</Text>
                 <Pressable style={styles.formSelect} onPress={() => setShowNeededByPicker(true)}>
                   <Text style={formData.neededBy ? styles.formSelectText : styles.formSelectPlaceholder}>
                     {formData.neededBy || 'Select a date'}
                   </Text>
-                  <Ionicons name="calendar-outline" size={16} color={theme.orange} />
+                  <Calendar size={16} color={theme.orange} />
                 </Pressable>
                 {showNeededByPicker && (
                   <DateTimePicker
@@ -724,13 +730,29 @@ export default function StudentDocumentsScreen() {
                   />
                 )}
               </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Purpose</Text>
+                <TextInput
+                  style={styles.textarea}
+                  placeholder="Specify the purpose of your request"
+                  placeholderTextColor={theme.tertiary}
+                  value={formData.purpose}
+                  onChangeText={(v) => setFormData((f) => ({ ...f, purpose: v }))}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={255}
+                />
+              </View>
             </ScrollView>
             <View style={styles.dialogActions}>
               <Pressable style={styles.btnSecondary} onPress={() => setDialogOpen(false)} disabled={submitting}>
                 <Text style={styles.btnSecondaryText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.btnPrimary} onPress={handleSubmitRequest} disabled={submitting}>
-                <Text style={styles.btnPrimaryText}>{submitting ? 'Submitting…' : 'Submit Request'}</Text>
+              <Pressable onPress={handleSubmitRequest} disabled={submitting}>
+                <LinearGradient colors={['#f97316', '#ea580c']} style={styles.btnPrimary}>
+                  <Text style={styles.btnPrimaryText}>{submitting ? 'Submitting...' : 'Submit Request'}</Text>
+                </LinearGradient>
               </Pressable>
             </View>
           </View>
@@ -771,7 +793,7 @@ export default function StudentDocumentsScreen() {
         <View style={styles.logoutOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconCircle}>
-              <Ionicons name="document-text-outline" size={26} color="#ef4444" />
+              <XCircle size={26} color="#ef4444" />
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
@@ -783,7 +805,6 @@ export default function StudentDocumentsScreen() {
                 <Text style={styles.logoutCancelBtnText}>Keep Request</Text>
               </Pressable>
               <Pressable style={styles.logoutConfirmBtn} onPress={doCancelRequest} disabled={cancellingId === cancelTarget?.id}>
-                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
                 <Text style={styles.logoutConfirmBtnText}>
                   {cancellingId === cancelTarget?.id ? 'Cancelling…' : 'Cancel Request'}
                 </Text>
@@ -914,9 +935,16 @@ function createStyles(theme: ThemePalette) {
     // Request button
     requestBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      backgroundColor: theme.orange, paddingVertical: 14, borderRadius: 14, alignSelf: 'flex-start', paddingHorizontal: 20,
+      paddingVertical: 14, borderRadius: 14, alignSelf: 'flex-start', paddingHorizontal: 20,
     },
     requestBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+
+    // Error banner
+    errorBanner: {
+      backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
+      borderRadius: 12, paddingVertical: 14, paddingHorizontal: 20,
+    },
+    errorBannerText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
 
     // Tabs
     tabsRow: { flexDirection: 'row', gap: 8, borderBottomWidth: 2, borderBottomColor: theme.border },
@@ -962,8 +990,13 @@ function createStyles(theme: ThemePalette) {
     docTracking: { fontSize: 11, color: theme.tertiary },
     docTrackingValue: { fontWeight: '700', color: theme.success },
 
+    docHeaderRight: { alignItems: 'flex-end', gap: 6, flexShrink: 0 },
+    trackingPill: {
+      backgroundColor: theme.orange, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12,
+    },
+    trackingPillText: { fontSize: 11, fontWeight: '700', color: '#ffffff', textTransform: 'uppercase' },
+
     statusBadge: {
-      flexDirection: 'row', alignItems: 'center', gap: 4,
       paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, flexShrink: 0,
     },
     statusBadgeText: { fontSize: 10, fontWeight: '700' },
@@ -983,14 +1016,13 @@ function createStyles(theme: ThemePalette) {
 
     claimBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      paddingVertical: 12, borderRadius: 12, backgroundColor: theme.primary,
+      paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
     },
-    claimBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    claimBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
 
     cancelBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(239, 68, 68, 0.35)',
-      backgroundColor: 'rgba(239, 68, 68, 0.05)',
+      paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
     },
     cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
 
@@ -1070,7 +1102,6 @@ function createStyles(theme: ThemePalette) {
       padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border,
     },
     dialogHeaderTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    dialogHeaderSubtitle: { fontSize: 12, color: theme.tertiary, marginTop: 4 },
     dialogBody: { padding: 18 },
     formGroup: { gap: 8, marginBottom: 16 },
     formLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
@@ -1093,7 +1124,7 @@ function createStyles(theme: ThemePalette) {
       flexDirection: 'row', gap: 10, justifyContent: 'flex-end',
       padding: 18, borderTopWidth: 1, borderTopColor: theme.border,
     },
-    btnPrimary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12, backgroundColor: theme.orange },
+    btnPrimary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12 },
     btnPrimaryText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
     btnSecondary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12, borderWidth: 1, borderColor: theme.border },
     btnSecondaryText: { fontSize: 13, fontWeight: '700', color: theme.subtext },

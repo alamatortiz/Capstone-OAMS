@@ -1,5 +1,5 @@
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { HelpCircle } from 'lucide-react-native';
 
 // Prompts the student for an optional concern before joining a queue.
 // Unlike QueueReasonModal (admin pause/stop/skip reasons, required text),
@@ -49,11 +49,13 @@ export default function QueueConcernModal({
       <View style={styles.logoutOverlay}>
         <View style={styles.logoutModalCard}>
           <View style={[styles.logoutIconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-            <Ionicons name="help-circle-outline" size={26} color="#3b82f6" />
+            <HelpCircle size={26} color="#3b82f6" />
           </View>
           <Text style={styles.logoutModalTitle}>What&apos;s your concern?</Text>
           {serviceName && (
-            <Text style={styles.logoutModalDescription}>Joining the {serviceName} queue.</Text>
+            <Text style={styles.logoutModalDescription}>
+              Joining the queue for {serviceName}. Let the staff know why you&apos;re here — this step is optional.
+            </Text>
           )}
           <TextInput
             style={styles.concernInput}

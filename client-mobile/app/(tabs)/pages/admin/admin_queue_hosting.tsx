@@ -15,6 +15,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle,
+  Calendar,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  FileText,
+  History,
+  Home as HomeIcon,
+  Pause,
+  Play,
+  Plus,
+  Search,
+  X,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
@@ -34,8 +50,6 @@ const coedLogo = require('@/assets/COED.png');
 const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -91,18 +105,20 @@ function OamsLogo({
 // 'closed' means exclusively "an admin manually stopped this queue".
 type QueueStatus = 'open' | 'paused' | 'full' | 'expired' | 'completed' | 'closed';
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 const STATUS_TINTS: Record<QueueStatus, { bg: string; border: string; color: string }> = {
@@ -115,11 +131,11 @@ const STATUS_TINTS: Record<QueueStatus, { bg: string; border: string; color: str
 };
 
 const STAT_TINTS = {
-  active: { border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6', icon: 'play' as IoniconName },
-  paused: { border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: 'pause' as IoniconName },
-  stillServing: { border: 'rgba(249, 115, 22, 0.35)', color: '#f97316', icon: 'time-outline' as IoniconName },
-  completed: { border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: 'checkmark-circle-outline' as IoniconName },
-  closed: { border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: 'close' as IoniconName },
+  active: { border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6', icon: Play },
+  paused: { border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: Pause },
+  stillServing: { border: 'rgba(249, 115, 22, 0.35)', color: '#f97316', icon: Clock },
+  completed: { border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: Check },
+  closed: { border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444', icon: X },
 } as const;
 
 const STATUS_FILTER_OPTIONS = [
@@ -395,13 +411,13 @@ export default function AdminQueueHostingScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
             <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.titleIcon}>
-              <Ionicons name="time-outline" size={22} color="#ffffff" />
+              <Clock size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Queue Hosting Management</Text>
@@ -419,7 +435,7 @@ export default function AdminQueueHostingScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.openQueueBtn}
             >
-              <Ionicons name="add" size={18} color="#ffffff" />
+              <Plus size={18} color="#ffffff" />
               <Text style={styles.openQueueBtnText}>Open Queue Line</Text>
             </LinearGradient>
           </Pressable>
@@ -443,7 +459,7 @@ export default function AdminQueueHostingScreen() {
                     <Text style={[styles.statCardValue, { color: tint.color }]}>{stat.value}</Text>
                   </View>
                   <View style={[styles.statIconCircle, { backgroundColor: tint.color }]}>
-                    <Ionicons name={tint.icon} size={20} color="#ffffff" />
+                    <tint.icon size={20} color="#ffffff" />
                   </View>
                 </View>
               );
@@ -453,7 +469,7 @@ export default function AdminQueueHostingScreen() {
           {/* Search & Filters */}
           <View style={styles.filtersCard}>
             <View style={styles.searchWrapper}>
-              <Ionicons name="search-outline" size={16} color={theme.tertiary} style={styles.searchIcon} />
+              <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by service or department..."
@@ -467,13 +483,13 @@ export default function AdminQueueHostingScreen() {
                 <Text style={styles.filterSelectText} numberOfLines={1}>
                   {STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label ?? 'All Statuses'}
                 </Text>
-                <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                <ChevronDown size={14} color={theme.tertiary} />
               </Pressable>
               <Pressable style={styles.filterSelect} onPress={() => setSelectField('type')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>
                   {typeFilter === 'all' ? 'All Service Types' : typeFilter}
                 </Text>
-                <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                <ChevronDown size={14} color={theme.tertiary} />
               </Pressable>
             </View>
             {hasActiveFilters && (
@@ -551,14 +567,14 @@ export default function AdminQueueHostingScreen() {
                         style={[styles.queueActionBtn, styles.queueActionBtnWarning]}
                         onPress={(e) => { e.stopPropagation(); handlePauseQueue(queue.id); }}
                       >
-                        <Ionicons name="pause-outline" size={14} color="#f59e0b" />
+                        <Pause size={14} color="#f59e0b" />
                         <Text style={[styles.queueActionBtnText, { color: '#f59e0b' }]}>Pause</Text>
                       </Pressable>
                       <Pressable
                         style={[styles.queueActionBtn, styles.queueActionBtnDanger]}
                         onPress={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                       >
-                        <Ionicons name="close-outline" size={14} color="#ef4444" />
+                        <X size={14} color="#ef4444" />
                         <Text style={[styles.queueActionBtnText, { color: '#ef4444' }]}>Close</Text>
                       </Pressable>
                     </View>
@@ -625,14 +641,14 @@ export default function AdminQueueHostingScreen() {
                         style={[styles.queueActionBtn, styles.queueActionBtnSuccess]}
                         onPress={(e) => { e.stopPropagation(); handleResumeQueue(queue.id); }}
                       >
-                        <Ionicons name="play-outline" size={14} color="#3b82f6" />
+                        <Play size={14} color="#3b82f6" />
                         <Text style={[styles.queueActionBtnText, { color: '#3b82f6' }]}>Resume</Text>
                       </Pressable>
                       <Pressable
                         style={[styles.queueActionBtn, styles.queueActionBtnDanger]}
                         onPress={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                       >
-                        <Ionicons name="close-outline" size={14} color="#ef4444" />
+                        <X size={14} color="#ef4444" />
                         <Text style={[styles.queueActionBtnText, { color: '#ef4444' }]}>Close</Text>
                       </Pressable>
                     </View>
@@ -698,7 +714,7 @@ export default function AdminQueueHostingScreen() {
                           style={[styles.queueActionBtn, styles.queueActionBtnDanger, { flex: 1 }]}
                           onPress={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
                         >
-                          <Ionicons name="close-outline" size={14} color="#ef4444" />
+                          <X size={14} color="#ef4444" />
                           <Text style={[styles.queueActionBtnText, { color: '#ef4444' }]}>Stop Queue</Text>
                         </Pressable>
                       </View>
@@ -795,7 +811,7 @@ export default function AdminQueueHostingScreen() {
 
           {queues.length === 0 && (
             <View style={styles.emptyState}>
-              <Ionicons name="time-outline" size={28} color={theme.tertiary} />
+              <Clock size={28} color={theme.tertiary} />
               <Text style={styles.emptyStateText}>
                 No queue lines yet today for {user?.departmentAbbrev ?? 'your department'}. Open one to start serving students.
               </Text>
@@ -804,7 +820,7 @@ export default function AdminQueueHostingScreen() {
 
           {queues.length > 0 && filteredQueues.length === 0 && (
             <View style={styles.emptyState}>
-              <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+              <AlertCircle size={28} color={theme.tertiary} />
               <Text style={styles.emptyStateText}>No queue lines match your search or filters.</Text>
               {hasActiveFilters && (
                 <Pressable style={styles.clearFiltersBtn} onPress={clearFilters}>
@@ -949,7 +965,7 @@ function NavDrawer({
           <View style={styles.drawerNav}>
             {navItems.map((item) => (
               <Pressable key={item.key} style={styles.drawerNavItem} onPress={() => onNavPress(item.key)}>
-                <Ionicons name={item.icon} size={18} color={theme.subtext} />
+                <item.icon size={18} color={theme.subtext} />
                 <Text style={styles.drawerNavLabel}>{item.label}</Text>
               </Pressable>
             ))}
@@ -1023,14 +1039,14 @@ function OpenQueueModal({
               </Text>
             </View>
             <Pressable style={styles.formModalCloseBtn} onPress={onClose} hitSlop={8}>
-              <Ionicons name="close" size={18} color={theme.subtext} />
+              <X size={18} color={theme.subtext} />
             </Pressable>
           </View>
 
           <ScrollView style={styles.formScroll} contentContainerStyle={{ gap: 14 }}>
             {!!formError && (
               <View style={styles.formErrorBox}>
-                <Ionicons name="alert-circle-outline" size={14} color="#ef4444" />
+                <AlertCircle size={14} color="#ef4444" />
                 <Text style={styles.formErrorText}>{formError}</Text>
               </View>
             )}
@@ -1044,7 +1060,7 @@ function OpenQueueModal({
                 >
                   {selectedServiceName || 'Select a service'}
                 </Text>
-                <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                <ChevronDown size={14} color={theme.tertiary} />
               </Pressable>
             </View>
 
@@ -1095,23 +1111,29 @@ function OpenQueueModal({
             <View style={styles.formRow}>
               <View style={styles.formRowItem}>
                 <Text style={styles.formLabel}>Service Start Time *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="08:00"
-                  placeholderTextColor={theme.tertiary}
-                  value={serviceStart}
-                  onChangeText={onChangeStart}
-                />
+                <View style={styles.searchWrapper}>
+                  <Clock size={14} color={theme.tertiary} style={styles.searchIcon} />
+                  <TextInput
+                    style={[styles.textInput, { paddingLeft: 36 }]}
+                    placeholder="08:00"
+                    placeholderTextColor={theme.tertiary}
+                    value={serviceStart}
+                    onChangeText={onChangeStart}
+                  />
+                </View>
               </View>
               <View style={styles.formRowItem}>
                 <Text style={styles.formLabel}>Service End Time *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="17:00"
-                  placeholderTextColor={theme.tertiary}
-                  value={serviceEnd}
-                  onChangeText={onChangeEnd}
-                />
+                <View style={styles.searchWrapper}>
+                  <Clock size={14} color={theme.tertiary} style={styles.searchIcon} />
+                  <TextInput
+                    style={[styles.textInput, { paddingLeft: 36 }]}
+                    placeholder="17:00"
+                    placeholderTextColor={theme.tertiary}
+                    value={serviceEnd}
+                    onChangeText={onChangeEnd}
+                  />
+                </View>
               </View>
             </View>
           </ScrollView>

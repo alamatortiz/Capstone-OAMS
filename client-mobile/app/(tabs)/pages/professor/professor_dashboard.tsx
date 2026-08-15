@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Calendar, CheckCircle, ChevronRight, ClipboardList, Clock, FileText, Megaphone } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -36,6 +37,11 @@ const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+// lucide-react-native icon component type -- matches web's actual icon
+// choices (prof-dashboard.jsx's "custom SVG" icons are hand-copied lucide
+// path data, so these map 1:1 onto real lucide components instead of the
+// closest available Ionicons look-alike).
+type LucideIconType = typeof Calendar;
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -97,7 +103,7 @@ interface StatItem {
   title: string;
   value: string;
   description: string;
-  icon: IoniconName;
+  icon: LucideIconType;
   tint: keyof typeof STAT_TINTS;
 }
 
@@ -105,7 +111,7 @@ interface QuickAction {
   key: string;
   title: string;
   description: string;
-  icon: IoniconName;
+  icon: LucideIconType;
   badge?: string;
   gradient: readonly [string, string];
 }
@@ -157,6 +163,28 @@ interface ActivityEntry {
   time: string;
 }
 
+interface DashboardAnnouncement {
+  id: string;
+  title: string;
+  description: string;
+  college: string;
+  date: string;
+  isPinned: boolean;
+}
+
+// Compact date used in the dashboard's pinned-announcement preview card --
+// no "Posted:"/"Reposted:" prefix, unlike professor_announcement.tsx's own
+// full detail formatter, matching web's plain formatManilaDateTime(ann.date).
+function formatAnnouncementPreviewDate(dateStr: string) {
+  return new Date(dateStr).toLocaleString('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 interface OfficeHoursData {
   departmentName: string;
   departmentAbbrev: string;
@@ -203,7 +231,7 @@ export default function ProfessorDashboardScreen() {
   const [dashData, setDashData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [announcements, setAnnouncements] = useState<{ isPinned: boolean }[]>([]);
+  const [announcements, setAnnouncements] = useState<DashboardAnnouncement[]>([]);
 
   const [officeHours, setOfficeHours] = useState<OfficeHoursData | null>(null);
   const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
@@ -320,13 +348,18 @@ export default function ProfessorDashboardScreen() {
       })();
 
   const stats: StatItem[] = [
-    { key: 'appointments', title: 'Pending Appointments', value: loading ? '—' : String(s?.pendingAppointments ?? 0), description: appointmentsDescription, icon: 'calendar-outline', tint: 'violet' },
-    { key: 'documents', title: 'Documents', value: loading ? '—' : String(s?.documentsToReview ?? 0), description: documentsDescription, icon: 'document-text-outline', tint: 'orange' },
-    { key: 'completed', title: 'Completed', value: loading ? '—' : String(s?.completedThisMonth ?? 0), description: 'This month', icon: 'checkmark-circle-outline', tint: 'green' },
+    { key: 'appointments', title: 'Pending Appointments', value: loading ? '—' : String(s?.pendingAppointments ?? 0), description: appointmentsDescription, icon: Calendar, tint: 'violet' },
+    { key: 'documents', title: 'Documents', value: loading ? '—' : String(s?.documentsToReview ?? 0), description: documentsDescription, icon: FileText, tint: 'orange' },
+    { key: 'completed', title: 'Completed', value: loading ? '—' : String(s?.completedThisMonth ?? 0), description: 'This month', icon: CheckCircle, tint: 'green' },
   ];
 
   const todaysAppointments: TodayAppointment[] = dashData?.todayAppointments ?? [];
   const recentActivity: ActivityEntry[] = dashData?.recentActivity ?? [];
+
+  // Mirrors prof-dashboard.jsx's allPinnedAnnouncements/pinnedPreview/morePinnedCount.
+  const pinnedAnnouncements = announcements.filter((a) => a.isPinned);
+  const pinnedPreview = pinnedAnnouncements.slice(0, 2);
+  const morePinnedCount = pinnedAnnouncements.length - pinnedPreview.length;
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -371,14 +404,23 @@ export default function ProfessorDashboardScreen() {
 
   // Mirrors prof-dashboard.jsx's own quickActions array exactly (order,
   // copy, and which tiles carry a live badge vs none).
-  const pinnedAnnouncementsCount = announcements.filter((a) => a.isPinned).length;
   const quickActions: QuickAction[] = [
-    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: 'megaphone-outline', badge: `${pinnedAnnouncementsCount} Pinned`, gradient: ['#22c55e', '#16a34a'] },
-    { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your weekly recurring availability by day. It repeats every week until you edit or remove it.', icon: 'time-outline', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'appointments', title: 'Appointments', description: 'Review and manage student appointment requests.', icon: 'calendar-outline', badge: `${s?.pendingAppointments ?? 0} Pending`, gradient: ['#3b82f6', '#2563eb'] },
-    { key: 'document-request', title: 'Document Requests', description: 'Request documents and track their status.', icon: 'create-outline', badge: `${s?.documentsToReview ?? 0} Pending`, gradient: ['#f97316', '#ea580c'] },
-    { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: 'swap-horizontal-outline', gradient: ['#06b6d4', '#0e7490'] },
+    { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: Megaphone, badge: `${pinnedAnnouncements.length} Pinned`, gradient: ['#22c55e', '#16a34a'] },
+    { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your weekly recurring availability by day. It repeats every week until you edit or remove it.', icon: Calendar, gradient: ['#a855f7', '#9333ea'] },
+    { key: 'appointments', title: 'Appointments', description: 'Review and manage student appointment requests.', icon: Calendar, badge: `${s?.pendingAppointments ?? 0} Pending`, gradient: ['#a855f7', '#9333ea'] },
+    { key: 'document-request', title: 'Document Requests', description: 'Request documents and track their status.', icon: FileText, badge: `${s?.documentsToReview ?? 0} Pending`, gradient: ['#f97316', '#ea580c'] },
+    { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: ClipboardList, gradient: ['#22c55e', '#16a34a'] },
   ];
+
+  // Badge color follows each tile's own gradient family, mirroring
+  // prof-dashboard.css's .action-badge overrides per action-gradient-N.
+  const ACTION_BADGE_META: Record<string, { bg: string; color: string }> = {
+    announcements: { bg: 'rgba(22, 163, 74, 0.15)', color: theme.primary },
+    'schedule-manager': { bg: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe' },
+    appointments: { bg: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe' },
+    'document-request': { bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' },
+    transactions: { bg: 'rgba(22, 163, 74, 0.15)', color: theme.primary },
+  };
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
@@ -456,12 +498,10 @@ export default function ProfessorDashboardScreen() {
           >
             <View style={styles.bannerBackdrop1} />
             <View style={styles.bannerBackdrop2} />
-            <Text style={styles.bannerGreeting}>
-              Welcome back, Prof. {(user?.name ?? 'Faculty').split(' ')[0]}!
-            </Text>
+            <Text style={styles.bannerGreeting}>Good day!</Text>
             <View style={styles.bannerTitleRow}>
               <Image source={collegeLogo} style={styles.bannerLogo} resizeMode="contain" />
-              <Text style={styles.bannerTitle}>{user?.departmentName ?? ''}</Text>
+              <Text style={styles.bannerTitle}>Prof. {user?.name ?? 'Faculty'}</Text>
             </View>
             <View style={styles.bannerBadges}>
               <View style={styles.bannerBadge}>
@@ -489,7 +529,7 @@ export default function ProfessorDashboardScreen() {
               return (
                 <Pressable key={stat.key} style={styles.statCard} onPress={() => handleStatPress(stat.key)}>
                   <View style={[styles.statIcon, { backgroundColor: tint.bg, borderColor: tint.border }]}>
-                    <Ionicons name={stat.icon} size={20} color={tint.color} />
+                    <stat.icon size={20} color={tint.color} />
                   </View>
                   <Text style={styles.statValue}>{stat.value}</Text>
                   <Text style={styles.statTitle}>{stat.title}</Text>
@@ -534,19 +574,22 @@ export default function ProfessorDashboardScreen() {
               >
                 <View style={styles.actionMain}>
                   <LinearGradient colors={action.gradient} style={styles.actionIcon}>
-                    <Ionicons name={action.icon} size={22} color="#ffffff" />
+                    <action.icon size={22} color="#ffffff" />
                   </LinearGradient>
                   <View style={styles.actionBody}>
-                    {action.badge && (
-                      <View style={styles.actionBadge}>
-                        <Text style={styles.actionBadgeText}>{action.badge}</Text>
-                      </View>
-                    )}
+                    {action.badge && (() => {
+                      const badgeMeta = ACTION_BADGE_META[action.key] ?? ACTION_BADGE_META.announcements;
+                      return (
+                        <View style={[styles.actionBadge, { backgroundColor: badgeMeta.bg, borderColor: badgeMeta.bg }]}>
+                          <Text style={[styles.actionBadgeText, { color: badgeMeta.color }]}>{action.badge}</Text>
+                        </View>
+                      );
+                    })()}
                     <Text style={styles.actionTitle}>{action.title}</Text>
                     <Text style={styles.actionDescription}>{action.description}</Text>
                     <View style={styles.actionCta}>
                       <Text style={styles.actionCtaText}>Open</Text>
-                      <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+                      <ChevronRight size={14} color={theme.primary} />
                     </View>
                   </View>
                 </View>
@@ -556,9 +599,13 @@ export default function ProfessorDashboardScreen() {
 
           {/* Today's Appointments */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today&apos;s Appointments</Text>
-            <Pressable onPress={() => router.push('/pages/professor/professor_appointment')} hitSlop={8}>
+            <View style={styles.sectionTitleRow}>
+              <Calendar size={16} color={theme.text} />
+              <Text style={styles.sectionTitle}>Today&apos;s Appointments</Text>
+            </View>
+            <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/professor/professor_appointment')} hitSlop={8}>
               <Text style={styles.viewAllText}>View All</Text>
+              <ChevronRight size={13} color={theme.primary} />
             </Pressable>
           </View>
           <View style={styles.card}>
@@ -567,54 +614,113 @@ export default function ProfessorDashboardScreen() {
             ) : todaysAppointments.length === 0 ? (
               <Text style={styles.emptyText}>No appointments scheduled for today.</Text>
             ) : (
-              todaysAppointments.map((apt, index) => {
-                const status = STATUS_META[apt.status] ?? STATUS_META.pending;
-                return (
+              <>
+                {todaysAppointments.slice(0, 3).map((apt, index, arr) => {
+                  const status = STATUS_META[apt.status] ?? STATUS_META.pending;
+                  return (
+                    <View
+                      key={apt.id}
+                      style={[
+                        styles.appointmentItem,
+                        index === arr.length - 1 && styles.appointmentItemLast,
+                      ]}
+                    >
+                      <View style={styles.appointmentIcon}>
+                        <Calendar size={20} color={theme.primary} />
+                      </View>
+                      <View style={styles.appointmentBody}>
+                        <View style={styles.appointmentStudentRow}>
+                          <Text style={styles.appointmentStudent}>{apt.student}</Text>
+                          {apt.studentNumber && (
+                            <View style={styles.studentIdBadge}>
+                              <Text style={styles.studentIdBadgeText}>{apt.studentNumber}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.appointmentPurpose}>{apt.appointmentType || apt.purpose}</Text>
+                      </View>
+                      <View style={styles.appointmentTimeStatus}>
+                        <Text style={styles.appointmentTime}>{apt.time}</Text>
+                        <View
+                          style={[
+                            styles.appointmentBadge,
+                            { backgroundColor: status.bg, borderColor: status.border },
+                          ]}
+                        >
+                          <Text style={[styles.appointmentBadgeText, { color: status.color }]}>
+                            {apt.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+                {todaysAppointments.length > 3 && (
+                  <Pressable onPress={() => router.push('/pages/professor/professor_appointment')} hitSlop={8}>
+                    <Text style={styles.moreLink}>+ {todaysAppointments.length - 3} more today</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </View>
+
+          {/* Pinned Announcements */}
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Megaphone size={16} color={theme.text} />
+              <Text style={styles.sectionTitle}>Pinned Announcements</Text>
+            </View>
+            <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/professor/professor_announcement')} hitSlop={8}>
+              <Text style={styles.viewAllText}>View All</Text>
+              <ChevronRight size={13} color={theme.primary} />
+            </Pressable>
+          </View>
+          <View style={styles.card}>
+            {loading ? (
+              <Text style={styles.emptyText}>Loading announcements...</Text>
+            ) : pinnedAnnouncements.length === 0 ? (
+              <Text style={styles.emptyText}>No pinned announcements</Text>
+            ) : (
+              <>
+                {pinnedPreview.map((ann, index) => (
                   <View
-                    key={apt.id}
+                    key={ann.id}
                     style={[
-                      styles.appointmentItem,
-                      index === todaysAppointments.length - 1 && styles.appointmentItemLast,
+                      styles.announcementItem,
+                      index === pinnedPreview.length - 1 && styles.announcementItemLast,
                     ]}
                   >
-                    <View style={styles.appointmentIcon}>
-                      <Ionicons name="people-outline" size={20} color={theme.primary} />
-                    </View>
-                    <View style={styles.appointmentBody}>
-                      <View style={styles.appointmentStudentRow}>
-                        <Text style={styles.appointmentStudent}>{apt.student}</Text>
-                        {apt.studentNumber && (
-                          <View style={styles.studentIdBadge}>
-                            <Text style={styles.studentIdBadgeText}>{apt.studentNumber}</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.appointmentPurpose}>{apt.appointmentType || apt.purpose}</Text>
-                    </View>
-                    <View style={styles.appointmentTimeStatus}>
-                      <Text style={styles.appointmentTime}>{apt.time}</Text>
-                      <View
-                        style={[
-                          styles.appointmentBadge,
-                          { backgroundColor: status.bg, borderColor: status.border },
-                        ]}
-                      >
-                        <Text style={[styles.appointmentBadgeText, { color: status.color }]}>
-                          {apt.status}
-                        </Text>
+                    <View style={styles.announcementItemHeader}>
+                      <Text style={styles.announcementTitle}>{ann.title}</Text>
+                      <View style={styles.pinnedBadge}>
+                        <Text style={styles.pinnedBadgeText}>Pinned</Text>
                       </View>
                     </View>
+                    <Text style={styles.appointmentPurpose}>
+                      {ann.college} · {formatAnnouncementPreviewDate(ann.date)}
+                    </Text>
+                    {ann.description ? (
+                      <Text style={styles.announcementDescription} numberOfLines={2}>
+                        {ann.description}
+                      </Text>
+                    ) : null}
                   </View>
-                );
-              })
+                ))}
+                {morePinnedCount > 0 && (
+                  <Pressable onPress={() => router.push('/pages/professor/professor_announcement')} hitSlop={8}>
+                    <Text style={styles.moreLink}>+ {morePinnedCount} more pinned</Text>
+                  </Pressable>
+                )}
+              </>
             )}
           </View>
 
           {/* Recent Activity */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <Pressable onPress={() => router.push('/pages/professor/professor_transactions')} hitSlop={8}>
+            <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/professor/professor_transactions')} hitSlop={8}>
               <Text style={styles.viewAllText}>See All</Text>
+              <ChevronRight size={13} color={theme.primary} />
             </Pressable>
           </View>
           <View style={styles.card}>
@@ -635,11 +741,11 @@ export default function ProfessorDashboardScreen() {
                     ]}
                   >
                     <View style={[styles.activityIconWrap, isDocument ? styles.activityIconDocument : styles.activityIconAppointment]}>
-                      <Ionicons
-                        name={isDocument ? 'document-text-outline' : 'calendar-outline'}
-                        size={15}
-                        color={isDocument ? '#f59e0b' : theme.primary}
-                      />
+                      {isDocument ? (
+                        <FileText size={15} color="#f59e0b" />
+                      ) : (
+                        <Calendar size={15} color={theme.primary} />
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.activityText}>{activity.title}</Text>
@@ -658,27 +764,41 @@ export default function ProfessorDashboardScreen() {
 
           {/* Office Hours */}
           <LinearGradient
-            colors={['#059669', '#10b981']}
+            colors={[theme.primary, theme.success]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.hoursCard}
           >
-            <View style={styles.hoursTitleRow}>
-              <Ionicons name="time-outline" size={18} color="#ffffff" />
-              <Text style={styles.hoursTitle}>Office Hours</Text>
+            <View style={styles.hoursHeaderRow}>
+              <View style={styles.hoursTitleRow}>
+                <Clock size={18} color="#ffffff" />
+                <Text style={styles.hoursTitle}>Office Hours</Text>
+              </View>
+              {!officeHoursLoading && officeHours && (
+                <View style={styles.hoursDeptPill}>
+                  <Text style={styles.hoursDeptText}>
+                    {officeHours.departmentName} ({officeHours.departmentAbbrev})
+                  </Text>
+                </View>
+              )}
             </View>
             {officeHoursLoading ? (
               <Text style={styles.hoursTime}>Loading office hours...</Text>
             ) : officeHoursError ? (
-              <Text style={styles.hoursTime}>{officeHoursError}</Text>
+              <View>
+                <Text style={styles.hoursTime}>{officeHoursError}</Text>
+                <Pressable onPress={fetchOfficeHours} hitSlop={8}>
+                  <Text style={styles.viewAllText}>Retry</Text>
+                </Pressable>
+              </View>
             ) : !officeHours ? (
               <Text style={styles.hoursTime}>No office hours available.</Text>
             ) : (
               <>
-                <View style={styles.hoursGrid}>
+                <View style={styles.hoursSchedule}>
                   {officeHours.schedule.map((entry, i) => (
                     <View key={i} style={styles.hoursItem}>
-                      <Text style={styles.hoursLabel}>{entry.day}</Text>
+                      <Text style={styles.hoursDay}>{entry.day}</Text>
                       <Text style={styles.hoursTime}>{entry.time}</Text>
                     </View>
                   ))}
@@ -718,7 +838,7 @@ export default function ProfessorDashboardScreen() {
             </View>
 
             <View style={styles.availabilityRow}>
-              <Text style={styles.availabilityLabel}>Available</Text>
+              <Text style={styles.availabilityLabel}>{isAvailable ? 'Available' : 'Unavailable'}</Text>
               <Switch
                 value={isAvailable}
                 onValueChange={toggleAvailability}
@@ -995,16 +1115,33 @@ function createStyles(theme: ThemePalette) {
       alignItems: 'center',
       justifyContent: 'space-between',
     },
+    sectionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     sectionTitle: {
       fontSize: 17,
       fontWeight: '800',
       color: theme.text,
       letterSpacing: -0.3,
     },
+    viewAllRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
     viewAllText: {
       fontSize: 12,
       fontWeight: '700',
       color: theme.primary,
+    },
+    moreLink: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.primary,
+      textAlign: 'center',
+      marginTop: 4,
     },
 
     // Quick actions
@@ -1167,6 +1304,49 @@ function createStyles(theme: ThemePalette) {
       textTransform: 'capitalize',
     },
 
+    // Pinned announcements
+    announcementItem: {
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      gap: 4,
+    },
+    announcementItemLast: {
+      borderBottomWidth: 0,
+      paddingBottom: 0,
+    },
+    announcementItemHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    announcementTitle: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    pinnedBadge: {
+      backgroundColor: 'rgba(34, 197, 94, 0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.3)',
+      borderRadius: 999,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+    },
+    pinnedBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: theme.primary,
+    },
+    announcementDescription: {
+      fontSize: 12,
+      color: theme.subtext,
+      lineHeight: 17,
+      marginTop: 2,
+    },
+
     // Recent activity
     activityItem: {
       flexDirection: 'row',
@@ -1220,42 +1400,71 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 18,
       padding: 20,
     },
+    hoursHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 10,
+      marginBottom: 18,
+    },
     hoursTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      marginBottom: 16,
     },
     hoursTitle: {
       fontSize: 16,
       fontWeight: '700',
       color: '#ffffff',
     },
-    hoursGrid: {
-      gap: 14,
+    hoursDeptPill: {
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      borderRadius: 999,
+      paddingVertical: 5,
+      paddingHorizontal: 12,
+      flexShrink: 1,
+    },
+    hoursDeptText: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: 'rgba(255,255,255,0.85)',
+    },
+    hoursSchedule: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginBottom: 14,
     },
     hoursItem: {
-      gap: 4,
+      flexGrow: 1,
+      minWidth: 140,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.15)',
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
     },
-    hoursLabel: {
-      fontSize: 12,
+    hoursDay: {
+      fontSize: 10,
       fontWeight: '700',
-      color: 'rgba(255,255,255,0.85)',
+      color: 'rgba(255,255,255,0.65)',
       textTransform: 'uppercase',
-      letterSpacing: 0.4,
+      letterSpacing: 0.5,
+      marginBottom: 4,
     },
     hoursTime: {
       fontSize: 13,
       fontWeight: '600',
       color: '#ffffff',
-      lineHeight: 20,
     },
     hoursLocationRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
       flexWrap: 'wrap',
-      marginTop: 14,
     },
     hoursLocationLabel: {
       fontSize: 10,

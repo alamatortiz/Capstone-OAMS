@@ -17,12 +17,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronLeft, Clock, FileText, HelpCircle, Home as HomeIcon,
+  Megaphone, MapPin, MessageSquare, Users, XCircle, ClipboardList,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useQueue } from '@/context/QueueContext';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
+
+type LucideIconType = typeof Users;
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -144,33 +150,37 @@ interface DepartmentServices {
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 const STATUS_META: Record<QueueStatus, { label: string; bg: string; border: string; color: string }> = {
   waiting: { label: 'Waiting', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
   serving: { label: "It's Your Turn!", bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' },
-  completed: { label: 'Completed', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.3)', color: '#6b7280' },
+  completed: { label: 'Completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   cancelled: { label: 'Cancelled', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
-  no_show: { label: 'Marked as No-Show', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
+  no_show: { label: 'Marked as No-Show', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
 };
 
 // "serving" covers both "called, not yet arrived" and "being served" --
-// arrivedAt distinguishes them, mirroring web's getStatusMeta.
-function getStatusMeta(queue: QueueRecord) {
+// arrivedAt distinguishes them, mirroring web's getStatusMeta. Uses the
+// theme's own primary green (matches web's var(--primary-color), which
+// itself shifts between dark/light) instead of a hardcoded hex.
+function getStatusMeta(queue: QueueRecord, theme: ThemePalette) {
   if (queue.status === 'serving') {
+    const bg = 'rgba(34, 197, 94, 0.15)';
+    const border = 'rgba(34, 197, 94, 0.3)';
     return queue.arrivedAt
-      ? { label: 'Being Served', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' }
-      : { label: 'Called — Please Proceed', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' };
+      ? { label: 'Servicing', bg, border, color: theme.primary }
+      : { label: 'Called', bg, border, color: theme.primary };
   }
   return STATUS_META[queue.status];
 }
@@ -318,14 +328,14 @@ export default function StudentQueueStatusScreen() {
             <>
               {/* Breadcrumb */}
               <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-                <Ionicons name="chevron-back" size={18} color={theme.subtext} />
-                <Text style={styles.breadcrumbText}>Dashboard</Text>
+                <ChevronLeft size={18} color={theme.subtext} />
+                <Text style={styles.breadcrumbText}>Home</Text>
               </Pressable>
 
               {/* Title */}
               <View style={styles.titleRow}>
                 <LinearGradient colors={['#3b82f6', '#6366f1']} style={styles.titleIcon}>
-                  <Ionicons name="time-outline" size={22} color="#ffffff" />
+                  <Clock size={22} color="#ffffff" />
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>My Queue Status</Text>
@@ -362,7 +372,7 @@ export default function StudentQueueStatusScreen() {
 
                         {queue.slotStatus === 'paused' && (
                           <View style={[styles.inlineBanner, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: 'rgba(245, 158, 11, 0.4)' }]}>
-                            <Ionicons name="alert-circle-outline" size={14} color="#f59e0b" />
+                            <AlertCircle size={14} color="#f59e0b" />
                             <Text style={[styles.inlineBannerText, { color: '#f59e0b' }]}>
                               Paused{queue.slotPauseReason ? `: ${queue.slotPauseReason}` : ''}
                             </Text>
@@ -370,9 +380,11 @@ export default function StudentQueueStatusScreen() {
                         )}
                         {(queue.slotStatus === 'full' || queue.slotStatus === 'expired') && (
                           <View style={[styles.inlineBanner, { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.35)' }]}>
-                            <Ionicons name="alert-circle-outline" size={14} color={theme.blue} />
+                            <AlertCircle size={14} color={theme.blue} />
                             <Text style={[styles.inlineBannerText, { color: theme.blue }]}>
-                              {queue.slotStatus === 'full' ? 'Full — still serving' : 'Hours ended — still serving'}
+                              {queue.slotStatus === 'full'
+                                ? 'Queue Full: No longer accepting students but students within the queue will still be served.'
+                                : 'Hours ended — still serving'}
                             </Text>
                           </View>
                         )}
@@ -405,7 +417,7 @@ export default function StudentQueueStatusScreen() {
                 </View>
               ) : (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="people-outline" size={32} color={theme.tertiary} />
+                  <Users size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Active Queues</Text>
                   <Text style={styles.emptyDescription}>
                     You are not participating in any active queues.
@@ -454,7 +466,7 @@ export default function StudentQueueStatusScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>
                       {item.label}
                     </Text>
@@ -518,7 +530,7 @@ export default function StudentQueueStatusScreen() {
         <View style={styles.logoutOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconCircle}>
-              <Ionicons name="close-circle-outline" size={26} color="#ef4444" />
+              <XCircle size={26} color="#ef4444" />
             </View>
             <Text style={styles.logoutModalTitle}>Leave Queue?</Text>
             <Text style={styles.logoutModalDescription}>
@@ -531,7 +543,6 @@ export default function StudentQueueStatusScreen() {
                 <Text style={styles.logoutCancelBtnText}>Stay in Queue</Text>
               </Pressable>
               <Pressable style={styles.logoutConfirmBtn} onPress={confirmLeaveQueue}>
-                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
                 <Text style={styles.logoutConfirmBtnText}>Leave Queue</Text>
               </Pressable>
             </View>
@@ -630,7 +641,7 @@ function QueueDetail({
   onLeave: () => void;
   onEditNotes: () => void;
 }) {
-  const statusMeta = getStatusMeta(queue);
+  const statusMeta = getStatusMeta(queue, theme);
   const peopleAhead = Math.max(queue.position - 1, 0);
 
   // ── Requirements / Procedure lookup (same fetch-and-match-by-name pattern
@@ -682,14 +693,14 @@ function QueueDetail({
     <>
       {/* Breadcrumb */}
       <Pressable style={styles.breadcrumb} onPress={onBack} hitSlop={8}>
-        <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+        <ChevronLeft size={18} color={theme.subtext} />
         <Text style={styles.breadcrumbText}>My Queues</Text>
       </Pressable>
 
       {/* Title */}
       <View style={styles.titleRow}>
         <LinearGradient colors={['#3b82f6', '#6366f1']} style={styles.titleIcon}>
-          <Ionicons name="time-outline" size={22} color="#ffffff" />
+          <Clock size={22} color="#ffffff" />
         </LinearGradient>
         <View style={styles.titleTextWrap}>
           <Text style={styles.pageTitle}>Queue Details</Text>
@@ -717,7 +728,7 @@ function QueueDetail({
         </View>
         {queue.location && (
           <View style={styles.heroMetaRow}>
-            <Ionicons name="location-outline" size={15} color="rgba(255,255,255,0.9)" />
+            <MapPin size={15} color="rgba(255,255,255,0.9)" />
             <Text style={styles.heroMetaText}>{queue.location}</Text>
           </View>
         )}
@@ -726,10 +737,10 @@ function QueueDetail({
       {/* It's your turn */}
       {queue.status === 'serving' && (
         <View style={styles.turnBanner}>
-          <Ionicons name="checkmark-circle-outline" size={22} color="#ffffff" />
+          <CheckCircle size={22} color="#ffffff" />
           <Text style={styles.turnBannerText}>
             {queue.arrivedAt
-              ? 'You are now being served.'
+              ? 'Service being processed'
               : "It's your turn — please proceed to the designated location."}
           </Text>
         </View>
@@ -738,7 +749,7 @@ function QueueDetail({
       {/* Paused banner */}
       {queue.slotStatus === 'paused' && (
         <View style={[styles.wideBanner, { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.4)' }]}>
-          <Ionicons name="alert-circle-outline" size={20} color="#f59e0b" />
+          <AlertCircle size={20} color="#f59e0b" />
           <View style={{ flex: 1 }}>
             <Text style={[styles.wideBannerText, { color: '#f59e0b' }]}>
               This queue is currently paused by the admin.
@@ -755,7 +766,7 @@ function QueueDetail({
       {/* Full / expired banner */}
       {(queue.slotStatus === 'full' || queue.slotStatus === 'expired') && (
         <View style={[styles.wideBanner, { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.35)' }]}>
-          <Ionicons name="alert-circle-outline" size={20} color={theme.blue} />
+          <AlertCircle size={20} color={theme.blue} />
           <Text style={[styles.wideBannerText, { color: theme.blue }]}>
             This queue is no longer accepting new students, but you&apos;re still in line and will be served.
           </Text>
@@ -766,7 +777,7 @@ function QueueDetail({
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="people-outline" size={18} color={theme.blue} />
+            <Users size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>Your Position</Text>
           </View>
           <View style={[styles.statusBadgePill, { backgroundColor: statusMeta.bg, borderColor: statusMeta.border }]}>
@@ -791,7 +802,7 @@ function QueueDetail({
                 : "You've been called — please proceed!"
               : queue.position === 1
                 ? "You're next!"
-                : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you.`}
+                : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`}
           </Text>
         </View>
 
@@ -803,7 +814,7 @@ function QueueDetail({
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="time-outline" size={18} color={theme.blue} />
+            <Clock size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>
               {queue.status === 'serving' ? 'Next Steps' : 'Estimated Wait'}
             </Text>
@@ -811,7 +822,7 @@ function QueueDetail({
         </View>
         <View style={styles.waitTimeRow}>
           <View style={styles.waitTimeIcon}>
-            <Ionicons name="time-outline" size={26} color={theme.blue} />
+            <Clock size={26} color={theme.blue} />
           </View>
           <Text style={styles.waitTimeValue}>{queue.estimatedWait}</Text>
           <Text style={styles.waitTimeJoined}>Joined at {queue.joinedAt}</Text>
@@ -823,7 +834,7 @@ function QueueDetail({
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardTitleRow}>
-              <Ionicons name="document-text-outline" size={18} color={theme.blue} />
+              <FileText size={18} color={theme.blue} />
               <Text style={styles.cardTitleText}>About this Service</Text>
             </View>
           </View>
@@ -835,7 +846,7 @@ function QueueDetail({
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="checkmark-circle-outline" size={18} color={theme.blue} />
+            <CheckCircle size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>Requirements</Text>
           </View>
         </View>
@@ -848,7 +859,7 @@ function QueueDetail({
           <View style={{ gap: 10 }}>
             {serviceRequirements.map((req) => (
               <View key={req.id} style={styles.reqItemRow}>
-                <Ionicons name="checkmark-circle-outline" size={16} color={theme.blue} style={{ marginTop: 1 }} />
+                <CheckCircle size={16} color={theme.blue} style={{ marginTop: 1 }} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={styles.reqNameRow}>
                     <Text style={styles.bodyText}>{req.name}</Text>
@@ -874,7 +885,7 @@ function QueueDetail({
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="help-circle-outline" size={18} color={theme.blue} />
+            <HelpCircle size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>Procedure</Text>
           </View>
         </View>
@@ -908,7 +919,7 @@ function QueueDetail({
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="chatbox-outline" size={18} color={theme.blue} />
+            <MessageSquare size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>Your Concern</Text>
           </View>
           <Pressable onPress={onEditNotes} hitSlop={8}>
@@ -926,7 +937,7 @@ function QueueDetail({
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="time-outline" size={18} color={theme.blue} />
+            <Clock size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>Service Hours</Text>
           </View>
         </View>
@@ -945,7 +956,7 @@ function QueueDetail({
         <View style={[styles.card, styles.cancelCard]}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardTitleRow}>
-              <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
+              <XCircle size={18} color="#ef4444" />
               <Text style={[styles.cardTitleText, { color: '#ef4444' }]}>Leave Queue</Text>
             </View>
           </View>
@@ -1146,7 +1157,7 @@ function createStyles(theme: ThemePalette) {
       marginTop: 2,
     },
     numberBadge: {
-      backgroundColor: theme.primary,
+      backgroundColor: theme.blue,
       borderRadius: 8,
       paddingVertical: 4,
       paddingHorizontal: 10,

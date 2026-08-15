@@ -15,6 +15,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Activity,
+  AlertCircle,
+  ArrowLeft,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  History,
+  Home,
+  MapPin,
+  PlusCircle,
+  RefreshCw,
+  TrendingUp,
+  Users,
+  X,
+} from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
@@ -35,8 +54,6 @@ const coedLogo = require('@/assets/COED.png');
 const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -109,18 +126,20 @@ interface QueueEntry {
   arrivedAt: string | null;
 }
 
+type LucideIconType = typeof Clock;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Dashboard', icon: Home },
+  { key: 'queue', label: 'Queue', icon: Clock },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
 export const ACTIVE_STATUSES: QueueSlotStatus[] = ['open', 'paused', 'full', 'expired'];
@@ -501,7 +520,7 @@ export default function AdminQueueScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.monitorTopbar}>
               <Pressable style={styles.backBtn} onPress={() => setMonitoringQueueId(null)}>
-                <Ionicons name="chevron-back" size={16} color={theme.text} />
+                <ArrowLeft size={16} color={theme.text} />
                 <Text style={styles.backBtnText}>Back to Queue List</Text>
               </Pressable>
               <Pressable
@@ -512,13 +531,13 @@ export default function AdminQueueScreen() {
                 }}
                 hitSlop={8}
               >
-                <Ionicons name="refresh-outline" size={18} color={theme.text} />
+                <RefreshCw size={18} color={theme.text} />
               </Pressable>
             </View>
 
             <View style={styles.titleRow}>
               <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.titleIcon}>
-                <Ionicons name="time-outline" size={22} color="#ffffff" />
+                <Clock size={22} color="#ffffff" />
               </LinearGradient>
               <View style={styles.titleTextWrap}>
                 <Text style={styles.pageTitle}>{monitoringQueue.queueType}</Text>
@@ -565,7 +584,6 @@ export default function AdminQueueScreen() {
             {/* Queue Progress */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Ionicons name="pulse-outline" size={17} color={theme.blue} />
                 <Text style={styles.cardTitleText}>Queue Progress</Text>
               </View>
               <View style={styles.progressCard}>
@@ -630,12 +648,12 @@ export default function AdminQueueScreen() {
                     monitoringQueue.status === 'paused'
                   }
                 >
-                  <Ionicons name="people-outline" size={16} color={theme.blue} />
+                  <Users size={16} color={theme.blue} />
                   <Text style={[styles.actionBtnText, { color: theme.blue }]}>Call Next</Text>
                 </Pressable>
                 {monitoringQueue.status === 'paused' ? (
                   <Pressable style={[styles.actionBtn, styles.actionBtnSuccess]} onPress={() => handleResumeQueue(monitoringQueue.id)}>
-                    <Ionicons name="alert-circle-outline" size={16} color={theme.primary} />
+                    <AlertCircle size={16} color={theme.primary} />
                     <Text style={[styles.actionBtnText, { color: theme.primary }]}>Resume Queue</Text>
                   </Pressable>
                 ) : (
@@ -644,7 +662,7 @@ export default function AdminQueueScreen() {
                     onPress={() => handlePauseQueue(monitoringQueue.id)}
                     disabled={monitoringQueue.status !== 'open'}
                   >
-                    <Ionicons name="alert-circle-outline" size={16} color="#f59e0b" />
+                    <AlertCircle size={16} color="#f59e0b" />
                     <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>Pause Queue</Text>
                   </Pressable>
                 )}
@@ -652,11 +670,11 @@ export default function AdminQueueScreen() {
                   style={[styles.actionBtn, styles.actionBtnDanger]}
                   onPress={() => handleCloseQueue(monitoringQueue.id)}
                 >
-                  <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+                  <X size={16} color="#ef4444" />
                   <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Stop Queue</Text>
                 </Pressable>
                 <Pressable style={[styles.actionBtn, styles.actionBtnNeutral]} onPress={handleExportData}>
-                  <Ionicons name="trending-up-outline" size={16} color={theme.subtext} />
+                  <TrendingUp size={16} color={theme.subtext} />
                   <Text style={[styles.actionBtnText, { color: theme.text }]}>Export Data</Text>
                 </Pressable>
               </View>
@@ -665,7 +683,7 @@ export default function AdminQueueScreen() {
             {/* Currently Serving */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Ionicons name="time-outline" size={17} color={theme.blue} />
+                <Clock size={17} color={theme.blue} />
                 <Text style={styles.cardTitleText}>Currently Serving</Text>
               </View>
               <Text style={styles.servingName}>
@@ -682,7 +700,7 @@ export default function AdminQueueScreen() {
                   style={[styles.wideBtn, styles.wideBtnPrimary]}
                   onPress={() => handleMarkArrived(monitoringQueue.id)}
                 >
-                  <Ionicons name="alert-circle-outline" size={16} color="#ffffff" />
+                  <AlertCircle size={16} color="#ffffff" />
                   <Text style={styles.wideBtnText}>Mark Arrived</Text>
                 </Pressable>
               )}
@@ -691,7 +709,7 @@ export default function AdminQueueScreen() {
                 onPress={() => handleMarkAsServed(monitoringQueue.id)}
                 disabled={!monitoringQueue.currentlyServingStudentNumber}
               >
-                <Ionicons name="checkmark-circle-outline" size={16} color="#ffffff" />
+                <AlertCircle size={16} color="#ffffff" />
                 <Text style={styles.wideBtnText}>Mark as Served</Text>
               </Pressable>
               <Pressable
@@ -699,7 +717,7 @@ export default function AdminQueueScreen() {
                 onPress={() => setSkipReasonModal(true)}
                 disabled={!monitoringQueue.currentlyServingStudentNumber}
               >
-                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
+                <X size={16} color="#ffffff" />
                 <Text style={styles.wideBtnText}>Skip / No-Show</Text>
               </Pressable>
             </View>
@@ -707,7 +725,7 @@ export default function AdminQueueScreen() {
             {/* Queue Entries */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Ionicons name="people-outline" size={17} color={theme.blue} />
+                <Users size={17} color={theme.blue} />
                 <Text style={styles.cardTitleText}>Queue Entries ({queueEntries.length})</Text>
               </View>
               {queueEntries.length === 0 ? (
@@ -744,7 +762,7 @@ export default function AdminQueueScreen() {
                           {entry.concern}
                         </Text>
                         <View style={styles.entryTimeRow}>
-                          <Ionicons name="time-outline" size={12} color={theme.tertiary} />
+                          <Clock size={12} color={theme.tertiary} />
                           <Text style={styles.entryTimeText}>Joined at {entry.joinedAt}</Text>
                         </View>
                       </View>
@@ -759,7 +777,7 @@ export default function AdminQueueScreen() {
                     onPress={() => setEntriesPage((p) => Math.max(0, p - 1))}
                     disabled={currentEntriesPage === 0}
                   >
-                    <Ionicons name="chevron-back" size={16} color={theme.text} />
+                    <ChevronLeft size={16} color={theme.text} />
                   </Pressable>
                   <Text style={styles.pageLabel}>
                     {entriesStartIndex + 1}–{Math.min(queueEntries.length, entriesStartIndex + ENTRIES_PER_PAGE)} of {queueEntries.length}
@@ -769,7 +787,7 @@ export default function AdminQueueScreen() {
                     onPress={() => setEntriesPage((p) => Math.min(totalEntryPages - 1, p + 1))}
                     disabled={currentEntriesPage >= totalEntryPages - 1}
                   >
-                    <Ionicons name="chevron-forward" size={16} color={theme.text} />
+                    <ChevronRight size={16} color={theme.text} />
                   </Pressable>
                 </View>
               )}
@@ -778,7 +796,7 @@ export default function AdminQueueScreen() {
             {/* Location */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Ionicons name="location-outline" size={17} color={theme.primary} />
+                <MapPin size={17} color={theme.blue} />
                 <Text style={styles.cardTitleText}>Location</Text>
               </View>
               <Text style={styles.plainText}>{monitoringQueue.location || 'Not specified'}</Text>
@@ -788,7 +806,7 @@ export default function AdminQueueScreen() {
             {monitoringQueue.serviceHours && (
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
-                  <Ionicons name="time-outline" size={17} color={theme.primary} />
+                  <Clock size={17} color={theme.blue} />
                   <Text style={styles.cardTitleText}>Service Hours</Text>
                 </View>
                 <View style={styles.hoursRow}>
@@ -805,7 +823,7 @@ export default function AdminQueueScreen() {
             {/* Status */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Ionicons name="pulse-outline" size={17} color={theme.blue} />
+                <Activity size={17} color={theme.blue} />
                 <Text style={styles.cardTitleText}>Status</Text>
               </View>
               <View style={[styles.wideStatusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
@@ -904,13 +922,13 @@ export default function AdminQueueScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
             <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.titleIcon}>
-              <Ionicons name="time-outline" size={22} color="#ffffff" />
+              <Clock size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Centralized Queue Management</Text>
@@ -920,23 +938,23 @@ export default function AdminQueueScreen() {
 
           <Pressable style={styles.hostQueueBtn} onPress={() => router.push('/pages/admin/admin_queue_hosting')}>
             <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.hostQueueIconBox}>
-              <Ionicons name="add-circle-outline" size={20} color="#ffffff" />
+              <PlusCircle size={20} color="#ffffff" />
             </LinearGradient>
             <View style={{ flex: 1 }}>
               <Text style={styles.hostQueueTitle}>Host Queue</Text>
               <Text style={styles.hostQueueSubtitle}>Open a new queue line and manage service slots</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.blue} />
+            <ChevronRight size={20} color={theme.blue} />
           </Pressable>
 
           {/* System Stats */}
           <View style={styles.statsGrid}>
             {(
               [
-                { key: 'activeQueues', label: 'Active Queues', value: String(systemStats.totalQueues), icon: 'pulse-outline' as IoniconName },
-                { key: 'totalWaiting', label: 'Total Waiting', value: String(systemStats.totalWaiting), icon: 'people-outline' as IoniconName },
-                { key: 'avgWaitTime', label: 'Avg Wait Time', value: systemStats.avgWaitTime, icon: 'time-outline' as IoniconName },
-                { key: 'operational', label: 'Operational', value: `${systemStats.operational}/${systemStats.totalQueues}`, icon: 'trending-up-outline' as IoniconName },
+                { key: 'activeQueues', label: 'Active Queues', value: String(systemStats.totalQueues), icon: Activity },
+                { key: 'totalWaiting', label: 'Total Waiting', value: String(systemStats.totalWaiting), icon: Users },
+                { key: 'avgWaitTime', label: 'Avg Wait Time', value: systemStats.avgWaitTime, icon: Clock },
+                { key: 'operational', label: 'Operational', value: `${systemStats.operational}/${systemStats.totalQueues}`, icon: TrendingUp },
               ] as const
             ).map((stat) => {
               const tint = STAT_TINTS[stat.key];
@@ -944,7 +962,7 @@ export default function AdminQueueScreen() {
                 <View key={stat.key} style={[styles.statCard, { borderColor: tint.border }]}>
                   <View style={styles.statCardTop}>
                     <Text style={styles.statCardLabel}>{stat.label}</Text>
-                    <Ionicons name={stat.icon} size={18} color={tint.color} />
+                    <stat.icon size={18} color={tint.color} />
                   </View>
                   <Text style={[styles.statCardValue, { color: tint.color }]}>{stat.value}</Text>
                 </View>
@@ -964,10 +982,10 @@ export default function AdminQueueScreen() {
                   <Text style={styles.filterSelectText} numberOfLines={1}>
                     {collegeOverviewFilter === 'all' ? 'All Colleges' : collegeOverviewFilter}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                  <ChevronDown size={14} color={theme.tertiary} />
                 </Pressable>
                 <Pressable style={styles.refreshBtnSm} onPress={fetchQueues} hitSlop={8}>
-                  <Ionicons name="refresh-outline" size={16} color={theme.text} />
+                  <RefreshCw size={16} color={theme.text} />
                 </Pressable>
               </View>
             </View>
@@ -1029,19 +1047,19 @@ export default function AdminQueueScreen() {
                   <Text style={styles.filterSelectText} numberOfLines={1}>
                     {serviceTypeFilter === 'all' ? 'All Types' : serviceTypeFilter}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color={theme.tertiary} />
+                  <ChevronDown size={14} color={theme.tertiary} />
                 </Pressable>
               )}
             </View>
 
             {activeQueueDetails.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <Activity size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No active queues found</Text>
               </View>
             ) : filteredQueueDetails.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="alert-circle-outline" size={28} color={theme.tertiary} />
+                <Activity size={28} color={theme.tertiary} />
                 <Text style={styles.emptyTitle}>No queues match this service type</Text>
               </View>
             ) : (
@@ -1092,7 +1110,7 @@ export default function AdminQueueScreen() {
                     </View>
 
                     <Pressable style={styles.monitorBtn} onPress={() => openMonitor(detail.id)}>
-                      <Ionicons name="alert-circle-outline" size={16} color="#ffffff" />
+                      <AlertCircle size={16} color="#ffffff" />
                       <Text style={styles.monitorBtnText}>Monitor</Text>
                     </Pressable>
                   </View>
@@ -1195,7 +1213,7 @@ function NavDrawer({
                   style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                   onPress={() => onNavPress(item.key)}
                 >
-                  <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                  <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                   <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                 </Pressable>
               );

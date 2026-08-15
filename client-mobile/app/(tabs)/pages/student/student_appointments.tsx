@@ -3,6 +3,8 @@ import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   Modal,
   Pressable,
@@ -16,6 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Calendar, CalendarDays, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ClipboardList,
+  Clock, FileText, GraduationCap, Home as HomeIcon, Loader2, MapPin, Megaphone, Users, X, XCircle,
+} from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
@@ -23,12 +29,31 @@ import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
+// Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
+function SpinningLoader({ size, color }: { size: number; color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
+
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+type LucideIconType = typeof Calendar;
 
 function OamsLogo({
   style,
@@ -134,27 +159,36 @@ function buildTwoWeekDates() {
   return { thisWeek: buildWeek(0), nextWeek: buildWeek(1) };
 }
 
-const STATUS_STYLES: Record<BookingStatus, { bg: string; border: string; color: string }> = {
-  pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
-  approved: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
-  completed: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' },
-  rejected: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' },
-  cancelled: { bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.4)', color: '#94a3b8' },
+// Mirrors AppointmentListItem.css's .apst-badge-* (dark) and
+// [data-theme="light"] .apst-badge-* (light) values exactly.
+const STATUS_STYLES_DARK: Record<BookingStatus, { bg: string; border: string; color: string }> = {
+  pending: { bg: 'rgba(251, 191, 36, 0.2)', border: 'rgba(251, 191, 36, 0.4)', color: '#fcd34d' },
+  approved: { bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.35)', color: '#86efac' },
+  completed: { bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.35)', color: '#34d399' },
+  rejected: { bg: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.35)', color: '#fca5a5' },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#d1d5db' },
+};
+const STATUS_STYLES_LIGHT: Record<BookingStatus, { bg: string; border: string; color: string }> = {
+  pending: { bg: 'rgba(217, 119, 6, 0.1)', border: 'rgba(217, 119, 6, 0.3)', color: '#92400e' },
+  approved: { bg: 'rgba(5, 150, 105, 0.1)', border: 'rgba(5, 150, 105, 0.25)', color: '#065f46' },
+  completed: { bg: 'rgba(5, 150, 105, 0.1)', border: 'rgba(5, 150, 105, 0.25)', color: '#065f46' },
+  rejected: { bg: 'rgba(220, 38, 38, 0.08)', border: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' },
+  cancelled: { bg: 'rgba(107, 114, 128, 0.08)', border: 'rgba(107, 114, 128, 0.2)', color: '#374151' },
 };
 
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 const MONTH_NAMES = [
@@ -496,7 +530,7 @@ export default function StudentAppointmentsScreen() {
       return (
         <View key={date} style={styles.dateGroupDisabled}>
           <View style={styles.dateHeaderRow}>
-            <Ionicons name="calendar-outline" size={18} color={theme.tertiary} />
+            <Calendar size={18} color={theme.tertiary} />
             <Text style={styles.dateHeaderTextDisabled}>{formatDate(date)}</Text>
           </View>
           <Text style={styles.dateCountDisabled}>
@@ -508,11 +542,11 @@ export default function StudentAppointmentsScreen() {
     return (
       <View key={date} style={styles.dateGroup}>
         <View style={styles.dateHeaderRow}>
-          <Ionicons name="calendar-outline" size={18} color={theme.purple} />
+          <Calendar size={18} color={theme.purple} />
           <Text style={styles.dateHeaderText}>{formatDate(date)}</Text>
         </View>
         <View style={styles.slotCountBadge}>
-          <Ionicons name="calendar-outline" size={12} color={theme.purple} />
+          <CalendarDays size={12} color={theme.purple} />
           <Text style={styles.slotCountBadgeText}>{daySlots.length} Slots</Text>
         </View>
         <View style={styles.slotsList}>
@@ -531,15 +565,15 @@ export default function StudentAppointmentsScreen() {
                 </View>
                 <View style={styles.slotDetails}>
                   <View style={styles.slotDetailRow}>
-                    <Ionicons name="time-outline" size={15} color={theme.purple} />
+                    <Clock size={15} color={theme.purple} />
                     <Text style={styles.slotDetailText}>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</Text>
                   </View>
                   <View style={styles.slotDetailRow}>
-                    <Ionicons name="location-outline" size={15} color={theme.purple} />
+                    <MapPin size={15} color={theme.purple} />
                     <Text style={styles.slotDetailText}>{slot.location}</Text>
                   </View>
                   <View style={styles.slotDetailRow}>
-                    <Ionicons name="people-outline" size={15} color={theme.purple} />
+                    <Users size={15} color={theme.purple} />
                     <Text style={styles.slotDetailText}>
                       {slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? 'spot' : 'spots'} left` : 'Unlimited'}
                       {slot.maxStudents != null ? ` (max ${slot.maxStudents})` : ''}
@@ -563,8 +597,10 @@ export default function StudentAppointmentsScreen() {
                     <Text style={styles.bookBtnTextDisabled}>Already Booked</Text>
                   </View>
                 ) : (
-                  <Pressable style={styles.bookBtn} onPress={() => openBookDialog(slot)}>
-                    <Text style={styles.bookBtnText}>Book this Slot</Text>
+                  <Pressable onPress={() => openBookDialog(slot)}>
+                    <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.bookBtn}>
+                      <Text style={styles.bookBtnText}>Book this Slot</Text>
+                    </LinearGradient>
                   </Pressable>
                 )}
               </View>
@@ -605,14 +641,14 @@ export default function StudentAppointmentsScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Breadcrumb */}
           <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={theme.subtext} />
+            <ChevronLeft size={18} color={theme.subtext} />
             <Text style={styles.breadcrumbText}>Home</Text>
           </Pressable>
 
           {/* Title */}
           <View style={styles.titleRow}>
             <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.titleIcon}>
-              <Ionicons name="calendar-outline" size={22} color="#ffffff" />
+              <Calendar size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Appointments</Text>
@@ -631,13 +667,13 @@ export default function StudentAppointmentsScreen() {
             }
           >
             <LinearGradient colors={['#7c3aed', '#a855f7']} style={styles.profSchedIcon}>
-              <Ionicons name="school-outline" size={22} color="#ffffff" />
+              <GraduationCap size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.profSchedText}>
               <Text style={styles.profSchedTitle}>Professor Schedules</Text>
               <Text style={styles.profSchedSubtitle}>Check professor consultation hours and availability across all departments.</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.purple} />
+            <ChevronRight size={18} color={theme.purple} />
           </Pressable>
 
           {/* Filters */}
@@ -654,7 +690,7 @@ export default function StudentAppointmentsScreen() {
                     return c ? `${c.abbrev} - ${c.name}` : 'Select college';
                   })()}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.purple} />
+                <ChevronDown size={16} color={theme.purple} />
               </Pressable>
             </View>
 
@@ -669,7 +705,7 @@ export default function StudentAppointmentsScreen() {
                     ? availableProfessors.find((p) => p.id === selectedProfessorId)?.name
                     : availableProfessors.length === 0 ? 'No professors available' : 'All Professors'}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={theme.purple} />
+                <ChevronDown size={16} color={theme.purple} />
               </Pressable>
             </View>
 
@@ -693,8 +729,10 @@ export default function StudentAppointmentsScreen() {
                   styles={styles}
                 />
                 {selectedDate !== '' && (
-                  <Pressable style={styles.clearDateBtn} onPress={() => setSelectedDate('')}>
-                    <Text style={styles.clearDateBtnText}>Clear date filter</Text>
+                  <Pressable onPress={() => setSelectedDate('')}>
+                    <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.clearDateBtn}>
+                      <Text style={styles.clearDateBtnText}>Clear date filter</Text>
+                    </LinearGradient>
                   </Pressable>
                 )}
               </View>
@@ -704,13 +742,13 @@ export default function StudentAppointmentsScreen() {
           {/* Tabs */}
           <View style={styles.tabsRow}>
             <Pressable style={[styles.tab, activeTab === 'slots' && styles.tabActive]} onPress={() => setActiveTab('slots')}>
-              <Ionicons name="calendar-clear-outline" size={15} color={activeTab === 'slots' ? theme.purple : theme.subtext} />
+              <CalendarDays size={15} color={activeTab === 'slots' ? theme.purple : theme.subtext} />
               <Text style={[styles.tabText, activeTab === 'slots' && styles.tabTextActive]}>Available Slots</Text>
               <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{visibleSlots.length}</Text></View>
             </Pressable>
             <Pressable style={[styles.tab, activeTab === 'bookings' && styles.tabActive]} onPress={() => setActiveTab('bookings')}>
-              <Ionicons name="clipboard-outline" size={15} color={activeTab === 'bookings' ? theme.purple : theme.subtext} />
-              <Text style={[styles.tabText, activeTab === 'bookings' && styles.tabTextActive]}>My Bookings</Text>
+              <ClipboardList size={15} color={activeTab === 'bookings' ? theme.purple : theme.subtext} />
+              <Text style={[styles.tabText, activeTab === 'bookings' && styles.tabTextActive]}>Active Bookings</Text>
               <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{activeBookings.length}</Text></View>
             </Pressable>
           </View>
@@ -720,20 +758,23 @@ export default function StudentAppointmentsScreen() {
             <View style={styles.tabPanel}>
               {slotsLoading ? (
                 <View style={styles.emptyCard}>
-                  <Text style={styles.emptyDescription}>Loading available slots…</Text>
+                  <SpinningLoader size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>Loading available slots…</Text>
                 </View>
               ) : slotsError ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
+                  <Calendar size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>Could not load slots</Text>
                   <Text style={styles.emptyDescription}>{slotsError}</Text>
-                  <Pressable style={styles.clearDateBtn} onPress={fetchSlots}>
-                    <Text style={styles.clearDateBtnText}>Retry</Text>
+                  <Pressable onPress={fetchSlots}>
+                    <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.clearDateBtn}>
+                      <Text style={styles.clearDateBtnText}>Retry</Text>
+                    </LinearGradient>
                   </Pressable>
                 </View>
               ) : availableSlots.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
+                  <Calendar size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Available Slots</Text>
                   <Text style={styles.emptyDescription}>
                     {selectedDate || selectedProfessorId ? 'Try adjusting your filters to see more results.' : 'No professors have published their consultation hours yet.'}
@@ -772,26 +813,29 @@ export default function StudentAppointmentsScreen() {
             <View style={styles.tabPanel}>
               {bookingsLoading ? (
                 <View style={styles.emptyCard}>
-                  <Text style={styles.emptyDescription}>Loading your appointments…</Text>
+                  <SpinningLoader size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyTitle}>Loading your appointments…</Text>
                 </View>
               ) : bookingsError ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                  <CheckCircle size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>Could not load your appointments</Text>
                   <Text style={styles.emptyDescription}>{bookingsError}</Text>
-                  <Pressable style={styles.clearDateBtn} onPress={fetchMyBookings}>
-                    <Text style={styles.clearDateBtnText}>Retry</Text>
+                  <Pressable onPress={fetchMyBookings}>
+                    <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.clearDateBtn}>
+                      <Text style={styles.clearDateBtnText}>Retry</Text>
+                    </LinearGradient>
                   </Pressable>
                 </View>
               ) : activeBookings.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                  <CheckCircle size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>No Appointments Booked</Text>
                   <Text style={styles.emptyDescription}>You have no active appointments yet.</Text>
                 </View>
               ) : (
                 sortedActiveBookings.map((booking) => {
-                  const s = STATUS_STYLES[booking.status];
+                  const s = isDarkMode ? STATUS_STYLES_DARK[booking.status] : STATUS_STYLES_LIGHT[booking.status];
                   return (
                     <Pressable
                       key={booking.id}
@@ -804,14 +848,16 @@ export default function StudentAppointmentsScreen() {
                       }
                     >
                       <View style={styles.bookingHeaderRow}>
-                        <Text style={styles.bookingPersonName}>{booking.person}</Text>
-                        <View style={styles.collegeBadge}>
-                          <Text style={styles.collegeBadgeText}>{collegeLabel(booking.college)}</Text>
+                        <View style={styles.bookingIconWrap}>
+                          <Calendar size={24} color={theme.purple} />
                         </View>
-                      </View>
-                      <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border, alignSelf: 'flex-start' }]}>
-                        <View style={[styles.statusDot, { backgroundColor: s.color }]} />
-                        <Text style={[styles.statusBadgeText, { color: s.color }]}>{booking.status}</Text>
+                        <View style={styles.bookingTitleSection}>
+                          <Text style={styles.bookingPersonName}>{booking.person}</Text>
+                          <Text style={styles.bookingCollegeText}>{collegeLabel(booking.college)}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
+                          <Text style={[styles.statusBadgeText, { color: s.color }]}>{booking.status}</Text>
+                        </View>
                       </View>
                       {booking.appointmentType && (
                         <View style={styles.apptTypeRow}>
@@ -819,35 +865,35 @@ export default function StudentAppointmentsScreen() {
                           <View style={styles.apptTypePill}><Text style={styles.apptTypePillText}>{booking.appointmentType}</Text></View>
                         </View>
                       )}
-                      <View style={styles.slotDetails}>
-                        <View style={styles.slotDetailRow}>
-                          <Ionicons name="calendar-outline" size={15} color={theme.purple} />
-                          <Text style={styles.slotDetailText}>{formatDate(booking.date)}</Text>
+                      <View style={styles.fieldGrid}>
+                        <View style={styles.fieldGridItem}>
+                          <Text style={styles.fieldLabel}>Date</Text>
+                          <Text style={styles.fieldValue}>{formatDate(booking.date)}</Text>
                         </View>
-                        <View style={styles.slotDetailRow}>
-                          <Ionicons name="time-outline" size={15} color={theme.purple} />
-                          <Text style={styles.slotDetailText}>
+                        <View style={styles.fieldGridItem}>
+                          <Text style={styles.fieldLabel}>Time Slot</Text>
+                          <Text style={styles.fieldValue}>
                             {booking.windowStart && booking.windowEnd
                               ? `${formatTime(booking.windowStart)} – ${formatTime(booking.windowEnd)}` : '—'}
                           </Text>
                         </View>
-                        <View style={styles.slotDetailRow}>
-                          <Ionicons name="location-outline" size={15} color={theme.purple} />
-                          <Text style={styles.slotDetailText}>{booking.location}</Text>
+                        <View style={styles.fieldGridItem}>
+                          <Text style={styles.fieldLabel}>Location</Text>
+                          <Text style={styles.fieldValue}>{booking.location}</Text>
                         </View>
+                        {booking.purpose ? (
+                          <View style={styles.fieldGridItemFull}>
+                            <Text style={styles.fieldLabel}>Purpose</Text>
+                            <Text style={styles.fieldValueFull}>{booking.purpose}</Text>
+                          </View>
+                        ) : null}
                       </View>
-                      {booking.purpose ? (
-                        <View style={styles.purposeBox}>
-                          <Text style={styles.purposeLabel}>Purpose:</Text>
-                          <Text style={styles.purposeText}>{booking.purpose}</Text>
-                        </View>
-                      ) : null}
                       <Pressable
                         style={styles.cancelBtn}
                         onPress={() => setCancelConfirmId(booking.id)}
                         disabled={cancellingId === booking.id}
                       >
-                        <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+                        <XCircle size={16} color="#ef4444" />
                         <Text style={styles.cancelBtnText}>{cancellingId === booking.id ? 'Cancelling…' : 'Cancel'}</Text>
                       </Pressable>
                     </Pressable>
@@ -885,7 +931,7 @@ export default function StudentAppointmentsScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                   </Pressable>
                 );
@@ -908,7 +954,7 @@ export default function StudentAppointmentsScreen() {
             <View style={styles.dialogHeaderRow}>
               <Text style={styles.dialogHeaderTitle}>Confirm Appointment</Text>
               <Pressable onPress={() => setShowBookDialog(false)} hitSlop={8}>
-                <Ionicons name="close" size={20} color={theme.subtext} />
+                <X size={20} color={theme.subtext} />
               </Pressable>
             </View>
             <ScrollView style={styles.dialogBody}>
@@ -918,15 +964,15 @@ export default function StudentAppointmentsScreen() {
                     <Text style={styles.slotSummaryName}>{selectedSlot.professorName}</Text>
                     <View style={styles.summaryDetails}>
                       <View style={styles.slotDetailRow}>
-                        <Ionicons name="calendar-outline" size={15} color={theme.purple} />
+                        <Calendar size={15} color={theme.purple} />
                         <Text style={styles.slotDetailText}>{formatDate(selectedSlot.date)}</Text>
                       </View>
                       <View style={styles.slotDetailRow}>
-                        <Ionicons name="time-outline" size={15} color={theme.purple} />
+                        <Clock size={15} color={theme.purple} />
                         <Text style={styles.slotDetailText}>{formatTime(selectedSlot.windowStart)} – {formatTime(selectedSlot.windowEnd)}</Text>
                       </View>
                       <View style={styles.slotDetailRow}>
-                        <Ionicons name="location-outline" size={15} color={theme.purple} />
+                        <MapPin size={15} color={theme.purple} />
                         <Text style={styles.slotDetailText}>{selectedSlot.location}</Text>
                       </View>
                     </View>
@@ -971,8 +1017,10 @@ export default function StudentAppointmentsScreen() {
               <Pressable style={styles.btnSecondary} onPress={() => setShowBookDialog(false)} disabled={submitting}>
                 <Text style={styles.btnSecondaryText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.btnPrimary} onPress={handleBookSlot} disabled={submitting}>
-                <Text style={styles.btnPrimaryText}>{submitting ? 'Booking…' : 'Confirm Booking'}</Text>
+              <Pressable onPress={handleBookSlot} disabled={submitting}>
+                <LinearGradient colors={['#a855f7', '#9333ea']} style={styles.btnPrimary}>
+                  <Text style={styles.btnPrimaryText}>{submitting ? 'Booking…' : 'Confirm Booking'}</Text>
+                </LinearGradient>
               </Pressable>
             </View>
           </View>
@@ -984,7 +1032,7 @@ export default function StudentAppointmentsScreen() {
         <View style={styles.logoutOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconCircle}>
-              <Ionicons name="calendar-outline" size={26} color="#ef4444" />
+              <XCircle size={26} color="#ef4444" />
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Appointment?</Text>
             <Text style={styles.logoutModalDescription}>
@@ -997,7 +1045,6 @@ export default function StudentAppointmentsScreen() {
                 <Text style={styles.logoutCancelBtnText}>Keep Appointment</Text>
               </Pressable>
               <Pressable style={styles.logoutConfirmBtn} onPress={doCancel} disabled={cancellingId !== null}>
-                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
                 <Text style={styles.logoutConfirmBtnText}>{cancellingId !== null ? 'Cancelling…' : 'Cancel Appointment'}</Text>
               </Pressable>
             </View>
@@ -1093,11 +1140,11 @@ function MiniCalendar({
     <View style={styles.calendarWrap}>
       <View style={styles.calendarHeaderRow}>
         <Pressable onPress={onPrevMonth} hitSlop={8} style={styles.calendarNavBtn}>
-          <Ionicons name="chevron-back" size={16} color={theme.purple} />
+          <ChevronLeft size={16} color={theme.purple} />
         </Pressable>
         <Text style={styles.calendarMonthLabel}>{MONTH_NAMES[month - 1]} {year}</Text>
         <Pressable onPress={onNextMonth} hitSlop={8} style={styles.calendarNavBtn}>
-          <Ionicons name="chevron-forward" size={16} color={theme.purple} />
+          <ChevronRight size={16} color={theme.purple} />
         </Pressable>
       </View>
       <View style={styles.calendarDowRow}>
@@ -1152,6 +1199,9 @@ type ThemePalette = {
   blue: string;
   purple: string;
   purpleDark: string;
+  collegeBadgeBg: string;
+  collegeBadgeText: string;
+  collegeBadgeBorder: string;
   iconBtnBg: string;
   iconBtnBorder: string;
 };
@@ -1173,6 +1223,9 @@ const darkPalette: ThemePalette = {
   blue: '#3b82f6',
   purple: '#a855f7',
   purpleDark: '#9333ea',
+  collegeBadgeBg: 'rgba(168, 85, 247, 0.15)',
+  collegeBadgeText: '#d8b4fe',
+  collegeBadgeBorder: 'transparent',
   iconBtnBg: 'rgba(34, 197, 94, 0.1)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.2)',
 };
@@ -1194,6 +1247,9 @@ const lightPalette: ThemePalette = {
   blue: '#2563eb',
   purple: '#9333ea',
   purpleDark: '#7c3aed',
+  collegeBadgeBg: 'rgba(147, 51, 234, 0.1)',
+  collegeBadgeText: '#7e22ce',
+  collegeBadgeBorder: 'rgba(147, 51, 234, 0.25)',
   iconBtnBg: 'rgba(34, 197, 94, 0.08)',
   iconBtnBorder: 'rgba(34, 197, 94, 0.15)',
 };
@@ -1340,17 +1396,17 @@ function createStyles(theme: ThemePalette) {
     slotHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
     slotProfessorName: { fontSize: 14, fontWeight: '700', color: theme.text, flex: 1 },
     collegeBadge: {
-      backgroundColor: 'rgba(168, 85, 247, 0.15)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.25)',
-      borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8,
+      backgroundColor: theme.collegeBadgeBg, borderWidth: 1, borderColor: theme.collegeBadgeBorder,
+      borderRadius: 6, paddingVertical: 4, paddingHorizontal: 10,
     },
-    collegeBadgeText: { fontSize: 10, fontWeight: '700', color: theme.purple, textTransform: 'uppercase' },
+    collegeBadgeText: { fontSize: 11, fontWeight: '700', color: theme.collegeBadgeText },
     slotDetails: { gap: 6 },
     slotDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     slotDetailText: { fontSize: 12, color: theme.subtext, flex: 1 },
 
     bookBtn: {
       alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, backgroundColor: theme.purple,
+      borderRadius: 12,
     },
     bookBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
     bookBtnDisabled: { backgroundColor: theme.border },
@@ -1370,19 +1426,24 @@ function createStyles(theme: ThemePalette) {
     statusGroup: { gap: 8 },
     statusGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     statusBadge: {
-      flexDirection: 'row', alignItems: 'center', gap: 6,
-      paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1,
+      alignItems: 'center', justifyContent: 'center', minWidth: 88,
+      paddingVertical: 5, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1,
     },
-    statusDot: { width: 6, height: 6, borderRadius: 3 },
-    statusBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+    statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
     statusGroupTitle: { fontSize: 14, fontWeight: '700', color: theme.text },
 
     bookingCard: {
-      backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
-      borderRadius: 16, padding: 14, gap: 10, marginBottom: 4,
+      backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)',
+      borderRadius: 16, padding: 20, gap: 14, marginBottom: 4,
     },
-    bookingHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-    bookingPersonName: { fontSize: 14, fontWeight: '700', color: theme.text, flex: 1 },
+    bookingHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    bookingIconWrap: {
+      width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(168, 85, 247, 0.12)', flexShrink: 0,
+    },
+    bookingTitleSection: { flex: 1, minWidth: 0 },
+    bookingPersonName: { fontSize: 16, fontWeight: '700', color: theme.purple },
+    bookingCollegeText: { fontSize: 13, color: theme.tertiary, marginTop: 2 },
     apptTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     apptTypeLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase' },
     apptTypePill: {
@@ -1391,19 +1452,18 @@ function createStyles(theme: ThemePalette) {
     },
     apptTypePillText: { fontSize: 11, fontWeight: '600', color: theme.purple },
 
-    purposeBox: {
-      backgroundColor: 'rgba(168, 85, 247, 0.08)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)',
-      borderRadius: 12, padding: 10, gap: 3,
-    },
-    purposeLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase' },
-    purposeText: { fontSize: 12, color: theme.text, lineHeight: 17 },
+    fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+    fieldGridItem: { width: '42%', flexGrow: 1, gap: 3 },
+    fieldGridItemFull: { width: '100%', gap: 3 },
+    fieldLabel: { fontSize: 11, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.5 },
+    fieldValue: { fontSize: 14, fontWeight: '600', color: theme.purple, lineHeight: 20 },
+    fieldValueFull: { fontSize: 14, fontWeight: '600', color: theme.text, lineHeight: 20 },
 
     cancelBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(239, 68, 68, 0.35)',
-      backgroundColor: 'rgba(239, 68, 68, 0.05)',
+      marginTop: 4, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
     },
-    cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    cancelBtnText: { fontSize: 13, fontWeight: '600', color: '#ef4444' },
 
     // Nav drawer
     drawerOverlay: { flex: 1, flexDirection: 'row' },
@@ -1473,7 +1533,7 @@ function createStyles(theme: ThemePalette) {
       flexDirection: 'row', gap: 10, justifyContent: 'flex-end',
       padding: 18, borderTopWidth: 1, borderTopColor: theme.border,
     },
-    btnPrimary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12, backgroundColor: theme.purple },
+    btnPrimary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12 },
     btnPrimaryText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
     btnSecondary: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12, borderWidth: 1, borderColor: theme.border },
     btnSecondaryText: { fontSize: 13, fontWeight: '700', color: theme.subtext },

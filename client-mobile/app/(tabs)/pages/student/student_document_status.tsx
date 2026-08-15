@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   Image,
   ImageSourcePropType,
   Modal,
@@ -16,6 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertCircle, Calendar, CheckCircle, ChevronLeft, Clock, FileText, Home as HomeIcon, Loader2,
+  Megaphone, MessageSquare, Users, XCircle, ClipboardList,
+} from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import NotificationBell from '@/components/NotificationBell';
@@ -24,6 +30,30 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import { DocStatus, getDetailStatusMeta } from '@/utils/documentStatus';
+
+// Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
+function SpinningLoader({ size, color }: { size: number; color: string }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
+
+const formatDateTimeLong = (dateString?: string) => {
+  if (!dateString) return '—';
+  const d = new Date(dateString);
+  return `${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+};
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -116,19 +146,21 @@ interface DocumentTypeOption {
   requirements: DocumentRequirement[];
 }
 
+type LucideIconType = typeof FileText;
+
 interface NavItem {
   key: string;
   label: string;
-  icon: IoniconName;
+  icon: LucideIconType;
 }
 
 const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: 'grid-outline' },
-  { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline' },
-  { key: 'queue', label: 'Queue', icon: 'time-outline' },
-  { key: 'appointments', label: 'Appointments', icon: 'calendar-outline' },
-  { key: 'documents', label: 'Documents', icon: 'document-text-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
+  { key: 'dashboard', label: 'Home', icon: HomeIcon },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
+  { key: 'queue', label: 'Queue', icon: Users },
+  { key: 'appointments', label: 'Appointments', icon: Calendar },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'transactions', label: 'Transactions', icon: ClipboardList },
 ];
 
 const formatDateLong = (dateString?: string) => {
@@ -143,11 +175,11 @@ const formatDateShort = (dateString?: string) => {
 
 const TABS = ['active', 'claimed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
-const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
-  active: { label: 'Active Requests', icon: 'alert-circle-outline' },
-  claimed: { label: 'Claimed', icon: 'checkmark-circle-outline' },
-  rejected: { label: 'Rejected', icon: 'close-circle-outline' },
-  cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
+const TAB_META: Record<TabKey, { label: string; icon: LucideIconType }> = {
+  active: { label: 'Active Requests', icon: AlertCircle },
+  claimed: { label: 'Claimed', icon: CheckCircle },
+  rejected: { label: 'Rejected', icon: XCircle },
+  cancelled: { label: 'Cancelled', icon: XCircle },
 };
 
 export default function StudentDocumentStatusScreen() {
@@ -157,8 +189,9 @@ export default function StudentDocumentStatusScreen() {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const params = useLocalSearchParams<{ docId?: string }>();
+  const params = useLocalSearchParams<{ docId?: string; from?: string }>();
   const [selectedDocId, setSelectedDocId] = useState<string | null>(params.docId ?? null);
+  const [fromDocumentsPage] = useState(params.from === 'documents');
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -323,8 +356,10 @@ export default function StudentDocumentStatusScreen() {
               theme={theme}
               styles={styles}
               doc={selectedDoc}
+              isDarkMode={isDarkMode}
               collegeLogoFor={collegeLogoFor}
-              onBack={() => setSelectedDocId(null)}
+              backLabel={fromDocumentsPage ? 'Document Requests' : 'All Documents'}
+              onBack={() => (fromDocumentsPage ? router.push('/pages/student/student_documents') : setSelectedDocId(null))}
               onCancel={() => setShowCancelDialog(true)}
               requirements={selectedDocRequirements}
               reqLoading={reqLoading}
@@ -333,14 +368,14 @@ export default function StudentDocumentStatusScreen() {
             <>
               {/* Breadcrumb */}
               <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
-                <Ionicons name="chevron-back" size={18} color={theme.subtext} />
-                <Text style={styles.breadcrumbText}>Dashboard</Text>
+                <ChevronLeft size={18} color={theme.subtext} />
+                <Text style={styles.breadcrumbText}>Home</Text>
               </Pressable>
 
               {/* Title */}
               <View style={styles.titleRow}>
                 <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
-                  <Ionicons name="document-text-outline" size={22} color="#ffffff" />
+                  <FileText size={22} color="#ffffff" />
                 </LinearGradient>
                 <View style={styles.titleTextWrap}>
                   <Text style={styles.pageTitle}>My Document Requests</Text>
@@ -350,18 +385,15 @@ export default function StudentDocumentStatusScreen() {
 
               {error && (
                 <View style={styles.emptyCard}>
-                  <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
-                  <Text style={styles.emptyTitle}>Something went wrong</Text>
+                  <AlertCircle size={32} color="#ef4444" />
                   <Text style={styles.emptyDescription}>{error}</Text>
-                  <Pressable style={styles.emptyRequestBtn} onPress={fetchDocuments}>
-                    <Text style={styles.emptyRequestBtnText}>Retry</Text>
-                  </Pressable>
                 </View>
               )}
 
-              {loading && !error && (
+              {loading && (
                 <View style={styles.emptyCard}>
-                  <Text style={styles.emptyDescription}>Loading documents…</Text>
+                  <SpinningLoader size={28} color={theme.tertiary} />
+                  <Text style={styles.emptyDescription}>Loading your documents…</Text>
                 </View>
               )}
 
@@ -376,9 +408,10 @@ export default function StudentDocumentStatusScreen() {
               >
                 {TABS.map((tab) => {
                   const active = activeTab === tab;
+                  const TabIcon = TAB_META[tab].icon;
                   return (
                     <Pressable key={tab} style={[styles.tab, active && styles.tabActive]} onPress={() => setActiveTab(tab)}>
-                      <Ionicons name={TAB_META[tab].icon} size={15} color={active ? theme.orange : theme.subtext} />
+                      <TabIcon size={15} color={active ? theme.orange : theme.subtext} />
                       <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_META[tab].label}</Text>
                       <View style={styles.tabCountPill}><Text style={styles.tabCountText}>{tabCounts[tab]}</Text></View>
                     </Pressable>
@@ -396,6 +429,7 @@ export default function StudentDocumentStatusScreen() {
                         theme={theme}
                         styles={styles}
                         doc={doc}
+                        isDarkMode={isDarkMode}
                         completed={false}
                         onPress={() => setSelectedDocId(doc.id)}
                       />
@@ -403,7 +437,7 @@ export default function StudentDocumentStatusScreen() {
                   </View>
                 ) : (
                   <View style={styles.emptyCard}>
-                    <Ionicons name="document-text-outline" size={32} color={theme.tertiary} />
+                    <FileText size={32} color={theme.tertiary} />
                     <Text style={styles.emptyTitle}>No Active Requests</Text>
                     <Text style={styles.emptyDescription}>You have no active document requests.</Text>
                     <Pressable style={styles.emptyRequestBtn} onPress={() => router.push('/pages/student/student_documents')}>
@@ -423,6 +457,7 @@ export default function StudentDocumentStatusScreen() {
                         theme={theme}
                         styles={styles}
                         doc={doc}
+                        isDarkMode={isDarkMode}
                         completed
                         onPress={() => setSelectedDocId(doc.id)}
                       />
@@ -430,7 +465,7 @@ export default function StudentDocumentStatusScreen() {
                   </View>
                 ) : (
                   <View style={styles.emptyCard}>
-                    <Ionicons name="checkmark-circle-outline" size={32} color={theme.tertiary} />
+                    <CheckCircle size={32} color={theme.tertiary} />
                     <Text style={styles.emptyTitle}>No Completed Requests</Text>
                     <Text style={styles.emptyDescription}>You have no records of claimed documents.</Text>
                   </View>
@@ -447,6 +482,7 @@ export default function StudentDocumentStatusScreen() {
                         theme={theme}
                         styles={styles}
                         doc={doc}
+                        isDarkMode={isDarkMode}
                         completed
                         onPress={() => setSelectedDocId(doc.id)}
                       />
@@ -454,7 +490,7 @@ export default function StudentDocumentStatusScreen() {
                   </View>
                 ) : (
                   <View style={styles.emptyCard}>
-                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <XCircle size={32} color={theme.tertiary} />
                     <Text style={styles.emptyTitle}>No Rejected Requests</Text>
                     <Text style={styles.emptyDescription}>You have no records of rejected document requests.</Text>
                   </View>
@@ -471,6 +507,7 @@ export default function StudentDocumentStatusScreen() {
                         theme={theme}
                         styles={styles}
                         doc={doc}
+                        isDarkMode={isDarkMode}
                         completed
                         onPress={() => setSelectedDocId(doc.id)}
                       />
@@ -478,7 +515,7 @@ export default function StudentDocumentStatusScreen() {
                   </View>
                 ) : (
                   <View style={styles.emptyCard}>
-                    <Ionicons name="close-circle-outline" size={32} color={theme.tertiary} />
+                    <XCircle size={32} color={theme.tertiary} />
                     <Text style={styles.emptyTitle}>No Cancelled Requests</Text>
                     <Text style={styles.emptyDescription}>You have no records of cancelled document requests.</Text>
                   </View>
@@ -517,7 +554,7 @@ export default function StudentDocumentStatusScreen() {
                     style={[styles.drawerNavItem, active && styles.drawerNavItemActive]}
                     onPress={() => handleNavPress(item.key)}
                   >
-                    <Ionicons name={item.icon} size={18} color={active ? '#ffffff' : theme.subtext} />
+                    <item.icon size={18} color={active ? '#ffffff' : theme.subtext} />
                     <Text style={[styles.drawerNavLabel, active && styles.drawerNavLabelActive]}>{item.label}</Text>
                   </Pressable>
                 );
@@ -538,7 +575,7 @@ export default function StudentDocumentStatusScreen() {
         <View style={styles.logoutOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconCircle}>
-              <Ionicons name="document-text-outline" size={26} color="#ef4444" />
+              <XCircle size={26} color="#ef4444" />
             </View>
             <Text style={styles.logoutModalTitle}>Cancel Request?</Text>
             <Text style={styles.logoutModalDescription}>
@@ -550,7 +587,6 @@ export default function StudentDocumentStatusScreen() {
                 <Text style={styles.logoutCancelBtnText}>Keep Request</Text>
               </Pressable>
               <Pressable style={styles.logoutConfirmBtn} onPress={confirmCancelRequest} disabled={cancelling}>
-                <Ionicons name="close-circle-outline" size={16} color="#ffffff" />
                 <Text style={styles.logoutConfirmBtnText}>{cancelling ? 'Cancelling…' : 'Cancel Request'}</Text>
               </Pressable>
             </View>
@@ -591,20 +627,22 @@ function DocumentListItem({
   styles,
   doc,
   completed,
+  isDarkMode,
   onPress,
 }: {
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
   doc: DocumentRecord;
   completed: boolean;
+  isDarkMode: boolean;
   onPress: () => void;
 }) {
-  const meta = getDetailStatusMeta(doc.status);
+  const meta = getDetailStatusMeta(doc.status, isDarkMode);
   return (
     <Pressable style={[styles.listCard, completed && styles.listCardCompleted]} onPress={onPress}>
       <View style={styles.listCardHeader}>
         <View style={[styles.listIconWrap, completed && styles.listIconWrapCompleted]}>
-          <Ionicons name="document-text-outline" size={20} color={completed ? theme.tertiary : theme.orange} />
+          <FileText size={20} color={completed ? theme.tertiary : theme.orange} />
         </View>
         <View style={styles.listTitleSection}>
           <Text style={styles.listTitle}>{doc.type}</Text>
@@ -650,7 +688,9 @@ function DocumentDetail({
   theme,
   styles,
   doc,
+  isDarkMode,
   collegeLogoFor,
+  backLabel,
   onBack,
   onCancel,
   requirements,
@@ -659,27 +699,29 @@ function DocumentDetail({
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
   doc: DocumentRecord;
+  isDarkMode: boolean;
   collegeLogoFor: (abbrev?: string) => ImageSourcePropType;
+  backLabel: string;
   onBack: () => void;
   onCancel: () => void;
   requirements: DocumentRequirement[];
   reqLoading: boolean;
 }) {
-  const meta = getDetailStatusMeta(doc.status);
+  const meta = getDetailStatusMeta(doc.status, isDarkMode);
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
 
   return (
     <>
       {/* Breadcrumb */}
       <Pressable style={styles.breadcrumb} onPress={onBack} hitSlop={8}>
-        <Ionicons name="chevron-back" size={18} color={theme.subtext} />
-        <Text style={styles.breadcrumbText}>All Documents</Text>
+        <ChevronLeft size={18} color={theme.subtext} />
+        <Text style={styles.breadcrumbText}>{backLabel}</Text>
       </Pressable>
 
       {/* Title */}
       <View style={styles.titleRow}>
         <LinearGradient colors={['#f97316', '#ea580c']} style={styles.titleIcon}>
-          <Ionicons name="document-text-outline" size={22} color="#ffffff" />
+          <FileText size={22} color="#ffffff" />
         </LinearGradient>
         <View style={styles.titleTextWrap}>
           <Text style={styles.pageTitle}>Document Details</Text>
@@ -707,29 +749,29 @@ function DocumentDetail({
 
       {/* Ready alert */}
       {doc.status === 'ready' && (
-        <View style={styles.readyBanner}>
-          <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
+        <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.readyBanner}>
+          <CheckCircle size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
             Your document is ready for pickup — please proceed to the designated location.
           </Text>
-        </View>
+        </LinearGradient>
       )}
 
       {/* Released alert */}
       {doc.status === 'released' && (
-        <View style={styles.readyBanner}>
-          <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
+        <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.readyBanner}>
+          <CheckCircle size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
             Your document has been released to the designated location — visit to complete pickup.
           </Text>
-        </View>
+        </LinearGradient>
       )}
 
       {/* Request details */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="document-text-outline" size={18} color={theme.orange} />
+            <FileText size={18} color={theme.orange} />
             <Text style={styles.cardTitleText}>Request Details</Text>
           </View>
           <View style={[styles.statusBadgePill, { backgroundColor: meta.bg, borderColor: meta.border }]}>
@@ -749,8 +791,8 @@ function DocumentDetail({
         </View>
         {doc.status === 'claimed' && doc.claimedDate ? (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date Acquired</Text>
-            <Text style={styles.detailValue}>{formatDateLong(doc.claimedDate)}</Text>
+            <Text style={styles.detailLabel}>Date and Time Claimed</Text>
+            <Text style={styles.detailValue}>{formatDateTimeLong(doc.claimedDate)}</Text>
           </View>
         ) : doc.status === 'released' && doc.releasedDate ? (
           <View style={styles.detailRow}>
@@ -772,7 +814,7 @@ function DocumentDetail({
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="checkmark-circle-outline" size={18} color={theme.orange} />
+            <CheckCircle size={18} color={theme.orange} />
             <Text style={styles.cardTitleText}>Requirements</Text>
           </View>
         </View>
@@ -785,7 +827,7 @@ function DocumentDetail({
           <View style={{ gap: 10 }}>
             {requirements.map((req) => (
               <View key={req.name} style={styles.reqItemRow}>
-                <Ionicons name="checkmark-circle-outline" size={16} color={theme.orange} style={{ marginTop: 1 }} />
+                <CheckCircle size={16} color={theme.orange} style={{ marginTop: 1 }} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={styles.hintRequirementNameRow}>
                     <Text style={styles.bodyText}>{req.name}</Text>
@@ -812,7 +854,7 @@ function DocumentDetail({
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardTitleRow}>
-              <Ionicons name="chatbox-outline" size={18} color={theme.orange} />
+              <MessageSquare size={18} color={theme.orange} />
               <Text style={styles.cardTitleText}>Notes</Text>
             </View>
           </View>
@@ -825,7 +867,7 @@ function DocumentDetail({
         <View style={[styles.card, styles.cancelCard]}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardTitleRow}>
-              <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
+              <XCircle size={18} color="#ef4444" />
               <Text style={[styles.cardTitleText, { color: '#ef4444' }]}>Cancel Request</Text>
             </View>
           </View>
@@ -1010,7 +1052,7 @@ function createStyles(theme: ThemePalette) {
     // Banners
     readyBanner: {
       flexDirection: 'row', alignItems: 'center', gap: 10,
-      backgroundColor: '#16a34a', borderRadius: 16, padding: 14,
+      borderRadius: 16, padding: 14,
     },
     readyBannerText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#ffffff' },
 
