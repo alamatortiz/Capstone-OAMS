@@ -749,31 +749,37 @@ export default function StudentDashboard() {
                 </div>
               ) : (
                 <div className="activity-list">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="activity-item">
-                      <div
-                        className={`activity-icon activity-${activity.type}`}
-                      >
-                        {activity.type === "queue" && <QueueIconNav />}
-                        {activity.type === "appointment" && <CalendarIconNav />}
-                        {activity.type === "document" && <FileText />}
+                  {recentActivity.map((activity) => {
+                    // A sent document shares document's icon/badge treatment
+                    // -- same visual family, just the opposite direction
+                    // (already disambiguated by the "Sent: ..." title text).
+                    const isDocLike = activity.type === "document" || activity.type === "submission";
+                    return (
+                      <div key={activity.id} className="activity-item">
+                        <div
+                          className={`activity-icon activity-${isDocLike ? "document" : activity.type}`}
+                        >
+                          {activity.type === "queue" && <QueueIconNav />}
+                          {activity.type === "appointment" && <CalendarIconNav />}
+                          {isDocLike && <FileText />}
+                        </div>
+                        <div className="activity-details">
+                          <p className="activity-title">{activity.title}</p>
+                          <p className="activity-college">{activity.college}</p>
+                          <p className="activity-time">{activity.time}</p>
+                        </div>
+                        <span
+                          className={`activity-badge ${
+                            isDocLike
+                              ? `activity-status-doc-${activity.status}`
+                              : `activity-status-${activity.status}`
+                          }`}
+                        >
+                          {formatActivityStatus(activity.status, activity.type)}
+                        </span>
                       </div>
-                      <div className="activity-details">
-                        <p className="activity-title">{activity.title}</p>
-                        <p className="activity-college">{activity.college}</p>
-                        <p className="activity-time">{activity.time}</p>
-                      </div>
-                      <span
-                        className={`activity-badge ${
-                          activity.type === "document"
-                            ? `activity-status-doc-${activity.status}`
-                            : `activity-status-${activity.status}`
-                        }`}
-                      >
-                        {formatActivityStatus(activity.status, activity.type)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

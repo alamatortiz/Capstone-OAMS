@@ -266,6 +266,7 @@ export default function TransactionsPage() {
       case "appointment":
         return <CalendarIconNav />;
       case "document":
+      case "submission":
         return <FileText />;
       default:
         return <AlertCircleIcon />;
@@ -279,6 +280,7 @@ export default function TransactionsPage() {
       case "appointment":
         return "tx-badge-appointment";
       case "document":
+      case "submission":
         return "tx-badge-document";
       default:
         return "tx-badge-default";
@@ -370,6 +372,7 @@ export default function TransactionsPage() {
                   { value: "queue", label: "Queue" },
                   { value: "appointment", label: "Appointment" },
                   { value: "document", label: "Document" },
+                  { value: "submission", label: "Sent Document" },
                 ]}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />

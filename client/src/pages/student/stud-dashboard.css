@@ -371,14 +371,15 @@ body {
 }
 
 .student-dashboard .stat-icon.dash-bg-orange-50 {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
-  color: var(--warning);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.2);
 }
 
 [data-theme="light"] .student-dashboard .stat-icon.dash-bg-orange-50 {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.15);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.04) 100%);
+  border: 1px solid rgba(249, 115, 22, 0.15);
+  color: #ea580c;
 }
 
 .student-dashboard .stat-icon.dash-bg-purple-50 {
@@ -614,12 +615,12 @@ body {
 }
 
 .student-dashboard .action-gradient-6 {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
 }
 
 .student-dashboard .action-badge {
   background: rgba(22, 163, 74, 0.15);
-  color: var(--primary-light);
+  color: #22c55e;
   padding: 0.375rem 0.625rem;
   border-radius: 0.625rem;
   margin-bottom: 0.5rem;
@@ -634,6 +635,10 @@ body {
 
 .student-dashboard .quick-action-card:hover .action-badge {
   background: rgba(22, 163, 74, 0.25);
+}
+
+[data-theme="light"] .student-dashboard .action-badge {
+  color: #15803d;
 }
 
 /* Violet badge — Appointments (gradient-2) & Professor Schedules (gradient-4) */
@@ -684,23 +689,23 @@ body {
 
 /* Orange badge — Document Requests (gradient-6) */
 .student-dashboard .quick-action-card:has(.action-gradient-6) .action-badge {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
-  border-color: rgba(245, 158, 11, 0.25);
+  background: rgba(249, 115, 22, 0.15);
+  color: #fdba74;
+  border-color: rgba(249, 115, 22, 0.25);
 }
 
 .student-dashboard .quick-action-card:has(.action-gradient-6):hover .action-badge {
-  background: rgba(245, 158, 11, 0.25);
+  background: rgba(249, 115, 22, 0.25);
 }
 
 [data-theme="light"] .student-dashboard .quick-action-card:has(.action-gradient-6) .action-badge {
-  background: rgba(217, 119, 6, 0.1);
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.25);
+  background: rgba(234, 88, 12, 0.1);
+  color: #ea580c;
+  border-color: rgba(234, 88, 12, 0.25);
 }
 
 [data-theme="light"] .student-dashboard .quick-action-card:has(.action-gradient-6):hover .action-badge {
-  background: rgba(217, 119, 6, 0.2);
+  background: rgba(234, 88, 12, 0.2);
 }
 
 .student-dashboard .action-title {

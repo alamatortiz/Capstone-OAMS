@@ -38,7 +38,7 @@ export const NOTIFICATION_TYPE_META: Record<
   { label: string; icon: string; color: string }
 > = {
   queue: { label: 'Queue', icon: 'time-outline', color: '#3b82f6' },
-  document: { label: 'Document', icon: 'document-text-outline', color: '#f59e0b' },
+  document: { label: 'Document', icon: 'document-text-outline', color: '#f97316' },
   appointment: { label: 'Appointment', icon: 'calendar-outline', color: '#a855f7' },
-  announcement: { label: 'Announcement', icon: 'megaphone-outline', color: '#ec4899' },
+  announcement: { label: 'Announcement', icon: 'megaphone-outline', color: '#22c55e' },
 };

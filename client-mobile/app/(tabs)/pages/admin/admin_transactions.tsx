@@ -88,7 +88,7 @@ function OamsLogo({
 // unlike the design-mockup AdminTransactionsPage.tsx (a "Comprehensive /
 // system-wide" view across all six colleges), this mirrors the actual wired
 // admin-transactions.jsx: one department's transaction log only. ───
-type TxType = 'queue' | 'appointment' | 'document';
+type TxType = 'queue' | 'appointment' | 'document' | 'submission';
 type TxStatus = string;
 
 interface Transaction {
@@ -123,7 +123,10 @@ const navItems: NavItem[] = [
 const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
   queue: { label: 'Queue', icon: Clock, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
   appointment: { label: 'Appointment', icon: Calendar, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
-  document: { label: 'Document', icon: FileText, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
+  document: { label: 'Document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#f97316' },
+  // Shares document's visual family -- opposite direction, already
+  // disambiguated by the "Sent Document" label and action text.
+  submission: { label: 'Sent Document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#f97316' },
 };
 
 const STATUS_META: Record<string, { label: string; bg: string; border: string; color: string }> = {
@@ -150,6 +153,7 @@ const TYPE_OPTIONS = [
   { value: 'queue', label: 'Queue' },
   { value: 'appointment', label: 'Appointment' },
   { value: 'document', label: 'Document' },
+  { value: 'submission', label: 'Sent Document' },
 ];
 
 const STATUS_OPTIONS = [
@@ -305,8 +309,8 @@ export default function AdminTransactionsScreen() {
   const STAT_TINTS = {
     total: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: theme.primary },
     queue: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
-    appointments: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
-    documents: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
+    appointments: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
+    documents: { bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#f97316' },
   } as const;
 
   const statCards: { key: keyof typeof stats; label: string; icon: LucideIconType }[] = [

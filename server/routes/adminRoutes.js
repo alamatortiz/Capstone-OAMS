@@ -9,7 +9,7 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
-const { upload, UPLOAD_DIR, MAX_FILES } = require("../middleware/upload");
+const { upload, UPLOAD_DIR, MAX_FILES, documentSubmissionUpload } = require("../middleware/upload");
 const {
   getAttachmentsMap,
   getAttachments,
@@ -18,6 +18,12 @@ const {
   deleteFiles,
   serveAnnouncementAttachment,
 } = require("../utils/announcementAttachments");
+const {
+  getFilesMap: getSubmissionFilesMap,
+  insertFiles: insertSubmissionFiles,
+  deleteFiles: deleteSubmissionFiles,
+  serveAdminDocumentSubmissionFile,
+} = require("../utils/documentSubmissionAttachments");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 const { getManilaDateString, getManilaTimeString, formatRelativeTime, formatTime12h: formatTime } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
@@ -28,6 +34,8 @@ const {
   STATUS_LABEL_MAP,
   VALID_SCAN_STATUSES,
   REQUIRED_PRIOR_STATUS,
+  SUBMISSION_DB_STATUS_MAP,
+  SUBMISSION_REQUIRED_PRIOR_STATUS,
 } = require("../utils/documentStatus");
 const { createNotification, createNotificationsBatch } = require("../utils/notifications");
 const { sendPushNotification } = require("../utils/pushNotifications");
@@ -64,7 +72,8 @@ router.get(
         [manilaToday, deptId, deptId],
       );
 
-      // 2. Pending documents (student + faculty requests, in this department's services)
+      // 2. Pending documents (student requests + faculty requests + student
+      // "sent" submissions, in this department's services)
       const [[docRow]] = await pool.query(
         `SELECT
            (SELECT COUNT(*) FROM document_requests dr
@@ -76,8 +85,12 @@ router.get(
               JOIN document_services s ON fdr.service_id = s.service_id
               WHERE fdr.status IN ('pending', 'processing')
                 AND (? IS NULL OR s.department_id = ?))
+           +
+           (SELECT COUNT(*) FROM document_submissions ds
+              WHERE ds.status IN ('pending', 'processing')
+                AND (? IS NULL OR ds.department_id = ?))
            AS pending_doc_count`,
-        [deptId, deptId, deptId, deptId],
+        [deptId, deptId, deptId, deptId, deptId, deptId],
       );
 
       // 3. Faculty available today -- shares the exact same schedule/toggle
@@ -96,17 +109,21 @@ router.get(
         [deptId],
       );
 
-      // 5. Pending documents list (latest 5 for the card, student + faculty combined)
+      // 5. Pending documents list (latest 5 for the card, student requests +
+      // faculty requests + student "sent" submissions combined). id_prefix
+      // keeps the 3 sources' auto-increment ids from colliding once merged
+      // into one list -- same trick GET /student/documents uses.
       const [pendingDocuments] = await pool.query(
         `SELECT * FROM (
            (SELECT
-              dr.request_id,
-              dr.request_type,
+              dr.request_id AS id,
+              dr.request_type AS document_name,
               dr.status,
               dr.created_at,
               CONCAT(st.first_name, ' ', st.last_name) AS requester_name,
               d.department_abbreviation AS college,
-              'student' AS requester_type
+              'student' AS requester_type,
+              'req' AS id_prefix
             FROM document_requests dr
             JOIN students st ON dr.student_id = st.student_id
             JOIN document_services s ON dr.service_id = s.service_id
@@ -115,23 +132,39 @@ router.get(
               AND (? IS NULL OR s.department_id = ?))
            UNION ALL
            (SELECT
-              fdr.request_id,
-              fdr.request_type,
+              fdr.request_id AS id,
+              fdr.request_type AS document_name,
               fdr.status,
               fdr.created_at,
               CONCAT(f.first_name, ' ', f.last_name) AS requester_name,
               d.department_abbreviation AS college,
-              'faculty' AS requester_type
+              'faculty' AS requester_type,
+              'fac' AS id_prefix
             FROM faculty_document_requests fdr
             JOIN faculty f ON fdr.faculty_id = f.faculty_id
             JOIN document_services s ON fdr.service_id = s.service_id
             JOIN departments d ON s.department_id = d.department_id
             WHERE fdr.status IN ('pending', 'processing')
               AND (? IS NULL OR s.department_id = ?))
+           UNION ALL
+           (SELECT
+              ds.submission_id AS id,
+              ds.title AS document_name,
+              ds.status,
+              ds.created_at,
+              CONCAT(st.first_name, ' ', st.last_name) AS requester_name,
+              d.department_abbreviation AS college,
+              'student' AS requester_type,
+              'sub' AS id_prefix
+            FROM document_submissions ds
+            JOIN students st ON ds.student_id = st.student_id
+            JOIN departments d ON ds.department_id = d.department_id
+            WHERE ds.status IN ('pending', 'processing')
+              AND (? IS NULL OR ds.department_id = ?))
          ) AS combined
          ORDER BY created_at DESC
          LIMIT 5`,
-        [deptId, deptId, deptId, deptId],
+        [deptId, deptId, deptId, deptId, deptId, deptId],
       );
 
       // 6. Hosted queues today (active slots with waiting counts)
@@ -173,9 +206,9 @@ router.get(
           announcements: annRow.announcement_count || 0,
         },
         pendingDocuments: pendingDocuments.map((d) => ({
-          id: d.request_id,
+          id: `${d.id_prefix}-${d.id}`,
           name: d.requester_name,
-          document: d.request_type,
+          document: d.document_name,
           college: d.college,
           requesterType: d.requester_type,
           date: new Date(d.created_at).toLocaleDateString("en-US", {
@@ -1121,7 +1154,7 @@ router.get(
 
 // GET /api/admin/transactions
 // Query params (all optional):
-//   type   = "all" | "queue" | "appointment" | "document"
+//   type   = "all" | "queue" | "appointment" | "document" | "submission"
 //   status = "all" | <status string from the relevant table>
 //   range  = "today" | "week" | "month" | "all"   (default "all")
 //   search = free text matched against student name/id, processor, details
@@ -1284,13 +1317,46 @@ router.get(
             JOIN faculty f ON fdr.faculty_id = f.faculty_id
             WHERE s.department_id = ?
           )
+          UNION ALL
+          (
+            SELECT
+              'submission' AS type,
+              ds.submission_id AS id,
+              CASE ds.status
+                WHEN 'claimed'    THEN 'Received Document'
+                WHEN 'processing' THEN 'Processing Sent Document'
+                WHEN 'rejected'   THEN 'Rejected Sent Document'
+                WHEN 'cancelled'  THEN 'Cancelled Sent Document'
+                ELSE 'Sent Document'
+              END AS action,
+              d.department_name AS college,
+              d.department_abbreviation AS college_abbrev,
+              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+              st.student_number AS student_id,
+              COALESCE(
+                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                 FROM audit_logs al
+                 JOIN administrators adm2 ON al.admin_id = adm2.admin_id
+                 WHERE al.target_table = 'document_submissions' AND al.target_record_id = ds.submission_id
+                 ORDER BY al.created_at DESC LIMIT 1),
+                ds.title
+              ) AS processor,
+              ds.purpose AS details,
+              ds.status AS raw_status,
+              ds.updated_at AS event_time,
+              'student' AS requester_type
+            FROM document_submissions ds
+            JOIN departments d ON ds.department_id = d.department_id
+            JOIN students st ON ds.student_id = st.student_id
+            WHERE ds.department_id = ?
+          )
         ) AS combined
         WHERE 1=1 ${dateClause}
         ORDER BY event_time DESC
         LIMIT 200
       `;
 
-      const unionParams = [deptId, deptId, deptId, deptId];
+      const unionParams = [deptId, deptId, deptId, deptId, deptId];
       if (dateParam) unionParams.push(dateParam);
       const [rows] = await pool.query(unionSql, unionParams);
 
@@ -1364,7 +1430,12 @@ router.get(
           queue: allForStats.filter((t) => t.type === "queue").length,
           appointments: allForStats.filter((t) => t.type === "appointment")
             .length,
-          documents: allForStats.filter((t) => t.type === "document").length,
+          // Sent documents fold into the same "documents" bucket as document
+          // requests -- both are document-related activity, just opposite
+          // directions.
+          documents: allForStats.filter(
+            (t) => t.type === "document" || t.type === "submission",
+          ).length,
         },
       });
     } catch (error) {
@@ -1779,6 +1850,223 @@ router.patch(
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
       sendServerError(res, error, "Document status update error:");
+    }
+  },
+);
+
+// GET /api/admin/document-submissions
+// Returns all "Send a Document" submissions scoped to the admin's own
+// department. Same shape as document-processing/faculty-document-processing
+// (minus `copies`, which is omitted entirely rather than null, so
+// `doc.copies != null` checks on the frontend work for free) so the
+// existing card/modal component can render all three sources.
+router.get(
+  "/document-submissions",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT
+           ds.submission_id,
+           ds.tracking_number,
+           ds.title,
+           ds.purpose,
+           ds.status,
+           ds.notes,
+           ds.created_at,
+           ds.needed_by,
+           ds.claimed_at,
+           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+           st.student_number AS student_id,
+           d.department_abbreviation AS college
+         FROM document_submissions ds
+         JOIN students st ON ds.student_id = st.student_id
+         JOIN departments d ON ds.department_id = d.department_id
+         WHERE ds.department_id = ?
+         ORDER BY ds.created_at DESC`,
+        [deptId],
+      );
+
+      const submissionIds = rows.map((r) => r.submission_id);
+      const [studentFilesMap, adminFilesMap] = await Promise.all([
+        getSubmissionFilesMap(submissionIds, "student_upload"),
+        getSubmissionFilesMap(submissionIds, "admin_return"),
+      ]);
+
+      const documents = rows.map((r) => ({
+        id: `sub-${r.submission_id}`,
+        trackingNumber: r.tracking_number,
+        studentName: r.student_name,
+        studentId: r.student_id,
+        requesterName: r.student_name,
+        requesterIdLabel: "Student ID",
+        requesterIdValue: r.student_id,
+        college: r.college,
+        documentType: r.title,
+        purpose: r.purpose,
+        requestDate: r.created_at instanceof Date
+          ? getManilaDateString(r.created_at)
+          : String(r.created_at).split("T")[0],
+        status: STATUS_LABEL_MAP[r.status] ?? r.status,
+        notes: r.notes || "",
+        neededBy: r.needed_by || null,
+        claimedDate: r.claimed_at || null,
+        requiresCoding: false,
+        officialCode: null,
+        studentFiles: studentFilesMap[r.submission_id] || [],
+        adminFiles: adminFilesMap[r.submission_id] || [],
+      }));
+
+      res.json({ documents });
+    } catch (error) {
+      sendServerError(res, error, "Document submissions fetch error:");
+    }
+  },
+);
+
+// PATCH /api/admin/document-submissions/:submissionId/status
+// Body (multipart/form-data or JSON): { status, notes, returnFiles[] }
+// Same terminal-state gate as document-processing's PATCH, using the
+// submission's own smaller status vocabulary (no 'generated'/'released' --
+// claimed is reached directly from processing). This one endpoint doubles
+// as "attach return files without changing status" -- the admin UI can
+// re-send the current status alongside new returnFiles, exactly like
+// PUT /admin/announcements/:id doubles as "edit text" / "add files." The
+// upload.array middleware safely no-ops on a plain-JSON request body.
+router.patch(
+  "/document-submissions/:submissionId/status",
+  authenticateToken,
+  authorizeRoles("admin"),
+  documentSubmissionUpload.upload.array("returnFiles", MAX_FILES),
+  async (req, res) => {
+    const submissionId = parseInt(req.params.submissionId, 10);
+    const { status, notes } = req.body;
+    const adminId = req.user.userId;
+
+    if (!SUBMISSION_DB_STATUS_MAP[status]) {
+      deleteSubmissionFiles(req.files);
+      return res.status(400).json({ error: "Invalid status" });
+    }
+    const dbStatus = SUBMISSION_DB_STATUS_MAP[status];
+
+    try {
+      const deptId = await getAdminDepartmentId(adminId);
+      if (!deptId) {
+        deleteSubmissionFiles(req.files);
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[submission]] = await pool.query(
+        `SELECT submission_id, student_id, status, department_id FROM document_submissions WHERE submission_id = ?`,
+        [submissionId],
+      );
+
+      if (!submission) {
+        deleteSubmissionFiles(req.files);
+        return res.status(404).json({ error: "Document submission not found" });
+      }
+      if (submission.department_id !== deptId) {
+        deleteSubmissionFiles(req.files);
+        return res.status(403).json({ error: "You can only update submissions for your own department" });
+      }
+
+      // Once a submission reaches a terminal state, nothing should move it
+      // again -- most importantly 'cancelled', since that's set by the
+      // student themselves. (claimed/rejected are also final.)
+      if (["claimed", "rejected", "cancelled"].includes(submission.status)) {
+        deleteSubmissionFiles(req.files);
+        return res.status(409).json({
+          error: "This submission is already finalized and can no longer be updated",
+        });
+      }
+
+      const requiredPrior = SUBMISSION_REQUIRED_PRIOR_STATUS[dbStatus];
+      if (requiredPrior && submission.status !== requiredPrior) {
+        deleteSubmissionFiles(req.files);
+        return res.status(409).json({
+          error: `Document must be ${requiredPrior} before it can be marked ${dbStatus}`,
+        });
+      }
+
+      if (req.files && req.files.length) {
+        const [[existing]] = await pool.query(
+          `SELECT COUNT(*) AS cnt, COALESCE(SUM(file_size), 0) AS bytes
+           FROM document_submission_files WHERE submission_id = ? AND direction = 'admin_return'`,
+          [submissionId],
+        );
+        const budgetError = validateBudget(req.files, existing.cnt, existing.bytes);
+        if (budgetError) {
+          deleteSubmissionFiles(req.files);
+          return res.status(400).json({ error: budgetError });
+        }
+      }
+
+      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const notesClause = notes !== undefined ? ", notes = ?" : "";
+
+      const values = [dbStatus];
+      if (notes !== undefined) values.push(notes);
+      values.push(submissionId);
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        await conn.query(
+          `UPDATE document_submissions SET status = ?${notesClause}${timestampClause} WHERE submission_id = ?`,
+          values,
+        );
+
+        if (req.files && req.files.length) {
+          await insertSubmissionFiles(submissionId, "admin_return", req.files, adminId, conn);
+        }
+
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        deleteSubmissionFiles(req.files);
+        throw error;
+      } finally {
+        conn.release();
+      }
+
+      await logAudit(adminId, "UPDATE", "document_submissions", submissionId, { status: submission.status }, { status: dbStatus });
+
+      emitToUser(submission.student_id, "document:status-updated", { requestId: submissionId, status });
+      createNotification(submission.student_id, `Your sent document is now ${status}.`, "document");
+
+      res.json({ message: "Document submission status updated", submissionId, status });
+    } catch (error) {
+      sendServerError(res, error, "Document submission status update error:");
+    }
+  },
+);
+
+// GET /api/admin/document-submissions/:submissionId/files/:fileId
+router.get(
+  "/document-submissions/:submissionId/files/:fileId",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const submissionId = parseInt(req.params.submissionId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!submissionId || !fileId) {
+      return res.status(400).json({ error: "Invalid submission or file id" });
+    }
+    try {
+      const adminDeptId = await getAdminDepartmentId(req.user.userId);
+      if (!adminDeptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      await serveAdminDocumentSubmissionFile(res, { submissionId, fileId, adminDeptId });
+    } catch (error) {
+      sendServerError(res, error, "Get document submission file error:");
     }
   },
 );

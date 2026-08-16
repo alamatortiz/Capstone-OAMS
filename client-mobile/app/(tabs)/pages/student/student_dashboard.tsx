@@ -96,7 +96,7 @@ function OamsLogo({
 const STAT_TINTS = {
   blue: { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.25)', color: '#3b82f6' },
   purple: { bg: 'rgba(168, 85, 247, 0.16)', border: 'rgba(168, 85, 247, 0.25)', color: '#a855f7' },
-  orange: { bg: 'rgba(245, 158, 11, 0.16)', border: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b' },
+  orange: { bg: 'rgba(249, 115, 22, 0.16)', border: 'rgba(249, 115, 22, 0.25)', color: '#f97316' },
   green: { bg: 'rgba(16, 185, 129, 0.16)', border: 'rgba(16, 185, 129, 0.25)', color: '#10b981' },
 } as const;
 
@@ -110,10 +110,10 @@ interface StatItem {
 }
 
 const BADGE_TINTS = {
-  green: { bg: 'rgba(22, 163, 74, 0.15)', border: 'rgba(22, 163, 74, 0.25)', color: '#4ade80' },
+  green: { bg: 'rgba(22, 163, 74, 0.15)', border: 'rgba(22, 163, 74, 0.25)', color: '#22c55e' },
   violet: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.25)', color: '#d8b4fe' },
   blue: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.25)', color: '#93c5fd' },
-  orange: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.25)', color: '#fcd34d' },
+  orange: { bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.25)', color: '#fdba74' },
 } as const;
 
 interface QuickAction {
@@ -151,8 +151,11 @@ interface Announcement {
 // (Users), appointment -> CalendarIconNav (Calendar), document -> FileText.
 const ACTIVITY_META = {
   queue: { icon: Users as LucideIconType, bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
-  appointment: { icon: Calendar as LucideIconType, bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  appointment: { icon: Calendar as LucideIconType, bg: 'rgba(168, 85, 247, 0.15)', color: '#a855f7' },
   document: { icon: FileText as LucideIconType, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
+  // Shares document's icon/color -- opposite direction, already
+  // disambiguated by the "Sent: ..." title text from the server.
+  submission: { icon: FileText as LucideIconType, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
 } as const;
 
 const STATUS_TINT_FALLBACK = { bg: 'rgba(107, 114, 128, 0.15)', color: '#9ca3af' };
@@ -455,7 +458,7 @@ export default function StudentDashboardScreen() {
     { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check professor consultation hours and availability across all departments.', icon: GraduationCap, badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
     { key: 'queues', title: 'Queues', description: 'Join queues and track your position in real-time.', icon: Users, badge: `${activeQueueCount} Participating Queues`, badgeTint: 'blue', gradient: ['#3b82f6', '#6366f1'] },
     { key: 'appointments', title: 'Appointments', description: 'Schedule appointments with professors and view available slots.', icon: Calendar, badge: `${dashStats?.stats?.appointments?.active ?? 0} Active Bookings`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'document-requests', title: 'Document Requests', description: 'Request documents and track their status.', icon: FileText, badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`, badgeTint: 'orange', gradient: ['#f59e0b', '#d97706'] },
+    { key: 'document-requests', title: 'Document Requests', description: 'Request documents and track their status.', icon: FileText, badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`, badgeTint: 'orange', gradient: ['#f97316', '#ea580c'] },
     { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: ClipboardList, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
   ];
 

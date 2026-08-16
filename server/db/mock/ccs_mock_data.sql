@@ -30,6 +30,8 @@ TRUNCATE TABLE qr_tracking_logs;
 TRUNCATE TABLE generated_files;
 TRUNCATE TABLE faculty_document_requests;
 TRUNCATE TABLE document_requests;
+TRUNCATE TABLE document_submission_files;
+TRUNCATE TABLE document_submissions;
 TRUNCATE TABLE appointments;
 TRUNCATE TABLE queue_status_logs;
 TRUNCATE TABLE queues;
@@ -564,4 +566,12 @@ INSERT INTO document_requests (student_id, service_id, request_type, purpose, st
 (104, 1, 'Good Moral Certificate', 'For scholarship application', 'processing'), -- ongoing
 (104, 2, 'Transcript of Records',  'For further studies',         'claimed'),    -- completed
 (104, 1, 'Good Moral Certificate', 'For employment',               'rejected');  -- cancelled
+
+-- Document submissions (student -> office "Send a Document") -- department_id
+-- is student 104's own department (1001, CCS); tracking_number is
+-- auto-assigned by ts_auto_tracking_number_submission, omitted here.
+INSERT INTO document_submissions (student_id, department_id, title, purpose, status) VALUES
+(104, 1001, 'Midterm Grade Sheet',  'For encoding into the records system', 'processing'), -- ongoing
+(104, 1001, 'Enrollment Form Scan', 'For digital archiving',                'claimed'),    -- completed
+(104, 1001, 'Late Add Form',        'For late enrollment processing',       'rejected');   -- cancelled
 

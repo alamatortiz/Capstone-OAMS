@@ -416,14 +416,14 @@ body {
 .stud-notifications-container .notif-item-queue::before { background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, transparent 100%); }
 .stud-notifications-container .notif-item-queue:hover { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1); }
 
-.stud-notifications-container .notif-item-document::before { background: linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, transparent 100%); }
-.stud-notifications-container .notif-item-document:hover { border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 8px 24px rgba(245, 158, 11, 0.1); }
+.stud-notifications-container .notif-item-document::before { background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, transparent 100%); }
+.stud-notifications-container .notif-item-document:hover { border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 8px 24px rgba(249, 115, 22, 0.1); }
 
 .stud-notifications-container .notif-item-appointment::before { background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, transparent 100%); }
 .stud-notifications-container .notif-item-appointment:hover { border-color: rgba(168, 85, 247, 0.3); box-shadow: 0 8px 24px rgba(168, 85, 247, 0.1); }
 
-.stud-notifications-container .notif-item-announcement::before { background: linear-gradient(135deg, rgba(236, 72, 153, 0.06) 0%, transparent 100%); }
-.stud-notifications-container .notif-item-announcement:hover { border-color: rgba(236, 72, 153, 0.3); box-shadow: 0 8px 24px rgba(236, 72, 153, 0.1); }
+.stud-notifications-container .notif-item-announcement::before { background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, transparent 100%); }
+.stud-notifications-container .notif-item-announcement:hover { border-color: rgba(34, 197, 94, 0.3); box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1); }
 
 .stud-notifications-container .notif-item--unread {
   background: rgba(34, 197, 94, 0.06);
@@ -448,9 +448,9 @@ body {
 }
 
 .stud-notifications-container .notif-icon-queue { background: linear-gradient(135deg, rgba(59, 130, 246, 0.9) 0%, rgba(59, 130, 246, 0.7) 100%); }
-.stud-notifications-container .notif-icon-document { background: linear-gradient(135deg, rgba(245, 158, 11, 0.9) 0%, rgba(245, 158, 11, 0.7) 100%); }
+.stud-notifications-container .notif-icon-document { background: linear-gradient(135deg, rgba(249, 115, 22, 0.9) 0%, rgba(249, 115, 22, 0.7) 100%); }
 .stud-notifications-container .notif-icon-appointment { background: linear-gradient(135deg, rgba(168, 85, 247, 0.9) 0%, rgba(168, 85, 247, 0.7) 100%); }
-.stud-notifications-container .notif-icon-announcement { background: linear-gradient(135deg, rgba(236, 72, 153, 0.9) 0%, rgba(236, 72, 153, 0.7) 100%); }
+.stud-notifications-container .notif-icon-announcement { background: linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(34, 197, 94, 0.7) 100%); }
 
 /* Content column: title+badges header row, then message as a description
    line -- mirrors .transaction-content/.transaction-header/.transaction-title. */
@@ -495,9 +495,9 @@ body {
 }
 
 .stud-notifications-container .notif-badge-queue { background: rgba(59, 130, 246, 0.15); color: var(--blue); border: 0.5px solid rgba(59, 130, 246, 0.3); }
-.stud-notifications-container .notif-badge-document { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 0.5px solid rgba(245, 158, 11, 0.3); }
+.stud-notifications-container .notif-badge-document { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 0.5px solid rgba(249, 115, 22, 0.3); }
 .stud-notifications-container .notif-badge-appointment { background: rgba(168, 85, 247, 0.15); color: var(--purple); border: 0.5px solid rgba(168, 85, 247, 0.3); }
-.stud-notifications-container .notif-badge-announcement { background: rgba(236, 72, 153, 0.15); color: var(--pink); border: 0.5px solid rgba(236, 72, 153, 0.3); }
+.stud-notifications-container .notif-badge-announcement { background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 0.5px solid rgba(34, 197, 94, 0.3); }
 /* Mirrors .tx-badge-completed's exact values for visual consistency with Transactions' own "Completed" badge. */
 .stud-notifications-container .notif-badge-unread { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 0.5px solid rgba(16, 185, 129, 0.3); }
 

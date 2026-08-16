@@ -94,7 +94,7 @@ function OamsLogo({
 
 const STAT_TINTS = {
   violet: { bg: 'rgba(124, 58, 237, 0.16)', border: 'rgba(124, 58, 237, 0.25)', color: '#7c3aed' },
-  orange: { bg: 'rgba(245, 158, 11, 0.16)', border: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b' },
+  orange: { bg: 'rgba(249, 115, 22, 0.16)', border: 'rgba(249, 115, 22, 0.25)', color: '#f97316' },
   green: { bg: 'rgba(34, 197, 94, 0.16)', border: 'rgba(34, 197, 94, 0.25)', color: '#22c55e' },
 } as const;
 
@@ -415,10 +415,10 @@ export default function ProfessorDashboardScreen() {
   // Badge color follows each tile's own gradient family, mirroring
   // prof-dashboard.css's .action-badge overrides per action-gradient-N.
   const ACTION_BADGE_META: Record<string, { bg: string; color: string }> = {
-    announcements: { bg: 'rgba(22, 163, 74, 0.15)', color: theme.primary },
+    announcements: { bg: 'rgba(22, 163, 74, 0.15)', color: isDarkMode ? '#22c55e' : '#15803d' },
     'schedule-manager': { bg: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe' },
     appointments: { bg: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe' },
-    'document-request': { bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' },
+    'document-request': { bg: 'rgba(249, 115, 22, 0.15)', color: '#fb923c' },
     transactions: { bg: 'rgba(22, 163, 74, 0.15)', color: theme.primary },
   };
 

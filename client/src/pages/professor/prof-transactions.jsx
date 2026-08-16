@@ -298,7 +298,7 @@ export default function ProfessorTransactionsPage() {
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 options={[
-                  { value: "all", label: "All Status" },
+                  { value: "all", label: "All Statuses" },
                   { value: "pending", label: "Pending" },
                   { value: "approved", label: "Approved" },
                   { value: "processing", label: "Processing" },

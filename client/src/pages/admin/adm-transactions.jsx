@@ -125,6 +125,7 @@ const TYPE_OPTIONS = [
   { value: "queue", label: "Queue" },
   { value: "appointment", label: "Appointment" },
   { value: "document", label: "Document" },
+  { value: "submission", label: "Sent Document" },
 ];
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
@@ -272,8 +273,15 @@ export default function AdminTransaction() {
         color: "admin-transaction-badge-document",
         label: "Document",
       },
+      submission: {
+        color: "admin-transaction-badge-document",
+        label: "Sent Document",
+      },
     };
-    const config = typeConfig[type];
+    const config = typeConfig[type] || {
+      color: "admin-transaction-badge-document",
+      label: type ? type.charAt(0).toUpperCase() + type.slice(1) : "Unknown",
+    };
     return (
       <span className={`admin-transaction-badge ${config.color}`}>
         {config.label}
@@ -282,7 +290,7 @@ export default function AdminTransaction() {
   };
 
   const getStatusBadge = (status, type) => {
-    const isDocument = type === "document";
+    const isDocument = type === "document" || type === "submission";
     const statusConfig = {
       completed: { color: "admin-transaction-badge-completed", label: "Completed" },
       cancelled: { color: "admin-transaction-badge-cancelled", label: "Cancelled" },

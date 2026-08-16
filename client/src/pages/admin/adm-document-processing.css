@@ -648,6 +648,99 @@ html, body {
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 .adp-modal-textarea::placeholder { color: var(--text-tertiary); }
+
+/* ── Attachments (Submissions source) ────────────────────────────────────── */
+.adp-attach-input {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+.adp-attach-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin: 0.35rem 0 0;
+}
+.adp-attach-budget {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.adp-attach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.6rem;
+}
+.adp-attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.6rem;
+  background: var(--input-background);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.adp-attach-chip:hover {
+  background: rgba(249, 115, 22, 0.08);
+  border-color: #f97316;
+  color: #f97316;
+}
+.adp-attach-chip--queued {
+  justify-content: space-between;
+  cursor: default;
+}
+.adp-attach-chip--queued:hover {
+  background: var(--input-background);
+  border-color: var(--card-border);
+  color: var(--text-secondary);
+}
+.adp-attach-filename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.adp-attach-chip svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.adp-attach-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.adp-attach-remove:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+.adp-attach-remove svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
 .adp-modal-actions {
   display: flex;
   flex-wrap: wrap;

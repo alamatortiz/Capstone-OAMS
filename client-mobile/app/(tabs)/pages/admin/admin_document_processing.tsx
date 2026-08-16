@@ -33,6 +33,9 @@ import {
   XCircle,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
@@ -40,6 +43,20 @@ import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { getHubStatusMeta, normalizeDocStatus, type DocStatus } from '@/utils/documentStatus';
+
+// Mirrors the server's limits (server/middleware/upload.js).
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_TYPES = [
+  'application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip',
+];
 
 type LucideIconType = typeof Clock;
 
@@ -116,8 +133,15 @@ function OamsLogo({
 // Field shapes match what those endpoints really return (trackingNumber,
 // requesterIdLabel/Value, neededBy, releasedDate, claimedDate, etc.) —
 // faculty requests have no "copies" column, so it isn't rendered for them. ───
-type RequestSource = 'student' | 'faculty';
+type RequestSource = 'student' | 'faculty' | 'submission';
 type DocumentStatus = 'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled';
+
+interface DocumentAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
 
 interface DocumentRequest {
   id: string;
@@ -138,6 +162,8 @@ interface DocumentRequest {
   claimedDate: string | null;
   requiresCoding?: boolean;
   officialCode?: string | null;
+  studentFiles?: DocumentAttachment[];
+  adminFiles?: DocumentAttachment[];
 }
 
 interface NavItem {
@@ -157,9 +183,13 @@ const navItems: NavItem[] = [
 const SOURCES: { id: RequestSource; label: string }[] = [
   { id: 'student', label: 'Students' },
   { id: 'faculty', label: 'Faculty' },
+  { id: 'submission', label: 'Submissions' },
 ];
 
 const TABS = ['all', 'pending', 'processing', 'ready', 'released', 'claimed', 'rejected', 'cancelled'] as const;
+// Submissions skip 'ready'/'released' -- nothing is physically generated or
+// picked up in that direction, so claimed is reached directly from processing.
+const SUBMISSION_TABS = ['all', 'pending', 'processing', 'claimed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
 
 type WeekFilter = 'this-week' | 'next-week' | 'this-month' | 'all';
@@ -202,6 +232,8 @@ export default function AdminDocumentProcessingScreen() {
   const [officialCode, setOfficialCode] = useState('');
   const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [returnFiles, setReturnFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const router = useRouter();
   const { user, token, logout } = useAuth();
   const adminName = user?.name ?? 'Admin';
@@ -215,9 +247,10 @@ export default function AdminDocumentProcessingScreen() {
   const fetchDocuments = useCallback(async () => {
     setError(null);
     try {
-      const [studentRes, facultyRes] = await Promise.all([
+      const [studentRes, facultyRes, submissionRes] = await Promise.all([
         api.get('/admin/document-processing'),
         api.get('/admin/faculty-document-processing'),
+        api.get('/admin/document-submissions'),
       ]);
       const studentDocs: DocumentRequest[] = (studentRes.data.documents ?? []).map((d: any) => ({
         ...d,
@@ -227,7 +260,15 @@ export default function AdminDocumentProcessingScreen() {
         ...d,
         source: 'faculty' as RequestSource,
       }));
-      setDocuments([...studentDocs, ...facultyDocs]);
+      // The server already prefixes these ids ("sub-42") so they stay
+      // collision-safe alongside student/faculty ids if ever merged into one
+      // list elsewhere -- handleUpdateStatus/file downloads strip it back
+      // off before hitting an endpoint that expects the raw submission_id.
+      const submissionDocs: DocumentRequest[] = (submissionRes.data.documents ?? []).map((d: any) => ({
+        ...d,
+        source: 'submission' as RequestSource,
+      }));
+      setDocuments([...studentDocs, ...facultyDocs, ...submissionDocs]);
     } catch (err) {
       console.error('Failed to load document requests:', err);
       setError('Failed to load document requests.');
@@ -368,29 +409,108 @@ export default function AdminDocumentProcessingScreen() {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes);
     setOfficialCode(doc.officialCode || '');
+    setReturnFiles([]);
   };
 
   const handleCloseDetails = () => {
     setSelectedDocument(null);
     setProcessingNotes('');
     setOfficialCode('');
+    setReturnFiles([]);
+  };
+
+  const pickReturnFiles = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ATTACHMENT_TYPES, multiple: true });
+    if (result.canceled || !result.assets?.length) return;
+    let count = returnFiles.length;
+    let tooLarge = 0;
+    let overBudget = 0;
+    const accepted: DocumentPicker.DocumentPickerAsset[] = [];
+    for (const asset of result.assets) {
+      if (asset.size != null && asset.size > MAX_FILE_BYTES) {
+        tooLarge += 1;
+        continue;
+      }
+      if (count + 1 > MAX_FILES) {
+        overBudget += 1;
+        continue;
+      }
+      accepted.push(asset);
+      count += 1;
+    }
+    if (accepted.length > 0) setReturnFiles((prev) => [...prev, ...accepted]);
+    if (tooLarge > 0) Alert.alert('File too large', `${tooLarge} file(s) skipped — each file must be 10MB or smaller.`);
+    if (overBudget > 0) Alert.alert('Attachment limit reached', `You can attach up to ${MAX_FILES} files.`);
+  };
+  const removeReturnFile = (uri: string) => setReturnFiles((prev) => prev.filter((f) => f.uri !== uri));
+
+  // Mirrors student_document_status.tsx's viewSubmissionFile() -- download to
+  // cache then hand off to the OS share sheet.
+  const viewSubmissionFile = async (submissionRawId: string, file: DocumentAttachment) => {
+    if (downloadingFileId) return;
+    setDownloadingFileId(file.id);
+    try {
+      const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uri = `${FileSystem.cacheDirectory}submission-${submissionRawId}-${file.id}-${safeName}`;
+      const result = await FileSystem.downloadAsync(
+        `${api.defaults.baseURL}/admin/document-submissions/${submissionRawId}/files/${file.id}`,
+        uri,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (result.status < 200 || result.status >= 300) {
+        await FileSystem.deleteAsync(result.uri, { idempotent: true });
+        Alert.alert('Error', 'Could not open the file.');
+        return;
+      }
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: file.mimeType ?? undefined });
+    } catch (err) {
+      console.error('Failed to download file:', err);
+      Alert.alert('Error', 'Could not open the file.');
+    } finally {
+      setDownloadingFileId(null);
+    }
   };
 
   const handleUpdateStatus = async (newStatus: DocumentStatus) => {
     if (!selectedDocument) return;
     const todayStr = weekDates.todayStr;
-    const endpoint =
-      selectedDocument.source === 'faculty'
-        ? `/admin/faculty-document-processing/${selectedDocument.id}/status`
-        : `/admin/document-processing/${selectedDocument.id}/status`;
+    const isSubmission = selectedDocument.source === 'submission';
+    // GET /admin/document-submissions prefixes ids ("sub-42") so the list
+    // stays merge-safe alongside other sources elsewhere -- but the PATCH
+    // route itself expects the raw numeric submission_id.
+    const rawId = isSubmission ? selectedDocument.id.replace(/^sub-/, '') : selectedDocument.id;
+    const endpoint = isSubmission
+      ? `/admin/document-submissions/${rawId}/status`
+      : selectedDocument.source === 'faculty'
+        ? `/admin/faculty-document-processing/${rawId}/status`
+        : `/admin/document-processing/${rawId}/status`;
     const needsCode = newStatus === 'ready' && selectedDocument.requiresCoding;
     setUpdating(true);
     try {
-      await api.patch(endpoint, {
-        status: newStatus,
-        notes: processingNotes,
-        ...(needsCode ? { officialCode } : {}),
-      });
+      if (isSubmission) {
+        const body = new FormData();
+        body.append('status', newStatus);
+        body.append('notes', processingNotes);
+        returnFiles.forEach((asset) => {
+          body.append('returnFiles', {
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType ?? 'application/octet-stream',
+          } as any);
+        });
+        await api.patch(endpoint, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } else {
+        await api.patch(endpoint, {
+          status: newStatus,
+          notes: processingNotes,
+          ...(needsCode ? { officialCode } : {}),
+        });
+      }
       setDocuments((prev) =>
         prev.map((d) =>
           d.id === selectedDocument.id
@@ -406,11 +526,19 @@ export default function AdminDocumentProcessingScreen() {
         ),
       );
       handleCloseDetails();
+      // Local patch above doesn't know about newly-attached return files --
+      // refetch so studentFiles/adminFiles stay accurate for this source.
+      if (isSubmission) await fetchDocuments();
     } catch {
       Alert.alert('Error', 'Failed to update document status.');
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handleAttachReturnFiles = () => {
+    if (!selectedDocument || returnFiles.length === 0) return;
+    handleUpdateStatus(selectedDocument.status);
   };
 
   const runConfirmStatusChange = () => {
@@ -453,13 +581,22 @@ export default function AdminDocumentProcessingScreen() {
         icon: XCircle,
         color: '#ef4444',
       },
-      claimed: {
-        title: 'Mark as Claimed?',
-        description: `Confirm that the ${selectedDocument.documentType} request for ${selectedDocument.requesterName} has been handed to the correct recipient, per office procedure?`,
-        confirmLabel: 'Mark as Claimed',
-        icon: CheckCircle,
-        color: '#10b981',
-      },
+      claimed:
+        selectedDocument.source === 'submission'
+          ? {
+              title: 'Mark as Received?',
+              description: `Confirm that ${selectedDocument.documentType} from ${selectedDocument.requesterName} has been received and processed by the office?`,
+              confirmLabel: 'Mark as Received',
+              icon: CheckCircle,
+              color: '#10b981',
+            }
+          : {
+              title: 'Mark as Claimed?',
+              description: `Confirm that the ${selectedDocument.documentType} request for ${selectedDocument.requesterName} has been handed to the correct recipient, per office procedure?`,
+              confirmLabel: 'Mark as Claimed',
+              icon: CheckCircle,
+              color: '#10b981',
+            },
     };
 
   const activeConfirmMeta = confirmStatus && confirmMeta ? confirmMeta[confirmStatus] : null;
@@ -554,7 +691,7 @@ export default function AdminDocumentProcessingScreen() {
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
               <View style={styles.tabsList}>
-                {TABS.map((tab) => {
+                {(source === 'submission' ? SUBMISSION_TABS : TABS).map((tab) => {
                   const active = activeTab === tab;
                   return (
                     <Pressable
@@ -744,7 +881,7 @@ export default function AdminDocumentProcessingScreen() {
                     <Text style={styles.detailsValue}>{selectedDocument.college}</Text>
                   </View>
                   <View style={styles.detailsField}>
-                    <Text style={styles.detailsLabel}>Document Type</Text>
+                    <Text style={styles.detailsLabel}>{selectedDocument.source === 'submission' ? 'Title' : 'Document Type'}</Text>
                     <Text style={styles.detailsValue}>{selectedDocument.documentType}</Text>
                   </View>
                   {selectedDocument.copies != null && (
@@ -787,6 +924,72 @@ export default function AdminDocumentProcessingScreen() {
                   )}
                 </View>
 
+                {selectedDocument.source === 'submission' && (
+                  <View style={styles.notesWrap}>
+                    <Text style={styles.detailsLabel}>Files from Student</Text>
+                    {selectedDocument.studentFiles && selectedDocument.studentFiles.length > 0 ? (
+                      <View style={{ gap: 8, marginTop: 6 }}>
+                        {selectedDocument.studentFiles.map((f) => (
+                          <Pressable
+                            key={f.id}
+                            style={styles.attachChip}
+                            onPress={() => viewSubmissionFile(selectedDocument.id.replace(/^sub-/, ''), f)}
+                            disabled={!!downloadingFileId}
+                          >
+                            <FileText size={14} color="#f97316" />
+                            <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.detailsValue}>No files attached.</Text>
+                    )}
+
+                    <Text style={[styles.detailsLabel, { marginTop: 12 }]}>
+                      Return Files ({returnFiles.length}/{MAX_FILES})
+                    </Text>
+                    {selectedDocument.adminFiles && selectedDocument.adminFiles.length > 0 && (
+                      <View style={{ gap: 8, marginTop: 6 }}>
+                        {selectedDocument.adminFiles.map((f) => (
+                          <Pressable
+                            key={f.id}
+                            style={styles.attachChip}
+                            onPress={() => viewSubmissionFile(selectedDocument.id.replace(/^sub-/, ''), f)}
+                            disabled={!!downloadingFileId}
+                          >
+                            <FileText size={14} color="#f97316" />
+                            <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                    {returnFiles.length > 0 && (
+                      <View style={{ gap: 8, marginTop: 6 }}>
+                        {returnFiles.map((f) => (
+                          <View key={f.uri} style={[styles.attachChip, { justifyContent: 'space-between' }]}>
+                            <Text style={styles.attachChipText} numberOfLines={1}>{f.name}</Text>
+                            <Pressable onPress={() => removeReturnFile(f.uri)} hitSlop={8}>
+                              <X size={14} color={theme.tertiary} />
+                            </Pressable>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    {(selectedDocument.status === 'pending' || selectedDocument.status === 'processing') && (
+                      <Pressable
+                        style={[styles.filterSelect, { marginTop: 8 }]}
+                        onPress={pickReturnFiles}
+                        disabled={returnFiles.length >= MAX_FILES}
+                      >
+                        <FileText size={14} color="#f97316" />
+                        <Text style={styles.filterSelectText}>
+                          {returnFiles.length >= MAX_FILES ? 'Attachment limit reached' : 'Add return files'}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
+
                 {selectedDocument.status === 'processing' && selectedDocument.requiresCoding && (
                   <View style={styles.notesWrap}>
                     <Text style={styles.detailsLabel}>Official Code *</Text>
@@ -819,7 +1022,12 @@ export default function AdminDocumentProcessingScreen() {
                       <Text style={styles.detailsActionBtnTextPrimary}>Start Processing</Text>
                     </Pressable>
                   )}
-                  {selectedDocument.status === 'processing' && (
+                  {selectedDocument.status === 'processing' && selectedDocument.source === 'submission' && (
+                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnSuccess]} onPress={() => setConfirmStatus('claimed')}>
+                      <Text style={styles.detailsActionBtnTextPrimary}>Mark as Received</Text>
+                    </Pressable>
+                  )}
+                  {selectedDocument.status === 'processing' && selectedDocument.source !== 'submission' && (
                     <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnSuccess]} onPress={handleMarkReadyClick}>
                       <Text style={styles.detailsActionBtnTextPrimary}>Mark as Ready</Text>
                     </Pressable>
@@ -834,6 +1042,16 @@ export default function AdminDocumentProcessingScreen() {
                       <Text style={styles.detailsActionBtnTextPrimary}>Mark as Claimed</Text>
                     </Pressable>
                   )}
+                  {selectedDocument.source === 'submission' &&
+                    (selectedDocument.status === 'pending' || selectedDocument.status === 'processing') && (
+                      <Pressable
+                        style={[styles.detailsActionBtn, styles.detailsActionBtnPrimary]}
+                        onPress={handleAttachReturnFiles}
+                        disabled={returnFiles.length === 0}
+                      >
+                        <Text style={styles.detailsActionBtnTextPrimary}>Attach Files</Text>
+                      </Pressable>
+                    )}
                   {(selectedDocument.status === 'pending' || selectedDocument.status === 'processing') && (
                     <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnDanger]} onPress={() => setConfirmStatus('rejected')}>
                       <Text style={styles.detailsActionBtnTextDanger}>Reject Request</Text>
@@ -1243,6 +1461,13 @@ function createStyles(theme: ThemePalette) {
     detailsFieldFull: { width: '100%' },
     detailsLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
     detailsValue: { fontSize: 13, color: theme.text },
+
+    attachChip: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background,
+    },
+    attachChipText: { flex: 1, fontSize: 12.5, color: theme.text },
 
     notesWrap: { marginTop: 18, gap: 8 },
     notesInput: {

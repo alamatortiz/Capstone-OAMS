@@ -26,8 +26,29 @@ import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as DocumentPicker from 'expo-document-picker';
 import { connectSocket } from '@/utils/socket';
 import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
+
+// Mirrors the server's limits (server/middleware/upload.js) -- purely
+// advisory here for the running-total UI, the server stays authoritative.
+// Unlike admin_announcement.tsx's picker (single-file only), this screen
+// needs true multi-select -- expo-document-picker's `multiple: true` option
+// (installed version's actual API; not `allowMultipleSelection`, which
+// belongs to a different, unrelated picker library).
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+const ATTACHMENT_TYPES = [
+  'application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip',
+];
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -77,8 +98,16 @@ function OamsLogo({
   );
 }
 
+interface DocumentAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 interface DocumentRequest {
   id: string;
+  kind?: 'request' | 'submission';
   type: string;
   college: string;
   requestDate: string;
@@ -91,6 +120,8 @@ interface DocumentRequest {
   neededBy?: string;
   releasedDate?: string;
   claimedDate?: string;
+  studentFiles?: DocumentAttachment[];
+  adminFiles?: DocumentAttachment[];
 }
 
 interface CollegeOption {
@@ -177,6 +208,51 @@ export default function StudentDocumentsScreen() {
     d.setDate(d.getDate() + 1);
     return d;
   })();
+
+  // ── "Send a Document" state ────────────────────────────────────────────
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sendSubmitting, setSendSubmitting] = useState(false);
+  const [sendFormData, setSendFormData] = useState({ title: '', purpose: '', neededBy: '' });
+  const [sendFiles, setSendFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
+  const [showSendNeededByPicker, setShowSendNeededByPicker] = useState(false);
+
+  const openSendDialog = () => {
+    setSendFormData({ title: '', purpose: '', neededBy: '' });
+    setSendFiles([]);
+    setSendDialogOpen(true);
+  };
+
+  const pickSendFiles = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ATTACHMENT_TYPES, multiple: true });
+    if (result.canceled || !result.assets?.length) return;
+
+    let count = sendFiles.length;
+    let bytes = sendFiles.reduce((sum, f) => sum + (f.size ?? 0), 0);
+    let tooLarge = 0;
+    let overBudget = 0;
+    const accepted: DocumentPicker.DocumentPickerAsset[] = [];
+    for (const asset of result.assets) {
+      if (asset.size != null && asset.size > MAX_FILE_BYTES) {
+        tooLarge += 1;
+        continue;
+      }
+      if (count + 1 > MAX_FILES || (asset.size != null && bytes + asset.size > MAX_TOTAL_BYTES)) {
+        overBudget += 1;
+        continue;
+      }
+      accepted.push(asset);
+      count += 1;
+      bytes += asset.size ?? 0;
+    }
+    if (accepted.length > 0) setSendFiles((prev) => [...prev, ...accepted]);
+    if (tooLarge > 0) {
+      Alert.alert('File too large', `${tooLarge} file(s) skipped — each file must be 10MB or smaller.`);
+    }
+    if (overBudget > 0) {
+      Alert.alert('Attachment limit reached', `${overBudget} file(s) skipped — you can attach up to ${MAX_FILES} files.`);
+    }
+  };
+  const removeSendFile = (uri: string) => setSendFiles((prev) => prev.filter((f) => f.uri !== uri));
 
   // Mirrors `documents` for the catch block below, without making
   // fetchDocuments depend on (and change identity with) the state itself.
@@ -306,6 +382,45 @@ export default function StudentDocumentsScreen() {
     }
   };
 
+  const handleSubmitSendDocument = async () => {
+    if (sendSubmitting) return;
+    if (!sendFormData.title.trim() || !sendFormData.purpose.trim()) {
+      Alert.alert('Missing information', 'Please fill in all required fields.');
+      return;
+    }
+    setSendSubmitting(true);
+    try {
+      const body = new FormData();
+      body.append('title', sendFormData.title);
+      body.append('purpose', sendFormData.purpose);
+      body.append('neededBy', sendFormData.neededBy);
+      sendFiles.forEach((asset) => {
+        body.append('attachments', {
+          uri: asset.uri,
+          name: asset.name,
+          type: asset.mimeType ?? 'application/octet-stream',
+        } as any);
+      });
+      const { data } = await api.post('/student/document-submissions', body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (data?.document) {
+        setDocuments((prev) => [data.document, ...prev]);
+      } else {
+        await fetchDocuments();
+      }
+      setSendDialogOpen(false);
+      setSendFormData({ title: '', purpose: '', neededBy: '' });
+      setSendFiles([]);
+      Alert.alert('Success', 'Document sent successfully!');
+    } catch (err: any) {
+      console.error('Failed to send document:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to send document');
+    } finally {
+      setSendSubmitting(false);
+    }
+  };
+
   const doCancelRequest = async () => {
     const target = cancelTarget;
     if (!target) return;
@@ -395,10 +510,12 @@ export default function StudentDocumentsScreen() {
                   <Text style={styles.docFieldValue}>{formatDateLong(doc.neededBy)}</Text>
                 </View>
               )}
-              <View style={styles.docField}>
-                <Text style={styles.docFieldLabel}>Number of Copies</Text>
-                <Text style={styles.docFieldValue}>{doc.copies ?? 1}</Text>
-              </View>
+              {doc.copies != null && (
+                <View style={styles.docField}>
+                  <Text style={styles.docFieldLabel}>Number of Copies</Text>
+                  <Text style={styles.docFieldValue}>{doc.copies}</Text>
+                </View>
+              )}
               <View style={styles.docFieldFull}>
                 <Text style={styles.docFieldLabel}>Purpose</Text>
                 <Text style={styles.docFieldValue}>{doc.purpose}</Text>
@@ -486,13 +603,21 @@ export default function StudentDocumentsScreen() {
             </View>
           </View>
 
-          {/* Request Document button */}
-          <Pressable onPress={openDialog}>
-            <LinearGradient colors={['#f97316', '#ea580c']} style={styles.requestBtn}>
-              <Plus size={18} color="#ffffff" />
-              <Text style={styles.requestBtnText}>Request Document</Text>
-            </LinearGradient>
-          </Pressable>
+          {/* Request Document / Send a Document buttons */}
+          <View style={styles.actionButtonsCol}>
+            <Pressable onPress={openDialog}>
+              <LinearGradient colors={['#f97316', '#ea580c']} style={styles.requestBtn}>
+                <Plus size={18} color="#ffffff" />
+                <Text style={styles.requestBtnText}>Request Document</Text>
+              </LinearGradient>
+            </Pressable>
+            <Pressable onPress={openSendDialog}>
+              <LinearGradient colors={['#f97316', '#ea580c']} style={styles.sendBtn}>
+                <Plus size={18} color="#ffffff" />
+                <Text style={styles.sendBtnText}>Send a Document</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
 
           {/* Tabs */}
           <ScrollView
@@ -759,6 +884,111 @@ export default function StudentDocumentsScreen() {
         </View>
       </Modal>
 
+      {/* Send a Document Dialog */}
+      <Modal visible={sendDialogOpen} animationType="fade" transparent onRequestClose={() => setSendDialogOpen(false)}>
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <View style={styles.dialogHeaderRow}>
+              <View>
+                <Text style={styles.dialogHeaderTitle}>Send a Document</Text>
+              </View>
+              <Pressable onPress={() => setSendDialogOpen(false)} hitSlop={8}>
+                <X size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.dialogBody}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Title</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="What are you sending?"
+                  placeholderTextColor={theme.tertiary}
+                  value={sendFormData.title}
+                  onChangeText={(v) => setSendFormData((f) => ({ ...f, title: v }))}
+                  maxLength={255}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Date Needed (Optional)</Text>
+                <Pressable style={styles.formSelect} onPress={() => setShowSendNeededByPicker(true)}>
+                  <Text style={sendFormData.neededBy ? styles.formSelectText : styles.formSelectPlaceholder}>
+                    {sendFormData.neededBy || 'Select a date'}
+                  </Text>
+                  <Calendar size={16} color={theme.orange} />
+                </Pressable>
+                {showSendNeededByPicker && (
+                  <DateTimePicker
+                    value={sendFormData.neededBy ? new Date(sendFormData.neededBy) : tomorrowDate}
+                    mode="date"
+                    minimumDate={tomorrowDate}
+                    onChange={(event, selectedDate) => {
+                      setShowSendNeededByPicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setSendFormData((f) => ({ ...f, neededBy: selectedDate.toISOString().slice(0, 10) }));
+                      }
+                    }}
+                  />
+                )}
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Purpose</Text>
+                <TextInput
+                  style={styles.textarea}
+                  placeholder="Specify the purpose of sending this document"
+                  placeholderTextColor={theme.tertiary}
+                  value={sendFormData.purpose}
+                  onChangeText={(v) => setSendFormData((f) => ({ ...f, purpose: v }))}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={255}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Attachments <Text style={styles.attachBudgetText}>({sendFiles.length}/{MAX_FILES} files)</Text>
+                </Text>
+                {sendFiles.length > 0 && (
+                  <View style={styles.attachList}>
+                    {sendFiles.map((f) => (
+                      <View key={f.uri} style={styles.attachChip}>
+                        <Text style={styles.attachChipText} numberOfLines={1}>{f.name}</Text>
+                        <Pressable onPress={() => removeSendFile(f.uri)} hitSlop={8}>
+                          <X size={14} color={theme.tertiary} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <Pressable
+                  style={styles.formSelect}
+                  onPress={pickSendFiles}
+                  disabled={sendFiles.length >= MAX_FILES}
+                >
+                  <Text style={styles.formSelectText}>
+                    {sendFiles.length >= MAX_FILES ? 'Attachment limit reached' : 'Add files'}
+                  </Text>
+                  <FileText size={16} color={theme.orange} />
+                </Pressable>
+                <Text style={styles.attachHintText}>Each file up to 10MB.</Text>
+              </View>
+            </ScrollView>
+            <View style={styles.dialogActions}>
+              <Pressable style={styles.btnSecondary} onPress={() => setSendDialogOpen(false)} disabled={sendSubmitting}>
+                <Text style={styles.btnSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={handleSubmitSendDocument} disabled={sendSubmitting}>
+                <LinearGradient colors={['#f97316', '#ea580c']} style={styles.btnPrimary}>
+                  <Text style={styles.btnPrimaryText}>{sendSubmitting ? 'Sending...' : 'Send Document'}</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* College / Document Type Select Modal */}
       <Modal visible={selectField !== null} animationType="fade" transparent onRequestClose={() => setSelectField(null)}>
         <View style={styles.logoutOverlay}>
@@ -932,12 +1162,29 @@ function createStyles(theme: ThemePalette) {
     pageTitle: { fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
     pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
 
-    // Request button
+    // Request / Send buttons
+    actionButtonsCol: { gap: 10, alignItems: 'flex-start' },
     requestBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 14, borderRadius: 14, alignSelf: 'flex-start', paddingHorizontal: 20,
     },
     requestBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    sendBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 14, borderRadius: 14, alignSelf: 'flex-start', paddingHorizontal: 20,
+    },
+    sendBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+
+    // Attachments (Send a Document)
+    attachBudgetText: { fontSize: 11, fontWeight: '400', color: theme.tertiary, textTransform: 'none' },
+    attachHintText: { fontSize: 11, color: theme.tertiary, marginTop: 4 },
+    attachList: { gap: 6, marginBottom: 8 },
+    attachChip: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+      paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+    },
+    attachChipText: { flex: 1, fontSize: 12, color: theme.text },
 
     // Error banner
     errorBanner: {

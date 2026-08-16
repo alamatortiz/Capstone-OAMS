@@ -105,9 +105,10 @@ function OamsLogo({
 
 const STAT_TINTS = {
   blue: { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.25)', color: '#3b82f6' },
-  orange: { bg: 'rgba(245, 158, 11, 0.16)', border: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b' },
+  orange: { bg: 'rgba(249, 115, 22, 0.16)', border: 'rgba(249, 115, 22, 0.25)', color: '#f97316' },
   emerald: { bg: 'rgba(16, 185, 129, 0.16)', border: 'rgba(16, 185, 129, 0.25)', color: '#10b981' },
   purple: { bg: 'rgba(168, 85, 247, 0.16)', border: 'rgba(168, 85, 247, 0.25)', color: '#a855f7' },
+  green: { bg: 'rgba(34, 197, 94, 0.16)', border: 'rgba(34, 197, 94, 0.25)', color: '#22c55e' },
 } as const;
 
 type LucideIconType = typeof Clock;
@@ -289,7 +290,7 @@ export default function AdminDashboardScreen() {
     { key: 'queues', title: 'Active Queues', value: loading ? '—' : String(s?.activeQueues ?? 0), description: `In ${user?.departmentName ?? ''}`, icon: Clock, tint: 'blue' },
     { key: 'documents', title: 'Pending Documents', value: loading ? '—' : String(s?.pendingDocuments ?? 0), description: 'Awaiting processing', icon: FileText, tint: 'orange' },
     { key: 'faculty', title: 'Faculty Available', value: loading ? '—' : String(s?.facultyAvailable ?? 0), description: 'Today', icon: Users, tint: 'emerald' },
-    { key: 'announcements', title: 'Announcements', value: loading ? '—' : String(s?.announcements ?? 0), description: 'Published', icon: Bell, tint: 'purple' },
+    { key: 'announcements', title: 'Announcements', value: loading ? '—' : String(s?.announcements ?? 0), description: 'Published', icon: Bell, tint: 'green' },
   ];
 
   const announcements: AnnouncementItem[] = dashStats?.announcements ?? [];

@@ -183,7 +183,7 @@
 }
 
 .admin-transaction-stat-card.admin-transaction-stat-document {
-  border-color: rgba(245, 158, 11, 0.3);
+  border-color: rgba(249, 115, 22, 0.3);
 }
 
 .admin-transaction-stat-content {
@@ -232,7 +232,7 @@
 }
 
 .admin-transaction-stat-document svg {
-  color: #f59e0b;
+  color: #f97316;
 }
 
 .admin-transaction-section-header {
@@ -523,9 +523,9 @@
 }
 
 .admin-transaction-badge-document {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: var(--warning);
-  border: 0.5px solid rgba(245, 158, 11, 0.3);
+  background-color: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  border: 0.5px solid rgba(249, 115, 22, 0.3);
 }
 
 .admin-transaction-badge-completed {

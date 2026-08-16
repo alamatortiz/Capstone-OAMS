@@ -272,9 +272,9 @@ body {
 }
 
 .transactions-container .stat-icon-box.tx-bg-orange-50 {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
-  border-color: rgba(245, 158, 11, 0.2);
-  color: var(--warning);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  border-color: rgba(249, 115, 22, 0.2);
+  color: #f97316;
 }
 
 .transactions-container .stat-icon-box.tx-bg-purple-50 {
@@ -666,8 +666,8 @@ body {
 }
 
 .tx-badge-document {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
-  color: var(--warning);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  color: #fb923c;
 }
 
 .transaction-content {

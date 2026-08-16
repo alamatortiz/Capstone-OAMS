@@ -449,6 +449,81 @@ CREATE TABLE qr_tracking_logs (
 );
 
 -- ─────────────────────────────────────────────────────────────
+-- 9b. DOCUMENT SUBMISSIONS (student -> office: sending a document, e.g.
+--     for encoding -- as opposed to document_requests, which is the
+--     office -> student direction. Deliberately named distinctly from the
+--     dormant `submissions`/`submitted_files` tables further down (an
+--     unrelated, unbuilt professor class-assignment feature) to avoid
+--     confusing the two "submission" concepts.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_submissions (
+    submission_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    tracking_number VARCHAR(50)  NOT NULL UNIQUE, -- assigned via trigger below (SUB-00001, ...)
+    student_id      INT          NOT NULL,
+    -- Direct FK, unlike document_requests.service_id -- there's no
+    -- document_services concept here (no type/copies/coding), so the
+    -- department is resolved once at creation time from the student's own
+    -- department_id and stored directly.
+    department_id   INT          NOT NULL,
+    title           VARCHAR(255) NOT NULL, -- student-authored; stands in for "document type" everywhere in the UI
+    purpose         VARCHAR(255) NOT NULL,
+    -- Deliberately smaller than document_requests.status: no 'generated'/
+    -- 'released' -- nothing is physically generated or picked up in this
+    -- direction, so claimed is reached directly from processing.
+    status          ENUM('pending','processing','claimed','rejected','cancelled') DEFAULT 'pending',
+    needed_by       DATE         NULL,
+    notes           TEXT         NULL, -- admin processing/rejection notes, mirrors document_requests.notes
+    claimed_at      TIMESTAMP    NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id)    REFERENCES students(student_id),
+    FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    INDEX idx_document_submissions_tracking (tracking_number),
+    INDEX idx_document_submissions_student (student_id),
+    INDEX idx_document_submissions_dept (department_id)
+);
+
+-- One table for BOTH attachment channels (the student's uploaded files AND
+-- the office's return files), disambiguated by `direction` -- not two
+-- separate tables, since both channels need identical columns and identical
+-- budget logic (5 files / 10MB each, independently per direction via
+-- "AND direction = ?"). All reads/writes go through
+-- server/utils/documentSubmissionAttachments.js, which always takes an
+-- explicit `direction` argument, so a missing filter can't leak one
+-- channel's files into the other.
+CREATE TABLE document_submission_files (
+    file_id         INT          AUTO_INCREMENT PRIMARY KEY,
+    submission_id   INT          NOT NULL,
+    direction       ENUM('student_upload','admin_return') NOT NULL,
+    filename        VARCHAR(255) NOT NULL, -- original filename, display only
+    file_path       VARCHAR(255) NOT NULL, -- UUID-based name actually on disk
+    mime_type       VARCHAR(100) NOT NULL,
+    file_size       INT          NOT NULL,
+    uploaded_by     INT          NOT NULL, -- users.user_id -- the student for student_upload rows, the admin for admin_return rows
+    uploaded_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (submission_id) REFERENCES document_submissions(submission_id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by)   REFERENCES users(user_id),
+    INDEX idx_document_submission_files_submission (submission_id, direction)
+);
+
+-- Auto-generates tracking_number on insert (SUB-00001, SUB-00002, ...).
+-- Unlike ts_auto_tracking_number/_faculty (which only exist in
+-- server/db/mock/ccs_mock_data.sql, not here -- a fresh DB never gets those
+-- unless the mock file happens to run after this one), this trigger is
+-- defined directly in the schema file where it belongs.
+DROP TRIGGER IF EXISTS ts_auto_tracking_number_submission;
+DELIMITER //
+CREATE TRIGGER ts_auto_tracking_number_submission
+BEFORE INSERT ON document_submissions
+FOR EACH ROW
+BEGIN
+    DECLARE next_id INT;
+    SELECT COALESCE(MAX(submission_id), 0) + 1 INTO next_id FROM document_submissions;
+    SET NEW.tracking_number = CONCAT('SUB-', LPAD(next_id, 5, '0'));
+END//
+DELIMITER ;
+
+-- ─────────────────────────────────────────────────────────────
 -- 11. ANNOUNCEMENTS
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE announcements (

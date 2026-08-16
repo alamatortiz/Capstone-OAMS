@@ -31,6 +31,23 @@ const REQUIRED_PRIOR_STATUS = {
   claimed: "released",
 };
 
+// document_submissions' own, smaller status vocabulary (student -> office
+// "Send a Document"). No 'generated'/'released' -- nothing is physically
+// generated or picked up in this direction, so claimed is reached directly
+// from processing. STATUS_LABEL_MAP above needs no submission-specific
+// counterpart -- it already has identity entries for pending/processing/
+// claimed/rejected/cancelled, the full submission vocabulary.
+const SUBMISSION_DB_STATUS_MAP = {
+  pending: "pending",
+  processing: "processing",
+  claimed: "claimed",
+  rejected: "rejected",
+};
+
+const SUBMISSION_REQUIRED_PRIOR_STATUS = {
+  claimed: "processing",
+};
+
 // Table/owner-column pair for each requester role. Kept as an internal,
 // hardcoded config -- never build these queries by splicing a caller-supplied
 // table/column name into SQL, even though today's two callers are trusted.
@@ -52,6 +69,14 @@ const CANCEL_CONFIG = {
                 WHERE fdr.request_id = ?
                 FOR UPDATE`,
     updateSql: `UPDATE faculty_document_requests SET status = 'cancelled' WHERE request_id = ?`,
+  },
+  submission: {
+    ownerColumn: "student_id",
+    selectSql: `SELECT student_id, status, department_id
+                FROM document_submissions
+                WHERE submission_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE document_submissions SET status = 'cancelled' WHERE submission_id = ?`,
   },
 };
 
@@ -97,5 +122,7 @@ module.exports = {
   STATUS_LABEL_MAP,
   VALID_SCAN_STATUSES,
   REQUIRED_PRIOR_STATUS,
+  SUBMISSION_DB_STATUS_MAP,
+  SUBMISSION_REQUIRED_PRIOR_STATUS,
   cancelOwnDocumentRequest,
 };

@@ -18,6 +18,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import {
   AlertCircle, Calendar, CheckCircle, ChevronLeft, Clock, FileText, Home as HomeIcon, Loader2,
   Megaphone, MessageSquare, Users, XCircle, ClipboardList,
@@ -117,8 +119,16 @@ function OamsLogo({
   );
 }
 
+interface DocumentAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 interface DocumentRecord {
   id: string;
+  kind?: 'request' | 'submission';
   type: string;
   college: string;
   collegeAbbrev?: string;
@@ -132,6 +142,8 @@ interface DocumentRecord {
   neededBy?: string;
   claimedDate?: string;
   releasedDate?: string;
+  studentFiles?: DocumentAttachment[];
+  adminFiles?: DocumentAttachment[];
 }
 
 interface DocumentRequirement {
@@ -709,6 +721,41 @@ function DocumentDetail({
 }) {
   const meta = getDetailStatusMeta(doc.status, isDarkMode);
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
+  const { token } = useAuth();
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
+  // Mirrors student_announcement.tsx's viewAttachment() -- download to cache
+  // then hand off to the OS share sheet, since RN has no direct "open file".
+  const viewSubmissionFile = async (file: DocumentAttachment) => {
+    if (downloadingFileId) return;
+    setDownloadingFileId(file.id);
+    try {
+      const submissionId = doc.id.replace(/^sub-/, '');
+      const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uri = `${FileSystem.cacheDirectory}submission-${submissionId}-${file.id}-${safeName}`;
+      const result = await FileSystem.downloadAsync(
+        `${api.defaults.baseURL}/student/document-submissions/${submissionId}/files/${file.id}`,
+        uri,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (result.status < 200 || result.status >= 300) {
+        await FileSystem.deleteAsync(result.uri, { idempotent: true });
+        Alert.alert('Error', 'Could not open the file.');
+        return;
+      }
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: file.mimeType ?? undefined });
+    } catch (err) {
+      console.error('Failed to download file:', err);
+      Alert.alert('Error', 'Could not open the file.');
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
 
   return (
     <>
@@ -800,54 +847,99 @@ function DocumentDetail({
             <Text style={styles.detailValue}>{formatDateLong(doc.releasedDate)}</Text>
           </View>
         ) : null}
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Number of Copies</Text>
-          <Text style={styles.detailValue}>{doc.copies}</Text>
-        </View>
+        {doc.copies != null && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Number of Copies</Text>
+            <Text style={styles.detailValue}>{doc.copies}</Text>
+          </View>
+        )}
         <View style={[styles.detailRow, styles.detailRowLast]}>
           <Text style={styles.detailLabel}>Purpose</Text>
           <Text style={styles.detailValue}>{doc.purpose}</Text>
         </View>
       </View>
 
-      {/* Requirements */}
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <View style={styles.cardTitleRow}>
-            <CheckCircle size={18} color={theme.orange} />
-            <Text style={styles.cardTitleText}>Requirements</Text>
+      {/* Requirements -- N/A for a sent document: doc.type there is the
+          student's free-text Title, which could coincidentally match a real
+          service name and pull in unrelated requirements, so this is hidden
+          outright rather than just visually de-emphasized. */}
+      {doc.kind !== 'submission' && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <CheckCircle size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Requirements</Text>
+            </View>
           </View>
-        </View>
-        {reqLoading ? (
-          <View style={styles.reqLoadingRow}>
-            <ActivityIndicator size="small" color={theme.orange} />
-            <Text style={styles.reqSubtext}>Loading requirements…</Text>
-          </View>
-        ) : requirements.length > 0 ? (
-          <View style={{ gap: 10 }}>
-            {requirements.map((req) => (
-              <View key={req.name} style={styles.reqItemRow}>
-                <CheckCircle size={16} color={theme.orange} style={{ marginTop: 1 }} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <View style={styles.hintRequirementNameRow}>
-                    <Text style={styles.bodyText}>{req.name}</Text>
-                    <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
-                      <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
-                        {req.isMandatory ? 'Required' : 'Optional'}
-                      </Text>
+          {reqLoading ? (
+            <View style={styles.reqLoadingRow}>
+              <ActivityIndicator size="small" color={theme.orange} />
+              <Text style={styles.reqSubtext}>Loading requirements…</Text>
+            </View>
+          ) : requirements.length > 0 ? (
+            <View style={{ gap: 10 }}>
+              {requirements.map((req) => (
+                <View key={req.name} style={styles.reqItemRow}>
+                  <CheckCircle size={16} color={theme.orange} style={{ marginTop: 1 }} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={styles.hintRequirementNameRow}>
+                      <Text style={styles.bodyText}>{req.name}</Text>
+                      <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                        <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                          {req.isMandatory ? 'Required' : 'Optional'}
+                        </Text>
+                      </View>
                     </View>
+                    {req.description && <Text style={styles.reqDescText}>{req.description}</Text>}
                   </View>
-                  {req.description && <Text style={styles.reqDescText}>{req.description}</Text>}
                 </View>
-              </View>
-            ))}
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.reqSubtext}>
+              No specific requirements have been defined for this service yet. Contact the office for details.
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Attachments -- only for a sent document */}
+      {doc.kind === 'submission' && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <FileText size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Attachments</Text>
+            </View>
           </View>
-        ) : (
-          <Text style={styles.reqSubtext}>
-            No specific requirements have been defined for this service yet. Contact the office for details.
-          </Text>
-        )}
-      </View>
+          <Text style={styles.reqSubtext}>Your Files</Text>
+          {doc.studentFiles && doc.studentFiles.length > 0 ? (
+            <View style={{ gap: 8, marginTop: 6, marginBottom: 10 }}>
+              {doc.studentFiles.map((f) => (
+                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewSubmissionFile(f)} disabled={!!downloadingFileId}>
+                  <FileText size={14} color={theme.orange} />
+                  <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.reqSubtext, { marginTop: 4, marginBottom: 10 }]}>No files attached.</Text>
+          )}
+          <Text style={styles.reqSubtext}>Office Return Files</Text>
+          {doc.adminFiles && doc.adminFiles.length > 0 ? (
+            <View style={{ gap: 8, marginTop: 6 }}>
+              {doc.adminFiles.map((f) => (
+                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewSubmissionFile(f)} disabled={!!downloadingFileId}>
+                  <FileText size={14} color={theme.orange} />
+                  <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.reqSubtext, { marginTop: 4 }]}>Nothing returned yet.</Text>
+          )}
+        </View>
+      )}
 
       {/* Notes */}
       {doc.notes && (
@@ -1077,6 +1169,12 @@ function createStyles(theme: ThemePalette) {
     reqSubtext: { fontSize: 12, color: theme.tertiary, marginTop: 4, marginBottom: 4 },
     reqLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     reqItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    attachChip: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background,
+    },
+    attachChipText: { flex: 1, fontSize: 12.5, color: theme.text },
     reqDescText: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
     hintRequirementNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     reqTagRequired: {

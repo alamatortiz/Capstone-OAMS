@@ -47,6 +47,29 @@ const formatDateShort = (dateStr) => {
   });
 };
 
+// Fetches one document-submission file's bytes on demand and opens/downloads
+// it -- mirrors adm-announcements.jsx's openAttachment().
+async function openSubmissionFile(submissionId, file) {
+  try {
+    const res = await api.get(
+      `/student/document-submissions/${submissionId}/files/${file.id}`,
+      { responseType: "blob" },
+    );
+    const url = URL.createObjectURL(res.data);
+    if (file.mimeType?.startsWith("image/") || file.mimeType === "application/pdf") {
+      window.open(url, "_blank");
+    } else {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.filename;
+      link.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    toast.error("Failed to load file");
+  }
+}
+
 // ─── Detail View ──────────────────────────────────────────────────────────────
 function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Documents", requirements, reqLoading }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -169,10 +192,12 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
                   <span className="dss-detail-value">{formatManilaDateTime(doc.claimedDate)}</span>
                 </div>
               )}
-              <div className="dss-detail-row">
-                <span className="dss-detail-label">Number of Copies</span>
-                <span className="dss-detail-value">{doc.copies ?? 1}</span>
-              </div>
+              {doc.copies != null && (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Number of Copies</span>
+                  <span className="dss-detail-value">{doc.copies}</span>
+                </div>
+              )}
               <div className="dss-detail-row" style={{ borderBottom: "none" }}>
                 <span className="dss-detail-label">Purpose</span>
                 <span className="dss-detail-value">{doc.purpose}</span>
@@ -180,48 +205,106 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
             </div>
           </div>
 
-          {/* Requirements card */}
-          <div className="dss-card">
-            <div className="dss-card-header">
-              <h3 className="dss-card-title">
-                <CheckCircle2 style={{ width: "1.375rem", height: "1.375rem" }} />
-                Requirements
-              </h3>
-            </div>
-            <div className="dss-card-content">
-              {reqLoading ? (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-tertiary)", fontSize: "0.875rem" }}>
-                  <Loader2 style={{ width: "1.125rem", height: "1.125rem", animation: "spin 1s linear infinite" }} />
-                  Loading requirements…
-                </div>
-              ) : requirements.length > 0 ? (
-                <ul className="dss-requirements-list">
-                  {requirements.map((req, i) => (
-                    <li key={req.name} className="dss-requirement-item">
-                      <CheckCircle2 className="dss-requirement-icon" />
-                      <div>
-                        <div className="dss-requirement-name-row">
-                          <span>{req.name}</span>
-                          <span className={`dss-requirement-badge ${req.isMandatory ? "is-mandatory" : "is-optional"}`}>
-                            {req.isMandatory ? "Required" : "Optional"}
-                          </span>
+          {/* Requirements card -- N/A for a sent document: doc.type there is
+              the student's free-text Title, which could coincidentally match
+              a real service name and pull in unrelated requirements, so this
+              is hidden outright rather than just visually de-emphasized. */}
+          {doc.kind !== "submission" && (
+            <div className="dss-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title">
+                  <CheckCircle2 style={{ width: "1.375rem", height: "1.375rem" }} />
+                  Requirements
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                {reqLoading ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-tertiary)", fontSize: "0.875rem" }}>
+                    <Loader2 style={{ width: "1.125rem", height: "1.125rem", animation: "spin 1s linear infinite" }} />
+                    Loading requirements…
+                  </div>
+                ) : requirements.length > 0 ? (
+                  <ul className="dss-requirements-list">
+                    {requirements.map((req, i) => (
+                      <li key={req.name} className="dss-requirement-item">
+                        <CheckCircle2 className="dss-requirement-icon" />
+                        <div>
+                          <div className="dss-requirement-name-row">
+                            <span>{req.name}</span>
+                            <span className={`dss-requirement-badge ${req.isMandatory ? "is-mandatory" : "is-optional"}`}>
+                              {req.isMandatory ? "Required" : "Optional"}
+                            </span>
+                          </div>
+                          {req.description && (
+                            <p style={{ fontSize: "0.75rem", opacity: 0.65, marginTop: "2px" }}>
+                              {req.description}
+                            </p>
+                          )}
                         </div>
-                        {req.description && (
-                          <p style={{ fontSize: "0.75rem", opacity: 0.65, marginTop: "2px" }}>
-                            {req.description}
-                          </p>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ fontSize: "0.9rem", color: "var(--text-tertiary)", margin: 0 }}>
-                  No specific requirements have been defined for this service yet. Contact the office for details.
-                </p>
-              )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{ fontSize: "0.9rem", color: "var(--text-tertiary)", margin: 0 }}>
+                    No specific requirements have been defined for this service yet. Contact the office for details.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Attachments card -- only for a sent document */}
+          {doc.kind === "submission" && (
+            <div className="dss-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title">
+                  <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Attachments
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                <p className="dss-detail-label" style={{ marginBottom: "0.4rem" }}>Your Files</p>
+                {doc.studentFiles?.length > 0 ? (
+                  <div className="dss-attach-list">
+                    {doc.studentFiles.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className="dss-attach-chip"
+                        onClick={() => openSubmissionFile(doc.id.replace(/^sub-/, ""), f)}
+                      >
+                        <FileText /> {f.filename}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: "0 0 0.75rem" }}>
+                    No files attached.
+                  </p>
+                )}
+
+                <p className="dss-detail-label" style={{ margin: "0.75rem 0 0.4rem" }}>Office Return Files</p>
+                {doc.adminFiles?.length > 0 ? (
+                  <div className="dss-attach-list">
+                    {doc.adminFiles.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className="dss-attach-chip"
+                        onClick={() => openSubmissionFile(doc.id.replace(/^sub-/, ""), f)}
+                      >
+                        <FileText /> {f.filename}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: 0 }}>
+                    Nothing returned yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Notes card */}
           {doc.notes && (

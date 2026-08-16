@@ -577,13 +577,13 @@
 .doc-card-title-section h3 {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #f59e0b;
+  color: #f97316;
   margin: 0 0 0.25rem 0;
   transition: color 0.3s ease;
 }
 
 [data-theme="light"] .doc-card-title-section h3 {
-  color: #d97706;
+  color: #ea580c;
 }
 
 .doc-card-college {

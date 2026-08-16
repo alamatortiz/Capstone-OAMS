@@ -60,7 +60,17 @@ const EyeIcon = () => (
 const SOURCES = [
   { id: "student", label: "Students", endpoint: "document-processing" },
   { id: "faculty", label: "Faculty", endpoint: "faculty-document-processing" },
+  { id: "submission", label: "Submissions", endpoint: "document-submissions" },
 ];
+
+// Mirrors the server's limits (server/middleware/upload.js) -- purely
+// advisory here for the running-total UI, the server stays authoritative.
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+const ATTACHMENT_ACCEPT =
+  ".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip";
+const formatBytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 
 export default function AdminDocumentProcessing() {
   // ── Document processing state ─────────────────────────────────────────────
@@ -79,6 +89,61 @@ export default function AdminDocumentProcessing() {
   useLockBodyScroll(showDetailsModal);
   const [processingNotes, setProcessingNotes] = useState("");
   const [officialCode, setOfficialCode] = useState("");
+
+  // ── Return-file attachments (submission source only) ────────────────────
+  const [returnFiles, setReturnFiles] = useState([]); // { id, file }[] queued to send back to the student
+  const addReturnFiles = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    const accepted = [];
+    let count = returnFiles.length;
+    let bytes = returnFiles.reduce((sum, f) => sum + f.file.size, 0);
+    let tooLarge = 0;
+    let overBudget = 0;
+    for (const file of incoming) {
+      if (file.size > MAX_FILE_BYTES) {
+        tooLarge += 1;
+        continue;
+      }
+      if (count + 1 > MAX_FILES || bytes + file.size > MAX_TOTAL_BYTES) {
+        overBudget += 1;
+        continue;
+      }
+      accepted.push({ id: Date.now() + Math.random(), file });
+      count += 1;
+      bytes += file.size;
+    }
+    if (accepted.length > 0) setReturnFiles((prev) => [...prev, ...accepted]);
+    if (tooLarge > 0) {
+      toast.error(`${tooLarge} file(s) skipped — each file must be ${formatBytes(MAX_FILE_BYTES)} or smaller`);
+    }
+    if (overBudget > 0) {
+      toast.error(`${overBudget} file(s) skipped — attachment limit reached`);
+    }
+  };
+  const removeReturnFile = (id) => setReturnFiles((prev) => prev.filter((f) => f.id !== id));
+
+  // Fetches one document-submission file's bytes on demand and opens/
+  // downloads it -- mirrors adm-announcements.jsx's openAttachment().
+  const openSubmissionFile = async (submissionId, file) => {
+    try {
+      const res = await api.get(
+        `/admin/document-submissions/${submissionId}/files/${file.id}`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(res.data);
+      if (file.mimeType?.startsWith("image/") || file.mimeType === "application/pdf") {
+        window.open(url, "_blank");
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = file.filename;
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      toast.error("Failed to load file");
+    }
+  };
 
   // ── Status-change confirmation ───────────────────────────────────────────
   const [confirmStatus, setConfirmStatus] = useState(null); // target status or null
@@ -177,27 +242,51 @@ export default function AdminDocumentProcessing() {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes || "");
     setOfficialCode(doc.officialCode || "");
+    setReturnFiles([]);
     setShowDetailsModal(true);
   };
 
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedDocument) return;
     const needsCode = newStatus === "ready" && selectedDocument.requiresCoding;
+    // Re-sending the document's own current status is how "Attach Files"
+    // works without also changing the status -- same endpoint doubles as
+    // both actions, mirroring PUT /admin/announcements/:id.
+    const isFileOnlyUpdate = source === "submission" && newStatus === selectedDocument.status;
+    // GET /admin/document-submissions prefixes ids ("sub-42") so this list
+    // stays merge-safe alongside other sources elsewhere (e.g. the admin
+    // dashboard widget) -- but the PATCH route itself expects the raw
+    // numeric submission_id, so the prefix must be stripped here.
+    const rawId = source === "submission" ? selectedDocument.id.replace(/^sub-/, "") : selectedDocument.id;
     try {
-      await api.patch(`/admin/${sourceEndpoint}/${selectedDocument.id}/status`, {
-        status: newStatus,
-        notes: processingNotes,
-        ...(needsCode ? { officialCode } : {}),
-      });
-      toast.success(`Document marked as ${newStatus}`);
+      if (source === "submission") {
+        const body = new FormData();
+        body.append("status", newStatus);
+        body.append("notes", processingNotes);
+        returnFiles.forEach((f) => body.append("returnFiles", f.file));
+        await api.patch(`/admin/${sourceEndpoint}/${rawId}/status`, body);
+      } else {
+        await api.patch(`/admin/${sourceEndpoint}/${rawId}/status`, {
+          status: newStatus,
+          notes: processingNotes,
+          ...(needsCode ? { officialCode } : {}),
+        });
+      }
+      toast.success(isFileOnlyUpdate ? "Files attached successfully" : `Document marked as ${newStatus}`);
       setShowDetailsModal(false);
       setSelectedDocument(null);
       setProcessingNotes("");
       setOfficialCode("");
+      setReturnFiles([]);
       await fetchDocuments();
     } catch (err) {
       toast.error(err?.response?.data?.error || "Failed to update document status");
     }
+  };
+
+  const handleAttachReturnFiles = () => {
+    if (!selectedDocument || returnFiles.length === 0) return;
+    handleUpdateStatus(selectedDocument.status);
   };
 
   const handleCloseModal = () => {
@@ -205,6 +294,7 @@ export default function AdminDocumentProcessing() {
     setSelectedDocument(null);
     setProcessingNotes("");
     setOfficialCode("");
+    setReturnFiles([]);
   };
 
   // "Mark as Ready" needs a non-blank official code first when the document
@@ -247,13 +337,21 @@ export default function AdminDocumentProcessing() {
       confirmText: "Reject Request",
       icon: <XCircleIcon />,
     },
-    claimed: {
-      title: "Mark as Claimed?",
-      message: <>Confirm that the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong> has been handed to the correct recipient, per office procedure?</>,
-      confirmText: "Mark as Claimed",
-      icon: <CheckCircleIcon />,
-      variant: "success",
-    },
+    claimed: source === "submission"
+      ? {
+          title: "Mark as Received?",
+          message: <>Confirm that <strong>{selectedDocument.documentType}</strong> from <strong>{selectedDocument.requesterName}</strong> has been received and processed by the office?</>,
+          confirmText: "Mark as Received",
+          icon: <CheckCircleIcon />,
+          variant: "success",
+        }
+      : {
+          title: "Mark as Claimed?",
+          message: <>Confirm that the <strong>{selectedDocument.documentType}</strong> request for <strong>{selectedDocument.requesterName}</strong> has been handed to the correct recipient, per office procedure?</>,
+          confirmText: "Mark as Claimed",
+          icon: <CheckCircleIcon />,
+          variant: "success",
+        },
   }[confirmStatus];
 
   const getStatusMeta = (status) => {
@@ -269,7 +367,13 @@ export default function AdminDocumentProcessing() {
     }
   };
 
-  const TABS = ["all", "pending", "processing", "ready", "released", "claimed", "rejected", "cancelled"];
+  // Submissions skip 'ready'/'released' -- nothing is physically generated
+  // or picked up in that direction, so claimed is reached directly from
+  // processing.
+  const TABS =
+    source === "submission"
+      ? ["all", "pending", "processing", "claimed", "rejected", "cancelled"]
+      : ["all", "pending", "processing", "ready", "released", "claimed", "rejected", "cancelled"];
 
   return (
     <AdminPageShell
@@ -317,13 +421,15 @@ export default function AdminDocumentProcessing() {
                       <p className="adp-modal-value">{selectedDocument.college}</p>
                     </div>
                     <div className="adp-modal-field">
-                      <label className="adp-modal-label">Document Type</label>
+                      <label className="adp-modal-label">{source === "submission" ? "Title" : "Document Type"}</label>
                       <p className="adp-modal-value">{selectedDocument.documentType}</p>
                     </div>
-                    <div className="adp-modal-field">
-                      <label className="adp-modal-label">Number of Copies</label>
-                      <p className="adp-modal-value">{selectedDocument.copies ?? 1}</p>
-                    </div>
+                    {selectedDocument.copies != null && (
+                      <div className="adp-modal-field">
+                        <label className="adp-modal-label">Number of Copies</label>
+                        <p className="adp-modal-value">{selectedDocument.copies}</p>
+                      </div>
+                    )}
                     {selectedDocument.neededBy && (
                       <div className="adp-modal-field">
                         <label className="adp-modal-label">Needed By</label>
@@ -357,6 +463,82 @@ export default function AdminDocumentProcessing() {
                       </div>
                     )}
                   </div>
+
+                  {source === "submission" && (
+                    <div className="adp-modal-notes-wrap">
+                      <label className="adp-modal-label">Files from Student</label>
+                      {selectedDocument.studentFiles?.length > 0 ? (
+                        <div className="adp-attach-list">
+                          {selectedDocument.studentFiles.map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              className="adp-attach-chip"
+                              onClick={() => openSubmissionFile(selectedDocument.id.replace(/^sub-/, ""), f)}
+                            >
+                              <FileText /> {f.filename}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="adp-modal-value">No files attached.</p>
+                      )}
+
+                      <label className="adp-modal-label" style={{ marginTop: "0.75rem" }}>
+                        Return Files{" "}
+                        <span className="adp-attach-budget">
+                          ({returnFiles.length}/{MAX_FILES} files, {formatBytes(returnFiles.reduce((sum, f) => sum + f.file.size, 0))}/{formatBytes(MAX_TOTAL_BYTES)})
+                        </span>
+                      </label>
+                      {selectedDocument.adminFiles?.length > 0 && (
+                        <div className="adp-attach-list">
+                          {selectedDocument.adminFiles.map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              className="adp-attach-chip"
+                              onClick={() => openSubmissionFile(selectedDocument.id.replace(/^sub-/, ""), f)}
+                            >
+                              <FileText /> {f.filename}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {returnFiles.length > 0 && (
+                        <div className="adp-attach-list">
+                          {returnFiles.map((f) => (
+                            <div key={f.id} className="adp-attach-chip adp-attach-chip--queued">
+                              <span className="adp-attach-filename"><FileText /> {f.file.name}</span>
+                              <button
+                                type="button"
+                                className="adp-attach-remove"
+                                aria-label={`Remove ${f.file.name}`}
+                                onClick={() => removeReturnFile(f.id)}
+                              >
+                                <CloseIcon />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {(selectedDocument.status === "pending" || selectedDocument.status === "processing") && (
+                        <>
+                          <input
+                            type="file"
+                            multiple
+                            accept={ATTACHMENT_ACCEPT}
+                            className="adp-attach-input"
+                            disabled={returnFiles.length >= MAX_FILES}
+                            onChange={(e) => {
+                              addReturnFiles(e.target.files);
+                              e.target.value = "";
+                            }}
+                          />
+                          <p className="adp-attach-hint">Each file up to {formatBytes(MAX_FILE_BYTES)}.</p>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {selectedDocument.status === "processing" && selectedDocument.requiresCoding && (
                     <div className="adp-modal-notes-wrap">
@@ -392,7 +574,12 @@ export default function AdminDocumentProcessing() {
                         Start Processing
                       </button>
                     )}
-                    {selectedDocument.status === "processing" && (
+                    {selectedDocument.status === "processing" && source === "submission" && (
+                      <button className="adp-modal-btn adp-modal-btn--success" onClick={() => setConfirmStatus("claimed")}>
+                        Mark as Received
+                      </button>
+                    )}
+                    {selectedDocument.status === "processing" && source !== "submission" && (
                       <button className="adp-modal-btn adp-modal-btn--success" onClick={handleMarkReadyClick}>
                         Mark as Ready
                       </button>
@@ -412,6 +599,16 @@ export default function AdminDocumentProcessing() {
                         Reject Request
                       </button>
                     )}
+                    {source === "submission" &&
+                      (selectedDocument.status === "pending" || selectedDocument.status === "processing") && (
+                        <button
+                          className="adp-modal-btn adp-modal-btn--outline"
+                          onClick={handleAttachReturnFiles}
+                          disabled={returnFiles.length === 0}
+                        >
+                          Attach Files
+                        </button>
+                      )}
                     <button className="adp-modal-btn adp-modal-btn--outline" onClick={handleCloseModal}>
                       Cancel
                     </button>

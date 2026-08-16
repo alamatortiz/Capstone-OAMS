@@ -75,7 +75,7 @@ function OamsLogo({
   );
 }
 
-type TxType = 'queue' | 'appointment' | 'document';
+type TxType = 'queue' | 'appointment' | 'document' | 'submission';
 type TxStatus = 'completed' | 'ongoing' | 'cancelled';
 
 interface Transaction {
@@ -92,7 +92,10 @@ interface Transaction {
 const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
   queue: { label: 'queue', icon: Users, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
   appointment: { label: 'appointment', icon: Calendar, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.35)', color: '#a855f7' },
-  document: { label: 'document', icon: FileText, bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
+  document: { label: 'document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.35)', color: '#f97316' },
+  // Shares document's visual family -- opposite direction, already
+  // disambiguated by the "Sent: ..." title text from the server.
+  submission: { label: 'sent document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.35)', color: '#f97316' },
 };
 
 const STATUS_META_DARK: Record<TxStatus, { label: string; bg: string; border: string; color: string }> = {
@@ -135,6 +138,7 @@ const TYPE_OPTIONS = [
   { value: 'queue', label: 'Queue' },
   { value: 'appointment', label: 'Appointment' },
   { value: 'document', label: 'Document' },
+  { value: 'submission', label: 'Sent Document' },
 ];
 
 const STATUS_OPTIONS = [
@@ -307,7 +311,7 @@ export default function StudentTransactionsScreen() {
   const stats: { key: string; label: string; value: number; icon: LucideIconType; color: string; bg: string; border: string }[] = [
     { key: 'total', label: 'Total', value: txStats.total, icon: ClipboardList, color: theme.blue, bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.2)' },
     { key: 'completed', label: 'Completed', value: txStats.completed, icon: CheckCircle, color: theme.success, bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 0.2)' },
-    { key: 'ongoing', label: 'Ongoing', value: txStats.ongoing, icon: Clock, color: theme.amber, bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.2)' },
+    { key: 'ongoing', label: 'Ongoing', value: txStats.ongoing, icon: Clock, color: theme.orange, bg: 'rgba(249, 115, 22, 0.2)', border: 'rgba(249, 115, 22, 0.2)' },
     { key: 'month', label: 'This Month', value: txStats.thisMonth, icon: Calendar, color: theme.success, bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.2)' },
   ];
 

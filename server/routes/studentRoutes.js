@@ -13,6 +13,15 @@ const { STATUS_LABEL_MAP, cancelOwnDocumentRequest } = require("../utils/documen
 const { createNotification } = require("../utils/notifications");
 const notificationsController = require("../controllers/notificationsController");
 const { getAttachmentsMap, serveAnnouncementAttachment } = require("../utils/announcementAttachments");
+const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
+const {
+  getFilesMap,
+  getFiles,
+  insertFiles,
+  validateBudget,
+  deleteFiles,
+  serveStudentDocumentSubmissionFile,
+} = require("../utils/documentSubmissionAttachments");
 
 // Logs the real error server-side (unchanged from before) but only ever
 // sends a generic, safe message to the client under the `error` key --
@@ -101,6 +110,18 @@ router.get(
         [studentId],
       );
 
+      // document_submissions has no 'generated'/'released' states (nothing is
+      // physically produced/picked up in that direction), so only
+      // pending/processing counts fold into the combined documents stat below.
+      const [[subRow]] = await pool.query(
+        `SELECT
+           SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_only_count,
+           SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count
+         FROM document_submissions
+         WHERE student_id = ?`,
+        [studentId],
+      );
+
       const [[completedRow]] = await pool.query(
         `SELECT
            (
@@ -114,8 +135,12 @@ router.get(
            (
              SELECT COUNT(*) FROM document_requests
              WHERE student_id = ? AND status = 'claimed'
+           ) +
+           (
+             SELECT COUNT(*) FROM document_submissions
+             WHERE student_id = ? AND status = 'claimed'
            ) AS total_completed`,
-        [studentId, studentId, studentId],
+        [studentId, studentId, studentId, studentId],
       );
 
       const [[facultyRow]] = await pool.query(
@@ -156,9 +181,18 @@ router.get(
            JOIN departments d ON s.department_id = d.department_id
            WHERE dr.student_id = ?
          )
+         UNION ALL
+         (
+           SELECT 'submission' AS type, NULL AS service_name, NULL AS professor_name, ds.title AS request_type,
+                  d.department_name AS college, ds.status, NULL AS admin_reason, NULL AS cancelled_by,
+                  ds.created_at AS event_time
+           FROM document_submissions ds
+           JOIN departments d ON ds.department_id = d.department_id
+           WHERE ds.student_id = ?
+         )
          ORDER BY event_time DESC
          LIMIT 5`,
-        [studentId, studentId, studentId],
+        [studentId, studentId, studentId, studentId],
       );
 
       // Pick the queue with the lowest position (closest to being served)
@@ -209,8 +243,8 @@ router.get(
             active: Number(apptRow.active_count || 0),
           },
           documents: (() => {
-            const pendingOnly = Number(docRow.pending_only_count || 0);
-            const processing = Number(docRow.processing_count || 0);
+            const pendingOnly = Number(docRow.pending_only_count || 0) + Number(subRow.pending_only_count || 0);
+            const processing = Number(docRow.processing_count || 0) + Number(subRow.processing_count || 0);
             const ready = Number(docRow.ready_count || 0);
             const released = Number(docRow.released_count || 0);
             const total = pendingOnly + processing + ready + released;
@@ -252,6 +286,7 @@ router.get(
           title:
             row.type === "queue" ? buildQueueActivityTitle(row) :
             row.type === "appointment" ? buildAppointmentActivityTitle(row) :
+            row.type === "submission" ? buildSubmissionActivityTitle(row) :
             buildDocumentActivityTitle(row),
           college: row.college,
           status: row.status,
@@ -309,6 +344,19 @@ function buildDocumentActivityTitle(row) {
     cancelled: `You cancelled the document request: ${row.request_type}`,
   };
   return map[row.status] ?? `Document request update: ${row.request_type}`;
+}
+
+// row.request_type carries document_submissions.title here (same UNION
+// column position as buildDocumentActivityTitle's request_type).
+function buildSubmissionActivityTitle(row) {
+  const map = {
+    pending: `Document sent: ${row.request_type}`,
+    processing: `Sent document being processed: ${row.request_type}`,
+    claimed: `Sent document received by the office: ${row.request_type}`,
+    rejected: `Sent document rejected: ${row.request_type}`,
+    cancelled: `You cancelled the sent document: ${row.request_type}`,
+  };
+  return map[row.status] ?? `Sent document update: ${row.request_type}`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -451,6 +499,11 @@ router.get(
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/student/documents
+// Merges document_requests ("Request a Document") and document_submissions
+// ("Send a Document") into one list, since both screens' claimed/rejected/
+// cancelled tabs render them identically. `id` is prefixed ("req-12"/
+// "sub-7") because the two tables' auto-increment ids would otherwise
+// collide once merged -- same trick GET /transactions already uses.
 router.get(
   "/documents",
   authenticateToken,
@@ -460,43 +513,83 @@ router.get(
 
     try {
       const [rows] = await pool.query(
-        `SELECT
-           dr.request_id,
-           dr.tracking_number,
-           dr.request_type,
-           dr.purpose,
-           dr.copies,
-           dr.status,
-           dr.estimated_completion,
-           dr.needed_by,
-           dr.released_at,
-           dr.claimed_at,
-           dr.notes,
-           dr.created_at,
-           d.department_name AS college
-         FROM document_requests dr
-         JOIN document_services s ON dr.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
-         WHERE dr.student_id = ?
-         ORDER BY dr.created_at DESC`,
-        [studentId],
+        `SELECT * FROM (
+           (
+             SELECT
+               'request' AS kind,
+               dr.request_id AS id,
+               dr.tracking_number,
+               dr.request_type AS title,
+               dr.purpose,
+               dr.copies,
+               dr.status,
+               dr.estimated_completion,
+               dr.needed_by,
+               dr.released_at,
+               dr.claimed_at,
+               dr.notes,
+               dr.created_at,
+               d.department_name AS college
+             FROM document_requests dr
+             JOIN document_services s ON dr.service_id = s.service_id
+             JOIN departments d ON s.department_id = d.department_id
+             WHERE dr.student_id = ?
+           )
+           UNION ALL
+           (
+             SELECT
+               'submission' AS kind,
+               ds.submission_id AS id,
+               ds.tracking_number,
+               ds.title AS title,
+               ds.purpose,
+               NULL AS copies,
+               ds.status,
+               NULL AS estimated_completion,
+               ds.needed_by,
+               NULL AS released_at,
+               ds.claimed_at,
+               ds.notes,
+               ds.created_at,
+               d.department_name AS college
+             FROM document_submissions ds
+             JOIN departments d ON ds.department_id = d.department_id
+             WHERE ds.student_id = ?
+           )
+         ) AS combined
+         ORDER BY created_at DESC`,
+        [studentId, studentId],
       );
 
-      const documents = rows.map((d) => ({
-        id: String(d.request_id),
-        type: d.request_type,
-        college: d.college,
-        requestDate: d.created_at,
-        purpose: d.purpose,
-        copies: d.copies,
-        status: STATUS_LABEL_MAP[d.status] ?? d.status,
-        trackingNumber: d.tracking_number,
-        notes: d.notes || undefined,
-        estimatedCompletion: d.estimated_completion || undefined,
-        neededBy: d.needed_by || undefined,
-        releasedDate: d.released_at || undefined,
-        claimedDate: d.claimed_at || undefined,
-      }));
+      const submissionIds = rows.filter((d) => d.kind === "submission").map((d) => d.id);
+      const [studentFilesMap, adminFilesMap] = await Promise.all([
+        getFilesMap(submissionIds, "student_upload"),
+        getFilesMap(submissionIds, "admin_return"),
+      ]);
+
+      const documents = rows.map((d) => {
+        const doc = {
+          id: `${d.kind === "submission" ? "sub" : "req"}-${d.id}`,
+          kind: d.kind,
+          type: d.title,
+          college: d.college,
+          requestDate: d.created_at,
+          purpose: d.purpose,
+          copies: d.copies,
+          status: STATUS_LABEL_MAP[d.status] ?? d.status,
+          trackingNumber: d.tracking_number,
+          notes: d.notes || undefined,
+          estimatedCompletion: d.estimated_completion || undefined,
+          neededBy: d.needed_by || undefined,
+          releasedDate: d.released_at || undefined,
+          claimedDate: d.claimed_at || undefined,
+        };
+        if (d.kind === "submission") {
+          doc.studentFiles = studentFilesMap[d.id] || [];
+          doc.adminFiles = adminFilesMap[d.id] || [];
+        }
+        return doc;
+      });
 
       res.json({ documents });
     } catch (error) {
@@ -655,6 +748,150 @@ router.post(
   },
 );
 
+// POST /api/student/document-submissions ("Send a Document")
+// Body (multipart/form-data): title, purpose, neededBy, attachments[] (max
+// MAX_FILES, 10MB each). No document type/college/copies -- the student can
+// only send to their own department, resolved server-side from
+// students.department_id, never trusted from the client.
+router.post(
+  "/document-submissions",
+  authenticateToken,
+  authorizeRoles("student"),
+  documentSubmissionUpload.upload.array("attachments", MAX_FILES),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const { title, purpose, neededBy } = req.body;
+
+    if (!title || !purpose) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: "title and purpose are required" });
+    }
+    if (title.length > 255) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: "Title must be 255 characters or fewer" });
+    }
+    if (purpose.length > 255) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: "Purpose must be 255 characters or fewer" });
+    }
+
+    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    if (neededBy && neededBy < tomorrow) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: "Needed-by date must be at least tomorrow" });
+    }
+
+    const budgetError = validateBudget(req.files || []);
+    if (budgetError) {
+      deleteFiles(req.files);
+      return res.status(400).json({ error: budgetError });
+    }
+
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      if (!stu) {
+        deleteFiles(req.files);
+        return res.status(404).json({ error: "Student not found" });
+      }
+      const departmentId = stu.department_id;
+
+      // Guard against a double-click/double-tap firing this twice before the
+      // client's own disabled-button state catches up to the first request.
+      const [[recentDup]] = await pool.query(
+        `SELECT submission_id FROM document_submissions
+         WHERE student_id = ? AND title = ? AND purpose = ?
+           AND status != 'cancelled'
+           AND created_at >= NOW() - INTERVAL 10 SECOND
+         LIMIT 1`,
+        [studentId, title, purpose],
+      );
+      if (recentDup) {
+        deleteFiles(req.files);
+        return res.status(409).json({ error: "This document was already sent a moment ago" });
+      }
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        const [result] = await conn.query(
+          `INSERT INTO document_submissions (student_id, department_id, title, purpose, needed_by, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
+          [studentId, departmentId, title, purpose, neededBy || null],
+        );
+
+        await insertFiles(result.insertId, "student_upload", req.files, studentId, conn);
+        await conn.commit();
+
+        const [[newSub]] = await pool.query(
+          `SELECT ds.submission_id, ds.tracking_number, ds.title, ds.purpose, ds.status,
+                  ds.needed_by, ds.notes, ds.created_at, d.department_name AS college
+           FROM document_submissions ds
+           JOIN departments d ON ds.department_id = d.department_id
+           WHERE ds.submission_id = ?`,
+          [result.insertId],
+        );
+        const studentFiles = await getFiles(newSub.submission_id, "student_upload");
+
+        emitToDept(departmentId, "document:new-request", { requestId: newSub.submission_id });
+
+        res.status(201).json({
+          message: "Document sent successfully",
+          document: {
+            id: `sub-${newSub.submission_id}`,
+            kind: "submission",
+            type: newSub.title,
+            college: newSub.college,
+            requestDate: newSub.created_at,
+            purpose: newSub.purpose,
+            copies: null,
+            status: newSub.status,
+            trackingNumber: newSub.tracking_number,
+            notes: newSub.notes || undefined,
+            neededBy: newSub.needed_by || undefined,
+            studentFiles,
+            adminFiles: [],
+          },
+        });
+      } catch (error) {
+        await conn.rollback();
+        deleteFiles(req.files);
+        sendServerError(res, error, "Create document submission error");
+      } finally {
+        conn.release();
+      }
+    } catch (error) {
+      deleteFiles(req.files);
+      sendServerError(res, error, "Create document submission error");
+    }
+  },
+);
+
+// GET /api/student/document-submissions/:submissionId/files/:fileId
+// Serves one file (either the student's own upload or the office's return
+// file) to the student who owns the submission.
+router.get(
+  "/document-submissions/:submissionId/files/:fileId",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const submissionId = parseInt(req.params.submissionId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!submissionId || !fileId) {
+      return res.status(400).json({ error: "Invalid submission or file id" });
+    }
+    try {
+      await serveStudentDocumentSubmissionFile(res, { submissionId, fileId, studentId });
+    } catch (error) {
+      sendServerError(res, error, "Get document submission file error");
+    }
+  },
+);
+
 // GET /api/student/documents/service-types
 // Returns document services visible to the student: their own dept + global (NULL dept),
 // filtered to recipient_type 'students' or 'both', active only.
@@ -733,27 +970,30 @@ router.get(
   },
 );
 
-// DELETE /api/student/documents/:requestId
-// Cancels a pending or processing document request owned by the student.
-// Soft-cancel (status = 'cancelled'), not a real delete, so it stays visible
-// in the student's transaction history the same way a cancelled queue ticket
-// or appointment does.
+// DELETE /api/student/documents/:docId
+// Cancels a pending or processing document request/submission owned by the
+// student. Soft-cancel (status = 'cancelled'), not a real delete, so it
+// stays visible in the student's transaction history the same way a
+// cancelled queue ticket or appointment does. docId is prefixed ("req-12"/
+// "sub-7") since GET /documents merges two tables whose auto-increment ids
+// would otherwise collide -- parseInt alone can't handle that prefix.
 router.delete(
-  "/documents/:requestId",
+  "/documents/:docId",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const requestId = parseInt(req.params.requestId, 10);
-
-    if (!requestId || isNaN(requestId)) {
-      return res.status(400).json({ error: "Invalid requestId" });
+    const match = /^(req|sub)-(\d+)$/.exec(req.params.docId);
+    if (!match) {
+      return res.status(400).json({ error: "Invalid document id" });
     }
+    const role = match[1] === "sub" ? "submission" : "student";
+    const requestId = parseInt(match[2], 10);
 
     const conn = await pool.getConnection();
     try {
       const result = await cancelOwnDocumentRequest(conn, {
-        role: "student",
+        role,
         ownerId: studentId,
         requestId,
       });
@@ -766,7 +1006,7 @@ router.delete(
 
       res.json({
         message: "Document request cancelled successfully",
-        requestId,
+        requestId: req.params.docId,
       });
     } catch (error) {
       await conn.rollback();
@@ -1951,12 +2191,26 @@ router.get(
         JOIN departments d ON s.department_id = d.department_id
         WHERE dr.student_id = ?
       )
+      UNION ALL
+      (
+        SELECT
+          'submission' AS type,
+          ds.submission_id AS id,
+          CONCAT('Sent: ', ds.title) AS title,
+          d.department_name AS college,
+          ds.status AS raw_status,
+          ds.purpose AS details,
+          ds.updated_at AS event_time
+        FROM document_submissions ds
+        JOIN departments d ON ds.department_id = d.department_id
+        WHERE ds.student_id = ?
+      )
     `;
 
     try {
       const filterClauses = [];
       const filterParams = [];
-      if (type && ["queue", "appointment", "document"].includes(type)) {
+      if (type && ["queue", "appointment", "document", "submission"].includes(type)) {
         filterClauses.push("type = ?");
         filterParams.push(type);
       }
@@ -1979,7 +2233,7 @@ router.get(
       // is always scoped to the student's unfiltered full history.
       const [[{ total: filteredTotal }]] = await pool.query(
         `SELECT COUNT(*) AS total FROM (${unionSql}) AS combined ${whereClause}`,
-        [studentId, studentId, studentId, ...filterParams],
+        [studentId, studentId, studentId, studentId, ...filterParams],
       );
       const totalPages = Math.max(1, Math.ceil(filteredTotal / limit));
 
@@ -1988,7 +2242,7 @@ router.get(
          ${whereClause}
          ORDER BY event_time DESC
          LIMIT ? OFFSET ?`,
-        [studentId, studentId, studentId, ...filterParams, limit, offset],
+        [studentId, studentId, studentId, studentId, ...filterParams, limit, offset],
       );
 
       const transactions = rows.map((row) => {
@@ -2037,6 +2291,7 @@ router.get(
           STATUS_GROUPS.completed,
           STATUS_GROUPS.ongoing,
           monthStartUTC,
+          studentId,
           studentId,
           studentId,
           studentId,

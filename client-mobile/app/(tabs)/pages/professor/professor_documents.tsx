@@ -1155,7 +1155,7 @@ function createStyles(theme: ThemePalette) {
       justifyContent: 'center',
       flexShrink: 0,
     },
-    docTypeText: { fontSize: 15.5, fontWeight: '700', color: '#f59e0b' },
+    docTypeText: { fontSize: 15.5, fontWeight: '700', color: '#f97316' },
     docCollegeText: { fontSize: 12.5, color: theme.tertiary, marginTop: 2 },
     docTrackingText: { fontSize: 12.5, color: theme.tertiary, marginTop: 2 },
     docTrackingValue: { fontWeight: '700', color: '#22c55e' },
