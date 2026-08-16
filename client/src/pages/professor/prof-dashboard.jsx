@@ -208,7 +208,7 @@ export default function ProfessorDashboard() {
 
   const stats = [
     {
-      title: "Pending Appointments",
+      title: "Appointments",
       value: loading ? "—" : String(s?.pendingAppointments ?? 0),
       // Same conditional-list-building pattern as stud-dashboard.jsx's own
       // Appointments card description, over s.appointments.{pending,approved}.
@@ -246,8 +246,8 @@ export default function ProfessorDashboard() {
     },
     {
       title: "Completed",
-      value: loading ? "—" : String(s?.completedThisMonth ?? 0),
-      description: "This month",
+      value: loading ? "—" : String(s?.completed ?? 0),
+      description: "Total transactions",
       icon: CheckCircleIcon,
       bgColor: "bg-green-50",
       link: "/professor/transactions",
@@ -290,7 +290,7 @@ export default function ProfessorDashboard() {
       icon: Calendar,
       path: "/professor/appointments",
       gradientIndex: 2,
-      badge: `${s?.pendingAppointments ?? 0} Pending`,
+      badge: `${s?.pendingAppointments ?? 0} Active`,
     },
     {
       label: "Document Requests",
@@ -534,7 +534,7 @@ export default function ProfessorDashboard() {
                       <span
                         className={
                           item.type === "document"
-                            ? `appt-status-badge activity-status-doc-${item.status}`
+                            ? `activity-status-badge activity-status-doc-${item.status}`
                             : `appt-status-badge appt-status-badge--${item.status}`
                         }
                       >

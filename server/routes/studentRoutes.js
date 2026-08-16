@@ -84,10 +84,10 @@ router.get(
         `SELECT
            SUM(CASE WHEN status = 'pending'  AND appointment_date >= ? THEN 1 ELSE 0 END) AS pending_count,
            SUM(CASE WHEN status = 'approved' AND appointment_date >= ? THEN 1 ELSE 0 END) AS approved_count,
-           SUM(CASE WHEN status IN ('pending', 'approved') THEN 1 ELSE 0 END) AS active_count
+           SUM(CASE WHEN status IN ('pending', 'approved') AND appointment_date >= ? THEN 1 ELSE 0 END) AS active_count
          FROM appointments
          WHERE student_id = ?`,
-        [getManilaDateString(), getManilaDateString(), studentId],
+        [getManilaDateString(), getManilaDateString(), getManilaDateString(), studentId],
       );
 
       const [[docRow]] = await pool.query(
@@ -128,12 +128,9 @@ router.get(
 
       const [recentActivity] = await pool.query(
         `(
-           SELECT 
-             'queue' AS type,
-             CONCAT('Joined queue at ', s.service_name) AS title,
-             d.department_name AS college,
-             q.status,
-             q.created_at AS event_time
+           SELECT 'queue' AS type, s.service_name, NULL AS professor_name, NULL AS request_type,
+                  d.department_name AS college, q.status, q.admin_reason, NULL AS cancelled_by,
+                  q.created_at AS event_time
            FROM queues q
            JOIN services s ON q.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id
@@ -141,12 +138,9 @@ router.get(
          )
          UNION ALL
          (
-           SELECT 
-             'appointment' AS type,
-             CONCAT('Appointment with ', CONCAT(f.first_name, ' ', f.last_name)) AS title,
-             d.department_name AS college,
-             a.status,
-             a.created_at AS event_time
+           SELECT 'appointment' AS type, NULL AS service_name, CONCAT(f.first_name, ' ', f.last_name) AS professor_name,
+                  NULL AS request_type, d.department_name AS college, a.status, NULL AS admin_reason, a.cancelled_by,
+                  a.created_at AS event_time
            FROM appointments a
            JOIN faculty f ON a.faculty_id = f.faculty_id
            JOIN departments d ON f.department_id = d.department_id
@@ -154,19 +148,16 @@ router.get(
          )
          UNION ALL
          (
-           SELECT 
-             'document' AS type,
-             CONCAT('Document request: ', dr.request_type) AS title,
-             d.department_name AS college,
-             dr.status,
-             dr.created_at AS event_time
+           SELECT 'document' AS type, NULL AS service_name, NULL AS professor_name, dr.request_type,
+                  d.department_name AS college, dr.status, NULL AS admin_reason, NULL AS cancelled_by,
+                  dr.created_at AS event_time
            FROM document_requests dr
            JOIN document_services s ON dr.service_id = s.service_id
            JOIN departments d ON s.department_id = d.department_id
            WHERE dr.student_id = ?
          )
          ORDER BY event_time DESC
-         LIMIT 3`,
+         LIMIT 5`,
         [studentId, studentId, studentId],
       );
 
@@ -258,7 +249,10 @@ router.get(
         recentActivity: recentActivity.map((row, i) => ({
           id: i + 1,
           type: row.type,
-          title: row.title,
+          title:
+            row.type === "queue" ? buildQueueActivityTitle(row) :
+            row.type === "appointment" ? buildAppointmentActivityTitle(row) :
+            buildDocumentActivityTitle(row),
           college: row.college,
           status: row.status,
           time: formatRelativeTime(new Date(row.event_time)),
@@ -269,6 +263,53 @@ router.get(
     }
   },
 );
+
+// Status-aware Recent Activity titles, mirroring professorRoutes.js's own
+// buildActivityTitle/buildDocumentActivityTitle pattern (that file's comment
+// notes it was written to match a student-side counterpart -- this is that
+// counterpart, from the student's own point of view).
+function buildQueueActivityTitle(row) {
+  if (row.status === "cancelled") {
+    // "Queue Stopped" matches the exact wording the student /transactions
+    // endpoint already uses for the same admin_reason-not-null signal.
+    return row.admin_reason ? "Queue Stopped" : `You left the queue at ${row.service_name}`;
+  }
+  const map = {
+    waiting: `Joined queue at ${row.service_name}`,
+    serving: `Now being served at ${row.service_name}`,
+    completed: `Queue completed at ${row.service_name}`,
+    no_show: `Missed your turn at ${row.service_name}`,
+  };
+  return map[row.status] ?? `Queue update at ${row.service_name}`;
+}
+
+function buildAppointmentActivityTitle(row) {
+  if (row.status === "cancelled") {
+    if (row.cancelled_by === "system") return `Appointment with ${row.professor_name} auto-cancelled — schedule changed`;
+    if (row.cancelled_by === "faculty") return `Appointment cancelled by ${row.professor_name}`;
+    return `You cancelled the appointment with ${row.professor_name}`;
+  }
+  const map = {
+    pending: `Appointment request sent to ${row.professor_name}`,
+    approved: `Appointment confirmed with ${row.professor_name}`,
+    completed: `Appointment completed with ${row.professor_name}`,
+    rejected: `Appointment rejected by ${row.professor_name}`,
+  };
+  return map[row.status] ?? `Appointment update with ${row.professor_name}`;
+}
+
+function buildDocumentActivityTitle(row) {
+  const map = {
+    pending: `Document request submitted: ${row.request_type}`,
+    processing: `Document request being processed: ${row.request_type}`,
+    generated: `Document ready for pickup: ${row.request_type}`,
+    released: `Document released: ${row.request_type}`,
+    claimed: `Document claimed: ${row.request_type}`,
+    rejected: `Document request rejected: ${row.request_type}`,
+    cancelled: `You cancelled the document request: ${row.request_type}`,
+  };
+  return map[row.status] ?? `Document request update: ${row.request_type}`;
+}
 
 // ─────────────────────────────────────────────────────────────
 // ANNOUNCEMENTS ENDPOINT

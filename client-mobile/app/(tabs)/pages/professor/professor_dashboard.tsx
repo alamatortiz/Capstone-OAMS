@@ -348,9 +348,9 @@ export default function ProfessorDashboardScreen() {
       })();
 
   const stats: StatItem[] = [
-    { key: 'appointments', title: 'Pending Appointments', value: loading ? '—' : String(s?.pendingAppointments ?? 0), description: appointmentsDescription, icon: Calendar, tint: 'violet' },
+    { key: 'appointments', title: 'Appointments', value: loading ? '—' : String(s?.pendingAppointments ?? 0), description: appointmentsDescription, icon: Calendar, tint: 'violet' },
     { key: 'documents', title: 'Documents', value: loading ? '—' : String(s?.documentsToReview ?? 0), description: documentsDescription, icon: FileText, tint: 'orange' },
-    { key: 'completed', title: 'Completed', value: loading ? '—' : String(s?.completedThisMonth ?? 0), description: 'This month', icon: CheckCircle, tint: 'green' },
+    { key: 'completed', title: 'Completed', value: loading ? '—' : String(s?.completed ?? 0), description: 'Total transactions', icon: CheckCircle, tint: 'green' },
   ];
 
   const todaysAppointments: TodayAppointment[] = dashData?.todayAppointments ?? [];
@@ -407,7 +407,7 @@ export default function ProfessorDashboardScreen() {
   const quickActions: QuickAction[] = [
     { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: Megaphone, badge: `${pinnedAnnouncements.length} Pinned`, gradient: ['#22c55e', '#16a34a'] },
     { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your weekly recurring availability by day. It repeats every week until you edit or remove it.', icon: Calendar, gradient: ['#a855f7', '#9333ea'] },
-    { key: 'appointments', title: 'Appointments', description: 'Review and manage student appointment requests.', icon: Calendar, badge: `${s?.pendingAppointments ?? 0} Pending`, gradient: ['#a855f7', '#9333ea'] },
+    { key: 'appointments', title: 'Appointments', description: 'Review and manage student appointment requests.', icon: Calendar, badge: `${s?.pendingAppointments ?? 0} Active`, gradient: ['#a855f7', '#9333ea'] },
     { key: 'document-request', title: 'Document Requests', description: 'Request documents and track their status.', icon: FileText, badge: `${s?.documentsToReview ?? 0} Pending`, gradient: ['#f97316', '#ea580c'] },
     { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: ClipboardList, gradient: ['#22c55e', '#16a34a'] },
   ];

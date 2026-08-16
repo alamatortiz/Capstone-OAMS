@@ -73,21 +73,27 @@ router.get(
          WHERE faculty_id = ?`,
         [facultyId],
       );
-      const docPendingOnly = docRow.pending_only || 0;
-      const docProcessing = docRow.processing_count || 0;
-      const docReady = docRow.ready_count || 0;
-      const docReleased = docRow.released_count || 0;
+      const docPendingOnly = Number(docRow.pending_only || 0);
+      const docProcessing = Number(docRow.processing_count || 0);
+      const docReady = Number(docRow.ready_count || 0);
+      const docReleased = Number(docRow.released_count || 0);
       const docCount = docPendingOnly + docProcessing;
 
-      // 4. Completed this month
+      // 4. Completed, all-time -- appointments completed + the faculty
+      // member's own document requests claimed. Mirrors student's own
+      // completedRow pattern (studentRoutes.js), minus the queue term since
+      // professors don't have queues.
       const [[completedRow]] = await pool.query(
-        `SELECT COUNT(*) AS completed_count
-         FROM appointments
-         WHERE faculty_id = ?
-           AND status = 'completed'
-           AND MONTH(appointment_date) = MONTH(?)
-           AND YEAR(appointment_date) = YEAR(?)`,
-        [facultyId, manilaToday, manilaToday],
+        `SELECT
+           (
+             SELECT COUNT(*) FROM appointments
+             WHERE faculty_id = ? AND status = 'completed'
+           ) +
+           (
+             SELECT COUNT(*) FROM faculty_document_requests
+             WHERE faculty_id = ? AND status = 'claimed'
+           ) AS total_completed`,
+        [facultyId, facultyId],
       );
 
       // 5. Today's appointments list
@@ -155,8 +161,8 @@ router.get(
         stats: {
           pendingAppointments: apptRow.pending_count || 0,
           appointments: {
-            pending: apptRow.pending_only || 0,
-            approved: apptRow.approved_only || 0,
+            pending: Number(apptRow.pending_only || 0),
+            approved: Number(apptRow.approved_only || 0),
           },
           todayAppointments: apptRow.today_count || 0,
           studentRequests: studentRow.student_count || 0,
@@ -168,7 +174,7 @@ router.get(
             ready: docReady,
             released: docReleased,
           },
-          completedThisMonth: completedRow.completed_count || 0,
+          completed: completedRow.total_completed || 0,
         },
         todayAppointments: todayAppointments.map((a) => ({
           id: a.appointment_id,

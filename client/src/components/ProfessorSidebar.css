@@ -275,7 +275,9 @@
 
 .sidebar-availability-label {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-secondary);
 }
 

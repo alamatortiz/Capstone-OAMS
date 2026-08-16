@@ -171,9 +171,9 @@ html, body {
 [data-theme="light"] .transactions-page .filters-card { border-color: rgba(21, 128, 61, 0.15); }
 
 .transactions-page .filters-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
@@ -181,6 +181,13 @@ html, body {
 .transactions-page .filters-header-text {
   display: flex;
   flex-direction: column;
+  grid-column: 2;
+  text-align: center;
+}
+
+.transactions-page .txn-export-btn {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .transactions-page .filters-title {
@@ -189,7 +196,7 @@ html, body {
   font-family: "Inter", sans-serif;
   color: var(--text-primary);
   margin: 0;
-  text-align: left;
+  text-align: center;
   transition: color 0.3s ease;
 }
 
@@ -197,7 +204,7 @@ html, body {
   font-size: 0.9375rem;
   color: var(--text-tertiary);
   margin: 0.4rem 0 0 0;
-  text-align: left;
+  text-align: center;
   transition: color 0.3s ease;
 }
 
@@ -530,8 +537,8 @@ html, body {
   transition: all 0.3s ease;
 }
 
-.txn-badge-appointment { background: rgba(168,85,247,0.15);  color: var(--purple);  border: 0.5px solid rgba(168,85,247,0.3); }
-.txn-badge-document    { background: rgba(249,115,22,0.15);  color: #fb923c;  border: 0.5px solid rgba(249,115,22,0.3); }
+.txn-badge-appointment { background: rgba(168,85,247,0.15);  color: var(--purple); }
+.txn-badge-document    { background: rgba(249,115,22,0.15);  color: #fb923c; }
 .txn-badge-completed   { background: rgba(16,185,129,0.15);  color: #34d399;  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-approved    { background: rgba(16,185,129,0.15);  color: var(--success);  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-rejected    { background: rgba(239,68,68,0.15);   color: #f87171;  border: 0.5px solid rgba(239,68,68,0.3); }
@@ -543,8 +550,8 @@ html, body {
 .txn-badge-claimed     { background: rgba(16,185,129,0.15);  color: #34d399;  border: 0.5px solid rgba(16,185,129,0.3); }
 .txn-badge-noshow      { background: rgba(239,68,68,0.15);   color: #f87171;  border: 0.5px solid rgba(239,68,68,0.3); }
 
-[data-theme="light"] .txn-badge-appointment { background: rgba(147,51,234,0.08); color: #6b21a8;  border-color: rgba(147,51,234,0.2); }
-[data-theme="light"] .txn-badge-document    { background: rgba(234,88,12,0.08);  color: #9a3412;  border-color: rgba(234,88,12,0.2); }
+[data-theme="light"] .txn-badge-appointment { background: rgba(147,51,234,0.08); color: #6b21a8; }
+[data-theme="light"] .txn-badge-document    { background: rgba(234,88,12,0.08);  color: #9a3412; }
 [data-theme="light"] .txn-badge-completed   { background: rgba(5,150,105,0.08);  color: #065f46;  border-color: rgba(5,150,105,0.2); }
 [data-theme="light"] .txn-badge-approved    { background: rgba(5,150,105,0.08);  color: #065f46;  border-color: rgba(5,150,105,0.2); }
 [data-theme="light"] .txn-badge-rejected    { background: rgba(220,38,38,0.08);  color: #991b1b;  border-color: rgba(220,38,38,0.2); }
@@ -583,13 +590,16 @@ html, body {
 .txn-student-id-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.375rem 0.875rem;
-  border-radius: 0.625rem;
-  font-size: 0.75rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
   font-weight: 700;
   background: rgba(168, 85, 247, 0.12);
   color: var(--purple);
   border: 1px solid rgba(168, 85, 247, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
   transition: all 0.3s ease;
 }
 
@@ -600,16 +610,26 @@ html, body {
 }
 
 .txn-tracking-pill {
-  padding: 0.375rem 0.875rem;
-  border-radius: 0.625rem;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  background: #f97316;
-  color: white;
+  background: rgba(249, 115, 22, 0.12);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
   font-family: "Inter", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .txn-tracking-pill {
+  background: rgba(234, 88, 12, 0.08);
+  color: #9a3412;
+  border-color: rgba(234, 88, 12, 0.2);
 }
 
 .txn-item-details {
@@ -673,6 +693,21 @@ html, body {
 }
 
 @media (max-width: 768px) {
+  .transactions-page .filters-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0.75rem;
+  }
+
+  .transactions-page .filters-header-text {
+    grid-column: 1;
+  }
+
+  .transactions-page .txn-export-btn {
+    grid-column: 1;
+    justify-self: center;
+  }
+
   .transactions-page .filters-grid { grid-template-columns: 1fr; }
 
   .txn-item {
