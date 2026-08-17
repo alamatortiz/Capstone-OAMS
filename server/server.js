@@ -38,6 +38,7 @@ const { sendServerError } = require("./utils/errorResponse");
 const { startNoShowSweeper } = require("./jobs/queueNoShowSweeper");
 const { startExpirySweeper } = require("./jobs/queueExpirySweeper");
 const { startDocumentPickupSweeper } = require("./jobs/documentPickupSweeper");
+const { startDocumentSubmissionStaleSweeper } = require("./jobs/documentSubmissionStaleSweeper");
 const { startAppointmentReminderSweeper } = require("./jobs/appointmentReminderSweeper");
 const { initSocketServer } = require("./sockets");
 
@@ -85,4 +86,5 @@ server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 startNoShowSweeper();
 startExpirySweeper();
 startDocumentPickupSweeper();
+startDocumentSubmissionStaleSweeper();
 startAppointmentReminderSweeper();

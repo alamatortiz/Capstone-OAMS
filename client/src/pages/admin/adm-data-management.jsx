@@ -494,6 +494,13 @@ export default function AdminDataManagement() {
       users: "User Account",
       students: "Student",
       faculty: "Faculty",
+      document_requests: "Document Request",
+      faculty_document_requests: "Faculty Document Request",
+      document_submissions: "Sent Document",
+      generated_files: "Generated File",
+      system_settings: "System Setting",
+      service_requirements: "Service Requirement",
+      service_procedure_steps: "Service Procedure Step",
     };
     const label = tableMap[log.targetTable] || log.targetTable;
     return log.targetRecordId ? `${label} #${log.targetRecordId}` : label;

@@ -476,6 +476,11 @@ CREATE TABLE document_submissions (
     claimed_at      TIMESTAMP    NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Set by documentSubmissionStaleSweeper.js once it has notified an admin
+    -- that this submission has sat in pending/processing for 7+ days --
+    -- prevents re-escalating the same submission on every subsequent daily
+    -- sweep, mirroring document_requests.escalated_at.
+    escalated_at    TIMESTAMP    NULL DEFAULT NULL,
     FOREIGN KEY (student_id)    REFERENCES students(student_id),
     FOREIGN KEY (department_id) REFERENCES departments(department_id),
     INDEX idx_document_submissions_tracking (tracking_number),

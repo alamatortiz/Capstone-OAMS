@@ -331,9 +331,20 @@ export default function StudentDashboardScreen() {
     };
     socket.on('announcement:changed', onAnnouncementChanged);
 
+    // document:cancelled is broadcast to the whole department, not just the
+    // affected student -- filtered by studentId before refetching, same
+    // pattern as student_transactions.tsx's handleOwnQueueEvent.
+    const handleOwnDocumentCancelled = (payload: any) => {
+      if (Number(payload?.studentId) === Number(user?.userId)) {
+        fetchStats();
+      }
+    };
+    socket.on('document:cancelled', handleOwnDocumentCancelled);
+
     return () => {
       statsEvents.forEach((event) => socket.off(event, fetchStats));
       socket.off('announcement:changed', onAnnouncementChanged);
+      socket.off('document:cancelled', handleOwnDocumentCancelled);
     };
   }, [user, token, fetchStats, fetchAnnouncements]);
 

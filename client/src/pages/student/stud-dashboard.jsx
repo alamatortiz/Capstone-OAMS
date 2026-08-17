@@ -226,9 +226,22 @@ export default function StudentDashboard() {
     statsEvents.forEach((event) => socket.on(event, fetchStats));
     socket.on("announcement:changed", fetchAnnouncements);
 
+    // document:cancelled is broadcast to the whole department (so the
+    // admin's live list updates too), not just the affected student --
+    // filtered by studentId before refetching, same pattern as
+    // stud-transactions.jsx's handleOwnQueueEvent, so this doesn't refetch
+    // every time ANY student in the department cancels a document.
+    const handleOwnDocumentCancelled = (payload) => {
+      if (Number(payload?.studentId) === Number(authUser?.userId)) {
+        fetchStats();
+      }
+    };
+    socket.on("document:cancelled", handleOwnDocumentCancelled);
+
     return () => {
       statsEvents.forEach((event) => socket.off(event, fetchStats));
       socket.off("announcement:changed", fetchAnnouncements);
+      socket.off("document:cancelled", handleOwnDocumentCancelled);
     };
   }, [authUser, token, fetchStats, fetchAnnouncements]);
 
