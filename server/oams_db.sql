@@ -736,6 +736,29 @@ CREATE TABLE submitted_files (
     INDEX idx_submitted_files_submission (submission_id)
 );
 
+-- ─────────────────────────────────────────────────────────────
+-- 17. FAQS
+-- Admin-authored question/answer pairs, department-scoped exactly like
+-- announcements (see idx_faqs_department / getAdminDepartmentId). No
+-- audience split (students only -- no faculty concept for FAQs), no
+-- type/category, no pin/archive/restore -- a flat, stable list ordered by
+-- insertion (created_at), never reshuffled by edits the way announcements'
+-- updated_at-driven "repost" ordering is. created_by is a denormalized
+-- name snapshot, same reasoning as announcements.created_by (survives the
+-- admin's own record changing later).
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE faqs (
+    faq_id          INT          AUTO_INCREMENT PRIMARY KEY,
+    question        TEXT         NOT NULL,
+    answer          TEXT         NOT NULL,
+    department_id   INT          NOT NULL,
+    created_by      VARCHAR(255) NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
+    INDEX idx_faqs_department (department_id)
+);
+
 -- ============================================================
 -- Schema definition ends here.
 -- Seed data (departments, users, mock records) is in:

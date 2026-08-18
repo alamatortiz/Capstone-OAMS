@@ -5,7 +5,7 @@ import deleteIcon from "../../assets/delete_icon.png";
 import "./adm-dashboard.css";
 import "./adm-announcements.css";
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, HelpCircle } from "lucide-react";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
@@ -769,13 +769,19 @@ export default function AdminAnnouncements() {
             subtitleClassName="ann-page-subtitle"
           />
 
-          <button
-            className="ann-btn-new"
-            onClick={() => { setCreateForm({ ...EMPTY_CREATE_FORM, audience: audienceView }); setIsCreating(true); }}
-          >
-            <PlusIconSmall />
-            New Announcement
-          </button>
+          <div className="ann-header-actions">
+            <button
+              className="ann-btn-new"
+              onClick={() => { setCreateForm({ ...EMPTY_CREATE_FORM, audience: audienceView }); setIsCreating(true); }}
+            >
+              <PlusIconSmall />
+              New Announcement
+            </button>
+            <Link to="/admin/faqs" className="ann-btn-faqs">
+              <HelpCircle />
+              Manage FAQs
+            </Link>
+          </div>
 
           {/* Source toggle */}
           <div className="ann-source-toggle">

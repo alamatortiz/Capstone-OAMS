@@ -37,6 +37,9 @@ const AppointmentStatusPage = React.lazy(
 const AnnouncementsPage = React.lazy(
   () => import("./pages/student/stud-announcements.jsx"),
 );
+const StudentFaqs = React.lazy(
+  () => import("./pages/student/stud-faqs.jsx"),
+);
 const ProfessorSchedulePage = React.lazy(
   () => import("./pages/student/stud-professor-schedules.jsx"),
 );
@@ -61,6 +64,9 @@ const AdminPinnacleSync = React.lazy(
 );
 const AdminAnnouncements = React.lazy(
   () => import("./pages/admin/adm-announcements.jsx"),
+);
+const AdminFaqs = React.lazy(
+  () => import("./pages/admin/adm-faqs.jsx"),
 );
 const AdminUserManagement = React.lazy(
   () => import("./pages/admin/adm-user-management.jsx"),
@@ -140,6 +146,14 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <AnnouncementsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/student/faqs"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <StudentFaqs />
                   </Suspense>
                 }
               />
@@ -318,6 +332,14 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <AdminAnnouncements />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/faqs"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminFaqs />
                   </Suspense>
                 }
               />

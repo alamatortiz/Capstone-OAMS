@@ -495,6 +495,48 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
+// FAQS ENDPOINT
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/student/faqs
+// Returns only the student's own department's FAQs, in stable insertion order.
+router.get(
+  "/faqs",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const studentDeptId = stu?.department_id ?? null;
+
+      const [rows] = await pool.query(
+        `SELECT faq_id, question, answer, created_at, updated_at
+         FROM faqs
+         WHERE department_id = ?
+         ORDER BY created_at ASC, faq_id ASC`,
+        [studentDeptId],
+      );
+
+      res.json({
+        faqs: rows.map((r) => ({
+          id: r.faq_id,
+          question: r.question,
+          answer: r.answer,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      });
+    } catch (error) {
+      sendServerError(res, error, "Fetch FAQs error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // DOCUMENT REQUEST ENDPOINTS
 // ─────────────────────────────────────────────────────────────
 

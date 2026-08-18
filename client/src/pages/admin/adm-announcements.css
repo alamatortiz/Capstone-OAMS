@@ -95,6 +95,12 @@
   text-align: left;
 }
 
+.ann-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .ann-btn-new {
   display: inline-flex;
   align-items: center;
@@ -127,6 +133,48 @@
   width: 1rem;
   height: 1rem;
   stroke: currentColor;
+}
+
+.ann-btn-faqs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  align-self: flex-start;
+  width: fit-content;
+}
+
+.ann-btn-faqs:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.ann-btn-faqs svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+@media (max-width: 640px) {
+  .ann-header-actions {
+    flex-direction: column;
+  }
+
+  .ann-btn-faqs {
+    align-self: stretch;
+    justify-content: center;
+  }
 }
 
 /* ===== Source toggle ===== */

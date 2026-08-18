@@ -1,0 +1,232 @@
+.faq-admin-page {
+  padding: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ===== Header (mirrors adm-announcements.css's ann-* header, own copy so
+   this page doesn't need to import that file) ===== */
+.faq-header-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  text-align: left;
+}
+
+.faq-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.faq-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.faq-title-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: #fff;
+  color: #fff;
+}
+
+.faq-page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.375rem 0;
+  text-align: left;
+}
+
+.faq-page-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+}
+
+/* ===== New FAQ button ===== */
+.faq-btn-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
+  align-self: flex-start;
+  width: fit-content;
+}
+
+.faq-btn-new:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.35);
+}
+
+.faq-btn-new svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+/* ===== List ===== */
+.faq-list-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.125rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.faq-item {
+  background: var(--input-background, var(--card-bg));
+  border: 1px solid var(--card-border);
+  border-radius: 0.875rem;
+  padding: 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  transition: border-color 0.3s ease;
+}
+
+.faq-item:hover {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.faq-item-content {
+  flex: 1;
+  min-width: 240px;
+  text-align: left;
+}
+
+.faq-item-question {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.faq-item-answer {
+  font-size: 0.9rem;
+  color: var(--text-secondary, var(--text-primary));
+  line-height: 1.6;
+  margin: 0 0 0.625rem 0;
+  white-space: pre-wrap;
+}
+
+.faq-item-meta {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.faq-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.faq-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.faq-action-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.faq-action-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.faq-action-btn-danger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ===== Empty / loading states ===== */
+.faq-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.faq-empty svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  opacity: 0.5;
+}
+
+.faq-empty p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.faq-loading {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .faq-admin-page {
+    padding: 1rem;
+  }
+
+  .faq-item {
+    flex-direction: column;
+  }
+
+  .faq-item-actions {
+    width: 100%;
+  }
+
+  .faq-action-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

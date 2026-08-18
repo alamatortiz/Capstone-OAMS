@@ -1,0 +1,66 @@
+.accordion-item {
+  background: var(--card-bg, #111612);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.75rem;
+  margin-bottom: 0.625rem;
+  overflow: hidden;
+  transition: border-color 0.3s ease;
+}
+
+.accordion-item-expanded {
+  border-color: var(--primary-color, #22c55e);
+}
+
+.accordion-item-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.125rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.accordion-item-summary {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0fdf4);
+  line-height: 1.4;
+}
+
+.accordion-item-chevron {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--muted-foreground, #94a3b8);
+  flex-shrink: 0;
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.accordion-item-expanded .accordion-item-chevron {
+  transform: rotate(180deg);
+  color: var(--primary-color, #22c55e);
+}
+
+.accordion-item-detail {
+  padding: 0.875rem 1.125rem 1rem;
+  border-top: 1px solid var(--card-border, #1e3a23);
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--text-secondary, #f0fdf4);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  animation: accordion-fade-in 0.2s ease;
+  white-space: pre-wrap;
+}
+
+[data-theme="light"] .accordion-item-detail {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+@keyframes accordion-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

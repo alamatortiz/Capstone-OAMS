@@ -3160,6 +3160,184 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────
+// FAQS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/faqs
+router.get(
+  "/faqs",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      const [rows] = await pool.query(
+        `SELECT faq_id, question, answer, created_by, created_at, updated_at
+         FROM faqs
+         WHERE department_id = ?
+         ORDER BY created_at ASC, faq_id ASC`,
+        [deptId],
+      );
+      res.json({
+        faqs: rows.map((r) => ({
+          id: r.faq_id,
+          question: r.question,
+          answer: r.answer,
+          createdBy: r.created_by,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      });
+    } catch (error) {
+      sendServerError(res, error, "FAQs fetch error:");
+    }
+  },
+);
+
+// POST /api/admin/faqs
+router.post(
+  "/faqs",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { question, answer } = req.body;
+    if (!question?.trim() || !answer?.trim()) {
+      return res.status(400).json({ error: "question and answer are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      const [[adminRow]] = await pool.query(
+        `SELECT CONCAT(first_name, ' ', last_name) AS full_name
+         FROM administrators
+         WHERE admin_id = ?`,
+        [req.user.userId],
+      );
+      const createdBy = adminRow?.full_name || "Admin Office";
+
+      const [result] = await pool.query(
+        `INSERT INTO faqs (question, answer, department_id, created_by) VALUES (?, ?, ?, ?)`,
+        [question.trim(), answer.trim(), deptId, createdBy],
+      );
+
+      const [[row]] = await pool.query(
+        `SELECT faq_id, question, answer, created_by, created_at, updated_at FROM faqs WHERE faq_id = ?`,
+        [result.insertId],
+      );
+
+      emitToDept(deptId, "faq:changed", { faqId: row.faq_id });
+
+      res.status(201).json({
+        faq: {
+          id: row.faq_id,
+          question: row.question,
+          answer: row.answer,
+          createdBy: row.created_by,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+      });
+    } catch (error) {
+      sendServerError(res, error, "FAQ create error:");
+    }
+  },
+);
+
+// PUT /api/admin/faqs/:id
+router.put(
+  "/faqs/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { id } = req.params;
+    const { question, answer } = req.body;
+    if (!question?.trim() || !answer?.trim()) {
+      return res.status(400).json({ error: "question and answer are required" });
+    }
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      const [[existing]] = await pool.query(
+        `SELECT department_id FROM faqs WHERE faq_id = ?`,
+        [id],
+      );
+      if (!existing) {
+        return res.status(404).json({ error: "FAQ not found" });
+      }
+      if (existing.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot edit FAQs from another department" });
+      }
+
+      await pool.query(
+        `UPDATE faqs SET question = ?, answer = ? WHERE faq_id = ?`,
+        [question.trim(), answer.trim(), id],
+      );
+
+      const [[row]] = await pool.query(
+        `SELECT faq_id, question, answer, created_by, created_at, updated_at FROM faqs WHERE faq_id = ?`,
+        [id],
+      );
+
+      emitToDept(deptId, "faq:changed", { faqId: row.faq_id });
+
+      res.json({
+        faq: {
+          id: row.faq_id,
+          question: row.question,
+          answer: row.answer,
+          createdBy: row.created_by,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+      });
+    } catch (error) {
+      sendServerError(res, error, "FAQ update error:");
+    }
+  },
+);
+
+// DELETE /api/admin/faqs/:id
+router.delete(
+  "/faqs/:id",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      const [[existing]] = await pool.query(
+        `SELECT department_id FROM faqs WHERE faq_id = ?`,
+        [id],
+      );
+      if (!existing) {
+        return res.status(404).json({ error: "FAQ not found" });
+      }
+      if (existing.department_id !== deptId) {
+        return res.status(403).json({ error: "Cannot delete FAQs from another department" });
+      }
+
+      await pool.query(`DELETE FROM faqs WHERE faq_id = ?`, [id]);
+
+      emitToDept(deptId, "faq:changed", { faqId: Number(id) });
+
+      res.json({ message: "FAQ deleted" });
+    } catch (error) {
+      sendServerError(res, error, "FAQ delete error:");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
 // QUEUE ANALYTICS
 // ─────────────────────────────────────────────────────────────
 
