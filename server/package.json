@@ -6,7 +6,9 @@
   "scripts": {
     "test": "jest",
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "backup": "node scripts/backup-db.js",
+    "restore": "node scripts/restore-db.js"
   },
   "keywords": [],
   "author": "",

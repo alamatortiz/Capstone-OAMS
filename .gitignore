@@ -48,6 +48,10 @@ docker-compose.override.yml
 
 # internal ops reference doc, kept local only
 docs/aiven-schema-sync.md
+docs/backup-restore.md
+
+# db backups (full data dumps -- PII-adjacent, same sensitivity as ca.pem/aiven doc)
+server/backups/
 
 # OS file
 .DS_Store
