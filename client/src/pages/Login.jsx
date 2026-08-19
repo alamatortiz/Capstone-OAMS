@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Mail, Lock, Sparkles, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +14,13 @@ import oamsLogo from "../assets/oams_logo.png";
 import darkModeIcon from "../assets/darkmode_icon.png";
 import sunIcon from "../assets/sun_icon.png";
 
-export default function Login() {
+// `registerAudience` scopes the "Don't have an account yet?" hint to a
+// single role: pages reached at /login/student or /login/faculty pass
+// "student"/"faculty" so each audience only ever sees its own registration
+// link, never both together. The bare /login (no prop) shows no
+// registration hint at all -- it's the general entry point, not a link
+// meant to be handed out for self-registration.
+export default function Login({ registerAudience }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -210,6 +216,15 @@ export default function Login() {
               )}
             </button>
           </form>
+
+          {registerAudience && (
+            <p className="login-register-hint">
+              Don't have an account yet?{" "}
+              <Link to={`/register/${registerAudience}`}>
+                Register as {registerAudience === "student" ? "Student" : "Faculty"}
+              </Link>
+            </p>
+          )}
         </div>
         {/* /login-card */}
       </div>

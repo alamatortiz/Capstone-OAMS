@@ -408,6 +408,106 @@ body.dark-mode .login-password-toggle:hover:not(:disabled) {
   padding-right: 40px;
 }
 
+/* ── Register hint (below the Login form) ── */
+.login-register-hint {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #6b7280;
+  transition: color 0.3s;
+}
+
+body.dark-mode .login-register-hint {
+  color: #94a3b8;
+}
+
+.login-register-hint a {
+  color: #16a34a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-register-hint a:hover {
+  text-decoration: underline;
+}
+
+body.dark-mode .login-register-hint a {
+  color: #4ade80;
+}
+
+/* ── Back-to-login link (below Register forms) ── */
+.login-back-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.login-back-link:hover {
+  color: #16a34a;
+}
+
+body.dark-mode .login-back-link {
+  color: #94a3b8;
+}
+
+body.dark-mode .login-back-link:hover {
+  color: #4ade80;
+}
+
+/* ── Paired fields on one row (Register forms) ── */
+.login-field-row {
+  display: flex;
+  gap: 14px;
+}
+
+.login-field-row .login-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Select fields (College, Year Level) share .login-input's look ── */
+select.login-select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+}
+
+.login-optional {
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+body.dark-mode .login-optional {
+  color: #4b5563;
+}
+
+/* ── Register cards hold more fields than Login -- stretch the divider to
+   match instead of the fixed short height used by the two-field Login
+   card, and let the wrapper align from the top so a much-taller card
+   doesn't leave the branding column awkwardly centered against empty
+   space. ── */
+.login-wrapper--register {
+  align-items: stretch;
+}
+
+.login-wrapper--register .login-branding {
+  justify-content: center;
+}
+
+.login-wrapper--register .login-divider {
+  height: auto;
+}
+
 /* ── Responsive: stack on mobile/tablet ── */
 @media (max-width: 680px) {
   .login-wrapper {
@@ -441,5 +541,11 @@ body.dark-mode .login-password-toggle:hover:not(:disabled) {
     width: 100%;
     margin-left: 0;
     padding: 28px 20px;
+  }
+
+  /* Paired fields stack too, same as everything else at this width */
+  .login-field-row {
+    flex-direction: column;
+    gap: 18px;
   }
 }

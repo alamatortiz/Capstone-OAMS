@@ -225,6 +225,195 @@ const registerPushToken = async (req, res) => {
   }
 };
 
+// Registration is intentionally split into two endpoints instead of one
+// shared handler with a `role` field -- the role is a literal baked into
+// each function's own INSERT, never read from req.body, so a request
+// against /register/student can only ever produce a student row no matter
+// what else is in the payload. This is the actual guarantee behind handing
+// out separate student/faculty registration links.
+const registerStudent = async (req, res) => {
+  const {
+    firstName,
+    lastName,
+    email,
+    studentNumber,
+    yearLevel,
+    collegeAbbrev,
+    password,
+  } = req.body;
+
+  if (
+    !firstName ||
+    !lastName ||
+    !email ||
+    !studentNumber ||
+    !yearLevel ||
+    !collegeAbbrev ||
+    !password
+  ) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 8 characters" });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[department]] = await conn.query(
+      "SELECT department_id FROM departments WHERE department_abbreviation = ?",
+      [collegeAbbrev],
+    );
+    if (!department) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Invalid college selected" });
+    }
+
+    const [dupes] = await conn.query(
+      "SELECT student_id FROM students WHERE student_number = ? OR email = ?",
+      [studentNumber, email],
+    );
+    if (dupes.length > 0) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: "An account with this student number or email already exists",
+      });
+    }
+
+    const [userResult] = await conn.query(
+      "INSERT INTO users (password, role, status) VALUES (?, 'student', 'active')",
+      [hashedPassword],
+    );
+    const userId = userResult.insertId;
+
+    await conn.query(
+      `INSERT INTO students (student_id, student_number, first_name, last_name, year_level, email, department_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        studentNumber,
+        firstName,
+        lastName,
+        yearLevel,
+        email,
+        department.department_id,
+      ],
+    );
+
+    await conn.commit();
+    console.log(
+      `New student registration: user_id=${userId}, student_number=${studentNumber}, ${new Date().toISOString()}`,
+    );
+    res.status(201).json({ message: "Registration successful" });
+  } catch (error) {
+    await conn.rollback();
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        error: "An account with this student number or email already exists",
+      });
+    }
+    sendServerError(res, error, "Student registration error:");
+  } finally {
+    conn.release();
+  }
+};
+
+const registerFaculty = async (req, res) => {
+  const {
+    firstName,
+    lastName,
+    email,
+    employeeId,
+    specialization,
+    collegeAbbrev,
+    password,
+  } = req.body;
+
+  if (
+    !firstName ||
+    !lastName ||
+    !email ||
+    !employeeId ||
+    !collegeAbbrev ||
+    !password
+  ) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 8 characters" });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[department]] = await conn.query(
+      "SELECT department_id FROM departments WHERE department_abbreviation = ?",
+      [collegeAbbrev],
+    );
+    if (!department) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Invalid college selected" });
+    }
+
+    const [dupes] = await conn.query(
+      "SELECT faculty_id FROM faculty WHERE employee_id = ? OR email = ?",
+      [employeeId, email],
+    );
+    if (dupes.length > 0) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: "An account with this employee ID or email already exists",
+      });
+    }
+
+    const [userResult] = await conn.query(
+      "INSERT INTO users (password, role, status) VALUES (?, 'faculty', 'active')",
+      [hashedPassword],
+    );
+    const userId = userResult.insertId;
+
+    await conn.query(
+      `INSERT INTO faculty (faculty_id, employee_id, first_name, last_name, specialization, email, department_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        employeeId,
+        firstName,
+        lastName,
+        specialization || null,
+        email,
+        department.department_id,
+      ],
+    );
+
+    await conn.commit();
+    console.log(
+      `New faculty registration: user_id=${userId}, employee_id=${employeeId}, ${new Date().toISOString()}`,
+    );
+    res.status(201).json({ message: "Registration successful" });
+  } catch (error) {
+    await conn.rollback();
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        error: "An account with this employee ID or email already exists",
+      });
+    }
+    sendServerError(res, error, "Faculty registration error:");
+  } finally {
+    conn.release();
+  }
+};
+
 const logout = async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -241,4 +430,11 @@ const logout = async (req, res) => {
   res.json({ message: "Logout successful" });
 };
 
-module.exports = { login, getCurrentUser, logout, registerPushToken };
+module.exports = {
+  login,
+  getCurrentUser,
+  logout,
+  registerPushToken,
+  registerStudent,
+  registerFaculty,
+};

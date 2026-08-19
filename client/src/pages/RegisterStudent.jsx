@@ -1,0 +1,355 @@
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  User,
+  Mail,
+  Lock,
+  IdCard,
+  GraduationCap,
+  Building2,
+  Sparkles,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { applyTheme, getSavedTheme } from "../utils/theme";
+import LoadingOverlay from "../components/LoadingOverlay";
+import api from "../utils/api";
+import { COLLEGES } from "../data/colleges";
+
+import "./Login.css";
+
+import pncLogo from "../assets/Pnc-Logo.png";
+import oamsLogo from "../assets/oams_logo.png";
+import darkModeIcon from "../assets/darkmode_icon.png";
+import sunIcon from "../assets/sun_icon.png";
+
+const YEAR_LEVELS = [1, 2, 3, 4, 5];
+
+export default function RegisterStudent() {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [studentNumber, setStudentNumber] = useState("");
+  const [yearLevel, setYearLevel] = useState("");
+  const [collegeAbbrev, setCollegeAbbrev] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(getSavedTheme() === "dark");
+  const [submitting, setSubmitting] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    applyTheme(getSavedTheme());
+    setIsDarkMode(getSavedTheme() === "dark");
+  }, []);
+
+  const toggleTheme = () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    applyTheme(newDarkMode ? "dark" : "light");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !studentNumber ||
+      !yearLevel ||
+      !collegeAbbrev ||
+      !password ||
+      !confirmPassword
+    ) {
+      toast.error("Please fill in all fields.");
+      return;
+    }
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post("/auth/register/student", {
+        firstName,
+        lastName,
+        email,
+        studentNumber,
+        yearLevel: Number(yearLevel),
+        collegeAbbrev,
+        password,
+      });
+
+      toast.success("Account created! Signing you in...");
+      await login(email, password);
+      navigate("/student/dashboard");
+    } catch (err) {
+      const status = err?.response?.status;
+      const message = err?.response?.data?.error;
+
+      if (status === 409) {
+        toast.error(message ?? "An account with these details already exists.");
+      } else if (status === 400) {
+        toast.error(message ?? "Please check your details and try again.");
+      } else if (status) {
+        toast.error("Something went wrong. Please try again later.");
+      } else {
+        toast.error("Unable to reach the server. Please check your connection.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="login-root">
+      <button
+        className="login-theme-btn"
+        aria-label="Toggle theme"
+        onClick={toggleTheme}
+      >
+        <img
+          src={isDarkMode ? sunIcon : darkModeIcon}
+          alt={isDarkMode ? "Light Mode" : "Dark Mode"}
+          className="login-theme-icon"
+        />
+      </button>
+
+      <div className="login-wrapper login-wrapper--register">
+        <div className="login-branding">
+          <div className="login-logos">
+            <img
+              src={pncLogo}
+              alt="University of Cabuyao"
+              className="login-pnc-logo"
+            />
+            <img src={oamsLogo} alt="OAMS" className="login-coams-logo" />
+          </div>
+          <p className="login-university-name">
+            University of Cabuyao<br />
+            (Pamantasan ng Cabuyao)
+          </p>
+        </div>
+
+        <div className="login-divider" aria-hidden="true" />
+
+        <div className="login-card">
+          <div className="login-card-header">
+            <h2 className="login-card-title">
+              Student Registration
+              <Sparkles className="login-sparkle-icon" size={20} />
+            </h2>
+            <p className="login-card-desc">
+              Create your student account to get started
+            </p>
+          </div>
+
+          <form className="login-form" onSubmit={handleSubmit}>
+            <div className="login-field-row">
+              <div className="login-field">
+                <label htmlFor="firstName" className="login-label">
+                  First Name
+                </label>
+                <div className="login-input-wrap">
+                  <User className="login-input-icon" size={16} />
+                  <input
+                    id="firstName"
+                    type="text"
+                    placeholder="Juan"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="login-input"
+                    autoComplete="given-name"
+                  />
+                </div>
+              </div>
+              <div className="login-field">
+                <label htmlFor="lastName" className="login-label">
+                  Last Name
+                </label>
+                <div className="login-input-wrap">
+                  <User className="login-input-icon" size={16} />
+                  <input
+                    id="lastName"
+                    type="text"
+                    placeholder="Dela Cruz"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="login-input"
+                    autoComplete="family-name"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="email" className="login-label">
+                Email
+              </label>
+              <div className="login-input-wrap">
+                <Mail className="login-input-icon" size={16} />
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="juan.delacruz@pnc.edu.ph"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="login-input"
+                  autoComplete="email"
+                />
+              </div>
+            </div>
+
+            <div className="login-field-row">
+              <div className="login-field">
+                <label htmlFor="studentNumber" className="login-label">
+                  Student Number
+                </label>
+                <div className="login-input-wrap">
+                  <IdCard className="login-input-icon" size={16} />
+                  <input
+                    id="studentNumber"
+                    type="text"
+                    placeholder="2399001"
+                    value={studentNumber}
+                    onChange={(e) => setStudentNumber(e.target.value)}
+                    className="login-input"
+                  />
+                </div>
+              </div>
+              <div className="login-field">
+                <label htmlFor="yearLevel" className="login-label">
+                  Year Level
+                </label>
+                <div className="login-input-wrap">
+                  <GraduationCap className="login-input-icon" size={16} />
+                  <select
+                    id="yearLevel"
+                    value={yearLevel}
+                    onChange={(e) => setYearLevel(e.target.value)}
+                    className="login-input login-select"
+                  >
+                    <option value="">Select...</option>
+                    {YEAR_LEVELS.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                        {y === 1 ? "st" : y === 2 ? "nd" : y === 3 ? "rd" : "th"} Year
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="college" className="login-label">
+                College
+              </label>
+              <div className="login-input-wrap">
+                <Building2 className="login-input-icon" size={16} />
+                <select
+                  id="college"
+                  value={collegeAbbrev}
+                  onChange={(e) => setCollegeAbbrev(e.target.value)}
+                  className="login-input login-select"
+                >
+                  <option value="">Select your college...</option>
+                  {COLLEGES.map((c) => (
+                    <option key={c.abbreviation} value={c.abbreviation}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="login-field-row">
+              <div className="login-field">
+                <label htmlFor="password" className="login-label">
+                  Password
+                </label>
+                <div className="login-input-wrap">
+                  <Lock className="login-input-icon" size={16} />
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="8+ chars"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="login-input login-input--password"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    disabled={submitting}
+                    tabIndex={0}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div className="login-field">
+                <label htmlFor="confirmPassword" className="login-label">
+                  Confirm Password
+                </label>
+                <div className="login-input-wrap">
+                  <Lock className="login-input-icon" size={16} />
+                  <input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Confirm"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="login-input"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="login-btn-submit"
+              disabled={submitting}
+            >
+              {submitting ? (
+                <span className="login-btn-loading">
+                  <span className="login-spinner" />
+                  Creating account...
+                </span>
+              ) : (
+                "Create Student Account"
+              )}
+            </button>
+          </form>
+
+          <Link to="/login/student" className="login-back-link">
+            <ArrowLeft size={14} />
+            Back to Login
+          </Link>
+        </div>
+      </div>
+
+      <p className="login-footer-copy">
+        © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights reserved.
+      </p>
+
+      {submitting && <LoadingOverlay label="Creating your account..." />}
+    </div>
+  );
+}

@@ -59,7 +59,13 @@ const features = [
   },
 ];
 
-function App() {
+// `loginAudience` scopes every "Sign In" button on this page to a single
+// role's login page: /landingpage/student and /landingpage/faculty pass
+// "student"/"faculty" so one click from either lands the visitor on
+// /login/student or /login/faculty (which in turn only ever shows that
+// role's own registration link). The bare / (no prop) keeps going to the
+// general /login, unchanged.
+function App({ loginAudience }) {
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(
     () => getSavedTheme() === "dark",
@@ -76,7 +82,8 @@ function App() {
     applyTheme(newDarkMode ? "dark" : "light");
   };
 
-  const goToLogin = () => navigate("/login");
+  const goToLogin = () =>
+    navigate(loginAudience ? `/login/${loginAudience}` : "/login");
   const goToDashboard = () => {
     const roleRoutes = {
       student: "/student/dashboard",

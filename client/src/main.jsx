@@ -19,6 +19,12 @@ function ScrollToTop() {
 import "./index.css";
 import App from "./App.jsx";
 import Login from "./pages/Login.jsx";
+const RegisterStudent = React.lazy(
+  () => import("./pages/RegisterStudent.jsx"),
+);
+const RegisterFaculty = React.lazy(
+  () => import("./pages/RegisterFaculty.jsx"),
+);
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/stud-dashboard.jsx";
@@ -126,7 +132,39 @@ createRoot(document.getElementById("root")).render(
           <Routes>
             {/* ─── Public Routes ─────────────────────────────────────────────── */}
             <Route path="/" element={<App />} />
+            <Route
+              path="/landingpage/student"
+              element={<App loginAudience="student" />}
+            />
+            <Route
+              path="/landingpage/faculty"
+              element={<App loginAudience="faculty" />}
+            />
             <Route path="/login" element={<Login />} />
+            <Route
+              path="/login/student"
+              element={<Login registerAudience="student" />}
+            />
+            <Route
+              path="/login/faculty"
+              element={<Login registerAudience="faculty" />}
+            />
+            <Route
+              path="/register/student"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <RegisterStudent />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/register/faculty"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <RegisterFaculty />
+                </Suspense>
+              }
+            />
             <Route path="/unauthorized" element={<div>Unauthorized</div>} />
 
             {/* ─── Protected Student Routes ──────────────────────────────────── */}
