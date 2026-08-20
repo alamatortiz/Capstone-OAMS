@@ -327,6 +327,10 @@
   text-overflow: ellipsis;
 }
 
+.nav-label-sm {
+  font-size: 0.64rem;
+}
+
 /* Sidebar Logout */
 .sidebar-logout {
   padding: 0.75rem;

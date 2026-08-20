@@ -17,14 +17,25 @@ export default function QueueConcernModal({
   submitting = false,
 }) {
   const [concern, setConcern] = useState("");
+  const [wasShown, setWasShown] = useState(show);
 
   useLockBodyScroll(show);
+
+  // Only clear once the modal actually closes (success or cancel) -- not on
+  // every confirm click, so a failed join (modal stays open for retry) keeps
+  // what the student already typed instead of silently wiping it. Adjusted
+  // during render (React's documented alternative to an effect for "reset
+  // state when a prop changes") rather than in a useEffect, which would
+  // cause an extra, avoidable render on every close.
+  if (show !== wasShown) {
+    setWasShown(show);
+    if (!show) setConcern("");
+  }
 
   if (!show) return null;
 
   const handleConfirm = () => {
     onConfirm(concern.trim());
-    setConcern("");
   };
 
   const handleCancel = () => {

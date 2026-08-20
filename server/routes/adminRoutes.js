@@ -2806,6 +2806,7 @@ router.post(
     // together -- otherwise a failure partway through leaves either a
     // permanent announcement with no attachments, or (on retry) a duplicate.
     const conn = await pool.getConnection();
+    let committed = false;
     try {
       await conn.beginTransaction();
 
@@ -2832,6 +2833,7 @@ router.post(
       await insertAttachments(result.insertId, req.files, conn);
 
       await conn.commit();
+      committed = true;
 
       const attachments = await getAttachments(result.insertId);
       emitToDept(deptId, "announcement:changed", { announcementId: result.insertId });
@@ -2872,8 +2874,10 @@ router.post(
         },
       });
     } catch (error) {
-      await conn.rollback();
-      deleteFiles(req.files);
+      if (!committed) {
+        await conn.rollback();
+        deleteFiles(req.files);
+      }
       sendServerError(res, error, "Announcement create error:");
     } finally {
       conn.release();
@@ -2900,6 +2904,7 @@ router.put(
     }
 
     const conn = await pool.getConnection();
+    let committed = false;
     try {
       await conn.beginTransaction();
 
@@ -2957,13 +2962,16 @@ router.put(
       }
 
       await conn.commit();
+      committed = true;
 
       emitToDept(deptId, "announcement:changed", { announcementId });
       const attachments = await getAttachments(announcementId);
       res.json({ message: "Announcement updated", date: new Date().toISOString(), isReposted: true, attachments });
     } catch (error) {
-      await conn.rollback();
-      deleteFiles(req.files);
+      if (!committed) {
+        await conn.rollback();
+        deleteFiles(req.files);
+      }
       sendServerError(res, error, "Announcement update error:");
     } finally {
       conn.release();

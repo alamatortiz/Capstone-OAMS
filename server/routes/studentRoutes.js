@@ -771,7 +771,8 @@ router.post(
       res.status(201).json({
         message: "Document request submitted successfully",
         document: {
-          id: String(newDoc.request_id),
+          id: `req-${newDoc.request_id}`,
+          kind: "request",
           type: newDoc.request_type,
           college: newDoc.college,
           requestDate: newDoc.created_at,
@@ -829,6 +830,7 @@ router.post(
       return res.status(400).json({ error: budgetError });
     }
 
+    let committed = false;
     try {
       const [[stu]] = await pool.query(
         `SELECT department_id FROM students WHERE student_id = ?`,
@@ -867,6 +869,7 @@ router.post(
 
         await insertFiles(result.insertId, "student_upload", req.files, studentId, conn);
         await conn.commit();
+        committed = true;
 
         const [[newSub]] = await pool.query(
           `SELECT ds.submission_id, ds.tracking_number, ds.title, ds.purpose, ds.status,
@@ -899,14 +902,16 @@ router.post(
           },
         });
       } catch (error) {
-        await conn.rollback();
-        deleteFiles(req.files);
+        if (!committed) {
+          await conn.rollback();
+          deleteFiles(req.files);
+        }
         sendServerError(res, error, "Create document submission error");
       } finally {
         conn.release();
       }
     } catch (error) {
-      deleteFiles(req.files);
+      if (!committed) deleteFiles(req.files);
       sendServerError(res, error, "Create document submission error");
     }
   },
@@ -2954,7 +2959,7 @@ router.get(
          WHERE s.student_id = ?`,
         [studentId],
       );
-      if (!dept) return res.status(404).json({ message: "Department not found" });
+      if (!dept) return res.status(404).json({ error: "Department not found" });
       res.json({
         departmentName: dept.department_name,
         departmentAbbrev: dept.department_abbreviation,
