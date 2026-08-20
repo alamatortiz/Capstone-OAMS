@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import type { ComponentProps } from 'react';
 import {
   Image,
   Modal,

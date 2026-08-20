@@ -378,7 +378,7 @@ export default function ProfessorNotificationsScreen() {
             <View style={styles.emptyCard}>
               <Ionicons name="notifications-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No Notifications</Text>
-              <Text style={styles.emptyDescription}>You're all caught up.</Text>
+              <Text style={styles.emptyDescription}>You&apos;re all caught up.</Text>
             </View>
           )}
 

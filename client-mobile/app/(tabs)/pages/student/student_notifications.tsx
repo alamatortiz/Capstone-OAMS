@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
-import type { ComponentProps } from 'react';
 import {
   AppState,
   DeviceEventEmitter,
@@ -53,7 +52,6 @@ const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -162,6 +160,12 @@ export default function StudentNotificationsScreen() {
   const notificationsRef = useRef(notifications);
   useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
 
+  // Lets background refreshes (below) re-fetch every page the user has
+  // already loaded via "Load More", instead of the closed-over `page` value
+  // from whenever the effect was created.
+  const pageRef = useRef(page);
+  useEffect(() => { pageRef.current = page; }, [page]);
+
   const requestIdRef = useRef(0);
 
   const fetchNotifications = useCallback(async (pageNum: number) => {
@@ -193,6 +197,35 @@ export default function StudentNotificationsScreen() {
     }
   }, [filterType]);
 
+  // Background refresh (socket/foreground/poll/cross-screen-sync, below) --
+  // re-fetches every page currently on screen and replaces the list in one
+  // shot, so it doesn't collapse whatever the user has "Load More"'d down to
+  // just page 1 (mirrors fetchNotifications' own request-id staleness guard).
+  const refreshLoadedPages = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    try {
+      const upTo = pageRef.current;
+      const responses = await Promise.all(
+        Array.from({ length: upTo }, (_, i) =>
+          api.get('/student/notifications', {
+            params: { type: filterType !== 'all' ? filterType : undefined, page: i + 1 },
+          }),
+        ),
+      );
+      if (requestId !== requestIdRef.current) return;
+      const merged = responses.flatMap((res) => res.data.notifications ?? []);
+      setNotifications(merged);
+      const last = responses[responses.length - 1]?.data;
+      setPage(last?.page ?? upTo);
+      setTotalPages(last?.totalPages ?? 1);
+      setError(null);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error('Failed to refresh notifications:', err);
+      Toast.show({ type: 'error', text1: 'Could not refresh notifications.' });
+    }
+  }, [filterType]);
+
   useEffect(() => {
     fetchNotifications(1);
   }, [fetchNotifications]);
@@ -206,34 +239,32 @@ export default function StudentNotificationsScreen() {
     if (!token) return undefined;
     const socket = connectSocket(token);
     if (!socket) return undefined;
-    const refetch = () => fetchNotifications(1);
-    WATCHED_EVENTS.forEach((event) => socket.on(event, refetch));
+    WATCHED_EVENTS.forEach((event) => socket.on(event, refreshLoadedPages));
     return () => {
-      WATCHED_EVENTS.forEach((event) => socket.off(event, refetch));
+      WATCHED_EVENTS.forEach((event) => socket.off(event, refreshLoadedPages));
     };
-  }, [token, fetchNotifications]);
+  }, [token, refreshLoadedPages]);
 
   useEffect(() => {
     if (!token) return undefined;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') fetchNotifications(1);
+      if (state === 'active') refreshLoadedPages();
     });
     return () => sub.remove();
-  }, [token, fetchNotifications]);
+  }, [token, refreshLoadedPages]);
 
   useEffect(() => {
     if (!token) return undefined;
     const interval = setInterval(() => {
-      if (AppState.currentState === 'active') fetchNotifications(1);
+      if (AppState.currentState === 'active') refreshLoadedPages();
     }, 45000);
     return () => clearInterval(interval);
-  }, [token, fetchNotifications]);
+  }, [token, refreshLoadedPages]);
 
   useEffect(() => {
-    const refetch = () => fetchNotifications(1);
-    const sub = DeviceEventEmitter.addListener(NOTIFICATIONS_SYNC_EVENT, refetch);
+    const sub = DeviceEventEmitter.addListener(NOTIFICATIONS_SYNC_EVENT, refreshLoadedPages);
     return () => sub.remove();
-  }, [fetchNotifications]);
+  }, [refreshLoadedPages]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -403,7 +434,7 @@ export default function StudentNotificationsScreen() {
             <View style={styles.emptyCard}>
               <Bell size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No Notifications</Text>
-              <Text style={styles.emptyDescription}>You're all caught up.</Text>
+              <Text style={styles.emptyDescription}>You&apos;re all caught up.</Text>
             </View>
           )}
 

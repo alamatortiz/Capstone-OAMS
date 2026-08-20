@@ -443,7 +443,7 @@ export default function ProfessorDocumentsScreen() {
             ) : activeRequests.length > 0 ? (
               <View style={styles.docList}>
                 {activeRequests.map((req) => {
-                  const meta = getHubStatusMeta(req.status);
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
                   return (
                     <Pressable
                       key={req.id}
@@ -551,7 +551,7 @@ export default function ProfessorDocumentsScreen() {
             ) : claimedRequests.length > 0 ? (
               <View style={styles.docList}>
                 {claimedRequests.map((req) => {
-                  const meta = getHubStatusMeta(req.status);
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
                   return (
                     <Pressable
                       key={req.id}
@@ -599,7 +599,7 @@ export default function ProfessorDocumentsScreen() {
             ) : rejectedRequests.length > 0 ? (
               <View style={styles.docList}>
                 {rejectedRequests.map((req) => {
-                  const meta = getHubStatusMeta(req.status);
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
                   return (
                     <Pressable
                       key={req.id}
@@ -649,7 +649,7 @@ export default function ProfessorDocumentsScreen() {
             ) : cancelledRequests.length > 0 ? (
               <View style={styles.docList}>
                 {cancelledRequests.map((req) => {
-                  const meta = getHubStatusMeta(req.status);
+                  const meta = getHubStatusMeta(req.status, isDarkMode);
                   return (
                     <Pressable
                       key={req.id}

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
-import type { ComponentProps } from 'react';
 import {
   Image,
   Modal,
@@ -33,7 +32,6 @@ const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -181,6 +179,12 @@ export default function StudentTransactionsScreen() {
   const transactionsRef = useRef(transactions);
   useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
 
+  // Lets background refreshes (below) re-fetch every page the user has
+  // already loaded via "Load More", instead of the closed-over `page` value
+  // from whenever the effect was created.
+  const pageRef = useRef(page);
+  useEffect(() => { pageRef.current = page; }, [page]);
+
   // Guards against out-of-order responses: e.g. tapping "Load More" and then
   // changing a filter before that request resolves would otherwise let the
   // stale "Load More" page land after the fresh filtered list and get
@@ -231,6 +235,42 @@ export default function StudentTransactionsScreen() {
     }
   }, [debouncedSearch, filterType, filterStatus]);
 
+  // Background refresh (socket/queue-events/poll, below) -- re-fetches every
+  // page currently on screen and replaces the list in one shot, so it
+  // doesn't collapse whatever the user has "Load More"'d down to just page 1
+  // (mirrors fetchTransactions' own request-id staleness guard).
+  const refreshLoadedPages = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    try {
+      const upTo = pageRef.current;
+      const responses = await Promise.all(
+        Array.from({ length: upTo }, (_, i) =>
+          api.get('/student/transactions', {
+            params: {
+              search: debouncedSearch || undefined,
+              type: filterType !== 'all' ? filterType : undefined,
+              status: filterStatus !== 'all' ? filterStatus : undefined,
+              limit: 20,
+              page: i + 1,
+            },
+          }),
+        ),
+      );
+      if (requestId !== requestIdRef.current) return;
+      const merged = responses.flatMap((res) => res.data.transactions ?? []);
+      setTransactions(merged);
+      const last = responses[responses.length - 1]?.data;
+      setPage(last?.page ?? upTo);
+      setTotalPages(last?.totalPages ?? 1);
+      if (last?.stats) setTxStats(last.stats);
+      setTxError(null);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error('Failed to refresh transactions:', err);
+      Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
+    }
+  }, [debouncedSearch, filterType, filterStatus]);
+
   useEffect(() => {
     fetchTransactions(1);
   }, [fetchTransactions]);
@@ -247,10 +287,10 @@ export default function StudentTransactionsScreen() {
   const handleOwnQueueEvent = useCallback(
     (payload: { studentId?: number | string }) => {
       if (Number(payload?.studentId) === Number(user?.userId)) {
-        fetchTransactions(1);
+        refreshLoadedPages();
       }
     },
-    [fetchTransactions, user?.userId],
+    [refreshLoadedPages, user?.userId],
   );
 
   // ── Live updates: refetch when a document/appointment status changes, or
@@ -262,7 +302,6 @@ export default function StudentTransactionsScreen() {
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const refetchFirstPage = () => fetchTransactions(1);
     const ownEvents = ['document:status-updated', 'appointment:status-updated'];
     const deptWideEvents = [
       'queue:called',
@@ -273,22 +312,22 @@ export default function StudentTransactionsScreen() {
       'document:cancelled',
     ];
 
-    ownEvents.forEach((event) => socket.on(event, refetchFirstPage));
+    ownEvents.forEach((event) => socket.on(event, refreshLoadedPages));
     deptWideEvents.forEach((event) => socket.on(event, handleOwnQueueEvent));
 
     return () => {
-      ownEvents.forEach((event) => socket.off(event, refetchFirstPage));
+      ownEvents.forEach((event) => socket.off(event, refreshLoadedPages));
       deptWideEvents.forEach((event) => socket.off(event, handleOwnQueueEvent));
     };
-  }, [user, token, fetchTransactions, handleOwnQueueEvent]);
+  }, [user, token, refreshLoadedPages, handleOwnQueueEvent]);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchTransactions(1);
+      refreshLoadedPages();
     }, 45000);
     return () => clearInterval(interval);
-  }, [fetchTransactions]);
+  }, [refreshLoadedPages]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/student/student_dashboard');

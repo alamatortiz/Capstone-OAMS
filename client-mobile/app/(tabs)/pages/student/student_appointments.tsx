@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
-import type { ComponentProps } from 'react';
 import {
   Alert,
   Animated,
@@ -52,7 +51,6 @@ const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type LucideIconType = typeof Calendar;
 
 function OamsLogo({

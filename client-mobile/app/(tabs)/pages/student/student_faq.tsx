@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Calendar, ChevronDown, ChevronLeft, ClipboardList, FileText, HelpCircle,
-  Home as HomeIcon, Search, Users,
+  Home as HomeIcon, Megaphone, Search, Users,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -88,7 +88,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Home', icon: HomeIcon },
-  { key: 'announcements', label: 'Announcements', icon: HelpCircle },
+  { key: 'announcements', label: 'Announcements', icon: Megaphone },
   { key: 'queue', label: 'Queue', icon: Users },
   { key: 'appointments', label: 'Appointments', icon: Calendar },
   { key: 'documents', label: 'Documents', icon: FileText },

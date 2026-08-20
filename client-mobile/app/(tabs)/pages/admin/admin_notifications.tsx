@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
-import type { ComponentProps } from 'react';
 import {
   AppState,
   DeviceEventEmitter,
@@ -392,7 +391,7 @@ export default function AdminNotificationsScreen() {
             <View style={styles.emptyCard}>
               <Bell size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>No Notifications</Text>
-              <Text style={styles.emptyDescription}>You're all caught up.</Text>
+              <Text style={styles.emptyDescription}>You&apos;re all caught up.</Text>
             </View>
           )}
 

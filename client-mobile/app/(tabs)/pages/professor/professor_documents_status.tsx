@@ -388,6 +388,7 @@ export default function ProfessorDocumentsStatusScreen() {
           {selectedDoc ? (
             <DocumentDetail
               theme={theme}
+              isDarkMode={isDarkMode}
               styles={styles}
               doc={selectedDoc}
               backLabel={detailOpenedFromExternal ? 'Document Requests' : 'All Requests'}
@@ -447,6 +448,7 @@ export default function ProfessorDocumentsStatusScreen() {
                       <DocumentListItem
                         key={doc.id}
                         theme={theme}
+                        isDarkMode={isDarkMode}
                         styles={styles}
                         doc={doc}
                         variant="active"
@@ -478,6 +480,7 @@ export default function ProfessorDocumentsStatusScreen() {
                       <DocumentListItem
                         key={doc.id}
                         theme={theme}
+                        isDarkMode={isDarkMode}
                         styles={styles}
                         doc={doc}
                         variant="claimed"
@@ -506,6 +509,7 @@ export default function ProfessorDocumentsStatusScreen() {
                       <DocumentListItem
                         key={doc.id}
                         theme={theme}
+                        isDarkMode={isDarkMode}
                         styles={styles}
                         doc={doc}
                         variant="rejected"
@@ -534,6 +538,7 @@ export default function ProfessorDocumentsStatusScreen() {
                       <DocumentListItem
                         key={doc.id}
                         theme={theme}
+                        isDarkMode={isDarkMode}
                         styles={styles}
                         doc={doc}
                         variant="cancelled"
@@ -658,14 +663,16 @@ function DocumentListItem({
   doc,
   variant,
   onPress,
+  isDarkMode,
 }: {
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
   doc: DocumentRecord;
   variant: TabKey;
   onPress: () => void;
+  isDarkMode: boolean;
 }) {
-  const meta = getDetailStatusMeta(doc.status);
+  const meta = getDetailStatusMeta(doc.status, isDarkMode);
   const completed = variant !== 'active';
   return (
     <Pressable style={[styles.listCard, completed && styles.listCardCompleted]} onPress={onPress}>
@@ -727,6 +734,7 @@ function DocumentDetail({
   onCancel,
   requirements,
   reqLoading,
+  isDarkMode,
 }: {
   theme: ThemePalette;
   styles: ReturnType<typeof createStyles>;
@@ -736,8 +744,9 @@ function DocumentDetail({
   onCancel: () => void;
   requirements: DocumentRequirement[];
   reqLoading: boolean;
+  isDarkMode: boolean;
 }) {
-  const meta = getDetailStatusMeta(doc.status);
+  const meta = getDetailStatusMeta(doc.status, isDarkMode);
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
 
   return (

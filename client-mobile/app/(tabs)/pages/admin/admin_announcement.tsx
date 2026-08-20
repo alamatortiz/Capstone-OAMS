@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,7 +35,6 @@ const sunIcon = require('@/assets/sun_icon.png');
 const editIcon = require('@/assets/edit_icon.png');
 const deleteIcon = require('@/assets/delete_icon.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,

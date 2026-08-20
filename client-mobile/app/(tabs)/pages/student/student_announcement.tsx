@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
-import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,8 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  AlertCircle, Bell, Calendar, ChevronLeft, Clock, FileText, HelpCircle, Home as HomeIcon, Loader2,
-  Megaphone, Paperclip, Users, X, ClipboardList,
+  AlertCircle, Bell, Calendar, ChevronLeft, FileText, HelpCircle, Home as HomeIcon, Loader2,
+  Megaphone, Paperclip, Users, ClipboardList,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -57,7 +56,6 @@ const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function OamsLogo({
   style,
@@ -219,6 +217,12 @@ export default function StudentAnnouncementScreen() {
   const announcementsRef = useRef(announcements);
   useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
 
+  // Lets the background refresh below re-fetch every page the user has
+  // already loaded via "Load More", instead of the closed-over `page` value
+  // from whenever the effect was created.
+  const pageRef = useRef(page);
+  useEffect(() => { pageRef.current = page; }, [page]);
+
   // Guards against out-of-order responses: e.g. switching tabs while a Load
   // More request for the previous tab is still in flight would otherwise let
   // the stale response land after the fresh one and get appended onto the
@@ -254,6 +258,32 @@ export default function StudentAnnouncementScreen() {
     }
   }, []);
 
+  // Background refresh (socket, below) -- re-fetches every page currently on
+  // screen and replaces the list in one shot, so it doesn't collapse
+  // whatever the user has "Load More"'d down to just page 1 (mirrors
+  // fetchAnnouncements' own request-id staleness guard).
+  const refreshLoadedPages = useCallback(async (category: FilterTabKey) => {
+    const requestId = ++requestIdRef.current;
+    try {
+      const upTo = pageRef.current;
+      const responses = await Promise.all(
+        Array.from({ length: upTo }, (_, i) =>
+          api.get('/student/announcements', { params: { category, page: i + 1 } }),
+        ),
+      );
+      if (requestId !== requestIdRef.current) return;
+      const merged = responses.flatMap((res) => res.data.announcements ?? []);
+      setAnnouncements(merged);
+      const last = responses[responses.length - 1]?.data;
+      setPage(last?.page ?? upTo);
+      setTotalPages(last?.totalPages ?? 1);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error('Failed to refresh announcements:', err);
+      Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
+    }
+  }, []);
+
   // Fresh load at page 1 whenever the mount happens or the selected tab
   // changes -- explicitly shows the loading state since the visible content
   // is about to change, not a silent background refresh.
@@ -278,7 +308,7 @@ export default function StudentAnnouncementScreen() {
     if (!socket) return;
 
     const onAnnouncementChanged = (payload: any) => {
-      fetchAnnouncements(1, selectedFilter);
+      refreshLoadedPages(selectedFilter);
       notify('New announcement', payload?.title ? String(payload.title) : 'An announcement was posted or updated.');
     };
     socket.on('announcement:changed', onAnnouncementChanged);
@@ -286,7 +316,7 @@ export default function StudentAnnouncementScreen() {
     return () => {
       socket.off('announcement:changed', onAnnouncementChanged);
     };
-  }, [user, token, fetchAnnouncements, selectedFilter]);
+  }, [user, token, refreshLoadedPages, selectedFilter]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);

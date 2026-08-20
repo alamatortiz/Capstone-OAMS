@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import {
-  AlertCircle, Calendar, CheckCircle, ChevronLeft, Clock, FileText, Home as HomeIcon, Loader2,
+  AlertCircle, Calendar, CheckCircle, ChevronLeft, FileText, Home as HomeIcon, Loader2,
   Megaphone, MessageSquare, Users, XCircle, ClipboardList,
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -68,7 +67,6 @@ const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,

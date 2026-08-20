@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ComponentProps } from 'react';
 import Toast from 'react-native-toast-message';
 import {
   Alert,

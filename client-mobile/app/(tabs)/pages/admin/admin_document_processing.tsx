@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -734,7 +733,7 @@ export default function AdminDocumentProcessingScreen() {
             ) : (
               <View style={styles.cardsList}>
                 {visibleDocuments.map((doc) => {
-                  const statusTint = getHubStatusMeta(doc.status);
+                  const statusTint = getHubStatusMeta(doc.status, isDarkMode);
                   const StatusIcon = getStatusIcon(doc.status);
                   const isOverdue = !!doc.neededBy && !DONE_STATUSES.includes(doc.status) && doc.neededBy < weekDates.todayStr;
                   const label = deadlineLabel(doc.neededBy);
@@ -855,7 +854,7 @@ export default function AdminDocumentProcessingScreen() {
               <ScrollView style={styles.detailsModalBody}>
                 <View style={styles.detailsStatusRow}>
                   {(() => {
-                    const meta = getHubStatusMeta(selectedDocument.status);
+                    const meta = getHubStatusMeta(selectedDocument.status, isDarkMode);
                     const StatusIcon = getStatusIcon(selectedDocument.status);
                     return (
                       <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>

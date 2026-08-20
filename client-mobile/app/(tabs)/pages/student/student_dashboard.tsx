@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
-import type { ComponentProps } from 'react';
 import {
   Alert,
   Image,
@@ -42,7 +41,6 @@ const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,

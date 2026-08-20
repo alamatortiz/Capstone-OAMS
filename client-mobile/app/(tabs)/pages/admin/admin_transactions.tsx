@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -22,7 +21,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Download,
   FileText,
   History,
   Home as HomeIcon,

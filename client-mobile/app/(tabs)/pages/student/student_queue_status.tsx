@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -41,7 +40,6 @@ const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
