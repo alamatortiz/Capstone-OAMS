@@ -19,8 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  AlertCircle, Bell, Calendar, ChevronLeft, Clock, FileText, Home as HomeIcon, Loader2, Megaphone,
-  Paperclip, Users, X, ClipboardList,
+  AlertCircle, Bell, Calendar, ChevronLeft, Clock, FileText, HelpCircle, Home as HomeIcon, Loader2,
+  Megaphone, Paperclip, Users, X, ClipboardList,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -478,6 +478,19 @@ export default function StudentAnnouncementScreen() {
             </View>
           </View>
 
+          {/* View FAQs */}
+          <Pressable onPress={() => router.push('/pages/student/student_faq')} style={styles.faqBtnWrap}>
+            <LinearGradient
+              colors={['#22c55e', '#16a34a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.faqBtn}
+            >
+              <HelpCircle size={16} color="#ffffff" />
+              <Text style={styles.faqBtnText}>View FAQs</Text>
+            </LinearGradient>
+          </Pressable>
+
           {/* Tabs */}
           <View style={styles.tabsBar}>
             {FILTER_TABS.map((tab) => {
@@ -763,6 +776,18 @@ function createStyles(theme: ThemePalette) {
       color: theme.subtext,
       marginTop: 3,
     },
+
+    // View FAQs link
+    faqBtnWrap: { alignSelf: 'flex-start' },
+    faqBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 12,
+      paddingVertical: 11,
+      paddingHorizontal: 16,
+    },
+    faqBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
 
     // Tabs (underline style, mirrors .ann-tab on web)
     tabsBar: {

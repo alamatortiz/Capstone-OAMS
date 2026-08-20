@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
   AlertCircle, Bell, Calendar, CheckCircle, ChevronDown, ChevronLeft, Clock, Eye, FileText,
-  History, Home as HomeIcon, Info, Megaphone, Paperclip, Pin, Plus, Search, Trash2, X,
+  HelpCircle, History, Home as HomeIcon, Info, Megaphone, Paperclip, Pin, Plus, Search, Trash2, X,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -664,18 +664,24 @@ export default function AdminAnnouncementScreen() {
             </View>
           </View>
 
-          {/* New Announcement */}
-          <Pressable onPress={openCreate} style={styles.newBtnWrap}>
-            <LinearGradient
-              colors={[theme.primary, theme.success]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.newBtn}
-            >
-              <Plus size={16} color="#ffffff" />
-              <Text style={styles.newBtnText}>New Announcement</Text>
-            </LinearGradient>
-          </Pressable>
+          {/* New Announcement / Manage FAQs */}
+          <View style={styles.headerActionsRow}>
+            <Pressable onPress={openCreate} style={styles.newBtnWrap}>
+              <LinearGradient
+                colors={[theme.primary, theme.success]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.newBtn}
+              >
+                <Plus size={16} color="#ffffff" />
+                <Text style={styles.newBtnText}>New Announcement</Text>
+              </LinearGradient>
+            </Pressable>
+            <Pressable style={styles.faqBtn} onPress={() => router.push('/pages/admin/admin_faq')}>
+              <HelpCircle size={16} color={theme.text} />
+              <Text style={styles.faqBtnText}>Manage FAQs</Text>
+            </Pressable>
+          </View>
 
           {/* Source toggle */}
           <View style={styles.sourceToggle}>
@@ -1487,7 +1493,8 @@ function createStyles(theme: ThemePalette) {
     pageTitle: { fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
     pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
 
-    // New announcement button
+    // New announcement button / Manage FAQs link
+    headerActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     newBtnWrap: { alignSelf: 'flex-start' },
     newBtn: {
       flexDirection: 'row',
@@ -1498,6 +1505,17 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 16,
     },
     newBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+    faqBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 12,
+      paddingVertical: 11,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    faqBtnText: { color: theme.text, fontSize: 13, fontWeight: '700' },
 
     // Source toggle (mirrors admin_document_processing.tsx's Students/Faculty
     // toggle, but colored with this screen's own green accent instead of that
