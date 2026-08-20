@@ -463,19 +463,6 @@ html, body {
   transition: color 0.3s ease;
 }
 
-/* ── Meeting link ────────────────────────────────────────── */
-.appt-meeting-link {
-  color: #a855f7;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  transition: opacity 0.2s;
-}
-
-.appt-meeting-link:hover { opacity: 0.8; text-decoration: underline; }
-
-[data-theme="light"] .appt-meeting-link { color: #9333ea; }
-
 /* ── Footer row ──────────────────────────────────────────── */
 .appt-footer {
   display: flex;

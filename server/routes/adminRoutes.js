@@ -1080,6 +1080,7 @@ router.get(
           a.appointment_date,
           a.appointment_time,
           a.status,
+          a.cancelled_by,
           a.notes,
           a.created_at,
           CONCAT(s.first_name, ' ', s.last_name) AS student_name,
@@ -1090,13 +1091,14 @@ router.get(
           f.email AS faculty_email,
           d.department_name,
           d.department_abbreviation,
-          d.office_location,
+          COALESCE(a.location_snapshot, fda.location) AS location,
           svc.service_name
         FROM appointments a
         JOIN students     s   ON a.student_id   = s.student_id
         JOIN faculty       f   ON a.faculty_id    = f.faculty_id
         JOIN departments   d   ON a.department_id = d.department_id
         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
+        LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
         WHERE a.department_id = ?
         ORDER BY a.created_at DESC`,
         [deptId],
@@ -1113,7 +1115,7 @@ router.get(
         return {
           id: String(r.appointment_id),
           college: `${r.department_name} (${r.department_abbreviation})`,
-          location: r.office_location ?? "TBA",
+          location: r.location ?? "TBA",
           studentName: r.student_name,
           studentId: r.student_number,
           studentCourse: r.student_course,
@@ -1124,6 +1126,7 @@ router.get(
           date: dateStr,
           time: formatTime(r.appointment_time),
           status: r.status,
+          cancelledBy: r.cancelled_by ?? null,
           requestedAt: new Date(r.created_at).toLocaleString("en-US", {
             timeZone: "Asia/Manila",
             year: "numeric",

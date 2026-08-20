@@ -1930,7 +1930,6 @@ router.get(
            a.created_at,
            f.faculty_id,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
-           f.specialization                        AS faculty_role,
            d.department_name                       AS college,
            d.department_abbreviation               AS college_abbrev,
            COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
@@ -1950,12 +1949,10 @@ router.get(
       const formatted = rows.map((row) => ({
         id: row.appointment_id,
         availabilityId: row.availability_id,
-        title: row.service_name ?? row.faculty_role ?? "Faculty Consultation",
         appointmentType: row.service_name ?? null,
         college: row.college,
         collegeAbbrev: row.college_abbrev ?? "",
         person: row.faculty_name,
-        personRole: row.faculty_role ?? "Faculty",
         date:
           row.appointment_date instanceof Date
             ? getManilaDateString(row.appointment_date)

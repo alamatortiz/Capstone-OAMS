@@ -7,7 +7,6 @@ import "./adm-appointment.css";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
-import { COLLEGES } from "../../data/colleges";
 import { formatManilaDate } from "../../utils/dateTime";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { connectSocket } from "../../utils/socket";
@@ -54,12 +53,6 @@ const CheckCircleIcon = () => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
-const ChevronDownIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="6 9 12 15 18 9"></polyline>
-  </svg>
-);
-
 const PersonIcon = ({ className = "" }) => (
   <svg
     viewBox="0 0 24 24"
@@ -73,10 +66,15 @@ const PersonIcon = ({ className = "" }) => (
   </svg>
 );
 
+const CANCELLED_BY_LABELS = {
+  student: "Student",
+  faculty: "Faculty",
+  system: "System (schedule change)",
+};
+
 export default function AdminAppointment() {
   const { user: authUser } = useAuth();
 
-  const [selectedCollege, setSelectedCollege] = useState("all");
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   useLockBodyScroll(Boolean(selectedAppointment));
@@ -89,10 +87,6 @@ export default function AdminAppointment() {
   const handleViewDetails = (appointment) =>
     setSelectedAppointment(appointment);
   const handleCloseDetails = () => setSelectedAppointment(null);
-  const stats = {
-    total: appointments.length,
-    pending: appointments.filter((a) => a.status === "pending").length,
-  };
 
   // Mirrors `appointments` for the catch block below, without making
   // fetchAppointments depend on (and change identity with) the state itself.
@@ -100,6 +94,7 @@ export default function AdminAppointment() {
   useEffect(() => { appointmentsRef.current = appointments; }, [appointments]);
 
   const fetchAppointments = useCallback(async () => {
+    setError(null);
     try {
       const res = await api.get("/admin/appointments");
       setAppointments(res.data.appointments ?? []);
@@ -152,6 +147,7 @@ export default function AdminAppointment() {
     approved: searchFiltered.filter((a) => a.status === "approved").length,
     completed: searchFiltered.filter((a) => a.status === "completed").length,
     rejected: searchFiltered.filter((a) => a.status === "rejected").length,
+    cancelled: searchFiltered.filter((a) => a.status === "cancelled").length,
   };
 
   const filterAppointments = (status) =>
@@ -195,7 +191,6 @@ export default function AdminAppointment() {
   };
 
   const AppointmentCard = ({ appointment, onViewDetails }) => {
-    const collegeData = COLLEGES.find((c) => c.name === appointment.college);
     return (
       <div key={appointment.id} className="admin-appointment-card">
         <div className="admin-appointment-card-content">
@@ -322,6 +317,16 @@ export default function AdminAppointment() {
                         {selectedAppointment.professor}
                       </span>
                     </div>
+                    {selectedAppointment.facultyEmail && (
+                      <div className="admin-appointment-modal-field">
+                        <span className="admin-appointment-modal-label">
+                          Faculty Email
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {selectedAppointment.facultyEmail}
+                        </span>
+                      </div>
+                    )}
                     <div className="admin-appointment-modal-field">
                       <span className="admin-appointment-modal-label">College</span>
                       <span className="admin-appointment-modal-value">
@@ -374,6 +379,18 @@ export default function AdminAppointment() {
                         {selectedAppointment.requestedAt}
                       </span>
                     </div>
+                    {selectedAppointment.status === "cancelled" &&
+                      selectedAppointment.cancelledBy && (
+                        <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                          <span className="admin-appointment-modal-label">
+                            Cancelled By
+                          </span>
+                          <span className="admin-appointment-modal-value">
+                            {CANCELLED_BY_LABELS[selectedAppointment.cancelledBy] ??
+                              selectedAppointment.cancelledBy}
+                          </span>
+                        </div>
+                      )}
                   </div>
                 </div>
 
@@ -397,7 +414,7 @@ export default function AdminAppointment() {
             icon={<CalendarIconNav />}
             iconClassName="admin-appointment-title-icon"
             title="Centralized Appointment Management"
-            subtitle="Oversee appointment system across all colleges"
+            subtitle={`Monitor and manage appointments for ${authUser?.departmentName ?? "your department"}`}
             headerClassName="admin-appointment-page-header"
             breadcrumbClassName="prof-breadcrumb"
             titleSectionClassName="admin-appointment-title-section"
@@ -428,12 +445,12 @@ export default function AdminAppointment() {
                 Appointment Overview
               </h2>
               <p className="admin-appointment-overview-subtitle">
-                System-wide appointment tracking and management
+                Appointment tracking and management for your department
               </p>
             </div>
             <div className="admin-appointment-tabs-container">
               <div className="admin-appointment-tabs-list">
-                {["all", "pending", "approved", "completed", "rejected"].map(
+                {["all", "pending", "approved", "completed", "rejected", "cancelled"].map(
                   (tab) => (
                     <button
                       key={tab}
@@ -452,7 +469,18 @@ export default function AdminAppointment() {
               </div>
 
               <div className="admin-appointment-tabs-content">
-                {filterAppointments(activeTab).length === 0 ? (
+                {error ? (
+                  <div className="admin-appointment-empty-state">
+                    <AlertCircleIcon />
+                    <p className="admin-appointment-empty-text">{error}</p>
+                    <button
+                      className="admin-appointment-view-details-btn"
+                      onClick={fetchAppointments}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : filterAppointments(activeTab).length === 0 ? (
                   <div className="admin-appointment-empty-state">
                     <CalendarIconNav />
                     <p className="admin-appointment-empty-text">

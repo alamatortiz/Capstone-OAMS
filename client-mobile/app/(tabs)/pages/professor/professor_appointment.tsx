@@ -105,7 +105,7 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
 ];
 
-const TABS = ['all', 'pending', 'approved', 'completed', 'rejected'] as const;
+const TABS = ['all', 'pending', 'approved', 'completed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
 
 const TAB_ICON_MAP: Record<TabKey, IoniconName> = {
@@ -114,6 +114,7 @@ const TAB_ICON_MAP: Record<TabKey, IoniconName> = {
   approved: 'checkmark-circle-outline',
   completed: 'checkmark-circle-outline',
   rejected: 'close-circle-outline',
+  cancelled: 'close-circle-outline',
 };
 
 const ALL_RANGES = ['week', 'month', 'all'] as const;
@@ -309,6 +310,7 @@ export default function ProfessorAppointmentScreen() {
     approved: appointments.filter((a) => a.status === 'approved').length,
     completed: appointments.filter((a) => a.status === 'completed').length,
     rejected: appointments.filter((a) => a.status === 'rejected').length,
+    cancelled: appointments.filter((a) => a.status === 'cancelled').length,
   };
 
   const visibleAppointments =

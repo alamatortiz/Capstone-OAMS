@@ -426,48 +426,6 @@ body {
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
 }
 
-.admin-appointment-college-select-wrapper {
-  position: relative;
-  min-width: 200px;
-}
-
-.admin-appointment-college-select-wrapper svg {
-  position: absolute;
-  right: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1rem;
-  height: 1rem;
-  color: var(--text-tertiary);
-  stroke: currentColor;
-  pointer-events: none;
-}
-
-.admin-appointment-college-select {
-  width: 100%;
-  padding: 0.75rem 2.5rem 0.75rem 1rem;
-  background: var(--input-background);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  font-family: inherit;
-  cursor: pointer;
-  appearance: none;
-  transition: all 0.2s ease;
-}
-
-.admin-appointment-college-select:focus {
-  outline: none;
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
-}
-
-.admin-appointment-college-select option {
-  background: var(--card-bg);
-  color: var(--text-primary);
-}
-
 /* ===== Appointment Overview Card ===== */
 .admin-appointment-overview-card {
   background: var(--card-bg);

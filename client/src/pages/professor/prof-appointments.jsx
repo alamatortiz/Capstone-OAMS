@@ -57,6 +57,7 @@ const TAB_ICON_MAP = {
   approved: CheckCircle2,
   completed: CheckCircle2,
   rejected: XCircle,
+  cancelled: XCircle,
 };
 
 const ALL_RANGE_LABELS = {
@@ -130,6 +131,7 @@ function AppointmentCard({
           <h3 className="appt-card-name">{appointment.studentName}</h3>
           <p className="appt-card-sub">
             {appointment.studentId}
+            {appointment.course ? ` · ${appointment.course}` : ""}
             {appointment.appointmentType ? ` · ${appointment.appointmentType}` : ""}
           </p>
         </div>
@@ -249,7 +251,7 @@ export default function ProfessorAppointmentsPage() {
     };
   }, [fetchAppointments]);
 
-  const TABS = ["all", "pending", "approved", "completed", "rejected"];
+  const TABS = ["all", "pending", "approved", "completed", "rejected", "cancelled"];
 
   // The This Week/This Month/All Time control governs every tab, not just
   // "All" — otherwise a tab's badge count and its rendered list would come
