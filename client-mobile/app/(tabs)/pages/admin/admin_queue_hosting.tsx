@@ -512,7 +512,7 @@ export default function AdminQueueHostingScreen() {
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
-                          source={collegeLogos[queue.department] ?? ccsLogo}
+                          source={collegeLogos[queue.college] ?? ccsLogo}
                           style={styles.queueCardLogo}
                           resizeMode="contain"
                         />
@@ -597,7 +597,7 @@ export default function AdminQueueHostingScreen() {
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
-                          source={collegeLogos[queue.department] ?? ccsLogo}
+                          source={collegeLogos[queue.college] ?? ccsLogo}
                           style={styles.queueCardLogo}
                           resizeMode="contain"
                         />
@@ -673,7 +673,7 @@ export default function AdminQueueHostingScreen() {
                       <View style={styles.queueCardTopRow}>
                         <View style={styles.queueCardTitleRow}>
                           <Image
-                            source={collegeLogos[queue.department] ?? ccsLogo}
+                            source={collegeLogos[queue.college] ?? ccsLogo}
                             style={styles.queueCardLogo}
                             resizeMode="contain"
                           />
@@ -738,7 +738,7 @@ export default function AdminQueueHostingScreen() {
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
-                          source={collegeLogos[queue.department] ?? ccsLogo}
+                          source={collegeLogos[queue.college] ?? ccsLogo}
                           style={styles.queueCardLogo}
                           resizeMode="contain"
                         />
@@ -781,7 +781,7 @@ export default function AdminQueueHostingScreen() {
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
                         <Image
-                          source={collegeLogos[queue.department] ?? ccsLogo}
+                          source={collegeLogos[queue.college] ?? ccsLogo}
                           style={styles.queueCardLogo}
                           resizeMode="contain"
                         />

@@ -516,21 +516,23 @@ export default function AdminScanDocumentScreen() {
 
       {/* Camera QR Scanner Modal */}
       <Modal visible={showCamera} animationType="slide" onRequestClose={() => setShowCamera(false)}>
-        <View style={{ flex: 1, backgroundColor: '#000000' }}>
-          <CameraView
-            style={{ flex: 1 }}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onBarcodeScanned={handleBarcodeScanned}
-          />
-          <SafeAreaView style={styles.cameraOverlay} edges={['top', 'bottom']}>
-            <Pressable style={styles.cameraCloseBtn} onPress={() => setShowCamera(false)} hitSlop={10}>
-              <X size={22} color="#ffffff" />
-            </Pressable>
-            <View style={styles.cameraFrameGuide} />
-            <Text style={styles.cameraHintText}>Position the QR code within the frame</Text>
-          </SafeAreaView>
-        </View>
+        {showCamera && (
+          <View style={{ flex: 1, backgroundColor: '#000000' }}>
+            <CameraView
+              style={{ flex: 1 }}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={handleBarcodeScanned}
+            />
+            <SafeAreaView style={styles.cameraOverlay} edges={['top', 'bottom']}>
+              <Pressable style={styles.cameraCloseBtn} onPress={() => setShowCamera(false)} hitSlop={10}>
+                <X size={22} color="#ffffff" />
+              </Pressable>
+              <View style={styles.cameraFrameGuide} />
+              <Text style={styles.cameraHintText}>Position the QR code within the frame</Text>
+            </SafeAreaView>
+          </View>
+        )}
       </Modal>
 
       {/* Document Verification Modal */}

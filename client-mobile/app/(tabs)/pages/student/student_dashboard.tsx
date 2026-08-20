@@ -246,12 +246,21 @@ export default function StudentDashboardScreen() {
   const announcementsRef = useRef(announcements);
   useEffect(() => { announcementsRef.current = announcements; }, [announcements]);
 
+  // Guards against out-of-order responses: mount plus half a dozen
+  // independent socket event types (below) can all trigger this fetch close
+  // together, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh stats with stale data.
+  const statsRequestIdRef = useRef(0);
+
   const fetchStats = useCallback(async () => {
+    const requestId = ++statsRequestIdRef.current;
     try {
       const { data } = await api.get('/student/dashboard-stats');
+      if (requestId !== statsRequestIdRef.current) return;
       setDashStats(data);
       setDashError(null);
     } catch (err) {
+      if (requestId !== statsRequestIdRef.current) return;
       console.error('Failed to fetch dashboard stats:', err);
       if (!dashStatsRef.current) {
         setDashError('Could not load dashboard data.');
@@ -259,7 +268,7 @@ export default function StudentDashboardScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh dashboard data.' });
       }
     } finally {
-      setDashLoading(false);
+      if (requestId === statsRequestIdRef.current) setDashLoading(false);
     }
   }, []);
 

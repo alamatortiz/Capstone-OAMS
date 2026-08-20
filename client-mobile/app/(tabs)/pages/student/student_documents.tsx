@@ -257,12 +257,21 @@ export default function StudentDocumentsScreen() {
   const documentsRef = useRef(documents);
   useEffect(() => { documentsRef.current = documents; }, [documents]);
 
+  // Guards against out-of-order responses: mount, the status-change socket
+  // event, and the 45s fallback poll below can all independently trigger
+  // this fetch, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
   const fetchDocuments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       const { data } = await api.get('/student/documents');
+      if (requestId !== requestIdRef.current) return;
       setDocuments(data.documents ?? []);
       setDocsError(null);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Failed to fetch documents:', err);
       if (documentsRef.current.length === 0) {
         setDocsError('Could not load your documents.');
@@ -270,7 +279,7 @@ export default function StudentDocumentsScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh your documents.' });
       }
     } finally {
-      setDocsLoading(false);
+      if (requestId === requestIdRef.current) setDocsLoading(false);
     }
   }, []);
 
@@ -297,11 +306,12 @@ export default function StudentDocumentsScreen() {
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
+    if (!user || !token) return undefined;
     const interval = setInterval(() => {
       fetchDocuments();
     }, 45000);
     return () => clearInterval(interval);
-  }, [fetchDocuments]);
+  }, [user, token, fetchDocuments]);
 
   useEffect(() => {
     const fetchServiceTypes = async () => {

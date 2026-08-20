@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -158,16 +158,23 @@ export default function ProfessorScheduleManagerScreen() {
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
+  // Guards against out-of-order responses, matching the pattern used
+  // elsewhere in this codebase for fetches with more than one trigger.
+  const requestIdRef = useRef(0);
+
   const fetchSlots = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const { data } = await api.get('/professor/availability');
+      if (requestId !== requestIdRef.current) return;
       setSlots(data ?? []);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch availability error:', err);
       Alert.alert('Error', 'Failed to load schedule data.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 

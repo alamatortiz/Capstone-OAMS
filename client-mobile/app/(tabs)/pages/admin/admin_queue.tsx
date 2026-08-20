@@ -214,6 +214,23 @@ export default function AdminQueueScreen() {
   const router = useRouter();
   const { monitorQueueId } = useLocalSearchParams<{ monitorQueueId?: string }>();
   const { user, logout } = useAuth();
+
+  const fetchEntries = useCallback(async (slotId: number) => {
+    try {
+      const res = await api.get(`/admin/queue-hosting/${slotId}/entries`);
+      setQueueEntries(res.data.entries ?? []);
+    } catch (error) {
+      console.error('Failed to fetch queue entries:', error);
+    }
+  }, []);
+
+  // The monitored queue's entry list also needs refreshing on every queue
+  // socket event, not just the queue list itself -- mirrors web's
+  // adm-queue.jsx (useAdminQueueHosting({ onLiveUpdate: fetchQueueEntries })).
+  const handleQueueLiveUpdate = useCallback(() => {
+    if (monitoringQueueId != null) fetchEntries(monitoringQueueId);
+  }, [monitoringQueueId, fetchEntries]);
+
   const {
     queues: queueDetails,
     error: queueHostingError,
@@ -224,7 +241,7 @@ export default function AdminQueueScreen() {
     handlePauseQueue,
     handleCloseQueue,
     handleReasonConfirm: handleReasonConfirmBase,
-  } = useAdminQueueHosting();
+  } = useAdminQueueHosting({ onLiveUpdate: handleQueueLiveUpdate });
   const [reasonText, setReasonText] = useState('');
 
   // Skip requires a reason too (kept consistent with pause/close) -- reuses
@@ -233,15 +250,6 @@ export default function AdminQueueScreen() {
   const [skipReasonModal, setSkipReasonModal] = useState(false);
   const [skipSubmitting, setSkipSubmitting] = useState(false);
   const [skipReasonText, setSkipReasonText] = useState('');
-
-  const fetchEntries = useCallback(async (slotId: number) => {
-    try {
-      const res = await api.get(`/admin/queue-hosting/${slotId}/entries`);
-      setQueueEntries(res.data.entries ?? []);
-    } catch (error) {
-      console.error('Failed to fetch queue entries:', error);
-    }
-  }, []);
 
   useEffect(() => {
     if (monitoringQueueId != null) fetchEntries(monitoringQueueId);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
@@ -70,7 +70,7 @@ function OamsLogo({
 }
 
 // ─── Field shapes documented here mirror what Field shapes mirror what
-// GET /professor/appointments really returns (studentName, studentId,
+// GET /professor/appointments really returns (studentName, studentId, course,
 // appointmentType, date, time, location, purpose, status, requestedAt) — this
 // screen otherwise ports the actual wired prof-appointments.jsx/.css 1:1
 // (no stat cards — that's a design-mockup-only feature, not part of the real
@@ -82,6 +82,7 @@ interface Appointment {
   id: number;
   studentName: string;
   studentId: string;
+  course: string | null;
   appointmentType: string | null;
   date: string;
   time: string;
@@ -220,16 +221,26 @@ export default function ProfessorAppointmentScreen() {
   const router = useRouter();
   const { user, logout, token } = useAuth();
 
+  // Guards against out-of-order responses: mount, the socket events below,
+  // and a direct refetch right after approve/reject/etc. (runConfirmAction)
+  // can all trigger this fetch close together, so a slower-but-earlier
+  // response landing after a newer one could otherwise revert the list to
+  // its pre-mutation state.
+  const requestIdRef = useRef(0);
+
   const fetchAppointments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const { data } = await api.get('/professor/appointments');
+      if (requestId !== requestIdRef.current) return;
       setAppointments(data ?? []);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch appointments error:', err);
       Alert.alert('Error', 'Could not load appointments.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 
@@ -499,6 +510,7 @@ export default function ProfessorAppointmentScreen() {
                         <Text style={styles.studentName}>{apt.studentName}</Text>
                         <Text style={styles.studentSub}>
                           {apt.studentId}
+                          {apt.course ? ` · ${apt.course}` : ''}
                           {apt.appointmentType ? ` · ${apt.appointmentType}` : ''}
                         </Text>
                       </View>

@@ -201,9 +201,17 @@ export default function ProfessorDocumentsScreen() {
   const requestsRef = useRef(requests);
   useEffect(() => { requestsRef.current = requests; }, [requests]);
 
+  // Guards against out-of-order responses: mount, the status-change socket
+  // event, and the 45s fallback poll below can all independently trigger
+  // this fetch, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
   const fetchRequests = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       const { data } = await api.get('/professor/documents');
+      if (requestId !== requestIdRef.current) return;
       setRequests(
         (data ?? []).map((r: any) => ({
           id: String(r.request_id),
@@ -220,6 +228,7 @@ export default function ProfessorDocumentsScreen() {
         })),
       );
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch document requests error:', err);
       if (requestsRef.current.length === 0) {
         Alert.alert('Error', 'Could not load your document requests.');
@@ -227,7 +236,7 @@ export default function ProfessorDocumentsScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh your document requests.' });
       }
     } finally {
-      setRequestsLoading(false);
+      if (requestId === requestIdRef.current) setRequestsLoading(false);
     }
   }, []);
 
@@ -248,11 +257,12 @@ export default function ProfessorDocumentsScreen() {
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
+    if (!user || !token) return undefined;
     const interval = setInterval(() => {
       fetchRequests();
     }, 45000);
     return () => clearInterval(interval);
-  }, [fetchRequests]);
+  }, [user, token, fetchRequests]);
 
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
 

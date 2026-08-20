@@ -182,10 +182,18 @@ export default function StudentProfessorSchedulesScreen() {
   const departmentsRef = useRef(departments);
   useEffect(() => { departmentsRef.current = departments; }, [departments]);
 
+  // Guards against out-of-order responses: mount, the availability-changed
+  // socket event, and the 45s fallback poll below can all independently
+  // trigger this fetch, so a slower-but-earlier response landing after a
+  // newer one could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
   const fetchSchedules = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoadError(null);
     try {
       const { data } = await api.get('/student/professor-schedules');
+      if (requestId !== requestIdRef.current) return;
       setDepartments(
         (data.departments ?? []).map((d: any) => ({
           departmentId: String(d.departmentId),
@@ -203,6 +211,7 @@ export default function StudentProfessorSchedulesScreen() {
         })),
       );
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch professor schedules error:', err);
       if (departmentsRef.current.length === 0) {
         setLoadError('Could not load professor schedules. Please try again.');
@@ -210,7 +219,7 @@ export default function StudentProfessorSchedulesScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh professor schedules.' });
       }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 

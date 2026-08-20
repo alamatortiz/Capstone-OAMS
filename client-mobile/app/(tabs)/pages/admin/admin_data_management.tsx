@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -312,18 +312,23 @@ export default function AdminDataManagementScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
+  const docRequestIdRef = useRef(0);
+
   const fetchDocumentTypes = useCallback(async (status: 'all' | DocStatus = 'all') => {
+    const requestId = ++docRequestIdRef.current;
     setDocLoading(true);
     setDocError(null);
     try {
       const params = status !== 'all' ? { status } : {};
       const { data } = await api.get('/admin/data-management/document-types', { params });
+      if (requestId !== docRequestIdRef.current) return;
       setDocumentTypes(data.documentTypes ?? []);
     } catch (err) {
+      if (requestId !== docRequestIdRef.current) return;
       console.error('Failed to load document types:', err);
       setDocError('Failed to load document types.');
     } finally {
-      setDocLoading(false);
+      if (requestId === docRequestIdRef.current) setDocLoading(false);
     }
   }, []);
 
@@ -344,24 +349,32 @@ export default function AdminDataManagementScreen() {
   const fetchLocations = useCallback(async () => {
     try {
       const { data } = await api.get('/admin/locations');
-      setLocations(data.locations ?? []);
+      // Server returns location_id as a raw MySQL integer; LocationOption.id
+      // (and serviceForm.locationId) are strings everywhere else in this
+      // screen, so normalize here to keep id comparisons working.
+      setLocations((data.locations ?? []).map((l: LocationOption) => ({ ...l, id: String(l.id) })));
     } catch (err) {
       console.error('Failed to load locations:', err);
     }
   }, []);
 
+  const auditRequestIdRef = useRef(0);
+
   const fetchAuditLogs = useCallback(async (action: 'all' | AuditAction = 'all') => {
+    const requestId = ++auditRequestIdRef.current;
     setAuditLoading(true);
     setAuditError(null);
     try {
       const params = action !== 'all' ? { action } : {};
       const { data } = await api.get('/admin/data-management/audit-logs', { params });
+      if (requestId !== auditRequestIdRef.current) return;
       setAuditLogs(data.auditLogs ?? []);
     } catch (err) {
+      if (requestId !== auditRequestIdRef.current) return;
       console.error('Failed to load audit logs:', err);
       setAuditError('Failed to load audit logs.');
     } finally {
-      setAuditLoading(false);
+      if (requestId === auditRequestIdRef.current) setAuditLoading(false);
     }
   }, []);
 
@@ -591,7 +604,7 @@ export default function AdminDataManagementScreen() {
       if (finalLocationId === '__other__') {
         const { data } = await api.post('/admin/locations', { name: otherLocationName.trim() });
         finalLocationId = String(data.id);
-        setLocations((prev) => [...prev, data]);
+        setLocations((prev) => [...prev, { ...data, id: finalLocationId }]);
       }
 
       const payload = {

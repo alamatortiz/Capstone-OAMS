@@ -213,17 +213,26 @@ export default function StudentDocumentStatusScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
+  // Guards against out-of-order responses: mount, the status-change socket
+  // event, and the 45s fallback poll below can all independently trigger
+  // this fetch, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
   const fetchDocuments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const { data } = await api.get('/student/documents');
+      if (requestId !== requestIdRef.current) return;
       setDocuments(data.documents ?? []);
       setError(null);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Failed to fetch documents:', err);
       setError('Could not load your documents.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 
@@ -271,11 +280,12 @@ export default function StudentDocumentStatusScreen() {
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
+    if (!user || !token) return undefined;
     const interval = setInterval(() => {
       fetchDocuments();
     }, 45000);
     return () => clearInterval(interval);
-  }, [fetchDocuments]);
+  }, [user, token, fetchDocuments]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

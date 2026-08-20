@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Image,
   Modal,
@@ -194,9 +194,24 @@ export default function AdminPinnacleSyncScreen() {
     router.replace('/login');
   };
 
+  // Tracks the pending "clear message" / "test connection" timers so a newer
+  // call can cancel an older one instead of racing it (e.g. Save then Test
+  // Connection in quick succession clearing the newer message early), and so
+  // neither fires a state update after the screen has unmounted.
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const testTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+      if (testTimeoutRef.current) clearTimeout(testTimeoutRef.current);
+    };
+  }, []);
+
   const flashMessage = (msg: SyncMessage, holdMs = 3000) => {
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
     setSyncMessage(msg);
-    setTimeout(() => setSyncMessage(null), holdMs);
+    flashTimeoutRef.current = setTimeout(() => setSyncMessage(null), holdMs);
   };
 
   const handleSaveConfiguration = async () => {
@@ -218,9 +233,10 @@ export default function AdminPinnacleSyncScreen() {
   };
 
   const handleTestConnection = () => {
+    if (testTimeoutRef.current) clearTimeout(testTimeoutRef.current);
     setIsTesting(true);
     setSyncMessage({ type: 'info', text: 'Testing connection to PinnaCle API...' });
-    setTimeout(() => {
+    testTimeoutRef.current = setTimeout(() => {
       setIsTesting(false);
       flashMessage(
         syncEnabled

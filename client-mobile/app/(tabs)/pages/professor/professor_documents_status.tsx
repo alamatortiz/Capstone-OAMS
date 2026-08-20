@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
@@ -212,10 +212,18 @@ export default function ProfessorDocumentsStatusScreen() {
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
   const goToRequestPage = () => router.push('/pages/professor/professor_documents');
 
+  // Guards against out-of-order responses: mount, the status-change socket
+  // event, and the 45s fallback poll below can all independently trigger
+  // this fetch, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
   const fetchDocuments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const { data } = await api.get('/professor/documents');
+      if (requestId !== requestIdRef.current) return;
       setDocuments(
         (data ?? []).map((r: any) => ({
           id: String(r.request_id),
@@ -234,10 +242,11 @@ export default function ProfessorDocumentsStatusScreen() {
         })),
       );
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch document requests error:', err);
       Alert.alert('Error', 'Could not load your document requests.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 
@@ -270,11 +279,12 @@ export default function ProfessorDocumentsStatusScreen() {
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
+    if (!user || !token) return undefined;
     const interval = setInterval(() => {
       fetchDocuments();
     }, 45000);
     return () => clearInterval(interval);
-  }, [fetchDocuments]);
+  }, [user, token, fetchDocuments]);
 
   useEffect(() => {
     if (!user || !token) return;

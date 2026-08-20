@@ -242,13 +242,22 @@ export default function ProfessorDashboardScreen() {
   const dashDataRef = useRef(dashData);
   useEffect(() => { dashDataRef.current = dashData; }, [dashData]);
 
+  // Guards against out-of-order responses: mount, the socket-driven refetch,
+  // and the manual retry button (below) can all trigger this fetch close
+  // together, so a slower-but-earlier response landing after a newer one
+  // could otherwise overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
   const fetchStats = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setError(null);
     try {
       const { data } = await api.get('/professor/dashboard-stats');
+      if (requestId !== requestIdRef.current) return;
       setDashData(data);
       setIsAvailable((data.availabilityStatus ?? 'available') === 'available');
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch dashboard stats error:', err);
       if (!dashDataRef.current) {
         setError('Could not load dashboard data.');
@@ -256,7 +265,7 @@ export default function ProfessorDashboardScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh dashboard data.' });
       }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 

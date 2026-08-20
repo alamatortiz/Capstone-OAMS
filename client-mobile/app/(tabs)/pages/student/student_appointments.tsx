@@ -247,9 +247,19 @@ export default function StudentAppointmentsScreen() {
   const bookingsRef = useRef(bookings);
   useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
 
+  // Guards against out-of-order responses: mount, multiple independent
+  // socket events, and (for slots) the book/cancel action handlers can all
+  // trigger these fetches close together, so a slower-but-earlier response
+  // landing after a newer one could otherwise overwrite fresh state with
+  // stale data.
+  const slotsRequestIdRef = useRef(0);
+  const bookingsRequestIdRef = useRef(0);
+
   const fetchSlots = useCallback(async () => {
+    const requestId = ++slotsRequestIdRef.current;
     try {
       const { data } = await api.get('/student/appointments/available-slots');
+      if (requestId !== slotsRequestIdRef.current) return;
       setSlots(
         (data.slots ?? []).map((s: any) => ({
           availabilityId: String(s.availabilityId),
@@ -268,6 +278,7 @@ export default function StudentAppointmentsScreen() {
       );
       setSlotsError(null);
     } catch (err) {
+      if (requestId !== slotsRequestIdRef.current) return;
       console.error('Failed to fetch available slots:', err);
       // Only take over the whole tab with a blocking error on the true first
       // load -- a background poll/socket refresh failing shouldn't wipe out
@@ -278,13 +289,15 @@ export default function StudentAppointmentsScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh available slots.' });
       }
     } finally {
-      setSlotsLoading(false);
+      if (requestId === slotsRequestIdRef.current) setSlotsLoading(false);
     }
   }, []);
 
   const fetchMyBookings = useCallback(async () => {
+    const requestId = ++bookingsRequestIdRef.current;
     try {
       const { data } = await api.get('/student/appointments');
+      if (requestId !== bookingsRequestIdRef.current) return;
       setBookings(
         (data.appointments ?? []).map((b: any) => ({
           id: String(b.id),
@@ -302,6 +315,7 @@ export default function StudentAppointmentsScreen() {
       );
       setBookingsError(null);
     } catch (err) {
+      if (requestId !== bookingsRequestIdRef.current) return;
       console.error('Failed to fetch bookings:', err);
       if (bookingsRef.current.length === 0) {
         setBookingsError('Could not load your bookings. Please try again.');
@@ -309,7 +323,7 @@ export default function StudentAppointmentsScreen() {
         Toast.show({ type: 'error', text1: 'Could not refresh your bookings.' });
       }
     } finally {
-      setBookingsLoading(false);
+      if (requestId === bookingsRequestIdRef.current) setBookingsLoading(false);
     }
   }, []);
 

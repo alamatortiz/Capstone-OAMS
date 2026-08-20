@@ -1032,7 +1032,11 @@ export default function AdminDocumentProcessingScreen() {
                     </Pressable>
                   )}
                   {selectedDocument.status === 'ready' && (
-                    <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnPrimary]} onPress={() => handleUpdateStatus('released')}>
+                    <Pressable
+                      style={[styles.detailsActionBtn, styles.detailsActionBtnPrimary, updating && { opacity: 0.6 }]}
+                      onPress={() => handleUpdateStatus('released')}
+                      disabled={updating}
+                    >
                       <Text style={styles.detailsActionBtnTextPrimary}>Mark as Released</Text>
                     </Pressable>
                   )}

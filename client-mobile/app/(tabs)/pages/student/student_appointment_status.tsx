@@ -239,10 +239,18 @@ export default function StudentAppointmentStatusScreen() {
   const statusStyles = isDarkMode ? STATUS_STYLES_DARK : STATUS_STYLES_LIGHT;
   const styles = createStyles(theme);
 
+  // Guards against out-of-order responses: mount and the status-change
+  // socket event below can both trigger this fetch close together, so a
+  // slower-but-earlier response landing after a newer one could otherwise
+  // overwrite fresh state with stale data.
+  const requestIdRef = useRef(0);
+
   const fetchAppointments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const { data } = await api.get('/student/appointments');
+      if (requestId !== requestIdRef.current) return;
       setAppointments(
         (data.appointments ?? []).map((a: any) => ({
           id: String(a.id),
@@ -261,10 +269,11 @@ export default function StudentAppointmentStatusScreen() {
       );
       setError(null);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Failed to fetch appointments:', err);
       setError('Could not load your appointments. Please try again.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 

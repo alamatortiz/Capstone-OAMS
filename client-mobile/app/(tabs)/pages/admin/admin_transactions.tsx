@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -195,13 +195,17 @@ export default function AdminTransactionsScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
+  const requestIdRef = useRef(0);
+
   const fetchTransactions = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const { data } = await api.get('/admin/transactions', {
         params: { type: filterType, status: filterStatus, range: dateRange },
       });
+      if (requestId !== requestIdRef.current) return;
       setTransactions(
         (data.transactions ?? []).map((t: any) => ({
           id: t.id,
@@ -218,10 +222,11 @@ export default function AdminTransactionsScreen() {
       );
       if (data.stats) setStats(data.stats);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Failed to load transactions:', err);
       setError('Failed to load transactions.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [filterType, filterStatus, dateRange]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Toast from 'react-native-toast-message';
 import type { ComponentProps } from 'react';
 import {
@@ -206,7 +206,16 @@ export default function ProfessorTransactionsScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Guards against out-of-order responses: this fetch's params genuinely
+  // change between calls (search/type/status), and it's triggered from four
+  // independent sources (filter change, search debounce, and two socket
+  // events), so a slower-but-earlier request landing after a newer one could
+  // otherwise overwrite the list with results for a filter that's no longer
+  // selected (mirrors student_transactions.tsx's own requestIdRef).
+  const requestIdRef = useRef(0);
+
   const fetchTransactions = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const params: Record<string, string> = {};
@@ -214,6 +223,7 @@ export default function ProfessorTransactionsScreen() {
       if (filterType !== 'all') params.filterType = filterType;
       if (filterStatus !== 'all') params.filterStatus = filterStatus;
       const { data } = await api.get('/professor/transactions', { params });
+      if (requestId !== requestIdRef.current) return;
       setTransactions(
         (data ?? []).map((t: any) => ({
           id: String(t.id),
@@ -227,9 +237,10 @@ export default function ProfessorTransactionsScreen() {
         })),
       );
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Fetch transactions error:', err);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [debouncedSearch, filterType, filterStatus]);
 

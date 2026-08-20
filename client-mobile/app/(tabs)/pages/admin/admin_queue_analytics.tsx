@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -185,17 +185,22 @@ export default function AdminQueueAnalyticsScreen() {
   const [serviceTypes, setServiceTypes] = useState<string[]>(['All Services']);
   const [trends, setTrends] = useState<Trends>(DEFAULT_TRENDS);
 
+  const requestIdRef = useRef(0);
+
   const fetchAnalytics = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       const res = await api.get('/admin/queue-analytics', {
         params: { period: timePeriod, service: serviceType },
       });
+      if (requestId !== requestIdRef.current) return;
       setPerformance(res.data.performance ?? []);
       setPositiveInsights(res.data.positiveInsights ?? []);
       setImprovementAreas(res.data.improvementAreas ?? []);
       setServiceTypes(res.data.serviceTypes ?? ['All Services']);
       setTrends(res.data.trends ?? DEFAULT_TRENDS);
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Failed to fetch queue analytics:', error);
     }
   }, [timePeriod, serviceType]);
