@@ -1080,6 +1080,7 @@ router.get(
           a.appointment_date,
           a.appointment_time,
           a.status,
+          a.cancelled_by,
           a.notes,
           a.created_at,
           CONCAT(s.first_name, ' ', s.last_name) AS student_name,
@@ -1090,13 +1091,14 @@ router.get(
           f.email AS faculty_email,
           d.department_name,
           d.department_abbreviation,
-          d.office_location,
+          COALESCE(a.location_snapshot, fda.location) AS location,
           svc.service_name
         FROM appointments a
         JOIN students     s   ON a.student_id   = s.student_id
         JOIN faculty       f   ON a.faculty_id    = f.faculty_id
         JOIN departments   d   ON a.department_id = d.department_id
         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
+        LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
         WHERE a.department_id = ?
         ORDER BY a.created_at DESC`,
         [deptId],
@@ -1113,7 +1115,7 @@ router.get(
         return {
           id: String(r.appointment_id),
           college: `${r.department_name} (${r.department_abbreviation})`,
-          location: r.office_location ?? "TBA",
+          location: r.location ?? "TBA",
           studentName: r.student_name,
           studentId: r.student_number,
           studentCourse: r.student_course,
@@ -1124,6 +1126,7 @@ router.get(
           date: dateStr,
           time: formatTime(r.appointment_time),
           status: r.status,
+          cancelledBy: r.cancelled_by ?? null,
           requestedAt: new Date(r.created_at).toLocaleString("en-US", {
             timeZone: "Asia/Manila",
             year: "numeric",
@@ -2806,6 +2809,7 @@ router.post(
     // together -- otherwise a failure partway through leaves either a
     // permanent announcement with no attachments, or (on retry) a duplicate.
     const conn = await pool.getConnection();
+    let committed = false;
     try {
       await conn.beginTransaction();
 
@@ -2832,6 +2836,7 @@ router.post(
       await insertAttachments(result.insertId, req.files, conn);
 
       await conn.commit();
+      committed = true;
 
       const attachments = await getAttachments(result.insertId);
       emitToDept(deptId, "announcement:changed", { announcementId: result.insertId });
@@ -2872,8 +2877,10 @@ router.post(
         },
       });
     } catch (error) {
-      await conn.rollback();
-      deleteFiles(req.files);
+      if (!committed) {
+        await conn.rollback();
+        deleteFiles(req.files);
+      }
       sendServerError(res, error, "Announcement create error:");
     } finally {
       conn.release();
@@ -2900,6 +2907,7 @@ router.put(
     }
 
     const conn = await pool.getConnection();
+    let committed = false;
     try {
       await conn.beginTransaction();
 
@@ -2957,13 +2965,16 @@ router.put(
       }
 
       await conn.commit();
+      committed = true;
 
       emitToDept(deptId, "announcement:changed", { announcementId });
       const attachments = await getAttachments(announcementId);
       res.json({ message: "Announcement updated", date: new Date().toISOString(), isReposted: true, attachments });
     } catch (error) {
-      await conn.rollback();
-      deleteFiles(req.files);
+      if (!committed) {
+        await conn.rollback();
+        deleteFiles(req.files);
+      }
       sendServerError(res, error, "Announcement update error:");
     } finally {
       conn.release();

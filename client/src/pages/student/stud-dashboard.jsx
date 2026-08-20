@@ -411,7 +411,7 @@ export default function StudentDashboard() {
   // definitions each destination page uses for its own counts) ─────────────
   const quickActions = [
     {
-      title: "Announcements",
+      title: "Announcements and FAQs",
       description: "Stay updated with the latest notices from your department.",
       icon: MegaphoneIcon,
       link: "/student/announcements",

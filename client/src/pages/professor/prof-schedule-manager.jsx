@@ -37,6 +37,11 @@ const ClockIcon = () => (
     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
   </svg>
 );
+const CloseIcon = () => (
+  <svg style={{ width: "1.125rem", height: "1.125rem" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -292,7 +297,7 @@ export default function ProfessorScheduleManager() {
             icon={<CalendarIconNav />}
             iconClassName="sa-title-icon"
             title="Schedule Manager"
-            subtitle="Set your weekly recurring availability by day. It repeats every week until you edit or remove it."
+            subtitle="Set your weekly availability schedule for appointments."
           />
 
           <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
@@ -303,27 +308,33 @@ export default function ProfessorScheduleManager() {
           <div className="sa-main-layout">
             {/* Left: Weekly day list */}
             <div className="sa-calendar-card">
-              <h2 className="sa-section-heading">Weekly Overview</h2>
-              <p className="sa-section-desc">Select a day to view or manage its slots. Days with slots are highlighted.</p>
-              <div className="sa-day-list">
-                {loading ? (
-                  <p className="sa-section-desc">Loading…</p>
-                ) : (
-                  DAYS.map((day) => {
-                    const count = (slotsByDay[day] ?? []).length;
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        className={`sa-day-btn${count > 0 ? " sa-day-btn--has-slots" : ""}${selectedDay === day ? " sa-day-btn--active" : ""}`}
-                        onClick={() => handleDayClick(day)}
-                      >
-                        <span className="sa-day-btn-name">{day}</span>
-                        <span className="sa-day-btn-count">{count} slot{count !== 1 ? "s" : ""}</span>
-                      </button>
-                    );
-                  })
-                )}
+              <div className="sa-panel-header">
+                <div>
+                  <h2 className="sa-section-heading">Weekly Overview</h2>
+                  <p className="sa-section-desc">Select a day to view or manage its slots. Days with slots are highlighted.</p>
+                </div>
+              </div>
+              <div className="sa-panel-body">
+                <div className="sa-day-list">
+                  {loading ? (
+                    <p className="sa-section-desc">Loading…</p>
+                  ) : (
+                    DAYS.map((day) => {
+                      const count = (slotsByDay[day] ?? []).length;
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          className={`sa-day-btn${count > 0 ? " sa-day-btn--has-slots" : ""}${selectedDay === day ? " sa-day-btn--active" : ""}`}
+                          onClick={() => handleDayClick(day)}
+                        >
+                          <span className="sa-day-btn-name">{day}</span>
+                          <span className="sa-day-btn-count">{count} slot{count !== 1 ? "s" : ""}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
 
@@ -331,51 +342,65 @@ export default function ProfessorScheduleManager() {
             <div className="sa-detail-panel">
               {selectedDay ? (
                 <>
-                  <div className="sa-detail-header-row">
-                    <h2 className="sa-section-heading">{selectedDay}</h2>
+                  <div className="sa-panel-header">
+                    <div>
+                      <h2 className="sa-section-heading">{selectedDay}</h2>
+                    </div>
                   </div>
-
-                  {selectedSlots.length === 0 ? (
-                    <div className="sa-detail-empty">
-                      <p>No time slots set for {selectedDay}.</p>
-                      <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
-                        <PlusIcon /> Add your first slot
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="sa-slot-list">
-                      {selectedSlots.map((s) => (
-                        <div key={s.availability_id} className="sa-slot-card">
-                          <div className="sa-slot-row">
-                            <ClockIcon />
-                            <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
-                            {s.location && <span className="sa-slot-location">· {s.location}</span>}
-                            <span className="sa-slot-location">· {s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}</span>
-                            <div className="sa-slot-actions">
-                              <button className="sa-edit-btn" onClick={() => openEditSlot(s, selectedDay)} title="Edit slot">
-                                <PencilIcon />
-                              </button>
-                              <button className="sa-delete-btn" onClick={() => requestDeleteSlot(s, selectedDay)} title="Remove slot">
-                                <TrashIcon />
-                              </button>
+                  <div className="sa-panel-body">
+                    {selectedSlots.length === 0 ? (
+                      <div className="sa-detail-empty">
+                        <p>No time slots set for {selectedDay}.</p>
+                        <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
+                          <PlusIcon /> Add your first slot
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="sa-slot-list">
+                        {selectedSlots.map((s) => (
+                          <div key={s.availability_id} className="sa-slot-card">
+                            <div className="sa-slot-card-header">
+                              <h3 className={`sa-slot-card-title${s.location ? "" : " sa-slot-card-title--muted"}`}>
+                                {s.location || "Location not set"}
+                              </h3>
+                              <div className="sa-slot-actions">
+                                <button className="sa-edit-btn" onClick={() => openEditSlot(s, selectedDay)} title="Edit slot" aria-label="Edit slot">
+                                  <PencilIcon />
+                                </button>
+                                <button className="sa-delete-btn" onClick={() => requestDeleteSlot(s, selectedDay)} title="Remove slot" aria-label="Remove slot">
+                                  <TrashIcon />
+                                </button>
+                              </div>
                             </div>
+                            <div className="sa-slot-card-row">
+                              <ClockIcon />
+                              <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                            </div>
+                            <div className="sa-slot-card-row sa-slot-card-row--muted">
+                              <span className="sa-slot-count">{s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}</span>
+                            </div>
+                            {s.appointmentTypes?.length > 0 && (
+                              <div className="sa-slot-types-block">
+                                <span className="sa-slot-types-heading">Appointment Types</span>
+                                <ul className="sa-slot-types-list">
+                                  {s.appointmentTypes.map((t) => (
+                                    <li key={t.id}>{t.name}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
-                          {s.appointmentTypes?.length > 0 && (
-                            <div className="sa-slot-types">
-                              {s.appointmentTypes.map((t) => (
-                                <span key={t.id} className="sa-preview-chip">{t.name}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
-                <div className="sa-detail-placeholder">
-                  <CalendarIconNav />
-                  <p>Select a day in the weekly overview to view or add time slots.</p>
+                <div className="sa-panel-body">
+                  <div className="sa-detail-placeholder">
+                    <CalendarIconNav />
+                    <p>Select a day in the weekly overview to view or add time slots.</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -383,46 +408,54 @@ export default function ProfessorScheduleManager() {
 
           {/* Weekly Schedule Summary */}
           <div className="sa-weekly-section">
-            <div className="sa-section-header-row">
+            <div className="sa-panel-header">
               <div>
                 <h2 className="sa-section-heading">Weekly Schedule Summary</h2>
-                <p className="sa-section-desc">Your recurring availability across the week</p>
+                <p className="sa-section-desc">Your recurring availability across the week.</p>
               </div>
             </div>
-
-            {scheduledDays.length === 0 ? (
-              <div className="sa-empty-upcoming">
-                <p>No weekly availability set. Click a day above or use "Add Time Slot" to get started.</p>
-              </div>
-            ) : (
-              <div className="sa-upcoming-list">
-                {scheduledDays.map((day) => {
-                  const slots = slotsByDay[day] ?? [];
-                  return (
-                    <div
-                      key={day}
-                      className={`sa-upcoming-item ${selectedDay === day ? "sa-upcoming-item--selected" : ""}`}
-                      onClick={() => setSelectedDay(day)}
-                    >
-                      <div className="sa-upcoming-date-col">
-                        <span className="sa-upcoming-date-label">{day}</span>
-                        <span className="sa-upcoming-count">{slots.length} slot{slots.length !== 1 ? "s" : ""}</span>
+            <div className="sa-panel-body">
+              {scheduledDays.length === 0 ? (
+                <div className="sa-detail-placeholder">
+                  <CalendarIconNav />
+                  <p>No weekly availability set. Click a day above or use "Add Time Slot" to get started.</p>
+                </div>
+              ) : (
+                <div className="sa-upcoming-list">
+                  {scheduledDays.map((day) => {
+                    const slots = slotsByDay[day] ?? [];
+                    return (
+                      <div
+                        key={day}
+                        className={`sa-upcoming-item ${selectedDay === day ? "sa-upcoming-item--selected" : ""}`}
+                        onClick={() => setSelectedDay(day)}
+                      >
+                        <div className="sa-upcoming-date-col">
+                          <span className="sa-upcoming-date-label">{day}</span>
+                          <span className="sa-upcoming-count">{slots.length} slot{slots.length !== 1 ? "s" : ""}</span>
+                        </div>
+                        <div className="sa-upcoming-slots-col">
+                          {slots.map((s) => (
+                            <div key={s.availability_id} className="sa-mini-slot-card">
+                              <span className={`sa-mini-slot-title${s.location ? "" : " sa-mini-slot-title--muted"}`}>
+                                {s.location || "Location not set"}
+                              </span>
+                              <div className="sa-mini-slot-row">
+                                <ClockIcon />
+                                <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                              </div>
+                              <span className="sa-mini-slot-count">
+                                {s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="sa-upcoming-slots-col">
-                        {slots.map((s) => (
-                          <div key={s.availability_id} className="sa-upcoming-slot-chip">
-                            <ClockIcon />
-                            <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
-                            {s.location && <span className="sa-chip-location">· {s.location}</span>}
-                            {s.max_students != null && <span className="sa-chip-location">· Max {s.max_students}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
@@ -433,8 +466,18 @@ export default function ProfessorScheduleManager() {
         <div className="sa-modal-overlay">
           <div className="sa-modal">
             <div className="sa-modal-header">
-              <h3>{editingId ? "Edit Time Slot" : "Add Time Slot"}</h3>
-              <p>{editingId ? "Update this recurring weekly slot" : "Set your recurring weekly availability"}</p>
+              <div>
+                <h3>{editingId ? "Edit Time Slot" : "Add Time Slot"}</h3>
+                <p>{editingId ? "Update this recurring weekly slot" : "Set your recurring weekly availability"}</p>
+              </div>
+              <button
+                type="button"
+                className="sa-modal-close"
+                onClick={() => { setShowAddSlot(false); setEditingId(null); }}
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
             </div>
             <div className="sa-modal-body">
               <div className="sa-form-group">
@@ -521,7 +564,7 @@ export default function ProfessorScheduleManager() {
                 />
                 <p className="sa-field-hint">Students are assigned slots in order of booking (first come, first served).</p>
                 {editingId && editingCurrentMaxBooked > 0 && (
-                  <p className="sa-field-hint" style={{ color: "#f59e0b" }}>
+                  <p className="sa-field-hint sa-field-hint--warning">
                     {editingCurrentMaxBooked} student{editingCurrentMaxBooked === 1 ? "" : "s"} already booked on a future date — max can't go below this.
                   </p>
                 )}

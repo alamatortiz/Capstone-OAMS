@@ -103,7 +103,7 @@ const NOTIFICATION_TYPE_PATHS = {
 
 const navItems = [
   { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
-  { icon: MegaphoneNavIcon, label: "Announcements", path: "/student/announcements" },
+  { icon: MegaphoneNavIcon, label: "Announcements and FAQs", path: "/student/announcements", smallLabel: true },
   { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
   { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
   { icon: FileTextNavIcon, label: "Documents", path: "/student/documents" },
@@ -212,7 +212,9 @@ export default function StudentSidebar() {
                   title={item.label}
                 >
                   <item.icon className="nav-icon-medium" />
-                  <span className="nav-label">{item.label}</span>
+                  <span className={`nav-label ${item.smallLabel ? "nav-label-sm" : ""}`}>
+                    {item.label}
+                  </span>
                 </Link>
               ))}
             </div>

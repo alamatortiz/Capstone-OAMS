@@ -542,6 +542,35 @@ INSERT INTO announcements (title, content, type, is_pinned, audience, department
 
 
 -- ─────────────────────────────────────────────────────────────
+-- SECTION 7a · SAMPLE FAQS (for UI evaluation)
+-- department_id 1001 = CCS. created_by mirrors the announcements
+-- rows above (same seeded admin).
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO faqs (question, answer, department_id, created_by) VALUES
+('How do I request an official document like a Transcript of Records or Certificate of Enrollment?',
+ 'Go to the Documents page, click "Request Document", choose the document type, fill in the required details, and submit. You can track its status from the same page once it has been processed.',
+ 1001, 'Admin Superuser'),
+('How long does a document request take to process?',
+ 'Most requests are processed within 3-5 working days, though this can vary by document type and the office''s current workload. You will get a notification once your document is ready for claiming.',
+ 1001, 'Admin Superuser'),
+('How do I join a queue at the CCS office?',
+ 'Go to the Queue page, select the service you need, and tap "Join Queue". You will see your live position and can track it from the Queue Status page until you are called.',
+ 1001, 'Admin Superuser'),
+('Can I cancel a queue ticket or appointment after booking it?',
+ 'Yes. Open the ticket or appointment from the Queue Status or Appointments page and use the cancel option there. Please cancel as early as possible so the slot can be freed up for other students.',
+ 1001, 'Admin Superuser'),
+('Where can I check a professor''s consultation hours?',
+ 'Go to the Professor Schedules page under Appointments to view posted consultation hours for CCS faculty before booking a slot.',
+ 1001, 'Admin Superuser'),
+('I didn''t get a notification about my request. What should I do?',
+ 'Check the Notifications and Transactions pages first, since status updates always post there even if a push notification is missed. If the status still looks wrong after that, visit the CCS office directly.',
+ 1001, 'Admin Superuser'),
+('Who do I contact if my question isn''t answered here?',
+ 'Visit the CCS department office during office hours, or send your question through an appointment request so a staff member can follow up with you directly.',
+ 1001, 'Admin Superuser');
+
+
+-- ─────────────────────────────────────────────────────────────
 -- SECTION 8 · SAMPLE TRANSACTIONS (for UI evaluation)
 -- 3 per type (queue/appointment/document), one per UI status
 -- (ongoing/completed/cancelled). All under student_id 104 (Luiz Gabriel

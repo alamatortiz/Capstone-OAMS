@@ -901,7 +901,7 @@ export default function StudentDocumentsScreen() {
                 <Text style={styles.formLabel}>Title</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="What are you sending?"
+                  placeholder="Indicate the reason behind your file submission"
                   placeholderTextColor={theme.tertiary}
                   value={sendFormData.title}
                   onChangeText={(v) => setSendFormData((f) => ({ ...f, title: v }))}

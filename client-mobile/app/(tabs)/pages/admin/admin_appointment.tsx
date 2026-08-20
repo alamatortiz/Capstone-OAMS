@@ -100,6 +100,7 @@ interface Appointment {
   studentId: string;
   studentCourse: string;
   professor: string;
+  facultyEmail: string | null;
   serviceName: string | null;
   purpose: string;
   date: string;
@@ -107,7 +108,14 @@ interface Appointment {
   status: AppointmentStatus;
   requestedAt: string;
   isToday: boolean;
+  cancelledBy: 'student' | 'faculty' | 'system' | null;
 }
+
+const CANCELLED_BY_LABELS: Record<string, string> = {
+  student: 'Student',
+  faculty: 'Faculty',
+  system: 'System (schedule change)',
+};
 
 type LucideIconType = typeof Clock;
 
@@ -125,7 +133,7 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: History },
 ];
 
-const TABS = ['all', 'pending', 'approved', 'completed', 'rejected'] as const;
+const TABS = ['all', 'pending', 'approved', 'completed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
 
 const STAT_TINTS = {
@@ -264,6 +272,7 @@ export default function AdminAppointmentScreen() {
     approved: searchFiltered.filter((a) => a.status === 'approved').length,
     completed: searchFiltered.filter((a) => a.status === 'completed').length,
     rejected: searchFiltered.filter((a) => a.status === 'rejected').length,
+    cancelled: searchFiltered.filter((a) => a.status === 'cancelled').length,
   };
 
   const visibleAppointments =
@@ -559,6 +568,12 @@ function AppointmentDetailsModal({
                 <Text style={styles.detailsLabel}>Faculty</Text>
                 <Text style={styles.detailsValue}>{appointment.professor}</Text>
               </View>
+              {appointment.facultyEmail && (
+                <View style={styles.detailsField}>
+                  <Text style={styles.detailsLabel}>Faculty Email</Text>
+                  <Text style={styles.detailsValue}>{appointment.facultyEmail}</Text>
+                </View>
+              )}
               <View style={styles.detailsField}>
                 <Text style={styles.detailsLabel}>College</Text>
                 <Text style={styles.detailsValue}>{appointment.college}</Text>
@@ -589,6 +604,14 @@ function AppointmentDetailsModal({
                 <Text style={styles.detailsLabel}>Requested At</Text>
                 <Text style={styles.detailsValue}>{appointment.requestedAt}</Text>
               </View>
+              {appointment.status === 'cancelled' && appointment.cancelledBy && (
+                <View style={[styles.detailsField, styles.detailsFieldFull]}>
+                  <Text style={styles.detailsLabel}>Cancelled By</Text>
+                  <Text style={styles.detailsValue}>
+                    {CANCELLED_BY_LABELS[appointment.cancelledBy] ?? appointment.cancelledBy}
+                  </Text>
+                </View>
+              )}
             </View>
           </ScrollView>
 

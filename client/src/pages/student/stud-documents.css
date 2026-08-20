@@ -569,6 +569,7 @@ body {
 .doc-attach-hint {
   font-size: 0.72rem;
   color: var(--text-tertiary);
+  text-align: left;
 }
 
 .doc-attach-list {

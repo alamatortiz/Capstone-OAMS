@@ -369,7 +369,15 @@ router.get(
             : formatTime(r.appointment_time),
         location: r.location ?? "TBA",
         status: r.status,
-        requestedAt: r.created_at,
+        requestedAt: new Date(r.created_at).toLocaleString("en-US", {
+          timeZone: "Asia/Manila",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }),
       })));
     } catch (err) {
       sendServerError(res, err, "GET /appointments error:");

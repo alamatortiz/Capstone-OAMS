@@ -511,7 +511,7 @@ export default function DocumentsPage() {
                     <input
                       id="send-title"
                       type="text"
-                      placeholder="What are you sending?"
+                      placeholder="Indicate the reason behind your file submission"
                       value={sendFormData.title}
                       onChange={(e) =>
                         setSendFormData({ ...sendFormData, title: e.target.value })
