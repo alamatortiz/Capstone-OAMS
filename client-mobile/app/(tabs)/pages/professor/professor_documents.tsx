@@ -391,7 +391,7 @@ export default function ProfessorDocumentsScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Document Requests</Text>
-              <Text style={styles.pageSubtitle}>Request official documents and track your submissions</Text>
+              <Text style={styles.pageSubtitle}>Request documents and track their status.</Text>
             </View>
           </View>
 
@@ -754,7 +754,7 @@ export default function ProfessorDocumentsScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Needed By (optional)</Text>
+                <Text style={styles.formLabel}>Date Needed (Optional)</Text>
                 <Pressable style={styles.selectTrigger} onPress={() => setShowNeededByPicker(true)}>
                   <Text style={formData.neededBy ? styles.selectTriggerText : styles.selectPlaceholder}>
                     {formData.neededBy || 'Select a date'}

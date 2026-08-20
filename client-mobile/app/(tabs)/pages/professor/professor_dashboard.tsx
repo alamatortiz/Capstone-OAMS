@@ -612,7 +612,12 @@ export default function ProfessorDashboardScreen() {
             {loading ? (
               <Text style={styles.emptyText}>Loading appointments...</Text>
             ) : todaysAppointments.length === 0 ? (
-              <Text style={styles.emptyText}>No appointments scheduled for today.</Text>
+              <View style={styles.emptyContent}>
+                <View style={styles.emptyIcon}>
+                  <Calendar size={18} color={theme.subtext} />
+                </View>
+                <Text style={styles.emptyText}>No appointments scheduled for today.</Text>
+              </View>
             ) : (
               <>
                 {todaysAppointments.slice(0, 3).map((apt, index, arr) => {
@@ -679,7 +684,12 @@ export default function ProfessorDashboardScreen() {
             {loading ? (
               <Text style={styles.emptyText}>Loading announcements...</Text>
             ) : pinnedAnnouncements.length === 0 ? (
-              <Text style={styles.emptyText}>No pinned announcements</Text>
+              <View style={styles.emptyContent}>
+                <View style={styles.emptyIcon}>
+                  <Megaphone size={18} color={theme.subtext} />
+                </View>
+                <Text style={styles.emptyText}>No pinned announcements</Text>
+              </View>
             ) : (
               <>
                 {pinnedPreview.map((ann, index) => (
@@ -1225,6 +1235,20 @@ function createStyles(theme: ThemePalette) {
       color: theme.subtext,
       textAlign: 'center',
       paddingVertical: 12,
+    },
+    emptyContent: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+    },
+    emptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.background,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 
     // Today's appointments

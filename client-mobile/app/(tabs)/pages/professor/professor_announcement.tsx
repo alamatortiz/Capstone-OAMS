@@ -376,7 +376,7 @@ export default function ProfessorAnnouncementScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Announcements</Text>
-              <Text style={styles.pageSubtitle}>Notices and updates for faculty in your department</Text>
+              <Text style={styles.pageSubtitle}>Stay updated with the latest notices from your department.</Text>
             </View>
           </View>
 

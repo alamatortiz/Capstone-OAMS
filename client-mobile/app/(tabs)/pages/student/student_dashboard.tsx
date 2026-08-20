@@ -676,7 +676,12 @@ export default function StudentDashboardScreen() {
               ) : announcementsError ? (
                 <Text style={styles.emptyText}>{announcementsError}</Text>
               ) : allPinnedAnnouncements.length === 0 ? (
-                <Text style={styles.emptyText}>No pinned announcements.</Text>
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}>
+                    <Megaphone size={22} color={theme.primary} />
+                  </View>
+                  <Text style={styles.emptyText}>No pinned announcements.</Text>
+                </View>
               ) : (
                 <>
                   {pinnedPreview.map((ann) => {
