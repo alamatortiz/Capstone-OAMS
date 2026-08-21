@@ -253,8 +253,15 @@ html, body {
   flex-wrap: wrap;
 }
 
+.sa-slot-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
 .sa-slot-card-title {
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -285,7 +292,7 @@ html, body {
 [data-theme="light"] .sa-slot-card-row svg { color: #9333ea; }
 
 .sa-slot-time {
-  font-size: 0.85rem;
+  font-size: 0.925rem;
   font-weight: 700;
   color: #a855f7;
   transition: color 0.3s ease;
@@ -293,8 +300,8 @@ html, body {
 
 [data-theme="light"] .sa-slot-time { color: #9333ea; }
 
-.sa-slot-card-row--muted .sa-slot-count {
-  font-size: 0.75rem;
+.sa-slot-count {
+  font-size: 0.8rem;
   color: var(--text-tertiary);
   transition: color 0.3s ease;
 }
@@ -435,7 +442,7 @@ html, body {
 }
 
 .sa-mini-slot-title {
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--text-primary);
   text-align: left;
@@ -465,7 +472,7 @@ html, body {
 [data-theme="light"] .sa-mini-slot-row svg { color: #9333ea; }
 
 .sa-mini-slot-row span {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: #a855f7;
   transition: color 0.3s ease;
@@ -475,7 +482,7 @@ html, body {
 
 .sa-mini-slot-count {
   align-self: flex-start;
-  font-size: 0.73rem;
+  font-size: 0.8rem;
   color: var(--text-tertiary);
   text-align: left;
   transition: color 0.3s ease;
@@ -529,14 +536,6 @@ html, body {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 0.25rem;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.sa-modal-header p {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0;
   text-align: left;
   transition: color 0.3s ease;
 }

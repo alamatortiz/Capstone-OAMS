@@ -19,10 +19,14 @@ import {
   XCircle,
   LayoutList,
   Loader2,
-  CalendarClock,
 } from "lucide-react";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
+const CalendarIconNav = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
 
 // ── Appointment-specific icons ─────────────────────────────────────────────────
 const CheckCircle2Icon = () => (
@@ -347,11 +351,11 @@ export default function ProfessorAppointmentsPage() {
             className="appt-sched-avail-card"
           >
             <div className="appt-sched-avail-card-icon">
-              <CalendarClock />
+              <CalendarIconNav />
             </div>
             <div className="appt-sched-avail-card-text">
               <span className="appt-sched-avail-card-title">Schedule Manager</span>
-              <span className="appt-sched-avail-card-subtitle">Set your weekly consultation hours so students can book with you.</span>
+              <span className="appt-sched-avail-card-subtitle">Set your weekly availability schedule for appointments.</span>
             </div>
             <ChevronRight className="appt-sched-avail-card-chevron" />
           </Link>

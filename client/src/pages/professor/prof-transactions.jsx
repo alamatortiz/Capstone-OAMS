@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { ChevronLeft, FileText } from "lucide-react";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -12,11 +13,6 @@ import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
-const ActivityIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-  </svg>
-);
 const CalendarSmIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -63,6 +59,20 @@ const ChevronDownIcon = ({ className = "" }) => (
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
+const AlertCircleIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+  </svg>
+);
 
 // ── Transactions data ─────────────────────────────────────────────────────────
 
@@ -76,7 +86,13 @@ export default function ProfessorTransactionsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
   const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
+
+  // Mirrors `transactions` for the catch block below, without making
+  // fetchTransactions depend on (and change identity with) the state itself.
+  const transactionsRef = useRef(transactions);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
 
   // ── Badge helpers ─────────────────────────────────────────────────────────
   const typeBadgeClass = (type) =>
@@ -122,8 +138,14 @@ export default function ProfessorTransactionsPage() {
         dateLabel: t.date ? formatManilaDate(t.date, { month: "short", day: "numeric", year: "numeric" }) : "",
         timeLabel: t.date ? formatManilaTime(t.date) : "",
       })));
-    } catch {
-      // silently fail — table might be empty
+      setTxError(null);
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+      if (transactionsRef.current.length === 0) {
+        setTxError("Could not load your transaction history.");
+      } else {
+        toast.error("Could not refresh your transaction history.");
+      }
     } finally {
       setLoading(false);
     }
@@ -318,8 +340,14 @@ export default function ProfessorTransactionsPage() {
           <div className="txn-list">
             {loading ? (
               <div className="txn-empty">
-                <ActivityIcon />
-                <p>Loading transactions...</p>
+                <SearchIcon />
+                <h3>Loading transactions…</h3>
+              </div>
+            ) : txError ? (
+              <div className="txn-empty">
+                <AlertCircleIcon />
+                <h3>Could not load transactions</h3>
+                <p>{txError}</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="txn-empty">
@@ -359,7 +387,9 @@ export default function ProfessorTransactionsPage() {
                         </div>
                       )
                     )}
-                    {txn.details && <p className="txn-item-details">{txn.details}</p>}
+                    {txn.type === "document" && txn.details && (
+                      <p className="txn-item-details">{txn.details}</p>
+                    )}
                   </div>
                   <div className="txn-item-meta">
                     <div className="txn-item-date">

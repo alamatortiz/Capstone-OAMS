@@ -11,6 +11,7 @@ import collegeCHASlogo from "../../assets/CHAS.png";
 import "./adm-transactions.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
+import { getManilaDateString } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -39,6 +40,14 @@ const ActivityIcon = () => (
     strokeWidth="2"
   >
     <path d="M22 12h-4l-3 9L9 3l-5 9H0"></path>
+  </svg>
+);
+const ClipboardListIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    <line x1="8" y1="11" x2="16" y2="11"></line>
+    <line x1="8" y1="15" x2="12" y2="15"></line>
   </svg>
 );
 const UserGroupIcon = () => (
@@ -105,9 +114,9 @@ const DownloadIcon = () => (
     <line x1="12" y1="15" x2="12" y2="3"></line>
   </svg>
 );
-const ChevronDownIcon = () => (
+const ChevronDownIcon = ({ className = "" }) => (
   <svg
-    className="icon"
+    className={className}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -149,20 +158,6 @@ const DATE_OPTIONS = [
 
 export default function AdminTransaction() {
   const { user: authUser, token } = useAuth();
-  const user = authUser
-    ? {
-        ...authUser,
-        college: authUser.departmentName ?? "N/A College",
-        employeeId: authUser.employeeId ?? "",
-        departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
-      }
-    : {
-        name: "Admin",
-        role: "admin",
-        college: "",
-        employeeId: "",
-        departmentAbbrev: "CCS",
-      };
 
   // ── Transaction Page State ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -320,6 +315,24 @@ export default function AdminTransaction() {
     );
   };
 
+  // ── Export (client-side CSV of whatever currently matches the active
+  // filters, mirroring the professor transactions page's export) ───────────
+  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const handleExport = () => {
+    const header = ["Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor", "Timestamp"];
+    const rows = filteredTransactions.map((t) => [
+      t.type, t.action, t.details, t.status, t.collegeAbbrev, t.studentName, t.studentId, t.processor, t.timestamp,
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `transactions-${getManilaDateString()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <AdminPageShell
       outerClassName="admin-transaction-with-sidebar"
@@ -328,10 +341,10 @@ export default function AdminTransaction() {
         <div className="admin-transaction-container">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
-            icon={<ActivityIcon />}
+            icon={<ClipboardListIcon />}
             iconClassName="admin-transaction-title-icon"
-            title="Transaction Logs"
-            subtitle={`View transaction logs for ${user.college} (${user.departmentAbbrev})`}
+            title="Transaction History"
+            subtitle="View all recent transactions within the office"
             headerClassName="admin-transaction-header"
             breadcrumbClassName="prof-breadcrumb"
             titleSectionClassName="admin-transaction-title-section"
@@ -347,117 +360,114 @@ export default function AdminTransaction() {
 
           {/* Department Statistics */}
           <div className="admin-transaction-stats-grid">
-            <div className="admin-transaction-stat-card admin-transaction-stat-total">
-              <div className="admin-transaction-stat-content">
-                <p className="admin-transaction-stat-label">
-                  Total Transactions
-                </p>
-                <p className="admin-transaction-stat-value">
-                  {loading ? "—" : stats.total}
-                </p>
+            <div className="admin-transaction-stat-card">
+              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-primary">
+                <ClipboardListIcon />
               </div>
-              <ActivityIcon />
-            </div>
-
-            <div className="admin-transaction-stat-card admin-transaction-stat-queue">
-              <div className="admin-transaction-stat-content">
-                <p className="admin-transaction-stat-label">Queue Services</p>
-                <p className="admin-transaction-stat-value">
-                  {loading ? "—" : stats.queue}
-                </p>
-              </div>
-              <UserGroupIcon />
-            </div>
-
-            <div className="admin-transaction-stat-card admin-transaction-stat-appointment">
-              <div className="admin-transaction-stat-content">
-                <p className="admin-transaction-stat-label">Appointments</p>
-                <p className="admin-transaction-stat-value">
-                  {loading ? "—" : stats.appointments}
-                </p>
-              </div>
-              <CalendarIcon />
-            </div>
-
-            <div className="admin-transaction-stat-card admin-transaction-stat-document">
-              <div className="admin-transaction-stat-content">
-                <p className="admin-transaction-stat-label">Documents</p>
-                <p className="admin-transaction-stat-value">
-                  {loading ? "—" : stats.documents}
-                </p>
-              </div>
-              <FileText />
-            </div>
-          </div>
-
-          {/* Transaction Log */}
-          <div className="admin-transaction-log-section">
-            <div className="admin-transaction-section-header">
-              <h2>Transaction Log</h2>
-              <p className="admin-transaction-section-subtitle">
-                Complete history of activity in your department
+              <p className="admin-transaction-stat-label">Total Transactions</p>
+              <p className="admin-transaction-stat-value admin-transaction-val-primary">
+                {loading ? "—" : stats.total}
               </p>
             </div>
 
-            {/* Filters */}
-            <div className="admin-transaction-filters-container">
-              <div className="admin-transaction-search-row">
-                <div className="admin-transaction-search-wrapper">
+            <div className="admin-transaction-stat-card">
+              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-blue">
+                <UserGroupIcon />
+              </div>
+              <p className="admin-transaction-stat-label">Queue Services</p>
+              <p className="admin-transaction-stat-value admin-transaction-val-blue">
+                {loading ? "—" : stats.queue}
+              </p>
+            </div>
+
+            <div className="admin-transaction-stat-card">
+              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-purple">
+                <CalendarIcon />
+              </div>
+              <p className="admin-transaction-stat-label">Appointments</p>
+              <p className="admin-transaction-stat-value admin-transaction-val-purple">
+                {loading ? "—" : stats.appointments}
+              </p>
+            </div>
+
+            <div className="admin-transaction-stat-card">
+              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-orange">
+                <FileText />
+              </div>
+              <p className="admin-transaction-stat-label">Documents</p>
+              <p className="admin-transaction-stat-value admin-transaction-val-orange">
+                {loading ? "—" : stats.documents}
+              </p>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="filters-card">
+            <div className="filters-header">
+              <div className="filters-header-text">
+                <h3 className="filters-title">Transaction Filter</h3>
+                <p className="filters-description">
+                  Search and filter department transactions.
+                </p>
+              </div>
+              <button
+                className="admin-transaction-export-btn"
+                onClick={handleExport}
+                disabled={filteredTransactions.length === 0}
+              >
+                <DownloadIcon />
+                Export Report
+              </button>
+            </div>
+            <div className="filters-grid">
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="tx-search">
+                  Search
+                </label>
+                <div className="filter-search-wrapper">
                   <SearchIcon />
                   <input
+                    id="tx-search"
                     type="text"
-                    className="admin-transaction-search-input"
+                    className="filter-search-input"
                     placeholder="Search by student, processor, or details..."
                     value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                   />
                 </div>
-
-                <div className="admin-transaction-filter-selects">
-                  <FilterSelect
-                    id="tx-filter-type"
-                    label=""
-                    labelClassName={undefined}
-                    ariaLabel="Filter by type"
-                    value={filterType}
-                    onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
-                    options={TYPE_OPTIONS}
-                    chevronIcon={<ChevronDownIcon />}
-                  />
-
-                  <FilterSelect
-                    id="tx-filter-status"
-                    label=""
-                    labelClassName={undefined}
-                    ariaLabel="Filter by status"
-                    value={filterStatus}
-                    onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-                    options={STATUS_OPTIONS}
-                    chevronIcon={<ChevronDownIcon />}
-                  />
-                </div>
               </div>
 
-              <div className="admin-transaction-actions-row">
-                <FilterSelect
-                  id="tx-filter-date-range"
-                  label=""
-                  labelClassName={undefined}
-                  ariaLabel="Filter by date range"
-                  value={dateRange}
-                  onChange={(e) => { setDateRange(e.target.value); setPage(1); }}
-                  options={DATE_OPTIONS}
-                  chevronIcon={<ChevronDownIcon />}
-                />
-                <button className="admin-transaction-export-btn">
-                  <DownloadIcon />
-                  Export Report
-                </button>
-              </div>
+              <FilterSelect
+                id="tx-filter-type"
+                label="Type"
+                value={filterType}
+                onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+                options={TYPE_OPTIONS}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+
+              <FilterSelect
+                id="tx-filter-status"
+                label="Status"
+                value={filterStatus}
+                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+                options={STATUS_OPTIONS}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+
+              <FilterSelect
+                id="tx-filter-date-range"
+                label="Date Range"
+                value={dateRange}
+                onChange={(e) => { setDateRange(e.target.value); setPage(1); }}
+                options={DATE_OPTIONS}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
             </div>
+          </div>
 
-            {/* Transactions List */}
-            <div className="admin-transaction-list">
+          {/* Transactions List */}
+          <div className="admin-transaction-list">
               {loading ? (
                 <div className="admin-transaction-empty-state">
                   <ActivityIcon />
@@ -527,7 +537,6 @@ export default function AdminTransaction() {
               )}
             </div>
             <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
-          </div>
         </div>
     </AdminPageShell>
   );

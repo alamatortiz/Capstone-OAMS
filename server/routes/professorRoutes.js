@@ -507,7 +507,7 @@ router.get(
             CONCAT(s.first_name,' ',s.last_name) AS studentName,
             s.student_number AS studentId,
             COALESCE(svc.service_name, a.notes, 'Consultation') AS description,
-            CONCAT('Student Appointment with ', s.student_number) AS title,
+            CONCAT('Student Appointment - ', COALESCE(svc.service_name, a.notes, 'Consultation')) AS title,
             COALESCE(svc.service_name, a.notes, 'Consultation') AS details,
             a.status, a.updated_at AS date, a.updated_at AS event_time
           FROM appointments a

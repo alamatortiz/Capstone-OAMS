@@ -277,7 +277,7 @@ export default function ProfessorDashboard() {
     },
     {
       label: "Schedule Manager",
-      description: "Set your weekly recurring availability by day. It repeats every week until you edit or remove it.",
+      description: "Set your weekly availability schedule for appointments.",
       icon: CalendarIcon,
       path: "/professor/schedule-manager",
       gradientIndex: 3,

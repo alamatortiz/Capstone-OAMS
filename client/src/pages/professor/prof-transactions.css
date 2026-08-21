@@ -122,9 +122,9 @@ html, body {
   color: var(--success, #10b981);
 }
 .txn-icon-box-orange {
-  background: linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(245,158,11,0.08) 100%);
-  border: 1px solid rgba(245,158,11,0.2);
-  color: var(--warning);
+  background: linear-gradient(135deg, rgba(249,115,22,0.2) 0%, rgba(249,115,22,0.08) 100%);
+  border: 1px solid rgba(249,115,22,0.2);
+  color: #f97316;
 }
 .txn-icon-box-primary {
   background: linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.08) 100%);
@@ -564,15 +564,17 @@ html, body {
 [data-theme="light"] .txn-badge-noshow      { background: rgba(220,38,38,0.08);  color: #991b1b;  border-color: rgba(220,38,38,0.2); }
 
 /* ── Item student line ───────────────────────────────────── */
-/* Column, not row: the appointment branch stacks the name above the ID
-   badge; the document branch renders a single child (the tracking pill), so
-   the direction change is a no-op there. No icon renders inside this
-   container in either branch anymore, so there's no icon-sizing rule to keep. */
+/* Row, not column: the appointment branch shows the name and ID badge
+   inline on one line; the document branch renders a single child (the
+   tracking pill), so the direction change is a no-op there. No icon renders
+   inside this container in either branch anymore, so there's no icon-sizing
+   rule to keep. */
 .txn-item-student {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   font-size: 0.875rem;
   color: var(--text-tertiary);
   transition: color 0.3s ease;

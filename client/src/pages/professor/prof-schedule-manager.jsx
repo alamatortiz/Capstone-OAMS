@@ -352,7 +352,7 @@ export default function ProfessorScheduleManager() {
                       <div className="sa-detail-empty">
                         <p>No time slots set for {selectedDay}.</p>
                         <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>
-                          <PlusIcon /> Add your first slot
+                          <PlusIcon /> Add Time Slot
                         </button>
                       </div>
                     ) : (
@@ -360,9 +360,16 @@ export default function ProfessorScheduleManager() {
                         {selectedSlots.map((s) => (
                           <div key={s.availability_id} className="sa-slot-card">
                             <div className="sa-slot-card-header">
-                              <h3 className={`sa-slot-card-title${s.location ? "" : " sa-slot-card-title--muted"}`}>
-                                {s.location || "Location not set"}
-                              </h3>
+                              <div className="sa-slot-card-info">
+                                <h3 className={`sa-slot-card-title${s.location ? "" : " sa-slot-card-title--muted"}`}>
+                                  {s.location || "Location not set"}
+                                </h3>
+                                <div className="sa-slot-card-row">
+                                  <ClockIcon />
+                                  <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
+                                </div>
+                                <span className="sa-slot-count">{s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}</span>
+                              </div>
                               <div className="sa-slot-actions">
                                 <button className="sa-edit-btn" onClick={() => openEditSlot(s, selectedDay)} title="Edit slot" aria-label="Edit slot">
                                   <PencilIcon />
@@ -371,13 +378,6 @@ export default function ProfessorScheduleManager() {
                                   <TrashIcon />
                                 </button>
                               </div>
-                            </div>
-                            <div className="sa-slot-card-row">
-                              <ClockIcon />
-                              <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
-                            </div>
-                            <div className="sa-slot-card-row sa-slot-card-row--muted">
-                              <span className="sa-slot-count">{s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}</span>
                             </div>
                             {s.appointmentTypes?.length > 0 && (
                               <div className="sa-slot-types-block">
@@ -468,7 +468,6 @@ export default function ProfessorScheduleManager() {
             <div className="sa-modal-header">
               <div>
                 <h3>{editingId ? "Edit Time Slot" : "Add Time Slot"}</h3>
-                <p>{editingId ? "Update this recurring weekly slot" : "Set your recurring weekly availability"}</p>
               </div>
               <button
                 type="button"
