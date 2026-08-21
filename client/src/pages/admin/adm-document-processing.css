@@ -826,5 +826,4 @@ html, body {
 @media (max-width: 480px) {
   .adp-modal-actions { flex-direction: column; }
   .adp-modal-btn { flex: unset; width: 100%; }
-  .adp-chat-container { width: calc(100vw - 3rem); }
 }

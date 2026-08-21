@@ -129,7 +129,6 @@ module.exports = {
   insertFiles,
   validateBudget,
   deleteFiles,
-  isPathInsideUploadDir,
   serveStudentDocumentSubmissionFile,
   serveAdminDocumentSubmissionFile,
 };

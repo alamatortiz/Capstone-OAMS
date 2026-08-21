@@ -225,7 +225,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
                   </div>
                 ) : requirements.length > 0 ? (
                   <ul className="dss-requirements-list">
-                    {requirements.map((req, i) => (
+                    {requirements.map((req) => (
                       <li key={req.name} className="dss-requirement-item">
                         <CheckCircle2 className="dss-requirement-icon" />
                         <div>

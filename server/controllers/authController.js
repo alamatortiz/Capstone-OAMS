@@ -198,7 +198,7 @@ const getCurrentUser = async (req, res) => {
       return res.status(404).json({ error: "User profile not found" });
     res.json({ user: profile });
   } catch (error) {
-    return res.status(500).json({ message: "Internal server error" });
+    return sendServerError(res, error, "Get current user error:");
   }
 };
 
@@ -258,6 +258,12 @@ const registerStudent = async (req, res) => {
       .status(400)
       .json({ error: "Password must be at least 8 characters" });
   }
+  const yearLevelNum = Number(yearLevel);
+  if (!Number.isInteger(yearLevelNum) || yearLevelNum < 1 || yearLevelNum > 5) {
+    return res
+      .status(400)
+      .json({ error: "Year level must be a whole number from 1 to 5" });
+  }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -299,7 +305,7 @@ const registerStudent = async (req, res) => {
         studentNumber,
         firstName,
         lastName,
-        yearLevel,
+        yearLevelNum,
         email,
         department.department_id,
       ],

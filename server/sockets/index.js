@@ -88,10 +88,6 @@ function initSocketServer(server, options = {}) {
   return io;
 }
 
-function getIo() {
-  return io;
-}
-
 function emitToSlot(slotId, event, payload) {
   if (!io || !slotId) return;
   io.to(slotRoom(slotId)).emit(event, payload);
@@ -109,7 +105,6 @@ function emitToUser(userId, event, payload) {
 
 module.exports = {
   initSocketServer,
-  getIo,
   emitToSlot,
   emitToDept,
   emitToUser,

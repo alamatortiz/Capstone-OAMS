@@ -114,8 +114,7 @@
 }
 
 .fm-input,
-.fm-textarea,
-.fm-select {
+.fm-textarea {
   width: 100%;
   padding: 0.65rem 0.875rem;
   border-radius: 0.625rem;
@@ -130,8 +129,7 @@
 }
 
 .fm-input:focus,
-.fm-textarea:focus,
-.fm-select:focus {
+.fm-textarea:focus {
   border-color: var(--primary-color, #22c55e);
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
 }

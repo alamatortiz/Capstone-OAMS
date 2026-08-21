@@ -772,8 +772,8 @@ router.post(
     if (max_students == null || max_students === "") {
       return res.status(400).json({ message: "max_students is required" });
     }
-    const maxStu = parseInt(max_students, 10);
-    if (isNaN(maxStu) || maxStu < 1) {
+    const maxStu = Number(max_students);
+    if (!Number.isInteger(maxStu) || maxStu < 1) {
       return res.status(400).json({ message: "max_students must be a positive integer" });
     }
 
@@ -875,8 +875,8 @@ router.patch(
 
     let maxStu;
     if (max_students !== undefined) {
-      maxStu = parseInt(max_students, 10);
-      if (isNaN(maxStu) || maxStu < 1) {
+      maxStu = Number(max_students);
+      if (!Number.isInteger(maxStu) || maxStu < 1) {
         return res.status(400).json({ message: "max_students must be a positive integer" });
       }
     }

@@ -1952,6 +1952,10 @@ router.patch(
     const { status, notes } = req.body;
     const adminId = req.user.userId;
 
+    if (!submissionId) {
+      deleteSubmissionFiles(req.files);
+      return res.status(400).json({ error: "Invalid submission id" });
+    }
     if (!SUBMISSION_DB_STATUS_MAP[status]) {
       deleteSubmissionFiles(req.files);
       return res.status(400).json({ error: "Invalid status" });

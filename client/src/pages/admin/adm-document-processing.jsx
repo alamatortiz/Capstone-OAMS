@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
 import "./adm-document-processing.css";
@@ -152,14 +152,25 @@ export default function AdminDocumentProcessing() {
   const sourceEndpoint = SOURCES.find((s) => s.id === source).endpoint;
 
   // ── Effects ───────────────────────────────────────────────────────────────
+  // Guards against a stale response landing after a newer one -- switching
+  // the source tab quickly (Students -> Faculty -> Submissions) re-triggers
+  // this on every change, and without this guard an earlier tab's slower
+  // response could resolve after a later tab's and silently overwrite the
+  // list with the wrong source's documents while the UI still shows the
+  // newer tab selected.
+  const requestIdRef = useRef(0);
   const fetchDocuments = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       const res = await api.get(`/admin/${sourceEndpoint}`);
+      if (requestId !== requestIdRef.current) return;
       setDocuments(res.data.documents ?? []);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error("Failed to load document requests:", err);
       toast.error("Failed to load document requests");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [sourceEndpoint]);
 

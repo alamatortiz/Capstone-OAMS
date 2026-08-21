@@ -396,7 +396,7 @@ export default function DocumentsPage() {
                         <div className="doc-hint-requirements">
                           <strong>Requirements:</strong>
                           <ul className="doc-requirements-list">
-                            {selectedTypeDetails.requirements.map((req, i) => (
+                            {selectedTypeDetails.requirements.map((req) => (
                               <li key={req.name}>
                                 <div className="doc-req-row">
                                   <span className="doc-req-name">{req.name}</span>

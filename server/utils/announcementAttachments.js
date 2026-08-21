@@ -120,6 +120,5 @@ module.exports = {
   insertAttachments,
   validateBudget,
   deleteFiles,
-  isPathInsideUploadDir,
   serveAnnouncementAttachment,
 };
