@@ -12,6 +12,8 @@ import {
   Eye,
   EyeOff,
   ArrowLeft,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,8 +26,6 @@ import "./Login.css";
 
 import pncLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
-import darkModeIcon from "../assets/darkmode_icon.png";
-import sunIcon from "../assets/sun_icon.png";
 
 const YEAR_LEVELS = [1, 2, 3, 4, 5];
 
@@ -120,11 +120,11 @@ export default function RegisterStudent() {
         aria-label="Toggle theme"
         onClick={toggleTheme}
       >
-        <img
-          src={isDarkMode ? sunIcon : darkModeIcon}
-          alt={isDarkMode ? "Light Mode" : "Dark Mode"}
-          className="login-theme-icon"
-        />
+        {isDarkMode ? (
+          <Sun className="login-theme-icon" />
+        ) : (
+          <Moon className="login-theme-icon" />
+        )}
       </button>
 
       <div className="login-wrapper login-wrapper--register">

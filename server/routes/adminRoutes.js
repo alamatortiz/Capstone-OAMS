@@ -152,12 +152,13 @@ router.get(
               ds.title AS document_name,
               ds.status,
               ds.created_at,
-              CONCAT(st.first_name, ' ', st.last_name) AS requester_name,
+              COALESCE(CONCAT(st.first_name, ' ', st.last_name), CONCAT(f.first_name, ' ', f.last_name)) AS requester_name,
               d.department_abbreviation AS college,
-              'student' AS requester_type,
+              ds.submitter_type AS requester_type,
               'sub' AS id_prefix
             FROM document_submissions ds
-            JOIN students st ON ds.student_id = st.student_id
+            LEFT JOIN students st ON ds.student_id = st.student_id
+            LEFT JOIN faculty f ON ds.faculty_id = f.faculty_id
             JOIN departments d ON ds.department_id = d.department_id
             WHERE ds.status IN ('pending', 'processing')
               AND (? IS NULL OR ds.department_id = ?))
@@ -1362,8 +1363,8 @@ router.get(
                 ELSE 'Sent Document'
               END AS action,
               d.department_abbreviation AS college_abbrev,
-              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-              st.student_number AS student_id,
+              COALESCE(CONCAT(st.first_name, ' ', st.last_name), CONCAT(f.first_name, ' ', f.last_name)) AS student_name,
+              COALESCE(st.student_number, f.employee_id) AS student_id,
               COALESCE(
                 (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
                  FROM audit_logs al
@@ -1378,10 +1379,11 @@ router.get(
               NULL AS raw_service_name,
               ds.status AS raw_status,
               ds.updated_at AS event_time,
-              'student' AS requester_type
+              ds.submitter_type AS requester_type
             FROM document_submissions ds
             JOIN departments d ON ds.department_id = d.department_id
-            JOIN students st ON ds.student_id = st.student_id
+            LEFT JOIN students st ON ds.student_id = st.student_id
+            LEFT JOIN faculty f ON ds.faculty_id = f.faculty_id
             WHERE ds.department_id = ?
           )
         ) AS combined

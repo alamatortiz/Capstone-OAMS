@@ -475,11 +475,11 @@ export default function AdminTransaction() {
             </div>
 
             <div className="admin-transaction-stat-card">
-              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-indigo">
+              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-primary">
                 <SettingsIcon />
               </div>
               <p className="admin-transaction-stat-label">Admin Actions</p>
-              <p className="admin-transaction-stat-value admin-transaction-val-indigo">
+              <p className="admin-transaction-stat-value admin-transaction-val-primary">
                 {loading ? "—" : stats.adminActions}
               </p>
             </div>
@@ -503,7 +503,7 @@ export default function AdminTransaction() {
                 Export Report
               </button>
             </div>
-            <div className="filters-grid">
+            <div className="filters-search-row">
               <div className="filter-group">
                 <label className="filter-label" htmlFor="tx-search">
                   Search
@@ -520,7 +520,8 @@ export default function AdminTransaction() {
                   />
                 </div>
               </div>
-
+            </div>
+            <div className="filters-grid">
               <FilterSelect
                 id="tx-filter-date-range"
                 label="Date Range"
@@ -559,8 +560,9 @@ export default function AdminTransaction() {
                 </div>
               ) : filteredTransactions.length === 0 ? (
                 <div className="admin-transaction-empty-state">
-                  <ActivityIcon />
-                  <p>No transactions found</p>
+                  <ClipboardListIcon />
+                  <h3>No Transactions Found</h3>
+                  <p>There are no department transaction records yet.</p>
                 </div>
               ) : (
                 pagedTransactions.map((transaction) => {

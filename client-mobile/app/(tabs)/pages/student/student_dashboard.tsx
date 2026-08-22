@@ -151,8 +151,8 @@ const ACTIVITY_META = {
   queue: { icon: Users as LucideIconType, bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' },
   appointment: { icon: Calendar as LucideIconType, bg: 'rgba(168, 85, 247, 0.15)', color: '#a855f7' },
   document: { icon: FileText as LucideIconType, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
-  // Shares document's icon/color -- opposite direction, already
-  // disambiguated by the "Sent: ..." title text from the server.
+  // Shares document's icon/color -- opposite direction, disambiguated by
+  // the "Document Submission: ..." title text from the server.
   submission: { icon: FileText as LucideIconType, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
 } as const;
 

@@ -148,23 +148,23 @@ body.dark-mode .icon-btn:hover {
 .icon-btn-img {
   width: 22px;
   height: 22px;
-  object-fit: contain;
-  filter: brightness(0.7) sepia(1) hue-rotate(80deg) saturate(2);
-  transition: filter 0.2s;
+  stroke-width: 2;
+  color: #16a34a;
+  transition: color 0.2s;
 }
 
 /* When the navbar is in dark mode, the toggle shows the SUN icon.
    Tint it yellow (#fbbf24). */
 body.dark-mode .icon-btn-img {
-  filter: brightness(1) sepia(1) saturate(6) hue-rotate(0deg);
+  color: #fbbf24;
 }
 
 .icon-btn:hover .icon-btn-img {
-  filter: brightness(1) sepia(1) hue-rotate(80deg) saturate(3);
+  color: #15803d;
 }
 
 body.dark-mode .icon-btn:hover .icon-btn-img {
-  filter: brightness(1.1) sepia(1) saturate(6) hue-rotate(0deg);
+  color: #fcd34d;
 }
 
 .btn-signin {

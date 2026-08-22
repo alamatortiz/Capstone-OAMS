@@ -91,8 +91,8 @@ const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: strin
   queue: { label: 'queue', icon: Users, bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
   appointment: { label: 'appointment', icon: Calendar, bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.35)', color: '#a855f7' },
   document: { label: 'document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.35)', color: '#f97316' },
-  // Shares document's visual family -- opposite direction, already
-  // disambiguated by the "Sent: ..." title text from the server.
+  // Shares document's visual family -- opposite direction, disambiguated by
+  // the "Document Submission: ..." title text from the server.
   submission: { label: 'sent document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.35)', color: '#f97316' },
 };
 

@@ -552,6 +552,29 @@ router.get(
         rows = rows.concat(docs);
       }
 
+      // Faculty's own sent documents (submissions) -- same document_submissions
+      // table the admin "Send a Document" queue and student transactions
+      // already read from, never surfaced on the professor's own history
+      // page before. No studentName/studentId here (unlike the appointment
+      // branch above) -- this is the faculty member's own submission, there's
+      // no other party to name, same as the document-request branch above it.
+      if (filterType === "all" || filterType === "submission") {
+        let sql = `
+          SELECT
+            sub.submission_id AS id, 'submission' AS type,
+            CONCAT('Document Submission: ', sub.title) AS title,
+            sub.purpose AS details,
+            sub.status, sub.updated_at AS date, sub.updated_at AS event_time,
+            sub.tracking_number AS trackingNumber, sub.purpose
+          FROM document_submissions sub
+          WHERE sub.faculty_id = ? AND sub.submitter_type = 'faculty'`;
+        const params = [facultyId];
+        if (filterStatus !== "all") { sql += " AND sub.status = ?"; params.push(filterStatus); }
+        if (search) { sql += " AND sub.title LIKE ?"; params.push(`%${search}%`); }
+        const [subs] = await pool.query(sql, params);
+        rows = rows.concat(subs);
+      }
+
       rows.sort((a, b) => new Date(b.event_time) - new Date(a.event_time));
       res.json(rows);
     } catch (err) {
@@ -608,8 +631,10 @@ router.get(
            (SELECT a.status AS raw_status, a.updated_at AS event_time FROM appointments a WHERE a.faculty_id = ?)
            UNION ALL
            (SELECT fdr.status AS raw_status, fdr.updated_at AS event_time FROM faculty_document_requests fdr WHERE fdr.faculty_id = ?)
+           UNION ALL
+           (SELECT sub.status AS raw_status, sub.updated_at AS event_time FROM document_submissions sub WHERE sub.faculty_id = ? AND sub.submitter_type = 'faculty')
          ) AS combined`,
-        [TXN_STATUS_GROUPS.completed, TXN_STATUS_GROUPS.ongoing, monthStartUTC, facultyId, facultyId],
+        [TXN_STATUS_GROUPS.completed, TXN_STATUS_GROUPS.ongoing, monthStartUTC, facultyId, facultyId, facultyId],
       );
       res.json({
         total: statsRow.total || 0,

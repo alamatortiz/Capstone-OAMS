@@ -1,6 +1,7 @@
 import "./App.css";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Sun, Moon } from "lucide-react";
 import { applyTheme, getSavedTheme } from "./utils/theme";
 import { useAuth } from "./context/AuthContext";
 
@@ -15,8 +16,6 @@ import casLogo from "./assets/CAS.png";
 import chasLogo from "./assets/CHAS.png";
 
 // Icon imports — copy these files into src/assets/
-import darkModeIcon from "./assets/darkmode_icon.png";
-import sunIcon from "./assets/sun_icon.png";
 import personsIcon from "./assets/persons_icon.png";
 import nextIcon from "./assets/next_icon.png";
 import queueIcon from "./assets/queue_management.png";
@@ -108,11 +107,11 @@ function App({ loginAudience }) {
             aria-label="Toggle theme"
             onClick={toggleTheme}
           >
-            <img
-              src={isDarkMode ? sunIcon : darkModeIcon}
-              alt={isDarkMode ? "Light Mode" : "Dark Mode"}
-              className="icon-btn-img"
-            />
+            {isDarkMode ? (
+              <Sun className="icon-btn-img" />
+            ) : (
+              <Moon className="icon-btn-img" />
+            )}
           </button>
           <button
             className="btn-signin"

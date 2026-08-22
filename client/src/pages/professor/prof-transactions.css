@@ -486,10 +486,12 @@ html, body {
 }
 
 /* Document — orange */
-.txn-type-document::before {
+.txn-type-document::before,
+.txn-type-submission::before {
   background: linear-gradient(135deg, rgba(249,115,22,0.06) 0%, transparent 100%);
 }
-.txn-type-document:hover {
+.txn-type-document:hover,
+.txn-type-submission:hover {
   border-color: rgba(249,115,22,0.35);
   box-shadow: 0 8px 24px rgba(249,115,22,0.1);
 }
@@ -522,7 +524,8 @@ html, body {
   background: linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.08) 100%);
   color: var(--purple, #a855f7);
 }
-.txn-icon-document {
+.txn-icon-document,
+.txn-icon-submission {
   background: linear-gradient(135deg, rgba(249,115,22,0.2) 0%, rgba(249,115,22,0.08) 100%);
   color: #f97316;
 }

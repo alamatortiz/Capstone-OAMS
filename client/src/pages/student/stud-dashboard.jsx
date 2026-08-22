@@ -765,7 +765,7 @@ export default function StudentDashboard() {
                   {recentActivity.map((activity) => {
                     // A sent document shares document's icon/badge treatment
                     // -- same visual family, just the opposite direction
-                    // (already disambiguated by the "Sent: ..." title text).
+                    // (disambiguated by the "Document Submission: ..." title text).
                     const isDocLike = activity.type === "document" || activity.type === "submission";
                     return (
                       <div key={activity.id} className="activity-item">

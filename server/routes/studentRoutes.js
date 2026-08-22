@@ -2255,7 +2255,7 @@ router.get(
         SELECT
           'submission' AS type,
           ds.submission_id AS id,
-          CONCAT('Sent: ', ds.title) AS title,
+          CONCAT('Document Submission: ', ds.title) AS title,
           d.department_name AS college,
           ds.status AS raw_status,
           ds.purpose AS details,

@@ -7,9 +7,11 @@ import { toast } from "sonner";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import FilterSelect from "../../components/FilterSelect";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { connectSocket } from "../../utils/socket";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { COLLEGES } from "../../data/colleges";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -56,12 +58,58 @@ const EyeIcon = () => (
     <circle cx="12" cy="12" r="3"></circle>
   </svg>
 );
+const ChevronDownIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+    <line x1="16" y1="2" x2="16" y2="6"></line>
+    <line x1="8" y1="2" x2="8" y2="6"></line>
+    <line x1="3" y1="10" x2="21" y2="10"></line>
+  </svg>
+);
 
 const SOURCES = [
-  { id: "student", label: "Students", endpoint: "document-processing" },
-  { id: "faculty", label: "Faculty", endpoint: "faculty-document-processing" },
-  { id: "submission", label: "Submissions", endpoint: "document-submissions" },
+  { id: "student", label: "Students" },
+  { id: "faculty", label: "Faculty" },
 ];
+const REQUEST_ENDPOINTS = {
+  student: "document-processing",
+  faculty: "faculty-document-processing",
+};
+
+const TYPE_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "request", label: "Requests" },
+  { value: "submission", label: "Submissions" },
+];
+const DATE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "all", label: "All Time" },
+];
+
+const fullCollegeName = (abbrev) =>
+  COLLEGES.find((c) => c.abbreviation === abbrev)?.name ?? abbrev;
+
+// Per-status empty-state copy, mirroring the icon+header+description pattern
+// stud-documents.jsx/prof-documents.jsx use per-tab (no shared config object
+// exists there either -- each hardcodes its own copy; this is the same idea
+// applied to this page's 8 status tabs instead).
+const EMPTY_STATE_META = {
+  all:        { Icon: FileText,        title: "No Documents Found",     desc: "There are no document requests or submissions yet." },
+  pending:    { Icon: AlertCircleIcon, title: "No Pending Documents",   desc: "There are no pending document requests or submissions." },
+  processing: { Icon: ClockIcon,       title: "No Documents Processing", desc: "There are no documents currently being processed." },
+  ready:      { Icon: CheckCircleIcon, title: "No Documents Ready",     desc: "There are no documents ready for release." },
+  released:   { Icon: CheckCircleIcon, title: "No Released Documents",  desc: "There are no records of released documents." },
+  claimed:    { Icon: CheckCircleIcon, title: "No Claimed Documents",   desc: "There are no records of claimed documents." },
+  rejected:   { Icon: XCircleIcon,     title: "No Rejected Documents",  desc: "There are no records of rejected documents." },
+  cancelled:  { Icon: XCircleIcon,     title: "No Cancelled Documents", desc: "There are no records of cancelled documents." },
+};
 
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
 // advisory here for the running-total UI, the server stays authoritative.
@@ -81,9 +129,10 @@ export default function AdminDocumentProcessing() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  // Default to "all" since This Week/Next Week/This Month all hide requests
-  // with no deadline set — admins can narrow down once deadlines are in use.
-  const [weekFilter, setWeekFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  // Default to "all" since Today/This Week/This Month all hide anything
+  // older — admins can narrow down once they actually want a recent slice.
+  const [dateRange, setDateRange] = useState("all");
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   useLockBodyScroll(showDetailsModal);
@@ -149,22 +198,36 @@ export default function AdminDocumentProcessing() {
   const [confirmStatus, setConfirmStatus] = useState(null); // target status or null
   const [confirmSaving, setConfirmSaving] = useState(false);
 
-  const sourceEndpoint = SOURCES.find((s) => s.id === source).endpoint;
-
   // ── Effects ───────────────────────────────────────────────────────────────
   // Guards against a stale response landing after a newer one -- switching
-  // the source tab quickly (Students -> Faculty -> Submissions) re-triggers
-  // this on every change, and without this guard an earlier tab's slower
-  // response could resolve after a later tab's and silently overwrite the
-  // list with the wrong source's documents while the UI still shows the
-  // newer tab selected.
+  // the source tab quickly (Students -> Faculty) re-triggers this on every
+  // change, and without this guard an earlier tab's slower response could
+  // resolve after a later tab's and silently overwrite the list with the
+  // wrong audience's documents while the UI still shows the newer tab
+  // selected.
   const requestIdRef = useRef(0);
   const fetchDocuments = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     try {
-      const res = await api.get(`/admin/${sourceEndpoint}`);
+      const requestEndpoint = REQUEST_ENDPOINTS[source];
+      const [reqRes, subRes] = await Promise.all([
+        api.get(`/admin/${requestEndpoint}`),
+        api.get(`/admin/document-submissions`),
+      ]);
       if (requestId !== requestIdRef.current) return;
-      setDocuments(res.data.documents ?? []);
+      const requests = (reqRes.data.documents ?? []).map((d) => ({
+        ...d,
+        _kind: "request",
+        _endpoint: requestEndpoint,
+      }));
+      // Submissions come back for both student- and faculty-submitters in
+      // one list (see GET /admin/document-submissions) -- split by the
+      // audience currently selected so Students/Faculty each only see their
+      // own sent documents, same as the request half already does.
+      const submissions = (subRes.data.documents ?? [])
+        .filter((d) => d.submitterType === source)
+        .map((d) => ({ ...d, _kind: "submission", _endpoint: "document-submissions" }));
+      setDocuments([...requests, ...submissions]);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error("Failed to load document requests:", err);
@@ -172,7 +235,7 @@ export default function AdminDocumentProcessing() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [sourceEndpoint]);
+  }, [source]);
 
   useEffect(() => {
     fetchDocuments();
@@ -194,10 +257,11 @@ export default function AdminDocumentProcessing() {
     };
   }, [fetchDocuments]);
 
-  // ── Deadline buckets ──────────────────────────────────────────────────────
+  // ── Date buckets ──────────────────────────────────────────────────────────
   // Monday-anchored this-week/next-week windows (same pattern as
-  // stud-appointments.jsx) plus a full-current-month window, applied to the
-  // requester-set "Needed By" deadline rather than the request date.
+  // stud-appointments.jsx) plus a full-current-month window. `nextWeek` is
+  // only used by deadlineLabel()'s "Needed By" annotation below; the Date
+  // Range filter itself only needs today/thisWeek/thisMonth.
   const weekDates = useMemo(() => {
     const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const [y, m, d] = getManilaDateString().split("-").map(Number);
@@ -212,9 +276,11 @@ export default function AdminDocumentProcessing() {
     });
     const daysInMonth = new Date(y, m, 0).getDate();
     const thisMonth = Array.from({ length: daysInMonth }, (_, i) => toDateStr(new Date(y, m - 1, i + 1)));
-    return { thisWeekStart: toDateStr(monday), thisWeek: buildWeek(0), nextWeek: buildWeek(1), thisMonth };
+    return { today: toDateStr(today), thisWeek: buildWeek(0), nextWeek: buildWeek(1), thisMonth };
   }, []);
 
+  // Still used for the per-card "Needed By: ... (This Week)" annotation --
+  // unrelated to the Date Range filter below, which filters by requestDate.
   const deadlineLabel = (dateString) => {
     if (!dateString) return null;
     if (weekDates.thisWeek.includes(dateString)) return "This Week";
@@ -234,14 +300,18 @@ export default function AdminDocumentProcessing() {
     );
   });
 
-  const baseFiltered = searchFiltered.filter((doc) => {
-    if (weekFilter === "all") return true;
-    if (!doc.neededBy) return false;
-    if (weekFilter === "this-week") return weekDates.thisWeek.includes(doc.neededBy);
-    if (weekFilter === "next-week") return weekDates.nextWeek.includes(doc.neededBy);
-    if (weekFilter === "this-month") return weekDates.thisMonth.includes(doc.neededBy);
+  const dateFiltered = searchFiltered.filter((doc) => {
+    if (dateRange === "all") return true;
+    if (dateRange === "today") return doc.requestDate === weekDates.today;
+    if (dateRange === "week") return weekDates.thisWeek.includes(doc.requestDate);
+    if (dateRange === "month") return weekDates.thisMonth.includes(doc.requestDate);
     return true;
   });
+
+  const baseFiltered =
+    typeFilter === "all"
+      ? dateFiltered
+      : dateFiltered.filter((doc) => doc._kind === typeFilter);
 
   const filteredDocuments =
     activeTab === "all"
@@ -259,25 +329,26 @@ export default function AdminDocumentProcessing() {
 
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedDocument) return;
+    const isSubmission = selectedDocument._kind === "submission";
     const needsCode = newStatus === "ready" && selectedDocument.requiresCoding;
     // Re-sending the document's own current status is how "Attach Files"
     // works without also changing the status -- same endpoint doubles as
     // both actions, mirroring PUT /admin/announcements/:id.
-    const isFileOnlyUpdate = source === "submission" && newStatus === selectedDocument.status;
+    const isFileOnlyUpdate = isSubmission && newStatus === selectedDocument.status;
     // GET /admin/document-submissions prefixes ids ("sub-42") so this list
     // stays merge-safe alongside other sources elsewhere (e.g. the admin
     // dashboard widget) -- but the PATCH route itself expects the raw
     // numeric submission_id, so the prefix must be stripped here.
-    const rawId = source === "submission" ? selectedDocument.id.replace(/^sub-/, "") : selectedDocument.id;
+    const rawId = isSubmission ? selectedDocument.id.replace(/^sub-/, "") : selectedDocument.id;
     try {
-      if (source === "submission") {
+      if (isSubmission) {
         const body = new FormData();
         body.append("status", newStatus);
         body.append("notes", processingNotes);
         returnFiles.forEach((f) => body.append("returnFiles", f.file));
-        await api.patch(`/admin/${sourceEndpoint}/${rawId}/status`, body);
+        await api.patch(`/admin/${selectedDocument._endpoint}/${rawId}/status`, body);
       } else {
-        await api.patch(`/admin/${sourceEndpoint}/${rawId}/status`, {
+        await api.patch(`/admin/${selectedDocument._endpoint}/${rawId}/status`, {
           status: newStatus,
           notes: processingNotes,
           ...(needsCode ? { officialCode } : {}),
@@ -348,7 +419,7 @@ export default function AdminDocumentProcessing() {
       confirmText: "Reject Request",
       icon: <XCircleIcon />,
     },
-    claimed: source === "submission"
+    claimed: selectedDocument._kind === "submission"
       ? {
           title: "Mark as Received?",
           message: <>Confirm that <strong>{selectedDocument.documentType}</strong> from <strong>{selectedDocument.requesterName}</strong> has been received and processed by the office?</>,
@@ -378,13 +449,12 @@ export default function AdminDocumentProcessing() {
     }
   };
 
-  // Submissions skip 'ready'/'released' -- nothing is physically generated
-  // or picked up in that direction, so claimed is reached directly from
-  // processing.
-  const TABS =
-    source === "submission"
-      ? ["all", "pending", "processing", "claimed", "rejected", "cancelled"]
-      : ["all", "pending", "processing", "ready", "released", "claimed", "rejected", "cancelled"];
+  // One fixed status list for the merged (requests + submissions) view.
+  // Submissions never populate 'ready'/'released' -- nothing is physically
+  // generated or picked up in that direction, claimed is reached directly
+  // from processing -- but that's just an empty tab for them, not a reason
+  // to hide the tab from the merged list.
+  const TABS = ["all", "pending", "processing", "ready", "released", "claimed", "rejected", "cancelled"];
 
   return (
     <AdminPageShell
@@ -432,7 +502,7 @@ export default function AdminDocumentProcessing() {
                       <p className="adp-modal-value">{selectedDocument.college}</p>
                     </div>
                     <div className="adp-modal-field">
-                      <label className="adp-modal-label">{source === "submission" ? "Title" : "Document Type"}</label>
+                      <label className="adp-modal-label">{selectedDocument._kind === "submission" ? "Title" : "Document Type"}</label>
                       <p className="adp-modal-value">{selectedDocument.documentType}</p>
                     </div>
                     {selectedDocument.copies != null && (
@@ -475,7 +545,7 @@ export default function AdminDocumentProcessing() {
                     )}
                   </div>
 
-                  {source === "submission" && (
+                  {selectedDocument._kind === "submission" && (
                     <div className="adp-modal-notes-wrap">
                       <label className="adp-modal-label">Files from Student</label>
                       {selectedDocument.studentFiles?.length > 0 ? (
@@ -585,12 +655,12 @@ export default function AdminDocumentProcessing() {
                         Start Processing
                       </button>
                     )}
-                    {selectedDocument.status === "processing" && source === "submission" && (
+                    {selectedDocument.status === "processing" && selectedDocument._kind === "submission" && (
                       <button className="adp-modal-btn adp-modal-btn--success" onClick={() => setConfirmStatus("claimed")}>
                         Mark as Received
                       </button>
                     )}
-                    {selectedDocument.status === "processing" && source !== "submission" && (
+                    {selectedDocument.status === "processing" && selectedDocument._kind !== "submission" && (
                       <button className="adp-modal-btn adp-modal-btn--success" onClick={handleMarkReadyClick}>
                         Mark as Ready
                       </button>
@@ -610,7 +680,7 @@ export default function AdminDocumentProcessing() {
                         Reject Request
                       </button>
                     )}
-                    {source === "submission" &&
+                    {selectedDocument._kind === "submission" &&
                       (selectedDocument.status === "pending" || selectedDocument.status === "processing") && (
                         <button
                           className="adp-modal-btn adp-modal-btn--outline"
@@ -675,29 +745,48 @@ export default function AdminDocumentProcessing() {
             ))}
           </div>
 
-          {/* Search + Week Filter */}
-          <div className="adp-filter-bar">
-            <div className="adp-search-wrap">
-              <span className="adp-search-icon"><SearchIcon /></span>
-              <input
-                type="text"
-                className="adp-search-input"
-                placeholder="Search by tracking number, name, or ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+          {/* Filters */}
+          <div className="filters-card">
+            <div className="filters-header">
+              <div className="filters-header-text">
+                <h3 className="filters-title">Document Processes Filter</h3>
+                <p className="filters-description">Search and filter document requests and submissions.</p>
+              </div>
+            </div>
+            <div className="filters-grid">
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="adp-search">Search</label>
+                <div className="filter-search-wrapper">
+                  <SearchIcon />
+                  <input
+                    id="adp-search"
+                    type="text"
+                    className="filter-search-input"
+                    placeholder="Search for document requests or submissions…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <FilterSelect
+                id="adp-type-filter"
+                label="Type"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                options={TYPE_OPTIONS}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+
+              <FilterSelect
+                id="adp-date-range-filter"
+                label="Date Range"
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                options={DATE_OPTIONS}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
             </div>
-            <select
-              className="adp-search-input adp-week-select"
-              value={weekFilter}
-              onChange={(e) => setWeekFilter(e.target.value)}
-              aria-label="Filter by needed-by deadline"
-            >
-              <option value="this-week">This Week</option>
-              <option value="next-week">Next Week</option>
-              <option value="this-month">This Month</option>
-              <option value="all">All</option>
-            </select>
           </div>
 
           {/* Category Tabs */}
@@ -727,16 +816,26 @@ export default function AdminDocumentProcessing() {
                 <p className="adp-empty-desc">Loading document requests...</p>
               </div>
             ) : filteredDocuments.length === 0 ? (
-              <div className="adp-empty-state">
-                <div className="adp-empty-icon"><FileText /></div>
-                <h3 className="adp-empty-title">No documents found</h3>
-                <p className="adp-empty-desc">Try adjusting your search or filters</p>
-              </div>
+              (() => {
+                const meta = EMPTY_STATE_META[activeTab] ?? EMPTY_STATE_META.all;
+                const EmptyIcon = meta.Icon;
+                return (
+                  <div className="adp-empty-state">
+                    <div className="adp-empty-icon"><EmptyIcon /></div>
+                    <h3 className="adp-empty-title">{meta.title}</h3>
+                    <p className="adp-empty-desc">{meta.desc}</p>
+                  </div>
+                );
+              })()
             ) : (
               filteredDocuments.map((doc) => {
                 const { label, cls, Icon } = getStatusMeta(doc.status);
                 const doneStatuses = ["claimed", "rejected", "cancelled"];
                 const isOverdue = doc.neededBy && !doneStatuses.includes(doc.status) && doc.neededBy < getManilaDateString();
+                const cardTitle =
+                  doc._kind === "submission"
+                    ? `Document Submission: ${doc.documentType}`
+                    : `${doc.documentType} Request`;
                 return (
                   <div key={doc.id} className="adp-doc-card">
                     <div className="adp-doc-card-inner">
@@ -744,41 +843,43 @@ export default function AdminDocumentProcessing() {
                         <FileText />
                       </div>
                       <div className="adp-doc-info">
-                        <div className="adp-doc-header-row">
-                          <div>
-                            <div className="adp-doc-name-row">
-                              <h3 className="adp-doc-student-name">{doc.requesterName}</h3>
-                              <span className="adp-college-badge adp-college-badge--outline">{doc.college}</span>
-                            </div>
-                            <p className="adp-doc-type">{doc.documentType}</p>
-                            <p className="adp-doc-meta">{doc.requesterIdLabel}: {doc.requesterIdValue} • Purpose: {doc.purpose}</p>
-                          </div>
+                        <h3 className="adp-doc-title">{cardTitle}</h3>
+                        <p className="adp-doc-college">{fullCollegeName(doc.college)}</p>
+                        <div className="adp-doc-requester-row">
+                          <span className="adp-doc-requester-name">{doc.requesterName}</span>
+                          <span className="adp-id-badge">{doc.requesterIdValue}</span>
                         </div>
-                        <div className="adp-doc-tags-row">
+                        <p className="adp-doc-purpose">Purpose: {doc.purpose}</p>
+                        {(doc.neededBy || doc.processedBy) && (
+                          <div className="adp-doc-tags-row">
+                            {doc.neededBy && (
+                              <span className={`adp-status-badge ${isOverdue ? "adp-badge-rejected" : "adp-badge-pending"}`}>
+                                {isOverdue ? "Overdue — " : "Needed By: "}{formatManilaDate(doc.neededBy)}
+                                {deadlineLabel(doc.neededBy) && ` (${deadlineLabel(doc.neededBy)})`}
+                              </span>
+                            )}
+                            {doc.processedBy && (
+                              <span className="adp-doc-date">By: {doc.processedBy}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="adp-doc-action">
+                        <button className="adp-view-btn" onClick={() => handleViewDetails(doc)}>
+                          <EyeIcon />
+                          <span>View</span>
+                        </button>
+                        <div className="adp-doc-action-badges">
                           <span className="adp-tracking-badge">{doc.trackingNumber}</span>
                           <span className={`adp-status-badge ${cls}`}>
                             <Icon />
                             {label}
                           </span>
-                          <span className="adp-doc-date">
-                            Requested: {formatManilaDate(doc.requestDate)}
-                          </span>
-                          {doc.neededBy && (
-                            <span className={`adp-status-badge ${isOverdue ? "adp-badge-rejected" : "adp-badge-pending"}`}>
-                              {isOverdue ? "Overdue — " : "Needed By: "}{formatManilaDate(doc.neededBy)}
-                              {deadlineLabel(doc.neededBy) && ` (${deadlineLabel(doc.neededBy)})`}
-                            </span>
-                          )}
-                          {doc.processedBy && (
-                            <span className="adp-doc-date">By: {doc.processedBy}</span>
-                          )}
                         </div>
-                      </div>
-                      <div className="adp-doc-action">
-                        <button className="adp-view-btn" onClick={() => handleViewDetails(doc)}>
-                          <EyeIcon />
-                          <span>View &amp; Process</span>
-                        </button>
+                        <span className="adp-doc-date">
+                          <CalendarIcon />
+                          Requested: {formatManilaDate(doc.requestDate)}
+                        </span>
                       </div>
                     </div>
                   </div>

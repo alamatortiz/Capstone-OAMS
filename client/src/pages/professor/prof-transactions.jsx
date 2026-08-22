@@ -99,10 +99,11 @@ export default function ProfessorTransactionsPage() {
     ({
       appointment: "txn-badge txn-badge-appointment",
       document: "txn-badge txn-badge-document",
+      submission: "txn-badge txn-badge-document",
     }[type] ?? "txn-badge");
 
   const typeLabel = (type) =>
-    ({ appointment: "Appointment", document: "Document" }[type] ?? type);
+    ({ appointment: "Appointment", document: "Document", submission: "Document Submission" }[type] ?? type);
 
   const statusBadgeClass = (status) =>
     ({
@@ -214,7 +215,7 @@ export default function ProfessorTransactionsPage() {
       t.title,
       t.details,
       statusLabel(t.status),
-      t.type === "document" ? t.trackingNumber : `${t.studentName ?? ""} (${t.studentId ?? ""})`,
+      t.type === "document" || t.type === "submission" ? t.trackingNumber : `${t.studentName ?? ""} (${t.studentId ?? ""})`,
       t.dateLabel,
       t.timeLabel,
     ]);
@@ -315,6 +316,7 @@ export default function ProfessorTransactionsPage() {
                   { value: "all", label: "All Types" },
                   { value: "appointment", label: "Appointment" },
                   { value: "document", label: "Document" },
+                  { value: "submission", label: "Document Submission" },
                 ]}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
@@ -376,7 +378,7 @@ export default function ProfessorTransactionsPage() {
                         <span className={statusBadgeClass(txn.status)}>{statusLabel(txn.status)}</span>
                       </div>
                     </div>
-                    {txn.type === "document" ? (
+                    {txn.type === "document" || txn.type === "submission" ? (
                       txn.trackingNumber && (
                         <div className="txn-item-student">
                           <span className="txn-tracking-pill">{txn.trackingNumber}</span>
@@ -392,7 +394,7 @@ export default function ProfessorTransactionsPage() {
                         </div>
                       )
                     )}
-                    {txn.type === "document" && txn.details && (
+                    {(txn.type === "document" || txn.type === "submission") && txn.details && (
                       <p className="txn-item-details">{txn.details}</p>
                     )}
                   </div>

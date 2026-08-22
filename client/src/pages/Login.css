@@ -57,21 +57,21 @@ body.dark-mode .login-theme-btn:hover {
 .login-theme-icon {
   width: 20px;
   height: 20px;
-  object-fit: contain;
-  filter: brightness(0.75) sepia(1) hue-rotate(80deg) saturate(2);
-  transition: filter 0.2s;
+  stroke-width: 2;
+  color: #16a34a;
+  transition: color 0.2s;
 }
 
 body.dark-mode .login-theme-icon {
-  filter: brightness(1) sepia(1) saturate(7) hue-rotate(0deg);
+  color: #4ade80;
 }
 
 .login-theme-btn:hover .login-theme-icon {
-  filter: brightness(1) sepia(1) hue-rotate(80deg) saturate(3);
+  color: #15803d;
 }
 
 body.dark-mode .login-theme-btn:hover .login-theme-icon {
-  filter: brightness(1.1) sepia(1) saturate(7) hue-rotate(0deg);
+  color: #86efac;
 }
 
 /* ── Two-column wrapper ── */

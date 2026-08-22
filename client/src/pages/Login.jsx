@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Mail, Lock, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Sparkles, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 
 import { applyTheme, getSavedTheme } from "../utils/theme";
@@ -11,8 +11,6 @@ import "./Login.css";
 
 import pncLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
-import darkModeIcon from "../assets/darkmode_icon.png";
-import sunIcon from "../assets/sun_icon.png";
 
 // `registerAudience` scopes the "Don't have an account yet?" hint to a
 // single role: pages reached at /login/student or /login/faculty pass
@@ -111,11 +109,11 @@ export default function Login({ registerAudience }) {
         aria-label="Toggle theme"
         onClick={toggleTheme}
       >
-        <img
-          src={isDarkMode ? sunIcon : darkModeIcon}
-          alt={isDarkMode ? "Light Mode" : "Dark Mode"}
-          className="login-theme-icon"
-        />
+        {isDarkMode ? (
+          <Sun className="login-theme-icon" />
+        ) : (
+          <Moon className="login-theme-icon" />
+        )}
       </button>
 
       <div className="login-wrapper">

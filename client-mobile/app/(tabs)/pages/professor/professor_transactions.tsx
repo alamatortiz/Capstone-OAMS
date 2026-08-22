@@ -83,7 +83,7 @@ function OamsLogo({
 // queries appointments + faculty_document_requests, it never returns a
 // queue-type row for this role. On mobile the two <select> dropdowns become
 // modal pickers, same pattern as the other professor screens. ───
-type TxnType = 'appointment' | 'document';
+type TxnType = 'appointment' | 'document' | 'submission';
 type TxnStatus =
   | 'pending'
   | 'approved'
@@ -124,6 +124,9 @@ const navItems: NavItem[] = [
 const TYPE_META: Record<TxnType, { label: string; icon: IoniconName; bg: string; border: string; color: string }> = {
   appointment: { label: 'Appointment', icon: 'calendar-outline', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
   document: { label: 'Document', icon: 'document-text-outline', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#fb923c' },
+  // Shares document's visual family -- opposite direction, disambiguated by
+  // the "Document Submission: ..." title text from the server.
+  submission: { label: 'Document Submission', icon: 'document-text-outline', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#fb923c' },
 };
 
 const STATUS_META: Record<TxnStatus, { label: string; bg: string; border: string; color: string }> = {
@@ -147,6 +150,7 @@ const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'all', label: 'All Types' },
   { value: 'appointment', label: 'Appointment' },
   { value: 'document', label: 'Document' },
+  { value: 'submission', label: 'Document Submission' },
 ];
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
@@ -292,7 +296,7 @@ export default function ProfessorTransactionsScreen() {
         TYPE_META[t.type].label,
         STATUS_META[t.status].label,
         t.details,
-        t.type === 'document' ? t.trackingNumber ?? '' : `${t.studentName ?? ''} (${t.studentId ?? ''})`,
+        t.type === 'document' || t.type === 'submission' ? t.trackingNumber ?? '' : `${t.studentName ?? ''} (${t.studentId ?? ''})`,
         formatDateOnly(t.date),
         formatTimeOnly(t.date),
       ]);
@@ -496,7 +500,7 @@ export default function ProfessorTransactionsScreen() {
                       </View>
                     </View>
 
-                    {txn.type === 'document' ? (
+                    {txn.type === 'document' || txn.type === 'submission' ? (
                       txn.trackingNumber && (
                         <View style={styles.txnSubRow}>
                           <Ionicons name="pricetag-outline" size={13} color={theme.tertiary} />

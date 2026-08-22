@@ -157,7 +157,7 @@ html, body {
   background: transparent;
   border: none;
   color: var(--text-tertiary);
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
@@ -226,6 +226,8 @@ html, body {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 .adp-source-btn:hover:not(.adp-source-btn-active) { color: var(--text-primary); }
@@ -236,67 +238,167 @@ html, body {
 }
 [data-theme="light"] .adp-source-btn-active { background: #ea580c; }
 
-/* ── Filter Bar ──────────────────────────────────────────────────────────── */
-.adp-filter-bar {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  align-items: center;
+/* ── Filter card ─────────────────────────────────────────────────────────
+   Bare filter-*/filters-card class names (matching prof-transactions.css's
+   own filters-card structure, reused here rather than reinvented), scoped
+   under .adp-main so they don't collide with adm-transactions.css/
+   prof-transactions.css/stud-transactions.css, which scope the exact same
+   bare class names under their own page containers for the same reason. */
+.adp-main .filters-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(249, 115, 22, 0.15);
   border-radius: 1rem;
-  padding: 1rem 1.25rem;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  padding: 1rem 1.5rem 1.5rem;
+  transition: all 0.3s ease;
 }
-.adp-search-wrap {
-  flex: 1;
-  min-width: 200px;
+[data-theme="light"] .adp-main .filters-card { border-color: rgba(234, 88, 12, 0.15); }
+
+.adp-main .filters-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.adp-main .filters-header-text {
+  display: flex;
+  flex-direction: column;
+  grid-column: 2;
+  text-align: center;
+}
+.adp-main .filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-family: "Inter", sans-serif;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+.adp-main .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.adp-main .filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .adp-main .filters-grid { gap: 1.5rem; }
+}
+@media (max-width: 768px) {
+  .adp-main .filters-grid { grid-template-columns: 1fr; }
+}
+
+.adp-main .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.adp-main .filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+  transition: color 0.3s ease;
+}
+.adp-main .filter-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.adp-main .filter-search-wrapper {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
-.adp-search-icon {
+.adp-main .filter-search-wrapper svg {
   position: absolute;
-  left: 0.75rem;
-  display: flex;
-  align-items: center;
-  color: var(--text-tertiary);
-  pointer-events: none;
-}
-.adp-search-icon svg {
+  left: 0.875rem;
   width: 1rem;
   height: 1rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
   stroke: currentColor;
+  z-index: 1;
 }
-.adp-search-input {
+.adp-main .filter-search-input {
   width: 100%;
-  padding: 0.625rem 1rem 0.625rem 2.5rem;
-  background: var(--input-background);
+  padding: 0.75rem 1.25rem 0.75rem 2.5rem;
+  background: var(--input-background, var(--card-bg));
   border: 1px solid var(--card-border);
   border-radius: 0.75rem;
   color: var(--text-primary);
   font-size: 0.875rem;
+  font-family: inherit;
   outline: none;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
-.adp-search-input:focus {
+.adp-main .filter-search-input::placeholder { color: var(--text-tertiary); }
+.adp-main .filter-search-input:hover { border-color: rgba(249, 115, 22, 0.3); }
+.adp-main .filter-search-input:focus {
   border-color: #f97316;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
-.adp-search-input::placeholder { color: var(--text-tertiary); }
-.adp-week-select {
-  width: auto;
-  min-width: 150px;
-  padding-left: 1rem;
-  padding-right: 2.25rem;
+
+.adp-main .filter-select {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
+  background: var(--input-background, var(--card-bg));
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
   cursor: pointer;
+  transition: all 0.2s ease;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f97316' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  background-size: 1rem;
+}
+.adp-main .filter-select:hover { border-color: rgba(249, 115, 22, 0.3); }
+.adp-main .filter-select:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+.adp-main .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.adp-main .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.adp-main .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+.adp-main .filter-select:focus + .filter-chevron {
+  color: #f97316;
 }
 
 /* ── Documents List ──────────────────────────────────────────────────────── */
@@ -307,14 +409,14 @@ html, body {
 }
 .adp-doc-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1rem;
   transition: all 0.3s ease;
   overflow: hidden;
 }
 .adp-doc-card:hover {
-  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.12);
-  border-color: rgba(249, 115, 22, 0.35);
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.4);
 }
 .adp-doc-card-inner {
   display: flex;
@@ -342,44 +444,49 @@ html, body {
   flex: 1;
   min-width: 0;
 }
-.adp-doc-header-row {
-  margin-bottom: 0.75rem;
-}
-.adp-doc-name-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.25rem;
-}
-.adp-doc-student-name {
+.adp-doc-title {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
   transition: color 0.3s ease;
 }
-.adp-college-badge--outline {
-  padding: 0.2rem 0.55rem;
-  border-radius: 0.375rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  border: 1px solid var(--card-border);
-  background: rgba(249, 115, 22, 0.05);
-  flex-shrink: 0;
-}
-.adp-doc-type {
+.adp-doc-college {
   font-size: 0.875rem;
   color: var(--text-secondary);
-  margin: 0 0 0.25rem 0;
+  margin: 0.25rem 0 0 0;
   transition: color 0.3s ease;
   text-align: left;
 }
-.adp-doc-meta {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  margin: 0;
+.adp-doc-requester-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.625rem;
+}
+.adp-doc-requester-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+.adp-id-badge {
+  padding: 0.3rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  font-family: "Inter", sans-serif;
+}
+[data-theme="light"] .adp-id-badge { color: #ea580c; }
+.adp-doc-purpose {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.625rem 0 0 0;
+  line-height: 1.45;
   transition: color 0.3s ease;
   text-align: left;
 }
@@ -436,36 +543,53 @@ html, body {
 [data-theme="light"] .adp-badge-cancelled   { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
 
 .adp-doc-date {
-  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
   color: var(--text-tertiary);
+  white-space: nowrap;
   transition: color 0.3s ease;
+}
+.adp-doc-date svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  stroke: currentColor;
 }
 .adp-doc-action {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.625rem;
   flex-shrink: 0;
+}
+.adp-doc-action-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .adp-view-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: transparent;
-  border: 1px solid var(--card-border);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: none;
   border-radius: 0.75rem;
-  color: var(--text-primary);
+  color: white;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
 }
 .adp-view-btn:hover {
-  border-color: #f97316;
-  color: #f97316;
-  background: rgba(249, 115, 22, 0.06);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
 }
-[data-theme="light"] .adp-view-btn:hover { color: #ea580c; }
 .adp-view-btn svg {
   width: 1rem;
   height: 1rem;
@@ -478,7 +602,7 @@ html, body {
   text-align: center;
   padding: 4rem 2rem;
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 1rem;
 }
 .adp-empty-icon {
@@ -812,16 +936,12 @@ html, body {
   }
   .adp-doc-action {
     width: 100%;
+    align-items: flex-end;
   }
   .adp-view-btn {
     width: 100%;
     justify-content: center;
   }
-  .adp-filter-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .adp-search-wrap { min-width: unset; }
 }
 @media (max-width: 480px) {
   .adp-modal-actions { flex-direction: column; }
