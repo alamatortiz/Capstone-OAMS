@@ -522,6 +522,11 @@ export default function AppointmentsPage() {
             iconClassName="ab-title-icon"
             title="Appointments"
             subtitle="Schedule appointments with professors and view available slots."
+            headerClassName="ab-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="ab-title-section"
+            titleClassName="ab-title"
+            subtitleClassName="ab-subtitle"
           />
 
           {/* Professor Schedules card */}

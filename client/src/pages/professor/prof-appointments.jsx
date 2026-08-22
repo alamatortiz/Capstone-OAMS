@@ -342,6 +342,11 @@ export default function ProfessorAppointmentsPage() {
             iconClassName="appt-title-icon"
             title="Appointment Manager"
             subtitle="Review and manage student appointment requests."
+            headerClassName="appt-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="appt-title-section"
+            titleClassName="appt-title"
+            subtitleClassName="appt-subtitle"
           />
 
           {/* Schedule Manager card */}

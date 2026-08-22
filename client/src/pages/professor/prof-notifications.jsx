@@ -154,6 +154,11 @@ export default function ProfessorNotifications() {
           icon={<Bell />}
           title="Notifications"
           subtitle="Stay updated on document and appointment activity."
+          headerClassName="notif-header"
+          breadcrumbClassName="prof-breadcrumb"
+          titleSectionClassName="notif-title-section"
+          titleClassName="notif-title"
+          subtitleClassName="notif-subtitle"
         />
 
         <div className="filters-card">

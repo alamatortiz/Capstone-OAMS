@@ -1,6 +1,7 @@
 /* ===== Professor Document Requests — styled to match the student Documents page ===== */
-/* :root theme variables, .dashboard-with-sidebar/.dashboard-main, and the shared
-   PageHeader classes (.queue-*, .breadcrumb-*) already come from prof-dashboard.css. */
+/* :root theme variables and .dashboard-with-sidebar/.dashboard-main already
+   come from prof-dashboard.css. The page header below is self-contained
+   (mirrors stud-documents.css's .doc-header family exactly). */
 
 .doc-content {
   padding: 1.5rem;
@@ -10,6 +11,46 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+/* ===== DOCUMENT HEADER ===== */
+.doc-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.doc-content .doc-header {
+  margin-bottom: 0;
+}
+
+.doc-content .prof-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.doc-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.doc-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  transition: color 0.3s ease;
+  text-align: left;
+}
+
+.doc-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  transition: color 0.3s ease;
 }
 
 .doc-title-icon {
@@ -842,7 +883,7 @@
     padding: 1rem;
   }
 
-  .doc-content .queue-title-section {
+  .doc-content .doc-title-section {
     flex-direction: column;
     align-items: flex-start;
   }

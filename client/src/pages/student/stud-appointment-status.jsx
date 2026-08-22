@@ -69,6 +69,11 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
         iconClassName="apst-title-icon"
         title="Appointment Details"
         subtitle="Your appointment details and status."
+        headerClassName="apst-header"
+        breadcrumbClassName="prof-breadcrumb"
+        titleSectionClassName="apst-title-section"
+        titleClassName="apst-title"
+        subtitleClassName="apst-subtitle"
       />
 
       {/* Hero */}
@@ -349,6 +354,11 @@ export default function AppointmentStatusPage() {
               iconClassName="apst-title-icon"
               title="My Appointments"
               subtitle="Track all of your appointments."
+              headerClassName="apst-header"
+              breadcrumbClassName="prof-breadcrumb"
+              titleSectionClassName="apst-title-section"
+              titleClassName="apst-title"
+              subtitleClassName="apst-subtitle"
             />
 
             {/* Professor Schedules card */}

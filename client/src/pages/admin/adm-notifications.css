@@ -148,6 +148,41 @@ body {
   }
 }
 
+/* ===== Page Header ===== */
+.notif-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.adm-notifications-container .prof-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.notif-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.notif-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.notif-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
 /* ===== Header icon ===== */
 .adm-notifications-container .queue-title-icon {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);

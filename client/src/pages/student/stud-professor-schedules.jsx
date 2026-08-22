@@ -236,6 +236,11 @@ export default function ProfessorSchedule() {
             icon={<GraduationCapIcon />}
             title="Professor Schedules"
             subtitle="Check professor consultation hours and availability across all departments."
+            headerClassName="psched-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="psched-title-section"
+            titleClassName="psched-title"
+            subtitleClassName="psched-subtitle"
           />
 
           {/* Loading state */}

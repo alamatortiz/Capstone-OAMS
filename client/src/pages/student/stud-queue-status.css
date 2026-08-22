@@ -124,7 +124,13 @@ body {
 }
 
 
-.queue-breadcrumb {
+.qss-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.queue-status-container .prof-breadcrumb {
   display: flex;
   align-items: center;
 }
@@ -159,7 +165,7 @@ body {
   height: 1.25rem;
 }
 
-.queue-title-section {
+.qss-title-section {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -187,7 +193,7 @@ body {
 }
 
 .queue-title-content h1,
-.queue-title {
+.qss-title {
   font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -198,7 +204,7 @@ body {
 }
 
 .queue-title-content p,
-.queue-subtitle {
+.qss-subtitle {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0.25rem 0 0 0;
@@ -1134,7 +1140,7 @@ body {
 
 
 @media print {
-  .queue-breadcrumb,
+  .queue-status-container .prof-breadcrumb,
   .qss-card-action,
   .queue-cancel-card,
   .queue-dialog-actions {

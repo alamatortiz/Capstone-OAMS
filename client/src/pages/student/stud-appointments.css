@@ -100,9 +100,9 @@ body {
   .appointment-main { margin-left: 0; margin-top: 4rem; }
 }
 
-/* ===== Header (queue-header format) ===== */
-.queue-header { display: flex; flex-direction: column; gap: 1rem; }
-.queue-breadcrumb { display: flex; align-items: center; }
+/* ===== Page Header ===== */
+.ab-header { display: flex; flex-direction: column; gap: 1rem; }
+.appointment-content .prof-breadcrumb { display: flex; align-items: center; }
 
 .breadcrumb-link,
 .breadcrumb-link:visited,
@@ -137,7 +137,7 @@ body {
   height: 1.25rem;
 }
 
-.queue-title-section { display: flex; align-items: center; gap: 1rem; }
+.ab-title-section { display: flex; align-items: center; gap: 1rem; }
 
 /* ─── Title Icon (purple) ─────────────────────────────────────────────────── */
 .ab-title-icon {
@@ -155,8 +155,8 @@ body {
 
 .ab-title-icon svg { width: 1.75rem; height: 1.75rem; stroke: #fff; }
 
-.queue-title { font-size: 1.875rem; font-weight: 700; color: var(--text-primary); margin: 0; line-height: 1.1; transition: color 0.3s ease; text-align: left; }
-.queue-subtitle { font-size: 0.875rem; color: var(--text-tertiary); margin: 0.25rem 0 0; transition: color 0.3s ease; }
+.ab-title { font-size: 1.875rem; font-weight: 700; color: var(--text-primary); margin: 0; line-height: 1.2; transition: color 0.3s ease; text-align: left; }
+.ab-subtitle { font-size: 0.875rem; color: var(--text-tertiary); margin: 0.25rem 0 0; transition: color 0.3s ease; }
 
 /* ===== Filters Card ===== */
 /* Scoped to .appointment-content so these generic class names don't bleed
@@ -841,7 +841,7 @@ body {
 
 @media (max-width: 768px) {
   .appointment-content { padding: 0.75rem; gap: 1rem; }
-  .queue-title { font-size: 1.5rem; }
+  .ab-title { font-size: 1.5rem; }
 }
 
 @media (max-width: 640px) {

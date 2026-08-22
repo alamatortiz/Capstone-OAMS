@@ -318,6 +318,11 @@ export default function TransactionsPage() {
             icon={<ClipboardListIcon />}
             title="Transaction History"
             subtitle="View all your activities and transactions."
+            headerClassName="tx-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="tx-title-section"
+            titleClassName="tx-title"
+            subtitleClassName="tx-subtitle"
           />
 
           {/* Stats Grid */}

@@ -39,10 +39,45 @@ html, body {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.3rem;
+  gap: 1.5rem;
 }
 
-/* ── Header icon accent (structure comes from the shared PageHeader classes in prof-dashboard.css) ─ */
+/* ── Page header ─────────────────────────────────────────── */
+.txn-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.transactions-page .prof-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.txn-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.txn-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.txn-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
 .txn-title-icon {
   width: 3.5rem;
   height: 3.5rem;

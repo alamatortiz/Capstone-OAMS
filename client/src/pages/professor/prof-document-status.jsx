@@ -67,6 +67,11 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
         iconClassName="dss-title-icon"
         title="Document Details"
         subtitle="Your document request details and status."
+        headerClassName="dss-header"
+        breadcrumbClassName="prof-breadcrumb"
+        titleSectionClassName="dss-title-section"
+        titleClassName="dss-title"
+        subtitleClassName="dss-subtitle"
       />
 
       {/* Hero */}
@@ -482,6 +487,11 @@ export default function ProfessorDocumentStatus() {
               iconClassName="dss-title-icon"
               title="My Document Requests"
               subtitle="Track all of your document requests."
+              headerClassName="dss-header"
+              breadcrumbClassName="prof-breadcrumb"
+              titleSectionClassName="dss-title-section"
+              titleClassName="dss-title"
+              subtitleClassName="dss-subtitle"
             />
 
             {/* Error */}

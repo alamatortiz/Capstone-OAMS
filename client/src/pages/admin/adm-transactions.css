@@ -127,7 +127,7 @@
 }
 
 .admin-transaction-subtitle {
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0;
   transition: color 0.3s ease;

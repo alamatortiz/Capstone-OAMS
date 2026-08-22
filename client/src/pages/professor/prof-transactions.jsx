@@ -247,6 +247,11 @@ export default function ProfessorTransactionsPage() {
             iconClassName="txn-title-icon"
             title="Transaction History"
             subtitle="View all your activities and transactions."
+            headerClassName="txn-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="txn-title-section"
+            titleClassName="txn-title"
+            subtitleClassName="txn-subtitle"
           />
 
           {/* Stats */}

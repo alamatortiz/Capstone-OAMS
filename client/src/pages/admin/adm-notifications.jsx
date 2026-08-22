@@ -149,6 +149,11 @@ export default function AdminNotifications() {
           icon={<Bell />}
           title="Notifications"
           subtitle="Stay updated on queue, document, appointment, and announcement activity"
+          headerClassName="notif-header"
+          breadcrumbClassName="prof-breadcrumb"
+          titleSectionClassName="notif-title-section"
+          titleClassName="notif-title"
+          subtitleClassName="notif-subtitle"
         />
 
         <div className="filters-card">

@@ -298,6 +298,11 @@ export default function ProfessorScheduleManager() {
             iconClassName="sa-title-icon"
             title="Schedule Manager"
             subtitle="Set your weekly availability schedule for appointments."
+            headerClassName="sa-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="sa-title-section"
+            titleClassName="sa-title"
+            subtitleClassName="sa-subtitle"
           />
 
           <button className="sa-action-btn sa-action-btn--primary" onClick={() => openAddSlot(selectedDay)}>

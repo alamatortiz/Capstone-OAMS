@@ -152,7 +152,40 @@ body {
   }
 }
 
-/* ===== PAGE HEADER (queue-header pattern, green accent) ===== */
+/* ===== PAGE HEADER (green accent) ===== */
+.ann-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.announcements-page .prof-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.ann-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ann-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.ann-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
 
 .breadcrumb-link,
 .breadcrumb-link:visited,
@@ -443,7 +476,7 @@ body {
     padding: 1rem;
   }
 
-  .announcements-page .queue-title {
+  .announcements-page .ann-title {
     font-size: 1.5rem;
   }
 }
@@ -475,7 +508,7 @@ body {
     padding: 2rem 1rem;
   }
 
-  .announcements-page .queue-title {
+  .announcements-page .ann-title {
     font-size: 1.25rem;
   }
 

@@ -127,18 +127,7 @@ body {
   transition: background-color 0.3s ease;
 }
 
-/* ===== PageHeader (shared across all faculty pages — mirrors the student module) ===== */
-.queue-header {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.queue-breadcrumb {
-  display: flex;
-  align-items: center;
-}
-
+/* ===== Breadcrumb (shared across all faculty pages — mirrors the student module) ===== */
 .breadcrumb-link,
 .breadcrumb-link:visited,
 .breadcrumb-link:active,
@@ -171,29 +160,6 @@ body {
   height: 1.25rem;
 }
 
-.queue-title-section {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.queue-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.2;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.queue-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0 0;
-  text-align: left;
-  transition: color 0.3s ease;
-}
 
 /* ===== Main Content ===== */
 .dashboard-main {
@@ -1557,10 +1523,6 @@ body {
   .professor-dashboard {
     padding: 0.75rem;
     gap: 1rem;
-  }
-
-  .queue-title {
-    font-size: 1.5rem;
   }
 
   .professor-dashboard .dash-stats-grid {

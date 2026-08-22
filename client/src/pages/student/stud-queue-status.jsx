@@ -128,6 +128,11 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
         icon={<Clock className="icon" />}
         title="Queue Details"
         subtitle="Your queue details and status."
+        headerClassName="qss-header"
+        breadcrumbClassName="prof-breadcrumb"
+        titleSectionClassName="qss-title-section"
+        titleClassName="qss-title"
+        subtitleClassName="qss-subtitle"
       />
 
       {/* Hero */}
@@ -687,6 +692,11 @@ export default function QueueStatusPage() {
               icon={<Clock className="icon" />}
               title="My Queue Status"
               subtitle="Track all the queues you are in."
+              headerClassName="qss-header"
+              breadcrumbClassName="prof-breadcrumb"
+              titleSectionClassName="qss-title-section"
+              titleClassName="qss-title"
+              subtitleClassName="qss-subtitle"
             />
 
             {/* Error */}

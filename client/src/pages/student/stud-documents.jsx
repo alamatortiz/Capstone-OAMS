@@ -656,6 +656,11 @@ export default function DocumentsPage() {
             iconClassName="doc-title-icon"
             title="Document Requests"
             subtitle="Request documents and track their status."
+            headerClassName="doc-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="doc-title-section"
+            titleClassName="doc-title"
+            subtitleClassName="doc-subtitle"
           />
 
           <div className="doc-action-buttons">

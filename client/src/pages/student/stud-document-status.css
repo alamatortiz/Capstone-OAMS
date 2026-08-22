@@ -58,6 +58,42 @@
   }
 }
 
+/* ─── Page Header ────────────────────────────────────────────────────────── */
+.dss-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dss-status-container .prof-breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.dss-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dss-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.dss-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0.25rem 0 0 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
 /* ─── Title Icon (orange, matching Documents color) ─────────────────────── */
 .dss-title-icon {
   width: 3.5rem;

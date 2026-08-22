@@ -368,6 +368,11 @@ export default function AnnouncementsPage() {
             icon={<MegaphoneIcon />}
             title="Announcements"
             subtitle="Stay updated with the latest notices from your department."
+            headerClassName="ann-header"
+            breadcrumbClassName="prof-breadcrumb"
+            titleSectionClassName="ann-title-section"
+            titleClassName="ann-title"
+            subtitleClassName="ann-subtitle"
           />
 
           <Link to="/student/faqs" className="ann-btn-faqs-link">
