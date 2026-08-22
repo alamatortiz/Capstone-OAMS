@@ -244,7 +244,7 @@ INSERT INTO users (user_id, password, role, status) VALUES
 -- SECTION 2 · ADMINISTRATORS (child profile)
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO administrators (admin_id, employee_id, first_name, last_name, position, email, department_id) VALUES
-(103, 'ADM-2026-001', 'Admin', 'Superuser', 'System Registrar Office', 'admin.oams@pnc.edu.ph', 1001);
+(103, 'ADM-2026-001', 'Admin', '', 'System Registrar Office', 'admin.oams@pnc.edu.ph', 1001);
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -517,28 +517,28 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 INSERT INTO announcements (title, content, type, is_pinned, audience, department_id, created_by) VALUES
 ('Library Extended Hours for Midterms',
  'The CCS library will stay open until 9:00 PM on weekdays for the rest of the term to give everyone more room to study.',
- 'general', FALSE, 'students', 1001, 'Admin Superuser'),
+ 'general', FALSE, 'students', 1001, 'Admin'),
 ('Enrollment Deadline Extended',
  'Late enrollment for the current semester has been extended by one week. Visit the registrar window before the new cutoff.',
- 'important', TRUE, 'students', 1001, 'Admin Superuser'),
+ 'important', TRUE, 'students', 1001, 'Admin'),
 ('IT Week 2026 Kickoff',
  'Join us for IT Week 2026! A full week of tech talks, competitions, and department activities starts Monday.',
- 'event', FALSE, 'students', 1001, 'Admin Superuser'),
+ 'event', FALSE, 'students', 1001, 'Admin'),
 ('Reminder: Submit Clearance Forms',
  'A quick reminder to submit your clearance forms to the department office before the end of the month.',
- 'reminder', FALSE, 'students', 1001, 'Admin Superuser'),
+ 'reminder', FALSE, 'students', 1001, 'Admin'),
 ('University-Wide Job Fair',
  'PNC is hosting a university-wide job fair open to students from every college. Bring your resume!',
- 'event', FALSE, 'students', 1001, 'Admin Superuser'),
+ 'event', FALSE, 'students', 1001, 'Admin'),
 ('System Maintenance Notice',
  'The student portal will undergo scheduled maintenance this weekend and may be intermittently unavailable.',
- 'important', TRUE, 'students', 1001, 'Admin Superuser'),
+ 'important', TRUE, 'students', 1001, 'Admin'),
 ('Faculty Meeting: End-of-Term Grade Submission',
  'All CCS faculty are required to attend the end-of-term meeting covering grade submission deadlines and procedures.',
- 'general', TRUE, 'faculty', 1001, 'Admin Superuser'),
+ 'general', TRUE, 'faculty', 1001, 'Admin'),
 ('Consultation Hours Reporting Reminder',
  'Please ensure your posted consultation hours in the system are accurate and up to date before the department audit.',
- 'general', FALSE, 'faculty', 1001, 'Admin Superuser');
+ 'general', FALSE, 'faculty', 1001, 'Admin');
 
 
 -- ─────────────────────────────────────────────────────────────
@@ -549,58 +549,78 @@ INSERT INTO announcements (title, content, type, is_pinned, audience, department
 INSERT INTO faqs (question, answer, department_id, created_by) VALUES
 ('How do I request an official document like a Transcript of Records or Certificate of Enrollment?',
  'Go to the Documents page, click "Request Document", choose the document type, fill in the required details, and submit. You can track its status from the same page once it has been processed.',
- 1001, 'Admin Superuser'),
+ 1001, 'Admin'),
 ('How long does a document request take to process?',
  'Most requests are processed within 3-5 working days, though this can vary by document type and the office''s current workload. You will get a notification once your document is ready for claiming.',
- 1001, 'Admin Superuser'),
+ 1001, 'Admin'),
 ('How do I join a queue at the CCS office?',
  'Go to the Queue page, select the service you need, and tap "Join Queue". You will see your live position and can track it from the Queue Status page until you are called.',
- 1001, 'Admin Superuser'),
+ 1001, 'Admin'),
 ('Can I cancel a queue ticket or appointment after booking it?',
  'Yes. Open the ticket or appointment from the Queue Status or Appointments page and use the cancel option there. Please cancel as early as possible so the slot can be freed up for other students.',
- 1001, 'Admin Superuser'),
+ 1001, 'Admin'),
 ('Where can I check a professor''s consultation hours?',
  'Go to the Professor Schedules page under Appointments to view posted consultation hours for CCS faculty before booking a slot.',
- 1001, 'Admin Superuser'),
+ 1001, 'Admin'),
 ('I didn''t get a notification about my request. What should I do?',
  'Check the Notifications and Transactions pages first, since status updates always post there even if a push notification is missed. If the status still looks wrong after that, visit the CCS office directly.',
- 1001, 'Admin Superuser'),
+ 1001, 'Admin'),
 ('Who do I contact if my question isn''t answered here?',
  'Visit the CCS department office during office hours, or send your question through an appointment request so a staff member can follow up with you directly.',
- 1001, 'Admin Superuser');
+ 1001, 'Admin');
 
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 8 · SAMPLE TRANSACTIONS (for UI evaluation)
--- 3 per type (queue/appointment/document), one per UI status
--- (ongoing/completed/cancelled). All under student_id 104 (Luiz Gabriel
--- Rosales, student_number 2302494, CCS) so one login surfaces every variant.
+-- One row per admin-Transactions-page type (queue/appointment/document x2/
+-- submission/admin action), deliberately connected to two specific accounts
+-- so every role's own Transactions view has matching data to review:
+--   - student_id 104 (Luiz Gabriel Rosales, student_number 2302494, CCS)
+--   - faculty_id 106 (Marvin Bicua, employee_id EMP-2026-003, CCS)
+-- The appointment below ties both together, so it shows up on the admin,
+-- student, AND professor Transactions pages simultaneously. There are two
+-- "document" rows (one via document_requests, one via faculty_document_
+-- requests) because the professor Transactions page only ever sources its
+-- own faculty_document_requests rows -- a student's document_requests row
+-- is invisible there by design (see professorRoutes.js's GET /transactions).
 -- ─────────────────────────────────────────────────────────────
 
--- Queue entries -- slot_id NULL is allowed (not tied to a live queue slot)
+-- Queue entry -- slot_id NULL is allowed (not tied to a live queue slot).
+-- Admin + student only (no queue concept on the professor side).
 INSERT INTO queues (student_id, service_id, queue_number, status, admin_reason) VALUES
-(104, 1, 1, 'waiting',   NULL),                    -- ongoing
-(104, 2, 2, 'completed', NULL),                    -- completed
-(104, 3, 3, 'cancelled', 'Office closed early');    -- cancelled -> "Queue Stopped" title
+(104, 2, 1, 'completed', NULL);
 
--- Appointments -- service_id/availability_id left NULL (no appointment_services seeded)
+-- Appointment -- student 104 booked with faculty 106 (EMP-2026-003).
+-- Visible on admin, student, AND professor Transactions pages.
 INSERT INTO appointments (student_id, faculty_id, department_id, appointment_date, appointment_time, status) VALUES
-(104, 102, 1001, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '10:00:00', 'pending'),    -- ongoing
-(104, 106, 1001, DATE_SUB(CURDATE(), INTERVAL 3 DAY), '14:00:00', 'completed'),  -- completed
-(104, 107, 1001, DATE_ADD(CURDATE(), INTERVAL 2 DAY), '09:00:00', 'rejected');   -- cancelled
+(104, 106, 1001, DATE_ADD(CURDATE(), INTERVAL 3 DAY), '11:00:00', 'approved');
 
--- Document requests -- tracking_number is auto-assigned by the
--- ts_auto_tracking_number trigger, so it's omitted here.
+-- Document request (student -> office). Admin + student only.
+-- tracking_number is auto-assigned by the ts_auto_tracking_number trigger.
 INSERT INTO document_requests (student_id, service_id, request_type, purpose, status) VALUES
-(104, 1, 'Good Moral Certificate', 'For scholarship application', 'processing'), -- ongoing
-(104, 2, 'Transcript of Records',  'For further studies',         'claimed'),    -- completed
-(104, 1, 'Good Moral Certificate', 'For employment',               'rejected');  -- cancelled
+(104, 2, 'Transcript of Records', 'For job application', 'released');
 
--- Document submissions (student -> office "Send a Document") -- department_id
--- is student 104's own department (1001, CCS); tracking_number is
--- auto-assigned by ts_auto_tracking_number_submission, omitted here.
+-- Document submission (student -> office "Send a Document"). Admin + student
+-- only. department_id is student 104's own (1001, CCS); tracking_number is
+-- auto-assigned by ts_auto_tracking_number_submission.
 INSERT INTO document_submissions (student_id, department_id, title, purpose, status) VALUES
-(104, 1001, 'Midterm Grade Sheet',  'For encoding into the records system', 'processing'), -- ongoing
-(104, 1001, 'Enrollment Form Scan', 'For digital archiving',                'claimed'),    -- completed
-(104, 1001, 'Late Add Form',        'For late enrollment processing',       'rejected');   -- cancelled
+(104, 1001, 'OJT Endorsement Letter', 'For internship requirements', 'claimed');
+
+-- Faculty document request (faculty -> office, their own document). Admin +
+-- professor only -- this is what gives the professor Transactions page a
+-- "document" row. service_id 5 = Certificate of Employment, the one seeded
+-- document_services row with recipient_type = 'faculty'. tracking_number is
+-- auto-assigned by ts_auto_tracking_number_faculty.
+INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, status) VALUES
+(106, 5, 'Certificate of Employment', 'For loan application', 'processing');
+
+-- Admin Action example: a fresh announcement + its matching audit_logs CREATE
+-- row (mirrors what POST /api/admin/announcements would produce). admin_id
+-- 103 = Admin (admin.oams@pnc.edu.ph), the CCS admin account used
+-- throughout. Admin-only -- no student/professor equivalent exists.
+INSERT INTO announcements (title, content, type, is_pinned, audience, department_id, created_by) VALUES
+('Queue System Downtime Advisory', 'The queueing system will be briefly unavailable this weekend for scheduled maintenance.', 'important', FALSE, 'students', 1001, 'Admin');
+
+INSERT INTO audit_logs (admin_id, action, target_table, target_record_id, old_values, new_values) VALUES
+(103, 'CREATE', 'announcements', LAST_INSERT_ID(), NULL, JSON_OBJECT('title', 'Queue System Downtime Advisory'));
 

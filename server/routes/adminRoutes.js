@@ -606,6 +606,8 @@ router.patch(
 
       await conn.commit();
 
+      await logAudit(adminId, "UPDATE", "queue_slots", slotId, { status: "open" }, { status: "paused", reason });
+
       emitToSlot(slotId, "queue:slot-status", { slotId, status: "paused", reason });
       emitToDept(deptId, "queue:slot-status", { slotId, status: "paused", reason });
       if (serving) {
@@ -637,11 +639,12 @@ router.patch(
   authorizeRoles("admin"),
   async (req, res) => {
     const slotId = parseInt(req.params.slotId, 10);
+    const adminId = req.user.userId;
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
-      const deptId = await getAdminDepartmentId(req.user.userId);
+      const deptId = await getAdminDepartmentId(adminId);
       const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
       if (!slot) return;
       if (slot.status !== "paused") {
@@ -657,6 +660,8 @@ router.patch(
       );
 
       await conn.commit();
+
+      await logAudit(adminId, "UPDATE", "queue_slots", slotId, { status: "paused" }, { status: "open" });
 
       emitToSlot(slotId, "queue:slot-status", { slotId, status: "open" });
       emitToDept(deptId, "queue:slot-status", { slotId, status: "open" });
@@ -722,6 +727,8 @@ router.patch(
       );
 
       await conn.commit();
+
+      await logAudit(adminId, "UPDATE", "queue_slots", slotId, { status: slot.status }, { status: "closed", reason, cancelledCount: affected.length });
 
       emitToSlot(slotId, "queue:slot-status", { slotId, status: "closed", reason });
       emitToDept(deptId, "queue:slot-status", { slotId, status: "closed", reason });
@@ -1193,6 +1200,11 @@ router.get(
         dateParam = new Date(manilaMidnightUTC.getTime() - 30 * 24 * 60 * 60 * 1000);
       }
 
+      // Same boundary, but against al.created_at -- the audit-log query below
+      // is a flat SELECT, not a derived table, so the "event_time" alias used
+      // by dateClause above isn't a valid column reference in its WHERE clause.
+      const auditDateClause = dateClause ? "AND al.created_at >= ?" : "";
+
       const unionSql = `
         SELECT * FROM (
           (
@@ -1204,24 +1216,35 @@ router.get(
                 WHEN q.status = 'completed' THEN 'Completed Queue Service'
                 WHEN q.status = 'cancelled' THEN 'Cancelled Queue Request'
                 WHEN q.status = 'serving'   THEN 'Currently Serving'
+                WHEN q.status = 'no_show'   THEN 'Missed Queue Turn'
                 ELSE 'Queue Joined'
               END AS action,
-              COALESCE(d.department_name, 'All Colleges') AS college,
-              COALESCE(d.department_abbreviation, 'ALL') AS college_abbrev,
+              d.department_abbreviation AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
-              COALESCE(CONCAT(adm.first_name, ' ', adm.last_name), s.service_name) AS processor,
+              COALESCE(
+                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                 FROM queue_status_logs qsl
+                 JOIN administrators adm2 ON qsl.changed_by = adm2.admin_id
+                 WHERE qsl.queue_id = q.queue_id
+                 ORDER BY qsl.created_at DESC LIMIT 1),
+                CONCAT(adm.first_name, ' ', adm.last_name),
+                s.service_name
+              ) AS processor,
               COALESCE(q.admin_reason, s.service_name) AS details,
+              CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
+              q.queue_number AS queue_number,
+              s.service_name AS raw_service_name,
               q.status AS raw_status,
               q.updated_at AS event_time,
               'student' AS requester_type
             FROM queues q
             JOIN services s ON q.service_id = s.service_id
+            JOIN departments d ON s.department_id = d.department_id
             LEFT JOIN queue_slots qs ON q.slot_id = qs.slot_id
             LEFT JOIN administrators adm ON qs.admin_id = adm.admin_id
-            LEFT JOIN departments d ON adm.department_id = d.department_id
             JOIN students st ON q.student_id = st.student_id
-            WHERE (d.department_id = ? OR d.department_id IS NULL)
+            WHERE s.department_id = ?
           )
           UNION ALL
           (
@@ -1235,12 +1258,14 @@ router.get(
                 WHEN 'cancelled' THEN 'Cancelled Appointment'
                 ELSE 'Pending Appointment'
               END AS action,
-              d.department_name AS college,
               d.department_abbreviation AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
               CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
               COALESCE(a.notes, 'No purpose specified') AS details,
+              CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
+              NULL AS queue_number,
+              NULL AS raw_service_name,
               a.status AS raw_status,
               a.updated_at AS event_time,
               'student' AS requester_type
@@ -1263,7 +1288,6 @@ router.get(
                 WHEN 'cancelled'  THEN 'Cancelled Document Request'
                 ELSE 'Pending Document Request'
               END AS action,
-              d.department_name AS college,
               d.department_abbreviation AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
@@ -1276,6 +1300,9 @@ router.get(
                 dr.request_type
               ) AS processor,
               dr.purpose AS details,
+              dr.tracking_number AS tracking_number,
+              NULL AS queue_number,
+              NULL AS raw_service_name,
               dr.status AS raw_status,
               dr.updated_at AS event_time,
               'student' AS requester_type
@@ -1298,7 +1325,6 @@ router.get(
                 WHEN 'cancelled'  THEN 'Cancelled Document Request'
                 ELSE 'Pending Document Request'
               END AS action,
-              d.department_name AS college,
               d.department_abbreviation AS college_abbrev,
               CONCAT(f.first_name, ' ', f.last_name) AS student_name,
               f.employee_id AS student_id,
@@ -1311,6 +1337,9 @@ router.get(
                 fdr.request_type
               ) AS processor,
               fdr.purpose AS details,
+              fdr.tracking_number AS tracking_number,
+              NULL AS queue_number,
+              NULL AS raw_service_name,
               fdr.status AS raw_status,
               fdr.updated_at AS event_time,
               'faculty' AS requester_type
@@ -1332,7 +1361,6 @@ router.get(
                 WHEN 'cancelled'  THEN 'Cancelled Sent Document'
                 ELSE 'Sent Document'
               END AS action,
-              d.department_name AS college,
               d.department_abbreviation AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
@@ -1345,6 +1373,9 @@ router.get(
                 ds.title
               ) AS processor,
               ds.purpose AS details,
+              ds.tracking_number AS tracking_number,
+              NULL AS queue_number,
+              NULL AS raw_service_name,
               ds.status AS raw_status,
               ds.updated_at AS event_time,
               'student' AS requester_type
@@ -1363,6 +1394,37 @@ router.get(
       if (dateParam) unionParams.push(dateParam);
       const [rows] = await pool.query(unionSql, unionParams);
 
+      // "Admin Action" rows -- things admins do to the system itself (post an
+      // announcement, edit an FAQ, pause a queue slot, scan a QR code, edit
+      // service/settings config), sourced from the existing audit_logs table
+      // rather than a UNION branch (it needs different raw columns -- JSON
+      // old/new value blobs -- to feed formatAuditTransaction, not the fixed
+      // per-status CASE shape the 5 branches above share). Deliberately
+      // excludes 'users' (account edits, per product decision -- that feature
+      // may be retired) and the 3 document-ish tables (already surfaced above
+      // via their own correlated audit_logs subqueries -- including them here
+      // too would show every document status change twice).
+      const auditSql = `
+        SELECT al.log_id AS id, al.action AS audit_action, al.target_table, al.target_record_id,
+               al.old_values, al.new_values, al.created_at AS event_time,
+               CONCAT(adm.first_name, ' ', adm.last_name) AS processor,
+               d.department_abbreviation AS college_abbrev
+        FROM audit_logs al
+        JOIN administrators adm ON al.admin_id = adm.admin_id
+        JOIN departments d ON adm.department_id = d.department_id
+        WHERE adm.department_id = ?
+          AND al.target_table IN (
+            'services','document_services','service_requirements','service_procedure_steps',
+            'system_settings','generated_files','announcements','faqs','queue_slots','locations'
+          )
+          ${auditDateClause}
+        ORDER BY al.created_at DESC
+        LIMIT 200
+      `;
+      const auditParams = [deptId];
+      if (dateParam) auditParams.push(dateParam);
+      const [auditRows] = await pool.query(auditSql, auditParams);
+
       // Map raw per-table statuses -> the badge vocabulary the UI uses.
       // Document statuses stay granular (matching /professor/transactions'
       // vocabulary) instead of collapsing pending/processing/generated/
@@ -1376,8 +1438,8 @@ router.get(
         completed: "completed",
         cancelled: "cancelled",
         no_show: "no_show",
-        waiting: "completed", // not surfaced as a transaction row by default, kept for safety
-        serving: "completed",
+        waiting: "pending",
+        serving: "processing",
         approved: "approved",
         pending: "pending",
         rejected: "rejected",
@@ -1387,19 +1449,92 @@ router.get(
         claimed: "completed",
       };
 
-      let transactions = rows.map((r) => ({
-        id: `${r.type}-${r.id}`,
-        type: r.type,
-        action: r.action,
-        college: `${r.college} (${r.college_abbrev})`,
-        collegeAbbrev: r.college_abbrev,
-        studentName: r.student_name,
-        studentId: r.student_id,
-        requesterType: r.requester_type,
-        processor: r.processor,
-        details: r.details || "No additional details provided.",
-        status: statusMap[r.raw_status] ?? r.raw_status,
-        timestamp: new Date(r.event_time).toLocaleString("en-US", {
+      const requestRows = rows.map((r) => {
+        // Queue rows get a student-facing ticket badge (e.g. "CCS-REG-012"),
+        // mirroring the exact format students see when they join a queue
+        // (see studentRoutes.js's queueNumberBadge derivation). Other types
+        // have no equivalent ticket number.
+        const queueNumberBadge =
+          r.type === "queue" && r.queue_number != null && r.raw_service_name
+            ? `${r.college_abbrev}-${r.raw_service_name
+                .split(" ")[0]
+                .substring(0, 3)
+                .toUpperCase()}-${String(r.queue_number).padStart(3, "0")}`
+            : null;
+        return {
+          // requester_type disambiguates 'document' rows sourced from
+          // document_requests (student) vs. faculty_document_requests
+          // (faculty) -- both branches share the same type label but have
+          // independent id sequences, so type+id alone can collide (e.g.
+          // both tables having a row with id 1) and produce duplicate React
+          // keys on the frontend.
+          id: `${r.type}-${r.requester_type}-${r.id}`,
+          type: r.type,
+          action: r.action,
+          collegeAbbrev: r.college_abbrev,
+          studentName: r.student_name,
+          studentId: r.student_id,
+          requesterType: r.requester_type,
+          processor: r.processor,
+          details: r.details || "No additional details provided.",
+          trackingNumber: r.tracking_number || null,
+          queueNumberBadge,
+          status: statusMap[r.raw_status] ?? r.raw_status,
+          rawEventTime: r.event_time,
+        };
+      });
+
+      const adminActionRows = auditRows.map((r) => {
+        const { action, details, status } = formatAuditTransaction(
+          r.target_table, r.audit_action, r.old_values, r.new_values,
+        );
+        return {
+          id: `admin_action-${r.id}`,
+          type: "admin_action",
+          action,
+          collegeAbbrev: r.college_abbrev,
+          studentName: null,
+          studentId: null,
+          requesterType: null,
+          processor: r.processor,
+          details: details || "No additional details provided.",
+          trackingNumber: null,
+          queueNumberBadge: null,
+          status,
+          rawEventTime: r.event_time,
+        };
+      });
+
+      // Merge, cap at 200 by recency -- this combined+capped set (not the
+      // raw per-source rows) is the basis for both the type/status filter
+      // below and the stats block, so stats stay in sync with what a filter
+      // change would reveal, matching the pre-existing "stats reflect the
+      // department total" behavior.
+      const combined = requestRows
+        .concat(adminActionRows)
+        .sort((a, b) => new Date(b.rawEventTime) - new Date(a.rawEventTime))
+        .slice(0, 200);
+
+      // Server-side filtering for type/status (search stays client-side,
+      // matching how the rest of the admin UI already filters in-memory)
+      let transactions = combined;
+      if (type !== "all") {
+        transactions = transactions.filter((t) => t.type === type);
+      }
+      if (status !== "all") {
+        transactions = transactions.filter((t) => t.status === status);
+      }
+
+      // Format the display timestamp last, only on what's actually returned.
+      // `date` is the raw instant (for client-side formatManilaDate/Time,
+      // matching professorRoutes.js's pattern); `timestamp` is kept as a
+      // pre-formatted fallback for the CSV export and any other consumer
+      // still relying on the old single-string shape.
+      transactions = transactions.map((t) => ({
+        ...t,
+        date: t.rawEventTime,
+        rawEventTime: undefined,
+        timestamp: new Date(t.rawEventTime).toLocaleString("en-US", {
           timeZone: "Asia/Manila",
           year: "numeric",
           month: "2-digit",
@@ -1410,21 +1545,9 @@ router.get(
         }),
       }));
 
-      // Server-side filtering for type/status (search stays client-side,
-      // matching how the rest of the admin UI already filters in-memory)
-      if (type !== "all") {
-        transactions = transactions.filter((t) => t.type === type);
-      }
-      if (status !== "all") {
-        transactions = transactions.filter((t) => t.status === status);
-      }
-
       // Aggregate stats over the full (unfiltered-by-type/status) dataset
       // so the summary cards always reflect the department total.
-      const allForStats = rows.map((r) => ({
-        type: r.type,
-        status: statusMap[r.raw_status] ?? r.raw_status,
-      }));
+      const allForStats = combined.map((t) => ({ type: t.type, status: t.status }));
 
       res.json({
         transactions,
@@ -1439,6 +1562,7 @@ router.get(
           documents: allForStats.filter(
             (t) => t.type === "document" || t.type === "submission",
           ).length,
+          adminActions: allForStats.filter((t) => t.type === "admin_action").length,
         },
       });
     } catch (error) {
@@ -2121,6 +2245,75 @@ async function logAudit(adminId, action, targetTable, targetRecordId, oldValues,
   }
 }
 
+// Turns an audit_logs row (target_table, action, old_values, new_values) into
+// the { action, details, status } shape the Transactions feed's "Admin
+// Action" type rows need. `status` uses its own vocabulary (created/updated/
+// deleted/viewed), deliberately distinct from the queue/document status
+// words so the two can never be visually confused on the same page.
+function formatAuditTransaction(targetTable, auditAction, oldValues, newValues) {
+  const statusMap = { CREATE: "created", UPDATE: "updated", DELETE: "deleted", READ: "viewed" };
+  const status = statusMap[auditAction] || auditAction.toLowerCase();
+  const old = oldValues || {};
+  const val = newValues || {};
+
+  switch (targetTable) {
+    case "announcements":
+      if (auditAction === "CREATE") return { action: "Posted Announcement", details: `Posted "${val.title}"`, status };
+      if (auditAction === "DELETE") return { action: "Deleted Announcement", details: `Deleted "${old.title}"`, status };
+      if (typeof val.isPinned === "boolean") return { action: val.isPinned ? "Pinned Announcement" : "Unpinned Announcement", details: val.title || old.title || "", status };
+      if (val.status === "archived") return { action: "Archived Announcement", details: val.title || old.title || "", status };
+      if (val.status === "active") return { action: "Restored Announcement", details: val.title || old.title || "", status };
+      return { action: "Edited Announcement", details: `Edited "${val.title}"`, status };
+
+    case "faqs": {
+      const question = (val.question || old.question || "").slice(0, 60);
+      if (auditAction === "CREATE") return { action: "Added FAQ", details: question, status };
+      if (auditAction === "DELETE") return { action: "Deleted FAQ", details: question, status };
+      return { action: "Edited FAQ", details: question, status };
+    }
+
+    case "queue_slots": {
+      if (val.status === "paused") return { action: "Paused Queue Slot", details: val.reason || "", status };
+      if (val.status === "open") return { action: "Resumed Queue Slot", details: "", status };
+      if (val.status === "closed") return {
+        action: "Closed Queue Slot",
+        details: val.cancelledCount ? `${val.reason || ""} (${val.cancelledCount} entry/entries cancelled)`.trim() : (val.reason || ""),
+        status,
+      };
+      return { action: "Updated Queue Slot", details: val.reason || "", status };
+    }
+
+    case "services":
+    case "document_services": {
+      const label = targetTable === "services" ? "Service" : "Document Type";
+      const name = val.name || old.name || "";
+      if (auditAction === "CREATE") return { action: `Created ${label}`, details: name, status };
+      if (auditAction === "DELETE") return { action: `Deleted ${label}`, details: name, status };
+      return { action: `Updated ${label}`, details: name, status };
+    }
+
+    case "service_requirements":
+      return { action: "Updated Service Requirements", details: `${val.requirementCount ?? 0} requirement(s)`, status };
+
+    case "service_procedure_steps":
+      return { action: "Updated Service Procedure", details: `${val.stepCount ?? 0} step(s)`, status };
+
+    case "system_settings":
+      return { action: "Updated Sync Settings", details: val.apiUrl ? `${val.apiUrl} (sync ${val.syncEnabled ? "on" : "off"})` : "", status };
+
+    case "generated_files":
+      return { action: "Scanned QR Code", details: val.trackingNumber ? `Tracking #${val.trackingNumber}` : "", status };
+
+    case "locations":
+      return { action: "Added Location", details: val.name || "", status };
+
+    default: {
+      const payload = val && Object.keys(val).length ? val : old;
+      return { action: `${auditAction} ${targetTable}`, details: payload ? JSON.stringify(payload).slice(0, 120) : "", status };
+    }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // DATA MANAGEMENT — Document Types
 // All routes scoped strictly to the admin's own department.
@@ -2383,6 +2576,7 @@ router.post(
         `SELECT location_id, location_name FROM locations WHERE department_id = ? AND location_name = ?`,
         [deptId, name],
       );
+      await logAudit(req.user.userId, "CREATE", "locations", loc.location_id, null, { name: loc.location_name });
       res.status(201).json({ id: loc.location_id, name: loc.location_name, isGlobal: false });
     } catch (error) {
       sendServerError(res, error, "Location create error:");
@@ -2842,6 +3036,8 @@ router.post(
       await conn.commit();
       committed = true;
 
+      await logAudit(req.user.userId, "CREATE", "announcements", result.insertId, null, { title: title.trim() });
+
       const attachments = await getAttachments(result.insertId);
       emitToDept(deptId, "announcement:changed", { announcementId: result.insertId });
 
@@ -2923,7 +3119,7 @@ router.put(
       }
 
       const [[row]] = await conn.query(
-        `SELECT department_id, audience FROM announcements WHERE announcement_id = ?`, [announcementId],
+        `SELECT department_id, audience, title FROM announcements WHERE announcement_id = ?`, [announcementId],
       );
       if (!row) {
         await conn.rollback();
@@ -2970,6 +3166,8 @@ router.put(
 
       await conn.commit();
       committed = true;
+
+      await logAudit(req.user.userId, "UPDATE", "announcements", announcementId, { title: row.title }, { title: title.trim() });
 
       emitToDept(deptId, "announcement:changed", { announcementId });
       const attachments = await getAttachments(announcementId);
@@ -3043,6 +3241,7 @@ router.patch(
       }
       const newPinned = row.is_pinned ? 0 : 1;
       await pool.query(`UPDATE announcements SET is_pinned = ? WHERE announcement_id = ?`, [newPinned, announcementId]);
+      await logAudit(req.user.userId, "UPDATE", "announcements", announcementId, { isPinned: !!row.is_pinned }, { isPinned: !!newPinned });
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ isPinned: !!newPinned });
     } catch (error) {
@@ -3072,6 +3271,7 @@ router.patch(
       // Archiving intentionally does NOT bump updated_at -- it's about to
       // disappear from students' feeds, not resurface as a repost.
       await pool.query(`UPDATE announcements SET status = 'archived' WHERE announcement_id = ?`, [announcementId]);
+      await logAudit(req.user.userId, "UPDATE", "announcements", announcementId, { status: "active" }, { status: "archived" });
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement archived" });
     } catch (error) {
@@ -3101,6 +3301,7 @@ router.patch(
       // Restoring bumps updated_at -- bringing an archived announcement back
       // into view counts as a repost, same as an actual content edit.
       await pool.query(`UPDATE announcements SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE announcement_id = ?`, [announcementId]);
+      await logAudit(req.user.userId, "UPDATE", "announcements", announcementId, { status: "archived" }, { status: "active" });
       emitToDept(deptId, "announcement:changed", { announcementId });
       res.json({ message: "Announcement restored", date: new Date().toISOString(), isReposted: true });
     } catch (error) {
@@ -3120,7 +3321,7 @@ router.delete(
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
       const [[row]] = await pool.query(
-        `SELECT department_id FROM announcements WHERE announcement_id = ?`,
+        `SELECT department_id, title FROM announcements WHERE announcement_id = ?`,
         [announcementId],
       );
       if (!row) return res.status(404).json({ error: "Announcement not found" });
@@ -3134,6 +3335,7 @@ router.delete(
       // ON DELETE CASCADE removes the announcement_attachments rows; the
       // physical files still need explicit cleanup below.
       await pool.query(`DELETE FROM announcements WHERE announcement_id = ?`, [announcementId]);
+      await logAudit(req.user.userId, "DELETE", "announcements", announcementId, { title: row.title }, null);
       attachments.forEach((a) => {
         fs.unlink(path.join(UPLOAD_DIR, a.file_path), (err) => {
           if (err && err.code !== "ENOENT") console.error("Attachment cleanup error:", err);
@@ -3245,6 +3447,8 @@ router.post(
         [result.insertId],
       );
 
+      await logAudit(req.user.userId, "CREATE", "faqs", row.faq_id, null, { question: question.trim() });
+
       emitToDept(deptId, "faq:changed", { faqId: row.faq_id });
 
       res.status(201).json({
@@ -3280,7 +3484,7 @@ router.put(
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
       const [[existing]] = await pool.query(
-        `SELECT department_id FROM faqs WHERE faq_id = ?`,
+        `SELECT department_id, question FROM faqs WHERE faq_id = ?`,
         [id],
       );
       if (!existing) {
@@ -3294,6 +3498,8 @@ router.put(
         `UPDATE faqs SET question = ?, answer = ? WHERE faq_id = ?`,
         [question.trim(), answer.trim(), id],
       );
+
+      await logAudit(req.user.userId, "UPDATE", "faqs", id, { question: existing.question }, { question: question.trim() });
 
       const [[row]] = await pool.query(
         `SELECT faq_id, question, answer, created_by, created_at, updated_at FROM faqs WHERE faq_id = ?`,
@@ -3331,7 +3537,7 @@ router.delete(
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
       const [[existing]] = await pool.query(
-        `SELECT department_id FROM faqs WHERE faq_id = ?`,
+        `SELECT department_id, question FROM faqs WHERE faq_id = ?`,
         [id],
       );
       if (!existing) {
@@ -3342,6 +3548,8 @@ router.delete(
       }
 
       await pool.query(`DELETE FROM faqs WHERE faq_id = ?`, [id]);
+
+      await logAudit(req.user.userId, "DELETE", "faqs", id, { question: existing.question }, null);
 
       emitToDept(deptId, "faq:changed", { faqId: Number(id) });
 
@@ -3784,8 +3992,9 @@ router.get(
          LEFT JOIN faculty f              ON fdr.faculty_id = f.faculty_id
          LEFT JOIN document_services fds  ON fdr.service_id = fds.service_id
          LEFT JOIN departments fd         ON fds.department_id = fd.department_id
-         WHERE UPPER(gf.qr_code) = UPPER(?)`,
-        [qrCode],
+         WHERE UPPER(gf.qr_code) = UPPER(?)
+           AND (d.department_id = ? OR fd.department_id = ?)`,
+        [qrCode, deptId, deptId],
       );
 
       if (!docRow) {

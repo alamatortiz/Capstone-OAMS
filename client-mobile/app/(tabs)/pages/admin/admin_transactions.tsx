@@ -25,6 +25,7 @@ import {
   History,
   Home as HomeIcon,
   Search,
+  Settings,
   Users,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -86,19 +87,20 @@ function OamsLogo({
 // unlike the design-mockup AdminTransactionsPage.tsx (a "Comprehensive /
 // system-wide" view across all six colleges), this mirrors the actual wired
 // admin-transactions.jsx: one department's transaction log only. ───
-type TxType = 'queue' | 'appointment' | 'document' | 'submission';
+type TxType = 'queue' | 'appointment' | 'document' | 'submission' | 'admin_action';
 type TxStatus = string;
 
 interface Transaction {
   id: string;
   type: TxType;
   action: string;
-  studentName: string;
-  studentId: string;
+  studentName: string | null;
+  studentId: string | null;
   requesterType?: 'student' | 'faculty';
   processor: string;
   details: string;
   status: TxStatus;
+  trackingNumber?: string | null;
   timestamp: string;
 }
 
@@ -125,7 +127,13 @@ const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: strin
   // Shares document's visual family -- opposite direction, already
   // disambiguated by the "Sent Document" label and action text.
   submission: { label: 'Sent Document', icon: FileText, bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#f97316' },
+  admin_action: { label: 'Admin Action', icon: Settings, bg: 'rgba(99, 102, 241, 0.15)', border: 'rgba(99, 102, 241, 0.3)', color: '#6366f1' },
 };
+// Defensive fallback -- TYPE_META[t.type] has no built-in ?? guard at the
+// call site (unlike STATUS_META below), so an unrecognized/future type value
+// would otherwise throw reading .bg/.border/.color off undefined and crash
+// the whole list render, not just degrade gracefully like status does.
+const DEFAULT_TYPE_META = { label: 'Unknown', icon: FileText, bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.3)', color: '#6b7280' };
 
 const STATUS_META: Record<string, { label: string; bg: string; border: string; color: string }> = {
   completed: { label: 'Completed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
@@ -138,6 +146,10 @@ const STATUS_META: Record<string, { label: string; bg: string; border: string; c
   released: { label: 'Released', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   no_show: { label: 'No Show', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
+  created: { label: 'Created', bg: 'rgba(20, 184, 166, 0.15)', border: 'rgba(20, 184, 166, 0.3)', color: '#14b8a6' },
+  updated: { label: 'Updated', bg: 'rgba(6, 182, 212, 0.15)', border: 'rgba(6, 182, 212, 0.3)', color: '#06b6d4' },
+  deleted: { label: 'Deleted', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' },
+  viewed: { label: 'Viewed', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
 };
 const DEFAULT_STATUS_META = { label: 'Unknown', bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.3)', color: '#6b7280' };
 
@@ -152,6 +164,7 @@ const TYPE_OPTIONS = [
   { value: 'appointment', label: 'Appointment' },
   { value: 'document', label: 'Document' },
   { value: 'submission', label: 'Sent Document' },
+  { value: 'admin_action', label: 'Admin Action' },
 ];
 
 const STATUS_OPTIONS = [
@@ -160,6 +173,10 @@ const STATUS_OPTIONS = [
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'created', label: 'Created' },
+  { value: 'updated', label: 'Updated' },
+  { value: 'deleted', label: 'Deleted' },
+  { value: 'viewed', label: 'Viewed' },
 ];
 
 const DATE_OPTIONS = [
@@ -182,7 +199,7 @@ export default function AdminTransactionsScreen() {
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [page, setPage] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0 });
+  const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0, adminActions: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -217,6 +234,7 @@ export default function AdminTransactionsScreen() {
           processor: t.processor,
           details: t.details,
           status: t.status,
+          trackingNumber: t.trackingNumber ?? null,
           timestamp: t.timestamp,
         })),
       );
@@ -248,6 +266,9 @@ export default function AdminTransactionsScreen() {
       'appointment:status-updated',
       'document:status-updated',
       'document:cancelled',
+      'announcement:changed',
+      'faq:changed',
+      'queue:slot-status',
     ];
     events.forEach((event) => socket.on(event, refetch));
     return () => {
@@ -294,10 +315,10 @@ export default function AdminTransactionsScreen() {
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !q ||
-      t.studentName.toLowerCase().includes(q) ||
-      t.studentId.toLowerCase().includes(q) ||
-      t.processor.toLowerCase().includes(q) ||
-      t.details.toLowerCase().includes(q);
+      t.studentName?.toLowerCase().includes(q) ||
+      t.studentId?.toLowerCase().includes(q) ||
+      t.processor?.toLowerCase().includes(q) ||
+      t.details?.toLowerCase().includes(q);
     return matchesSearch;
   });
 
@@ -314,6 +335,7 @@ export default function AdminTransactionsScreen() {
     queue: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
     appointments: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
     documents: { bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)', color: '#f97316' },
+    adminActions: { bg: 'rgba(99, 102, 241, 0.15)', border: 'rgba(99, 102, 241, 0.3)', color: '#6366f1' },
   } as const;
 
   const statCards: { key: keyof typeof stats; label: string; icon: LucideIconType }[] = [
@@ -321,6 +343,7 @@ export default function AdminTransactionsScreen() {
     { key: 'queue', label: 'Queue Services', icon: Users },
     { key: 'appointments', label: 'Appointments', icon: Calendar },
     { key: 'documents', label: 'Documents', icon: FileText },
+    { key: 'adminActions', label: 'Admin Actions', icon: Settings },
   ];
 
   const selectOptions =
@@ -461,7 +484,7 @@ export default function AdminTransactionsScreen() {
           ) : filteredTransactions.length > 0 ? (
             <View style={styles.txList}>
               {pagedTransactions.map((t) => {
-                const typeMeta = TYPE_META[t.type];
+                const typeMeta = TYPE_META[t.type] ?? DEFAULT_TYPE_META;
                 const statusMeta = STATUS_META[t.status] ?? DEFAULT_STATUS_META;
                 return (
                   <View key={t.id} style={styles.txCard}>
@@ -476,18 +499,23 @@ export default function AdminTransactionsScreen() {
 
                     <Text style={styles.txAction}>{t.action}</Text>
 
-                    <View style={styles.txStudentRow}>
-                      <Users size={14} color={theme.tertiary} />
-                      <Text style={styles.txStudentName}>{t.studentName}</Text>
-                      <Text style={styles.txStudentId}>({t.studentId})</Text>
-                      {t.requesterType === 'faculty' && (
-                        <View style={styles.facultyBadge}>
-                          <Text style={styles.facultyBadgeText}>Faculty</Text>
-                        </View>
-                      )}
-                    </View>
+                    {t.studentName && (
+                      <View style={styles.txStudentRow}>
+                        <Users size={14} color={theme.tertiary} />
+                        <Text style={styles.txStudentName}>{t.studentName}</Text>
+                        <Text style={styles.txStudentId}>({t.studentId})</Text>
+                        {t.requesterType === 'faculty' && (
+                          <View style={styles.facultyBadge}>
+                            <Text style={styles.facultyBadgeText}>Faculty</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
 
                     <Text style={styles.txDetails}>{t.details}</Text>
+                    {t.trackingNumber && (
+                      <Text style={styles.txTracking}>Tracking #{t.trackingNumber}</Text>
+                    )}
                     <Text style={styles.txProcessor}>Processed by: {t.processor}</Text>
 
                     <View style={styles.txMetaRow}>
@@ -869,6 +897,7 @@ function createStyles(theme: ThemePalette) {
     facultyBadgeText: { fontSize: 10, fontWeight: '700', color: '#8b5cf6' },
     txDetails: { fontSize: 13, color: theme.subtext, lineHeight: 18 },
     txProcessor: { fontSize: 11, color: theme.tertiary },
+    txTracking: { fontSize: 11, color: theme.tertiary, fontFamily: 'monospace' },
     txMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',

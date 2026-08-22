@@ -679,6 +679,12 @@ router.post(
     const collegeName = college.replace(/\s*\([^)]*\)\s*$/, "").trim();
 
     try {
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const ownDeptId = stu?.department_id ?? null;
+
       // 1. Try to find a service matching both the document type and college
       let serviceId = null;
 
@@ -706,24 +712,33 @@ router.post(
       }
 
       // 3. Fall back to any document service under the student's own department
-      if (!serviceId) {
-        const [[stu]] = await pool.query(
-          `SELECT department_id FROM students WHERE student_id = ?`,
-          [studentId],
+      if (!serviceId && ownDeptId) {
+        const [deptDefault] = await pool.query(
+          `SELECT service_id FROM document_services WHERE department_id = ? LIMIT 1`,
+          [ownDeptId],
         );
-        if (stu) {
-          const [deptDefault] = await pool.query(
-            `SELECT service_id FROM document_services WHERE department_id = ? LIMIT 1`,
-            [stu.department_id],
-          );
-          if (deptDefault.length) serviceId = deptDefault[0].service_id;
-        }
+        if (deptDefault.length) serviceId = deptDefault[0].service_id;
       }
 
       if (!serviceId) {
         return res.status(404).json({
           error:
             "No matching service configuration found for the selected college",
+        });
+      }
+
+      // Confirm the resolved service is actually one this student is allowed
+      // to use (own department, or cross-college) -- tiers 1-2 above resolve
+      // by whatever college name the client sent, so the server shouldn't
+      // just trust it without re-checking (mirrors professorRoutes.js's
+      // POST /documents, which already does this).
+      const [[svc]] = await pool.query(
+        `SELECT department_id, is_cross_college FROM document_services WHERE service_id = ?`,
+        [serviceId],
+      );
+      if (!svc || (svc.department_id !== ownDeptId && !svc.is_cross_college)) {
+        return res.status(403).json({
+          error: "This service isn't available to your department",
         });
       }
 
@@ -2758,6 +2773,13 @@ router.get(
   authorizeRoles("student"),
   async (req, res) => {
     try {
+      const studentId = req.user.userId;
+      const [[stu]] = await pool.query(
+        `SELECT department_id FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      const ownDeptId = stu?.department_id ?? null;
+
       // 1. All departments
       const [departments] = await pool.query(
         `SELECT department_id, department_name, department_abbreviation, office_location
@@ -2766,7 +2788,10 @@ router.get(
       );
 
       // 2. All services with their requirements (LEFT JOIN so services without
-      //    rows in service_requirements are still returned).
+      //    rows in service_requirements are still returned), scoped to the
+      //    student's own department or ones open to every department -- a
+      //    service that belongs to another department and isn't
+      //    cross-college was never meant to be visible/joinable here.
       const [services] = await pool.query(
         `SELECT
            s.service_id,
@@ -2780,7 +2805,9 @@ router.get(
            sr.is_mandatory
          FROM services s
          LEFT JOIN service_requirements sr ON sr.service_id = s.service_id
+         WHERE s.department_id = ? OR s.is_cross_college = TRUE
          ORDER BY s.department_id, s.service_name, sr.requirement_id`,
+        [ownDeptId],
       );
 
       // 2b. All procedure steps for every service, ordered by step_number.

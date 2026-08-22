@@ -11,7 +11,7 @@ import collegeCHASlogo from "../../assets/CHAS.png";
 import "./adm-transactions.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import { getManilaDateString } from "../../utils/dateTime";
+import { getManilaDateString, formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
@@ -78,6 +78,30 @@ const CalendarIcon = () => (
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
+const ClockIcon = () => (
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12 6 12 12 16 14"></polyline>
+  </svg>
+);
+const SettingsIcon = () => (
+  <svg
+    className="icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+  </svg>
+);
 const CollegeLogoIcon = ({ collegeShortName }) => {
   const logoSrcMap = {
     CCS: collegeCCSLogo,
@@ -135,6 +159,7 @@ const TYPE_OPTIONS = [
   { value: "appointment", label: "Appointment" },
   { value: "document", label: "Document" },
   { value: "submission", label: "Sent Document" },
+  { value: "admin_action", label: "Admin Action" },
 ];
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
@@ -148,7 +173,16 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" },
   { value: "cancelled", label: "Cancelled" },
   { value: "no_show", label: "No Show" },
+  { value: "created", label: "Created" },
+  { value: "updated", label: "Updated" },
+  { value: "deleted", label: "Deleted" },
+  { value: "viewed", label: "Viewed" },
 ];
+// Colleges CollegeLogoIcon actually has artwork for -- used to skip the logo
+// (keeping the text label) for any transaction whose collegeAbbrev isn't one
+// of these, instead of silently falling back to the CAS logo.
+const KNOWN_COLLEGES = ["CCS", "CBAA", "COE", "COED", "CAS", "CHAS"];
+
 const DATE_OPTIONS = [
   { value: "today", label: "Today" },
   { value: "week", label: "This Week" },
@@ -174,6 +208,7 @@ export default function AdminTransaction() {
     queue: 0,
     appointments: 0,
     documents: 0,
+    adminActions: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -190,7 +225,7 @@ export default function AdminTransaction() {
       });
       setTransactions(res.data.transactions ?? []);
       setTxnStats(
-        res.data.stats ?? { total: 0, queue: 0, appointments: 0, documents: 0 },
+        res.data.stats ?? { total: 0, queue: 0, appointments: 0, documents: 0, adminActions: 0 },
       );
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
@@ -227,6 +262,9 @@ export default function AdminTransaction() {
       "appointment:status-updated",
       "document:status-updated",
       "document:cancelled",
+      "announcement:changed",
+      "faq:changed",
+      "queue:slot-status",
     ];
     events.forEach((event) => socket.on(event, fetchTransactions));
     return () => {
@@ -272,6 +310,10 @@ export default function AdminTransaction() {
         color: "admin-transaction-badge-document",
         label: "Sent Document",
       },
+      admin_action: {
+        color: "admin-transaction-badge-admin-action",
+        label: "Admin Action",
+      },
     };
     const config = typeConfig[type] || {
       color: "admin-transaction-badge-document",
@@ -303,25 +345,57 @@ export default function AdminTransaction() {
       generated: { color: "admin-transaction-badge-generated", label: "Ready" },
       released: { color: "admin-transaction-badge-released", label: "Released" },
       claimed: { color: "admin-transaction-badge-claimed", label: "Claimed" },
+      created: { color: "admin-transaction-badge-created", label: "Created" },
+      updated: { color: "admin-transaction-badge-updated", label: "Updated" },
+      deleted: { color: "admin-transaction-badge-cancelled", label: "Deleted" },
+      viewed: { color: "admin-transaction-badge-processing", label: "Viewed" },
     };
     const config = statusConfig[status] || {
       color: "admin-transaction-badge-approved",
       label: status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown",
     };
     return (
-      <span className={`admin-transaction-badge ${config.color}`}>
+      <span className={`admin-transaction-badge admin-transaction-status-badge ${config.color}`}>
         {config.label}
       </span>
     );
+  };
+
+  // Type -> icon shown in the item's leading icon column.
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case "queue":
+        return <UserGroupIcon />;
+      case "appointment":
+        return <CalendarIcon />;
+      case "admin_action":
+        return <SettingsIcon />;
+      case "document":
+      case "submission":
+      default:
+        return <FileText />;
+    }
+  };
+
+  // Type -> color for the student/professor ID badge and the tracking/queue
+  // reference badge (both share the same pill shape and color rules).
+  const getIdBadgeClass = (type) => {
+    const map = {
+      queue: "admin-transaction-id-badge-queue",
+      appointment: "admin-transaction-id-badge-appointment",
+      document: "admin-transaction-id-badge-document",
+      submission: "admin-transaction-id-badge-document",
+    };
+    return `admin-transaction-id-badge ${map[type] || "admin-transaction-id-badge-document"}`;
   };
 
   // ── Export (client-side CSV of whatever currently matches the active
   // filters, mirroring the professor transactions page's export) ───────────
   const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
   const handleExport = () => {
-    const header = ["Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor", "Timestamp"];
+    const header = ["Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor", "Tracking #", "Timestamp"];
     const rows = filteredTransactions.map((t) => [
-      t.type, t.action, t.details, t.status, t.collegeAbbrev, t.studentName, t.studentId, t.processor, t.timestamp,
+      t.type, t.action, t.details, t.status, t.collegeAbbrev, t.studentName, t.studentId, t.processor, t.trackingNumber, t.timestamp,
     ]);
     const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -399,6 +473,16 @@ export default function AdminTransaction() {
                 {loading ? "—" : stats.documents}
               </p>
             </div>
+
+            <div className="admin-transaction-stat-card">
+              <div className="admin-transaction-stat-icon-box admin-transaction-icon-box-indigo">
+                <SettingsIcon />
+              </div>
+              <p className="admin-transaction-stat-label">Admin Actions</p>
+              <p className="admin-transaction-stat-value admin-transaction-val-indigo">
+                {loading ? "—" : stats.adminActions}
+              </p>
+            </div>
           </div>
 
           {/* Filters */}
@@ -438,6 +522,15 @@ export default function AdminTransaction() {
               </div>
 
               <FilterSelect
+                id="tx-filter-date-range"
+                label="Date Range"
+                value={dateRange}
+                onChange={(e) => { setDateRange(e.target.value); setPage(1); }}
+                options={DATE_OPTIONS}
+                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+
+              <FilterSelect
                 id="tx-filter-type"
                 label="Type"
                 value={filterType}
@@ -452,15 +545,6 @@ export default function AdminTransaction() {
                 value={filterStatus}
                 onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                 options={STATUS_OPTIONS}
-                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
-              />
-
-              <FilterSelect
-                id="tx-filter-date-range"
-                label="Date Range"
-                value={dateRange}
-                onChange={(e) => { setDateRange(e.target.value); setPage(1); }}
-                options={DATE_OPTIONS}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
             </div>
@@ -480,56 +564,92 @@ export default function AdminTransaction() {
                 </div>
               ) : (
                 pagedTransactions.map((transaction) => {
+                  const iconType =
+                    transaction.type === "submission" ? "document" : transaction.type;
+                  const refBadge =
+                    transaction.type === "document" || transaction.type === "submission"
+                      ? transaction.trackingNumber
+                      : transaction.type === "queue"
+                        ? transaction.queueNumberBadge
+                        : null;
                   return (
                     <div
                       key={transaction.id}
                       className="admin-transaction-item"
                     >
+                      <div className="admin-transaction-item-icon">
+                        <span
+                          className={`admin-transaction-icon-wrap admin-transaction-icon-${iconType}`}
+                        >
+                          {getTypeIcon(transaction.type)}
+                        </span>
+                      </div>
+
                       <div className="admin-transaction-item-content">
-                        <div className="admin-transaction-item-badges">
-                          {getTypeBadge(transaction.type)}
-                          {getStatusBadge(transaction.status, transaction.type)}
-                          <span className="admin-transaction-item-action">
+                        <div className="admin-transaction-item-header">
+                          <h3 className="admin-transaction-item-title">
                             {transaction.action}
-                          </span>
+                          </h3>
+                          <div className="admin-transaction-item-badges">
+                            {getTypeBadge(transaction.type)}
+                            {getStatusBadge(transaction.status, transaction.type)}
+                          </div>
                         </div>
 
                         <div className="admin-transaction-item-grid">
                           <div className="admin-transaction-item-college">
-                            <CollegeLogoIcon
-                              collegeShortName={transaction.collegeAbbrev}
-                            />
+                            {KNOWN_COLLEGES.includes(transaction.collegeAbbrev) && (
+                              <CollegeLogoIcon
+                                collegeShortName={transaction.collegeAbbrev}
+                              />
+                            )}
                             <span className="admin-transaction-item-college-name">
                               {transaction.collegeAbbrev}
                             </span>
                           </div>
-                          <div className="admin-transaction-item-student">
-                            <UserGroupIcon />
-                            <span className="admin-transaction-item-student-name">
-                              {transaction.studentName}
-                            </span>
-                            <span className="admin-transaction-item-student-id">
-                              ({transaction.studentId})
-                            </span>
-                            {transaction.requesterType === "faculty" && (
-                              <span className="admin-transaction-badge-faculty">
-                                Faculty
+                          {transaction.studentName && (
+                            <div className="admin-transaction-item-student">
+                              <span className="admin-transaction-item-student-name">
+                                {transaction.studentName}
                               </span>
-                            )}
-                          </div>
+                              <span className={getIdBadgeClass(transaction.type)}>
+                                {transaction.studentId}
+                              </span>
+                              {transaction.requesterType === "faculty" && (
+                                <span className="admin-transaction-badge-faculty">
+                                  Faculty
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <p className="admin-transaction-item-details">
                           {transaction.details}
                         </p>
+                        {refBadge && (
+                          <span className={getIdBadgeClass(transaction.type)}>
+                            {refBadge}
+                          </span>
+                        )}
                         <p className="admin-transaction-item-processor">
                           Processed by: {transaction.processor}
                         </p>
                       </div>
 
-                      <div className="admin-transaction-item-timestamp">
-                        <CalendarIcon />
-                        <span>{transaction.timestamp}</span>
+                      <div className="admin-transaction-item-meta">
+                        <div className="admin-transaction-item-date">
+                          <CalendarIcon />
+                          {formatManilaDate(transaction.date, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </div>
+                        <div className="admin-transaction-item-time">
+                          <ClockIcon />
+                          {formatManilaTime(transaction.date)}
+                        </div>
                       </div>
                     </div>
                   );
