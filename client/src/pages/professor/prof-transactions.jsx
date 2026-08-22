@@ -248,7 +248,7 @@ export default function ProfessorTransactionsPage() {
             title="Transaction History"
             subtitle="View all your activities and transactions."
             headerClassName="txn-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="txn-title-section"
             titleClassName="txn-title"
             subtitleClassName="txn-subtitle"

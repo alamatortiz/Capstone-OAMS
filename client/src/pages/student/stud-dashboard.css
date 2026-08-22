@@ -1726,6 +1726,31 @@ body {
   margin: 0;
 }
 
+.office-hours-retry-btn {
+  outline: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.5rem 0.875rem 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.office-hours-retry-btn:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--primary-color);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
   .dash-main {

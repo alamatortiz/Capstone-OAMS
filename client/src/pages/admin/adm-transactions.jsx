@@ -340,13 +340,13 @@ export default function AdminTransaction() {
     >
         <div className="admin-transaction-container">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<ClipboardListIcon />}
             iconClassName="admin-transaction-title-icon"
             title="Transaction History"
             subtitle="View all recent transactions within the office"
             headerClassName="admin-transaction-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="admin-transaction-title-section"
             titleClassName="admin-transaction-title"
             subtitleClassName="admin-transaction-subtitle"

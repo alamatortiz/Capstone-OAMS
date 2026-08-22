@@ -21,7 +21,7 @@ html, body {
   gap: 1rem;
 }
 
-.sa-page .prof-breadcrumb {
+.sa-page .page-breadcrumb {
   display: flex;
   align-items: center;
 }

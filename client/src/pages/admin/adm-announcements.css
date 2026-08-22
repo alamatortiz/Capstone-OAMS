@@ -10,11 +10,11 @@
 
 /* ===== Breadcrumb (self-contained so its rendered height/gap can't be
    clobbered by whichever other admin page's CSS happened to load last) ===== */
-.ann-page .prof-breadcrumb {
+.ann-page .page-breadcrumb {
   display: flex;
   align-items: center;
 }
-.ann-page .prof-breadcrumb-link {
+.ann-page .page-breadcrumb-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -30,11 +30,11 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.ann-page .prof-breadcrumb-link:hover {
+.ann-page .page-breadcrumb-link:hover {
   color: var(--primary-color);
   background: rgba(34, 197, 94, 0.1);
 }
-.ann-page .prof-breadcrumb-link svg {
+.ann-page .page-breadcrumb-link svg {
   width: 1.25rem;
   height: 1.25rem;
   stroke: currentColor;

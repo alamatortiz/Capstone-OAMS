@@ -136,11 +136,11 @@
 }
 
 /* ===== Breadcrumb (mirrors professor/student pages) ===== */
-.prof-breadcrumb {
+.page-breadcrumb {
   display: flex;
   align-items: center;
 }
-.prof-breadcrumb-link {
+.page-breadcrumb-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -156,11 +156,11 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.prof-breadcrumb-link:hover {
+.page-breadcrumb-link:hover {
   color: #3b82f6;
   background: rgba(59, 130, 246, 0.1);
 }
-.prof-breadcrumb-link svg {
+.page-breadcrumb-link svg {
   width: 1.25rem;
   height: 1.25rem;
   stroke: currentColor;

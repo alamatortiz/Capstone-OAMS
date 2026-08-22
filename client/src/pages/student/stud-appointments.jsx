@@ -523,7 +523,7 @@ export default function AppointmentsPage() {
             title="Appointments"
             subtitle="Schedule appointments with professors and view available slots."
             headerClassName="ab-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="ab-title-section"
             titleClassName="ab-title"
             subtitleClassName="ab-subtitle"

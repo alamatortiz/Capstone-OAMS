@@ -7,14 +7,14 @@
 export default function PageHeader({
   breadcrumb,
   icon,
-  iconClassName = "queue-title-icon",
+  iconClassName = "page-title-icon",
   title,
   subtitle,
-  headerClassName = "queue-header",
-  breadcrumbClassName = "queue-breadcrumb",
-  titleSectionClassName = "queue-title-section",
-  titleClassName = "queue-title",
-  subtitleClassName = "queue-subtitle",
+  headerClassName = "page-header",
+  breadcrumbClassName = "page-breadcrumb",
+  titleSectionClassName = "page-title-section",
+  titleClassName = "page-title",
+  subtitleClassName = "page-subtitle",
 }) {
   return (
     <div className={headerClassName}>

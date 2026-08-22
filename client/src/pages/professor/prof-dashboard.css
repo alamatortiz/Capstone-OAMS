@@ -740,9 +740,7 @@ body {
    Recent Activity below, since both surface real appointment statuses.
    Colors copied verbatim from prof-appointments.css's .appt-status-badge--*
    (the authoritative appointments-module palette) so the dashboard always
-   matches real status colors; ALL CAPS per the dashboard's own requirement
-   (the real Appointments page keeps its own unscoped, `capitalize`d rule --
-   untouched, since it lives in a separate stylesheet only loaded there). */
+   matches real status colors. */
 .professor-dashboard .appt-status-badge {
   display: inline-flex;
   align-items: center;

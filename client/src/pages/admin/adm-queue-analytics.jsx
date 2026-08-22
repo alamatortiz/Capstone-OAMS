@@ -273,13 +273,13 @@ export default function AdminQueueAnalytics() {
     >
         <div className="aqa-content">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<BarChartIcon />}
             iconClassName="aqa-title-icon"
             title="Queue Analytics"
             subtitle="Real-time queue performance metrics and insights"
             headerClassName="aqa-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="aqa-title-section"
             titleClassName="aqa-page-title"
             subtitleClassName="aqa-page-subtitle"

@@ -818,13 +818,13 @@ export default function AdminQueue() {
     >
         <div className="queue-page-container">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<QueueIconNav />}
             iconClassName="aq-title-icon"
             title="Centralized Queue Management"
             subtitle={`Monitor and control queues for ${user?.college}`}
             headerClassName="aq-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="aq-title-section"
             titleClassName="aq-title"
             subtitleClassName="aq-subtitle"

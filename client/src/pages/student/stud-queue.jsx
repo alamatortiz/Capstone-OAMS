@@ -334,6 +334,12 @@ export default function QueuePage() {
             icon={<Users className="icon" />}
             title={selectedSlot ? 'Queue Details' : 'Queues'}
             subtitle="Join queues and track your position in real-time."
+            headerClassName="queue-header"
+            breadcrumbClassName="page-breadcrumb"
+            titleSectionClassName="queue-title-section"
+            iconClassName="queue-title-icon"
+            titleClassName="queue-title"
+            subtitleClassName="queue-subtitle"
           />
 
           {/* ── DETAIL VIEW ── */}

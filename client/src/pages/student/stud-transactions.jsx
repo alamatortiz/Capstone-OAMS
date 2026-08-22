@@ -316,10 +316,11 @@ export default function TransactionsPage() {
               </Link>
             }
             icon={<ClipboardListIcon />}
+            iconClassName="tx-title-icon"
             title="Transaction History"
             subtitle="View all your activities and transactions."
             headerClassName="tx-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="tx-title-section"
             titleClassName="tx-title"
             subtitleClassName="tx-subtitle"

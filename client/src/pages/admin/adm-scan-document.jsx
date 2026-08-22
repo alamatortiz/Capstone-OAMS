@@ -404,13 +404,13 @@ export default function AdminScanDocument() {
     >
         <div className="asd-page">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<QRScanIcon />}
             iconClassName="asd-title-icon"
             title="Document Scanner"
             subtitle="Scan QR codes to verify and view document details"
             headerClassName="asd-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="asd-title-section"
             titleClassName="asd-page-title"
             subtitleClassName="asd-page-subtitle"

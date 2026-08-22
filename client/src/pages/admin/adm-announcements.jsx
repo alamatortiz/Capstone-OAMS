@@ -757,13 +757,13 @@ export default function AdminAnnouncements() {
     >
         <div className="ann-page">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<MegaphoneIcon />}
             iconClassName="ann-title-icon"
             title="Announcements Management"
             subtitle={`Manage announcements for ${user?.college || "your department"}`}
             headerClassName="ann-header-row"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="ann-title-section"
             titleClassName="ann-page-title"
             subtitleClassName="ann-page-subtitle"

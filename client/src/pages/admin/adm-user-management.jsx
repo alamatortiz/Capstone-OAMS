@@ -335,7 +335,7 @@ export default function AdminUserManagement() {
         <div className="aum-content">
           <PageHeader
             breadcrumb={
-              <Link to="/admin/dashboard" className="prof-breadcrumb-link">
+              <Link to="/admin/dashboard" className="page-breadcrumb-link">
                 <ChevronLeft />Home
               </Link>
             }
@@ -344,7 +344,7 @@ export default function AdminUserManagement() {
             title="User Account Management"
             subtitle="Manage all user accounts across the OAMS system"
             headerClassName="aum-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="aum-title-section"
             titleClassName="aum-page-title"
             subtitleClassName="aum-page-subtitle"

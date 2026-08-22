@@ -2,11 +2,11 @@ import { Calendar, XCircle } from "lucide-react";
 import "./AppointmentListItem.css";
 
 const STATUS_META = {
-  pending: { label: "Pending", cls: "apst-badge-pending" },
-  approved: { label: "Approved", cls: "apst-badge-approved" },
-  completed: { label: "Completed", cls: "apst-badge-completed" },
-  rejected: { label: "Rejected", cls: "apst-badge-rejected" },
-  cancelled: { label: "Cancelled", cls: "apst-badge-cancelled" },
+  pending: { label: "Pending", cls: "apt-badge-pending" },
+  approved: { label: "Approved", cls: "apt-badge-approved" },
+  completed: { label: "Completed", cls: "apt-badge-completed" },
+  rejected: { label: "Rejected", cls: "apt-badge-rejected" },
+  cancelled: { label: "Cancelled", cls: "apt-badge-cancelled" },
 };
 
 // Shared card for both the appointment booking page's "Active Bookings" tab
@@ -22,39 +22,39 @@ export default function AppointmentListItem({
 }) {
   const { label, cls } = STATUS_META[appointment.status] ?? {
     label: appointment.status,
-    cls: "apst-badge-pending",
+    cls: "apt-badge-pending",
   };
   const canCancel = appointment.status === "pending" || appointment.status === "approved";
 
   return (
     <div
-      className={`apst-list-item ${onClick ? "apst-list-item--clickable" : ""}`}
+      className={`apt-list-item ${onClick ? "apt-list-item--clickable" : ""}`}
       onClick={onClick}
     >
-      <div className="apst-list-header">
-        <div className="apst-list-icon-wrap">
+      <div className="apt-list-header">
+        <div className="apt-list-icon-wrap">
           <Calendar style={{ width: "1.5rem", height: "1.5rem" }} />
         </div>
-        <div className="apst-list-title-section">
-          <h3 className="apst-list-name">{appointment.person}</h3>
-          <p className="apst-list-college">{appointment.college}</p>
+        <div className="apt-list-title-section">
+          <h3 className="apt-list-name">{appointment.person}</h3>
+          <p className="apt-list-college">{appointment.college}</p>
         </div>
-        <span className={`apst-badge ${cls}`}>{label}</span>
+        <span className={`apt-badge ${cls}`}>{label}</span>
       </div>
 
       {appointment.appointmentType && (
-        <div className="apst-list-appt-type">
-          <span className="apst-list-appt-type-label">Type:</span>
-          <span className="apst-list-appt-type-value">{appointment.appointmentType}</span>
+        <div className="apt-list-appt-type">
+          <span className="apt-list-appt-type-label">Type:</span>
+          <span className="apt-list-appt-type-value">{appointment.appointmentType}</span>
         </div>
       )}
 
-      <div className="apst-list-card-grid">
-        <div className="apst-list-card-field">
+      <div className="apt-list-card-grid">
+        <div className="apt-list-card-field">
           <label>Date</label>
           <p>{formatDate(appointment.date)}</p>
         </div>
-        <div className="apst-list-card-field">
+        <div className="apt-list-card-field">
           <label>Time Slot</label>
           <p>
             {appointment.windowStart && appointment.windowEnd
@@ -62,12 +62,12 @@ export default function AppointmentListItem({
               : "—"}
           </p>
         </div>
-        <div className="apst-list-card-field">
+        <div className="apt-list-card-field">
           <label>Location</label>
           <p>{appointment.location}</p>
         </div>
         {appointment.purpose && (
-          <div className="apst-list-card-field-full">
+          <div className="apt-list-card-field-full">
             <label>Purpose</label>
             <p>{appointment.purpose}</p>
           </div>
@@ -77,7 +77,7 @@ export default function AppointmentListItem({
       {showCancelButton && canCancel && (
         <button
           type="button"
-          className="apst-list-cancel-btn"
+          className="apt-list-cancel-btn"
           onClick={(e) => {
             e.stopPropagation();
             onCancel?.(appointment.id);

@@ -646,13 +646,13 @@ export default function AdminDocumentProcessing() {
     >
         <div className="adp-content">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<FileText className="adp-icon-lg" />}
             iconClassName="adp-title-icon"
             title="Document Processing"
             subtitle="Process and manage document requests"
             headerClassName="adp-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="adp-title-section"
             titleClassName="adp-page-title"
             subtitleClassName="adp-page-subtitle"

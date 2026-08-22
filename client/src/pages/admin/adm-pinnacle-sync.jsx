@@ -227,7 +227,7 @@ export default function AdminPinnacleSync() {
     >
         <div className="aps-page">
           <div className="aps-header-block">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
+          <div className="page-breadcrumb"><Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link></div>
           {/* Header */}
           <div className="aps-page-header">
             <div className="aps-title-section">

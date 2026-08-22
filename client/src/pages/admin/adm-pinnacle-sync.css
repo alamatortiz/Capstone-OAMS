@@ -17,11 +17,11 @@
 
 /* ── Breadcrumb (self-contained so its rendered height/gap can't be
    clobbered by whichever other admin page's CSS happened to load last) ── */
-.aps-page .prof-breadcrumb {
+.aps-page .page-breadcrumb {
   display: flex;
   align-items: center;
 }
-.aps-page .prof-breadcrumb-link {
+.aps-page .page-breadcrumb-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -37,11 +37,11 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.aps-page .prof-breadcrumb-link:hover {
+.aps-page .page-breadcrumb-link:hover {
   color: var(--primary-color);
   background: rgba(34, 197, 94, 0.1);
 }
-.aps-page .prof-breadcrumb-link svg {
+.aps-page .page-breadcrumb-link svg {
   width: 1.25rem;
   height: 1.25rem;
   stroke: currentColor;

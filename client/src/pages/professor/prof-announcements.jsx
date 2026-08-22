@@ -290,10 +290,11 @@ export default function ProfessorAnnouncementsPage() {
               </Link>
             }
             icon={<MegaphoneIcon />}
+            iconClassName="ann-title-icon"
             title="Announcements"
             subtitle="Stay updated with the latest notices from your department."
             headerClassName="ann-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="ann-title-section"
             titleClassName="ann-title"
             subtitleClassName="ann-subtitle"

@@ -922,13 +922,13 @@ export default function AdminDataManagement() {
         <div className="admin-dashboard">
 
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<DatabaseIcon />}
             iconClassName="adm-title-icon"
             title="Data Management"
             subtitle={`${user?.college} (${user?.departmentAbbrev}) — Configure document types and queue services`}
             headerClassName="adm-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="adm-title-section"
             titleClassName="adm-page-title"
             subtitleClassName="adm-page-subtitle"

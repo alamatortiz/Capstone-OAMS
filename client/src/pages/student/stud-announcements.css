@@ -159,7 +159,7 @@ body {
   gap: 1rem;
 }
 
-.announcements-page .prof-breadcrumb {
+.announcements-page .page-breadcrumb {
   display: flex;
   align-items: center;
 }
@@ -187,10 +187,10 @@ body {
   transition: color 0.3s ease;
 }
 
-.breadcrumb-link,
-.breadcrumb-link:visited,
-.breadcrumb-link:active,
-.breadcrumb-link:focus {
+.announcements-page .breadcrumb-link,
+.announcements-page .breadcrumb-link:visited,
+.announcements-page .breadcrumb-link:active,
+.announcements-page .breadcrumb-link:focus {
   outline: none;
   background: transparent;
   border: none;
@@ -210,23 +210,31 @@ body {
   appearance: none;
 }
 
-.breadcrumb-link:hover {
+.announcements-page .breadcrumb-link:hover {
   background-color: rgba(34, 197, 94, 0.1);
   color: var(--primary-color);
 }
 
-.breadcrumb-link svg {
+.announcements-page .breadcrumb-link svg {
   width: 1rem;
   height: 1rem;
   stroke: currentColor;
 }
 
-.announcements-page .queue-title-icon {
+.ann-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
-.announcements-page .queue-title-icon svg {
+.ann-title-icon svg {
   width: 1.75rem;
   height: 1.75rem;
   stroke: currentColor;

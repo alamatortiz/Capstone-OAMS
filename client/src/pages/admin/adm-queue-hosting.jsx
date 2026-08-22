@@ -417,7 +417,7 @@ export default function AdminQueueHosting() {
     >
         <div className="aqh-page-container">
           <div className="aqh-header-block">
-          <div className="prof-breadcrumb"><Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link></div>
+          <div className="page-breadcrumb"><Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link></div>
           {/* Page Header */}
           <div className="aqh-page-header">
             <div className="aqh-title-section">

@@ -16,7 +16,7 @@
   gap: 1rem;
 }
 
-.dss-status-container .prof-breadcrumb {
+.dss-status-container .page-breadcrumb {
   display: flex;
   align-items: center;
 }

@@ -65,7 +65,7 @@
   gap: 1rem;
 }
 
-.dss-status-container .prof-breadcrumb {
+.dss-status-container .page-breadcrumb {
   display: flex;
   align-items: center;
 }
@@ -841,7 +841,7 @@
 }
 
 /* ─── Breadcrumb (self-contained copy) ───────────────────────────────────── */
-.breadcrumb-link {
+.dss-status-container .breadcrumb-link {
   outline: none;
   text-decoration: none;
   background: transparent;
@@ -861,12 +861,12 @@
   appearance: none;
 }
 
-.breadcrumb-link:hover {
+.dss-status-container .breadcrumb-link:hover {
   background-color: rgba(34, 197, 94, 0.1);
   color: var(--primary-color);
 }
 
-.breadcrumb-icon {
+.dss-status-container .breadcrumb-icon {
   width: 1.25rem;
   height: 1.25rem;
 }

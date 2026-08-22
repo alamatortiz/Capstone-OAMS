@@ -124,13 +124,13 @@ export default function AdminProfessorAvailability() {
     >
         <div className="apa-page-container">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<UsersIcon className="apa-icon-lg" />}
             iconClassName="apa-title-icon"
             title="Faculty Availability"
             subtitle="Monitor faculty consultation schedules and availability for your department"
             headerClassName="apa-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="apa-title-section"
             titleClassName="apa-page-title"
             subtitleClassName="apa-page-subtitle"

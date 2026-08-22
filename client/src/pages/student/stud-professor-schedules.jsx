@@ -234,10 +234,11 @@ export default function ProfessorSchedule() {
               )
             }
             icon={<GraduationCapIcon />}
+            iconClassName="psched-title-icon"
             title="Professor Schedules"
             subtitle="Check professor consultation hours and availability across all departments."
             headerClassName="psched-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="psched-title-section"
             titleClassName="psched-title"
             subtitleClassName="psched-subtitle"
@@ -245,7 +246,7 @@ export default function ProfessorSchedule() {
 
           {/* Loading state */}
           {loading && (
-            <div className="empty-state">
+            <div className="psched-empty-state">
               <Loader2Icon style={{ animation: "spin 1s linear infinite" }} />
               <p>Loading professor schedules…</p>
             </div>
@@ -253,11 +254,11 @@ export default function ProfessorSchedule() {
 
           {/* Error state */}
           {!loading && loadError && (
-            <div className="empty-state">
+            <div className="psched-empty-state">
               <AlertCircle />
               <p>{loadError}</p>
               <button
-                className="breadcrumb-link"
+                className="psched-retry-btn"
                 style={{ marginTop: "0.5rem" }}
                 onClick={fetchSchedules}
               >
@@ -270,7 +271,7 @@ export default function ProfessorSchedule() {
           {!loading && !loadError && viewMode === "departments" && (
             <div className="departments-grid">
               {departments.length === 0 ? (
-                <div className="empty-state">
+                <div className="psched-empty-state">
                   <AlertCircle />
                   <p>No faculty schedules are available yet.</p>
                 </div>
@@ -335,7 +336,7 @@ export default function ProfessorSchedule() {
                 {/* Professors List */}
                 <div className="professors-list">
                   {(selectedDepartment.faculty?.length ?? 0) === 0 ? (
-                    <div className="empty-state">
+                    <div className="psched-empty-state">
                       <AlertCircle />
                       <p>No faculty members found for this department.</p>
                     </div>

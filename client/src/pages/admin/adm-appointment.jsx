@@ -410,13 +410,13 @@ export default function AdminAppointment() {
     >
         <div className="admin-appointment-container">
           <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="prof-breadcrumb-link"><ChevronLeft />Home</Link>}
+            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<CalendarIconNav />}
             iconClassName="admin-appointment-title-icon"
             title="Centralized Appointment Management"
             subtitle={`Monitor and manage appointments for ${authUser?.departmentName ?? "your department"}`}
             headerClassName="admin-appointment-page-header"
-            breadcrumbClassName="prof-breadcrumb"
+            breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="admin-appointment-title-section"
             titleClassName="admin-appointment-page-title"
             subtitleClassName="admin-appointment-page-subtitle"

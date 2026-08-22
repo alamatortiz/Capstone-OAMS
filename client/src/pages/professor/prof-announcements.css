@@ -159,7 +159,7 @@ body {
   gap: 1rem;
 }
 
-.announcements-page .prof-breadcrumb {
+.announcements-page .page-breadcrumb {
   display: flex;
   align-items: center;
 }
@@ -221,12 +221,20 @@ body {
   stroke: currentColor;
 }
 
-.announcements-page .queue-title-icon {
+.ann-title-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
-.announcements-page .queue-title-icon svg {
+.ann-title-icon svg {
   width: 1.75rem;
   height: 1.75rem;
   stroke: currentColor;

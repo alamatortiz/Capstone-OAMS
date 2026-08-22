@@ -150,10 +150,11 @@ export default function StudentNotifications() {
             </Link>
           }
           icon={<Bell />}
+          iconClassName="notif-title-icon"
           title="Notifications"
           subtitle="Stay updated on queue, document, appointment, and announcement activity."
           headerClassName="notif-header"
-          breadcrumbClassName="prof-breadcrumb"
+          breadcrumbClassName="page-breadcrumb"
           titleSectionClassName="notif-title-section"
           titleClassName="notif-title"
           subtitleClassName="notif-subtitle"

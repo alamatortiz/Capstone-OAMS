@@ -154,15 +154,15 @@ body {
   gap: 1rem;
 }
 
-.queue-breadcrumb {
+.page-breadcrumb {
   display: flex;
   align-items: center;
 }
 
-.breadcrumb-link,
-.breadcrumb-link:visited,
-.breadcrumb-link:active,
-.breadcrumb-link:focus {
+.queue-page .breadcrumb-link,
+.queue-page .breadcrumb-link:visited,
+.queue-page .breadcrumb-link:active,
+.queue-page .breadcrumb-link:focus {
   outline: none;
   background: transparent;
   border: none;
@@ -182,12 +182,12 @@ body {
   appearance: none;
 }
 
-.breadcrumb-link:hover {
+.queue-page .breadcrumb-link:hover {
   background-color: rgba(34, 197, 94, 0.1);
   color: var(--primary-color);
 }
 
-.breadcrumb-icon {
+.queue-page .breadcrumb-icon {
   width: 1.25rem;
   height: 1.25rem;
 }

@@ -191,7 +191,7 @@ export default function AdminFaqs() {
       <div className="faq-admin-page">
         <PageHeader
           breadcrumb={
-            <Link to="/admin/announcements" className="prof-breadcrumb-link">
+            <Link to="/admin/announcements" className="page-breadcrumb-link">
               <ChevronLeft />
               Announcements
             </Link>
@@ -201,7 +201,7 @@ export default function AdminFaqs() {
           title="FAQ Management"
           subtitle={`Manage frequently asked questions for ${user?.college || "your department"}`}
           headerClassName="faq-header-row"
-          breadcrumbClassName="prof-breadcrumb"
+          breadcrumbClassName="page-breadcrumb"
           titleSectionClassName="faq-title-section"
           titleClassName="faq-page-title"
           subtitleClassName="faq-page-subtitle"

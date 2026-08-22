@@ -818,7 +818,7 @@ export default function StudentDashboard() {
                 <p className="stud-hours-empty">
                   {officeHoursError}{" "}
                   <button
-                    className="breadcrumb-link"
+                    className="office-hours-retry-btn"
                     style={{ display: "inline", padding: 0 }}
                     onClick={fetchOfficeHours}
                   >

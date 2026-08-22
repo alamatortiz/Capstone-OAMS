@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { FileText, Megaphone, Calendar } from "lucide-react";
+import { FileText, Megaphone, Calendar, CalendarClock } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
@@ -278,7 +278,7 @@ export default function ProfessorDashboard() {
     {
       label: "Schedule Manager",
       description: "Set your weekly availability schedule for appointments.",
-      icon: CalendarIcon,
+      icon: CalendarClock,
       path: "/professor/schedule-manager",
       gradientIndex: 3,
       // no badge — the professor's schedule doesn't have a single live count
