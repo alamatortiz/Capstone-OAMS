@@ -5,8 +5,10 @@ import { ChevronLeft } from "lucide-react";
 import "./adm-queue-analytics.css";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
+import { toast } from "sonner";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
+import { getManilaDateString } from "../../utils/dateTime";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const DownloadIcon = () => (
@@ -254,6 +256,29 @@ export default function AdminQueueAnalytics() {
     ? Math.round(performance.reduce((sum, p) => sum + (p.satisfaction || 0), 0) / performance.length)
     : 0;
 
+  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const handleExportReport = () => {
+    const header = ["Service", "College", "Status", "Students Served", "Avg Wait", "Peak Hours", "Satisfaction"];
+    const rows = performance.map((item) => [
+      item.service,
+      item.college,
+      item.status,
+      item.studentsServed,
+      item.avgWait,
+      item.peakHours,
+      item.satisfaction,
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `queue-analytics-${getManilaDateString()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Export complete");
+  };
+
   const getStatusColor = (status) => {
     if (status === "excellent") return "aqa-status-excellent";
     if (status === "good") return "aqa-status-good";
@@ -293,7 +318,7 @@ export default function AdminQueueAnalytics() {
                 <p className="aqa-filters-sub">Customize your analytics view</p>
               </div>
               <div className="aqa-filters-actions">
-                <button className="aqa-btn-outline">
+                <button className="aqa-btn-outline" onClick={handleExportReport}>
                   <DownloadIcon /> Export Report
                 </button>
                 <button className="aqa-btn-outline">

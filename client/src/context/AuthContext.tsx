@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import api from "../utils/api";
 
-type Role = "student" | "faculty" | "admin";
+type Role = "student" | "faculty" | "admin" | "superadmin";
 
 type UserData = {
   userId: number;

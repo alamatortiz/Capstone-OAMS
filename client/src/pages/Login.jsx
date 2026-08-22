@@ -78,6 +78,7 @@ export default function Login({ registerAudience }) {
             student: "/student/dashboard",
             faculty: "/professor/dashboard",
             admin: "/admin/dashboard",
+            superadmin: "/superadmin/dashboard",
           };
           navigate(roleRoutes[userData.role] ?? "/dashboard");
         }, 500);

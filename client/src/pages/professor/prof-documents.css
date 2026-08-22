@@ -71,7 +71,15 @@
   height: 1.75rem;
 }
 
-.doc-request-btn {
+.doc-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  align-items: flex-start;
+}
+
+.doc-request-btn,
+.doc-send-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -90,12 +98,14 @@
   width: fit-content;
 }
 
-.doc-request-btn:hover {
+.doc-request-btn:hover,
+.doc-send-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
 }
 
-.doc-request-btn svg {
+.doc-request-btn svg,
+.doc-send-btn svg {
   width: 1rem;
   height: 1rem;
 }
@@ -888,7 +898,13 @@
     align-items: flex-start;
   }
 
-  .doc-request-btn {
+  .doc-action-buttons {
+    align-self: stretch;
+    justify-content: center;
+  }
+
+  .doc-request-btn,
+  .doc-send-btn {
     align-self: stretch;
     justify-content: center;
   }
@@ -900,6 +916,81 @@
   .doc-card-field-full {
     grid-column: 1;
   }
+}
+
+/* ===== ATTACHMENTS (Send a Document) ===== */
+.doc-attach-input {
+  width: 100%;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+.doc-attach-budget {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.doc-attach-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  text-align: left;
+}
+
+.doc-attach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+
+.doc-attach-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.6rem;
+  background: var(--input-background);
+}
+
+.doc-attach-filename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.doc-attach-filename svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.doc-attach-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.doc-attach-remove:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 @media (max-width: 640px) {

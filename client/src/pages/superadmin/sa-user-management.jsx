@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import "./adm-user-management.css";
+import "./sa-user-management.css";
 import { toast } from "sonner";
-import AdminPageShell from "../../components/AdminPageShell";
+import SuperadminPageShell from "../../components/SuperadminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
-import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaDateTime, getManilaDateString } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import api from "../../utils/api";
@@ -100,8 +100,12 @@ const COLLEGE_OPTIONS = COLLEGES.map((c) => ({
 
 const BLANK_FORM = { name: "", email: "", role: "student", college: "", employeeId: "", studentId: "", status: "active" };
 
+// Matches the working CSV pattern already used by prof-transactions.jsx /
+// adm-transactions.jsx -- client-side generation, no backend export route.
+const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function AdminUserManagement() {
+export default function SuperadminUserManagement() {
   // ── User-management state ────────────────────────────────────────────────────
   const [users, setUsers]           = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -117,7 +121,6 @@ export default function AdminUserManagement() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
-  // ── Handlers: chat ───────────────────────────────────────────────────────────
   // ── Handlers: CRUD ───────────────────────────────────────────────────────────
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -217,6 +220,26 @@ export default function AdminUserManagement() {
   const safePage = Math.min(page, totalPages);
   const displayUsers = displayUsersAll.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  // Exports the currently-filtered list (respects search/role/status filters),
+  // matching the CSV pattern already used by prof-transactions.jsx / adm-transactions.jsx.
+  const handleExport = () => {
+    const header = ["Name", "Email", "Role", "College", "Student ID", "Employee ID", "Status", "Last Login", "Created Date"];
+    const rows = filtered.map((u) => [
+      u.name, u.email, u.role, u.college, u.studentId || "", u.employeeId || "", u.status,
+      u.lastLogin ? formatManilaDateTime(u.lastLogin) : "",
+      u.createdDate ? formatManilaDate(u.createdDate) : "",
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `users-${getManilaDateString()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Export complete");
+  };
+
   // ── Confirm-modal copy, derived from the pending action ──────────────────────
   const confirmSuspending = confirmAction?.user.status !== "suspended";
   const confirmMeta = confirmAction && {
@@ -243,7 +266,7 @@ export default function AdminUserManagement() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <AdminPageShell
+    <SuperadminPageShell
       outerClassName="admin-dashboard-with-sidebar"
       mainClassName="admin-dashboard-main"
       overlay={
@@ -335,7 +358,7 @@ export default function AdminUserManagement() {
         <div className="aum-content">
           <PageHeader
             breadcrumb={
-              <Link to="/admin/dashboard" className="page-breadcrumb-link">
+              <Link to="/superadmin/dashboard" className="page-breadcrumb-link">
                 <ChevronLeft />Home
               </Link>
             }
@@ -361,7 +384,7 @@ export default function AdminUserManagement() {
                 </div>
               </div>
               <div className="aum-filter-actions">
-                <button className="aum-sm-btn" onClick={() => toast.success("Export started")}><DownloadIcon /> Export</button>
+                <button className="aum-sm-btn" onClick={handleExport}><DownloadIcon /> Export</button>
                 <button className="aum-sm-btn" onClick={() => toast.info("Import feature coming soon")}><UploadIcon /> Import</button>
                 <button className="aum-sm-btn" onClick={() => { fetchUsers(); toast.success("Data refreshed"); }}><RefreshIcon /> Refresh</button>
               </div>
@@ -456,6 +479,6 @@ export default function AdminUserManagement() {
           </div>
 
         </div>
-    </AdminPageShell>
+    </SuperadminPageShell>
   );
 }

@@ -10,6 +10,7 @@ import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import { getManilaDateString } from "../../utils/dateTime";
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -524,6 +525,28 @@ export default function AdminDataManagement() {
       return `Deleted: ${v.name || "record"}`;
     }
     return "";
+  };
+
+  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const handleExportLogs = () => {
+    const header = ["Timestamp", "Action", "Admin", "Admin Email", "Target", "Change Summary"];
+    const rows = auditLogs.map((log) => [
+      log.timestamp,
+      log.action,
+      log.adminName,
+      log.adminEmail,
+      formatTargetLabel(log),
+      formatChangeSummary(log),
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `audit-logs-${getManilaDateString()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Export complete");
   };
 
   // ── Render ─────────────────────────────────────────────────
@@ -1079,7 +1102,7 @@ export default function AdminDataManagement() {
                     <h2 className="adm-card-title">System Audit Logs</h2>
                     <p className="adm-card-desc">Track all administrative actions for {user?.departmentAbbrev}</p>
                   </div>
-                  <button className="adm-btn-outline" onClick={() => toast.success("Logs exported successfully.")}>
+                  <button className="adm-btn-outline" onClick={handleExportLogs}>
                     <DownloadIcon />
                     Export Logs
                   </button>

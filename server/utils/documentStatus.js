@@ -78,6 +78,17 @@ const CANCEL_CONFIG = {
                 FOR UPDATE`,
     updateSql: `UPDATE document_submissions SET status = 'cancelled' WHERE submission_id = ?`,
   },
+  // Faculty's own "Send a Document" submissions -- same document_submissions
+  // table as `submission` above (submitter_type = 'faculty' rows), just
+  // keyed by faculty_id instead of student_id.
+  facultySubmission: {
+    ownerColumn: "faculty_id",
+    selectSql: `SELECT faculty_id, status, department_id
+                FROM document_submissions
+                WHERE submission_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE document_submissions SET status = 'cancelled' WHERE submission_id = ?`,
+  },
 };
 
 // Shared soft-cancel flow for a "my own pending/processing document request"

@@ -13,6 +13,15 @@ import { getDocStatusHubMeta } from "../../utils/documentStatus";
 
 import { ChevronLeft, XCircle, FileText, CheckCircle2 } from "lucide-react";
 
+// Mirrors the server's limits (server/middleware/upload.js) -- purely
+// advisory here for the running-total UI, the server stays authoritative.
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+const ATTACHMENT_ACCEPT =
+  ".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip";
+const formatBytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+
 // ─── Icons ────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -76,6 +85,49 @@ export default function ProfessorDocumentRequest() {
     neededBy: "",
   });
 
+  // ── "Send a Document" form state ───────────────────────────────────────
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sendSubmitting, setSendSubmitting] = useState(false);
+  const [sendFormData, setSendFormData] = useState({
+    title: "",
+    purpose: "",
+    neededBy: "",
+  });
+  const [sendFiles, setSendFiles] = useState([]); // { id, file }[]
+
+  // Accepts as many of the newly-picked files as still fit under MAX_FILES /
+  // MAX_TOTAL_BYTES, rejecting anything individually over MAX_FILE_BYTES
+  // outright -- mirrors stud-documents.jsx's addSendFiles().
+  const addSendFiles = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    const accepted = [];
+    let count = sendFiles.length;
+    let bytes = sendFiles.reduce((sum, f) => sum + f.file.size, 0);
+    let tooLarge = 0;
+    let overBudget = 0;
+    for (const file of incoming) {
+      if (file.size > MAX_FILE_BYTES) {
+        tooLarge += 1;
+        continue;
+      }
+      if (count + 1 > MAX_FILES || bytes + file.size > MAX_TOTAL_BYTES) {
+        overBudget += 1;
+        continue;
+      }
+      accepted.push({ id: Date.now() + Math.random(), file });
+      count += 1;
+      bytes += file.size;
+    }
+    if (accepted.length > 0) setSendFiles((prev) => [...prev, ...accepted]);
+    if (tooLarge > 0) {
+      toast.error(`${tooLarge} file(s) skipped — each file must be ${formatBytes(MAX_FILE_BYTES)} or smaller`);
+    }
+    if (overBudget > 0) {
+      toast.error(`${overBudget} file(s) skipped — attachment limit reached`);
+    }
+  };
+  const removeSendFile = (id) => setSendFiles((prev) => prev.filter((f) => f.id !== id));
+
   // ── Effects ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchDocumentTypes = async () => {
@@ -111,6 +163,7 @@ export default function ProfessorDocumentRequest() {
       setRequests(
         res.data.map((r) => ({
           id: String(r.request_id),
+          kind: r.kind,
           type: r.service_name,
           college: r.college,
           purpose: r.purpose,
@@ -123,6 +176,8 @@ export default function ProfessorDocumentRequest() {
           neededBy: r.needed_by || undefined,
           releasedDate: r.released_at || undefined,
           claimedDate: r.claimed_at || undefined,
+          facultyFiles: r.faculty_files || [],
+          adminFiles: r.admin_files || [],
         })),
       );
       setRequestsError(null);
@@ -192,6 +247,35 @@ export default function ProfessorDocumentRequest() {
       toast.error(err?.response?.data?.message ?? "Failed to submit document request.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSubmitSendDocument = async () => {
+    if (sendSubmitting) return;
+    if (!sendFormData.title.trim() || !sendFormData.purpose.trim()) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    setSendSubmitting(true);
+    try {
+      const body = new FormData();
+      body.append("title", sendFormData.title);
+      body.append("purpose", sendFormData.purpose);
+      body.append("neededBy", sendFormData.neededBy);
+      sendFiles.forEach((f) => body.append("attachments", f.file));
+
+      await api.post("/professor/document-submissions", body);
+      await fetchRequests();
+      setSendDialogOpen(false);
+      setSendFormData({ title: "", purpose: "", neededBy: "" });
+      setSendFiles([]);
+      toast.success("Document sent successfully!");
+    } catch (err) {
+      console.error("Failed to send document:", err);
+      toast.error(err?.response?.data?.message ?? "Failed to send document");
+    } finally {
+      setSendSubmitting(false);
     }
   };
 
@@ -370,6 +454,142 @@ export default function ProfessorDocumentRequest() {
             </div>
           )}
 
+          {/* Send a Document Dialog */}
+          {sendDialogOpen && (
+            <div className="doc-dialog-overlay" onClick={() => setSendDialogOpen(false)}>
+              <div className="doc-dialog" onClick={(e) => e.stopPropagation()}>
+                <div className="doc-dialog-header">
+                  <div>
+                    <h2>Send a Document</h2>
+                  </div>
+                  <button
+                    className="doc-dialog-close"
+                    onClick={() => setSendDialogOpen(false)}
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+                <form
+                  className="doc-dialog-content"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmitSendDocument();
+                  }}
+                >
+                  <div className="doc-form-group">
+                    <label htmlFor="send-title">Title</label>
+                    <input
+                      id="send-title"
+                      type="text"
+                      placeholder="Indicate the reason behind your file submission"
+                      value={sendFormData.title}
+                      onChange={(e) =>
+                        setSendFormData({ ...sendFormData, title: e.target.value })
+                      }
+                      className="doc-form-input"
+                      maxLength={255}
+                      required
+                    />
+                  </div>
+
+                  <div className="doc-form-group">
+                    <label htmlFor="send-neededBy">Date Needed (Optional)</label>
+                    <input
+                      id="send-neededBy"
+                      type="date"
+                      min={getManilaTomorrowDateString()}
+                      value={sendFormData.neededBy}
+                      onChange={(e) =>
+                        setSendFormData({ ...sendFormData, neededBy: e.target.value })
+                      }
+                      className="doc-form-input"
+                    />
+                  </div>
+
+                  <div className="doc-form-group">
+                    <label htmlFor="send-purpose">Purpose</label>
+                    <textarea
+                      id="send-purpose"
+                      placeholder="Specify the purpose of sending this document"
+                      value={sendFormData.purpose}
+                      onChange={(e) =>
+                        setSendFormData({ ...sendFormData, purpose: e.target.value })
+                      }
+                      className="doc-form-textarea"
+                      rows={3}
+                      maxLength={255}
+                      required
+                    />
+                  </div>
+
+                  <div className="doc-form-group">
+                    <label htmlFor="send-attachments">
+                      Attachments{" "}
+                      <span className="doc-attach-budget">
+                        ({sendFiles.length}/{MAX_FILES} files, {formatBytes(sendFiles.reduce((sum, f) => sum + f.file.size, 0))}/{formatBytes(MAX_TOTAL_BYTES)})
+                      </span>
+                    </label>
+                    <p className="doc-attach-hint">Each file up to {formatBytes(MAX_FILE_BYTES)}.</p>
+
+                    {sendFiles.length > 0 && (
+                      <div className="doc-attach-list">
+                        {sendFiles.map((f) => (
+                          <div key={f.id} className="doc-attach-chip">
+                            <span className="doc-attach-filename">
+                              <FileText /> {f.file.name}
+                            </span>
+                            <button
+                              type="button"
+                              className="doc-attach-remove"
+                              aria-label={`Remove ${f.file.name}`}
+                              onClick={() => removeSendFile(f.id)}
+                            >
+                              <CloseIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <input
+                      id="send-attachments"
+                      type="file"
+                      multiple
+                      accept={ATTACHMENT_ACCEPT}
+                      className="doc-attach-input"
+                      disabled={sendFiles.length >= MAX_FILES}
+                      onChange={(e) => {
+                        addSendFiles(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                    {sendFiles.length >= MAX_FILES && (
+                      <span className="doc-attach-hint">Attachment limit reached</span>
+                    )}
+                  </div>
+
+                  <div className="doc-dialog-actions">
+                    <button
+                      type="button"
+                      className="doc-btn-secondary"
+                      onClick={() => setSendDialogOpen(false)}
+                      disabled={sendSubmitting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="doc-form-submit"
+                      disabled={sendSubmitting}
+                    >
+                      {sendSubmitting ? "Sending..." : "Send Document"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* Cancel Confirm Dialog */}
           <ActionConfirmModal
             show={cancelTarget !== null}
@@ -412,12 +632,20 @@ export default function ProfessorDocumentRequest() {
           subtitleClassName="doc-subtitle"
         />
 
-        <button
-          className="doc-request-btn"
-          onClick={() => setDialogOpen(true)}
-        >
-          <PlusIcon /> Request Document
-        </button>
+        <div className="doc-action-buttons">
+          <button
+            className="doc-request-btn"
+            onClick={() => setDialogOpen(true)}
+          >
+            <PlusIcon /> Request Document
+          </button>
+          <button
+            className="doc-send-btn"
+            onClick={() => setSendDialogOpen(true)}
+          >
+            <PlusIcon /> Send a Document
+          </button>
+        </div>
 
         {/* Document Tabs */}
         <div className="doc-tabs-container">

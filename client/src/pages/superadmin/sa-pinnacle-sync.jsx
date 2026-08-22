@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import "./adm-pinnacle-sync.css";
-import AdminPageShell from "../../components/AdminPageShell";
+import "./sa-pinnacle-sync.css";
+import SuperadminPageShell from "../../components/SuperadminPageShell";
 import api from "../../utils/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ const ClockIconSm = () => (
   </svg>
 );
 
-export default function AdminPinnacleSync() {
+export default function SuperadminPinnacleSync() {
   const { user: authUser } = useAuth();
 
   // ── PinnaCle Sync state ──────────────────────────────────────────────────────
@@ -221,13 +221,13 @@ export default function AdminPinnacleSync() {
   };
 
   return (
-    <AdminPageShell
+    <SuperadminPageShell
       outerClassName="admin-dashboard-with-sidebar"
       mainClassName="admin-dashboard-main"
     >
         <div className="aps-page">
           <div className="aps-header-block">
-          <div className="page-breadcrumb"><Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link></div>
+          <div className="page-breadcrumb"><Link to="/superadmin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link></div>
           {/* Header */}
           <div className="aps-page-header">
             <div className="aps-title-section">
@@ -501,6 +501,6 @@ export default function AdminPinnacleSync() {
             </div>
           )}
         </div>
-    </AdminPageShell>
+    </SuperadminPageShell>
   );
 }

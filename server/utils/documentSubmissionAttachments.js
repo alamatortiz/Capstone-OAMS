@@ -96,6 +96,33 @@ async function serveStudentDocumentSubmissionFile(res, { submissionId, fileId, s
   res.sendFile(resolvedPath);
 }
 
+// Serves one submission file to the faculty member who owns the submission --
+// exact mirror of serveStudentDocumentSubmissionFile, for the faculty
+// "Send a Document" flow (document_submissions.submitter_type = 'faculty').
+async function serveFacultyDocumentSubmissionFile(res, { submissionId, fileId, facultyId }) {
+  const [[row]] = await pool.query(
+    `SELECT ds.faculty_id, dsf.file_path, dsf.mime_type
+     FROM document_submission_files dsf
+     JOIN document_submissions ds ON ds.submission_id = dsf.submission_id
+     WHERE dsf.file_id = ? AND dsf.submission_id = ?`,
+    [fileId, submissionId],
+  );
+  if (!row) {
+    return res.status(404).json({ error: "File not found" });
+  }
+  if (row.faculty_id !== facultyId) {
+    return res.status(403).json({ error: "You can only view files on your own document submissions" });
+  }
+
+  const resolvedPath = path.join(UPLOAD_DIR, row.file_path);
+  if (!isPathInsideUploadDir(resolvedPath)) {
+    return res.status(400).json({ error: "Invalid file path" });
+  }
+
+  res.type(row.mime_type || "application/octet-stream");
+  res.sendFile(resolvedPath);
+}
+
 // Serves one submission file to an admin of the submission's own department --
 // either direction, so admins can review what the student sent and confirm
 // what they've returned.
@@ -130,5 +157,6 @@ module.exports = {
   validateBudget,
   deleteFiles,
   serveStudentDocumentSubmissionFile,
+  serveFacultyDocumentSubmissionFile,
   serveAdminDocumentSubmissionFile,
 };

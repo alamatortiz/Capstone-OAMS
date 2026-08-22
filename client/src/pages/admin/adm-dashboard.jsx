@@ -100,33 +100,6 @@ const PlusIcon = () => (
     <line x1="5" y1="12" x2="19" y2="12"></line>
   </svg>
 );
-const UserManagementIcon = () => (
-  <svg
-    className="tool-icon-svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-    <circle cx="9" cy="7" r="4"></circle>
-    <circle cx="19" cy="6" r="2"></circle>
-    <circle
-      cx="19"
-      cy="6"
-      r="2.8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-    ></circle>
-    <path d="M19 4l1 1"></path>
-    <path d="M20 7l-1-1"></path>
-    <path d="M18 7l1-1"></path>
-    <path d="M18 5l1 1"></path>
-  </svg>
-);
 const DatabaseIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -145,11 +118,6 @@ const DatabaseIcon = () => (
 const QueueAnalyticsIcon = () => (
   <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="currentColor">
     <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z" />
-  </svg>
-);
-const SyncIcon = () => (
-  <svg className="tool-icon-svg" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
   </svg>
 );
 const QRCodeIcon = () => (
@@ -175,14 +143,11 @@ const HostQueueIcon = () => (
 );
 
 // ── Static tool/action arrays ─────────────────────────────────────────────────
+// User Management and Pinnacle Sync moved to the separate superadmin area
+// (see pages/superadmin/) -- both are system-wide, cross-department tools,
+// not the kind of thing a department-scoped admin ("secretary" role)
+// should be managing.
 const adminTools = [
-  {
-    icon: UserManagementIcon,
-    iconColor: "bg-user-mgmt",
-    title: "User Management",
-    description: "Manage user accounts",
-    path: "/admin/user-management",
-  },
   {
     icon: DatabaseIcon,
     iconColor: "bg-data-mgmt",
@@ -196,13 +161,6 @@ const adminTools = [
     title: "Queue Analytics",
     description: "Performance metrics",
     path: "/admin/queue-analytics",
-  },
-  {
-    icon: SyncIcon,
-    iconColor: "bg-cyan-500",
-    title: "Pinnacle Sync",
-    description: "Data synchronization",
-    path: "/admin/pinnacle-sync",
   },
 ];
 const quickActions = [

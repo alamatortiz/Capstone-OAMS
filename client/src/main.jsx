@@ -65,20 +65,25 @@ const AdminScanDocument = React.lazy(
 const AdminQueueAnalytics = React.lazy(
   () => import("./pages/admin/adm-queue-analytics.jsx"),
 );
-const AdminPinnacleSync = React.lazy(
-  () => import("./pages/admin/adm-pinnacle-sync.jsx"),
-);
 const AdminAnnouncements = React.lazy(
   () => import("./pages/admin/adm-announcements.jsx"),
 );
 const AdminFaqs = React.lazy(
   () => import("./pages/admin/adm-faqs.jsx"),
 );
-const AdminUserManagement = React.lazy(
-  () => import("./pages/admin/adm-user-management.jsx"),
-);
 const AdminDataManagement = React.lazy(
   () => import("./pages/admin/adm-data-management.jsx"),
+);
+
+// Superadmin -- system-wide role, separate from department-scoped admin.
+const SuperadminDashboard = React.lazy(
+  () => import("./pages/superadmin/sa-dashboard.jsx"),
+);
+const SuperadminUserManagement = React.lazy(
+  () => import("./pages/superadmin/sa-user-management.jsx"),
+);
+const SuperadminPinnacleSync = React.lazy(
+  () => import("./pages/superadmin/sa-pinnacle-sync.jsx"),
 );
 
 import AppointmentsPage from "./pages/student/stud-appointments.jsx";
@@ -104,6 +109,9 @@ const ProfessorScheduleManagerPage = React.lazy(
 );
 const ProfessorNotifications = React.lazy(
   () => import("./pages/professor/prof-notifications.jsx"),
+);
+const ProfessorFaqs = React.lazy(
+  () => import("./pages/professor/prof-faqs.jsx"),
 );
 const ProfessorAnnouncementsPage = React.lazy(
   () => import("./pages/professor/prof-announcements.jsx"),
@@ -250,6 +258,14 @@ createRoot(document.getElementById("root")).render(
                 }
               />
               <Route
+                path="/professor/faqs"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ProfessorFaqs />
+                  </Suspense>
+                }
+              />
+              <Route
                 path="/professor/queue"
                 element={<Navigate to="/professor/appointments" replace />}
               />
@@ -382,14 +398,6 @@ createRoot(document.getElementById("root")).render(
                 }
               />
               <Route
-                path="/admin/user-management"
-                element={
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AdminUserManagement />
-                  </Suspense>
-                }
-              />
-              <Route
                 path="/admin/data-management"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
@@ -397,11 +405,34 @@ createRoot(document.getElementById("root")).render(
                   </Suspense>
                 }
               />
+            </Route>
+
+            {/* ─── Protected Superadmin Routes ───────────────────────────────────
+                System-wide role, deliberately kept separate from /admin/* --
+                never shown in any admin nav/tool-card, provisioned by direct
+                SQL only. ─────────────────────────────────────────────────── */}
+            <Route element={<ProtectedRoute allowedRoles={["superadmin"]} />}>
               <Route
-                path="/admin/pinnacle-sync"
+                path="/superadmin/dashboard"
                 element={
                   <Suspense fallback={<LoadingFallback />}>
-                    <AdminPinnacleSync />
+                    <SuperadminDashboard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/superadmin/user-management"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminUserManagement />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/superadmin/pinnacle-sync"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminPinnacleSync />
                   </Suspense>
                 }
               />

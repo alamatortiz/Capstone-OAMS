@@ -89,6 +89,7 @@ function App({ loginAudience }) {
       student: "/student/dashboard",
       faculty: "/professor/dashboard",
       admin: "/admin/dashboard",
+      superadmin: "/superadmin/dashboard",
     };
     navigate(roleRoutes[user?.role] ?? "/login");
   };

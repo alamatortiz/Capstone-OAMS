@@ -3,7 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 interface ProtectedRouteProps {
-  allowedRoles: Array<"student" | "faculty" | "admin">;
+  allowedRoles: Array<"student" | "faculty" | "admin" | "superadmin">;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {

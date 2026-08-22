@@ -2009,11 +2009,15 @@ router.get(
            ds.created_at,
            ds.needed_by,
            ds.claimed_at,
-           CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-           st.student_number AS student_id,
+           ds.submitter_type,
+           COALESCE(st.first_name, f.first_name) AS first_name,
+           COALESCE(st.last_name, f.last_name) AS last_name,
+           st.student_number,
+           f.employee_id,
            d.department_abbreviation AS college
          FROM document_submissions ds
-         JOIN students st ON ds.student_id = st.student_id
+         LEFT JOIN students st ON ds.student_id = st.student_id
+         LEFT JOIN faculty f ON ds.faculty_id = f.faculty_id
          JOIN departments d ON ds.department_id = d.department_id
          WHERE ds.department_id = ?
          ORDER BY ds.created_at DESC`,
@@ -2026,29 +2030,34 @@ router.get(
         getSubmissionFilesMap(submissionIds, "admin_return"),
       ]);
 
-      const documents = rows.map((r) => ({
-        id: `sub-${r.submission_id}`,
-        trackingNumber: r.tracking_number,
-        studentName: r.student_name,
-        studentId: r.student_id,
-        requesterName: r.student_name,
-        requesterIdLabel: "Student ID",
-        requesterIdValue: r.student_id,
-        college: r.college,
-        documentType: r.title,
-        purpose: r.purpose,
-        requestDate: r.created_at instanceof Date
-          ? getManilaDateString(r.created_at)
-          : String(r.created_at).split("T")[0],
-        status: STATUS_LABEL_MAP[r.status] ?? r.status,
-        notes: r.notes || "",
-        neededBy: r.needed_by || null,
-        claimedDate: r.claimed_at || null,
-        requiresCoding: false,
-        officialCode: null,
-        studentFiles: studentFilesMap[r.submission_id] || [],
-        adminFiles: adminFilesMap[r.submission_id] || [],
-      }));
+      const documents = rows.map((r) => {
+        const requesterName = `${r.first_name} ${r.last_name}`;
+        const requesterIdValue = r.submitter_type === "faculty" ? r.employee_id : r.student_number;
+        return {
+          id: `sub-${r.submission_id}`,
+          trackingNumber: r.tracking_number,
+          studentName: requesterName,
+          studentId: requesterIdValue,
+          requesterName,
+          requesterIdLabel: r.submitter_type === "faculty" ? "Employee ID" : "Student ID",
+          requesterIdValue,
+          submitterType: r.submitter_type,
+          college: r.college,
+          documentType: r.title,
+          purpose: r.purpose,
+          requestDate: r.created_at instanceof Date
+            ? getManilaDateString(r.created_at)
+            : String(r.created_at).split("T")[0],
+          status: STATUS_LABEL_MAP[r.status] ?? r.status,
+          notes: r.notes || "",
+          neededBy: r.needed_by || null,
+          claimedDate: r.claimed_at || null,
+          requiresCoding: false,
+          officialCode: null,
+          studentFiles: studentFilesMap[r.submission_id] || [],
+          adminFiles: adminFilesMap[r.submission_id] || [],
+        };
+      });
 
       res.json({ documents });
     } catch (error) {
@@ -2094,7 +2103,7 @@ router.patch(
       }
 
       const [[submission]] = await pool.query(
-        `SELECT submission_id, student_id, status, department_id FROM document_submissions WHERE submission_id = ?`,
+        `SELECT submission_id, student_id, faculty_id, status, department_id FROM document_submissions WHERE submission_id = ?`,
         [submissionId],
       );
 
@@ -2169,8 +2178,11 @@ router.patch(
 
       await logAudit(adminId, "UPDATE", "document_submissions", submissionId, { status: submission.status }, { status: dbStatus });
 
-      emitToUser(submission.student_id, "document:status-updated", { requestId: submissionId, status });
-      createNotification(submission.student_id, `Your sent document is now ${status}.`, "document");
+      // Submitter is either a student or a faculty member (never both, per
+      // the submitter_type CHECK constraint) -- notify whichever one sent it.
+      const submitterId = submission.student_id ?? submission.faculty_id;
+      emitToUser(submitterId, "document:status-updated", { requestId: submissionId, status });
+      createNotification(submitterId, `Your sent document is now ${status}.`, "document");
 
       res.json({ message: "Document submission status updated", submissionId, status });
     } catch (error) {
@@ -3827,7 +3839,7 @@ router.get(
 router.get(
   "/pinnacle-sync/config",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     try {
       const [rows] = await pool.query(
@@ -3851,7 +3863,7 @@ router.get(
 router.post(
   "/pinnacle-sync/config",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     const { apiUrl, apiKey, syncInterval, syncEnabled } = req.body;
     const adminId = req.user.userId;
@@ -3882,13 +3894,13 @@ router.post(
 router.get(
   "/pinnacle-sync/stats",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     try {
       const [roleRows] = await pool.query(
         `SELECT role, COUNT(*) AS cnt FROM users GROUP BY role`,
       );
-      const counts = { student: 0, faculty: 0, admin: 0 };
+      const counts = { student: 0, faculty: 0, admin: 0, superadmin: 0 };
       let total = 0;
       for (const r of roleRows) {
         counts[r.role] = parseInt(r.cnt, 10);
@@ -3925,7 +3937,7 @@ router.get(
 router.post(
   "/pinnacle-sync/trigger",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     try {
       const [result] = await pool.query(
@@ -4103,7 +4115,7 @@ router.get(
 router.get(
   "/users",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     try {
       const [studentRows] = await pool.query(
@@ -4170,7 +4182,7 @@ router.get(
 router.put(
   "/users/:id",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     const { name, email, college, studentId, employeeId, status } = req.body;
@@ -4227,7 +4239,7 @@ router.put(
 router.patch(
   "/users/:id/status",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     const { status } = req.body;
@@ -4255,7 +4267,7 @@ router.patch(
 router.delete(
   "/users/:id",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     const adminId = req.user.userId;
@@ -4280,7 +4292,7 @@ router.delete(
 router.post(
   "/users/:id/reset-password",
   authenticateToken,
-  authorizeRoles("admin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     const adminId = req.user.userId;

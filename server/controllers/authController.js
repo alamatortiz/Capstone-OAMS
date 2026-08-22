@@ -46,6 +46,16 @@ const fetchUserProfile = async (userId, role) => {
       LEFT JOIN departments d ON a.department_id = d.department_id
       WHERE u.user_id = ?
     `;
+  } else if (role === "superadmin") {
+    // No department_id -- superadmin is system-wide by design, so the
+    // profile has no department_name/department_abbreviation fields at all.
+    query = `
+      SELECT u.user_id, u.role, u.status,
+             sa.employee_id, sa.first_name, sa.last_name, sa.email
+      FROM users u
+      JOIN superadmins sa ON u.user_id = sa.superadmin_id
+      WHERE u.user_id = ?
+    `;
   } else {
     throw new Error("Invalid user role");
   }
@@ -72,11 +82,15 @@ const login = async (req, res) => {
       LEFT JOIN students s ON u.user_id = s.student_id
       LEFT JOIN faculty f ON u.user_id = f.faculty_id
       LEFT JOIN administrators a ON u.user_id = a.admin_id
-      WHERE s.student_number = ? OR f.employee_id = ? OR a.employee_id = ? OR s.email = ? OR f.email = ? OR a.email = ?
+      LEFT JOIN superadmins sa ON u.user_id = sa.superadmin_id
+      WHERE s.student_number = ? OR f.employee_id = ? OR a.employee_id = ? OR sa.employee_id = ?
+         OR s.email = ? OR f.email = ? OR a.email = ? OR sa.email = ?
       LIMIT 1
     `;
 
     const [users] = await pool.query(userQuery, [
+      emailOrSchoolId,
+      emailOrSchoolId,
       emailOrSchoolId,
       emailOrSchoolId,
       emailOrSchoolId,

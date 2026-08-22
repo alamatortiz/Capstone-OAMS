@@ -30,7 +30,7 @@ CREATE TABLE departments (
 CREATE TABLE users (
     user_id             INT          AUTO_INCREMENT PRIMARY KEY,
     password            VARCHAR(255) NOT NULL,
-    role                ENUM('student','faculty','admin') NOT NULL,
+    role                ENUM('student','faculty','admin','superadmin') NOT NULL,
     status              ENUM('active','inactive','suspended') DEFAULT 'active',
     last_login_at       TIMESTAMP    NULL,
     failed_login_attempts INT        NOT NULL DEFAULT 0,
@@ -73,7 +73,11 @@ CREATE TABLE faculty (
     INDEX idx_faculty_dept (department_id)
 );
 
--- NOTE: No super_admin role. Admins are scoped to their department_id.
+-- NOTE: 'admin' (College Office Admin) is always department-scoped -- a
+-- secretary-level role handling one department's own operational work.
+-- System-wide concerns (Pinnacle Sync, cross-department User Management)
+-- belong to the separate 'superadmin' role below instead, which
+-- deliberately has no department_id at all -- see the superadmins table.
 CREATE TABLE administrators (
     admin_id        INT          PRIMARY KEY,
     employee_id     VARCHAR(20)  NOT NULL UNIQUE,
@@ -84,6 +88,20 @@ CREATE TABLE administrators (
     department_id   INT          NOT NULL,
     FOREIGN KEY (admin_id)      REFERENCES users(user_id)       ON DELETE CASCADE,
     FOREIGN KEY (department_id) REFERENCES departments(department_id)
+);
+
+-- System-wide role, not scoped to any department -- exists purely for
+-- Pinnacle Sync and cross-department User Management (see authorizeRoles
+-- call sites in adminRoutes.js's PINNACLE SYNC / USER ACCOUNT MANAGEMENT
+-- sections). Provisioned by direct SQL only; there is deliberately no
+-- self-registration or admin-driven creation path for this role.
+CREATE TABLE superadmins (
+    superadmin_id   INT          PRIMARY KEY,
+    employee_id     VARCHAR(20)  NOT NULL UNIQUE,
+    first_name      VARCHAR(50)  NOT NULL,
+    last_name       VARCHAR(50)  NOT NULL,
+    email           VARCHAR(100) NOT NULL UNIQUE,
+    FOREIGN KEY (superadmin_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -459,10 +477,18 @@ CREATE TABLE qr_tracking_logs (
 CREATE TABLE document_submissions (
     submission_id   INT          AUTO_INCREMENT PRIMARY KEY,
     tracking_number VARCHAR(50)  NOT NULL UNIQUE, -- assigned via trigger below (SUB-00001, ...)
-    student_id      INT          NOT NULL,
+    -- Exactly one of student_id/faculty_id is set, per submitter_type --
+    -- enforced by the CHECK constraint below, not just convention. Faculty
+    -- submissions reuse this same table/attachment pipeline rather than a
+    -- parallel faculty_document_submissions table, since
+    -- document_submission_files and documentStatus.js's CANCEL_CONFIG were
+    -- both already built to generalize over multiple owner columns.
+    student_id      INT          NULL,
+    faculty_id      INT          NULL,
+    submitter_type  ENUM('student','faculty') NOT NULL DEFAULT 'student',
     -- Direct FK, unlike document_requests.service_id -- there's no
     -- document_services concept here (no type/copies/coding), so the
-    -- department is resolved once at creation time from the student's own
+    -- department is resolved once at creation time from the submitter's own
     -- department_id and stored directly.
     department_id   INT          NOT NULL,
     title           VARCHAR(255) NOT NULL, -- student-authored; stands in for "document type" everywhere in the UI
@@ -482,9 +508,15 @@ CREATE TABLE document_submissions (
     -- sweep, mirroring document_requests.escalated_at.
     escalated_at    TIMESTAMP    NULL DEFAULT NULL,
     FOREIGN KEY (student_id)    REFERENCES students(student_id),
+    FOREIGN KEY (faculty_id)    REFERENCES faculty(faculty_id),
     FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    CONSTRAINT chk_document_submissions_one_submitter CHECK (
+        (submitter_type = 'student' AND student_id IS NOT NULL AND faculty_id IS NULL) OR
+        (submitter_type = 'faculty' AND faculty_id IS NOT NULL AND student_id IS NULL)
+    ),
     INDEX idx_document_submissions_tracking (tracking_number),
     INDEX idx_document_submissions_student (student_id),
+    INDEX idx_document_submissions_faculty (faculty_id),
     INDEX idx_document_submissions_dept (department_id)
 );
 
@@ -589,6 +621,11 @@ CREATE TABLE external_sync_logs (
 -- Full audit trail for all admin-initiated actions
 CREATE TABLE audit_logs (
     log_id           INT          AUTO_INCREMENT PRIMARY KEY,
+    -- FKs directly to users, not administrators -- administrators.admin_id
+    -- already mirrors users.user_id 1:1, so this loses nothing for existing
+    -- admin-authored rows, and it lets superadmin actions (logAudit is
+    -- called from the now-superadmin-only Pinnacle Sync / User Management
+    -- routes too) get logged without violating the FK.
     admin_id         INT          NOT NULL,
     action           ENUM('CREATE','READ','UPDATE','DELETE','LOGIN','LOGOUT','EXPORT') NOT NULL,
     target_table     VARCHAR(100),
@@ -598,7 +635,7 @@ CREATE TABLE audit_logs (
     ip_address       VARCHAR(45),
     user_agent       TEXT,
     created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES administrators(admin_id)
+    FOREIGN KEY (admin_id) REFERENCES users(user_id)
 );
 
 -- System configuration controlled by admins

@@ -13,6 +13,15 @@ const { isValidTransition } = require("../utils/appointmentStatus");
 const { cancelOwnDocumentRequest } = require("../utils/documentStatus");
 const { sendServerError } = require("../utils/errorResponse");
 const { getAttachmentsMap, serveAnnouncementAttachment } = require("../utils/announcementAttachments");
+const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
+const {
+  getFilesMap,
+  getFiles,
+  insertFiles,
+  validateBudget,
+  deleteFiles,
+  serveFacultyDocumentSubmissionFile,
+} = require("../utils/documentSubmissionAttachments");
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const VALID_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -1182,6 +1191,11 @@ router.get(
 );
 
 // GET /api/professor/documents
+// Merges the old fixed-type faculty_document_requests with the newer
+// free-form document_submissions ('Send a Document', submitter_type =
+// 'faculty') -- mirrors studentRoutes.js's own combined GET /documents.
+// request_id is returned prefixed ("req-12"/"sub-7") since the two source
+// tables' auto-increment ids would otherwise collide once merged.
 router.get(
   "/documents",
   authenticateToken,
@@ -1190,16 +1204,71 @@ router.get(
     const facultyId = req.user.userId;
     try {
       const [rows] = await pool.query(
-        `SELECT fdr.*, ds.service_name, ds.processing_time,
-                d.department_name AS college
-         FROM faculty_document_requests fdr
-         JOIN document_services ds ON fdr.service_id = ds.service_id
-         JOIN departments d ON ds.department_id = d.department_id
-         WHERE fdr.faculty_id = ?
-         ORDER BY fdr.created_at DESC`,
-        [facultyId]
+        `SELECT * FROM (
+           (
+             SELECT
+               'request' AS kind,
+               fdr.request_id AS request_id,
+               fdr.tracking_number,
+               fdr.request_type AS service_name,
+               fdr.purpose,
+               fdr.copies,
+               fdr.status,
+               fdr.estimated_completion,
+               fdr.needed_by,
+               fdr.released_at,
+               fdr.claimed_at,
+               fdr.notes,
+               fdr.created_at,
+               d.department_name AS college
+             FROM faculty_document_requests fdr
+             JOIN document_services ds ON fdr.service_id = ds.service_id
+             JOIN departments d ON ds.department_id = d.department_id
+             WHERE fdr.faculty_id = ?
+           )
+           UNION ALL
+           (
+             SELECT
+               'submission' AS kind,
+               dsub.submission_id AS request_id,
+               dsub.tracking_number,
+               dsub.title AS service_name,
+               dsub.purpose,
+               NULL AS copies,
+               dsub.status,
+               NULL AS estimated_completion,
+               dsub.needed_by,
+               NULL AS released_at,
+               dsub.claimed_at,
+               dsub.notes,
+               dsub.created_at,
+               d.department_name AS college
+             FROM document_submissions dsub
+             JOIN departments d ON dsub.department_id = d.department_id
+             WHERE dsub.faculty_id = ? AND dsub.submitter_type = 'faculty'
+           )
+         ) AS combined
+         ORDER BY created_at DESC`,
+        [facultyId, facultyId],
       );
-      res.json(rows);
+
+      const submissionIds = rows.filter((r) => r.kind === "submission").map((r) => r.request_id);
+      const [facultyFilesMap, adminFilesMap] = await Promise.all([
+        getFilesMap(submissionIds, "student_upload"),
+        getFilesMap(submissionIds, "admin_return"),
+      ]);
+
+      const documents = rows.map((r) => {
+        const rawId = r.request_id;
+        const doc = { ...r, request_id: `${r.kind === "submission" ? "sub" : "req"}-${rawId}` };
+        if (r.kind === "submission") {
+          doc.faculty_files = facultyFilesMap[rawId] || [];
+          doc.admin_files = adminFilesMap[rawId] || [];
+        }
+        return doc;
+      });
+
+      res.json(documents);
     } catch (err) {
       sendServerError(res, err, "GET /documents error:");
     }
@@ -1286,26 +1355,30 @@ router.post(
 );
 
 // DELETE /api/professor/documents/:requestId
-// Cancels a pending or processing document request owned by the faculty member.
-// Soft-cancel (status = 'cancelled'), not a real delete, so it stays visible
-// in the faculty member's transaction history the same way a cancelled queue
-// ticket or appointment does.
+// Cancels a pending or processing document request/submission owned by the
+// faculty member. Soft-cancel (status = 'cancelled'), not a real delete, so
+// it stays visible in the faculty member's transaction history the same way
+// a cancelled queue ticket or appointment does. requestId is prefixed
+// ("req-12"/"sub-7") since GET /documents merges two tables whose
+// auto-increment ids would otherwise collide -- mirrors
+// studentRoutes.js's own DELETE /documents/:docId.
 router.delete(
   "/documents/:requestId",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const requestId = parseInt(req.params.requestId, 10);
-
-    if (!requestId || isNaN(requestId)) {
+    const match = /^(req|sub)-(\d+)$/.exec(req.params.requestId);
+    if (!match) {
       return res.status(400).json({ message: "Invalid requestId" });
     }
+    const role = match[1] === "sub" ? "facultySubmission" : "faculty";
+    const requestId = parseInt(match[2], 10);
 
     const conn = await pool.getConnection();
     try {
       const result = await cancelOwnDocumentRequest(conn, {
-        role: "faculty",
+        role,
         ownerId: facultyId,
         requestId,
       });
@@ -1318,7 +1391,7 @@ router.delete(
 
       res.json({
         message: "Document request cancelled successfully",
-        requestId,
+        requestId: req.params.requestId,
       });
     } catch (err) {
       await conn.rollback();
@@ -1327,6 +1400,155 @@ router.delete(
       conn.release();
     }
   }
+);
+
+// POST /api/professor/document-submissions ("Send a Document")
+// Body (multipart/form-data): title, purpose, neededBy, attachments[] (max
+// MAX_FILES, 10MB each). No document type/college/copies -- the faculty
+// member can only send to their own department, resolved server-side from
+// faculty.department_id, never trusted from the client. Exact mirror of
+// studentRoutes.js's own POST /document-submissions.
+router.post(
+  "/document-submissions",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  documentSubmissionUpload.upload.array("attachments", MAX_FILES),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { title, purpose, neededBy } = req.body;
+
+    if (!title || !purpose) {
+      deleteFiles(req.files);
+      return res.status(400).json({ message: "title and purpose are required" });
+    }
+    if (title.length > 255) {
+      deleteFiles(req.files);
+      return res.status(400).json({ message: "Title must be 255 characters or fewer" });
+    }
+    if (purpose.length > 255) {
+      deleteFiles(req.files);
+      return res.status(400).json({ message: "Purpose must be 255 characters or fewer" });
+    }
+
+    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    if (neededBy && neededBy < tomorrow) {
+      deleteFiles(req.files);
+      return res.status(400).json({ message: "Needed-by date must be at least tomorrow" });
+    }
+
+    const budgetError = validateBudget(req.files || []);
+    if (budgetError) {
+      deleteFiles(req.files);
+      return res.status(400).json({ message: budgetError });
+    }
+
+    let committed = false;
+    try {
+      const [[fac]] = await pool.query(
+        `SELECT department_id FROM faculty WHERE faculty_id = ?`,
+        [facultyId],
+      );
+      if (!fac) {
+        deleteFiles(req.files);
+        return res.status(404).json({ message: "Faculty member not found" });
+      }
+      const departmentId = fac.department_id;
+
+      // Guard against a double-click/double-tap firing this twice before the
+      // client's own disabled-button state catches up to the first request.
+      const [[recentDup]] = await pool.query(
+        `SELECT submission_id FROM document_submissions
+         WHERE faculty_id = ? AND submitter_type = 'faculty' AND title = ? AND purpose = ?
+           AND status != 'cancelled'
+           AND created_at >= NOW() - INTERVAL 10 SECOND
+         LIMIT 1`,
+        [facultyId, title, purpose],
+      );
+      if (recentDup) {
+        deleteFiles(req.files);
+        return res.status(409).json({ message: "This document was already sent a moment ago" });
+      }
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        const [result] = await conn.query(
+          `INSERT INTO document_submissions (faculty_id, submitter_type, department_id, title, purpose, needed_by, status, created_at)
+           VALUES (?, 'faculty', ?, ?, ?, ?, 'pending', NOW())`,
+          [facultyId, departmentId, title, purpose, neededBy || null],
+        );
+
+        await insertFiles(result.insertId, "student_upload", req.files, facultyId, conn);
+        await conn.commit();
+        committed = true;
+
+        const [[newSub]] = await pool.query(
+          `SELECT ds.submission_id, ds.tracking_number, ds.title, ds.purpose, ds.status,
+                  ds.needed_by, ds.notes, ds.created_at, d.department_name AS college
+           FROM document_submissions ds
+           JOIN departments d ON ds.department_id = d.department_id
+           WHERE ds.submission_id = ?`,
+          [result.insertId],
+        );
+        const facultyFiles = await getFiles(newSub.submission_id, "student_upload");
+
+        emitToDept(departmentId, "document:new-request", { requestId: newSub.submission_id });
+
+        res.status(201).json({
+          message: "Document sent successfully",
+          document: {
+            id: `sub-${newSub.submission_id}`,
+            kind: "submission",
+            type: newSub.title,
+            college: newSub.college,
+            requestDate: newSub.created_at,
+            purpose: newSub.purpose,
+            copies: null,
+            status: newSub.status,
+            trackingNumber: newSub.tracking_number,
+            notes: newSub.notes || undefined,
+            neededBy: newSub.needed_by || undefined,
+            facultyFiles,
+            adminFiles: [],
+          },
+        });
+      } catch (error) {
+        if (!committed) {
+          await conn.rollback();
+          deleteFiles(req.files);
+        }
+        sendServerError(res, error, "Create document submission error");
+      } finally {
+        conn.release();
+      }
+    } catch (error) {
+      if (!committed) deleteFiles(req.files);
+      sendServerError(res, error, "Create document submission error");
+    }
+  },
+);
+
+// GET /api/professor/document-submissions/:submissionId/files/:fileId
+// Serves one file (either the faculty member's own upload or the office's
+// return file) to the faculty member who owns the submission.
+router.get(
+  "/document-submissions/:submissionId/files/:fileId",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const submissionId = parseInt(req.params.submissionId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!submissionId || !fileId) {
+      return res.status(400).json({ message: "Invalid submission or file id" });
+    }
+    try {
+      await serveFacultyDocumentSubmissionFile(res, { submissionId, fileId, facultyId });
+    } catch (error) {
+      sendServerError(res, error, "Get document submission file error");
+    }
+  },
 );
 
 // ─────────────────────────────────────────────────────────────
@@ -1514,6 +1736,50 @@ router.get(
       });
     } catch (error) {
       sendServerError(res, error, "Announcement attachment fetch error");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// FAQS ENDPOINT (read-only, mirrors the student FAQ route)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/professor/faqs
+// Returns only the faculty member's own department's FAQs, in stable
+// insertion order. No create/edit/delete here -- FAQ management stays
+// admin-only, same as the student side.
+router.get(
+  "/faqs",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    try {
+      const [[fac]] = await pool.query(
+        `SELECT department_id FROM faculty WHERE faculty_id = ?`,
+        [facultyId],
+      );
+      const facultyDeptId = fac?.department_id ?? null;
+
+      const [rows] = await pool.query(
+        `SELECT faq_id, question, answer, created_at, updated_at
+         FROM faqs
+         WHERE department_id = ?
+         ORDER BY created_at ASC, faq_id ASC`,
+        [facultyDeptId],
+      );
+
+      res.json({
+        faqs: rows.map((r) => ({
+          id: r.faq_id,
+          question: r.question,
+          answer: r.answer,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      });
+    } catch (error) {
+      sendServerError(res, error, "Fetch FAQs error");
     }
   },
 );

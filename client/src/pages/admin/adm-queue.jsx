@@ -11,7 +11,7 @@ import QueueReasonModal from "../../components/QueueReasonModal";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
 import { getCollegeLogo } from "../../data/collegeLogo";
-import { formatTimeString } from "../../utils/dateTime";
+import { formatTimeString, getManilaDateString } from "../../utils/dateTime";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -240,6 +240,28 @@ export default function AdminQueue() {
     if (entry.status === "no_show") return "No-Show";
     if (entry.status === "serving") return entry.arrivedAt ? "Being Served" : "Called";
     return entry.status;
+  };
+
+  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const handleExportQueueData = () => {
+    const header = ["Queue Number", "Student Name", "Student ID", "Status", "Concern", "Joined At"];
+    const rows = queueEntries.map((entry) => [
+      entry.queueNumber,
+      entry.studentName,
+      entry.studentId,
+      getEntryStatusLabel(entry),
+      entry.concern,
+      entry.joinedAt,
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `queue-${monitoringQueue.id}-${getManilaDateString()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Export complete");
   };
 
   // Re-derive the monitored queue from live data on every refresh, so the
@@ -591,7 +613,10 @@ export default function AdminQueue() {
                       <CloseIcon />
                       Stop Queue
                     </button>
-                    <button className="queue-action-btn queue-action-btn--neutral">
+                    <button
+                      className="queue-action-btn queue-action-btn--neutral"
+                      onClick={handleExportQueueData}
+                    >
                       <TrendingUpIcon />
                       Export Data
                     </button>
