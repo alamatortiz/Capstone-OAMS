@@ -610,10 +610,12 @@ export default function ProfessorDocumentsScreen() {
                             <Text style={styles.docInfoDateValue}>{formatDate(req.neededBy)}</Text>
                           </View>
                         )}
-                        <View style={styles.docInfoField}>
-                          <Text style={styles.docInfoLabel}>Number of Copies</Text>
-                          <Text style={styles.docInfoDateValue}>{req.copies ?? 1}</Text>
-                        </View>
+                        {req.copies != null && (
+                          <View style={styles.docInfoField}>
+                            <Text style={styles.docInfoLabel}>Number of Copies</Text>
+                            <Text style={styles.docInfoDateValue}>{req.copies}</Text>
+                          </View>
+                        )}
                         <View style={[styles.docInfoField, styles.docInfoFieldFull]}>
                           <Text style={styles.docInfoLabel}>Purpose</Text>
                           <Text style={styles.docInfoValue}>{req.purpose}</Text>

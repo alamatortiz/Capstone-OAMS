@@ -900,10 +900,12 @@ function DocumentDetail({
             <Text style={styles.detailValue}>{formatDateTime(doc.claimedDate)}</Text>
           </View>
         )}
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Number of Copies</Text>
-          <Text style={styles.detailValue}>{doc.copies ?? 1}</Text>
-        </View>
+        {doc.copies != null && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Number of Copies</Text>
+            <Text style={styles.detailValue}>{doc.copies}</Text>
+          </View>
+        )}
         <View style={[styles.detailRow, styles.detailRowLast]}>
           <Text style={styles.detailLabel}>Purpose</Text>
           <Text style={styles.detailValue}>{doc.purpose}</Text>
