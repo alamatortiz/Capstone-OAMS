@@ -29,8 +29,6 @@ import {
   Home as HomeIcon,
   Plus,
   QrCode,
-  RefreshCw,
-  UserCog,
   Users,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -129,12 +127,12 @@ interface ToolItem {
   gradient: readonly [string, string];
 }
 
-// Icon backgrounds mirror admin-dashboard.css: bg-user-mgmt, bg-data-mgmt, bg-blue-600, bg-cyan-500
+// User Management and Pinnacle Sync moved to the separate superadmin area
+// (mirrors adm-dashboard.jsx's own comment on the web side).
+// Icon backgrounds mirror admin-dashboard.css: bg-data-mgmt, bg-blue-600
 const adminTools: ToolItem[] = [
-  { key: 'user-management', title: 'User Management', description: 'Manage user accounts', icon: UserCog, gradient: ['#94a3b8', '#64748b'] },
   { key: 'data-management', title: 'Data Management', description: 'Configure settings', icon: Database, gradient: ['#475569', '#334155'] },
   { key: 'queue-analytics', title: 'Queue Analytics', description: 'Performance metrics', icon: BarChart3, gradient: ['#3b82f6', '#2563eb'] },
-  { key: 'pinnacle-sync', title: 'Pinnacle Sync', description: 'Data synchronization', icon: RefreshCw, gradient: ['#06b6d4', '#0891b2'] },
 ];
 
 // Icon backgrounds mirror admin-dashboard.css: bg-scan-doc, bg-blue-500
@@ -326,20 +324,12 @@ export default function AdminDashboardScreen() {
   };
 
   const handleToolPress = (key: string) => {
-    if (key === 'user-management') {
-      router.push('/pages/admin/admin_user_management');
-      return;
-    }
     if (key === 'data-management') {
       router.push('/pages/admin/admin_data_management');
       return;
     }
     if (key === 'queue-analytics') {
       router.push('/pages/admin/admin_queue_analytics');
-      return;
-    }
-    if (key === 'pinnacle-sync') {
-      router.push('/pages/admin/admin_pinnacle_sync');
       return;
     }
     comingSoon();

@@ -17,13 +17,9 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  Calendar,
   CheckCircle,
   ChevronLeft,
-  Clock,
   Database,
-  FileText,
-  History,
   Home as HomeIcon,
   Info,
   RefreshCw,
@@ -35,8 +31,6 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/utils/api';
-import NotificationBell from '@/components/NotificationBell';
-import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -89,7 +83,7 @@ type PinnacleTab = (typeof PINNACLE_TABS)[number];
 type SyncMessageType = 'success' | 'error' | 'warning' | 'info';
 type SyncMessage = { type: SyncMessageType; text: string };
 
-type LucideIconType = typeof Clock;
+type LucideIconType = typeof HomeIcon;
 
 const ALERT_TINTS: Record<SyncMessageType, { bg: string; border: string; color: string; icon: LucideIconType }> = {
   success: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.3)', color: '#4ade80', icon: CheckCircle },
@@ -106,13 +100,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
-  { key: 'queue', label: 'Queue', icon: Clock },
-  { key: 'appointments', label: 'Appointments', icon: Calendar },
-  { key: 'documents', label: 'Documents', icon: FileText },
-  { key: 'transactions', label: 'Transactions', icon: History },
+  { key: 'user-management', label: 'User Management', icon: Users },
+  { key: 'pinnacle-sync', label: 'Pinnacle Sync', icon: RefreshCw },
 ];
 
-export default function AdminPinnacleSyncScreen() {
+export default function SuperadminPinnacleSyncScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -130,9 +122,8 @@ export default function AdminPinnacleSyncScreen() {
 
   const router = useRouter();
   const { user, logout } = useAuth();
-  const adminName = user?.name ?? 'Admin';
-  const adminRole = 'Admin';
-  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+  const adminName = user?.name ?? 'Superadmin';
+  const adminRole = 'Superadmin';
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
@@ -158,7 +149,7 @@ export default function AdminPinnacleSyncScreen() {
   }, []);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
-  const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
+  const goToDashboard = () => router.push('/pages/superadmin/superadmin_dashboard');
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
@@ -166,20 +157,12 @@ export default function AdminPinnacleSyncScreen() {
       goToDashboard();
       return;
     }
-    if (key === 'queue') {
-      router.push('/pages/admin/admin_queue');
+    if (key === 'user-management') {
+      router.push('/pages/superadmin/superadmin_user_management');
       return;
     }
-    if (key === 'appointments') {
-      router.push('/pages/admin/admin_appointment');
-      return;
-    }
-    if (key === 'documents') {
-      router.push('/pages/admin/admin_document_processing');
-      return;
-    }
-    if (key === 'transactions') {
-      router.push('/pages/admin/admin_transactions');
+    if (key === 'pinnacle-sync') {
+      router.push('/pages/superadmin/superadmin_pinnacle_sync');
       return;
     }
   };
@@ -295,12 +278,6 @@ export default function AdminPinnacleSyncScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
-            <NotificationBell
-              endpointBase="admin"
-              theme={theme}
-              typePaths={ADMIN_NOTIFICATION_PATHS}
-              viewAllPath={ADMIN_NOTIFICATIONS_VIEW_ALL}
-            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>
@@ -551,7 +528,6 @@ export default function AdminPinnacleSyncScreen() {
         styles={styles}
         adminName={adminName}
         adminRole={adminRole}
-        adminDepartmentName={adminDepartmentName}
       />
 
       <LogoutModal
@@ -582,7 +558,6 @@ function NavDrawer({
   styles,
   adminName,
   adminRole,
-  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -592,7 +567,6 @@ function NavDrawer({
   styles: ReturnType<typeof createStyles>;
   adminName: string;
   adminRole: string;
-  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -608,7 +582,6 @@ function NavDrawer({
             <View style={styles.drawerRoleBadge}>
               <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>

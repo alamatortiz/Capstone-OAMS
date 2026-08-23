@@ -11,7 +11,7 @@ import api, { setCachedToken } from "../utils/api";
 import { disconnectSocket } from "../utils/socket";
 import { ensureNotificationPermission } from "../utils/notifications";
 
-type Role = "student" | "faculty" | "admin";
+type Role = "student" | "faculty" | "admin" | "superadmin";
 
 type UserData = {
   userId: number;
@@ -44,7 +44,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 // Web calls this role "faculty"; mobile's route segments are named
 // "professor". Keep the server's naming as the source of truth everywhere
 // except here, at the boundary where a role turns into a route path.
-export function getRouteRole(role: Role): "student" | "professor" | "admin" {
+export function getRouteRole(role: Role): "student" | "professor" | "admin" | "superadmin" {
   return role === "faculty" ? "professor" : role;
 }
 

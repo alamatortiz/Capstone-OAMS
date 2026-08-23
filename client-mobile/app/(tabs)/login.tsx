@@ -105,6 +105,9 @@ export default function LoginScreen() {
         case 'admin':
           router.replace('/pages/admin/admin_dashboard');
           break;
+        case 'superadmin':
+          router.replace('/pages/superadmin/superadmin_dashboard');
+          break;
       }
     } catch (error: any) {
       Alert.alert(

@@ -380,6 +380,19 @@ export default function ProfessorAnnouncementScreen() {
             </View>
           </View>
 
+          {/* View FAQs */}
+          <Pressable onPress={() => router.push('/pages/professor/professor_faq')} style={styles.faqBtnWrap}>
+            <LinearGradient
+              colors={['#22c55e', '#16a34a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.faqBtn}
+            >
+              <Ionicons name="help-circle-outline" size={16} color="#ffffff" />
+              <Text style={styles.faqBtnText}>View FAQs</Text>
+            </LinearGradient>
+          </Pressable>
+
           {error && (
             <View style={styles.emptyCard}>
               <Ionicons name="alert-circle-outline" size={32} color={theme.tertiary} />
@@ -649,6 +662,18 @@ function createStyles(theme: ThemePalette) {
       color: theme.subtext,
       marginTop: 3,
     },
+
+    // View FAQs link
+    faqBtnWrap: { alignSelf: 'flex-start' },
+    faqBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 12,
+      paddingVertical: 11,
+      paddingHorizontal: 16,
+    },
+    faqBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
 
     // Retry button (error state)
     collegeFilterBtn: {

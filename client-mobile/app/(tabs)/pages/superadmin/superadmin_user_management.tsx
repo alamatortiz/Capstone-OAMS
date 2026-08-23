@@ -18,16 +18,12 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   AlertCircle,
   Ban,
-  Calendar,
   CheckCircle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Download,
-  FileText,
   Filter,
-  History,
   Home as HomeIcon,
   Key,
   Pencil,
@@ -40,8 +36,6 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import NotificationBell from '@/components/NotificationBell';
-import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -89,12 +83,12 @@ function OamsLogo({
   );
 }
 
-// Unlike the other admin_* screens, GET /api/admin/users (adminRoutes.js) is
-// genuinely system-wide — it joins students/faculty/administrators across
-// every department, not just the signed-in admin's own college. This screen
-// mirrors admin-user-management.jsx (the web page) rather than the
-// design-mockup UserManagementPage.tsx: no stats grid and no "Add User" —
-// there is no POST /users route — and the edit form locks Role, since
+// GET/PUT/DELETE/PATCH /api/admin/users* are superadmin-only (adminRoutes.js)
+// and genuinely system-wide — they join students/faculty/administrators
+// across every department, not just one college. This screen mirrors
+// sa-user-management.jsx (the web page) rather than the design-mockup
+// UserManagementPage.tsx: no stats grid and no "Add User" — there is no
+// POST /users route — and the edit form locks Role, since
 // PUT /api/admin/users/:id treats it as read-only.
 type Role = 'student' | 'professor' | 'admin';
 type Status = 'active' | 'inactive' | 'suspended';
@@ -148,7 +142,7 @@ const STATUS_BADGE_TINTS: Record<Status, { bg: string; border: string; color: st
   suspended: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
 };
 
-type LucideIconType = typeof Clock;
+type LucideIconType = typeof HomeIcon;
 
 interface NavItem {
   key: string;
@@ -158,10 +152,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
-  { key: 'queue', label: 'Queue', icon: Clock },
-  { key: 'appointments', label: 'Appointments', icon: Calendar },
-  { key: 'documents', label: 'Documents', icon: FileText },
-  { key: 'transactions', label: 'Transactions', icon: History },
+  { key: 'user-management', label: 'User Management', icon: Users },
+  { key: 'pinnacle-sync', label: 'Pinnacle Sync', icon: RefreshCw },
 ];
 
 const TABS = [
@@ -199,7 +191,7 @@ function formatDateTime(dateStr: string) {
   });
 }
 
-export default function AdminUserManagementScreen() {
+export default function SuperadminUserManagementScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -222,9 +214,8 @@ export default function AdminUserManagementScreen() {
 
   const router = useRouter();
   const { user, logout } = useAuth();
-  const adminName = user?.name ?? 'Admin';
-  const adminRole = 'Admin';
-  const adminDepartmentName = user?.departmentName ?? 'Your Department';
+  const adminName = user?.name ?? 'Superadmin';
+  const adminRole = 'Superadmin';
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
@@ -247,7 +238,7 @@ export default function AdminUserManagementScreen() {
   }, [fetchUsers]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
-  const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
+  const goToDashboard = () => router.push('/pages/superadmin/superadmin_dashboard');
 
   const handleNavPress = (key: string) => {
     setMenuOpen(false);
@@ -255,20 +246,12 @@ export default function AdminUserManagementScreen() {
       goToDashboard();
       return;
     }
-    if (key === 'queue') {
-      router.push('/pages/admin/admin_queue');
+    if (key === 'user-management') {
+      router.push('/pages/superadmin/superadmin_user_management');
       return;
     }
-    if (key === 'appointments') {
-      router.push('/pages/admin/admin_appointment');
-      return;
-    }
-    if (key === 'documents') {
-      router.push('/pages/admin/admin_document_processing');
-      return;
-    }
-    if (key === 'transactions') {
-      router.push('/pages/admin/admin_transactions');
+    if (key === 'pinnacle-sync') {
+      router.push('/pages/superadmin/superadmin_pinnacle_sync');
       return;
     }
   };
@@ -446,12 +429,6 @@ export default function AdminUserManagementScreen() {
             <Pressable style={styles.iconBtn} onPress={toggleTheme} hitSlop={8}>
               <Image source={isDarkMode ? sunIcon : darkModeIcon} style={styles.iconBtnImg} resizeMode="contain" />
             </Pressable>
-            <NotificationBell
-              endpointBase="admin"
-              theme={theme}
-              typePaths={ADMIN_NOTIFICATION_PATHS}
-              viewAllPath={ADMIN_NOTIFICATIONS_VIEW_ALL}
-            />
             <Pressable style={styles.iconBtn} onPress={() => setMenuOpen(true)} hitSlop={8}>
               <Ionicons name="menu-outline" size={20} color={theme.text} />
             </Pressable>
@@ -664,7 +641,6 @@ export default function AdminUserManagementScreen() {
         styles={styles}
         adminName={adminName}
         adminRole={adminRole}
-        adminDepartmentName={adminDepartmentName}
       />
 
       {/* Edit user modal */}
@@ -837,7 +813,6 @@ function NavDrawer({
   styles,
   adminName,
   adminRole,
-  adminDepartmentName,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -847,7 +822,6 @@ function NavDrawer({
   styles: ReturnType<typeof createStyles>;
   adminName: string;
   adminRole: string;
-  adminDepartmentName: string;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -863,7 +837,6 @@ function NavDrawer({
             <View style={styles.drawerRoleBadge}>
               <Text style={styles.drawerRoleBadgeText}>{adminRole}</Text>
             </View>
-            <Text style={styles.drawerCollege}>{adminDepartmentName}</Text>
           </View>
 
           <View style={styles.drawerNav}>
