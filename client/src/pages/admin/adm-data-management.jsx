@@ -527,7 +527,14 @@ export default function AdminDataManagement() {
     return "";
   };
 
-  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  // Prefixes a leading =/+/-/@ with a single quote so spreadsheet apps
+  // (Excel, Sheets) treat the cell as literal text instead of a formula --
+  // user-entered fields like names have no format restriction at registration.
+  const csvEscape = (value) => {
+    let str = String(value ?? "");
+    if (/^[=+\-@]/.test(str)) str = `'${str}`;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
   const handleExportLogs = () => {
     const header = ["Timestamp", "Action", "Admin", "Admin Email", "Target", "Change Summary"];
     const rows = auditLogs.map((log) => [

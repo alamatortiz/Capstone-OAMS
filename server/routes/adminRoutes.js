@@ -4274,6 +4274,10 @@ router.delete(
     const userId = parseInt(req.params.id, 10);
     const adminId = req.user.userId;
 
+    if (userId === adminId) {
+      return res.status(400).json({ error: "You cannot delete your own account" });
+    }
+
     try {
       const [[userRow]] = await pool.query(`SELECT role FROM users WHERE user_id = ?`, [userId]);
       if (!userRow) return res.status(404).json({ error: "User not found" });

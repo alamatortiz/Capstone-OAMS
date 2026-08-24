@@ -102,7 +102,14 @@ const BLANK_FORM = { name: "", email: "", role: "student", college: "", employee
 
 // Matches the working CSV pattern already used by prof-transactions.jsx /
 // adm-transactions.jsx -- client-side generation, no backend export route.
-const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+// Prefixes a leading =/+/-/@ with a single quote so spreadsheet apps
+// (Excel, Sheets) treat the cell as literal text instead of a formula --
+// user-entered fields like names have no format restriction at registration.
+const csvEscape = (value) => {
+  let str = String(value ?? "");
+  if (/^[=+\-@]/.test(str)) str = `'${str}`;
+  return `"${str.replace(/"/g, '""')}"`;
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function SuperadminUserManagement() {

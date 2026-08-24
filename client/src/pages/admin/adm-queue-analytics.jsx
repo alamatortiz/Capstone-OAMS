@@ -256,7 +256,14 @@ export default function AdminQueueAnalytics() {
     ? Math.round(performance.reduce((sum, p) => sum + (p.satisfaction || 0), 0) / performance.length)
     : 0;
 
-  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  // Prefixes a leading =/+/-/@ with a single quote so spreadsheet apps
+  // (Excel, Sheets) treat the cell as literal text instead of a formula --
+  // user-entered fields like names have no format restriction at registration.
+  const csvEscape = (value) => {
+    let str = String(value ?? "");
+    if (/^[=+\-@]/.test(str)) str = `'${str}`;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
   const handleExportReport = () => {
     const header = ["Service", "College", "Status", "Students Served", "Avg Wait", "Peak Hours", "Satisfaction"];
     const rows = performance.map((item) => [
