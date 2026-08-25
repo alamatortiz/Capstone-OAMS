@@ -1229,8 +1229,7 @@ router.get(
                  JOIN administrators adm2 ON qsl.changed_by = adm2.admin_id
                  WHERE qsl.queue_id = q.queue_id
                  ORDER BY qsl.created_at DESC LIMIT 1),
-                CONCAT(adm.first_name, ' ', adm.last_name),
-                s.service_name
+                CONCAT(adm.first_name, ' ', adm.last_name)
               ) AS processor,
               COALESCE(q.admin_reason, s.service_name) AS details,
               CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
@@ -1292,14 +1291,11 @@ router.get(
               d.department_abbreviation AS college_abbrev,
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
-              COALESCE(
-                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+              (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
                  FROM audit_logs al
                  JOIN administrators adm2 ON al.admin_id = adm2.admin_id
                  WHERE al.target_table = 'document_requests' AND al.target_record_id = dr.request_id
-                 ORDER BY al.created_at DESC LIMIT 1),
-                dr.request_type
-              ) AS processor,
+                 ORDER BY al.created_at DESC LIMIT 1) AS processor,
               dr.purpose AS details,
               dr.tracking_number AS tracking_number,
               NULL AS queue_number,
@@ -1329,14 +1325,11 @@ router.get(
               d.department_abbreviation AS college_abbrev,
               CONCAT(f.first_name, ' ', f.last_name) AS student_name,
               f.employee_id AS student_id,
-              COALESCE(
-                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+              (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
                  FROM audit_logs al
                  JOIN administrators adm2 ON al.admin_id = adm2.admin_id
                  WHERE al.target_table = 'faculty_document_requests' AND al.target_record_id = fdr.request_id
-                 ORDER BY al.created_at DESC LIMIT 1),
-                fdr.request_type
-              ) AS processor,
+                 ORDER BY al.created_at DESC LIMIT 1) AS processor,
               fdr.purpose AS details,
               fdr.tracking_number AS tracking_number,
               NULL AS queue_number,
@@ -1365,14 +1358,11 @@ router.get(
               d.department_abbreviation AS college_abbrev,
               COALESCE(CONCAT(st.first_name, ' ', st.last_name), CONCAT(f.first_name, ' ', f.last_name)) AS student_name,
               COALESCE(st.student_number, f.employee_id) AS student_id,
-              COALESCE(
-                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+              (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
                  FROM audit_logs al
                  JOIN administrators adm2 ON al.admin_id = adm2.admin_id
                  WHERE al.target_table = 'document_submissions' AND al.target_record_id = ds.submission_id
-                 ORDER BY al.created_at DESC LIMIT 1),
-                ds.title
-              ) AS processor,
+                 ORDER BY al.created_at DESC LIMIT 1) AS processor,
               ds.purpose AS details,
               ds.tracking_number AS tracking_number,
               NULL AS queue_number,
@@ -1478,6 +1468,7 @@ router.get(
           studentId: r.student_id,
           requesterType: r.requester_type,
           processor: r.processor,
+          processorRole: r.type === "appointment" ? "faculty" : (r.processor ? "admin" : null),
           details: r.details || "No additional details provided.",
           trackingNumber: r.tracking_number || null,
           queueNumberBadge,
@@ -1499,6 +1490,7 @@ router.get(
           studentId: null,
           requesterType: null,
           processor: r.processor,
+          processorRole: "admin",
           details: details || "No additional details provided.",
           trackingNumber: null,
           queueNumberBadge: null,
