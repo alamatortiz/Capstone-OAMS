@@ -48,6 +48,45 @@ function fmt12(t) {
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
 }
 
+// ── End-time picker (Google-Calendar-style fixed durations) ────────────────────
+const DURATION_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90];
+const END_CAP_MIN = 23 * 60 + 59; // 11:59 PM -- never crosses into the next day
+
+function toMinutes(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+function toHHMM(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+function formatDuration(min) {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60), rem = min % 60;
+  return rem === 0 ? `${h} hr` : `${h} hr ${rem} min`;
+}
+// Generates the fixed-duration end-time options for a given start time, capped
+// at 11:59 PM. currentEnd (when editing an existing slot) is injected as its
+// own option if its duration doesn't match any of the standard ones, so a
+// legacy/non-standard slot length is never silently dropped from the list.
+function getEndTimeOptions(startTime, currentEnd) {
+  if (!startTime) return [];
+  const startMin = toMinutes(startTime);
+  let opts = DURATION_MINUTES
+    .map((dur) => startMin + dur)
+    .filter((end) => end <= END_CAP_MIN)
+    .map((end) => ({ value: toHHMM(end), duration: end - startMin }));
+  if (opts.length === 0 && startMin < END_CAP_MIN) {
+    opts = [{ value: toHHMM(END_CAP_MIN), duration: END_CAP_MIN - startMin }];
+  }
+  if (currentEnd && !opts.some((o) => o.value === currentEnd)) {
+    const dur = toMinutes(currentEnd) - startMin;
+    if (dur > 0) opts.push({ value: currentEnd, duration: dur });
+  }
+  return opts.sort((a, b) => a.duration - b.duration);
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function ProfessorScheduleManager() {
   const location = useLocation();
@@ -78,6 +117,9 @@ export default function ProfessorScheduleManager() {
   // ── Delete-slot confirmation ─────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, day, slot } or null
   const [deleteSaving, setDeleteSaving] = useState(false);
+
+  // ── Save-slot confirmation ───────────────────────────────────────────────────
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   // ── Fetch weekly availability ───────────────────────────────────────────────
   const fetchAll = async () => {
@@ -143,6 +185,15 @@ export default function ProfessorScheduleManager() {
     setAddDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
   };
 
+  // Preserves the current End Time if it's still valid for the new Start Time
+  // (e.g. nudging Start by a minute while editing shouldn't wipe an untouched
+  // End Time), and clears it only when the new Start actually invalidates it.
+  const handleStartChange = (e) => {
+    const newStart = e.target.value;
+    setAddStart(newStart);
+    setAddEnd((prevEnd) => (prevEnd && prevEnd > newStart ? prevEnd : ""));
+  };
+
   const commitApptTag = () => {
     const val = addApptInput.trim();
     if (!val || addApptTypes.includes(val) || addApptTypes.length >= 10) return;
@@ -165,7 +216,9 @@ export default function ProfessorScheduleManager() {
     });
 
   // ── Save (add or edit) slot ─────────────────────────────────────────────────
-  const handleSaveSlot = async () => {
+  // Validation only -- on success, opens the confirmation modal instead of
+  // saving directly. The actual save happens in handleConfirmSave.
+  const handleValidateAndOpenConfirm = () => {
     if (addDays.length === 0 || !addStart || !addEnd || !addLocation.trim()) {
       toast.error("Please select at least one day, times, and location.");
       return;
@@ -192,6 +245,11 @@ export default function ProfessorScheduleManager() {
       return;
     }
 
+    setShowSaveConfirm(true);
+  };
+
+  const handleConfirmSave = async () => {
+    const maxStu = parseInt(addMaxStudents, 10);
     setAddSaving(true);
     try {
       if (showOtherLocation && !locations.some((loc) => loc.name === addLocation.trim())) {
@@ -214,6 +272,7 @@ export default function ProfessorScheduleManager() {
         });
         toast.success("Time slot updated.");
         setShowAddSlot(false);
+        setShowSaveConfirm(false);
         setSelectedDay(addDays[0]);
       } else {
         const results = await Promise.allSettled(
@@ -232,10 +291,12 @@ export default function ProfessorScheduleManager() {
         if (failed.length === 0) {
           toast.success(addDays.length > 1 ? "Time slots added." : "Time slot added.");
           setShowAddSlot(false);
+          setShowSaveConfirm(false);
           if (!selectedDay) setSelectedDay(addDays[0]);
         } else if (failed.length < addDays.length) {
           toast.error(`${failed.length} of ${addDays.length} day(s) failed to save.`);
           setShowAddSlot(false);
+          setShowSaveConfirm(false);
         } else {
           const msg = failed[0].reason?.response?.data?.message ?? "Failed to add time slot.";
           toast.error(msg);
@@ -271,6 +332,12 @@ export default function ProfessorScheduleManager() {
   const scheduledDays = DAYS.filter((d) => (slotsByDay[d] ?? []).length > 0);
 
   const selectedSlots = selectedDay ? (slotsByDay[selectedDay] ?? []) : [];
+
+  const endOptions = getEndTimeOptions(addStart, addEnd);
+  // Locks the Add/Edit modal's fields while the save-confirmation overlay is
+  // showing, so a keyboard user can't Tab past the confirmation into fields
+  // hidden behind it and change them while a stale summary is displayed.
+  const modalLocked = addSaving || showSaveConfirm;
 
   return (
     <div className="dashboard-with-sidebar">
@@ -473,6 +540,7 @@ export default function ProfessorScheduleManager() {
                 className="sa-modal-close"
                 onClick={() => { setShowAddSlot(false); setEditingId(null); }}
                 aria-label="Close"
+                disabled={modalLocked}
               >
                 <CloseIcon />
               </button>
@@ -485,6 +553,7 @@ export default function ProfessorScheduleManager() {
                     className="sa-input sa-select"
                     value={addDays[0] ?? ""}
                     onChange={(e) => setAddDays([e.target.value])}
+                    disabled={modalLocked}
                   >
                     {DAYS.map((day) => (
                       <option key={day} value={day}>{day}</option>
@@ -498,6 +567,7 @@ export default function ProfessorScheduleManager() {
                           type="checkbox"
                           checked={addDays.includes(day)}
                           onChange={() => toggleAddDay(day)}
+                          disabled={modalLocked}
                         />
                         {day.slice(0, 3)}
                       </label>
@@ -509,11 +579,32 @@ export default function ProfessorScheduleManager() {
               <div className="sa-form-row">
                 <div className="sa-form-group">
                   <label>Start Time *</label>
-                  <input className="sa-input" type="time" value={addStart} onChange={(e) => setAddStart(e.target.value)} />
+                  <input className="sa-input" type="time" value={addStart} onChange={handleStartChange} disabled={modalLocked} />
                 </div>
                 <div className="sa-form-group">
                   <label>End Time *</label>
-                  <input className="sa-input" type="time" value={addEnd} onChange={(e) => setAddEnd(e.target.value)} />
+                  <select
+                    className="sa-input sa-select"
+                    value={addEnd}
+                    disabled={!addStart || modalLocked}
+                    onChange={(e) => setAddEnd(e.target.value)}
+                  >
+                    <option value="">
+                      {!addStart ? "Select a start time first"
+                        : endOptions.length === 0 ? "No end times available"
+                        : "Select end time"}
+                    </option>
+                    {endOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {fmt12(o.value)} ({formatDuration(o.duration)})
+                      </option>
+                    ))}
+                  </select>
+                  {addStart && endOptions.length === 0 && (
+                    <p className="sa-field-hint sa-field-hint--warning">
+                      No end times available — pick a start time before 11:59 PM.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="sa-form-group">
@@ -521,6 +612,7 @@ export default function ProfessorScheduleManager() {
                 <select
                   className="sa-input"
                   value={showOtherLocation ? "__other__" : addLocation}
+                  disabled={modalLocked}
                   onChange={(e) => {
                     if (e.target.value === "__other__") {
                       setShowOtherLocation(true);
@@ -547,6 +639,7 @@ export default function ProfessorScheduleManager() {
                     placeholder="Type the location name"
                     value={addLocation}
                     onChange={(e) => setAddLocation(e.target.value)}
+                    disabled={modalLocked}
                   />
                 )}
               </div>
@@ -559,6 +652,7 @@ export default function ProfessorScheduleManager() {
                   placeholder="e.g. 5"
                   value={addMaxStudents}
                   onChange={(e) => setAddMaxStudents(e.target.value)}
+                  disabled={modalLocked}
                 />
                 <p className="sa-field-hint">Students are assigned slots in order of booking (first come, first served).</p>
                 {editingId && editingCurrentMaxBooked > 0 && (
@@ -589,20 +683,39 @@ export default function ProfessorScheduleManager() {
                       }
                     }}
                     onBlur={commitApptTag}
+                    disabled={modalLocked}
                   />
                 </div>
                 <p className="sa-field-hint">Students will choose from these types when booking. Leave empty for no restriction.</p>
               </div>
             </div>
             <div className="sa-modal-footer">
-              <button className="sa-btn sa-btn--outline" onClick={() => { setShowAddSlot(false); setEditingId(null); }}>Cancel</button>
-              <button className="sa-btn sa-btn--primary" onClick={handleSaveSlot} disabled={addSaving}>
+              <button className="sa-btn sa-btn--outline" onClick={() => { setShowAddSlot(false); setEditingId(null); }} disabled={modalLocked}>Cancel</button>
+              <button className="sa-btn sa-btn--primary" onClick={handleValidateAndOpenConfirm} disabled={modalLocked}>
                 {addSaving ? "Saving…" : editingId ? "Save Changes" : "Add Slot"}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ── Save Time Slot Confirmation ── */}
+      <ActionConfirmModal
+        show={showSaveConfirm}
+        onCancel={() => setShowSaveConfirm(false)}
+        onConfirm={handleConfirmSave}
+        variant="success"
+        title={editingId ? "Save these changes?" : "Add this time slot?"}
+        message={
+          <>
+            <strong>{addDays.join(", ")}</strong>, {fmt12(addStart)} – {fmt12(addEnd)}<br />
+            {addLocation.trim()} · Max {addMaxStudents} student{addMaxStudents === "1" ? "" : "s"}
+          </>
+        }
+        icon={editingId ? <PencilIcon /> : <PlusIcon />}
+        confirmText={addSaving ? "Saving…" : editingId ? "Save Changes" : "Add Slot"}
+        confirmDisabled={addSaving}
+      />
 
       {/* ── Delete Time Slot Confirmation ── */}
       <ActionConfirmModal

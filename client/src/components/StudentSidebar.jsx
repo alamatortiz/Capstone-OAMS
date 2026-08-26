@@ -103,7 +103,7 @@ const NOTIFICATION_TYPE_PATHS = {
 
 const navItems = [
   { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
-  { icon: MegaphoneNavIcon, label: "Announcements and FAQs", path: "/student/announcements", smallLabel: true },
+  { icon: MegaphoneNavIcon, label: "Announcements", path: "/student/announcements" },
   { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
   { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
   { icon: FileTextNavIcon, label: "Documents", path: "/student/documents" },
