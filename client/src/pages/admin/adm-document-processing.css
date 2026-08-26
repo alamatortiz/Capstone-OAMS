@@ -239,7 +239,7 @@ html, body {
 [data-theme="light"] .adp-source-btn-active { background: #ea580c; }
 
 /* ── Filter card ─────────────────────────────────────────────────────────
-   Bare filter-*/filters-card class names (matching prof-transactions.css's
+   Bare filter- and filters-card class names (matching prof-transactions.css's
    own filters-card structure, reused here rather than reinvented), scoped
    under .adp-main so they don't collide with adm-transactions.css/
    prof-transactions.css/stud-transactions.css, which scope the exact same
