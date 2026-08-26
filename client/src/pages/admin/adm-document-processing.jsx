@@ -468,14 +468,22 @@ export default function AdminDocumentProcessing() {
               <div className="adp-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="adp-modal-header">
                   <div>
-                    <h2 className="adp-modal-title">Document Request Details</h2>
-                    <p className="adp-modal-subtitle">Review and process document request</p>
+                    <h2 className="adp-modal-title">
+                      {selectedDocument._kind === "submission" ? "Document Submission Details" : "Document Request Details"}
+                    </h2>
                   </div>
                   <button className="adp-modal-close-btn" onClick={handleCloseModal} aria-label="Close modal">
                     <CloseIcon />
                   </button>
                 </div>
                 <div className="adp-modal-body">
+                  <div className="adp-modal-hero">
+                    <p className="adp-modal-hero-label">
+                      {selectedDocument._kind === "submission" ? "Title" : "Document Type"}
+                    </p>
+                    <p className="adp-modal-hero-title">{selectedDocument.documentType}</p>
+                    <p className="adp-modal-hero-purpose">{selectedDocument.purpose}</p>
+                  </div>
                   <div className="adp-modal-grid">
                     <div className="adp-modal-field">
                       <label className="adp-modal-label">Tracking Number</label>
@@ -501,10 +509,6 @@ export default function AdminDocumentProcessing() {
                       <label className="adp-modal-label">College</label>
                       <p className="adp-modal-value">{selectedDocument.college}</p>
                     </div>
-                    <div className="adp-modal-field">
-                      <label className="adp-modal-label">{selectedDocument._kind === "submission" ? "Title" : "Document Type"}</label>
-                      <p className="adp-modal-value">{selectedDocument.documentType}</p>
-                    </div>
                     {selectedDocument.copies != null && (
                       <div className="adp-modal-field">
                         <label className="adp-modal-label">Number of Copies</label>
@@ -517,10 +521,6 @@ export default function AdminDocumentProcessing() {
                         <p className="adp-modal-value">{formatManilaDate(selectedDocument.neededBy)}</p>
                       </div>
                     )}
-                    <div className="adp-modal-field adp-modal-field--full">
-                      <label className="adp-modal-label">Purpose</label>
-                      <p className="adp-modal-value">{selectedDocument.purpose}</p>
-                    </div>
                     <div className="adp-modal-field">
                       <label className="adp-modal-label">Request Date</label>
                       <p className="adp-modal-value">{formatManilaDate(selectedDocument.requestDate)}</p>
@@ -849,7 +849,7 @@ export default function AdminDocumentProcessing() {
                           <span className="adp-doc-requester-name">{doc.requesterName}</span>
                           <span className="adp-id-badge">{doc.requesterIdValue}</span>
                         </div>
-                        <p className="adp-doc-purpose">Purpose: {doc.purpose}</p>
+                        <p className="adp-doc-purpose">{doc.purpose}</p>
                         {(doc.neededBy || doc.processedBy) && (
                           <div className="adp-doc-tags-row">
                             {doc.neededBy && (

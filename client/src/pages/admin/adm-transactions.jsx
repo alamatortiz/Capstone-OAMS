@@ -577,7 +577,7 @@ export default function AdminTransaction() {
                   return (
                     <div
                       key={transaction.id}
-                      className="admin-transaction-item"
+                      className={`admin-transaction-item admin-transaction-item-${iconType}`}
                     >
                       <div className="admin-transaction-item-icon">
                         <span
@@ -635,7 +635,11 @@ export default function AdminTransaction() {
                           </span>
                         )}
                         <p className="admin-transaction-item-processor">
-                          Processed by: {transaction.processor}
+                          {transaction.processorRole === "admin"
+                            ? `Processed by: Admin ${transaction.processor}`
+                            : transaction.processorRole === "faculty"
+                              ? `Processed by: Faculty ${transaction.processor}`
+                              : "Processed by: Not yet processed"}
                         </p>
                       </div>
 

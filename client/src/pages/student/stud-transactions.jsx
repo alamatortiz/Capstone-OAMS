@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -84,6 +84,14 @@ const CalendarIcon = () => (
   </svg>
 );
 
+const DownloadIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
 const PAGE_SIZE = 20;
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -106,6 +114,7 @@ export default function TransactionsPage() {
     ongoing: 0,
     thisMonth: 0,
   });
+  const [isExporting, setIsExporting] = useState(false);
 
   // Debounce the search box so every keystroke doesn't trigger a refetch.
   // setPage(1) is batched together with setDebouncedSearch here (React 19
@@ -201,6 +210,43 @@ export default function TransactionsPage() {
     },
     [debouncedSearch, filterType, filterStatus, page],
   );
+
+  // ── Export (CSV of everything matching the current filters, not just the
+  // current page -- mirrors prof/admin's export, adapted for this page's
+  // server-side pagination by issuing its own request at the server's max
+  // page size instead of reading the paginated `transactions` state). ─────
+  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await api.get("/student/transactions", {
+        params: {
+          search: debouncedSearch || undefined,
+          type: filterType !== "all" ? filterType : undefined,
+          status: filterStatus !== "all" ? filterStatus : undefined,
+          limit: 100,
+          page: 1,
+        },
+      });
+      const header = ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
+      const rows = (res.data.transactions ?? []).map((t) => [
+        t.type, t.title, t.details, t.status, t.college, t.date, t.time,
+      ]);
+      const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `transactions-${getManilaDateString()}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export your transaction history.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Fresh load whenever the page mounts, the search/type/status filters
   // change, or the user navigates to a different page (fetchTransactions'
@@ -345,10 +391,20 @@ export default function TransactionsPage() {
           {/* Filters */}
           <div className="filters-card">
             <div className="filters-header">
-              <h3 className="filters-title">Transaction Filter</h3>
-              <p className="filters-description">
-                Search and filter your transactions.
-              </p>
+              <div className="filters-header-text">
+                <h3 className="filters-title">Transaction Filter</h3>
+                <p className="filters-description">
+                  Search and filter your transactions.
+                </p>
+              </div>
+              <button
+                className="tx-export-btn"
+                onClick={handleExport}
+                disabled={isExporting || transactions.length === 0}
+              >
+                <DownloadIcon />
+                {isExporting ? "Exporting…" : "Export"}
+              </button>
             </div>
             <div className="filters-grid">
               <div className="filter-group">
