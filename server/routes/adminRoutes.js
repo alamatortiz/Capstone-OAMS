@@ -377,6 +377,7 @@ router.get(
 
         return {
           id: q.slot_id,
+          serviceId: q.service_id,
           queueType: q.service_name,
           department: q.department_name
             ? `${q.department_name} (${q.department_abbreviation})`

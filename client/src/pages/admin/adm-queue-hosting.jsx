@@ -69,6 +69,14 @@ const CheckIcon = () => (
     <polyline points="20 6 9 17 4 12"></polyline>
   </svg>
 );
+const RepeatIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="17 1 21 5 17 9"></polyline>
+    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+    <polyline points="7 23 3 19 7 15"></polyline>
+    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+  </svg>
+);
 
 // ── College logo resolver ────────────────────────────────────────────────
 // Resolves a college's logo image from /src/assets/{CODE}.png, falling
@@ -159,6 +167,23 @@ export default function AdminQueueHosting() {
   };
   const openModal = () => {
     resetForm();
+    setShowModal(true);
+  };
+  // Pre-fills the modal from a past queue's config instead of blanking it --
+  // "Host Again" on a Completed/Closed card. Start/End Time are reused as-is:
+  // serviceHours are plain HH:MM clock times, not date-anchored, and POST
+  // always opens the new slot for today regardless of the source queue's
+  // actual date, so no conversion is needed. The existing serviceEnd <=
+  // getManilaTimeString() check on submit already covers the one real edge
+  // case (re-hosting an old "8am-5pm" queue after 5pm today).
+  const openModalWithConfig = (queue) => {
+    setServiceId(String(queue.serviceId));
+    setMaxCapacity(String(queue.maxCapacity));
+    setServiceTime(String(queue.avgServiceMinutes ?? 15));
+    setNoShowTimeout(String(queue.noShowTimeoutMinutes ?? 15));
+    setServiceStart(queue.serviceHours.start);
+    setServiceEnd(queue.serviceHours.end);
+    setDefaultEndClamped(false);
     setShowModal(true);
   };
   const closeModal = () => {
@@ -866,9 +891,20 @@ export default function AdminQueueHosting() {
                           </p>
                         </div>
                       </div>
-                      <span className="aqh-status-badge aqh-status-completed">
-                        completed
-                      </span>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-completed">
+                          completed
+                        </span>
+                        <div className="aqh-queue-card-actions">
+                          <button
+                            className="aqh-action-btn aqh-action-btn--repeat"
+                            onClick={(e) => { e.stopPropagation(); openModalWithConfig(queue); }}
+                          >
+                            <RepeatIcon />
+                            <span>Host Again</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <p className="aqh-closed-meta">
                       Served {queue.servedCount} student(s), capacity{" "}
@@ -914,9 +950,20 @@ export default function AdminQueueHosting() {
                           </p>
                         </div>
                       </div>
-                      <span className="aqh-status-badge aqh-status-closed">
-                        closed
-                      </span>
+                      <div className="aqh-queue-card-top-right">
+                        <span className="aqh-status-badge aqh-status-closed">
+                          closed
+                        </span>
+                        <div className="aqh-queue-card-actions">
+                          <button
+                            className="aqh-action-btn aqh-action-btn--repeat"
+                            onClick={(e) => { e.stopPropagation(); openModalWithConfig(queue); }}
+                          >
+                            <RepeatIcon />
+                            <span>Host Again</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <p className="aqh-closed-meta">
                       Served {queue.servedCount} student(s), capacity{" "}

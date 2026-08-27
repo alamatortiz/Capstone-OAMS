@@ -675,6 +675,12 @@
   color: #ef4444;
 }
 
+.aqh-action-btn--repeat:hover {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
 /* ===== Queue stat rows ===== */
 .aqh-queue-stats-row {
   display: grid;
