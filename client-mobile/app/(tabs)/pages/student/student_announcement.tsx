@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -55,7 +56,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
 
 function OamsLogo({
   style,
@@ -194,7 +194,7 @@ const navItems: NavItem[] = [
 ];
 
 export default function StudentAnnouncementScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterTabKey>('pinned');
@@ -320,8 +320,6 @@ export default function StudentAnnouncementScreen() {
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const viewAttachment = async (announcement: Announcement, attachment: AnnouncementAttachment) => {
     if (downloadingId) return;

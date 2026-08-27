@@ -36,6 +36,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -192,7 +193,7 @@ function formatDateTime(dateStr: string) {
 }
 
 export default function SuperadminUserManagementScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -237,7 +238,6 @@ export default function SuperadminUserManagementScreen() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/superadmin/superadmin_dashboard');
 
   const handleNavPress = (key: string) => {
@@ -741,11 +741,49 @@ export default function SuperadminUserManagementScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* College/Status picker, rendered inside this same Modal (not a
+              separate nested Modal) -- two simultaneously-visible native
+              Modals cause touch-routing/z-order bugs under Fabric, which was
+              swallowing taps on this picker's Close button. */}
+          {(activePicker === 'formCollege' || activePicker === 'formStatus') && pickerConfig && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.filterModalCard}>
+                <Text style={styles.confirmTitle}>{pickerConfig.title}</Text>
+                {pickerConfig.options.map((opt) => {
+                  const selected = opt.value === pickerConfig.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
+                      onPress={() => {
+                        pickerConfig.onSelect(opt.value);
+                        setActivePicker(null);
+                      }}
+                    >
+                      <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]}>{opt.label}</Text>
+                      {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
+                    </Pressable>
+                  );
+                })}
+                <Pressable style={styles.cancelBtn} onPress={() => setActivePicker(null)}>
+                  <Text style={styles.cancelBtnText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
 
-      {/* Shared picker (filters + form selects) */}
-      <Modal visible={!!activePicker} animationType="fade" transparent onRequestClose={() => setActivePicker(null)}>
+      {/* Shared picker: filters only -- the form's College/Status pickers
+          render inside showFormModal itself so they never run as a second
+          Modal on top of an already-open one. */}
+      <Modal
+        visible={activePicker === 'filterRole' || activePicker === 'filterStatus'}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setActivePicker(null)}
+      >
         <View style={styles.modalOverlay}>
           {pickerConfig && (
             <View style={styles.filterModalCard}>

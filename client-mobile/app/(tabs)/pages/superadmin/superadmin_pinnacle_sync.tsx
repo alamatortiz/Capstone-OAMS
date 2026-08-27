@@ -30,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -105,7 +106,7 @@ const navItems: NavItem[] = [
 ];
 
 export default function SuperadminPinnacleSyncScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
@@ -148,7 +149,6 @@ export default function SuperadminPinnacleSyncScreen() {
     load();
   }, []);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/superadmin/superadmin_dashboard');
 
   const handleNavPress = (key: string) => {

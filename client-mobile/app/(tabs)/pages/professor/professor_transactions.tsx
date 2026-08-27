@@ -20,6 +20,7 @@ import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -182,7 +183,7 @@ const formatTimeOnly = (dateStr: string) => {
 const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 export default function ProfessorTransactionsScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -200,7 +201,6 @@ export default function ProfessorTransactionsScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
 
   // Debounced 400ms, mirroring prof-transactions.jsx's own search debounce,

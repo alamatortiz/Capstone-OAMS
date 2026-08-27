@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -170,7 +171,7 @@ const emptyFormData: { typeId: number | ''; purpose: string; copies: string; nee
 };
 
 export default function ProfessorDocumentsScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
@@ -241,8 +242,6 @@ export default function ProfessorDocumentsScreen() {
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
@@ -933,6 +932,39 @@ export default function ProfessorDocumentsScreen() {
               </View>
             </ScrollView>
           </View>
+
+          {/* Document Type picker, rendered inside this same Modal (not a
+              separate nested Modal) -- two simultaneously-visible native
+              Modals cause touch-routing/z-order bugs under Fabric, which was
+              swallowing taps on this picker's Close button. */}
+          {typePickerOpen && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.pickerModalCard}>
+                <Text style={styles.pickerModalTitle}>Document Type</Text>
+                <ScrollView style={{ maxHeight: 320 }}>
+                  {documentTypes.map((t) => {
+                    const selected = formData.typeId === t.id;
+                    return (
+                      <Pressable
+                        key={t.id}
+                        style={[styles.pickerOption, selected && styles.pickerOptionActive]}
+                        onPress={() => {
+                          setFormData((prev) => ({ ...prev, typeId: t.id }));
+                          setTypePickerOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>{t.name}</Text>
+                        {selected && <Ionicons name="checkmark" size={16} color="#f97316" />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Pressable style={styles.pickerModalClose} onPress={() => setTypePickerOpen(false)}>
+                  <Text style={styles.pickerModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -1044,37 +1076,6 @@ export default function ProfessorDocumentsScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Document Type Picker */}
-      <Modal visible={typePickerOpen} animationType="fade" transparent onRequestClose={() => setTypePickerOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.pickerModalCard}>
-            <Text style={styles.pickerModalTitle}>Document Type</Text>
-            <ScrollView style={{ maxHeight: 320 }}>
-              {documentTypes.map((t) => {
-                const selected = formData.typeId === t.id;
-                return (
-                  <Pressable
-                    key={t.id}
-                    style={[styles.pickerOption, selected && styles.pickerOptionActive]}
-                    onPress={() => {
-                      setFormData((prev) => ({ ...prev, typeId: t.id }));
-                      setTypePickerOpen(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>{t.name}</Text>
-                    {selected && <Ionicons name="checkmark" size={16} color="#f97316" />}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Pressable style={styles.pickerModalClose} onPress={() => setTypePickerOpen(false)}>
-              <Text style={styles.pickerModalCloseText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
 
       {/* Cancel Confirm Modal */}
       <Modal visible={!!cancelTarget} animationType="fade" transparent onRequestClose={() => setCancelTarget(null)}>

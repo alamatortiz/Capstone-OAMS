@@ -21,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -112,7 +113,7 @@ const navItems: NavItem[] = [
 ];
 
 export default function AdminFaqScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
@@ -153,7 +154,6 @@ export default function AdminFaqScreen() {
     fetchFaqs();
   }, [fetchFaqs]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToAnnouncements = () => router.push('/pages/admin/admin_announcement');
 
   const handleNavPress = (key: string) => {

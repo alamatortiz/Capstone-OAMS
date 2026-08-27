@@ -32,6 +32,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -169,7 +170,7 @@ const navItems: NavItem[] = [
 ];
 
 export default function AdminQueueAnalyticsScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('Today');
@@ -243,7 +244,6 @@ export default function AdminQueueAnalyticsScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
 
   const handleNavPress = (key: string) => {

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -150,7 +151,7 @@ function getInitials(name: string) {
 }
 
 export default function AdminProfessorAvailabilityScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<StatusTab>('all');
@@ -196,7 +197,6 @@ export default function AdminProfessorAvailabilityScreen() {
     };
   }, [user, token, fetchFaculty]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
 
   const handleNavPress = (key: string) => {

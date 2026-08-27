@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
@@ -208,7 +209,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function ProfessorAppointmentScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -269,8 +270,6 @@ export default function ProfessorAppointmentScreen() {
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

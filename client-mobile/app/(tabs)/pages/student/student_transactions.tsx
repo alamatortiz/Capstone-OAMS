@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -31,7 +32,6 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
-
 
 function OamsLogo({
   style,
@@ -147,7 +147,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function StudentTransactionsScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -329,7 +329,6 @@ export default function StudentTransactionsScreen() {
     return () => clearInterval(interval);
   }, [refreshLoadedPages]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/student/student_dashboard');
 
   const handleNavPress = (key: string) => {

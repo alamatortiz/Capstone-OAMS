@@ -4,6 +4,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { AuthProvider, useAuth, getRouteRole } from '../context/AuthContext';
 import { QueueProvider } from '../context/QueueContext';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
 
 // Routes reachable without being logged in.
 const PUBLIC_SEGMENTS = new Set(['login', 'unauthorized']);
@@ -12,7 +13,14 @@ const PUBLIC_SEGMENTS = new Set(['login', 'unauthorized']);
 // Centralized here (rather than per-screen) since expo-router's file-based routes for
 // `(tabs)/pages/**` don't need to change to get this behavior.
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  // Waited on too: for an unauthenticated cold start, AuthContext's own
+  // isLoading can resolve before this SecureStore read does (no network call
+  // needed when there's no session to fetch), which would otherwise let
+  // login.tsx/index.tsx render one frame with the hardcoded dark default
+  // before a saved light-mode preference flips it.
+  const { isLoading: themeLoading } = useTheme();
+  const isLoading = authLoading || themeLoading;
   const segments = useSegments();
   const router = useRouter();
 
@@ -54,13 +62,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <QueueProvider>
-        <AuthGate>
-          <Stack screenOptions={{ headerShown: false }} />
-        </AuthGate>
-        <Toast />
-      </QueueProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <QueueProvider>
+          <AuthGate>
+            <Stack screenOptions={{ headerShown: false }} />
+          </AuthGate>
+          <Toast />
+        </QueueProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Home as HomeIcon, RefreshCw, Shield, UserCog, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -92,7 +93,7 @@ const navItems: NavItem[] = [
 ];
 
 export default function SuperadminDashboardScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
@@ -100,8 +101,6 @@ export default function SuperadminDashboardScreen() {
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const handleToolPress = (key: string) => {
     if (key === 'user-management') {

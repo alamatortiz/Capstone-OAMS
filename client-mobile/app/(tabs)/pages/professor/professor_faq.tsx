@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -121,7 +122,7 @@ function FaqAccordionItem({
 }
 
 export default function ProfessorFaqScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,7 +167,6 @@ export default function ProfessorFaqScreen() {
     };
   }, [user, token, fetchFaqs]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToAnnouncements = () => router.push('/pages/professor/professor_announcement');
 
   const handleNavPress = (key: string) => {

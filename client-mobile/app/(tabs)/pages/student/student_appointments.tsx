@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -97,7 +98,6 @@ interface College {
   abbrev: string;
   name: string;
 }
-
 
 interface AppointmentType {
   id: string;
@@ -212,7 +212,7 @@ type ActiveFilter = 'college' | 'professor' | null;
 type ActiveTab = 'slots' | 'bookings';
 
 export default function StudentAppointmentsScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
@@ -396,7 +396,6 @@ export default function StudentAppointmentsScreen() {
   const [purpose, setPurpose] = useState('');
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
   const goToDashboard = () => router.push('/pages/student/student_dashboard');
 

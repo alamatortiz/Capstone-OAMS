@@ -36,6 +36,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
@@ -215,7 +216,7 @@ function formatDisplayDate(dateStr: string | null) {
 type ConfirmStatus = 'processing' | 'ready' | 'claimed' | 'rejected';
 
 export default function AdminDocumentProcessingScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [documents, setDocuments] = useState<DocumentRequest[]>([]);
@@ -294,8 +295,6 @@ export default function AdminDocumentProcessingScreen() {
       socket.off('document:new-request', onNewRequest);
     };
   }, [user, token, fetchDocuments]);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

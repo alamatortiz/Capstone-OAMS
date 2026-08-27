@@ -21,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -176,7 +177,7 @@ const TAB_META: Record<TabKey, { label: string; icon: LucideIconType }> = {
 type SelectField = 'college' | 'type' | null;
 
 export default function StudentDocumentsScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
@@ -329,7 +330,6 @@ export default function StudentDocumentsScreen() {
     fetchServiceTypes();
   }, []);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
   const goToDashboard = () => router.push('/pages/student/student_dashboard');
 
@@ -889,6 +889,38 @@ export default function StudentDocumentsScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* College / Document Type picker, rendered inside this same Modal
+              (not a separate nested Modal) -- two simultaneously-visible
+              native Modals cause touch-routing/z-order bugs under Fabric,
+              which was swallowing taps on this picker's Close button. */}
+          {selectField !== null && (
+            <View style={[StyleSheet.absoluteFill, styles.logoutOverlay]}>
+              <View style={styles.filterModalCard}>
+                <Text style={styles.logoutModalTitle}>{selectTitle}</Text>
+                <ScrollView style={styles.filterOptionsList}>
+                  {selectOptions.map((opt) => {
+                    const selected = opt.value === selectCurrentValue;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
+                        onPress={() => chooseOption(opt.value)}
+                      >
+                        <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]} numberOfLines={2}>
+                          {opt.label}
+                        </Text>
+                        {selected && <Ionicons name="checkmark" size={16} color={theme.orange} />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Pressable style={styles.filterModalClose} onPress={() => setSelectField(null)}>
+                  <Text style={styles.filterModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -993,35 +1025,6 @@ export default function StudentDocumentsScreen() {
                 </LinearGradient>
               </Pressable>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* College / Document Type Select Modal */}
-      <Modal visible={selectField !== null} animationType="fade" transparent onRequestClose={() => setSelectField(null)}>
-        <View style={styles.logoutOverlay}>
-          <View style={styles.filterModalCard}>
-            <Text style={styles.logoutModalTitle}>{selectTitle}</Text>
-            <ScrollView style={styles.filterOptionsList}>
-              {selectOptions.map((opt) => {
-                const selected = opt.value === selectCurrentValue;
-                return (
-                  <Pressable
-                    key={opt.value}
-                    style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
-                    onPress={() => chooseOption(opt.value)}
-                  >
-                    <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]} numberOfLines={2}>
-                      {opt.label}
-                    </Text>
-                    {selected && <Ionicons name="checkmark" size={16} color={theme.orange} />}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Pressable style={styles.filterModalClose} onPress={() => setSelectField(null)}>
-              <Text style={styles.filterModalCloseText}>Close</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>

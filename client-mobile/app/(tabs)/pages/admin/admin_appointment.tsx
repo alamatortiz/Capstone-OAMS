@@ -31,6 +31,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -157,7 +158,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function AdminAppointmentScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -213,8 +214,6 @@ export default function AdminAppointmentScreen() {
       events.forEach((event) => socket.off(event, refetch));
     };
   }, [user, token, fetchAppointments]);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

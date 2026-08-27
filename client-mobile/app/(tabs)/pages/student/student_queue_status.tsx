@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { useQueue } from '@/context/QueueContext';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -39,7 +40,6 @@ const coedLogo = require('@/assets/COED.png');
 const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
-
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -184,7 +184,7 @@ function getStatusMeta(queue: QueueRecord, theme: ThemePalette) {
 }
 
 export default function StudentQueueStatusScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [selectedQueueId, setSelectedQueueId] = useState<number | null>(null);
@@ -197,8 +197,6 @@ export default function StudentQueueStatusScreen() {
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

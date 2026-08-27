@@ -33,6 +33,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -260,7 +261,7 @@ function formatChangeSummary(log: AuditLog) {
 }
 
 export default function AdminDataManagementScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('documents');
@@ -393,7 +394,6 @@ export default function AdminDataManagementScreen() {
     if (activeTab === 'audit') fetchAuditLogs(auditActionFilter);
   }, [activeTab, auditActionFilter, fetchAuditLogs]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
 
   const handleNavPress = (key: string) => {
@@ -1228,6 +1228,39 @@ export default function AdminDataManagementScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* Status/Recipient picker, rendered inside this same Modal (not a
+              separate nested Modal) -- two simultaneously-visible native
+              Modals cause touch-routing/z-order bugs under Fabric, which was
+              swallowing taps on this picker's Close button. */}
+          {(activePicker === 'docStatus' || activePicker === 'docRecipient') && pickerConfig && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.filterModalCard}>
+                <Text style={styles.confirmTitle}>{pickerConfig.title}</Text>
+                <ScrollView style={styles.filterOptionsList}>
+                  {pickerConfig.options.map((opt) => {
+                    const selected = opt.value === pickerConfig.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
+                        onPress={() => {
+                          pickerConfig.onSelect(opt.value);
+                          setActivePicker(null);
+                        }}
+                      >
+                        <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]}>{opt.label}</Text>
+                        {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Pressable style={styles.cancelBtn} onPress={() => setActivePicker(null)}>
+                  <Text style={styles.cancelBtnText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -1422,34 +1455,37 @@ export default function AdminDataManagementScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
-      </Modal>
 
-      {/* Shared picker (status / recipient / location) */}
-      <Modal visible={!!activePicker} animationType="fade" transparent onRequestClose={() => setActivePicker(null)}>
-        <View style={styles.modalOverlay}>
-          {pickerConfig && (
-            <View style={styles.filterModalCard}>
-              <Text style={styles.confirmTitle}>{pickerConfig.title}</Text>
-              {pickerConfig.options.map((opt) => {
-                const selected = opt.value === pickerConfig.value;
-                return (
-                  <Pressable
-                    key={opt.value}
-                    style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
-                    onPress={() => {
-                      pickerConfig.onSelect(opt.value);
-                      setActivePicker(null);
-                    }}
-                  >
-                    <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]}>{opt.label}</Text>
-                    {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
-                  </Pressable>
-                );
-              })}
-              <Pressable style={styles.cancelBtn} onPress={() => setActivePicker(null)}>
-                <Text style={styles.cancelBtnText}>Close</Text>
-              </Pressable>
+          {/* Location picker, rendered inside this same Modal (not a separate
+              nested Modal) -- two simultaneously-visible native Modals cause
+              touch-routing/z-order bugs under Fabric, which was swallowing
+              taps on this picker's Close button. */}
+          {activePicker === 'serviceLocation' && pickerConfig && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.filterModalCard}>
+                <Text style={styles.confirmTitle}>{pickerConfig.title}</Text>
+                <ScrollView style={styles.filterOptionsList}>
+                  {pickerConfig.options.map((opt) => {
+                    const selected = opt.value === pickerConfig.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
+                        onPress={() => {
+                          pickerConfig.onSelect(opt.value);
+                          setActivePicker(null);
+                        }}
+                      >
+                        <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]}>{opt.label}</Text>
+                        {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Pressable style={styles.cancelBtn} onPress={() => setActivePicker(null)}>
+                  <Text style={styles.cancelBtnText}>Close</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         </View>
@@ -1861,7 +1897,8 @@ function createStyles(theme: ThemePalette) {
     submitBtn: { paddingVertical: 11, paddingHorizontal: 20, borderRadius: 10, backgroundColor: theme.primary },
 
     // Filter / picker modal
-    filterModalCard: { width: '100%', maxWidth: 340, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: 20, padding: 20, gap: 4 },
+    filterModalCard: { width: '100%', maxWidth: 340, maxHeight: '70%', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: 20, padding: 20, gap: 4 },
+    filterOptionsList: { maxHeight: 320 },
     filterOptionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 10 },
     filterOptionRowActive: { backgroundColor: 'rgba(34, 197, 94, 0.1)' },
     filterOptionText: { fontSize: 14, fontWeight: '600', color: theme.text },

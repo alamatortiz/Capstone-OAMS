@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -91,6 +92,10 @@ interface AvailabilitySlot {
   location: string;
   max_students: number;
   appointmentTypes: AppointmentType[];
+  // Highest number of students booked on any single future date for this
+  // slot template -- server-computed, used to block lowering Max Students
+  // below a count that's already booked.
+  currentMaxBooked: number;
 }
 
 interface LocationOption {
@@ -122,12 +127,58 @@ function fmt12(t: string) {
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
 }
 
+// ── End-time picker (Google-Calendar-style fixed durations) ────────────────
+const DURATION_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90];
+const END_CAP_MIN = 23 * 60 + 59; // 11:59 PM -- never crosses into the next day
+
+function toMinutes(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+function toHHMM(min: number) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+function formatDuration(min: number) {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const rem = min % 60;
+  return rem === 0 ? `${h} hr` : `${h} hr ${rem} min`;
+}
+
+interface EndTimeOption {
+  value: string;
+  duration: number;
+}
+
+// Generates the fixed-duration end-time options for a given start time, capped
+// at 11:59 PM. currentEnd (when editing an existing slot) is injected as its
+// own option if its duration doesn't match any of the standard ones, so a
+// legacy/non-standard slot length is never silently dropped from the list.
+function getEndTimeOptions(startTime: string, currentEnd: string): EndTimeOption[] {
+  if (!startTime) return [];
+  const startMin = toMinutes(startTime);
+  let opts: EndTimeOption[] = DURATION_MINUTES
+    .map((dur) => startMin + dur)
+    .filter((end) => end <= END_CAP_MIN)
+    .map((end) => ({ value: toHHMM(end), duration: end - startMin }));
+  if (opts.length === 0 && startMin < END_CAP_MIN) {
+    opts = [{ value: toHHMM(END_CAP_MIN), duration: END_CAP_MIN - startMin }];
+  }
+  if (currentEnd && !opts.some((o) => o.value === currentEnd)) {
+    const dur = toMinutes(currentEnd) - startMin;
+    if (dur > 0) opts.push({ value: currentEnd, duration: dur });
+  }
+  return opts.sort((a, b) => a.duration - b.duration);
+}
+
 export default function ProfessorScheduleManagerScreen() {
   const params = useLocalSearchParams<{ from?: string }>();
   const router = useRouter();
   const { user, logout } = useAuth();
 
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
@@ -144,6 +195,8 @@ export default function ProfessorScheduleManagerScreen() {
   const [addLocation, setAddLocation] = useState('');
   const [showOtherLocation, setShowOtherLocation] = useState(false);
   const [addMaxStudents, setAddMaxStudents] = useState('');
+  // Students already booked (future dates) for the slot being edited.
+  const [editingCurrentMaxBooked, setEditingCurrentMaxBooked] = useState(0);
   const [addApptTypes, setAddApptTypes] = useState<string[]>([]);
   const [addApptInput, setAddApptInput] = useState('');
 
@@ -153,10 +206,11 @@ export default function ProfessorScheduleManagerScreen() {
 
   const [deleteTarget, setDeleteTarget] = useState<{ slot: AvailabilitySlot; day: string } | null>(null);
 
+  // ── Save-slot confirmation ───────────────────────────────────────────────
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   // Guards against out-of-order responses, matching the pattern used
   // elsewhere in this codebase for fetches with more than one trigger.
@@ -227,6 +281,7 @@ export default function ProfessorScheduleManagerScreen() {
     setAddLocation('');
     setShowOtherLocation(false);
     setAddMaxStudents('');
+    setEditingCurrentMaxBooked(0);
     setAddApptTypes([]);
     setAddApptInput('');
     setShowAddSlot(true);
@@ -240,6 +295,7 @@ export default function ProfessorScheduleManagerScreen() {
     setAddLocation(slot.location);
     setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
     setAddMaxStudents(String(slot.max_students));
+    setEditingCurrentMaxBooked(slot.currentMaxBooked ?? 0);
     setAddApptTypes(slot.appointmentTypes.map((t) => t.name));
     setAddApptInput('');
     setShowAddSlot(true);
@@ -248,6 +304,30 @@ export default function ProfessorScheduleManagerScreen() {
   const toggleAddDay = (day: string) => {
     if (editingId) { setAddDays([day]); return; }
     setAddDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
+  // Closes the Add/Edit modal from any entry point (header X, Cancel, Android
+  // hardware back via the outer Modal's onRequestClose). RN's Modal hides its
+  // native presentation on visible={false} without unmounting children, so
+  // without this, an in-modal picker/confirm overlay left open (reachable via
+  // hardware back, which bypasses the overlay's own Close button and its
+  // covering z-order) would still be "open" in state and reappear immediately
+  // the next time this modal is opened, before the user has tapped anything.
+  const closeAddSlotModal = () => {
+    setShowAddSlot(false);
+    setEditingId(null);
+    setStartPickerOpen(false);
+    setEndPickerOpen(false);
+    setLocationPickerOpen(false);
+    setShowSaveConfirm(false);
+  };
+
+  // Preserves the current End Time if it's still valid for the new Start Time
+  // (e.g. nudging Start by a minute while editing shouldn't wipe an untouched
+  // End Time), and clears it only when the new Start actually invalidates it.
+  const handleStartChange = (newStart: string) => {
+    setAddStart(newStart);
+    setAddEnd((prevEnd) => (prevEnd && prevEnd > newStart ? prevEnd : ''));
   };
 
   const commitApptTag = () => {
@@ -267,7 +347,9 @@ export default function ProfessorScheduleManagerScreen() {
       return start < sEnd && sStart < end;
     });
 
-  const handleSaveSlot = async () => {
+  // Validation only -- on success, opens the confirmation overlay instead of
+  // saving directly. The actual save happens in handleConfirmSave.
+  const handleValidateAndOpenConfirm = () => {
     if (addDays.length === 0 || !addStart || !addEnd || !addLocation.trim()) {
       Alert.alert('Missing information', 'Please select at least one day, times, and location.');
       return;
@@ -276,9 +358,20 @@ export default function ProfessorScheduleManagerScreen() {
       Alert.alert('Invalid time range', 'End time must be after start time.');
       return;
     }
+    if (!addMaxStudents.trim()) {
+      Alert.alert('Missing information', 'Max students is required.');
+      return;
+    }
     const maxStu = parseInt(addMaxStudents, 10);
-    if (!addMaxStudents.trim() || isNaN(maxStu) || maxStu < 1) {
+    if (isNaN(maxStu) || maxStu < 1) {
       Alert.alert('Invalid max students', 'Max students must be a positive number.');
+      return;
+    }
+    if (editingId && maxStu < editingCurrentMaxBooked) {
+      Alert.alert(
+        'Invalid max students',
+        `Cannot set max students below ${editingCurrentMaxBooked} — that many students are already booked on a future date.`,
+      );
       return;
     }
 
@@ -288,6 +381,11 @@ export default function ProfessorScheduleManagerScreen() {
       return;
     }
 
+    setShowSaveConfirm(true);
+  };
+
+  const handleConfirmSave = async () => {
+    const maxStu = parseInt(addMaxStudents, 10);
     const trimmedLocation = addLocation.trim();
     setAddSaving(true);
     try {
@@ -310,6 +408,7 @@ export default function ProfessorScheduleManagerScreen() {
           appointmentTypes: addApptTypes,
         });
         setShowAddSlot(false);
+        setShowSaveConfirm(false);
         setSelectedDay(addDays[0]);
       } else {
         const results = await Promise.allSettled(
@@ -327,10 +426,12 @@ export default function ProfessorScheduleManagerScreen() {
         const failed = results.filter((r) => r.status === 'rejected');
         if (failed.length === 0) {
           setShowAddSlot(false);
+          setShowSaveConfirm(false);
           if (!selectedDay) setSelectedDay(addDays[0]);
         } else if (failed.length < addDays.length) {
           Alert.alert('Partial failure', `${failed.length} of ${addDays.length} day(s) failed to save.`);
           setShowAddSlot(false);
+          setShowSaveConfirm(false);
         } else {
           const reason: any = (failed[0] as PromiseRejectedResult).reason;
           Alert.alert('Error', reason?.response?.data?.message ?? 'Failed to add time slot.');
@@ -363,6 +464,12 @@ export default function ProfessorScheduleManagerScreen() {
   };
 
   const selectedLocationLabel = showOtherLocation ? 'Other (type your own)…' : addLocation || 'Select a location';
+
+  const endOptions = getEndTimeOptions(addStart, addEnd);
+  // Locks the Add/Edit modal's fields while the save-confirmation overlay is
+  // showing, so a keyboard/switch-access user can't reach fields hidden
+  // behind it and change them while a stale summary is displayed.
+  const modalLocked = addSaving || showSaveConfirm;
 
   return (
     <View style={styles.root}>
@@ -535,7 +642,7 @@ export default function ProfessorScheduleManagerScreen() {
       </SafeAreaView>
 
       {/* Add / Edit Time Slot Modal */}
-      <Modal visible={showAddSlot} animationType="fade" transparent onRequestClose={() => setShowAddSlot(false)}>
+      <Modal visible={showAddSlot} animationType="fade" transparent onRequestClose={closeAddSlotModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.formDialogCard}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -546,7 +653,7 @@ export default function ProfessorScheduleManagerScreen() {
                     {editingId ? 'Update this recurring weekly slot' : 'Set your recurring weekly availability'}
                   </Text>
                 </View>
-                <Pressable onPress={() => setShowAddSlot(false)} hitSlop={8}>
+                <Pressable onPress={closeAddSlotModal} hitSlop={8} disabled={modalLocked}>
                   <Ionicons name="close" size={20} color={theme.subtext} />
                 </Pressable>
               </View>
@@ -561,6 +668,7 @@ export default function ProfessorScheduleManagerScreen() {
                         key={day}
                         style={[styles.dayCheckbox, checked && styles.dayCheckboxChecked]}
                         onPress={() => toggleAddDay(day)}
+                        disabled={modalLocked}
                       >
                         <Text style={[styles.dayCheckboxText, checked && styles.dayCheckboxTextChecked]}>
                           {day.slice(0, 3)}
@@ -577,7 +685,7 @@ export default function ProfessorScheduleManagerScreen() {
               <View style={styles.formRow}>
                 <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={styles.formLabel}>Start Time</Text>
-                  <Pressable style={styles.selectTrigger} onPress={() => setStartPickerOpen(true)}>
+                  <Pressable style={styles.selectTrigger} onPress={() => setStartPickerOpen(true)} disabled={modalLocked}>
                     <Text style={addStart ? styles.selectTriggerText : styles.selectPlaceholder}>
                       {addStart ? fmt12(addStart) : 'Select'}
                     </Text>
@@ -586,18 +694,33 @@ export default function ProfessorScheduleManagerScreen() {
                 </View>
                 <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={styles.formLabel}>End Time</Text>
-                  <Pressable style={styles.selectTrigger} onPress={() => setEndPickerOpen(true)}>
+                  <Pressable
+                    style={styles.selectTrigger}
+                    onPress={() => setEndPickerOpen(true)}
+                    disabled={!addStart || modalLocked}
+                  >
                     <Text style={addEnd ? styles.selectTriggerText : styles.selectPlaceholder}>
-                      {addEnd ? fmt12(addEnd) : 'Select'}
+                      {addEnd
+                        ? fmt12(addEnd)
+                        : !addStart
+                          ? 'Select a start time first'
+                          : endOptions.length === 0
+                            ? 'No end times available'
+                            : 'Select'}
                     </Text>
                     <Ionicons name="chevron-down" size={16} color={theme.subtext} />
                   </Pressable>
+                  {!!addStart && endOptions.length === 0 && (
+                    <Text style={styles.fieldHintWarning}>
+                      No end times available — pick a start time before 11:59 PM.
+                    </Text>
+                  )}
                 </View>
               </View>
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Location</Text>
-                <Pressable style={styles.selectTrigger} onPress={() => setLocationPickerOpen(true)}>
+                <Pressable style={styles.selectTrigger} onPress={() => setLocationPickerOpen(true)} disabled={modalLocked}>
                   <Text style={addLocation || showOtherLocation ? styles.selectTriggerText : styles.selectPlaceholder}>
                     {selectedLocationLabel}
                   </Text>
@@ -610,6 +733,7 @@ export default function ProfessorScheduleManagerScreen() {
                     placeholderTextColor={theme.tertiary}
                     value={addLocation}
                     onChangeText={setAddLocation}
+                    editable={!modalLocked}
                   />
                 )}
               </View>
@@ -623,8 +747,14 @@ export default function ProfessorScheduleManagerScreen() {
                   keyboardType="number-pad"
                   value={addMaxStudents}
                   onChangeText={setAddMaxStudents}
+                  editable={!modalLocked}
                 />
                 <Text style={styles.fieldHint}>Students are assigned slots in order of booking (first come, first served).</Text>
+                {editingId && editingCurrentMaxBooked > 0 && (
+                  <Text style={styles.fieldHintWarning}>
+                    {editingCurrentMaxBooked} student{editingCurrentMaxBooked === 1 ? '' : 's'} already booked on a future date — max can&apos;t go below this.
+                  </Text>
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -634,7 +764,7 @@ export default function ProfessorScheduleManagerScreen() {
                     {addApptTypes.map((tag) => (
                       <View key={tag} style={styles.tagChip}>
                         <Text style={styles.tagChipText}>{tag}</Text>
-                        <Pressable onPress={() => removeApptTag(tag)} hitSlop={6}>
+                        <Pressable onPress={() => removeApptTag(tag)} hitSlop={6} disabled={modalLocked}>
                           <Ionicons name="close" size={12} color="#a855f7" />
                         </Pressable>
                       </View>
@@ -650,8 +780,9 @@ export default function ProfessorScheduleManagerScreen() {
                     onChangeText={setAddApptInput}
                     onSubmitEditing={commitApptTag}
                     returnKeyType="done"
+                    editable={!modalLocked}
                   />
-                  <Pressable style={styles.tagAddBtn} onPress={commitApptTag}>
+                  <Pressable style={styles.tagAddBtn} onPress={commitApptTag} disabled={modalLocked}>
                     <Ionicons name="add" size={18} color="#ffffff" />
                   </Pressable>
                 </View>
@@ -659,10 +790,14 @@ export default function ProfessorScheduleManagerScreen() {
               </View>
 
               <View style={styles.dialogActionsRow}>
-                <Pressable style={styles.cancelBtn} onPress={() => { setShowAddSlot(false); setEditingId(null); }}>
+                <Pressable
+                  style={styles.cancelBtn}
+                  onPress={closeAddSlotModal}
+                  disabled={modalLocked}
+                >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
-                <Pressable style={styles.submitBtn} onPress={handleSaveSlot} disabled={addSaving}>
+                <Pressable style={styles.submitBtn} onPress={handleValidateAndOpenConfirm} disabled={modalLocked}>
                   <Text style={styles.confirmBtnText}>
                     {addSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Slot'}
                   </Text>
@@ -670,6 +805,119 @@ export default function ProfessorScheduleManagerScreen() {
               </View>
             </ScrollView>
           </View>
+
+          {/* Location picker, rendered inside this same Modal (not a separate
+              nested Modal) -- two simultaneously-visible native Modals cause
+              touch-routing/z-order bugs under Fabric, which was swallowing
+              taps on this picker's Close button. */}
+          {locationPickerOpen && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.pickerModalCard}>
+                <Text style={styles.pickerModalTitle}>Location</Text>
+                <ScrollView style={{ maxHeight: 320 }}>
+                  {locations.map((loc) => {
+                    const selected = !showOtherLocation && addLocation === loc.name;
+                    return (
+                      <Pressable
+                        key={loc.id}
+                        style={[styles.pickerOption, selected && styles.pickerOptionActive]}
+                        onPress={() => {
+                          setShowOtherLocation(false);
+                          setAddLocation(loc.name);
+                          setLocationPickerOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>
+                          {loc.name}{loc.isGlobal ? ' (Shared)' : ''}
+                        </Text>
+                        {selected && <Ionicons name="checkmark" size={16} color="#a855f7" />}
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable
+                    style={[styles.pickerOption, showOtherLocation && styles.pickerOptionActive]}
+                    onPress={() => {
+                      setShowOtherLocation(true);
+                      setAddLocation('');
+                      setLocationPickerOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.pickerOptionText, showOtherLocation && styles.pickerOptionTextActive]}>
+                      Other (type your own)…
+                    </Text>
+                    {showOtherLocation && <Ionicons name="checkmark" size={16} color="#a855f7" />}
+                  </Pressable>
+                </ScrollView>
+                <Pressable style={styles.pickerModalClose} onPress={() => setLocationPickerOpen(false)}>
+                  <Text style={styles.pickerModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* End Time picker (Google-Calendar-style fixed durations), rendered
+              inside this same Modal for the same reason as the Location
+              picker above -- avoids stacking a second native Modal. */}
+          {endPickerOpen && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.pickerModalCard}>
+                <Text style={styles.pickerModalTitle}>End Time</Text>
+                <ScrollView style={{ maxHeight: 320 }}>
+                  {endOptions.map((opt) => {
+                    const selected = opt.value === addEnd;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        style={[styles.pickerOption, selected && styles.pickerOptionActive]}
+                        onPress={() => { setAddEnd(opt.value); setEndPickerOpen(false); }}
+                      >
+                        <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>
+                          {fmt12(opt.value)} ({formatDuration(opt.duration)})
+                        </Text>
+                        {selected && <Ionicons name="checkmark" size={16} color="#a855f7" />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Pressable style={styles.pickerModalClose} onPress={() => setEndPickerOpen(false)}>
+                  <Text style={styles.pickerModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* Save confirmation, rendered inside this same Modal for the same
+              reason as the pickers above. Mirrors the Delete confirmation's
+              card look further down, with success-tinted framing instead. */}
+          {showSaveConfirm && (
+            <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+              <View style={styles.confirmModalCard}>
+                <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+                  <Ionicons name={editingId ? 'pencil-outline' : 'add-outline'} size={26} color="#22c55e" />
+                </View>
+                <Text style={styles.confirmTitle}>{editingId ? 'Save these changes?' : 'Add this time slot?'}</Text>
+                <Text style={styles.confirmDescription}>
+                  <Text style={{ fontWeight: '700', color: theme.text }}>{addDays.join(', ')}</Text>, {fmt12(addStart)} – {fmt12(addEnd)}
+                  {'\n'}
+                  {addLocation.trim()} · Max {addMaxStudents || 0} student{addMaxStudents === '1' ? '' : 's'}
+                </Text>
+                <View style={styles.confirmActionsRow}>
+                  <Pressable style={styles.cancelBtn} onPress={() => setShowSaveConfirm(false)} disabled={addSaving}>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.confirmActionBtn, { backgroundColor: '#22c55e' }]}
+                    onPress={handleConfirmSave}
+                    disabled={addSaving}
+                  >
+                    <Text style={styles.confirmBtnText}>
+                      {addSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Slot'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -678,66 +926,10 @@ export default function ProfessorScheduleManagerScreen() {
         visible={startPickerOpen}
         title="Start Time"
         value={addStart}
-        onSelect={(t) => { setAddStart(t); setStartPickerOpen(false); }}
+        onSelect={(t) => { handleStartChange(t); setStartPickerOpen(false); }}
         onClose={() => setStartPickerOpen(false)}
         styles={styles}
       />
-
-      {/* End Time Picker */}
-      <TimePickerModal
-        visible={endPickerOpen}
-        title="End Time"
-        value={addEnd}
-        onSelect={(t) => { setAddEnd(t); setEndPickerOpen(false); }}
-        onClose={() => setEndPickerOpen(false)}
-        styles={styles}
-      />
-
-      {/* Location Picker */}
-      <Modal visible={locationPickerOpen} animationType="fade" transparent onRequestClose={() => setLocationPickerOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.pickerModalCard}>
-            <Text style={styles.pickerModalTitle}>Location</Text>
-            <ScrollView style={{ maxHeight: 320 }}>
-              {locations.map((loc) => {
-                const selected = !showOtherLocation && addLocation === loc.name;
-                return (
-                  <Pressable
-                    key={loc.id}
-                    style={[styles.pickerOption, selected && styles.pickerOptionActive]}
-                    onPress={() => {
-                      setShowOtherLocation(false);
-                      setAddLocation(loc.name);
-                      setLocationPickerOpen(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>
-                      {loc.name}{loc.isGlobal ? ' (Shared)' : ''}
-                    </Text>
-                    {selected && <Ionicons name="checkmark" size={16} color="#a855f7" />}
-                  </Pressable>
-                );
-              })}
-              <Pressable
-                style={[styles.pickerOption, showOtherLocation && styles.pickerOptionActive]}
-                onPress={() => {
-                  setShowOtherLocation(true);
-                  setAddLocation('');
-                  setLocationPickerOpen(false);
-                }}
-              >
-                <Text style={[styles.pickerOptionText, showOtherLocation && styles.pickerOptionTextActive]}>
-                  Other (type your own)…
-                </Text>
-                {showOtherLocation && <Ionicons name="checkmark" size={16} color="#a855f7" />}
-              </Pressable>
-            </ScrollView>
-            <Pressable style={styles.pickerModalClose} onPress={() => setLocationPickerOpen(false)}>
-              <Text style={styles.pickerModalCloseText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
 
       {/* Delete Time Slot Confirmation */}
       <Modal visible={!!deleteTarget} animationType="fade" transparent onRequestClose={() => setDeleteTarget(null)}>
@@ -1186,6 +1378,7 @@ function createStyles(theme: ThemePalette) {
     formRow: { flexDirection: 'row', gap: 12 },
     formLabel: { fontSize: 13.5, fontWeight: '700', color: theme.text },
     fieldHint: { fontSize: 11.5, color: theme.tertiary, lineHeight: 16 },
+    fieldHintWarning: { fontSize: 11.5, color: '#f59e0b', lineHeight: 16, marginTop: 6 },
 
     selectTrigger: {
       flexDirection: 'row',

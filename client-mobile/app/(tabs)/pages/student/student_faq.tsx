@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -126,7 +127,7 @@ function FaqAccordionItem({
 }
 
 export default function StudentFaqScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,7 +173,6 @@ export default function StudentFaqScreen() {
     };
   }, [user, token, fetchFaqs]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToAnnouncements = () => router.push('/pages/student/student_announcement');
 
   const comingSoon = () =>

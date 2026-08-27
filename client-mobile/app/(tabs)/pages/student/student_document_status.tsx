@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -66,7 +67,6 @@ const coedLogo = require('@/assets/COED.png');
 const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
-
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -193,7 +193,7 @@ const TAB_META: Record<TabKey, { label: string; icon: LucideIconType }> = {
 };
 
 export default function StudentDocumentStatusScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -287,7 +287,6 @@ export default function StudentDocumentStatusScreen() {
     return () => clearInterval(interval);
   }, [user, token, fetchDocuments]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
   const goToDashboard = () => router.push('/pages/student/student_dashboard');
 

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Image,
   Pressable,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/context/ThemeContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -102,12 +102,11 @@ function OamsLogo({
 }
 
 export default function WelcomeScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
   const router = useRouter();
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToLogin = () => router.push('./login');
 
   return (

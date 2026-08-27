@@ -22,6 +22,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -34,7 +35,6 @@ const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 const editIcon = require('@/assets/edit_icon.png');
 const deleteIcon = require('@/assets/delete_icon.png');
-
 
 function OamsLogo({
   style,
@@ -285,7 +285,7 @@ interface PickerState {
 }
 
 export default function AdminAnnouncementScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
@@ -333,7 +333,6 @@ export default function AdminAnnouncementScreen() {
     fetchAnnouncements();
   }, [fetchAnnouncements]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
 
   // Mirrors admin_document_processing.tsx's handleSourceChange -- switching

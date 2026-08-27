@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, getRouteRole } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -67,15 +68,13 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const handleSubmit = async () => {
     if (!email && !password) {

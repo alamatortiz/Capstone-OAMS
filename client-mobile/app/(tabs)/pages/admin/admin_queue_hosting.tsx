@@ -33,6 +33,7 @@ import {
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
@@ -156,7 +157,7 @@ function getNowHHMM() {
 type SelectField = 'service' | 'status' | 'type' | null;
 
 export default function AdminQueueHostingScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
@@ -192,7 +193,6 @@ export default function AdminQueueHostingScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
 
   const handleNavPress = (key: string) => {
@@ -361,18 +361,13 @@ export default function AdminQueueHostingScreen() {
   };
 
   const typeFilterOptions = [{ value: 'all', label: 'All Service Types' }, ...serviceTypeOptions.map((t) => ({ value: t, label: t }))];
-  const selectOptions =
-    selectField === 'service'
-      ? services.map((s) => ({ value: s.service_id, label: s.service_name }))
-      : selectField === 'status'
-        ? STATUS_FILTER_OPTIONS
-        : typeFilterOptions;
-  const selectTitle =
-    selectField === 'service' ? 'Select a Service' : selectField === 'status' ? 'Filter by Status' : 'Filter by Service Type';
-  const selectCurrentValue = selectField === 'service' ? serviceId : selectField === 'status' ? statusFilter : typeFilter;
+  // 'service' is handled separately inside OpenQueueModal (see
+  // serviceSelectOpen) so this shared picker only ever needs status/type.
+  const selectOptions = selectField === 'status' ? STATUS_FILTER_OPTIONS : typeFilterOptions;
+  const selectTitle = selectField === 'status' ? 'Filter by Status' : 'Filter by Service Type';
+  const selectCurrentValue = selectField === 'status' ? statusFilter : typeFilter;
   const chooseSelectOption = (value: string) => {
-    if (selectField === 'service') setServiceId(value);
-    else if (selectField === 'status') setStatusFilter(value);
+    if (selectField === 'status') setStatusFilter(value);
     else if (selectField === 'type') setTypeFilter(value);
     setSelectField(null);
   };
@@ -864,10 +859,20 @@ export default function AdminQueueHostingScreen() {
         adminDepartmentName={user?.departmentName ?? ''}
         adminDepartmentAbbrev={user?.departmentAbbrev ?? ''}
         submitting={submitting}
+        serviceSelectOpen={selectField === 'service'}
+        serviceOptions={services.map((s) => ({ value: s.service_id, label: s.service_name }))}
+        selectedServiceValue={serviceId}
+        onSelectService={(value) => {
+          setServiceId(value);
+          setSelectField(null);
+        }}
+        onCloseServiceSelect={() => setSelectField(null)}
       />
 
-      {/* Shared select modal: service picker + status/type filters */}
-      <Modal visible={selectField !== null} animationType="fade" transparent onRequestClose={() => setSelectField(null)}>
+      {/* Shared select modal: status/type filters only -- the service picker
+          renders inside OpenQueueModal itself (see serviceSelectOpen above)
+          so it never runs as a second Modal on top of an already-open one. */}
+      <Modal visible={selectField === 'status' || selectField === 'type'} animationType="fade" transparent onRequestClose={() => setSelectField(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.filterModalCard}>
             <Text style={styles.confirmTitle}>{selectTitle}</Text>
@@ -1003,6 +1008,11 @@ function OpenQueueModal({
   adminDepartmentName,
   adminDepartmentAbbrev,
   submitting,
+  serviceSelectOpen,
+  serviceOptions,
+  selectedServiceValue,
+  onSelectService,
+  onCloseServiceSelect,
 }: {
   visible: boolean;
   selectedServiceName: string;
@@ -1025,6 +1035,11 @@ function OpenQueueModal({
   adminDepartmentName: string;
   adminDepartmentAbbrev: string;
   submitting: boolean;
+  serviceSelectOpen: boolean;
+  serviceOptions: { value: string; label: string }[];
+  selectedServiceValue: string;
+  onSelectService: (value: string) => void;
+  onCloseServiceSelect: () => void;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1150,6 +1165,38 @@ function OpenQueueModal({
             </Pressable>
           </View>
         </View>
+
+        {/* Service picker, rendered inside this same Modal (not a separate
+            nested Modal) -- two simultaneously-visible native Modals cause
+            touch-routing/z-order bugs under Fabric, which was swallowing taps
+            on this picker's Close button. */}
+        {serviceSelectOpen && (
+          <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+            <View style={styles.filterModalCard}>
+              <Text style={styles.confirmTitle}>Select a Service</Text>
+              <ScrollView style={styles.filterOptionsList}>
+                {serviceOptions.map((opt) => {
+                  const selected = opt.value === selectedServiceValue;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
+                      onPress={() => onSelectService(opt.value)}
+                    >
+                      <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]} numberOfLines={2}>
+                        {opt.label}
+                      </Text>
+                      {selected && <Ionicons name="checkmark" size={16} color={theme.blue} />}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              <Pressable style={styles.cancelBtn} onPress={onCloseServiceSelect}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
   );

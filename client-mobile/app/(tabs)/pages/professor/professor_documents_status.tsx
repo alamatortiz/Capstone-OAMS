@@ -20,6 +20,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
@@ -200,7 +201,7 @@ export default function ProfessorDocumentsStatusScreen() {
   const params = useLocalSearchParams<{ docId?: string; from?: string }>();
   const router = useRouter();
 
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -219,7 +220,6 @@ export default function ProfessorDocumentsStatusScreen() {
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const comingSoon = () => Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
   const goToDashboard = () => router.push('/pages/professor/professor_dashboard');
   const goToRequestPage = () => router.push('/pages/professor/professor_documents');

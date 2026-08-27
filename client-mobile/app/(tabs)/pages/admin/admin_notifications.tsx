@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell, {
@@ -141,7 +142,7 @@ const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
 ];
 
 export default function AdminNotificationsScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [filterType, setFilterType] = useState<TypeFilter>('all');
@@ -262,7 +263,6 @@ export default function AdminNotificationsScreen() {
     router.push(ADMIN_NOTIFICATION_PATHS[item.type] as never);
   };
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
   const goToDashboard = () => router.push('/pages/admin/admin_dashboard');
 
   const handleNavPress = (key: string) => {

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { useQueue } from '@/context/QueueContext';
 import api from '@/utils/api';
 import QueueConcernModal from '@/components/QueueConcernModal';
@@ -58,7 +59,6 @@ const coedLogo = require('@/assets/COED.png');
 const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
-
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -132,7 +132,7 @@ const navItems: NavItem[] = [
 type FilterKind = 'college' | 'service' | null;
 
 export default function StudentQueueScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [selectedCollege, setSelectedCollege] = useState('all');
@@ -228,8 +228,6 @@ export default function StudentQueueScreen() {
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');

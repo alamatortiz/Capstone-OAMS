@@ -36,6 +36,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
@@ -202,7 +203,7 @@ function getEntryStatusLabel(status: QueueEntryStatus, arrivedAt?: string | null
 type FilterKind = 'collegeOverview' | 'serviceType' | null;
 
 export default function AdminQueueScreen() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [monitoringQueueId, setMonitoringQueueId] = useState<number | null>(null);
@@ -257,8 +258,6 @@ export default function AdminQueueScreen() {
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
