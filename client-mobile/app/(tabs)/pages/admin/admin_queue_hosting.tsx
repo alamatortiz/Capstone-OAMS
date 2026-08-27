@@ -27,6 +27,7 @@ import {
   Pause,
   Play,
   Plus,
+  Repeat,
   Search,
   X,
 } from 'lucide-react-native';
@@ -148,10 +149,30 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'closed', label: 'Closed' },
 ];
 
-function getNowHHMM() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+// Mirrors web's utils/dateTime.js getManilaTimeString() -- explicit
+// Asia/Manila timezone regardless of the device's own timezone/clock
+// setting, so "now" means the same thing here as it does for every other
+// admin on this screen (was previously device-local time, a pre-existing
+// divergence from web unrelated to tonight's port).
+function getManilaTimeString() {
+  return new Date().toLocaleTimeString('en-GB', {
+    timeZone: 'Asia/Manila',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+// Adds `minutesToAdd` to a "HH:MM" time string, clamping at "23:59" instead
+// of rolling into the next day -- queue windows are always same-day
+// (slot_date is fixed to "today" server-side), so wrapping would silently
+// misrepresent the window instead of extending it.
+function addMinutesClampedToDay(timeStr: string, minutesToAdd: number) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const totalMinutes = Math.min(hours * 60 + minutes + minutesToAdd, 23 * 60 + 59);
+  const hh = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+  const mm = String(totalMinutes % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
 }
 
 type SelectField = 'service' | 'status' | 'type' | null;
@@ -245,18 +266,51 @@ export default function AdminQueueHostingScreen() {
   const [noShowTimeout, setNoShowTimeout] = useState('15');
   const [serviceTime, setServiceTime] = useState('15');
   const [formError, setFormError] = useState('');
+  // True only right after resetForm() auto-computes an end time that got
+  // clamped to 23:59 instead of the full +240min window (see
+  // addMinutesClampedToDay) -- cleared as soon as the admin edits either
+  // time field themselves, since past that point it's their explicit choice.
+  const [defaultEndClamped, setDefaultEndClamped] = useState(false);
 
   const resetForm = () => {
     setServiceId('');
     setMaxCapacity('100');
-    setServiceStart('08:00');
-    setServiceEnd('17:00');
+    const now = getManilaTimeString();
+    const [h, m] = now.split(':').map(Number);
+    const rawTargetMinutes = h * 60 + m + 240;
+    setServiceStart(now);
+    setServiceEnd(addMinutesClampedToDay(now, 240));
     setNoShowTimeout('15');
     setServiceTime('15');
     setFormError('');
+    setDefaultEndClamped(rawTargetMinutes > 23 * 60 + 59);
   };
   const openModal = () => {
     resetForm();
+    setShowOpenModal(true);
+  };
+  // Pre-fills the modal from a past queue's config instead of blanking it --
+  // "Host Again" on a Completed/Closed card. Start/End Time are reused as-is:
+  // serviceHours are plain HH:MM clock times, not date-anchored, and POST
+  // always opens the new slot for today regardless of the source queue's
+  // actual date, so no conversion is needed.
+  const openModalWithConfig = (queue: any) => {
+    // Deliberately NOT String(queue.serviceId) despite web's equivalent doing
+    // so: web's serviceId always ends up a string because it flows through a
+    // native <select>'s value/onChange, which the DOM always coerces to
+    // string. This screen's Service field is a custom picker instead (see
+    // `services.find((s) => s.service_id === serviceId)` below), and
+    // `services` here is never stringified -- service_id comes straight off
+    // a mysql2 row as a raw number. Casting to string here would silently
+    // break that strict-equality lookup and show "Select a service" instead
+    // of the pre-filled name.
+    setServiceId(queue.serviceId);
+    setMaxCapacity(String(queue.maxCapacity));
+    setServiceTime(String(queue.avgServiceMinutes ?? 15));
+    setNoShowTimeout(String(queue.noShowTimeoutMinutes ?? 15));
+    setServiceStart(queue.serviceHours.start);
+    setServiceEnd(queue.serviceHours.end);
+    setDefaultEndClamped(false);
     setShowOpenModal(true);
   };
   const closeModal = () => {
@@ -278,7 +332,7 @@ export default function AdminQueueHostingScreen() {
       setFormError('Start time must be before end time');
       return;
     }
-    if (serviceEnd <= getNowHHMM()) {
+    if (serviceEnd <= getManilaTimeString()) {
       setFormError('End time has already passed — choose a window that ends later than the current time');
       return;
     }
@@ -742,15 +796,24 @@ export default function AdminQueueHostingScreen() {
                           <Text style={styles.queueCardDept}>{queue.department}</Text>
                         </View>
                       </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: STATUS_TINTS.completed.bg, borderColor: STATUS_TINTS.completed.border },
-                        ]}
-                      >
-                        <Text style={[styles.statusBadgeText, { color: STATUS_TINTS.completed.color }]}>
-                          completed
-                        </Text>
+                      <View style={styles.queueCardTopRight}>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: STATUS_TINTS.completed.bg, borderColor: STATUS_TINTS.completed.border },
+                          ]}
+                        >
+                          <Text style={[styles.statusBadgeText, { color: STATUS_TINTS.completed.color }]}>
+                            completed
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={styles.actionBtnRepeat}
+                          onPress={(e) => { e.stopPropagation(); openModalWithConfig(queue); }}
+                        >
+                          <Repeat size={13} color={theme.text} />
+                          <Text style={styles.actionBtnRepeatText}>Host Again</Text>
+                        </Pressable>
                       </View>
                     </View>
                     <Text style={styles.closedMeta}>
@@ -785,13 +848,22 @@ export default function AdminQueueHostingScreen() {
                           <Text style={styles.queueCardDept}>{queue.department}</Text>
                         </View>
                       </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: STATUS_TINTS.closed.bg, borderColor: STATUS_TINTS.closed.border },
-                        ]}
-                      >
-                        <Text style={[styles.statusBadgeText, { color: STATUS_TINTS.closed.color }]}>closed</Text>
+                      <View style={styles.queueCardTopRight}>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: STATUS_TINTS.closed.bg, borderColor: STATUS_TINTS.closed.border },
+                          ]}
+                        >
+                          <Text style={[styles.statusBadgeText, { color: STATUS_TINTS.closed.color }]}>closed</Text>
+                        </View>
+                        <Pressable
+                          style={styles.actionBtnRepeat}
+                          onPress={(e) => { e.stopPropagation(); openModalWithConfig(queue); }}
+                        >
+                          <Repeat size={13} color={theme.text} />
+                          <Text style={styles.actionBtnRepeatText}>Host Again</Text>
+                        </Pressable>
                       </View>
                     </View>
                     <Text style={styles.closedMeta}>
@@ -848,8 +920,8 @@ export default function AdminQueueHostingScreen() {
         formError={formError}
         onOpenServiceSelect={() => setSelectField('service')}
         onChangeCapacity={setMaxCapacity}
-        onChangeStart={setServiceStart}
-        onChangeEnd={setServiceEnd}
+        onChangeStart={(v) => { setServiceStart(v); setDefaultEndClamped(false); }}
+        onChangeEnd={(v) => { setServiceEnd(v); setDefaultEndClamped(false); }}
         onChangeNoShowTimeout={setNoShowTimeout}
         onChangeServiceTime={setServiceTime}
         onClose={closeModal}
@@ -859,6 +931,7 @@ export default function AdminQueueHostingScreen() {
         adminDepartmentName={user?.departmentName ?? ''}
         adminDepartmentAbbrev={user?.departmentAbbrev ?? ''}
         submitting={submitting}
+        defaultEndClamped={defaultEndClamped}
         serviceSelectOpen={selectField === 'service'}
         serviceOptions={services.map((s) => ({ value: s.service_id, label: s.service_name }))}
         selectedServiceValue={serviceId}
@@ -1013,6 +1086,7 @@ function OpenQueueModal({
   selectedServiceValue,
   onSelectService,
   onCloseServiceSelect,
+  defaultEndClamped,
 }: {
   visible: boolean;
   selectedServiceName: string;
@@ -1040,6 +1114,7 @@ function OpenQueueModal({
   selectedServiceValue: string;
   onSelectService: (value: string) => void;
   onCloseServiceSelect: () => void;
+  defaultEndClamped: boolean;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1148,6 +1223,12 @@ function OpenQueueModal({
                     onChangeText={onChangeEnd}
                   />
                 </View>
+                {defaultEndClamped && (
+                  <Text style={styles.formHintWarning}>
+                    It&apos;s late enough today that the usual 4-hour window would run past midnight — the end time
+                    was capped at 11:59 PM instead. Adjust it if you meant a shorter window.
+                  </Text>
+                )}
               </View>
             </View>
           </ScrollView>
@@ -1433,6 +1514,20 @@ function createStyles(theme: ThemePalette) {
     statusBadge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, borderWidth: 0.5 },
     statusBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
 
+    // "Host Again" button, sits beside the status badge on Completed/Closed cards
+    queueCardTopRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+    actionBtnRepeat: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    actionBtnRepeatText: { fontSize: 11, fontWeight: '700', color: theme.text },
+
     queueStatsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -1519,6 +1614,7 @@ function createStyles(theme: ThemePalette) {
     formGroup: { gap: 6 },
     formLabel: { fontSize: 12, fontWeight: '700', color: theme.text },
     formHint: { fontSize: 11, color: theme.tertiary, lineHeight: 15 },
+    formHintWarning: { fontSize: 11, color: '#f59e0b', lineHeight: 15, marginTop: 6 },
 
     selectTrigger: {
       flexDirection: 'row',
