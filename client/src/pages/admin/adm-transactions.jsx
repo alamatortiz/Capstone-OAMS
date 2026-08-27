@@ -355,7 +355,7 @@ export default function AdminTransaction() {
       label: status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown",
     };
     return (
-      <span className={`admin-transaction-badge admin-transaction-status-badge ${config.color}`}>
+      <span className={`admin-transaction-badge ${config.color}`}>
         {config.label}
       </span>
     );
