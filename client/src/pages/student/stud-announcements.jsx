@@ -367,8 +367,8 @@ export default function AnnouncementsPage() {
             }
             icon={<MegaphoneIcon />}
             iconClassName="ann-title-icon"
-            title="Announcements"
-            subtitle="Stay updated with the latest notices from your department."
+            title="Announcements and FAQs"
+            subtitle="Stay informed on latest notices and answers to frequently asked questions within your department."
             headerClassName="ann-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="ann-title-section"

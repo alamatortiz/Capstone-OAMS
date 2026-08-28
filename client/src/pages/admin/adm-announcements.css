@@ -60,11 +60,7 @@
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.75rem;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    var(--success) 100%
-  );
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -106,11 +102,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    var(--success) 100%
-  );
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   color: #ffffff;
   border: none;
   border-radius: 0.75rem;
@@ -135,46 +127,93 @@
   stroke: currentColor;
 }
 
-.ann-btn-faqs {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  align-self: flex-start;
-  width: fit-content;
-}
-
-.ann-btn-faqs:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-  background: rgba(34, 197, 94, 0.08);
-}
-
-.ann-btn-faqs svg {
-  width: 1rem;
-  height: 1rem;
-  stroke: currentColor;
-}
-
 @media (max-width: 640px) {
   .ann-header-actions {
     flex-direction: column;
   }
+}
 
-  .ann-btn-faqs {
-    align-self: stretch;
-    justify-content: center;
-  }
+/* ===== FAQs management entry -- full card button =====
+   Same geometry as stud-appointments' .ab-prof-sched-card, recoloured green
+   (that card is purple and scoped to stud-appointments.css -- not reused). */
+.ann-faqs-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(34, 197, 94, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 0.875rem;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+}
+
+.ann-faqs-card:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.14) 100%);
+  border-color: rgba(34, 197, 94, 0.55);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.22);
+  transform: translateY(-2px);
+  color: var(--text-primary);
+}
+
+.ann-faqs-card-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.625rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+}
+
+.ann-faqs-card-icon svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  color: #fff;
+  stroke: #fff;
+}
+
+.ann-faqs-card-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.ann-faqs-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.ann-faqs-card-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.ann-faqs-card-chevron {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+[data-theme="light"] .ann-faqs-card {
+  background: linear-gradient(135deg, rgba(21, 128, 61, 0.08) 0%, rgba(21, 128, 61, 0.04) 100%);
+  border-color: rgba(21, 128, 61, 0.25);
+}
+
+[data-theme="light"] .ann-faqs-card:hover {
+  background: linear-gradient(135deg, rgba(21, 128, 61, 0.14) 0%, rgba(21, 128, 61, 0.09) 100%);
+  border-color: rgba(21, 128, 61, 0.45);
 }
 
 /* ===== Source toggle ===== */
@@ -184,22 +223,24 @@
    a fixed "faculty" meaning. */
 .ann-source-toggle {
   display: inline-flex;
-  gap: 0.25rem;
+  gap: 0.35rem;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  padding: 0.25rem;
+  border-radius: 0.875rem;
+  padding: 0.35rem;
   width: fit-content;
 }
 .ann-source-btn {
-  padding: 0.5rem 1.1rem;
+  padding: 0.65rem 1.6rem;
   background: transparent;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.6rem;
   color: var(--text-tertiary);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
   font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
@@ -231,115 +272,249 @@
   }
 }
 
+/* Card style mirrors adm-transactions.css's .admin-transaction-stat-card:
+   centered column, green icon-box on top, big green value -- all four cards
+   share the one green treatment (no per-type accent colours). */
 .ann-stat-card {
   background: var(--card-bg);
-  border: 1.5px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 1.1rem 1.25rem;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.375rem;
   transition: all 0.3s ease;
-  text-align: left;
+}
+
+.ann-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+[data-theme="light"] .ann-stat-card {
+  border-color: rgba(21, 128, 61, 0.18);
+}
+[data-theme="light"] .ann-stat-card:hover {
+  box-shadow: 0 8px 24px rgba(21, 128, 61, 0.1);
+  border-color: rgba(21, 128, 61, 0.35);
+}
+
+.ann-stat-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+}
+
+.ann-stat-icon-box svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
 }
 
 .ann-stat-label {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--text-tertiary);
-  margin: 0 0 0.375rem 0;
-  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0;
 }
 
 .ann-stat-value {
-  font-size: 1.75rem;
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--primary-color);
+  margin: 0;
+}
+
+/* ===== Filters =====
+   Mirrors adm-transactions.css's `.admin-transaction-container .filters-card`
+   block. Every selector is scoped under `.ann-page` because none of these
+   class names (`filters-card`, `filter-*`) are declared globally -- each page
+   keeps its own scoped copy (codebase convention). */
+.ann-page .filters-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .ann-page .filters-card {
+  border-color: rgba(21, 128, 61, 0.25);
+}
+
+.ann-page .filters-header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.ann-page .filters-header-text {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.ann-page .filters-title {
+  font-size: 1.375rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  text-align: center;
+}
+
+.ann-page .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  text-align: center;
+}
+
+.ann-page .filters-search-row {
+  margin-bottom: 1rem;
+}
+
+.ann-page .filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .ann-page .filters-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ann-page .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ann-page .filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
   text-align: left;
 }
 
-.ann-stat-icon {
-  width: 1.75rem;
-  height: 1.75rem;
-  flex-shrink: 0;
-  opacity: 0.4;
-}
-
-.ann-stat-total {
-  border-color: rgba(34, 197, 94, 0.45);
-}
-.ann-stat-total .ann-stat-icon {
-  color: var(--primary-color);
-}
-
-.ann-stat-pinned .ann-stat-value {
-  color: var(--primary-color);
-}
-.ann-stat-pinned .ann-stat-icon {
-  color: var(--primary-color);
-}
-
-.ann-stat-important {
-  border-color: rgba(239, 68, 68, 0.45);
-  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.08);
-}
-.ann-stat-important .ann-stat-value {
-  color: #ef4444;
-}
-.ann-stat-important .ann-stat-icon {
-  color: #ef4444;
-}
-
-.ann-stat-archived .ann-stat-value {
-  color: var(--text-tertiary);
-}
-.ann-stat-archived .ann-stat-icon {
-  color: var(--text-tertiary);
-}
-
-/* ===== Filters ===== */
-.ann-filters-card {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 1rem;
-}
-
-.ann-search-wrap {
+.ann-page .filter-select-wrapper {
   position: relative;
-  flex: 1 1 280px;
+  width: 100%;
 }
 
-.ann-search-icon {
+.ann-page .filter-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ann-page .filter-search-wrapper svg {
   position: absolute;
-  left: 0.85rem;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 0.875rem;
   width: 1rem;
   height: 1rem;
   color: var(--text-tertiary);
   pointer-events: none;
+  stroke: currentColor;
+  z-index: 1;
 }
 
-.ann-search-input {
+.ann-page .filter-search-input {
   width: 100%;
-  padding: 0.65rem 0.85rem 0.65rem 2.4rem;
+  padding: 0.75rem 1.25rem 0.75rem 2.5rem;
   background: var(--input-background);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: 0.75rem;
   color: var(--text-primary);
   font-size: 0.875rem;
   font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
-.ann-search-input::placeholder {
+.ann-page .filter-search-input::placeholder { color: var(--text-tertiary); }
+.ann-page .filter-search-input:hover { border-color: rgba(34, 197, 94, 0.3); }
+.ann-page .filter-search-input:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.ann-page .filter-select {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  padding-right: 2.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.ann-page .filter-select:hover { border-color: rgba(34, 197, 94, 0.3); }
+.ann-page .filter-select:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.ann-page .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.ann-page .filter-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
   color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
 }
 
+.ann-page .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.ann-page .filter-select:focus + .filter-chevron {
+  color: #22c55e;
+}
+
+/* Retained for the create/edit modals only (see `.ann-modal select.ann-select`
+   further down, which fully overrides width/padding). */
 .ann-select {
   flex: 0 0 auto;
   min-width: 170px;
@@ -353,46 +528,23 @@
   cursor: pointer;
 }
 
-.ann-search-input:focus,
 .ann-select:focus {
   outline: none;
   border-color: rgba(34, 197, 94, 0.6);
 }
 
 @media (max-width: 640px) {
-  .ann-select {
-    min-width: 100%;
-  }
   .ann-btn-new {
     align-self: stretch;
     justify-content: center;
   }
 }
 
-/* ===== List card ===== */
-.ann-list-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 1.5rem;
+/* ===== List ===== */
+.ann-list {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-}
-
-.ann-list-header h2 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
-  text-align: left;
-}
-
-.ann-list-header p {
-  font-size: 0.85rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  text-align: left;
 }
 
 .ann-tabs {
@@ -457,31 +609,33 @@
   margin-bottom: 0.75rem;
 }
 
-/* ===== Announcement item ===== */
+/* ===== Announcement item =====
+   Matches the student `.announcement-card` visual from stud-announcements.css
+   (rounded card on --card-bg, hover lift, gradient icon square with a white
+   glyph) while keeping the admin action-button row underneath. Class names stay
+   `ann-`-prefixed on purpose -- adm-dashboard.css (also loaded on this page)
+   defines conflicting bare `.announcement-*` rules. */
 .ann-item {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  background: var(--secondary);
+  background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-left: 4px solid var(--card-border);
-  border-radius: 0.85rem;
-  padding: 1.1rem 1.25rem;
-  transition: all 0.3s ease;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ann-item:hover {
+  transform: translateY(-4px);
   border-color: rgba(34, 197, 94, 0.4);
-  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.08);
-}
-
-.ann-item-pinned {
-  border-left-color: var(--primary-color);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
 }
 
 .ann-item-icon {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3rem;
+  height: 3rem;
+  min-width: 3rem;
   border-radius: 0.75rem;
   display: flex;
   align-items: center;
@@ -490,29 +644,27 @@
 }
 
 .ann-item-icon svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #fff;
+  stroke: #fff;
+  stroke-width: 2;
 }
 
 .ann-icon-important {
-  background: rgba(239, 68, 68, 0.18);
-  color: #ef4444;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 .ann-icon-event {
-  background: rgba(249, 115, 22, 0.18);
-  color: #f97316;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
 }
 .ann-icon-reminder {
-  background: rgba(59, 130, 246, 0.18);
-  color: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 .ann-icon-general {
-  background: rgba(148, 163, 184, 0.18);
-  color: #94a3b8;
+  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
 }
 .ann-icon-pinned {
-  background: rgba(34, 197, 94, 0.18);
-  color: var(--primary-color);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
 }
 
 .ann-item-body {
@@ -537,10 +689,11 @@
 }
 
 .ann-item-title {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  line-height: 1.2;
   text-align: left;
 }
 
@@ -587,11 +740,11 @@
   border: 0.5px solid rgba(34, 197, 94, 0.4);
 }
 .ann-item-desc {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
-  margin: 0 0 0.6rem 0;
-  line-height: 1.5;
-  text-align: left;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.6;
+  text-align: justify;
   overflow-wrap: break-word;
   word-break: break-word;
 }
@@ -953,11 +1106,7 @@
   font-weight: 700;
   cursor: pointer;
   border: none;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    var(--success) 100%
-  );
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   color: #ffffff;
 }
 
@@ -972,11 +1121,7 @@
 
 /* View modal specifics */
 .ann-view-banner {
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    var(--success) 100%
-  );
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   border-radius: 1rem;
   padding: 1.25rem;
   color: #ffffff;
@@ -1188,7 +1333,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid var(--border, #e5e7eb);
-  border-top-color: var(--accent, #f97316);
+  border-top-color: var(--primary-color, #22c55e);
   border-radius: 50%;
   animation: ann-spin 0.7s linear infinite;
 }

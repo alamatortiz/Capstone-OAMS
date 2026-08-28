@@ -33,11 +33,18 @@ function buildReminderMessage({ appointment_date, appointment_time, location_sna
 async function sweepAppointmentReminders() {
   try {
     const [due] = await pool.query(
+      // appointment_date/time are Manila wall-clock with no timezone, but NOW()
+      // is UTC (db.js keeps the connection at "Z" and the container has no TZ
+      // override). Compare against Manila-now so the 24h window is real -- see
+      // queueExpirySweeper.js for the same reasoning. CONVERT_TZ with numeric
+      // offsets needs no MySQL timezone tables.
       `SELECT appointment_id, student_id, appointment_date, appointment_time, location_snapshot
        FROM appointments
        WHERE status = 'approved'
          AND reminder_sent_at IS NULL
-         AND TIMESTAMP(appointment_date, appointment_time) BETWEEN NOW() AND (NOW() + INTERVAL ? HOUR)`,
+         AND TIMESTAMP(appointment_date, appointment_time)
+             BETWEEN CONVERT_TZ(NOW(), '+00:00', '+08:00')
+                 AND (CONVERT_TZ(NOW(), '+00:00', '+08:00') + INTERVAL ? HOUR)`,
       [REMINDER_LEAD_HOURS],
     );
 
@@ -79,10 +86,12 @@ async function sweepAppointmentReminders() {
 // professorRoutes.js so a transaction feed can't tell the two apart.
 async function sweepStaleApproved() {
   const [stale] = await pool.query(
+    // Manila-now comparison -- see the note in sweepAppointmentReminders above.
     `SELECT appointment_id, student_id, department_id
      FROM appointments
      WHERE status = 'approved'
-       AND TIMESTAMP(appointment_date, appointment_time) <= (NOW() - INTERVAL ? HOUR)`,
+       AND TIMESTAMP(appointment_date, appointment_time)
+           <= (CONVERT_TZ(NOW(), '+00:00', '+08:00') - INTERVAL ? HOUR)`,
     [COMPLETE_GRACE_HOURS],
   );
 

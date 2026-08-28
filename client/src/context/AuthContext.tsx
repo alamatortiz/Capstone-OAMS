@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import api from "../utils/api";
+import { disconnectSocket } from "../utils/socket";
 
 type Role = "student" | "faculty" | "admin" | "superadmin";
 
@@ -137,10 +138,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    // Capture the token BEFORE clearing storage. api.js's request interceptor
+    // reads the token from sessionStorage (about to be emptied) and runs
+    // asynchronously, so it cannot re-attach it -- without passing it
+    // explicitly here the /auth/logout request goes out unauthenticated and
+    // the server never records the logout, leaving the JWT valid for its full
+    // 24h lifetime. Also tear down the socket (mobile already does this).
+    const storedToken = sessionStorage.getItem("oams_token");
     clearAuthData();
-    // Optionally, inform the backend about logout if session management is needed there
+    disconnectSocket();
     api
-      .post("/auth/logout")
+      .post(
+        "/auth/logout",
+        null,
+        storedToken
+          ? { headers: { Authorization: `Bearer ${storedToken}` } }
+          : undefined,
+      )
       .catch((error) => console.error("Logout error:", error));
   };
 

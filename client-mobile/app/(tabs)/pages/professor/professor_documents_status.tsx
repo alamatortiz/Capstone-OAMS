@@ -27,6 +27,7 @@ import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { DocStatus, getDetailStatusMeta } from '@/utils/documentStatus';
+import { formatManilaDate } from '@/utils/date';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -161,18 +162,18 @@ const navItems: NavItem[] = [
   { key: 'transactions', label: 'Transactions', icon: 'time-outline' },
 ];
 
+// The documents API returns full ISO timestamp strings (…T05:30:00.000Z);
+// `new Date(`${dateStr}T00:00:00`)` produced an Invalid Date and fell back to
+// the raw string. Delegate to the shared Manila formatter, keeping the local
+// "—" empty placeholder.
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '—';
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return formatManilaDate(dateStr);
 };
 
 const formatDateShort = (dateStr?: string) => {
   if (!dateStr) return '—';
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatManilaDate(dateStr, { month: 'short' });
 };
 
 const formatDateTime = (dateStr?: string) => {

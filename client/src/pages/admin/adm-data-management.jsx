@@ -120,6 +120,10 @@ export default function AdminDataManagement() {
   const [requirements, setRequirements] = useState([]);
   const [reqForm, setReqForm] = useState(emptyReqForm());
   const [reqLoading, setReqLoading] = useState(false);
+  // True once the requirements list has been populated for the current modal
+  // (immediately for "add", after a successful fetch for "edit"). Submitting
+  // before this is true would send an empty list and wipe the real one.
+  const [reqLoaded, setReqLoaded] = useState(false);
 
   // ── Service Settings ───────────────────────────────────────
   const [serviceSettings, setServiceSettings] = useState([]);
@@ -136,6 +140,9 @@ export default function AdminDataManagement() {
   const [svcReqForm, setSvcReqForm] = useState({ name: "", description: "", isMandatory: true });
   const [svcStepForm, setSvcStepForm] = useState({ title: "", description: "" });
   const [svcReqLoading, setSvcReqLoading] = useState(false);
+  // As reqLoaded above, but covers both requirements and steps for the service
+  // modal (they load together).
+  const [svcDetailsLoaded, setSvcDetailsLoaded] = useState(false);
 
   // Fixed premises fetched once for the Location dropdown
   const [locations, setLocations] = useState([]);
@@ -218,6 +225,7 @@ export default function AdminDataManagement() {
     setDocForm(emptyDocForm());
     setRequirements([]);
     setReqForm(emptyReqForm());
+    setReqLoaded(true);
     setShowDocModal(true);
   };
 
@@ -234,12 +242,14 @@ export default function AdminDataManagement() {
     });
     setRequirements([]);
     setReqForm(emptyReqForm());
+    setReqLoaded(false);
     setShowDocModal(true);
 
     setReqLoading(true);
     try {
       const { data } = await api.get(`/admin/data-management/document-types/${doc.id}/requirements`);
       setRequirements(data.requirements || []);
+      setReqLoaded(true);
     } catch {
       toast.error("Failed to load requirements.");
     } finally {
@@ -253,6 +263,7 @@ export default function AdminDataManagement() {
     setDocForm(emptyDocForm());
     setRequirements([]);
     setReqForm(emptyReqForm());
+    setReqLoaded(false);
   };
 
   const addRequirement = () => {
@@ -285,12 +296,17 @@ export default function AdminDataManagement() {
         isCrossCollege: docForm.isCrossCollege,
         recipientType: docForm.recipientType,
         requiresCoding: docForm.requiresCoding,
-        requirements: requirements.map((r) => ({
+      };
+      // Only send the requirements list once it's trustworthy (loaded from the
+      // server on edit, or always on add). Omitting the key tells the server to
+      // leave the existing rows alone rather than wiping them.
+      if (reqLoaded || !editingDoc) {
+        payload.requirements = requirements.map((r) => ({
           name: r.name,
           description: r.description || "",
           isMandatory: r.isMandatory !== false,
-        })),
-      };
+        }));
+      }
 
       if (editingDoc) {
         await api.put(`/admin/data-management/document-types/${editingDoc.id}`, payload);
@@ -328,6 +344,7 @@ export default function AdminDataManagement() {
     setServiceSteps([]);
     setSvcReqForm({ name: "", description: "", isMandatory: true });
     setSvcStepForm({ title: "", description: "" });
+    setSvcDetailsLoaded(true);
     setShowServiceModal(true);
   };
 
@@ -338,11 +355,13 @@ export default function AdminDataManagement() {
       description: s.description || "",
       isCrossCollege: !!s.isCrossCollege,
       locationId: s.locationId ? String(s.locationId) : "",
+      otherLocationName: "",
     });
     setServiceRequirements([]);
     setServiceSteps([]);
     setSvcReqForm({ name: "", description: "", isMandatory: true });
     setSvcStepForm({ title: "", description: "" });
+    setSvcDetailsLoaded(false);
     setShowServiceModal(true);
 
     setSvcReqLoading(true);
@@ -353,6 +372,7 @@ export default function AdminDataManagement() {
       ]);
       setServiceRequirements(reqRes.data.requirements || []);
       setServiceSteps(stepRes.data.steps || []);
+      setSvcDetailsLoaded(true);
     } catch {
       toast.error("Failed to load service details.");
     } finally {
@@ -368,6 +388,7 @@ export default function AdminDataManagement() {
     setServiceSteps([]);
     setSvcReqForm({ name: "", description: "", isMandatory: true });
     setSvcStepForm({ title: "", description: "" });
+    setSvcDetailsLoaded(false);
   };
 
   const addServiceRequirement = () => {
@@ -431,22 +452,27 @@ export default function AdminDataManagement() {
         toast.success("Service created.");
       }
 
-      await Promise.all([
-        api.put(`/admin/data-management/service-types/${serviceId}/requirements`, {
-          requirements: serviceRequirements.map((r) => ({
-            name: r.name,
-            description: r.description || "",
-            isMandatory: r.isMandatory !== false,
-          })),
-        }),
-        api.put(`/admin/data-management/service-types/${serviceId}/steps`, {
-          steps: serviceSteps.map((s) => ({
-            stepNumber: s.stepNumber,
-            title: s.title,
-            description: s.description || "",
-          })),
-        }),
-      ]);
+      // Only replace requirements/steps once they've actually loaded (on edit)
+      // -- otherwise the modal's brief empty state would blow away the real
+      // rows. On add there's nothing to lose, so always send.
+      if (svcDetailsLoaded || !editingService) {
+        await Promise.all([
+          api.put(`/admin/data-management/service-types/${serviceId}/requirements`, {
+            requirements: serviceRequirements.map((r) => ({
+              name: r.name,
+              description: r.description || "",
+              isMandatory: r.isMandatory !== false,
+            })),
+          }),
+          api.put(`/admin/data-management/service-types/${serviceId}/steps`, {
+            steps: serviceSteps.map((s) => ({
+              stepNumber: s.stepNumber,
+              title: s.title,
+              description: s.description || "",
+            })),
+          }),
+        ]);
+      }
 
       closeServiceModal();
       fetchServiceTypes();
@@ -727,7 +753,11 @@ export default function AdminDataManagement() {
                 </div>
                 <div className="adm-modal-footer">
                   <button className="adm-btn-outline" onClick={closeDocModal}>Cancel</button>
-                  <button className="adm-btn-primary" onClick={handleDocSubmit} disabled={docSaving}>
+                  <button
+                    className="adm-btn-primary"
+                    onClick={handleDocSubmit}
+                    disabled={docSaving || (editingDoc && !reqLoaded)}
+                  >
                     {docSaving ? "Saving..." : (editingDoc ? "Update" : "Create")}
                   </button>
                 </div>
@@ -922,7 +952,11 @@ export default function AdminDataManagement() {
                 </div>
                 <div className="adm-modal-footer">
                   <button className="adm-btn-outline" onClick={closeServiceModal}>Cancel</button>
-                  <button className="adm-btn-primary" onClick={handleServiceSubmit} disabled={serviceSaving}>
+                  <button
+                    className="adm-btn-primary"
+                    onClick={handleServiceSubmit}
+                    disabled={serviceSaving || (editingService && !svcDetailsLoaded)}
+                  >
                     {serviceSaving ? "Saving..." : (editingService ? "Update" : "Add Service")}
                   </button>
                 </div>

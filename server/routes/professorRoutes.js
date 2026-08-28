@@ -1765,48 +1765,4 @@ router.get(
   },
 );
 
-// ─────────────────────────────────────────────────────────────
-// FAQS ENDPOINT (read-only, mirrors the student FAQ route)
-// ─────────────────────────────────────────────────────────────
-
-// GET /api/professor/faqs
-// Returns only the faculty member's own department's FAQs, in stable
-// insertion order. No create/edit/delete here -- FAQ management stays
-// admin-only, same as the student side.
-router.get(
-  "/faqs",
-  authenticateToken,
-  authorizeRoles("faculty"),
-  async (req, res) => {
-    const facultyId = req.user.userId;
-    try {
-      const [[fac]] = await pool.query(
-        `SELECT department_id FROM faculty WHERE faculty_id = ?`,
-        [facultyId],
-      );
-      const facultyDeptId = fac?.department_id ?? null;
-
-      const [rows] = await pool.query(
-        `SELECT faq_id, question, answer, created_at, updated_at
-         FROM faqs
-         WHERE department_id = ?
-         ORDER BY created_at ASC, faq_id ASC`,
-        [facultyDeptId],
-      );
-
-      res.json({
-        faqs: rows.map((r) => ({
-          id: r.faq_id,
-          question: r.question,
-          answer: r.answer,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at,
-        })),
-      });
-    } catch (error) {
-      sendServerError(res, error, "Fetch FAQs error");
-    }
-  },
-);
-
 module.exports = router;

@@ -29,6 +29,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { connectSocket } from '@/utils/socket';
 import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
+import { toLocalYMD } from '@/utils/date';
 
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
 // advisory here for the running-total UI, the server stays authoritative.
@@ -857,7 +858,7 @@ export default function StudentDocumentsScreen() {
                     onChange={(event, selectedDate) => {
                       setShowNeededByPicker(false);
                       if (event.type === 'set' && selectedDate) {
-                        setFormData((f) => ({ ...f, neededBy: selectedDate.toISOString().slice(0, 10) }));
+                        setFormData((f) => ({ ...f, neededBy: toLocalYMD(selectedDate) }));
                       }
                     }}
                   />
@@ -965,7 +966,7 @@ export default function StudentDocumentsScreen() {
                     onChange={(event, selectedDate) => {
                       setShowSendNeededByPicker(false);
                       if (event.type === 'set' && selectedDate) {
-                        setSendFormData((f) => ({ ...f, neededBy: selectedDate.toISOString().slice(0, 10) }));
+                        setSendFormData((f) => ({ ...f, neededBy: toLocalYMD(selectedDate) }));
                       }
                     }}
                   />

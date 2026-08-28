@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Megaphone as LucideMegaphone, HelpCircle } from "lucide-react";
+import { Megaphone as LucideMegaphone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -14,7 +14,6 @@ import "./prof-announcements.css";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const MegaphoneIcon = () => <LucideMegaphone />;
-const HelpCircleIcon = () => <HelpCircle />;
 
 const AlertCircleIcon = () => (
   <svg
@@ -300,11 +299,6 @@ export default function ProfessorAnnouncementsPage() {
             titleClassName="ann-title"
             subtitleClassName="ann-subtitle"
           />
-
-          <Link to="/professor/faqs" className="ann-btn-faqs-link">
-            <HelpCircleIcon />
-            View FAQs
-          </Link>
 
           {/* Error banner */}
           {annError && (

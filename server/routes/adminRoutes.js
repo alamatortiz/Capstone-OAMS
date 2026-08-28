@@ -2454,7 +2454,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { name, description, processingTime, status, isCrossCollege, recipientType, requiresCoding, requirements = [] } = req.body;
+    const { name, description, processingTime, status, isCrossCollege, recipientType, requiresCoding, requirements } = req.body;
     if (!name || !description || !processingTime) {
       return res.status(400).json({ error: "name, description, and processingTime are required" });
     }
@@ -2477,14 +2477,19 @@ router.put(
         [name, description, status || "active", processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
       );
 
-      // Replace requirements: delete all then re-insert
-      await pool.query(`DELETE FROM document_requirements WHERE service_id = ?`, [serviceId]);
-      if (requirements.length > 0) {
-        const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
-        await pool.query(
-          `INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
-          [reqValues],
-        );
+      // Replace requirements only when the client actually sent the list. An
+      // omitted key means "leave as-is" -- the edit modal briefly holds an
+      // empty list while it fetches the real one, and an early Update must not
+      // wipe every requirement. An explicit [] still means "clear all".
+      if (Array.isArray(requirements)) {
+        await pool.query(`DELETE FROM document_requirements WHERE service_id = ?`, [serviceId]);
+        if (requirements.length > 0) {
+          const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
+          await pool.query(
+            `INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
+            [reqValues],
+          );
+        }
       }
 
       await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
@@ -2768,7 +2773,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { requirements = [] } = req.body;
+    const { requirements } = req.body;
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
@@ -2779,18 +2784,22 @@ router.put(
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
 
-      await pool.query(`DELETE FROM service_requirements WHERE service_id = ?`, [serviceId]);
-      if (requirements.length > 0) {
-        const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
-        await pool.query(
-          `INSERT INTO service_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
-          [reqValues],
+      // Only touch requirements when the client actually sent the list -- an
+      // omitted key means "leave as-is" (guards the edit modal's brief empty
+      // window). An explicit [] still clears all.
+      if (Array.isArray(requirements)) {
+        await pool.query(`DELETE FROM service_requirements WHERE service_id = ?`, [serviceId]);
+        if (requirements.length > 0) {
+          const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
+          await pool.query(
+            `INSERT INTO service_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
+            [reqValues],
+          );
+        }
+        await logAudit(req.user.userId, "UPDATE", "service_requirements", serviceId,
+          null, { requirementCount: requirements.length },
         );
       }
-
-      await logAudit(req.user.userId, "UPDATE", "service_requirements", serviceId,
-        null, { requirementCount: requirements.length },
-      );
       res.json({ message: "Service requirements updated" });
     } catch (error) {
       sendServerError(res, error, "Service requirements update error:");
@@ -2840,7 +2849,7 @@ router.put(
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
-    const { steps = [] } = req.body;
+    const { steps } = req.body;
     try {
       const deptId = await getAdminDepartmentId(req.user.userId);
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
@@ -2851,18 +2860,22 @@ router.put(
       );
       if (!svc) return res.status(404).json({ error: "Service type not found in your department" });
 
-      await pool.query(`DELETE FROM service_procedure_steps WHERE service_id = ?`, [serviceId]);
-      if (steps.length > 0) {
-        const stepValues = steps.map((s, i) => [serviceId, s.stepNumber ?? i + 1, s.title, s.description || null]);
-        await pool.query(
-          `INSERT INTO service_procedure_steps (service_id, step_number, step_title, description) VALUES ?`,
-          [stepValues],
+      // Only touch steps when the client actually sent the list -- an omitted
+      // key means "leave as-is" (guards the edit modal's brief empty window).
+      // An explicit [] still clears all.
+      if (Array.isArray(steps)) {
+        await pool.query(`DELETE FROM service_procedure_steps WHERE service_id = ?`, [serviceId]);
+        if (steps.length > 0) {
+          const stepValues = steps.map((s, i) => [serviceId, s.stepNumber ?? i + 1, s.title, s.description || null]);
+          await pool.query(
+            `INSERT INTO service_procedure_steps (service_id, step_number, step_title, description) VALUES ?`,
+            [stepValues],
+          );
+        }
+        await logAudit(req.user.userId, "UPDATE", "service_procedure_steps", serviceId,
+          null, { stepCount: steps.length },
         );
       }
-
-      await logAudit(req.user.userId, "UPDATE", "service_procedure_steps", serviceId,
-        null, { stepCount: steps.length },
-      );
       res.json({ message: "Service procedure steps updated" });
     } catch (error) {
       sendServerError(res, error, "Service steps update error:");

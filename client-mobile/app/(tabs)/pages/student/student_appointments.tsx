@@ -272,6 +272,11 @@ export default function StudentAppointmentsScreen() {
           location: s.location,
           spotsLeft: s.spotsLeft,
           maxStudents: s.maxStudents,
+          // Server flags a window that has already ended today / is at capacity
+          // (studentRoutes.js available-slots). Without carrying these through,
+          // the card renders an active "Book this Slot" that always 409s.
+          isPast: !!s.isPast,
+          isFull: !!s.isFull,
           professorAvailabilityStatus: s.professorAvailabilityStatus,
           appointmentTypes: (s.appointmentTypes ?? []).map((t: any) => ({ id: String(t.id), name: t.name })),
         })),

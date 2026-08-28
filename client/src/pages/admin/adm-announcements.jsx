@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
 import editIcon from "../../assets/edit_icon.png";
 import deleteIcon from "../../assets/delete_icon.png";
 import "./adm-dashboard.css";
 import "./adm-announcements.css";
 import { Link } from "react-router-dom";
-import { ChevronLeft, HelpCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle, Megaphone } from "lucide-react";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
+import FilterSelect from "../../components/FilterSelect";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
 import { formatManilaDateTime } from "../../utils/dateTime";
@@ -19,10 +19,13 @@ const PlusIconSmall = () => (
     <line x1="5" y1="12" x2="19" y2="12"></line>
   </svg>
 );
-const MegaphoneIcon = (props) => (
-  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 11l18-5v12L3 13v-2z"></path>
-    <path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"></path>
+// Shared megaphone icon — the same lucide `Megaphone` the student/professor
+// announcement screens use. Kept as a props-forwarding wrapper so callers can
+// still pass `className`/`style` through to the underlying <svg>.
+const MegaphoneIcon = (props) => <Megaphone {...props} />;
+const ChevronDownIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
 const PinIcon = (props) => (
@@ -114,6 +117,16 @@ const AUDIENCE_VIEWS = [
   { id: "faculty", label: "Faculty" },
 ];
 
+// Type filter options (students audience only -- faculty announcements have no
+// category). Fed to the shared <FilterSelect>.
+const TYPE_FILTER_OPTIONS = [
+  { value: "all", label: "All Types" },
+  { value: "important", label: "Important" },
+  { value: "event", label: "Events" },
+  { value: "reminder", label: "Reminders" },
+  { value: "general", label: "General" },
+];
+
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
 // advisory here for the running-total UI, the server stays authoritative.
 const MAX_FILES = 5;
@@ -136,11 +149,6 @@ const formatPostedLabel = (announcement) => {
 };
 
 export default function AdminAnnouncements() {
-  const { user: authUser } = useAuth();
-  const user = authUser
-    ? { ...authUser, college: authUser.departmentName ?? "N/A College", departmentAbbrev: authUser.departmentAbbrev ?? "CCS" }
-    : { name: "Admin", college: "", departmentAbbrev: "CCS" };
-
   // ── Announcements state ────────────────────────────────────────────────────
   const [announcements, setAnnouncements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -760,8 +768,8 @@ export default function AdminAnnouncements() {
             breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<MegaphoneIcon />}
             iconClassName="ann-title-icon"
-            title="Announcements Management"
-            subtitle={`Manage announcements for ${user?.college || "your department"}`}
+            title="Announcements and FAQs Management"
+            subtitle="Manage department announcements and frequently asked questions."
             headerClassName="ann-header-row"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="ann-title-section"
@@ -777,11 +785,22 @@ export default function AdminAnnouncements() {
               <PlusIconSmall />
               New Announcement
             </button>
-            <Link to="/admin/faqs" className="ann-btn-faqs">
-              <HelpCircle />
-              Manage FAQs
-            </Link>
           </div>
+
+          {/* FAQs management entry -- full card button (green; mirrors the
+              stud-appointments ab-prof-sched-card) */}
+          <Link to="/admin/faqs" className="ann-faqs-card">
+            <div className="ann-faqs-card-icon">
+              <HelpCircle />
+            </div>
+            <div className="ann-faqs-card-text">
+              <span className="ann-faqs-card-title">Manage FAQs</span>
+              <span className="ann-faqs-card-subtitle">
+                Add and edit your department's frequently asked questions.
+              </span>
+            </div>
+            <ChevronRight className="ann-faqs-card-chevron" />
+          </Link>
 
           {/* Source toggle */}
           <div className="ann-source-toggle">
@@ -798,53 +817,70 @@ export default function AdminAnnouncements() {
 
           {/* Stats */}
           <div className="ann-stats-grid">
-            <div className="ann-stat-card ann-stat-total">
-              <div><p className="ann-stat-label">Total Active</p><p className="ann-stat-value">{stats.total}</p></div>
-              <MegaphoneIcon className="ann-stat-icon" />
+            <div className="ann-stat-card">
+              <div className="ann-stat-icon-box"><MegaphoneIcon /></div>
+              <p className="ann-stat-label">Total Active</p>
+              <p className="ann-stat-value">{stats.total}</p>
             </div>
-            <div className="ann-stat-card ann-stat-pinned">
-              <div><p className="ann-stat-label">Pinned</p><p className="ann-stat-value">{stats.pinned}</p></div>
-              <PinIcon className="ann-stat-icon" />
+            <div className="ann-stat-card">
+              <div className="ann-stat-icon-box"><PinIcon /></div>
+              <p className="ann-stat-label">Pinned</p>
+              <p className="ann-stat-value">{stats.pinned}</p>
             </div>
-            <div className="ann-stat-card ann-stat-important">
-              <div><p className="ann-stat-label">Important</p><p className="ann-stat-value">{stats.important}</p></div>
-              <AlertCircleIcon className="ann-stat-icon" />
+            <div className="ann-stat-card">
+              <div className="ann-stat-icon-box"><AlertCircleIcon /></div>
+              <p className="ann-stat-label">Important</p>
+              <p className="ann-stat-value">{stats.important}</p>
             </div>
-            <div className="ann-stat-card ann-stat-archived">
-              <div><p className="ann-stat-label">Archived</p><p className="ann-stat-value">{stats.archived}</p></div>
-              <XIcon className="ann-stat-icon" />
+            <div className="ann-stat-card">
+              <div className="ann-stat-icon-box"><XIcon /></div>
+              <p className="ann-stat-label">Archived</p>
+              <p className="ann-stat-value">{stats.archived}</p>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="ann-filters-card">
-            <div className="ann-search-wrap">
-              <SearchIcon className="ann-search-icon" />
-              <input
-                className="ann-search-input"
-                placeholder="Search announcements by title, content, or creator..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+          <div className="filters-card">
+            <div className="filters-header">
+              <div className="filters-header-text">
+                <h3 className="filters-title">Announcement Filter</h3>
+                <p className="filters-description">
+                  Search and filter department announcements.
+                </p>
+              </div>
+            </div>
+            <div className="filters-search-row">
+              <div className="filter-group">
+                <label className="filter-label" htmlFor="ann-search">Search</label>
+                <div className="filter-search-wrapper">
+                  <SearchIcon />
+                  <input
+                    id="ann-search"
+                    type="text"
+                    className="filter-search-input"
+                    placeholder="Search by title, content, or creator..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
             {audienceView === "students" && (
-              <select className="ann-select" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
-                <option value="all">All Types</option>
-                <option value="important">Important</option>
-                <option value="event">Events</option>
-                <option value="reminder">Reminders</option>
-                <option value="general">General</option>
-              </select>
+              <div className="filters-grid">
+                <FilterSelect
+                  id="ann-filter-type"
+                  label="Type"
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  options={TYPE_FILTER_OPTIONS}
+                  chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+                />
+              </div>
             )}
           </div>
 
           {/* List */}
-          <div className="ann-list-card">
-            <div className="ann-list-header">
-              <h2>Announcements — {user?.college || "Your Department"}</h2>
-              <p>View and manage your department's announcements</p>
-            </div>
-
+          <div className="ann-list">
             <div className="ann-tabs">
               <button className={`ann-tab ${activeTab === "active" ? "ann-tab-active" : ""}`} onClick={() => setActiveTab("active")}>
                 Active

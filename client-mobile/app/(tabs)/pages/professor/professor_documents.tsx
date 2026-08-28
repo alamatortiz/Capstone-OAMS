@@ -24,6 +24,7 @@ import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
+import { toLocalYMD, formatManilaDate } from '@/utils/date';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -156,11 +157,11 @@ const TAB_META: Record<TabKey, { label: string; icon: IoniconName }> = {
   cancelled: { label: 'Cancelled', icon: 'close-circle-outline' },
 };
 
+// The documents API returns full ISO timestamp strings (…T05:30:00.000Z);
+// the old `new Date(`${dateStr}T00:00:00`)` produced an Invalid Date and fell
+// back to rendering the raw string. Delegate to the shared Manila formatter.
 function formatDate(dateStr?: string) {
-  if (!dateStr) return '';
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return formatManilaDate(dateStr);
 }
 
 const emptyFormData: { typeId: number | ''; purpose: string; copies: string; neededBy: string } = {
@@ -897,7 +898,7 @@ export default function ProfessorDocumentsScreen() {
                     onChange={(event, selectedDate) => {
                       setShowNeededByPicker(false);
                       if (event.type === 'set' && selectedDate) {
-                        setFormData((prev) => ({ ...prev, neededBy: selectedDate.toISOString().slice(0, 10) }));
+                        setFormData((prev) => ({ ...prev, neededBy: toLocalYMD(selectedDate) }));
                       }
                     }}
                   />
@@ -1010,7 +1011,7 @@ export default function ProfessorDocumentsScreen() {
                     onChange={(event, selectedDate) => {
                       setShowSendNeededByPicker(false);
                       if (event.type === 'set' && selectedDate) {
-                        setSendFormData((prev) => ({ ...prev, neededBy: selectedDate.toISOString().slice(0, 10) }));
+                        setSendFormData((prev) => ({ ...prev, neededBy: toLocalYMD(selectedDate) }));
                       }
                     }}
                   />
