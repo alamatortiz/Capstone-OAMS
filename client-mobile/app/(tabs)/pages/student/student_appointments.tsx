@@ -694,8 +694,8 @@ export default function StudentAppointmentsScreen() {
 
           {/* Filters */}
           <View style={styles.filtersCard}>
-            <Text style={styles.filtersTitle}>Filter & Search</Text>
-            <Text style={styles.filtersDescription}>Optionally filter by college, professor, or date.</Text>
+            <Text style={styles.filtersTitle}>Appointments Filter</Text>
+            <Text style={styles.filtersDescription}>Filter appointments by college, professor, or date.</Text>
 
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>College</Text>

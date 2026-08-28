@@ -309,22 +309,24 @@ export default function ProfessorAppointmentScreen() {
     router.replace('/login');
   };
 
-  const allRangeAppointments =
+  // Governs every tab, not just "All" -- picking a range then switching tabs
+  // should keep showing only that range's appointments for that status.
+  const rangeFiltered =
     allRange === 'all'
       ? appointments
       : appointments.filter((a) => isWithinRange(a.date, allRange === 'week' ? getWeekRange() : getMonthRange()));
 
   const tabCounts: Record<TabKey, number> = {
-    all: allRangeAppointments.length,
-    pending: appointments.filter((a) => a.status === 'pending').length,
-    approved: appointments.filter((a) => a.status === 'approved').length,
-    completed: appointments.filter((a) => a.status === 'completed').length,
-    rejected: appointments.filter((a) => a.status === 'rejected').length,
-    cancelled: appointments.filter((a) => a.status === 'cancelled').length,
+    all: rangeFiltered.length,
+    pending: rangeFiltered.filter((a) => a.status === 'pending').length,
+    approved: rangeFiltered.filter((a) => a.status === 'approved').length,
+    completed: rangeFiltered.filter((a) => a.status === 'completed').length,
+    rejected: rangeFiltered.filter((a) => a.status === 'rejected').length,
+    cancelled: rangeFiltered.filter((a) => a.status === 'cancelled').length,
   };
 
   const visibleAppointments =
-    activeTab === 'all' ? allRangeAppointments : appointments.filter((a) => a.status === activeTab);
+    activeTab === 'all' ? rangeFiltered : rangeFiltered.filter((a) => a.status === activeTab);
 
   const requestAction = (type: ActionType, apt: Appointment) => setConfirmAction({ type, apt });
 
@@ -487,18 +489,15 @@ export default function ProfessorAppointmentScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>
-                {activeTab === 'all'
-                  ? allRange !== 'all'
-                    ? `No Appointments ${ALL_RANGE_LABELS[allRange]}`
-                    : 'No Appointments Yet'
-                  : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                {activeTab === 'all' ? 'No Appointments' : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                {allRange !== 'all' ? ` ${ALL_RANGE_LABELS[allRange]}` : activeTab === 'all' ? ' Yet' : ''}
               </Text>
               <Text style={styles.emptyText}>
-                {activeTab === 'all'
-                  ? allRange !== 'all'
-                    ? 'You have no appointments in this range — switch to "All Time" to see everything.'
-                    : 'New appointment requests from students will appear here.'
-                  : `You have no ${activeTab} appointments.`}
+                {allRange !== 'all'
+                  ? 'You have no appointments in this range — switch to "All Time" to see everything.'
+                  : activeTab === 'all'
+                    ? 'New appointment requests from students will appear here.'
+                    : `You have no ${activeTab} appointments.`}
               </Text>
             </View>
           ) : (
