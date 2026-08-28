@@ -487,11 +487,17 @@ export default function ProfessorAppointmentScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={32} color={theme.tertiary} />
               <Text style={styles.emptyTitle}>
-                {activeTab === 'all' ? 'No Appointments Yet' : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                {activeTab === 'all'
+                  ? allRange !== 'all'
+                    ? `No Appointments ${ALL_RANGE_LABELS[allRange]}`
+                    : 'No Appointments Yet'
+                  : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
               </Text>
               <Text style={styles.emptyText}>
                 {activeTab === 'all'
-                  ? 'New appointment requests from students will appear here.'
+                  ? allRange !== 'all'
+                    ? 'You have no appointments in this range — switch to "All Time" to see everything.'
+                    : 'New appointment requests from students will appear here.'
                   : `You have no ${activeTab} appointments.`}
               </Text>
             </View>

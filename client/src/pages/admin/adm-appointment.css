@@ -147,89 +147,125 @@ body {
   gap: 1.5rem;
 }
 
-/* ── Appointment Details Modal (read-only / monitoring view) ── */
+/* ── Appointment Details Modal (read-only / monitoring view) ──
+   Token-based (mirrors adm-document-processing's .adp-modal*) so it themes in
+   both light and dark; re-skinned to the appointment purple. */
 .admin-appointment-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
   padding: 1rem;
 }
 
 .admin-appointment-modal {
-  background: #0f1a14; /* match your dark theme card bg */
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  border-radius: 12px;
   width: 100%;
-  max-width: 560px;
+  max-width: 42rem;
+  background: var(--card-bg);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
   max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.admin-appointment-modal-title,
+.admin-appointment-modal-label,
+.admin-appointment-modal-value {
+  text-align: left;
 }
 
 .admin-appointment-modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  justify-content: space-between;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--card-border);
+  transition: border-color 0.3s ease;
+  flex-shrink: 0;
 }
 
 .admin-appointment-modal-title {
-  font-size: 1.1rem;
+  font-size: 1.125rem;
   font-weight: 700;
-  color: #fff;
-  margin: 0 0 0.25rem 0;
-}
-
-.admin-appointment-modal-subtitle {
-  font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--text-primary);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .admin-appointment-modal-close-btn {
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: var(--text-tertiary);
   cursor: pointer;
-  padding: 0.25rem;
-  line-height: 0;
+  padding: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 .admin-appointment-modal-close-btn:hover {
-  color: #fff;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
 }
 .admin-appointment-modal-close-btn svg {
-  width: 20px;
-  height: 20px;
+  width: 1.125rem;
+  height: 1.125rem;
+  stroke: currentColor;
 }
 
 .admin-appointment-modal-body {
+  flex: 1;
+  min-height: 0;
   padding: 1.5rem;
-}
-
-.admin-appointment-modal-status-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
 }
 
-.admin-appointment-modal-tracking {
-  font-size: 0.85rem;
-  color: #9ca3af;
+.admin-appointment-modal-hero {
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(168, 85, 247, 0.2);
+}
+.admin-appointment-modal-hero-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 0.375rem 0;
+}
+.admin-appointment-modal-hero-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
 }
 
 .admin-appointment-modal-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem 1.5rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 480px) {
+  .admin-appointment-modal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-appointment-modal-field {
@@ -243,37 +279,47 @@ body {
 }
 
 .admin-appointment-modal-label {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #6b7280;
+  letter-spacing: 0.05em;
+  transition: color 0.3s ease;
 }
 
 .admin-appointment-modal-value {
-  font-size: 0.92rem;
-  color: #e5e7eb;
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
 }
 
 .admin-appointment-modal-footer {
   display: flex;
   justify-content: flex-end;
   padding: 1rem 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--card-border);
+  transition: border-color 0.3s ease;
+  flex-shrink: 0;
 }
 
 .admin-appointment-modal-close-action {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #e5e7eb;
-  padding: 0.5rem 1.25rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--card-border);
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
 }
 .admin-appointment-modal-close-action:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(168, 85, 247, 0.05);
+  border-color: rgba(168, 85, 247, 0.3);
+  color: var(--purple);
 }
 
 @media (max-width: 1024px) {
@@ -369,22 +415,47 @@ body {
 /* ===== Filters Card ===== */
 .admin-appointment-filters-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(168, 85, 247, 0.15);
   border-radius: 1rem;
-  padding: 1.25rem;
+  padding: 1rem 1.5rem 1.5rem;
   transition: all 0.3s ease;
 }
 
-.admin-appointment-filters-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+[data-theme="light"] .admin-appointment-filters-card {
+  border-color: rgba(147, 51, 234, 0.15);
 }
 
-@media (min-width: 768px) {
-  .admin-appointment-filters-content {
-    flex-direction: row;
-  }
+.admin-appointment-filters-header {
+  margin-bottom: 1.5rem;
+}
+
+.admin-appointment-filters-header h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.admin-appointment-filters-header p {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0;
+  transition: color 0.3s ease;
+}
+
+.admin-appointment-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-appointment-filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+  transition: color 0.3s ease;
 }
 
 .admin-appointment-search-wrapper {
@@ -426,91 +497,94 @@ body {
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
 }
 
-/* ===== Appointment Overview Card ===== */
-.admin-appointment-overview-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.admin-appointment-overview-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  transition: border-color 0.3s ease;
-}
-
-[data-theme="light"] .admin-appointment-overview-header {
-  border-bottom-color: #e2e8f0;
-}
-
-.admin-appointment-overview-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.5rem 0;
-  transition: color 0.3s ease;
-  text-align: left;
-}
-
-.admin-appointment-overview-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  transition: color 0.3s ease;
-  text-align: left;
-}
-
-/* ===== Tabs ===== */
-.admin-appointment-tabs-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
+/* ===== Tabs (mirrors prof-appointments' .appt-tabs-*) ===== */
 .admin-appointment-tabs-list {
   display: flex;
-  border-bottom: 1px solid var(--card-border);
-  padding: 0 1.5rem;
-  gap: 2rem;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
   transition: border-color 0.3s ease;
 }
 
 .admin-appointment-tab-trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 1rem 0;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
   background: transparent;
   border: none;
+  border-radius: 0;
   color: var(--text-tertiary);
   font-size: 0.875rem;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   white-space: nowrap;
-  font-family: inherit;
 }
 
-.admin-appointment-tab-trigger:hover {
-  color: var(--text-primary);
+.admin-appointment-tab-trigger:hover:not(.active) {
+  color: var(--purple);
 }
 
 .admin-appointment-tab-trigger.active {
   color: var(--purple);
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Keep the embedded <select> clickable while the "All" tab is active. */
+.admin-appointment-tab-trigger--dropdown.active {
+  pointer-events: auto;
+  cursor: default;
 }
 
 .admin-appointment-tab-trigger.active::after {
   content: "";
   position: absolute;
-  bottom: 0;
+  bottom: -2px;
   left: 0;
   right: 0;
   height: 2px;
   background: var(--purple);
+}
+
+.admin-appointment-tab-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.admin-appointment-range-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  outline: none;
+  padding: 0 1.1rem 0 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a855f7' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: 0.9rem;
+}
+
+[data-theme="light"] .admin-appointment-range-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239333ea' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+.admin-appointment-range-select:focus-visible {
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35);
+  border-radius: 0.25rem;
 }
 
 .admin-appointment-tab-count {
@@ -532,12 +606,7 @@ body {
   background: rgba(168, 85, 247, 0.25);
 }
 
-/* ===== Tab Content ===== */
-.admin-appointment-tabs-content {
-  padding: 1.5rem;
-  padding-top: 0;
-}
-
+/* ===== List / Empty State ===== */
 .admin-appointment-cards-list {
   display: flex;
   flex-direction: column;
@@ -552,14 +621,25 @@ body {
   padding: 3rem 1.5rem;
   gap: 1rem;
   text-align: center;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.125rem;
+  transition: all 0.3s ease;
 }
 
 .admin-appointment-empty-state svg {
-  width: 4rem;
-  height: 4rem;
+  width: 3rem;
+  height: 3rem;
   color: var(--text-tertiary);
-  opacity: 0.3;
   stroke: currentColor;
+}
+
+.admin-appointment-empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s ease;
 }
 
 .admin-appointment-empty-text {
@@ -612,35 +692,11 @@ body {
   min-width: 0;
 }
 
-.admin-appointment-college-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--purple);
-  width: fit-content;
-}
-
-.admin-appointment-college-badge svg {
-  width: 0.875rem;
-  height: 0.875rem;
-  stroke: currentColor;
-}
-
 .admin-appointment-student-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-
-.admin-appointment-student-person-icon {
-  width: 1.05rem;
-  height: 1.05rem;
-  flex-shrink: 0;
-  color: var(--text-tertiary);
-  stroke: currentColor;
 }
 
 .admin-appointment-student-name {
@@ -651,10 +707,20 @@ body {
   transition: color 0.3s ease;
 }
 
-.admin-appointment-student-id {
-  font-size: 0.85rem;
-  color: var(--text-tertiary);
-  transition: color 0.3s ease;
+.admin-appointment-student-id-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--purple);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  transition: all 0.3s ease;
 }
 
 .admin-appointment-purpose {
@@ -679,7 +745,7 @@ body {
   border-radius: 0.5rem;
   font-size: 0.8rem;
   font-weight: 600;
-  text-transform: capitalize;
+  text-transform: uppercase;
   white-space: nowrap;
   transition: all 0.3s ease;
 }
@@ -784,7 +850,40 @@ body {
   margin: 0;
 }
 
-.admin-appointment-view-details-btn {
+/* Card "View Details" button — mirrors adm-document-processing's .adp-view-btn,
+   re-skinned to the appointment purple. */
+.admin-appointment-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  border: none;
+  border-radius: 0.75rem;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+}
+
+.admin-appointment-view-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(168, 85, 247, 0.35);
+}
+
+.admin-appointment-view-btn svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* Error-state "Retry" button (formerly shared the card's view-details class). */
+.admin-appointment-retry-btn {
   padding: 0.5rem 1rem;
   background: transparent;
   border: 1px solid var(--card-border);
@@ -797,7 +896,7 @@ body {
   font-family: inherit;
 }
 
-.admin-appointment-view-details-btn:hover {
+.admin-appointment-retry-btn:hover {
   background: rgba(168, 85, 247, 0.1);
   border-color: var(--purple);
   color: var(--purple);
@@ -812,14 +911,6 @@ body {
 
   .admin-appointment-container {
     padding: 1rem;
-  }
-
-  .admin-appointment-filters-content {
-    flex-direction: column;
-  }
-
-  .admin-appointment-college-select-wrapper {
-    min-width: unset;
   }
 }
 
@@ -858,18 +949,13 @@ body {
     padding: 0.75rem;
   }
 
-  .admin-appointment-tabs-list {
-    padding: 0 1rem;
-    gap: 1rem;
+  .admin-appointment-tab-trigger {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.78rem;
   }
 
   .admin-appointment-card-content {
     padding: 1rem;
-  }
-
-  .admin-appointment-college-select-wrapper {
-    min-width: unset;
-    width: 100%;
   }
 }
 
@@ -881,4 +967,13 @@ body {
 .icon {
   width: 1rem;
   height: 1rem;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

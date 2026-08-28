@@ -2,12 +2,21 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  Clock,
+  LayoutList,
+  Loader2,
+  XCircle,
+} from "lucide-react";
 import "./adm-appointment.css";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import { formatManilaDate } from "../../utils/dateTime";
+import { filterByRange } from "../../utils/dateRange";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { connectSocket } from "../../utils/socket";
 
@@ -32,10 +41,10 @@ const SearchIcon = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
   </svg>
 );
-const BuildingIcon = () => (
+const EyeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
   </svg>
 );
 const AlertCircleIcon = () => (
@@ -53,23 +62,25 @@ const CheckCircleIcon = () => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
-const PersonIcon = ({ className = "" }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    className={className}
-  >
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-    <circle cx="12" cy="7" r="4"></circle>
-  </svg>
-);
-
 const CANCELLED_BY_LABELS = {
   student: "Student",
   faculty: "Faculty",
   system: "System (schedule change)",
+};
+
+const TAB_ICON_MAP = {
+  all: LayoutList,
+  pending: Clock,
+  approved: CheckCircle2,
+  completed: CheckCircle2,
+  rejected: XCircle,
+  cancelled: XCircle,
+};
+
+const ALL_RANGE_LABELS = {
+  week: "This Week",
+  month: "This Month",
+  all: "All Time",
 };
 
 export default function AdminAppointment() {
@@ -84,6 +95,7 @@ export default function AdminAppointment() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [allRange, setAllRange] = useState("week");
   const handleViewDetails = (appointment) =>
     setSelectedAppointment(appointment);
   const handleCloseDetails = () => setSelectedAppointment(null);
@@ -141,19 +153,24 @@ export default function AdminAppointment() {
       })
     : appointments;
 
+  // The This Week / This Month / All Time control (on the "All" tab) governs
+  // every tab, not just "All" — matching prof-appointments — so a tab's count
+  // and its list always come from the same range-filtered array.
+  const rangeFiltered = filterByRange(searchFiltered, allRange);
+
   const tabCounts = {
-    all: searchFiltered.length,
-    pending: searchFiltered.filter((a) => a.status === "pending").length,
-    approved: searchFiltered.filter((a) => a.status === "approved").length,
-    completed: searchFiltered.filter((a) => a.status === "completed").length,
-    rejected: searchFiltered.filter((a) => a.status === "rejected").length,
-    cancelled: searchFiltered.filter((a) => a.status === "cancelled").length,
+    all: rangeFiltered.length,
+    pending: rangeFiltered.filter((a) => a.status === "pending").length,
+    approved: rangeFiltered.filter((a) => a.status === "approved").length,
+    completed: rangeFiltered.filter((a) => a.status === "completed").length,
+    rejected: rangeFiltered.filter((a) => a.status === "rejected").length,
+    cancelled: rangeFiltered.filter((a) => a.status === "cancelled").length,
   };
 
   const filterAppointments = (status) =>
     status === "all"
-      ? searchFiltered
-      : searchFiltered.filter((a) => a.status === status);
+      ? rangeFiltered
+      : rangeFiltered.filter((a) => a.status === status);
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -196,16 +213,12 @@ export default function AdminAppointment() {
         <div className="admin-appointment-card-content">
           <div className="admin-appointment-card-header">
             <div className="admin-appointment-card-left">
-              <div className="admin-appointment-college-badge">
-                <BuildingIcon />
-              </div>
               <div className="admin-appointment-student-info">
-                <PersonIcon className="admin-appointment-student-person-icon" />
                 <h4 className="admin-appointment-student-name">
                   {appointment.studentName}
                 </h4>
-                <span className="admin-appointment-student-id">
-                  ({appointment.studentId})
+                <span className="admin-appointment-student-id-badge">
+                  {appointment.studentId}
                 </span>
               </div>
 
@@ -248,10 +261,11 @@ export default function AdminAppointment() {
               Requested: {appointment.requestedAt}
             </span>
             <button
-              className="admin-appointment-view-details-btn"
+              className="admin-appointment-view-btn"
               onClick={() => onViewDetails(appointment)}
             >
-              View Details
+              <EyeIcon />
+              <span>View Details</span>
             </button>
           </div>
         </div>
@@ -266,7 +280,10 @@ export default function AdminAppointment() {
       overlay={
         <>
           {selectedAppointment && (
-            <div className="admin-appointment-modal-overlay">
+            <div
+              className="admin-appointment-modal-overlay"
+              onClick={handleCloseDetails}
+            >
               <div
                 className="admin-appointment-modal"
                 onClick={(e) => e.stopPropagation()}
@@ -276,9 +293,6 @@ export default function AdminAppointment() {
                     <h2 className="admin-appointment-modal-title">
                       Appointment Details
                     </h2>
-                    <p className="admin-appointment-modal-subtitle">
-                      Read-only — monitoring view
-                    </p>
                   </div>
                   <button
                     className="admin-appointment-modal-close-btn"
@@ -290,14 +304,20 @@ export default function AdminAppointment() {
                 </div>
 
                 <div className="admin-appointment-modal-body">
-                  <div className="admin-appointment-modal-status-row">
-                    {getStatusBadge(selectedAppointment.status)}
-                    <span className="admin-appointment-modal-tracking">
-                      #{selectedAppointment.id}
-                    </span>
+                  <div className="admin-appointment-modal-hero">
+                    <p className="admin-appointment-modal-hero-label">Purpose</p>
+                    <p className="admin-appointment-modal-hero-title">
+                      {selectedAppointment.purpose}
+                    </p>
                   </div>
 
                   <div className="admin-appointment-modal-grid">
+                    <div className="admin-appointment-modal-field">
+                      <span className="admin-appointment-modal-label">Status</span>
+                      <div className="admin-appointment-modal-value">
+                        {getStatusBadge(selectedAppointment.status)}
+                      </div>
+                    </div>
                     <div className="admin-appointment-modal-field">
                       <span className="admin-appointment-modal-label">Student</span>
                       <span className="admin-appointment-modal-value">
@@ -365,14 +385,6 @@ export default function AdminAppointment() {
                     )}
                     <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
                       <span className="admin-appointment-modal-label">
-                        Purpose / Notes
-                      </span>
-                      <span className="admin-appointment-modal-value">
-                        {selectedAppointment.purpose}
-                      </span>
-                    </div>
-                    <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
-                      <span className="admin-appointment-modal-label">
                         Requested At
                       </span>
                       <span className="admin-appointment-modal-value">
@@ -411,10 +423,10 @@ export default function AdminAppointment() {
         <div className="admin-appointment-container">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
-            icon={<CalendarIconNav />}
+            icon={<Calendar />}
             iconClassName="admin-appointment-title-icon"
-            title="Centralized Appointment Management"
-            subtitle={`Monitor and manage appointments for ${authUser?.departmentName ?? "your department"}`}
+            title="Department Appointments Overview"
+            subtitle="Monitor appointments within your department"
             headerClassName="admin-appointment-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="admin-appointment-title-section"
@@ -424,10 +436,21 @@ export default function AdminAppointment() {
 
           {/* Filters */}
           <div className="admin-appointment-filters-card">
-            <div className="admin-appointment-filters-content">
+            <div className="admin-appointment-filters-header">
+              <h2>Appointments Filter</h2>
+              <p>Search appointments across your department.</p>
+            </div>
+            <div className="admin-appointment-filter-group">
+              <label
+                htmlFor="appt-search"
+                className="admin-appointment-filter-label"
+              >
+                Search
+              </label>
               <div className="admin-appointment-search-wrapper">
                 <SearchIcon />
                 <input
+                  id="appt-search"
                   type="text"
                   placeholder="Search by student name, ID, or professor..."
                   value={searchQuery}
@@ -438,68 +461,120 @@ export default function AdminAppointment() {
             </div>
           </div>
 
-          {/* Appointments List with Tabs */}
-          <div className="admin-appointment-overview-card">
-            <div className="admin-appointment-overview-header">
-              <h2 className="admin-appointment-overview-title">
-                Appointment Overview
-              </h2>
-              <p className="admin-appointment-overview-subtitle">
-                Appointment tracking and management for your department
-              </p>
-            </div>
-            <div className="admin-appointment-tabs-container">
-              <div className="admin-appointment-tabs-list">
-                {["all", "pending", "approved", "completed", "rejected", "cancelled"].map(
-                  (tab) => (
-                    <button
+          {/* Tabs */}
+          <div className="admin-appointment-tabs-list">
+            {["all", "pending", "approved", "completed", "rejected", "cancelled"].map(
+              (tab) => {
+                const TabIcon = TAB_ICON_MAP[tab];
+
+                if (tab === "all") {
+                  return (
+                    <div
                       key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`admin-appointment-tab-trigger ${
+                      role="button"
+                      tabIndex={0}
+                      className={`admin-appointment-tab-trigger admin-appointment-tab-trigger--dropdown ${
                         activeTab === tab ? "active" : ""
                       }`}
+                      onClick={() => setActiveTab("all")}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") setActiveTab("all");
+                      }}
                     >
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      {TabIcon && <TabIcon className="admin-appointment-tab-icon" />}
+                      <select
+                        className="admin-appointment-range-select"
+                        value={allRange}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          setAllRange(e.target.value);
+                          setActiveTab("all");
+                        }}
+                      >
+                        {Object.entries(ALL_RANGE_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
                       <span className="admin-appointment-tab-count">
-                        {loading ? "—" : tabCounts[tab]}
+                        {loading ? "—" : tabCounts.all}
                       </span>
-                    </button>
-                  ),
-                )}
-              </div>
+                    </div>
+                  );
+                }
 
-              <div className="admin-appointment-tabs-content">
-                {error ? (
-                  <div className="admin-appointment-empty-state">
-                    <AlertCircleIcon />
-                    <p className="admin-appointment-empty-text">{error}</p>
-                    <button
-                      className="admin-appointment-view-details-btn"
-                      onClick={fetchAppointments}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : filterAppointments(activeTab).length === 0 ? (
-                  <div className="admin-appointment-empty-state">
-                    <CalendarIconNav />
-                    <p className="admin-appointment-empty-text">
-                      No appointments found
-                    </p>
-                  </div>
-                ) : (
-                  <div className="admin-appointment-cards-list">
-                    {filterAppointments(activeTab).map((appointment) => (
-                      <AppointmentCard
-                        key={appointment.id}
-                        appointment={appointment}
-                        onViewDetails={handleViewDetails}
-                      />
-                    ))}
-                  </div>
-                )}
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`admin-appointment-tab-trigger ${
+                      activeTab === tab ? "active" : ""
+                    }`}
+                  >
+                    {TabIcon && <TabIcon className="admin-appointment-tab-icon" />}
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    <span className="admin-appointment-tab-count">
+                      {loading ? "—" : tabCounts[tab]}
+                    </span>
+                  </button>
+                );
+              },
+            )}
+          </div>
+
+          {/* List */}
+          <div className="admin-appointment-cards-list">
+            {loading ? (
+              <div className="admin-appointment-empty-state">
+                <Loader2 style={{ animation: "spin 1s linear infinite" }} />
+                <p className="admin-appointment-empty-text">
+                  Loading appointments…
+                </p>
               </div>
-            </div>
+            ) : error ? (
+              <div className="admin-appointment-empty-state">
+                <AlertCircleIcon />
+                <p className="admin-appointment-empty-text">{error}</p>
+                <button
+                  className="admin-appointment-retry-btn"
+                  onClick={fetchAppointments}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : filterAppointments(activeTab).length === 0 ? (
+              <div className="admin-appointment-empty-state">
+                <CalendarIconNav />
+                <h3 className="admin-appointment-empty-title">
+                  {activeTab === "all"
+                    ? "No Appointments"
+                    : `No ${
+                        activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
+                      } Appointments`}
+                  {allRange !== "all"
+                    ? ` ${ALL_RANGE_LABELS[allRange]}`
+                    : activeTab === "all"
+                      ? " Yet"
+                      : ""}
+                </h3>
+                <p className="admin-appointment-empty-text">
+                  {allRange !== "all"
+                    ? `Nothing scheduled in this range. Switch to "All Time" to see every appointment.`
+                    : activeTab === "all"
+                      ? "Appointment requests in your department will appear here."
+                      : `There are no ${activeTab} appointments in your department.`}
+                </p>
+              </div>
+            ) : (
+              filterAppointments(activeTab).map((appointment) => (
+                <AppointmentCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  onViewDetails={handleViewDetails}
+                />
+              ))
+            )}
           </div>
         </div>
     </AdminPageShell>

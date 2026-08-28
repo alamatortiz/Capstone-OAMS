@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ComponentProps } from 'react';
 import Toast from 'react-native-toast-message';
 import {
   ActivityIndicator,
@@ -22,11 +23,11 @@ import {
   CheckCircle,
   ChevronLeft,
   Clock,
+  Eye,
   FileText,
   History,
   Home as HomeIcon,
   Search,
-  User,
   X,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -118,6 +119,7 @@ const CANCELLED_BY_LABELS: Record<string, string> = {
 };
 
 type LucideIconType = typeof Clock;
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 interface NavItem {
   key: string;
@@ -136,12 +138,23 @@ const navItems: NavItem[] = [
 const TABS = ['all', 'pending', 'approved', 'completed', 'rejected', 'cancelled'] as const;
 type TabKey = (typeof TABS)[number];
 
-const STAT_TINTS = {
-  total: { bg: 'rgba(168, 85, 247, 0.16)', border: 'rgba(168, 85, 247, 0.25)', color: '#a855f7' },
-  pending: { bg: 'rgba(245, 158, 11, 0.16)', border: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b' },
-  approved: { bg: 'rgba(16, 185, 129, 0.16)', border: 'rgba(16, 185, 129, 0.25)', color: '#10b981' },
-  today: { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.25)', color: '#3b82f6' },
-} as const;
+const TAB_ICON_MAP: Record<TabKey, IoniconName> = {
+  all: 'list-outline',
+  pending: 'time-outline',
+  approved: 'checkmark-circle-outline',
+  completed: 'checkmark-circle-outline',
+  rejected: 'close-circle-outline',
+  cancelled: 'close-circle-outline',
+};
+
+const ALL_RANGES = ['week', 'month', 'all'] as const;
+type AllRange = (typeof ALL_RANGES)[number];
+
+const ALL_RANGE_LABELS: Record<AllRange, string> = {
+  week: 'This Week',
+  month: 'This Month',
+  all: 'All Time',
+};
 
 const STATUS_TINTS: Record<AppointmentStatus, { bg: string; border: string; color: string; icon: LucideIconType }> = {
   pending: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b', icon: AlertCircle },
@@ -150,6 +163,25 @@ const STATUS_TINTS: Record<AppointmentStatus, { bg: string; border: string; colo
   completed: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981', icon: CheckCircle },
   cancelled: { bg: 'rgba(107, 114, 128, 0.15)', border: 'rgba(107, 114, 128, 0.35)', color: '#6b7280', icon: AlertCircle },
 };
+
+// Date helpers — mirror getWeekRange/getMonthRange/isWithinRange in the web
+// dateRange.js (week starts Sunday, matching the booking calendar).
+function getWeekRange(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+  return { start, end };
+}
+
+function getMonthRange(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+}
+
+function isWithinRange(dateStr: string, range: { start: Date; end: Date }) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d >= range.start && d <= range.end;
+}
 
 function formatDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -166,13 +198,20 @@ export default function AdminAppointmentScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [allRange, setAllRange] = useState<AllRange>('week');
+  const [rangeModalOpen, setRangeModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+
+  const selectRange = (r: AllRange) => {
+    setAllRange(r);
+    setActiveTab('all');
+    setRangeModalOpen(false);
+  };
   const router = useRouter();
   const { user, token, logout } = useAuth();
   const adminName = user?.name ?? 'Admin';
   const adminRole = 'Admin';
   const adminDepartmentName = user?.departmentName ?? 'Your Department';
-  const adminDepartmentAbbrev = user?.departmentAbbrev ?? '';
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -264,24 +303,26 @@ export default function AdminAppointmentScreen() {
       })
     : appointments;
 
+  // The This Week / This Month / All Time control (on the "All" tab) governs
+  // every tab, not just "All" — matching web prof-appointments.
+  const rangeFiltered =
+    allRange === 'all'
+      ? searchFiltered
+      : searchFiltered.filter((a) =>
+          isWithinRange(a.date, allRange === 'week' ? getWeekRange() : getMonthRange()),
+        );
+
   const tabCounts: Record<TabKey, number> = {
-    all: searchFiltered.length,
-    pending: searchFiltered.filter((a) => a.status === 'pending').length,
-    approved: searchFiltered.filter((a) => a.status === 'approved').length,
-    completed: searchFiltered.filter((a) => a.status === 'completed').length,
-    rejected: searchFiltered.filter((a) => a.status === 'rejected').length,
-    cancelled: searchFiltered.filter((a) => a.status === 'cancelled').length,
+    all: rangeFiltered.length,
+    pending: rangeFiltered.filter((a) => a.status === 'pending').length,
+    approved: rangeFiltered.filter((a) => a.status === 'approved').length,
+    completed: rangeFiltered.filter((a) => a.status === 'completed').length,
+    rejected: rangeFiltered.filter((a) => a.status === 'rejected').length,
+    cancelled: rangeFiltered.filter((a) => a.status === 'cancelled').length,
   };
 
   const visibleAppointments =
-    activeTab === 'all' ? searchFiltered : searchFiltered.filter((a) => a.status === activeTab);
-
-  const stats = {
-    total: appointments.length,
-    pending: appointments.filter((a) => a.status === 'pending').length,
-    approved: appointments.filter((a) => a.status === 'approved').length,
-    today: appointments.filter((a) => a.isToday).length,
-  };
+    activeTab === 'all' ? rangeFiltered : rangeFiltered.filter((a) => a.status === activeTab);
 
   return (
     <View style={styles.root}>
@@ -324,160 +365,192 @@ export default function AdminAppointmentScreen() {
               <Calendar size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
-              <Text style={styles.pageTitle}>Centralized Appointment Management</Text>
+              <Text style={styles.pageTitle}>Department Appointments Overview</Text>
               <Text style={styles.pageSubtitle}>
-                Monitor and manage appointments for {adminDepartmentName}
+                Monitor appointments within your department
               </Text>
             </View>
           </View>
 
-          {/* Stats */}
-          <View style={styles.statsGrid}>
-            {(
-              [
-                { key: 'total', label: 'Total Appointments', value: String(stats.total), icon: Calendar },
-                { key: 'pending', label: 'Pending', value: String(stats.pending), icon: AlertCircle },
-                { key: 'approved', label: 'Approved', value: String(stats.approved), icon: CheckCircle },
-                { key: 'today', label: 'Today', value: String(stats.today), icon: Clock },
-              ] as const
-            ).map((stat) => {
-              const tint = STAT_TINTS[stat.key];
-              return (
-                <View key={stat.key} style={[styles.statCard, { borderColor: tint.border }]}>
-                  <View style={styles.statCardTop}>
-                    <Text style={styles.statCardLabel}>{stat.label}</Text>
-                    <stat.icon size={18} color={tint.color} />
-                  </View>
-                  <Text style={[styles.statCardValue, { color: tint.color }]}>{stat.value}</Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Search */}
+          {/* Filters */}
           <View style={styles.card}>
-            <View style={styles.searchWrapper}>
-              <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by student name, ID, or professor..."
-                placeholderTextColor={theme.tertiary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
+            <View style={styles.filtersHeader}>
+              <Text style={styles.filtersTitle}>Appointments Filter</Text>
+              <Text style={styles.filtersDescription}>
+                Search appointments across your department.
+              </Text>
+            </View>
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterLabel}>Search</Text>
+              <View style={styles.searchWrapper}>
+                <Search size={16} color={theme.tertiary} style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search by student name, ID, or professor..."
+                  placeholderTextColor={theme.tertiary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
             </View>
           </View>
 
-          {/* Appointment Overview */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitleText}>Appointment Overview</Text>
-            <Text style={styles.cardSubtitleText}>
-              Appointment tracking and management for {adminDepartmentAbbrev}
-            </Text>
+          {/* Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
+            <View style={styles.tabsList}>
+              {TABS.map((tab) => {
+                const active = activeTab === tab;
+                const icon = TAB_ICON_MAP[tab];
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
-              <View style={styles.tabsList}>
-                {TABS.map((tab) => {
-                  const active = activeTab === tab;
+                if (tab === 'all') {
                   return (
                     <Pressable
                       key={tab}
                       style={[styles.tabTrigger, active && styles.tabTriggerActive]}
-                      onPress={() => setActiveTab(tab)}
+                      onPress={() => setActiveTab('all')}
                     >
-                      <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                      </Text>
+                      <Ionicons name={icon} size={14} color={active ? '#a855f7' : theme.subtext} />
+                      <Pressable
+                        style={styles.rangeDropdown}
+                        onPress={() => setRangeModalOpen(true)}
+                        hitSlop={6}
+                      >
+                        <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
+                          {ALL_RANGE_LABELS[allRange]}
+                        </Text>
+                        <Ionicons
+                          name="chevron-down"
+                          size={12}
+                          color={active ? '#a855f7' : theme.subtext}
+                        />
+                      </Pressable>
                       <View style={[styles.tabCount, active && styles.tabCountActive]}>
                         <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>
-                          {tabCounts[tab]}
+                          {tabCounts.all}
                         </Text>
                       </View>
                     </Pressable>
                   );
-                })}
-              </View>
-            </ScrollView>
+                }
 
-            {loading ? (
-              <View style={styles.emptyCard}>
-                <ActivityIndicator color={theme.primary} />
-                <Text style={styles.emptyTitle}>Loading appointments…</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.emptyCard}>
-                <AlertCircle size={28} color={theme.tertiary} />
-                <Text style={styles.emptyTitle}>{error}</Text>
-                <Pressable style={styles.viewDetailsBtn} onPress={fetchAppointments}>
-                  <Text style={styles.viewDetailsBtnText}>Retry</Text>
-                </Pressable>
-              </View>
-            ) : visibleAppointments.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Calendar size={28} color={theme.tertiary} />
-                <Text style={styles.emptyTitle}>No appointments found</Text>
-              </View>
-            ) : (
-              <View style={styles.cardsList}>
-                {visibleAppointments.map((appointment) => {
-                  const statusTint = STATUS_TINTS[appointment.status];
-                  return (
-                    <View key={appointment.id} style={styles.apptCard}>
-                      <View style={styles.apptCardHeaderRow}>
-                        <View style={{ flex: 1, gap: 6 }}>
-                          <View style={styles.collegeBadge}>
-                            <HomeIcon size={13} color="#a855f7" />
-                            <Text style={styles.collegeBadgeText}>{adminDepartmentAbbrev}</Text>
+                return (
+                  <Pressable
+                    key={tab}
+                    style={[styles.tabTrigger, active && styles.tabTriggerActive]}
+                    onPress={() => setActiveTab(tab)}
+                  >
+                    <Ionicons name={icon} size={14} color={active ? '#a855f7' : theme.subtext} />
+                    <Text style={[styles.tabTriggerText, active && styles.tabTriggerTextActive]}>
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </Text>
+                    <View style={[styles.tabCount, active && styles.tabCountActive]}>
+                      <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>
+                        {tabCounts[tab]}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          {/* List */}
+          {loading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator color={theme.primary} />
+              <Text style={styles.emptyTitle}>Loading appointments…</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyCard}>
+              <AlertCircle size={28} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>{error}</Text>
+              <Pressable style={styles.viewDetailsBtn} onPress={fetchAppointments}>
+                <Text style={styles.viewDetailsBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : visibleAppointments.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Calendar size={28} color={theme.tertiary} />
+              <Text style={styles.emptyTitle}>
+                {activeTab === 'all'
+                  ? 'No Appointments'
+                  : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                {allRange !== 'all'
+                  ? ` ${ALL_RANGE_LABELS[allRange]}`
+                  : activeTab === 'all'
+                    ? ' Yet'
+                    : ''}
+              </Text>
+              <Text style={styles.emptyText}>
+                {allRange !== 'all'
+                  ? 'Nothing scheduled in this range. Switch to "All Time" to see every appointment.'
+                  : activeTab === 'all'
+                    ? 'Appointment requests in your department will appear here.'
+                    : `There are no ${activeTab} appointments in your department.`}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.cardsList}>
+              {visibleAppointments.map((appointment) => {
+                const statusTint = STATUS_TINTS[appointment.status];
+                return (
+                  <View key={appointment.id} style={styles.apptCard}>
+                    <View style={styles.apptCardHeaderRow}>
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <View style={styles.studentInfoRow}>
+                          <Text style={styles.studentName}>{appointment.studentName}</Text>
+                          <View style={styles.studentIdBadge}>
+                            <Text style={styles.studentIdBadgeText}>{appointment.studentId}</Text>
                           </View>
-                          <View style={styles.studentInfoRow}>
-                            <User size={15} color={theme.tertiary} />
-                            <Text style={styles.studentName}>{appointment.studentName}</Text>
-                            <Text style={styles.studentId}>({appointment.studentId})</Text>
-                          </View>
-                          <Text style={styles.purposeText}>{appointment.purpose}</Text>
                         </View>
-                        <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
-                          <statusTint.icon size={12} color={statusTint.color} />
-                          <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
-                            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                          </Text>
-                        </View>
+                        <Text style={styles.purposeText}>{appointment.purpose}</Text>
                       </View>
-
-                      <View style={styles.apptDetailsGrid}>
-                        <View style={styles.apptDetailItem}>
-                          <Text style={styles.apptDetailLabel}>Professor</Text>
-                          <Text style={styles.apptDetailValue}>{appointment.professor}</Text>
-                        </View>
-                        <View style={styles.apptDetailItem}>
-                          <Text style={styles.apptDetailLabel}>Date</Text>
-                          <Text style={styles.apptDetailValue}>{formatDate(appointment.date)}</Text>
-                        </View>
-                        <View style={styles.apptDetailItem}>
-                          <Text style={styles.apptDetailLabel}>Time</Text>
-                          <Text style={styles.apptDetailValue}>{appointment.time}</Text>
-                        </View>
-                        <View style={styles.apptDetailItem}>
-                          <Text style={styles.apptDetailLabel}>Location</Text>
-                          <Text style={styles.apptDetailValue}>{appointment.location}</Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.apptCardFooter}>
-                        <Text style={styles.requestedText}>Requested: {appointment.requestedAt}</Text>
-                        <Pressable
-                          style={styles.viewDetailsBtn}
-                          onPress={() => setSelectedAppointment(appointment)}
-                        >
-                          <Text style={styles.viewDetailsBtnText}>View Details</Text>
-                        </Pressable>
+                      <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
+                        <statusTint.icon size={12} color={statusTint.color} />
+                        <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
+                          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                        </Text>
                       </View>
                     </View>
-                  );
-                })}
-              </View>
-            )}
-          </View>
+
+                    <View style={styles.apptDetailsGrid}>
+                      <View style={styles.apptDetailItem}>
+                        <Text style={styles.apptDetailLabel}>Professor</Text>
+                        <Text style={styles.apptDetailValue}>{appointment.professor}</Text>
+                      </View>
+                      <View style={styles.apptDetailItem}>
+                        <Text style={styles.apptDetailLabel}>Date</Text>
+                        <Text style={styles.apptDetailValue}>{formatDate(appointment.date)}</Text>
+                      </View>
+                      <View style={styles.apptDetailItem}>
+                        <Text style={styles.apptDetailLabel}>Time</Text>
+                        <Text style={styles.apptDetailValue}>{appointment.time}</Text>
+                      </View>
+                      <View style={styles.apptDetailItem}>
+                        <Text style={styles.apptDetailLabel}>Location</Text>
+                        <Text style={styles.apptDetailValue}>{appointment.location}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.apptCardFooter}>
+                      <Text style={styles.requestedText}>Requested: {appointment.requestedAt}</Text>
+                      <Pressable onPress={() => setSelectedAppointment(appointment)}>
+                        <LinearGradient
+                          colors={['#a855f7', '#9333ea']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.viewBtn}
+                        >
+                          <Eye size={14} color="#fff" />
+                          <Text style={styles.viewBtnText}>View Details</Text>
+                        </LinearGradient>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -500,6 +573,14 @@ export default function AdminAppointmentScreen() {
         styles={styles}
       />
 
+      <RangePickerModal
+        visible={rangeModalOpen}
+        value={allRange}
+        onSelect={selectRange}
+        onClose={() => setRangeModalOpen(false)}
+        styles={styles}
+      />
+
       <LogoutModal
         visible={logoutModalVisible}
         onCancel={() => setLogoutModalVisible(false)}
@@ -511,6 +592,47 @@ export default function AdminAppointmentScreen() {
 }
 
 // ─────────────────────────── Shared sub-components ───────────────────────────
+
+function RangePickerModal({
+  visible,
+  value,
+  onSelect,
+  onClose,
+  styles,
+}: {
+  visible: boolean;
+  value: AllRange;
+  onSelect: (r: AllRange) => void;
+  onClose: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.rangeModalCard}>
+          {ALL_RANGES.map((r) => {
+            const selected = value === r;
+            return (
+              <Pressable
+                key={r}
+                style={[styles.rangeOption, selected && styles.rangeOptionActive]}
+                onPress={() => onSelect(r)}
+              >
+                <Text style={[styles.rangeOptionText, selected && styles.rangeOptionTextActive]}>
+                  {ALL_RANGE_LABELS[r]}
+                </Text>
+                {selected && <Ionicons name="checkmark" size={16} color="#a855f7" />}
+              </Pressable>
+            );
+          })}
+          <Pressable style={styles.rangeModalClose} onPress={onClose}>
+            <Text style={styles.rangeModalCloseText}>Close</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function AppointmentDetailsModal({
   appointment,
@@ -533,7 +655,6 @@ function AppointmentDetailsModal({
           <View style={styles.detailsModalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.detailsModalTitle}>Appointment Details</Text>
-              <Text style={styles.detailsModalSubtitle}>Read-only — monitoring view</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8}>
               <X size={22} color={theme.text} />
@@ -541,17 +662,35 @@ function AppointmentDetailsModal({
           </View>
 
           <ScrollView style={styles.detailsModalBody}>
-            <View style={styles.detailsStatusRow}>
-              <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
-                <statusTint.icon size={12} color={statusTint.color} />
-                <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
-                  {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                </Text>
-              </View>
-              <Text style={styles.detailsTracking}>#{appointment.id}</Text>
-            </View>
+            <LinearGradient
+              colors={['#a855f7', '#9333ea']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.detailsHero}
+            >
+              <Text style={styles.detailsHeroLabel}>PURPOSE</Text>
+              <Text style={styles.detailsHeroTitle}>{appointment.purpose}</Text>
+            </LinearGradient>
 
             <View style={styles.detailsGrid}>
+              <View style={styles.detailsField}>
+                <Text style={styles.detailsLabel}>Status</Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {
+                      backgroundColor: statusTint.bg,
+                      borderColor: statusTint.border,
+                      alignSelf: 'flex-start',
+                    },
+                  ]}
+                >
+                  <statusTint.icon size={12} color={statusTint.color} />
+                  <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
+                    {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                  </Text>
+                </View>
+              </View>
               <View style={styles.detailsField}>
                 <Text style={styles.detailsLabel}>Student</Text>
                 <Text style={styles.detailsValue}>
@@ -594,10 +733,6 @@ function AppointmentDetailsModal({
                   <Text style={styles.detailsValue}>{appointment.serviceName}</Text>
                 </View>
               )}
-              <View style={[styles.detailsField, styles.detailsFieldFull]}>
-                <Text style={styles.detailsLabel}>Purpose / Notes</Text>
-                <Text style={styles.detailsValue}>{appointment.purpose}</Text>
-              </View>
               <View style={[styles.detailsField, styles.detailsFieldFull]}>
                 <Text style={styles.detailsLabel}>Requested At</Text>
                 <Text style={styles.detailsValue}>{appointment.requestedAt}</Text>
@@ -815,20 +950,6 @@ function createStyles(theme: ThemePalette) {
     pageTitle: { fontSize: 20, fontWeight: '800', color: theme.text, letterSpacing: -0.3 },
     pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
 
-    // Stats
-    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    statCard: {
-      width: '47.5%',
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderRadius: 16,
-      padding: 14,
-      gap: 8,
-    },
-    statCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    statCardLabel: { fontSize: 11, fontWeight: '600', color: theme.subtext, flex: 1 },
-    statCardValue: { fontSize: 22, fontWeight: '800' },
-
     // Generic card
     card: {
       backgroundColor: theme.card,
@@ -838,8 +959,13 @@ function createStyles(theme: ThemePalette) {
       padding: 16,
       gap: 14,
     },
-    cardTitleText: { fontSize: 15, fontWeight: '700', color: theme.text },
-    cardSubtitleText: { fontSize: 12, color: theme.subtext, marginTop: -8 },
+
+    // Filters card
+    filtersHeader: { gap: 2 },
+    filtersTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    filtersDescription: { fontSize: 12, color: theme.subtext },
+    filterGroup: { gap: 6 },
+    filterLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
 
     // Search
     searchWrapper: { position: 'relative', justifyContent: 'center' },
@@ -856,12 +982,25 @@ function createStyles(theme: ThemePalette) {
       fontSize: 13,
     },
 
-    // Tabs
+    // Tabs (mirrors professor_appointment.tsx)
     tabsScroll: { flexGrow: 0 },
-    tabsList: { flexDirection: 'row', gap: 18, borderBottomWidth: 1, borderBottomColor: theme.border },
-    tabTrigger: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingBottom: 12 },
-    tabTriggerActive: { borderBottomWidth: 2, borderBottomColor: '#a855f7' },
-    tabTriggerText: { fontSize: 13, fontWeight: '600', color: theme.subtext },
+    tabsList: { flexDirection: 'row', gap: 6, borderBottomWidth: 2, borderBottomColor: theme.border },
+    tabTrigger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      paddingBottom: 12,
+    },
+    tabTriggerActive: { borderBottomWidth: 2, borderBottomColor: '#a855f7', marginBottom: -2 },
+    tabTriggerText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.subtext,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
     tabTriggerTextActive: { color: '#a855f7' },
     tabCount: {
       minWidth: 20,
@@ -875,11 +1014,22 @@ function createStyles(theme: ThemePalette) {
     tabCountActive: { backgroundColor: 'rgba(168, 85, 247, 0.25)' },
     tabCountText: { fontSize: 10, fontWeight: '700', color: '#a855f7' },
     tabCountTextActive: { color: '#a855f7' },
+    rangeDropdown: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 
     // Appointment cards
     cardsList: { gap: 12 },
-    emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 24 },
-    emptyTitle: { fontSize: 13, color: theme.tertiary },
+    emptyCard: {
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 18,
+      paddingVertical: 40,
+      paddingHorizontal: 20,
+    },
+    emptyTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    emptyText: { fontSize: 13, color: theme.tertiary, textAlign: 'center' },
     apptCard: {
       backgroundColor: 'rgba(168, 85, 247, 0.05)',
       borderWidth: 1.5,
@@ -889,11 +1039,23 @@ function createStyles(theme: ThemePalette) {
       gap: 12,
     },
     apptCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-    collegeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    collegeBadgeText: { fontSize: 11.5, fontWeight: '700', color: '#a855f7' },
     studentInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
     studentName: { fontSize: 14.5, fontWeight: '700', color: theme.text },
-    studentId: { fontSize: 12, color: theme.tertiary },
+    studentIdBadge: {
+      borderWidth: 1,
+      borderRadius: 6,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      borderColor: 'rgba(168, 85, 247, 0.3)',
+    },
+    studentIdBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#a855f7',
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+    },
     purposeText: { fontSize: 12.5, fontWeight: '500', color: theme.subtext },
     statusBadge: {
       flexDirection: 'row',
@@ -904,7 +1066,7 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 8,
       borderWidth: 0.5,
     },
-    statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+    statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
 
     apptDetailsGrid: {
       flexDirection: 'row',
@@ -927,6 +1089,16 @@ function createStyles(theme: ThemePalette) {
       borderTopColor: 'rgba(168, 85, 247, 0.2)',
     },
     requestedText: { fontSize: 11, color: theme.tertiary, flexShrink: 1, paddingRight: 8 },
+    viewBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+    },
+    viewBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+    // Error-state "Retry" button (kept from the old card view button).
     viewDetailsBtn: {
       paddingVertical: 8,
       paddingHorizontal: 14,
@@ -940,7 +1112,7 @@ function createStyles(theme: ThemePalette) {
     detailsModalCard: {
       width: '100%',
       maxWidth: 420,
-      maxHeight: '85%',
+      maxHeight: '88%',
       backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: 'rgba(168, 85, 247, 0.25)',
@@ -955,10 +1127,17 @@ function createStyles(theme: ThemePalette) {
       borderBottomColor: theme.border,
     },
     detailsModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    detailsModalSubtitle: { fontSize: 11.5, color: theme.subtext, marginTop: 3 },
     detailsModalBody: { padding: 18 },
-    detailsStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-    detailsTracking: { fontSize: 12, color: theme.subtext },
+    detailsHero: { borderRadius: 14, padding: 16, marginBottom: 16 },
+    detailsHeroLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      color: 'rgba(255, 255, 255, 0.8)',
+      textTransform: 'uppercase',
+      marginBottom: 4,
+    },
+    detailsHeroTitle: { fontSize: 17, fontWeight: '700', color: '#fff', lineHeight: 22 },
     detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
     detailsField: { width: '46%', gap: 3 },
     detailsFieldFull: { width: '100%' },
@@ -975,11 +1154,41 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 10,
       paddingHorizontal: 18,
       borderRadius: 10,
-      backgroundColor: theme.iconBtnBg,
+      backgroundColor: 'transparent',
       borderWidth: 1,
-      borderColor: theme.iconBtnBorder,
+      borderColor: theme.border,
     },
     detailsCloseBtnText: { fontSize: 13, fontWeight: '700', color: theme.text },
+
+    // Range picker modal
+    rangeModalCard: {
+      width: '80%',
+      maxWidth: 280,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      padding: 8,
+    },
+    rangeOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+    },
+    rangeOptionActive: { backgroundColor: 'rgba(168, 85, 247, 0.1)' },
+    rangeOptionText: { fontSize: 14, fontWeight: '600', color: theme.text },
+    rangeOptionTextActive: { color: '#a855f7' },
+    rangeModalClose: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 4,
+    },
+    rangeModalCloseText: { fontSize: 13, fontWeight: '700', color: theme.subtext },
 
     // Nav drawer (shared visual language with admin_dashboard.tsx / admin_queue.tsx)
     drawerOverlay: { flex: 1, flexDirection: 'row' },

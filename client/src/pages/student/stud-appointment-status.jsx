@@ -463,13 +463,16 @@ export default function AppointmentStatusPage() {
                       <Calendar className="apst-empty-icon" />
                       <h3 className="apst-empty-title">
                         {activeTab === "all" ? "No Appointments Booked" : `No ${TABS.find(t => t.key === activeTab)?.label} Appointments`}
+                        {allRange !== "all" ? ` ${RANGE_LABELS[allRange]}` : ""}
                       </h3>
                       <p className="apst-empty-text">
-                        {activeTab === "all"
-                          ? "You have no active appointments yet."
-                          : activeTab === "pending"
-                            ? "You have no records of pending appointments."
-                            : `You have no records of ${activeTab} appointments.`}
+                        {allRange !== "all"
+                          ? `Nothing in this range — switch to "All Time" to see all your appointments.`
+                          : activeTab === "all"
+                            ? "You have no active appointments yet."
+                            : activeTab === "pending"
+                              ? "You have no records of pending appointments."
+                              : `You have no records of ${activeTab} appointments.`}
                       </p>
                       {(activeTab === "all" || activeTab === "pending") && (
                         <button

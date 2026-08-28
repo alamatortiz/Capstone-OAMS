@@ -325,13 +325,12 @@ html, body {
    bare class names under their own page containers for the same reason. */
 .adp-main .filters-card {
   background: var(--card-bg);
-  border: 1px solid rgba(249, 115, 22, 0.25);
+  border: 1px solid rgba(249, 115, 22, 0.15);
   border-radius: 1rem;
   padding: 1rem 1.5rem 1.5rem;
-  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.1);
   transition: all 0.3s ease;
 }
-[data-theme="light"] .adp-main .filters-card { border-color: rgba(234, 88, 12, 0.25); }
+[data-theme="light"] .adp-main .filters-card { border-color: rgba(234, 88, 12, 0.15); }
 
 .adp-main .filters-header {
   display: grid;

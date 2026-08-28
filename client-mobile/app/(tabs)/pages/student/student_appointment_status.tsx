@@ -657,13 +657,16 @@ export default function StudentAppointmentStatusScreen() {
                   <Calendar size={32} color={theme.tertiary} />
                   <Text style={styles.emptyTitle}>
                     {activeTab === 'all' ? 'No Appointments Booked' : `No ${TABS.find((t) => t.key === activeTab)?.label} Appointments`}
+                    {allRange !== 'all' ? ` ${RANGE_LABELS[allRange]}` : ''}
                   </Text>
                   <Text style={styles.emptyDescription}>
-                    {activeTab === 'all'
-                      ? 'You have no active appointments yet.'
-                      : activeTab === 'pending'
-                        ? 'You have no records of pending appointments.'
-                        : `You have no records of ${activeTab} appointments.`}
+                    {allRange !== 'all'
+                      ? 'Nothing in this range — switch to "All Time" to see all your appointments.'
+                      : activeTab === 'all'
+                        ? 'You have no active appointments yet.'
+                        : activeTab === 'pending'
+                          ? 'You have no records of pending appointments.'
+                          : `You have no records of ${activeTab} appointments.`}
                   </Text>
                   {(activeTab === 'all' || activeTab === 'pending') && (
                     <Pressable onPress={goToBooking}>

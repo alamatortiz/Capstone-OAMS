@@ -548,8 +548,8 @@ export default function AppointmentsPage() {
           {/* Filters */}
           <div className="filters-card">
             <div className="filters-header">
-              <h2>Filter & Search</h2>
-              <p>Optionally filter by college, professor, or date.</p>
+              <h2>Appointments Filter</h2>
+              <p>Filter appointments by college, professor, or date.</p>
             </div>
             <div className="filters-top-row">
               <FilterSelect

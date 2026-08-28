@@ -433,13 +433,20 @@ export default function ProfessorAppointmentsPage() {
                 <Calendar className="appt-empty-icon" />
                 <h3 className="appt-empty-title">
                   {activeTab === "all"
-                    ? "No Appointments Yet"
+                    ? "No Appointments"
                     : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                  {allRange !== "all"
+                    ? ` ${ALL_RANGE_LABELS[allRange]}`
+                    : activeTab === "all"
+                      ? " Yet"
+                      : ""}
                 </h3>
                 <p className="appt-empty-text">
-                  {activeTab === "all"
-                    ? "New appointment requests from students will appear here."
-                    : `You have no ${activeTab} appointments.`}
+                  {allRange !== "all"
+                    ? `You have no appointments in this range — switch to "All Time" to see everything.`
+                    : activeTab === "all"
+                      ? "New appointment requests from students will appear here."
+                      : `You have no ${activeTab} appointments.`}
                 </p>
               </div>
             ) : (
