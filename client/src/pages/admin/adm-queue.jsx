@@ -29,13 +29,6 @@ const SlidersIcon = () => (
   </svg>
 );
 
-const EyeIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-    <circle cx="12" cy="12" r="3"></circle>
-  </svg>
-);
-
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -145,6 +138,10 @@ export default function AdminQueue() {
   const navigate = useNavigate();
 
   const [monitoringQueueId, setMonitoringQueueId] = useState(null);
+  // Where the monitor view was opened from: "hosting" when reached via a Queue
+  // Hosting card (nav state), null for an in-page Manage click. Drives the
+  // monitor-view breadcrumb target/label.
+  const [monitorCameFrom, setMonitorCameFrom] = useState(null);
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
 
   // ── Queue entries (individual students waiting) for the monitored queue ──
@@ -159,10 +156,11 @@ export default function AdminQueue() {
   // to Queue List" below stays on this same URL, so an uncleared state would
   // silently re-trigger the monitor view on a page refresh after backing out.
   useEffect(() => {
-    const id = location.state?.monitorQueueId;
+    const { monitorQueueId: id, from } = location.state || {};
     if (id) {
       setMonitoringQueueId(id);
       setEntriesPage(0);
+      setMonitorCameFrom(from === "hosting" ? "hosting" : null);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, location.pathname, navigate]);
@@ -442,13 +440,23 @@ export default function AdminQueue() {
               </button>
               <PageHeader
                 breadcrumb={
-                  <button
-                    className="page-breadcrumb-link"
-                    onClick={() => setMonitoringQueueId(null)}
-                  >
-                    <ChevronLeft />
-                    Queue Management
-                  </button>
+                  monitorCameFrom === "hosting" ? (
+                    <Link
+                      to="/admin/queue-hosting"
+                      className="page-breadcrumb-link"
+                    >
+                      <ChevronLeft />
+                      Queue Hosting
+                    </Link>
+                  ) : (
+                    <button
+                      className="page-breadcrumb-link"
+                      onClick={() => setMonitoringQueueId(null)}
+                    >
+                      <ChevronLeft />
+                      Queue Management
+                    </button>
+                  )
                 }
                 icon={<Users className="icon" />}
                 iconClassName="aq-title-icon"
@@ -777,13 +785,17 @@ export default function AdminQueue() {
             </div>
           )}
 
-          <Link to="/admin/queue-hosting" className="aq-host-link-btn">
+          <Link
+            to="/admin/queue-hosting"
+            state={{ from: "queue" }}
+            className="aq-host-link-btn"
+          >
             <div className="aq-host-link-btn-icon-box">
               <PlusCircleIcon />
             </div>
             <div className="aq-host-link-btn-text">
-              <span className="aq-host-link-btn-title">Host Queue</span>
-              <span className="aq-host-link-btn-subtitle">Open a new queue line and manage service slots</span>
+              <span className="aq-host-link-btn-title">Queue Hosting</span>
+              <span className="aq-host-link-btn-subtitle">Host and manage queues within your department.</span>
             </div>
             <svg className="aq-host-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6"></polyline>
@@ -871,7 +883,7 @@ export default function AdminQueue() {
             ) : (
               filteredQueueDetails.map((detail) => (
                 <div key={detail.id} className="queue-detail-row">
-                  <div className="queue-detail-info">
+                  <div className="queue-detail-topbar">
                     <div className="queue-detail-header-row">
                       <img
                         src={getCollegeLogo(detail.college)}
@@ -883,52 +895,56 @@ export default function AdminQueue() {
                         <span className="queue-detail-abbrev">{detail.college}</span>
                       </div>
                     </div>
-
-                    <div className="queue-detail-grid">
-                      <div className="queue-detail-item">
-                        <span className="queue-detail-item-label">Currently Serving</span>
-                        <span className="queue-detail-item-value">
-                          {detail.currentlyServingStudentNumber || "—"}
-                        </span>
-                      </div>
-                      <div className="queue-detail-item">
-                        <span className="queue-detail-item-label">Waiting</span>
-                        <span className="queue-detail-item-value">
-                          {detail.currentCount} students
-                        </span>
-                      </div>
-                      <div className="queue-detail-item">
-                        <span className="queue-detail-item-label">Avg Service</span>
-                        <span className="queue-detail-item-value">
-                          {formatAvgService(detail.avgServiceMinutes)}
-                        </span>
-                      </div>
-                      {detail.location && (
-                        <div className="queue-detail-item">
-                          <span className="queue-detail-item-label">Location</span>
-                          <span className="queue-detail-item-value">
-                            {detail.location}
-                          </span>
-                        </div>
-                      )}
-                      {detail.serviceHours && (
-                        <div className="queue-detail-item">
-                          <span className="queue-detail-item-label">Service Hours</span>
-                          <span className="queue-detail-item-value">
-                            {formatTimeString(detail.serviceHours.start)} -{" "}
-                            {formatTimeString(detail.serviceHours.end)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      className="btn-monitor"
+                      onClick={() => {
+                        setMonitoringQueueId(detail.id);
+                        setEntriesPage(0);
+                        setMonitorCameFrom(null);
+                      }}
+                    >
+                      <SlidersIcon />
+                      Manage
+                    </button>
                   </div>
-                  <button
-                    className="btn-monitor"
-                    onClick={() => { setMonitoringQueueId(detail.id); setEntriesPage(0); }}
-                  >
-                    <EyeIcon />
-                    View Details
-                  </button>
+
+                  <div className="queue-detail-grid">
+                    <div className="queue-detail-item">
+                      <span className="queue-detail-item-label">Currently Serving</span>
+                      <span className="queue-detail-item-value">
+                        {detail.currentlyServingStudentNumber || "—"}
+                      </span>
+                    </div>
+                    <div className="queue-detail-item">
+                      <span className="queue-detail-item-label">Waiting</span>
+                      <span className="queue-detail-item-value">
+                        {detail.currentCount} students
+                      </span>
+                    </div>
+                    <div className="queue-detail-item">
+                      <span className="queue-detail-item-label">Avg Service</span>
+                      <span className="queue-detail-item-value">
+                        {formatAvgService(detail.avgServiceMinutes)}
+                      </span>
+                    </div>
+                    {detail.location && (
+                      <div className="queue-detail-item">
+                        <span className="queue-detail-item-label">Location</span>
+                        <span className="queue-detail-item-value">
+                          {detail.location}
+                        </span>
+                      </div>
+                    )}
+                    {detail.serviceHours && (
+                      <div className="queue-detail-item">
+                        <span className="queue-detail-item-label">Service Hours</span>
+                        <span className="queue-detail-item-value">
+                          {formatTimeString(detail.serviceHours.start)} -{" "}
+                          {formatTimeString(detail.serviceHours.end)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))
             )}

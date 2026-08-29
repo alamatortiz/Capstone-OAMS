@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-queue-hosting.css";
 import { toast } from "sonner";
@@ -9,19 +9,16 @@ import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
 import AdminPageShell from "../../components/AdminPageShell";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
-import { formatManilaDateTime, getManilaTimeString, addMinutesClampedToDay, formatTimeString } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime, getManilaTimeString, addMinutesClampedToDay, formatTimeString } from "../../utils/dateTime";
 
 // ── Icons ──────────────────────────────────────────────────────
-const QueueIconNav = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
+// Plus-in-circle — matches adm-queue's .aq-host-link-btn-icon-box glyph so the
+// two screens' "hosting" affordance reads the same.
+const PlusCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
+    <line x1="12" y1="8" x2="12" y2="16"></line>
+    <line x1="8" y1="12" x2="16" y2="12"></line>
   </svg>
 );
 const CloseIcon = () => (
@@ -90,6 +87,11 @@ const getCollegeLogo = (code) =>
 
 export default function AdminQueueHosting() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Origin-aware breadcrumb: "Queue Management" when opened from adm-queue's
+  // host link (nav state), "Home" otherwise (dashboard quick action, direct
+  // URL, refresh).
+  const cameFromQueue = location.state?.from === "queue";
   const { user: authUser } = useAuth();
   const user = authUser
     ? {
@@ -268,6 +270,16 @@ export default function AdminQueueHosting() {
   const completedQueues = filteredQueues.filter((q) => q.status === "completed");
   // 'closed' now means exclusively "an admin manually stopped this queue".
   const closedQueues = filteredQueues.filter((q) => q.status === "closed");
+  // The flat card list, ordered by status priority. Any status outside these
+  // five groups (e.g. 'cancelled') is intentionally omitted, matching the old
+  // per-section behaviour — so gate the list on this, not filteredQueues.length.
+  const visibleQueues = [
+    ...activeQueues,
+    ...pausedQueues,
+    ...stillServingQueues,
+    ...completedQueues,
+    ...closedQueues,
+  ];
   const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "all" || typeFilter !== "all";
 
   return (
@@ -297,12 +309,7 @@ export default function AdminQueueHosting() {
             <div className="aqh-modal-overlay">
               <div className="aqh-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="aqh-modal-header">
-                  <div>
-                    <h2 className="aqh-modal-title">Open New Queue Line</h2>
-                    <p className="aqh-modal-subtitle">
-                      For {user.college} ({user.departmentAbbrev}) only
-                    </p>
-                  </div>
+                  <h2 className="aqh-modal-title">Open New Queue Line</h2>
                   <button
                     className="aqh-modal-close-btn"
                     onClick={closeModal}
@@ -313,6 +320,17 @@ export default function AdminQueueHosting() {
                 </div>
 
                 <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">New Queue Line</p>
+                    <p className="aqh-modal-hero-title">
+                      {user.college} ({user.departmentAbbrev})
+                    </p>
+                    <p className="aqh-modal-hero-purpose">
+                      Set the service, capacity, and hours below. Students can
+                      join as soon as the line is open.
+                    </p>
+                  </div>
+
                   <div className="aqh-form-group">
                     <label className="aqh-form-label">Service *</label>
                     <div className="aqh-form-select-wrap">
@@ -442,21 +460,36 @@ export default function AdminQueueHosting() {
     >
         <div className="aqh-page-container">
           <div className="aqh-header-block">
-          <div className="page-breadcrumb"><Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link></div>
-          {/* Page Header */}
-          <div className="aqh-page-header">
-            <div className="aqh-title-section">
-              <div className="aqh-title-icon">
-                <QueueIconNav />
-              </div>
-              <div>
-                <h1 className="aqh-page-title">Queue Hosting Management</h1>
-                <p className="aqh-page-subtitle">
-                  {user.college} ({user.departmentAbbrev}) — open, manage, and
-                  close your department's queue lines.
-                </p>
+            <div className="page-breadcrumb">
+              {cameFromQueue ? (
+                <Link to="/admin/queue" className="page-breadcrumb-link">
+                  <ChevronLeft />
+                  Queue Management
+                </Link>
+              ) : (
+                <Link to="/admin/dashboard" className="page-breadcrumb-link">
+                  <ChevronLeft />
+                  Home
+                </Link>
+              )}
+            </div>
+            {/* Page Header */}
+            <div className="aqh-page-header">
+              <div className="aqh-title-section">
+                <div className="aqh-title-icon">
+                  <PlusCircleIcon />
+                </div>
+                <div>
+                  <h1 className="aqh-page-title">Queue Hosting</h1>
+                  <p className="aqh-page-subtitle">
+                    Host and manage queues within your department.
+                  </p>
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="aqh-actions-row">
             <button
               className="aqh-open-queue-btn"
               onClick={openModal}
@@ -465,7 +498,6 @@ export default function AdminQueueHosting() {
               <PlusIcon />
               Open Queue Line
             </button>
-          </div>
           </div>
 
           {queueHostingError && (
@@ -477,124 +509,142 @@ export default function AdminQueueHosting() {
           {/* Summary Stats */}
           <div className="aqh-summary-grid">
             <div className="aqh-summary-card aqh-summary-active">
+              <div className="aqh-summary-icon aqh-icon-active">
+                <PlayIcon />
+              </div>
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Active Queues</p>
                 <p className="aqh-summary-value aqh-value-active">
                   {loading ? "—" : activeQueues.length}
                 </p>
               </div>
-              <div className="aqh-summary-icon aqh-icon-active">
-                <PlayIcon />
-              </div>
             </div>
             <div className="aqh-summary-card aqh-summary-paused">
+              <div className="aqh-summary-icon aqh-icon-paused">
+                <PauseIcon />
+              </div>
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Paused Queues</p>
                 <p className="aqh-summary-value aqh-value-paused">
                   {loading ? "—" : pausedQueues.length}
                 </p>
               </div>
-              <div className="aqh-summary-icon aqh-icon-paused">
-                <PauseIcon />
-              </div>
             </div>
             <div className="aqh-summary-card aqh-summary-still-serving">
+              <div className="aqh-summary-icon aqh-icon-still-serving">
+                <ClockIcon />
+              </div>
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Still Serving</p>
                 <p className="aqh-summary-value aqh-value-still-serving">
                   {loading ? "—" : stillServingQueues.length}
                 </p>
               </div>
-              <div className="aqh-summary-icon aqh-icon-still-serving">
-                <ClockIcon />
-              </div>
             </div>
             <div className="aqh-summary-card aqh-summary-completed">
+              <div className="aqh-summary-icon aqh-icon-completed">
+                <CheckIcon />
+              </div>
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Completed Queues</p>
                 <p className="aqh-summary-value aqh-value-completed">
                   {loading ? "—" : completedQueues.length}
                 </p>
               </div>
-              <div className="aqh-summary-icon aqh-icon-completed">
-                <CheckIcon />
-              </div>
             </div>
             <div className="aqh-summary-card aqh-summary-closed">
+              <div className="aqh-summary-icon aqh-icon-closed">
+                <CloseIcon />
+              </div>
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Manually Closed</p>
                 <p className="aqh-summary-value aqh-value-closed">
                   {loading ? "—" : closedQueues.length}
                 </p>
               </div>
-              <div className="aqh-summary-icon aqh-icon-closed">
-                <CloseIcon />
-              </div>
             </div>
           </div>
 
           {/* Search & Filters */}
           <div className="aqh-filters-card">
-            <div className="aqh-filter-bar">
-              <div className="aqh-search-wrapper">
-                <SearchIcon />
-                <input
-                  type="text"
-                  className="aqh-form-input aqh-search-input"
-                  placeholder="Search by service or department..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+            <div className="aqh-filters-header">
+              <h3 className="aqh-filters-title">Queue Filter</h3>
+              <p className="aqh-filters-description">
+                Search and filter your department's queue lines by status and
+                service type.
+              </p>
+            </div>
+            <div className="aqh-filters-grid">
+              <div className="aqh-filter-group aqh-filter-group--search">
+                <label className="aqh-filter-label" htmlFor="aqh-search">Search</label>
+                <div className="aqh-search-wrapper">
+                  <SearchIcon />
+                  <input
+                    id="aqh-search"
+                    type="text"
+                    className="aqh-form-input aqh-search-input"
+                    placeholder="Search by service or department..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="aqh-form-select-wrap aqh-filter-select-wrap">
-                <select
-                  className="aqh-form-select"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  aria-label="Filter by status"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="open">Active</option>
-                  <option value="paused">Paused</option>
-                  <option value="full">Full</option>
-                  <option value="expired">Hours Ended</option>
-                  <option value="completed">Completed</option>
-                  <option value="closed">Closed</option>
-                </select>
-                <span className="aqh-select-chevron">
-                  <ChevronDownIcon />
-                </span>
+              <div className="aqh-filter-group">
+                <label className="aqh-filter-label" htmlFor="aqh-status-filter">Status</label>
+                <div className="aqh-form-select-wrap">
+                  <select
+                    id="aqh-status-filter"
+                    className="aqh-form-select"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    aria-label="Filter by status"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="open">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="full">Full</option>
+                    <option value="expired">Hours Ended</option>
+                    <option value="completed">Completed</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                  <span className="aqh-select-chevron">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
               </div>
-              <div className="aqh-form-select-wrap aqh-filter-select-wrap">
-                <select
-                  className="aqh-form-select"
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  aria-label="Filter by service type"
-                >
-                  <option value="all">All Service Types</option>
-                  {serviceTypeOptions.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-                <span className="aqh-select-chevron">
-                  <ChevronDownIcon />
-                </span>
+              <div className="aqh-filter-group">
+                <label className="aqh-filter-label" htmlFor="aqh-type-filter">Service Type</label>
+                <div className="aqh-form-select-wrap">
+                  <select
+                    id="aqh-type-filter"
+                    className="aqh-form-select"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    aria-label="Filter by service type"
+                  >
+                    <option value="all">All Service Types</option>
+                    {serviceTypeOptions.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  <span className="aqh-select-chevron">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
           {loading && (
-            <p className="aqh-empty-state">
-              Loading your department's queues...
-            </p>
+            <div className="aqh-empty-state">
+              <ClockIcon />
+              <p>Loading your department&apos;s queues&hellip;</p>
+            </div>
           )}
 
-          {/* Active Queue Lines */}
-          {!loading && activeQueues.length > 0 && (
-            <section className="aqh-section">
-              <h2 className="aqh-section-title">Active Queue Lines</h2>
-              <div className="aqh-queue-list">
+          {/* All queue lines, flat, ordered by status priority */}
+          {!loading && visibleQueues.length > 0 && (
+            <div className="aqh-queue-list">
                 {activeQueues.map((queue) => (
                   <div
                     key={queue.id}
@@ -629,7 +679,7 @@ export default function AdminQueueHosting() {
                           active
                         </span>
                         {queue.currentlyServingStudentNumber && (
-                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-completed" : "aqh-status-paused"}`}>
+                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-serving" : "aqh-status-called"}`}>
                             {queue.currentlyServingArrivedAt ? "being served" : "called"}
                           </span>
                         )}
@@ -668,16 +718,20 @@ export default function AdminQueueHosting() {
                       <div className="aqh-queue-stat">
                         <p className="aqh-queue-stat-label">Opened At</p>
                         <p className="aqh-queue-stat-value aqh-stat-value-sm">
-                          {formatManilaDateTime(queue.createdAt, {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            month: "numeric",
-                            day: "numeric",
-                          })}
+                          <span className="aqh-stat-datetime">
+                            <span>
+                              {formatManilaDate(queue.createdAt, {
+                                year: "numeric",
+                                month: "numeric",
+                                day: "numeric",
+                              })}
+                            </span>
+                            <span>{formatManilaTime(queue.createdAt)}</span>
+                          </span>
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
-                        <p className="aqh-queue-stat-label">Capacity</p>
+                        <p className="aqh-queue-stat-label">Occupied Slots</p>
                         <div className="aqh-capacity-bar-track">
                           <div
                             className="aqh-capacity-bar-fill"
@@ -690,15 +744,6 @@ export default function AdminQueueHosting() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </section>
-          )}
-
-          {/* Paused Queue Lines */}
-          {!loading && pausedQueues.length > 0 && (
-            <section className="aqh-section">
-              <h2 className="aqh-section-title">Paused Queue Lines</h2>
-              <div className="aqh-queue-list">
                 {pausedQueues.map((queue) => (
                   <div
                     key={queue.id}
@@ -773,15 +818,6 @@ export default function AdminQueueHosting() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </section>
-          )}
-
-          {/* Still Serving Queue Lines (full or hours ended, students remain) */}
-          {!loading && stillServingQueues.length > 0 && (
-            <section className="aqh-section">
-              <h2 className="aqh-section-title">Still Serving (Closed to New Joins)</h2>
-              <div className="aqh-queue-list">
                 {stillServingQueues.map((queue) => (
                   <div
                     key={queue.id}
@@ -816,7 +852,7 @@ export default function AdminQueueHosting() {
                           {queue.status === "full" ? "full" : "hours ended"}
                         </span>
                         {queue.currentlyServingStudentNumber && (
-                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-completed" : "aqh-status-paused"}`}>
+                          <span className={`aqh-status-badge ${queue.currentlyServingArrivedAt ? "aqh-status-serving" : "aqh-status-called"}`}>
                             {queue.currentlyServingArrivedAt ? "being served" : "called"}
                           </span>
                         )}
@@ -853,15 +889,6 @@ export default function AdminQueueHosting() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </section>
-          )}
-
-          {/* Completed Queue Lines */}
-          {!loading && completedQueues.length > 0 && (
-            <section className="aqh-section">
-              <h2 className="aqh-section-title">Completed Queue Lines (Today)</h2>
-              <div className="aqh-queue-list">
                 {completedQueues.map((queue) => (
                   <div
                     key={queue.id}
@@ -912,15 +939,6 @@ export default function AdminQueueHosting() {
                     </p>
                   </div>
                 ))}
-              </div>
-            </section>
-          )}
-
-          {/* Manually Closed Queue Lines */}
-          {!loading && closedQueues.length > 0 && (
-            <section className="aqh-section">
-              <h2 className="aqh-section-title">Manually Closed Queue Lines (Today)</h2>
-              <div className="aqh-queue-list">
                 {closedQueues.map((queue) => (
                   <div
                     key={queue.id}
@@ -971,12 +989,13 @@ export default function AdminQueueHosting() {
                     </p>
                   </div>
                 ))}
-              </div>
-            </section>
+            </div>
           )}
 
           {!loading && queues.length === 0 && (
             <div className="aqh-empty-state">
+              <ClockIcon />
+              <h3>No Queue Lines Yet</h3>
               <p>
                 No queue lines yet today for {user.departmentAbbrev}. Open one
                 to start serving students.
@@ -984,8 +1003,10 @@ export default function AdminQueueHosting() {
             </div>
           )}
 
-          {!loading && queues.length > 0 && filteredQueues.length === 0 && (
+          {!loading && queues.length > 0 && visibleQueues.length === 0 && (
             <div className="aqh-empty-state">
+              <ClockIcon />
+              <h3>No Matches</h3>
               <p>No queue lines match your search or filters.</p>
               {hasActiveFilters && (
                 <button

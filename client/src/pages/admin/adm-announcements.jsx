@@ -474,68 +474,84 @@ export default function AdminAnnouncements() {
           {/* View Modal */}
           {viewingAnnouncement && (
             <div className="ann-modal-overlay">
-              <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="ann-modal ann-modal--view" onClick={(e) => e.stopPropagation()}>
                 <div className="ann-modal-header">
                   <div>
                     <h3 className="ann-modal-title"><EyeIcon /> Announcement Details</h3>
                     <p className="ann-modal-desc">View complete information about this announcement.</p>
+                    <div className="ann-modal-header-badges">
+                      {viewingAnnouncement.audience === "students" && (
+                        <span className={`ann-badge ${TYPE_META[viewingAnnouncement.type].badgeClass}`}>
+                          {TYPE_META[viewingAnnouncement.type].label}
+                        </span>
+                      )}
+                      <span className={`ann-pin-badge ${viewingAnnouncement.isPinned ? "ann-pin-badge--on" : "ann-pin-badge--off"}`}>
+                        {viewingAnnouncement.isPinned && <PinIcon />}
+                        {viewingAnnouncement.isPinned ? "Pinned" : "Not Pinned"}
+                      </span>
+                    </div>
                   </div>
                   <button className="ann-modal-close" onClick={() => setViewingAnnouncement(null)} aria-label="Close">
                     <XIcon />
                   </button>
                 </div>
 
-                <div className="ann-view-banner">
-                  <div>
+                <div className="ann-view-body">
+                  <div className="ann-view-banner">
+                    <p className="ann-view-banner-label">Title</p>
                     <h2>{viewingAnnouncement.title}</h2>
                     <div className="ann-view-banner-date"><CalendarIcon />{formatPostedLabel(viewingAnnouncement)}</div>
                   </div>
-                  <div className="ann-view-banner-badges">
-                    {viewingAnnouncement.audience === "students" && (
-                      <span className={`ann-badge ${viewingAnnouncement.isPinned ? "ann-badge-pinned" : TYPE_META[viewingAnnouncement.type].badgeClass}`}>
-                        {TYPE_META[viewingAnnouncement.type].label}
-                      </span>
-                    )}
-                    {viewingAnnouncement.isPinned && (
-                      <span className="ann-pinned-pill"><PinIcon /> Pinned</span>
-                    )}
-                  </div>
-                </div>
 
-                <p className="ann-view-label">Content</p>
-                <div className="ann-view-block"><p>{viewingAnnouncement.content}</p></div>
-
-                {viewingAnnouncement.attachments?.length > 0 && (
-                  <div className="ann-attachment-view">
-                    <p className="ann-view-label">Attachments ({viewingAnnouncement.attachments.length})</p>
-                    <div className="ann-attachment-list">
-                      {viewingAnnouncement.attachments.map((att) => (
-                        <button
-                          key={att.id}
-                          type="button"
-                          className="ann-btn-secondary"
-                          onClick={() => openAttachment(viewingAnnouncement.id, att)}
-                        >
-                          <FileIcon /> {att.filename}
-                        </button>
-                      ))}
+                  <div className="ann-view-grid">
+                    <div>
+                      <p className="ann-view-label">Created By</p>
+                      <p className="ann-view-value">{viewingAnnouncement.createdBy || "Admin Office"}</p>
+                    </div>
+                    <div>
+                      <p className="ann-view-label">Audience</p>
+                      <p className="ann-view-value">
+                        {viewingAnnouncement.audience === "students" ? "Students" : "Faculty"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="ann-view-label">Posted</p>
+                      <p className="ann-view-value">
+                        {formatManilaDate(viewingAnnouncement.date, { month: "long", day: "numeric", year: "numeric" })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="ann-view-label">Status</p>
+                      <p className="ann-view-value">
+                        <span className={`ann-status-pill ${viewingAnnouncement.status === "active" ? "ann-status-active" : "ann-status-archived"}`}>
+                          {viewingAnnouncement.status}
+                        </span>
+                      </p>
                     </div>
                   </div>
-                )}
 
-                <div className="ann-view-grid">
                   <div>
-                    <p className="ann-view-label">Created By</p>
-                    <p className="ann-view-value">{viewingAnnouncement.createdBy || "Admin Office"}</p>
+                    <p className="ann-view-label">Content</p>
+                    <div className="ann-view-block"><p>{viewingAnnouncement.content}</p></div>
                   </div>
-                  <div>
-                    <p className="ann-view-label">Status</p>
-                    <p className="ann-view-value">
-                      <span className={`ann-status-pill ${viewingAnnouncement.status === "active" ? "ann-status-active" : "ann-status-archived"}`}>
-                        {viewingAnnouncement.status}
-                      </span>
-                    </p>
-                  </div>
+
+                  {viewingAnnouncement.attachments?.length > 0 && (
+                    <div className="ann-attachment-view">
+                      <p className="ann-view-label">Attachments ({viewingAnnouncement.attachments.length})</p>
+                      <div className="ann-attachment-list">
+                        {viewingAnnouncement.attachments.map((att) => (
+                          <button
+                            key={att.id}
+                            type="button"
+                            className="ann-btn-secondary"
+                            onClick={() => openAttachment(viewingAnnouncement.id, att)}
+                          >
+                            <FileIcon /> {att.filename}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="ann-modal-footer">

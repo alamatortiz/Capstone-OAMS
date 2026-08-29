@@ -135,12 +135,14 @@
   }
 }
 
-/* ===== Breadcrumb (mirrors professor/student pages) ===== */
-.page-breadcrumb {
+/* ===== Breadcrumb (mirrors professor/student pages) =====
+   Scoped to .aqh-page-container so these generic class names don't leak onto
+   other admin screens once this (lazily loaded) stylesheet is in the document. */
+.aqh-page-container .page-breadcrumb {
   display: flex;
   align-items: center;
 }
-.page-breadcrumb-link {
+.aqh-page-container .page-breadcrumb-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -156,11 +158,11 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.page-breadcrumb-link:hover {
+.aqh-page-container .page-breadcrumb-link:hover {
   color: #3b82f6;
   background: rgba(59, 130, 246, 0.1);
 }
-.page-breadcrumb-link svg {
+.aqh-page-container .page-breadcrumb-link svg {
   width: 1.25rem;
   height: 1.25rem;
   stroke: currentColor;
@@ -177,9 +179,12 @@
 .aqh-page-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
-  flex-wrap: wrap;
+}
+
+/* The "Open Queue Line" CTA now sits on its own row below the header. */
+.aqh-actions-row {
+  display: flex;
 }
 
 .aqh-title-section {
@@ -251,10 +256,11 @@
   stroke: currentColor;
 }
 
-/* ===== Summary Stat Cards ===== */
+/* ===== Summary Stat Cards (mirrors adm-queue's .queue-system-stats layout,
+   but each card keeps its own per-status accent colour) ===== */
 .aqh-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
 }
 
@@ -262,11 +268,12 @@
   background: var(--card-bg);
   border: 1.5px solid rgba(59, 130, 246, 0.3);
   border-radius: 1rem;
-  padding: 1.25rem;
+  padding: 1.25rem 1rem;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  text-align: center;
+  gap: 0.5rem;
   transition: all 0.3s ease;
 }
 
@@ -308,22 +315,25 @@
 }
 
 .aqh-summary-content {
-  text-align: left;
+  text-align: center;
 }
 
 .aqh-summary-label {
-  font-size: 0.875rem;
+  font-size: 0.7rem;
   color: var(--text-tertiary);
-  margin: 0 0 0.5rem 0;
-  font-weight: 500;
-  text-align: left;
+  margin: 0 0 0.375rem 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
 }
 
 .aqh-summary-value {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
   margin: 0;
-  text-align: left;
+  text-align: center;
 }
 
 .aqh-value-active {
@@ -343,56 +353,106 @@
 }
 
 .aqh-summary-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: white;
 }
 
 .aqh-summary-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
+/* Translucent tint of the card's own accent (mirrors .queue-stat-box-icon-box) */
 .aqh-icon-active {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
 }
 .aqh-icon-paused {
-  background: var(--warning);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--warning);
 }
 .aqh-icon-still-serving {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  color: #f97316;
 }
 .aqh-icon-completed {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #10b981;
 }
 .aqh-icon-closed {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.08) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
 }
 
-/* ===== Search & Filter Bar ===== */
+/* ===== Search & Filter Card (mirrors stud-queue's .filters-card) ===== */
 .aqh-filters-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(59, 130, 246, 0.15);
   border-radius: 1rem;
-  padding: 1.25rem;
+  padding: 1rem 1.5rem 1.5rem;
   transition: all 0.3s ease;
 }
 
-.aqh-filter-bar {
+.aqh-filters-header {
+  margin-bottom: 1.5rem;
+}
+
+.aqh-filters-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.aqh-filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+  text-align: center;
+}
+
+.aqh-filters-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .aqh-filters-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  .aqh-filter-group--search {
+    grid-column: 1 / -1;
+  }
+}
+
+.aqh-filter-group {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aqh-filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
 }
 
 .aqh-search-wrapper {
   position: relative;
-  flex: 1 1 260px;
+  width: 100%;
 }
 
 .aqh-search-wrapper svg {
@@ -409,11 +469,6 @@
 
 .aqh-form-input.aqh-search-input {
   padding-left: 2.5rem;
-}
-
-.aqh-filter-select-wrap {
-  flex: 0 0 auto;
-  min-width: 170px;
 }
 
 .aqh-clear-filters-btn {
@@ -435,29 +490,7 @@
   border-color: rgba(59, 130, 246, 0.6);
 }
 
-@media (max-width: 640px) {
-  .aqh-filter-select-wrap {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
-}
-
-/* ===== Section + Queue Cards ===== */
-.aqh-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.aqh-section-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
+/* ===== Queue Cards ===== */
 .aqh-queue-list {
   display: flex;
   flex-direction: column;
@@ -465,7 +498,7 @@
 }
 
 .aqh-queue-card {
-  background: rgba(59, 130, 246, 0.06);
+  background: var(--card-bg);
   border: 1.5px solid rgba(59, 130, 246, 0.3);
   border-radius: 1rem;
   padding: 1.25rem 1.5rem;
@@ -473,65 +506,25 @@
 }
 
 .aqh-queue-card:hover {
-  background: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.5);
   box-shadow: 0 8px 16px rgba(59, 130, 246, 0.1);
 }
 
-.aqh-card-paused {
-  background: rgba(245, 158, 11, 0.06);
-  border-color: rgba(245, 158, 11, 0.3);
-}
-.aqh-card-paused:hover {
-  background: rgba(245, 158, 11, 0.1);
-  border-color: rgba(245, 158, 11, 0.5);
-  box-shadow: 0 8px 16px rgba(245, 158, 11, 0.1);
-}
-
-.aqh-card-closed {
-  background: var(--card-bg);
-  border-color: var(--card-border);
+/* Every status shares the neutral card + blue border/hover; the (uppercase,
+   colour-coded) status badge carries the status meaning. Finished lines read
+   muted. */
+.aqh-card-closed,
+.aqh-card-completed {
   opacity: 0.85;
 }
-.aqh-card-closed:hover {
-  background: var(--card-bg);
-  border-color: var(--card-border);
-  box-shadow: none;
-}
 
-.aqh-card-still-serving {
-  background: rgba(249, 115, 22, 0.06);
-  border-color: rgba(249, 115, 22, 0.3);
-}
-.aqh-card-still-serving:hover {
-  background: rgba(249, 115, 22, 0.1);
-  border-color: rgba(249, 115, 22, 0.5);
-  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.1);
-}
-
-.aqh-card-completed {
-  background: var(--card-bg);
-  border-color: rgba(16, 185, 129, 0.3);
-  opacity: 0.9;
-}
-.aqh-card-completed:hover {
-  background: var(--card-bg);
-  border-color: rgba(16, 185, 129, 0.3);
-  box-shadow: none;
-}
-
-/* Clickable-card affordance -- placed after the per-status hover rules
-   above (including the closed/completed ones that suppress box-shadow) so
-   it wins the source-order tie at equal specificity. Only touches
-   transform/box-shadow, leaving each status's own background/border hover
-   tint intact. */
 .aqh-queue-card--clickable {
   cursor: pointer;
 }
 
 .aqh-queue-card--clickable:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.15);
 }
 
 .aqh-queue-card-top {
@@ -563,7 +556,7 @@
 }
 
 .aqh-queue-card-title {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 0.2rem 0;
@@ -572,7 +565,7 @@
 }
 
 .aqh-queue-card-dept {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-secondary);
   margin: 0;
   text-align: left;
@@ -586,21 +579,24 @@
   flex-wrap: wrap;
 }
 
-/* Status badge (active / paused / closed) */
+/* Status badge — adm-queue's .status-badge colour mapping + all-caps, at this
+   screen's smaller size. active=green, paused=amber, full/expired=orange,
+   completed/closed=red. */
 .aqh-status-badge {
   padding: 0.375rem 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: capitalize;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
   text-align: center;
   white-space: nowrap;
 }
 
 .aqh-status-active {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border: 0.5px solid rgba(59, 130, 246, 0.4);
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
 }
 
 .aqh-status-paused {
@@ -622,21 +618,38 @@
 }
 
 .aqh-status-completed {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 0.5px solid rgba(16, 185, 129, 0.4);
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Secondary "currently serving" pill — kept semantic (positive = green,
+   waiting on the student = amber), independent of the status-badge remap. */
+.aqh-status-serving {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
+}
+
+.aqh-status-called {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+  border: 0.5px solid rgba(245, 158, 11, 0.4);
 }
 
 .aqh-queue-card-actions {
   display: flex;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
+/* Resting appearance mirrors adm-faqs' .faq-action-btn; each variant keeps its
+   own semantic hover accent. */
 .aqh-action-btn {
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 0.875rem;
   background: transparent;
   border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
+  border-radius: 0.625rem;
   color: var(--text-primary);
   font-weight: 600;
   font-size: 0.8rem;
@@ -648,8 +661,8 @@
 }
 
 .aqh-action-btn svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.875rem;
+  height: 0.875rem;
   stroke: currentColor;
 }
 
@@ -659,14 +672,10 @@
   color: var(--warning);
 }
 
-.aqh-action-resume {
-  background: rgba(59, 130, 246, 0.15);
+.aqh-action-resume:hover {
+  background: rgba(59, 130, 246, 0.12);
   border-color: #3b82f6;
   color: #3b82f6;
-}
-.aqh-action-resume:hover {
-  background: #3b82f6;
-  color: white;
 }
 
 .aqh-action-close:hover {
@@ -690,10 +699,6 @@
   border-top: 1px solid rgba(59, 130, 246, 0.2);
 }
 
-.aqh-card-paused .aqh-queue-stats-row {
-  border-top-color: rgba(245, 158, 11, 0.2);
-}
-
 .aqh-stats-row-4 {
   grid-template-columns: repeat(4, 1fr);
 }
@@ -706,7 +711,7 @@
 }
 
 .aqh-queue-stat-label {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--text-tertiary);
   margin: 0 0 0.375rem 0;
   text-align: left;
@@ -714,7 +719,7 @@
 }
 
 .aqh-queue-stat-value {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -723,8 +728,15 @@
 }
 
 .aqh-stat-value-sm {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
+}
+
+/* "Opened At" — date stacked above time */
+.aqh-stat-datetime {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
 }
 
 /* Capacity bar */
@@ -743,57 +755,51 @@
   transition: width 0.3s ease;
 }
 
-/* Allowed departments */
-.aqh-queue-departments {
-  margin-top: 1rem;
-  text-align: left;
-}
-
-.aqh-queue-departments-label {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  margin: 0 0 0.5rem 0;
-  text-align: left;
-}
-
-.aqh-dept-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.aqh-dept-badge {
-  padding: 0.3rem 0.7rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--card-border);
-  background: var(--input-background);
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
 .aqh-closed-meta {
   margin: 0.6rem 0 0;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--text-tertiary);
   text-align: left;
 }
 
+/* Empty / loading states — mirrors adm-queue's .queue-empty-state */
 .aqh-empty-state {
-  padding: 3rem 1rem;
+  padding: 3rem 1.5rem;
   text-align: center;
   color: var(--text-tertiary);
-  border: 1px dashed var(--card-border);
+  border: 1px solid rgba(59, 130, 246, 0.15);
   border-radius: 1rem;
   background: var(--card-bg);
 }
 
-/* ===== Modal ===== */
+.aqh-empty-state svg {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-tertiary);
+  display: block;
+  margin: 0 auto 1rem;
+  stroke: currentColor;
+}
+
+.aqh-empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.aqh-empty-state p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* ===== Modal (mirrors adm-document-processing's .adp-modal shell, blue) ===== */
 .aqh-modal-overlay {
   position: fixed;
   inset: 0;
   z-index: 60;
   background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -804,11 +810,12 @@
   width: 100%;
   max-width: 640px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1.25rem;
-  padding: 1.5rem;
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
   transition:
     background-color 0.3s ease,
@@ -820,7 +827,9 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
   text-align: left;
 }
 
@@ -828,7 +837,7 @@
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.3rem 0;
+  margin: 0;
   text-align: left;
 }
 
@@ -855,8 +864,8 @@
 }
 
 .aqh-modal-close-btn:hover {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--text-primary);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
 }
 
 .aqh-modal-close-btn svg {
@@ -867,7 +876,44 @@
 .aqh-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Blue hero band (mirrors .adp-modal-hero) */
+.aqh-modal-hero {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+}
+
+.aqh-modal-hero-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 0.375rem 0;
+}
+
+.aqh-modal-hero-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.aqh-modal-hero-purpose {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0.75rem 0 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 1.5;
 }
 
 .aqh-form-group {
@@ -970,89 +1016,6 @@
   pointer-events: none;
 }
 
-.aqh-dept-checklist-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.aqh-select-all-btn {
-  padding: 0.35rem 0.75rem;
-  border-radius: 0.6rem;
-  border: 1px solid var(--card-border);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.aqh-select-all-btn:hover {
-  border-color: #3b82f6;
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.08);
-}
-
-.aqh-dept-checklist {
-  max-height: 12rem;
-  overflow-y: auto;
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  padding: 0.85rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  background: var(--input-background);
-}
-
-.aqh-dept-checklist-item {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  cursor: pointer;
-}
-
-.aqh-checkbox-native {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.aqh-checkbox {
-  width: 1.1rem;
-  height: 1.1rem;
-  flex-shrink: 0;
-  border-radius: 0.3rem;
-  border: 1.5px solid var(--card-border);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.aqh-checkbox svg {
-  width: 0.7rem;
-  height: 0.7rem;
-}
-
-.aqh-checkbox-checked {
-  background: #3b82f6;
-  border-color: #3b82f6;
-}
-
-.aqh-dept-checklist-label {
-  font-size: 0.86rem;
-  color: var(--text-secondary);
-  text-align: left;
-}
-
 .aqh-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1061,23 +1024,29 @@
 
 .aqh-modal-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.65rem;
-  margin-top: 1.5rem;
-  padding-top: 1.1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1.1rem 1.5rem;
   border-top: 1px solid var(--card-border);
+  flex-shrink: 0;
 }
 
-.aqh-btn-cancel {
-  padding: 0.65rem 1.15rem;
+.aqh-btn-cancel,
+.aqh-btn-submit {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.65rem 1.25rem;
   border-radius: 0.75rem;
-  border: 1px solid var(--card-border);
-  background: transparent;
-  color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.aqh-btn-cancel {
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .aqh-btn-cancel:hover {
@@ -1087,26 +1056,30 @@
 }
 
 .aqh-btn-submit {
-  padding: 0.65rem 1.25rem;
-  border-radius: 0.75rem;
   border: none;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .aqh-btn-submit:hover {
-  transform: scale(1.03);
+  transform: translateY(-1px);
   box-shadow: 0 8px 16px rgba(59, 130, 246, 0.35);
+}
+
+@media (max-width: 480px) {
+  .aqh-modal-footer {
+    flex-direction: column;
+  }
+  .aqh-btn-cancel,
+  .aqh-btn-submit {
+    width: 100%;
+  }
 }
 
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
   .aqh-summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
   .aqh-stats-row-4 {
     grid-template-columns: repeat(2, 1fr);
@@ -1140,11 +1113,11 @@
   .aqh-page-title {
     font-size: 1.25rem;
   }
-  .aqh-page-header {
-    flex-direction: column;
-    align-items: stretch;
+  .aqh-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
-  .aqh-open-queue-btn {
+  .aqh-actions-row .aqh-open-queue-btn {
+    width: 100%;
     justify-content: center;
   }
   .aqh-stats-row-4,

@@ -626,19 +626,20 @@ body {
   box-shadow: 0 12px 28px rgba(59, 130, 246, 0.15);
 }
 
-.queue-detail-info {
-  flex: 1;
-  min-width: 0;
+/* Card top row: logo + heading on the left, the Manage button pinned top-right. */
+.queue-detail-topbar {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  text-align: left;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .queue-detail-header-row {
   display: flex;
   align-items: center;
   gap: 0.875rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .queue-detail-heading {
@@ -688,7 +689,6 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 1rem;
-  margin-top: 0.5rem;
 }
 
 .queue-detail-row .queue-detail-item {
@@ -1320,6 +1320,13 @@ body {
 
   .queue-overview-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Full-width Manage button stacks under the heading instead of fighting the
+     space-between top-bar row. */
+  .queue-detail-topbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .btn-monitor {

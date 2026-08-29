@@ -240,10 +240,8 @@ body {
 }
 
 /* ===== Queue Tabs ===== */
-.qp-tabs-navigation {
-  margin-top: 1rem;
-}
-
+/* No margin-top here on purpose: the header→tabs gap is the .queue-page flex
+   gap (1.3rem) alone, matching stud-document-status's .dss-tabs-container. */
 .qp-tabs-list {
   display: flex;
   gap: 0.5rem;
