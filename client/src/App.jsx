@@ -1,7 +1,17 @@
 import "./App.css";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Sun, Moon } from "lucide-react";
+import {
+  Sun,
+  Moon,
+  AlertCircle,
+  Layers,
+  TrendingUp,
+  Monitor,
+  Smartphone,
+  RefreshCw,
+  Check,
+} from "lucide-react";
 import { applyTheme, getSavedTheme } from "./utils/theme";
 import { useAuth } from "./context/AuthContext";
 
@@ -55,6 +65,51 @@ const features = [
     icon: transactionIcon,
     title: "Transaction Tracking",
     desc: "Monitor all your activities and service requests",
+  },
+];
+
+// "Why OAMS" — problem / solution / impact, explaining what the system
+// replaces and why it matters for the University of Cabuyao's college offices.
+const whyOams = [
+  {
+    icon: AlertCircle,
+    title: "The Problem",
+    desc: "College offices across campus have long relied on manual, paper-based, walk-in processes — long lines, lost forms, and no way to check a request's status without going back in person.",
+  },
+  {
+    icon: Layers,
+    title: "The Solution",
+    desc: "OAMS brings queuing, appointment scheduling, document processing, and announcements into one digital platform shared by every college office.",
+  },
+  {
+    icon: TrendingUp,
+    title: "The Impact",
+    desc: "Shorter wait times, real-time visibility into every request, and less paperwork for students, professors, and staff alike.",
+  },
+];
+
+// Cross-platform: OAMS ships as both a web dashboard and a companion mobile
+// app (React Native/Expo), sharing the same account and data in real time.
+const platforms = [
+  {
+    icon: Monitor,
+    title: "Web Dashboard",
+    desc: "Full queue, appointment, and document tools built for college office staff and administrators, on any modern browser.",
+    points: [
+      "Manage queues & appointments",
+      "Generate reports & analytics",
+      "Built for larger screens",
+    ],
+  },
+  {
+    icon: Smartphone,
+    title: "Mobile App",
+    desc: "Everything students and professors need for queuing, appointments, and documents — right in your pocket.",
+    points: [
+      "Join queues & get notified",
+      "Scan QR codes for documents",
+      "Real-time push notifications",
+    ],
   },
 ];
 
@@ -160,6 +215,28 @@ function App({ loginAudience }) {
         </button>
       </section>
 
+      {/* ── Why OAMS ── */}
+      <section className="about-section">
+        <h2 className="section-title">Why OAMS?</h2>
+        <p className="about-intro">
+          Across CBAA, COED, COE, CCS, CAS, and CHAS, everyday college office
+          work has long meant standing in line. OAMS is a digitalization
+          project for the University of Cabuyao (Pamantasan ng Cabuyao) that
+          brings that work online, for every college office and every role.
+        </p>
+        <div className="features-grid about-grid">
+          {whyOams.map((item) => (
+            <div className="feature-card" key={item.title}>
+              <div className="feature-icon">
+                <item.icon className="feature-icon-svg" />
+              </div>
+              <h3 className="feature-title">{item.title}</h3>
+              <p className="feature-desc">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── Key Features ── */}
       <section className="features-section">
         <h2 className="section-title">Key Features</h2>
@@ -174,6 +251,39 @@ function App({ loginAudience }) {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Cross-Platform ── */}
+      <section className="platforms-section">
+        <h2 className="section-title">One Account, Every Device</h2>
+        <p className="platforms-description">
+          OAMS runs as a full web dashboard and a dedicated mobile app, so
+          students, professors, and staff can pick up right where they left
+          off — no matter what they&rsquo;re using.
+        </p>
+        <div className="platforms-grid">
+          {platforms.map((p) => (
+            <div className="feature-card platform-card" key={p.title}>
+              <div className="feature-icon platform-icon">
+                <p.icon className="platform-icon-svg" />
+              </div>
+              <h3 className="feature-title">{p.title}</h3>
+              <p className="feature-desc">{p.desc}</p>
+              <ul className="platform-list">
+                {p.points.map((point) => (
+                  <li key={point}>
+                    <Check className="platform-check" />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <p className="platforms-footnote">
+          <RefreshCw className="platforms-footnote-icon" />
+          Same account, same data — always in sync across web and mobile.
+        </p>
       </section>
 
       {/* ── Serving All Colleges ── */}
