@@ -10,6 +10,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
+import {
+  AlertCircle,
+  Layers,
+  TrendingUp,
+  Monitor,
+  Smartphone,
+  RefreshCw,
+  Check,
+} from 'lucide-react-native';
+
+type LucideIconType = typeof AlertCircle;
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -58,6 +69,48 @@ const features = [
     icon: transactionIcon,
     title: 'Transaction Tracking',
     desc: 'Monitor all your activities and service requests',
+  },
+];
+
+// "Why OAMS" — problem / solution / impact, explaining what the system
+// replaces and why it matters for the University of Cabuyao's college offices.
+const whyOams: { icon: LucideIconType; title: string; desc: string }[] = [
+  {
+    icon: AlertCircle,
+    title: 'The Problem',
+    desc: "College offices across campus have long relied on manual, paper-based, walk-in processes — long lines, lost forms, and no way to check a request's status without going back in person.",
+  },
+  {
+    icon: Layers,
+    title: 'The Solution',
+    desc: 'OAMS brings queuing, appointment scheduling, document processing, and announcements into one digital platform shared by every college office.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'The Impact',
+    desc: 'Shorter wait times, real-time visibility into every request, and less paperwork for students, professors, and staff alike.',
+  },
+];
+
+// Cross-platform: OAMS ships as both a web dashboard and this companion
+// mobile app, sharing the same account and data in real time.
+const platforms: {
+  icon: LucideIconType;
+  title: string;
+  desc: string;
+  points: string[];
+}[] = [
+  {
+    icon: Monitor,
+    title: 'Web Dashboard',
+    desc: 'Full queue, appointment, and document tools built for college office staff and administrators, on any modern browser.',
+    points: ['Manage queues & appointments', 'Generate reports & analytics', 'Built for larger screens'],
+  },
+  {
+    icon: Smartphone,
+    title: 'Mobile App',
+    desc: 'Everything students and professors need for queuing, appointments, and documents — right in your pocket.',
+    points: ['Join queues & get notified', 'Scan QR codes for documents', 'Real-time push notifications'],
   },
 ];
 
@@ -158,6 +211,29 @@ export default function WelcomeScreen() {
           </Pressable>
         </View>
 
+        {/* Why OAMS */}
+        <View style={styles.featuresSection}>
+          <Text style={styles.sectionTitle}>Why OAMS?</Text>
+          <Text style={styles.collegesDescription}>
+            Across CBAA, COED, COE, CCS, CAS, and CHAS, everyday college
+            office work has long meant standing in line. OAMS is a
+            digitalization project for the University of Cabuyao (Pamantasan
+            ng Cabuyao) that brings that work online, for every college
+            office and every role.
+          </Text>
+          <View style={styles.featuresGrid}>
+            {whyOams.map((item) => (
+              <View style={styles.featureCard} key={item.title}>
+                <View style={styles.iconCircle}>
+                  <item.icon size={26} color={isDarkMode ? '#4ade80' : '#16a34a'} />
+                </View>
+                <Text style={styles.featureTitle}>{item.title}</Text>
+                <Text style={styles.featureDesc}>{item.desc}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
         {/* Key Features */}
         <View style={styles.featuresSection}>
           <Text style={styles.sectionTitle}>Key Features</Text>
@@ -171,6 +247,41 @@ export default function WelcomeScreen() {
                 <Text style={styles.featureDesc}>{f.desc}</Text>
               </View>
             ))}
+          </View>
+        </View>
+
+        {/* Cross-Platform */}
+        <View style={styles.featuresSection}>
+          <Text style={styles.sectionTitle}>One Account, Every Device</Text>
+          <Text style={styles.collegesDescription}>
+            OAMS runs as a full web dashboard and this dedicated mobile app,
+            so students, professors, and staff can pick up right where they
+            left off — no matter what they&apos;re using.
+          </Text>
+          <View style={styles.featuresGrid}>
+            {platforms.map((p) => (
+              <View style={styles.featureCard} key={p.title}>
+                <View style={styles.iconCircle}>
+                  <p.icon size={26} color={isDarkMode ? '#4ade80' : '#16a34a'} />
+                </View>
+                <Text style={styles.featureTitle}>{p.title}</Text>
+                <Text style={styles.featureDesc}>{p.desc}</Text>
+                <View style={styles.platformList}>
+                  {p.points.map((point) => (
+                    <View style={styles.platformListRow} key={point}>
+                      <Check size={15} color={isDarkMode ? '#4ade80' : '#16a34a'} />
+                      <Text style={styles.platformListText}>{point}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+          <View style={styles.platformsFootnote}>
+            <RefreshCw size={15} color={isDarkMode ? '#4ade80' : '#16a34a'} />
+            <Text style={styles.platformsFootnoteText}>
+              Same account, same data — always in sync across web and mobile.
+            </Text>
           </View>
         </View>
 
@@ -336,8 +447,8 @@ function createStyles(theme: typeof lightPalette) {
       gap: 0,
       marginBottom: 20,
     },
-    heroPncLogoImg: { height: 64, width: 64 },
-    heroLogoImg: { height: 50, width: 160, marginLeft: -14 },
+    heroPncLogoImg: { height: 76, width: 76 },
+    heroLogoImg: { height: 60, width: 192, marginLeft: -16 },
     heroTitle: {
       fontSize: 28,
       fontWeight: '800',
@@ -415,6 +526,47 @@ function createStyles(theme: typeof lightPalette) {
       fontSize: 13,
       color: theme.subtext,
       lineHeight: 20,
+      textAlign: 'center',
+    },
+
+    // Centered icon wrapper for lucide (SVG) icons, sized to match
+    // featureIcon/featureIconImg's 48px footprint used for PNG icons.
+    iconCircle: {
+      width: 48,
+      height: 48,
+      marginBottom: 14,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    },
+    platformList: {
+      alignSelf: 'stretch',
+      marginTop: 16,
+      gap: 8,
+    },
+    platformListRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    platformListText: {
+      flex: 1,
+      fontSize: 13,
+      color: theme.text,
+      lineHeight: 19,
+    },
+    platformsFootnote: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 8,
+    },
+    platformsFootnoteText: {
+      flexShrink: 1,
+      fontSize: 13,
+      color: theme.subtext,
       textAlign: 'center',
     },
 
@@ -518,8 +670,8 @@ function createStyles(theme: typeof lightPalette) {
       alignItems: 'center',
       gap: 0,
     },
-    footerPncLogoImg: { height: 54, width: 54 },
-    footerLogoImg: { height: 44, width: 132 },
+    footerPncLogoImg: { height: 64, width: 64 },
+    footerLogoImg: { height: 52, width: 156 },
     footerRight: {
       alignItems: 'center',
       gap: 4,
