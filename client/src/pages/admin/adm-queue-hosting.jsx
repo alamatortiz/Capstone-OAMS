@@ -453,7 +453,7 @@ export default function AdminQueueHosting() {
                 <h1 className="aqh-page-title">Queue Hosting Management</h1>
                 <p className="aqh-page-subtitle">
                   {user.college} ({user.departmentAbbrev}) — open, manage, and
-                  close your department's queue lines
+                  close your department's queue lines.
                 </p>
               </div>
             </div>

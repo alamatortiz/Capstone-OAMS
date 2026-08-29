@@ -12,6 +12,7 @@ export default function ActionConfirmModal({
   cancelText = "Cancel",
   confirmDisabled = false,
   variant = "danger",
+  centered = false,
 }) {
   useLockBodyScroll(show);
 
@@ -22,10 +23,10 @@ export default function ActionConfirmModal({
       <div className="acm-modal">
         {icon && <div className={`acm-icon acm-icon--${variant}`}>{icon}</div>}
         <h3 className="acm-title">{title}</h3>
-        <div className="acm-message">{message}</div>
+        <div className={`acm-message${centered ? " acm-message--centered" : ""}`}>{message}</div>
         <div className="acm-actions">
           <button
-            className="acm-cancel"
+            className={`acm-cancel acm-cancel--${variant}`}
             onClick={onCancel}
             disabled={confirmDisabled}
           >

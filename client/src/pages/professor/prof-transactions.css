@@ -492,13 +492,7 @@ html, body {
   border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 1rem;
   padding: 3rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
   text-align: center;
-  color: var(--text-tertiary);
 }
 
 .txn-empty svg {
@@ -506,13 +500,14 @@ html, body {
   height: 3rem;
   color: var(--text-tertiary);
   stroke: currentColor;
+  margin: 0 auto 1rem;
 }
 
 .txn-empty h3 {
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0;
+  margin: 0 0 0.5rem 0;
   transition: color 0.3s ease;
 }
 
@@ -521,6 +516,12 @@ html, body {
   color: var(--text-tertiary);
   margin: 0;
   transition: color 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .txn-empty {
+    padding: 2rem 1rem;
+  }
 }
 
 /* ── Individual transaction item ─────────────────────────── */

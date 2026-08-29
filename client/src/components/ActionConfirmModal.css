@@ -58,6 +58,11 @@
   color: #3b82f6;
 }
 
+.acm-icon--primary {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
 .acm-title {
   font-size: 1.125rem;
   font-weight: 700;
@@ -71,6 +76,10 @@
   margin: 0 0 1.5rem;
   line-height: 1.5;
   text-align: justify;
+}
+
+.acm-message--centered {
+  text-align: center;
 }
 
 .acm-actions {
@@ -94,6 +103,11 @@
 .acm-cancel:hover:not(:disabled) {
   background: rgba(34, 197, 94, 0.05);
   border-color: rgba(34, 197, 94, 0.3);
+}
+
+.acm-cancel--primary:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.06);
+  border-color: rgba(168, 85, 247, 0.3);
 }
 
 .acm-cancel:disabled {
@@ -139,6 +153,14 @@
 
 .acm-confirm--neutral:hover:not(:disabled) {
   background: #2563eb;
+}
+
+.acm-confirm--primary {
+  background: #a855f7;
+}
+
+.acm-confirm--primary:hover:not(:disabled) {
+  background: #9333ea;
 }
 
 .acm-confirm:disabled {

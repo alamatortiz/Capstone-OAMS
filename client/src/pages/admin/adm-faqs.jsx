@@ -1,25 +1,19 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, HelpCircle, Plus, Pencil, Trash2 } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { Calendar, ChevronLeft, Clock, HelpCircle, Plus, Pencil, Trash2 } from "lucide-react";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FormModal from "../../components/FormModal";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
-import { formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import "./adm-dashboard.css";
 import "./adm-faqs.css";
 
 const EMPTY_FORM = { question: "", answer: "" };
 
 export default function AdminFaqs() {
-  const { user: authUser } = useAuth();
-  const user = authUser
-    ? { ...authUser, college: authUser.departmentName ?? "N/A College", departmentAbbrev: authUser.departmentAbbrev ?? "CCS" }
-    : { name: "Admin", college: "", departmentAbbrev: "CCS" };
-
   const [faqs, setFaqs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -116,8 +110,6 @@ export default function AdminFaqs() {
           <FormModal
             show={isCreating}
             title="New FAQ"
-            description="Add a question and answer for your department's students."
-            icon={<HelpCircle />}
             onCancel={closeCreate}
             onSubmit={saveCreate}
             submitting={isSaving}
@@ -149,7 +141,6 @@ export default function AdminFaqs() {
           <FormModal
             show={!!editingFaq}
             title="Edit FAQ"
-            icon={<HelpCircle />}
             onCancel={closeEdit}
             onSubmit={saveEdit}
             submitting={isSaving}
@@ -182,6 +173,8 @@ export default function AdminFaqs() {
             message="Delete this question and answer permanently? This can't be undone."
             confirmText="Delete"
             variant="danger"
+            icon={<Trash2 />}
+            centered
             onConfirm={handleDelete}
             onCancel={() => setDeleteId(null)}
           />
@@ -199,7 +192,7 @@ export default function AdminFaqs() {
           icon={<HelpCircle />}
           iconClassName="faq-title-icon"
           title="FAQ Management"
-          subtitle={`Manage frequently asked questions for ${user?.college || "your department"}`}
+          subtitle="Manage frequently asked questions within your department."
           headerClassName="faq-header-row"
           breadcrumbClassName="page-breadcrumb"
           titleSectionClassName="faq-title-section"
@@ -226,10 +219,12 @@ export default function AdminFaqs() {
                 <div className="faq-item-content">
                   <h3 className="faq-item-question">{faq.question}</h3>
                   <p className="faq-item-answer">{faq.answer}</p>
-                  <p className="faq-item-meta">
-                    Added {formatManilaDateTime(faq.createdAt, { month: "long" })}
-                    {faq.createdBy ? ` by ${faq.createdBy}` : ""}
-                  </p>
+                  <div className="faq-item-meta">
+                    <span className="faq-item-meta-label">Added</span>
+                    <span className="faq-item-meta-date"><Calendar />{formatManilaDate(faq.createdAt, { month: "short", day: "numeric", year: "numeric" })}</span>
+                    <span className="faq-item-meta-time"><Clock />{formatManilaTime(faq.createdAt)}</span>
+                    {faq.createdBy && <span className="faq-item-meta-author">Posted by {faq.createdBy}</span>}
+                  </div>
                 </div>
                 <div className="faq-item-actions">
                   <button className="faq-action-btn" onClick={() => openEdit(faq)}>

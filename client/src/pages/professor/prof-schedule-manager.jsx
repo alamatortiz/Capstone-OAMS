@@ -106,6 +106,7 @@ export default function ProfessorScheduleManager() {
   const [addDays, setAddDays] = useState([]);           // string[] (single-item when editing)
   const [addStart, setAddStart] = useState("");
   const [addEnd, setAddEnd] = useState("");
+  const [endCustom, setEndCustom] = useState(false); // End Time picked via "Custom time…" (free time input)
   const [addLocation, setAddLocation] = useState("");
   const [showOtherLocation, setShowOtherLocation] = useState(false);
   const [addMaxStudents, setAddMaxStudents] = useState("");
@@ -157,6 +158,7 @@ export default function ProfessorScheduleManager() {
     setAddDays(day ? [day] : []);
     setAddStart("");
     setAddEnd("");
+    setEndCustom(false);
     setAddLocation("");
     setShowOtherLocation(false);
     setAddMaxStudents("");
@@ -172,6 +174,7 @@ export default function ProfessorScheduleManager() {
     setAddDays([day]);
     setAddStart(slot.start_time.slice(0, 5));
     setAddEnd(slot.end_time.slice(0, 5));
+    setEndCustom(false);
     setAddLocation(slot.location ?? "");
     setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
     setAddMaxStudents(slot.max_students != null ? String(slot.max_students) : "");
@@ -333,7 +336,7 @@ export default function ProfessorScheduleManager() {
 
   const selectedSlots = selectedDay ? (slotsByDay[selectedDay] ?? []) : [];
 
-  const endOptions = getEndTimeOptions(addStart, addEnd);
+  const endOptions = getEndTimeOptions(addStart, endCustom ? "" : addEnd);
   // Locks the Add/Edit modal's fields while the save-confirmation overlay is
   // showing, so a keyboard user can't Tab past the confirmation into fields
   // hidden behind it and change them while a stale summary is displayed.
@@ -585,9 +588,17 @@ export default function ProfessorScheduleManager() {
                   <label>End Time *</label>
                   <select
                     className="sa-input sa-select"
-                    value={addEnd}
+                    value={endCustom ? "__custom__" : addEnd}
                     disabled={!addStart || modalLocked}
-                    onChange={(e) => setAddEnd(e.target.value)}
+                    onChange={(e) => {
+                      if (e.target.value === "__custom__") {
+                        setEndCustom(true);
+                        setAddEnd("");
+                      } else {
+                        setEndCustom(false);
+                        setAddEnd(e.target.value);
+                      }
+                    }}
                   >
                     <option value="">
                       {!addStart ? "Select a start time first"
@@ -599,8 +610,19 @@ export default function ProfessorScheduleManager() {
                         {fmt12(o.value)} ({formatDuration(o.duration)})
                       </option>
                     ))}
+                    {addStart && <option value="__custom__">Custom time…</option>}
                   </select>
-                  {addStart && endOptions.length === 0 && (
+                  {endCustom && (
+                    <input
+                      className="sa-input"
+                      type="time"
+                      value={addEnd}
+                      min={addStart}
+                      onChange={(e) => setAddEnd(e.target.value)}
+                      disabled={modalLocked}
+                    />
+                  )}
+                  {addStart && !endCustom && endOptions.length === 0 && (
                     <p className="sa-field-hint sa-field-hint--warning">
                       No end times available — pick a start time before 11:59 PM.
                     </p>
@@ -704,7 +726,8 @@ export default function ProfessorScheduleManager() {
         show={showSaveConfirm}
         onCancel={() => setShowSaveConfirm(false)}
         onConfirm={handleConfirmSave}
-        variant="success"
+        variant="primary"
+        centered
         title={editingId ? "Save these changes?" : "Add this time slot?"}
         message={
           <>

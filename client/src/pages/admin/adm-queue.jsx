@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "../../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Users } from "lucide-react";
 import "./adm-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -10,15 +9,30 @@ import AdminPageShell from "../../components/AdminPageShell";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
+import FilterSelect from "../../components/FilterSelect";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { formatTimeString, getManilaDateString } from "../../utils/dateTime";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────
-const QueueIconNav = () => (
+const SlidersIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
+    <line x1="4" y1="21" x2="4" y2="14"></line>
+    <line x1="4" y1="10" x2="4" y2="3"></line>
+    <line x1="12" y1="21" x2="12" y2="12"></line>
+    <line x1="12" y1="8" x2="12" y2="3"></line>
+    <line x1="20" y1="21" x2="20" y2="16"></line>
+    <line x1="20" y1="12" x2="20" y2="3"></line>
+    <line x1="1" y1="14" x2="7" y2="14"></line>
+    <line x1="9" y1="8" x2="15" y2="8"></line>
+    <line x1="17" y1="16" x2="23" y2="16"></line>
+  </svg>
+);
+
+const EyeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
   </svg>
 );
 
@@ -82,20 +96,6 @@ const TrendingUpIcon = ({ className }) => (
   </svg>
 );
 
-const BuildingIcon = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="9 18 9 8 15 8 15 18" />
-    <polyline points="6 18 3 18 3 7 21 7 21 18 18 18" />
-    <line x1="9" y1="13" x2="15" y2="13" />
-  </svg>
-);
-
 const RefreshIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="23 4 23 10 17 10"></polyline>
@@ -134,8 +134,8 @@ const PlusCircleIcon = ({ className }) => (
   </svg>
 );
 
-const ChevronDownIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const ChevronDownIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
@@ -143,21 +143,6 @@ const ChevronDownIcon = () => (
 export default function AdminQueue() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
-  const user = authUser
-    ? {
-        ...authUser,
-        college: authUser.departmentName ?? "N/A College",
-        employeeId: authUser.employeeId ?? "",
-        departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
-      }
-    : {
-        name: "Admin",
-        role: "admin",
-        college: "",
-        employeeId: "",
-        departmentAbbrev: "CCS",
-      };
 
   const [monitoringQueueId, setMonitoringQueueId] = useState(null);
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
@@ -449,56 +434,48 @@ export default function AdminQueue() {
           <div className="queue-monitoring-container">
             <div className="queue-monitoring-topbar">
               <button
-                className="btn-back-queue"
-                onClick={() => setMonitoringQueueId(null)}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <line x1="19" y1="12" x2="5" y2="12"></line>
-                  <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back to Queue List
-              </button>
-              {/* refresh icon aligned to the right edge of the back button */}
-              <button
                 className="btn-refresh-queue queue-monitoring-refresh"
                 onClick={fetchQueueDetails}
+                aria-label="Refresh queue data"
               >
                 <RefreshIcon />
               </button>
+              <PageHeader
+                breadcrumb={
+                  <button
+                    className="page-breadcrumb-link"
+                    onClick={() => setMonitoringQueueId(null)}
+                  >
+                    <ChevronLeft />
+                    Queue Management
+                  </button>
+                }
+                icon={<Users className="icon" />}
+                iconClassName="aq-title-icon"
+                title={monitoringQueue.queueType}
+                subtitle={monitoringQueue.department}
+                headerClassName="aq-page-header"
+                breadcrumbClassName="page-breadcrumb"
+                titleSectionClassName="aq-title-section"
+                titleClassName="aq-title"
+                subtitleClassName="aq-subtitle"
+              />
             </div>
 
-            {/* Queue Header */}
-            <div className="queue-monitoring-header">
-              <div className="queue-header-content">
-                <div className="queue-monitoring-title-icon">
-                  <QueueIconNav />
-                </div>
-                <div className="queue-header-text">
-                  <h1 className="queue-monitoring-title">
-                    {monitoringQueue.queueType}
-                  </h1>
-                  <p className="queue-monitoring-college">
-                    {monitoringQueue.college}
-                  </p>
-                </div>
-              </div>
-              {(monitoringQueue.status === "full" || monitoringQueue.status === "expired") && (
-                <p className="queue-monitoring-status-note">
-                  {monitoringQueue.status === "full"
-                    ? "This queue is full — closed to new joins, but you can still call and serve everyone already in line."
-                    : "This queue's hours have ended — closed to new joins, but you can still call and serve everyone already in line."}
-                </p>
-              )}
-            </div>
+            {(monitoringQueue.status === "full" || monitoringQueue.status === "expired") && (
+              <p className="queue-monitoring-status-note">
+                {monitoringQueue.status === "full"
+                  ? "This queue is full — closed to new joins, but you can still call and serve everyone already in line."
+                  : "This queue's hours have ended — closed to new joins, but you can still call and serve everyone already in line."}
+              </p>
+            )}
 
             {/* Stats Cards */}
             <div className="queue-monitoring-stats">
               <div className="queue-stat-card">
+                <div className="queue-stat-card-icon-box">
+                  <ClockIcon />
+                </div>
                 <div className="queue-stat-label">
                   Currently Serving
                   {monitoringQueue.currentlyServingStudentNumber && (
@@ -508,334 +485,266 @@ export default function AdminQueue() {
                 <div className="queue-stat-value">
                   {monitoringQueue.currentlyServingStudentNumber || "—"}
                 </div>
-                <ClockIcon className="queue-stat-icon" />
               </div>
               <div className="queue-stat-card">
+                <div className="queue-stat-card-icon-box">
+                  <UsersIcon />
+                </div>
                 <div className="queue-stat-label">Students Waiting</div>
-                <div className="queue-stat-value" style={{ color: "#3b82f6" }}>
+                <div className="queue-stat-value">
                   {monitoringQueue.currentCount}
                 </div>
-                <UsersIcon className="queue-stat-icon" />
               </div>
               <div className="queue-stat-card">
+                <div className="queue-stat-card-icon-box">
+                  <ClockIcon />
+                </div>
                 <div className="queue-stat-label">Avg Service Time</div>
-                <div className="queue-stat-value" style={{ color: "#3b82f6" }}>
+                <div className="queue-stat-value">
                   {formatAvgService(monitoringQueue.avgServiceMinutes)}
                 </div>
-                <ClockIcon className="queue-stat-icon" />
               </div>
             </div>
 
-            {/* Main Content Grid */}
-            <div className="queue-monitoring-grid">
-              {/* Left Column */}
-              <div className="queue-monitoring-left">
-                {/* Queue Progress */}
-                <div className="queue-detail-card">
-                  <div className="queue-detail-header">
-                    <h3>Queue Progress</h3>
-                  </div>
-                  <div className="queue-detail-content">
-                    <QueueProgressBars
-                      occupancyCurrent={monitoringQueue.totalInQueue ?? 0}
-                      occupancyTotal={monitoringQueue.maxCapacity ?? 0}
-                      occupancyPercent={monitoringQueue.queueOccupancyPercent ?? 0}
-                      servicedCurrent={monitoringQueue.servedCount ?? 0}
-                      servicedTotal={monitoringQueue.totalInQueue ?? 0}
-                      servicedPercent={monitoringQueue.servicedPercent ?? 0}
-                    />
-                    <div className="progress-stats">
-                      <div className="progress-stat">
-                        <span className="progress-stat-label">
-                          Total Served Today
-                        </span>
-                        <span className="progress-stat-value">
-                          {monitoringQueue.servedCount}
-                        </span>
-                      </div>
-                      <div className="progress-stat">
-                        <span className="progress-stat-label">
-                          Est. Wait Time
-                        </span>
-                        <span className="progress-stat-value">
-                          {estimatedWaitMinutes != null
-                            ? `${estimatedWaitMinutes} mins`
-                            : "N/A"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Queue Actions */}
-                <div className="queue-detail-card">
-                  <div className="queue-detail-header">
-                    <h3>Queue Actions</h3>
-                  </div>
-                  <div className="queue-actions-grid">
-                    <button
-                      className="queue-action-btn queue-action-btn--primary"
-                      onClick={() => handleCallNext(monitoringQueue.id)}
-                      disabled={
-                        !!monitoringQueue.currentlyServingStudentNumber ||
-                        monitoringQueue.currentCount === 0 ||
-                        monitoringQueue.status === "paused"
-                      }
-                      title={
-                        monitoringQueue.status === "paused"
-                          ? "Queue is paused — resume it before calling students"
-                          : undefined
-                      }
-                    >
-                      <UsersIcon />
-                      Call Next
-                    </button>
-                    {monitoringQueue.status === "paused" ? (
-                      <button
-                        className="queue-action-btn queue-action-btn--success"
-                        onClick={() => handleResumeQueue(monitoringQueue.id)}
-                      >
-                        <AlertCircleIcon />
-                        Resume Queue
-                      </button>
-                    ) : (
-                      <button
-                        className="queue-action-btn queue-action-btn--warning"
-                        onClick={() => handlePauseQueue(monitoringQueue.id)}
-                        disabled={monitoringQueue.status !== "open"}
-                        title={
-                          monitoringQueue.status !== "open"
-                            ? "Only an open queue can be paused"
-                            : undefined
-                        }
-                      >
-                        <AlertCircleIcon />
-                        Pause Queue
-                      </button>
-                    )}
-                    <button
-                      className="queue-action-btn queue-action-btn--danger"
-                      onClick={() => handleStopQueue(monitoringQueue.id)}
-                    >
-                      <CloseIcon />
-                      Stop Queue
-                    </button>
-                    <button
-                      className="queue-action-btn queue-action-btn--neutral"
-                      onClick={handleExportQueueData}
-                    >
-                      <TrendingUpIcon />
-                      Export Data
-                    </button>
-                  </div>
-                </div>
-
-                {/* Currently Serving */}
-                <div className="queue-detail-card">
-                  <div className="queue-detail-header">
-                    <h3>
-                      <ClockIcon />
-                      Currently Serving
-                    </h3>
-                  </div>
-                  <div className="queue-detail-content">
-                    <p className="professor-name">
-                      {monitoringQueue.currentlyServingStudentNumber ||
-                        "No student is currently being served"}
-                    </p>
-                    <p className="professor-label">
-                      {monitoringQueue.queueType}
-                      {monitoringQueue.currentlyServingStudentNumber && (
-                        <>
-                          {" • "}
-                          {monitoringQueue.currentlyServingArrivedAt ? "Being Served" : "Called — awaiting arrival"}
-                        </>
-                      )}
-                    </p>
-                    {monitoringQueue.currentlyServingStudentNumber && !monitoringQueue.currentlyServingArrivedAt && (
-                      <button
-                        className="queue-action-btn queue-action-btn--primary"
-                        style={{ width: "100%", marginTop: "0.75rem" }}
-                        onClick={() => handleMarkArrived(monitoringQueue.id)}
-                      >
-                        <AlertCircleIcon />
-                        Mark Arrived
-                      </button>
-                    )}
-                    <button
-                      className="queue-action-btn queue-action-btn--success"
-                      style={{ width: "100%", marginTop: "0.75rem" }}
-                      onClick={() => handleMarkAsServed(monitoringQueue.id)}
-                      disabled={!monitoringQueue.currentlyServingStudentNumber}
-                    >
-                      <AlertCircleIcon />
-                      Mark as Served
-                    </button>
-                    <button
-                      className="queue-action-btn queue-action-btn--danger"
-                      style={{ width: "100%", marginTop: "0.5rem" }}
-                      onClick={() => setSkipReasonModal(true)}
-                      disabled={!monitoringQueue.currentlyServingStudentNumber}
-                    >
-                      <CloseIcon />
-                      Skip / No-Show
-                    </button>
-                  </div>
-                </div>
-
-                {/* Queue Entries */}
-                <div className="queue-detail-card">
-                  <div className="queue-detail-header">
-                    <h3>
-                      <UsersIcon />
-                      Queue Entries ({queueEntries.length})
-                    </h3>
-                  </div>
-                  <div className="queue-entries-list">
-                    {loadingEntries ? (
-                      <p className="queue-entries-empty">Loading entries…</p>
-                    ) : queueEntries.length === 0 ? (
-                      <p className="queue-entries-empty">No students in queue.</p>
-                    ) : (
-                      paginatedEntries.map((entry, index) => (
-                        <div
-                          key={entry.queueNumber}
-                          className={`queue-entry-item ${entry.status === "serving" ? "is-serving" : ""}`}
-                        >
-                          <div className="queue-entry-top">
-                            <div className="queue-entry-number">{entriesStartIndex + index + 1}</div>
-                            <div className="queue-entry-info">
-                              <h4 className="queue-entry-name">{entry.studentName}</h4>
-                              <p className="queue-entry-id">ID: {entry.studentId}</p>
-                            </div>
-                            <div className="queue-entry-badges">
-                              <span className={`queue-entry-status queue-entry-status--${entry.status}`}>
-                                {getEntryStatusLabel(entry)}
-                              </span>
-                              <span className="queue-entry-queue-number">{entry.queueNumber}</span>
-                            </div>
-                          </div>
-                          <div className="queue-entry-details">
-                            <p className="queue-entry-concern">
-                              <strong>Concern:</strong> {entry.concern}
-                            </p>
-                            <p className="queue-entry-time">
-                              <ClockIcon />
-                              Joined at {entry.joinedAt}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  {!loadingEntries && queueEntries.length > ENTRIES_PER_PAGE && (
-                    <div className="queue-entries-pagination">
-                      <button
-                        className="queue-entries-page-btn"
-                        onClick={() => setEntriesPage((p) => Math.max(0, p - 1))}
-                        disabled={currentEntriesPage === 0}
-                        aria-label="Previous batch"
-                      >
-                        <ChevronLeft />
-                      </button>
-                      <span className="queue-entries-page-label">
-                        {entriesStartIndex + 1}–{Math.min(queueEntries.length, entriesStartIndex + ENTRIES_PER_PAGE)} of {queueEntries.length}
-                      </span>
-                      <button
-                        className="queue-entries-page-btn"
-                        onClick={() => setEntriesPage((p) => Math.min(totalEntryPages - 1, p + 1))}
-                        disabled={currentEntriesPage >= totalEntryPages - 1}
-                        aria-label="Next batch"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
+            {/* Queue Overview */}
+            <div className="queue-detail-card queue-overview-card">
+              <div className="queue-detail-header">
+                <h3>
+                  <ActivityIcon />
+                  Queue Overview
+                </h3>
+                <div className={`status-badge status-badge--${monitoringQueue.status}`}>
+                  {getQueueStatusLabel(monitoringQueue.status)}
                 </div>
               </div>
-
-              {/* Right Column */}
-              <div className="queue-monitoring-right">
-                {/* Location */}
-                <div className="queue-detail-card">
-                  <div className="queue-detail-header">
-                    <h3>
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                        <circle cx="12" cy="10" r="3"></circle>
-                      </svg>
-                      Location
-                    </h3>
-                  </div>
-                  <div className="queue-detail-content">
-                    <p className="queue-detail-text">
+              <div className="queue-detail-content">
+                <div className="queue-overview-grid">
+                  <div className="queue-overview-item">
+                    <span className="queue-overview-label">Location</span>
+                    <span className="queue-overview-value">
                       {monitoringQueue.location || "Not specified"}
-                    </p>
+                    </span>
+                  </div>
+                  <div className="queue-overview-item">
+                    <span className="queue-overview-label">Service Hours</span>
+                    <span className="queue-overview-value">
+                      {monitoringQueue.serviceHours
+                        ? `${formatTimeString(monitoringQueue.serviceHours.start)} – ${formatTimeString(monitoringQueue.serviceHours.end)}`
+                        : "Not specified"}
+                    </span>
+                  </div>
+                  <div className="queue-overview-item">
+                    <span className="queue-overview-label">Total Served Today</span>
+                    <span className="queue-overview-value">{monitoringQueue.servedCount}</span>
+                  </div>
+                  <div className="queue-overview-item">
+                    <span className="queue-overview-label">Est. Wait Time</span>
+                    <span className="queue-overview-value">
+                      {estimatedWaitMinutes != null ? `${estimatedWaitMinutes} mins` : "N/A"}
+                    </span>
                   </div>
                 </div>
-
-                {/* Service Hours */}
-                {monitoringQueue.serviceHours && (
-                  <div className="queue-detail-card">
-                    <div className="queue-detail-header">
-                      <h3>
-                        <ClockIcon />
-                        Service Hours
-                      </h3>
-                    </div>
-                    <div className="queue-detail-content">
-                      <div
-                        className="service-hours-row"
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span className="service-hours-label">Opens</span>
-                        <span className="service-hours-value">
-                          {formatTimeString(monitoringQueue.serviceHours.start)}
-                        </span>
-                      </div>
-                      <div
-                        className="service-hours-row"
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span className="service-hours-label">Closes</span>
-                        <span className="service-hours-value">
-                          {formatTimeString(monitoringQueue.serviceHours.end)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Status */}
-                <div className="queue-detail-card">
-                  <div className="queue-detail-header">
-                    <h3>
-                      <ActivityIcon />
-                      Status
-                    </h3>
-                  </div>
-                  <div className="queue-detail-content">
-                    <div className={`status-badge status-badge--${monitoringQueue.status}`}>
-                      {getQueueStatusLabel(monitoringQueue.status)}
-                    </div>
-                  </div>
-                </div>
+                <QueueProgressBars
+                  occupancyCurrent={monitoringQueue.totalInQueue ?? 0}
+                  occupancyTotal={monitoringQueue.maxCapacity ?? 0}
+                  occupancyPercent={monitoringQueue.queueOccupancyPercent ?? 0}
+                  servicedCurrent={monitoringQueue.servedCount ?? 0}
+                  servicedTotal={monitoringQueue.totalInQueue ?? 0}
+                  servicedPercent={monitoringQueue.servicedPercent ?? 0}
+                />
               </div>
+            </div>
+
+            {/* Queue Actions */}
+            <div className="queue-detail-card">
+              <div className="queue-detail-header">
+                <h3>
+                  <SlidersIcon />
+                  Queue Actions
+                </h3>
+              </div>
+              <div className="queue-actions-grid">
+                <button
+                  className="queue-action-btn queue-action-btn--primary"
+                  onClick={() => handleCallNext(monitoringQueue.id)}
+                  disabled={
+                    !!monitoringQueue.currentlyServingStudentNumber ||
+                    monitoringQueue.currentCount === 0 ||
+                    monitoringQueue.status === "paused"
+                  }
+                  title={
+                    monitoringQueue.status === "paused"
+                      ? "Queue is paused — resume it before calling students"
+                      : undefined
+                  }
+                >
+                  <UsersIcon />
+                  Call Next
+                </button>
+                {monitoringQueue.status === "paused" ? (
+                  <button
+                    className="queue-action-btn queue-action-btn--success"
+                    onClick={() => handleResumeQueue(monitoringQueue.id)}
+                  >
+                    <AlertCircleIcon />
+                    Resume Queue
+                  </button>
+                ) : (
+                  <button
+                    className="queue-action-btn queue-action-btn--warning"
+                    onClick={() => handlePauseQueue(monitoringQueue.id)}
+                    disabled={monitoringQueue.status !== "open"}
+                    title={
+                      monitoringQueue.status !== "open"
+                        ? "Only an open queue can be paused"
+                        : undefined
+                    }
+                  >
+                    <AlertCircleIcon />
+                    Pause Queue
+                  </button>
+                )}
+                <button
+                  className="queue-action-btn queue-action-btn--danger"
+                  onClick={() => handleStopQueue(monitoringQueue.id)}
+                >
+                  <CloseIcon />
+                  Stop Queue
+                </button>
+                <button
+                  className="queue-action-btn queue-action-btn--neutral"
+                  onClick={handleExportQueueData}
+                >
+                  <TrendingUpIcon />
+                  Export Data
+                </button>
+              </div>
+            </div>
+
+            {/* Currently Serving */}
+            <div className="queue-detail-card">
+              <div className="queue-detail-header">
+                <h3>
+                  <ClockIcon />
+                  Currently Serving
+                </h3>
+              </div>
+              <div className="queue-detail-content">
+                <p className="queue-serving-name">
+                  {monitoringQueue.currentlyServingStudentNumber ||
+                    "No student is currently being served"}
+                </p>
+                <p className="queue-serving-label">
+                  {monitoringQueue.queueType}
+                  {monitoringQueue.currentlyServingStudentNumber && (
+                    <>
+                      {" • "}
+                      {monitoringQueue.currentlyServingArrivedAt ? "Being Served" : "Called — awaiting arrival"}
+                    </>
+                  )}
+                </p>
+                {monitoringQueue.currentlyServingStudentNumber && !monitoringQueue.currentlyServingArrivedAt && (
+                  <button
+                    className="queue-action-btn queue-action-btn--primary"
+                    style={{ width: "100%", marginTop: "0.75rem" }}
+                    onClick={() => handleMarkArrived(monitoringQueue.id)}
+                  >
+                    <AlertCircleIcon />
+                    Mark Arrived
+                  </button>
+                )}
+                <button
+                  className="queue-action-btn queue-action-btn--success"
+                  style={{ width: "100%", marginTop: "0.75rem" }}
+                  onClick={() => handleMarkAsServed(monitoringQueue.id)}
+                  disabled={!monitoringQueue.currentlyServingStudentNumber}
+                >
+                  <AlertCircleIcon />
+                  Mark as Served
+                </button>
+                <button
+                  className="queue-action-btn queue-action-btn--danger"
+                  style={{ width: "100%", marginTop: "0.5rem" }}
+                  onClick={() => setSkipReasonModal(true)}
+                  disabled={!monitoringQueue.currentlyServingStudentNumber}
+                >
+                  <CloseIcon />
+                  Skip / No-Show
+                </button>
+              </div>
+            </div>
+
+            {/* Queue Entries */}
+            <div className="queue-detail-card">
+              <div className="queue-detail-header">
+                <h3>
+                  <UsersIcon />
+                  Queue Entries
+                  <span className="queue-entries-count-badge">{queueEntries.length}</span>
+                </h3>
+              </div>
+              <div className="queue-entries-list">
+                {loadingEntries ? (
+                  <p className="queue-entries-empty">Loading entries…</p>
+                ) : queueEntries.length === 0 ? (
+                  <p className="queue-entries-empty">No students in queue.</p>
+                ) : (
+                  paginatedEntries.map((entry, index) => (
+                    <div
+                      key={entry.queueNumber}
+                      className={`queue-entry-item ${entry.status === "serving" ? "is-serving" : ""}`}
+                    >
+                      <div className="queue-entry-top">
+                        <div className="queue-entry-number">{entriesStartIndex + index + 1}</div>
+                        <div className="queue-entry-info">
+                          <h4 className="queue-entry-name">{entry.studentName}</h4>
+                          <p className="queue-entry-id">ID: {entry.studentId}</p>
+                        </div>
+                        <div className="queue-entry-badges">
+                          <span className={`queue-entry-status queue-entry-status--${entry.status}`}>
+                            {getEntryStatusLabel(entry)}
+                          </span>
+                          <span className="queue-entry-queue-number">{entry.queueNumber}</span>
+                        </div>
+                      </div>
+                      <div className="queue-entry-details">
+                        <p className="queue-entry-concern">
+                          <strong>Concern:</strong> {entry.concern}
+                        </p>
+                        <p className="queue-entry-time">
+                          <ClockIcon />
+                          Joined at {entry.joinedAt}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {!loadingEntries && queueEntries.length > ENTRIES_PER_PAGE && (
+                <div className="queue-entries-pagination">
+                  <button
+                    className="queue-entries-page-btn"
+                    onClick={() => setEntriesPage((p) => Math.max(0, p - 1))}
+                    disabled={currentEntriesPage === 0}
+                    aria-label="Previous batch"
+                  >
+                    <ChevronLeft />
+                  </button>
+                  <span className="queue-entries-page-label">
+                    {entriesStartIndex + 1}–{Math.min(queueEntries.length, entriesStartIndex + ENTRIES_PER_PAGE)} of {queueEntries.length}
+                  </span>
+                  <button
+                    className="queue-entries-page-btn"
+                    onClick={() => setEntriesPage((p) => Math.min(totalEntryPages - 1, p + 1))}
+                    disabled={currentEntriesPage >= totalEntryPages - 1}
+                    aria-label="Next batch"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
       </AdminPageShell>
@@ -851,10 +760,10 @@ export default function AdminQueue() {
         <div className="queue-page-container">
           <PageHeader
             breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
-            icon={<QueueIconNav />}
+            icon={<Users className="icon" />}
             iconClassName="aq-title-icon"
-            title="Centralized Queue Management"
-            subtitle={`Monitor and control queues for ${user?.college}`}
+            title="Queue Management"
+            subtitle="Manage and monitor queues within your department."
             headerClassName="aq-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="aq-title-section"
@@ -884,168 +793,145 @@ export default function AdminQueue() {
           {/* System Stats */}
           <div className="queue-system-stats">
             <div className="queue-stat-box">
-              <div className="queue-stat-box-content">
-                <div className="queue-stat-box-text">
-                  <p className="queue-stat-box-label">Active Queues</p>
-                  <p className="queue-stat-box-value">
-                    {systemStats.totalQueues}
-                  </p>
-                </div>
-                <ActivityIcon className="queue-stat-box-icon" />
+              <div className="queue-stat-box-icon-box">
+                <ActivityIcon />
               </div>
+              <p className="queue-stat-box-label">Active Queues</p>
+              <p className="queue-stat-box-value">{systemStats.totalQueues}</p>
             </div>
             <div className="queue-stat-box">
-              <div className="queue-stat-box-content">
-                <div className="queue-stat-box-text">
-                  <p className="queue-stat-box-label">Total Waiting</p>
-                  <p className="queue-stat-box-value">
-                    {systemStats.totalWaiting}
-                  </p>
-                </div>
-                <UsersIcon className="queue-stat-box-icon" />
+              <div className="queue-stat-box-icon-box">
+                <UsersIcon />
               </div>
+              <p className="queue-stat-box-label">Total Waiting</p>
+              <p className="queue-stat-box-value">{systemStats.totalWaiting}</p>
             </div>
             <div className="queue-stat-box">
-              <div className="queue-stat-box-content">
-                <div className="queue-stat-box-text">
-                  <p className="queue-stat-box-label">Avg Wait Time</p>
-                  <p className="queue-stat-box-value">
-                    {systemStats.avgWaitTime}
-                  </p>
-                </div>
-                <ClockIcon className="queue-stat-box-icon" />
+              <div className="queue-stat-box-icon-box">
+                <ClockIcon />
               </div>
+              <p className="queue-stat-box-label">Avg Wait Time</p>
+              <p className="queue-stat-box-value">{systemStats.avgWaitTime}</p>
             </div>
             <div className="queue-stat-box">
-              <div className="queue-stat-box-content">
-                <div className="queue-stat-box-text">
-                  <p className="queue-stat-box-label">Operational</p>
-                  <p className="queue-stat-box-value">
-                    {systemStats.operational}/{systemStats.totalQueues}
-                  </p>
-                </div>
-                <TrendingUpIcon className="queue-stat-box-icon" />
+              <div className="queue-stat-box-icon-box">
+                <TrendingUpIcon />
               </div>
+              <p className="queue-stat-box-label">Operational</p>
+              <p className="queue-stat-box-value">
+                {systemStats.operational}/{systemStats.totalQueues}
+              </p>
             </div>
           </div>
 
-          {/* Active Queue Details */}
-          <div className="queue-details-section">
-            <div className="queue-section-header">
-              <div className="queue-section-title">
-                <h2>Active Queue Details</h2>
-                <p>Queue information for {user?.college}</p>
+          {/* Filter */}
+          {serviceTypes.length > 0 && (
+            <div className="filters-card">
+              <div className="filters-header">
+                <h3 className="filters-title">Queue Filter</h3>
+                <p className="filters-description">
+                  Filter active queues by service type.
+                </p>
               </div>
-              {serviceTypes.length > 0 && (
-                <div className="queue-section-controls">
-                  <div className="queue-filter-wrapper">
-                    <select
-                      className="queue-filter-select"
-                      value={serviceTypeFilter}
-                      onChange={(e) => setServiceTypeFilter(e.target.value)}
-                      aria-label="Filter by service type"
-                    >
-                      <option value="all">All Service Types</option>
-                      {serviceTypes.map((type) => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
-                    <span className="queue-filter-icon">
-                      <ChevronDownIcon />
-                    </span>
-                  </div>
-                </div>
-              )}
+              <div className="filters-grid">
+                <FilterSelect
+                  id="queue-filter-service-type"
+                  label="Service Type"
+                  value={serviceTypeFilter}
+                  onChange={(e) => setServiceTypeFilter(e.target.value)}
+                  options={[
+                    { value: "all", label: "All Service Types" },
+                    ...serviceTypes.map((type) => ({ value: type, label: type })),
+                  ]}
+                  chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+                />
+              </div>
             </div>
-            <div className="queue-details-list">
-              {loading ? (
-                <div className="queue-empty-state">
-                  <ActivityIcon />
-                  <p>Loading queues…</p>
-                </div>
-              ) : activeQueueDetails.length === 0 ? (
-                <div className="queue-empty-state">
-                  <ActivityIcon />
-                  <p>No active queues found</p>
-                </div>
-              ) : filteredQueueDetails.length === 0 ? (
-                <div className="queue-empty-state">
-                  <ActivityIcon />
-                  <p>No queues match this service type</p>
-                </div>
-              ) : (
-                filteredQueueDetails.map((detail) => (
-                  <div key={detail.id} className="queue-detail-row">
-                    <div className="queue-detail-info">
+          )}
+
+          {/* Active queue rows */}
+          <div className="queue-details-list">
+            {loading ? (
+              <div className="queue-empty-state">
+                <ActivityIcon />
+                <p>Loading queues…</p>
+              </div>
+            ) : activeQueueDetails.length === 0 ? (
+              <div className="queue-empty-state">
+                <ActivityIcon />
+                <h3>No Active Queues</h3>
+                <p>There are no open queues in your department yet.</p>
+              </div>
+            ) : filteredQueueDetails.length === 0 ? (
+              <div className="queue-empty-state">
+                <ActivityIcon />
+                <h3>No Active Queues</h3>
+                <p>Try adjusting the service-type filter.</p>
+              </div>
+            ) : (
+              filteredQueueDetails.map((detail) => (
+                <div key={detail.id} className="queue-detail-row">
+                  <div className="queue-detail-info">
                     <div className="queue-detail-header-row">
                       <img
                         src={getCollegeLogo(detail.college)}
                         alt={`${detail.college} logo`}
                         className="queue-detail-college-logo"
                       />
-                      <span className="queue-detail-abbrev">{detail.college}</span>
-                      <span className="queue-detail-service">{detail.queueType}</span>
-                    </div>
-
-                      <div className="queue-detail-grid">
-                        <div className="queue-detail-item">
-                          <span className="queue-detail-item-label">
-                            Currently Serving
-                          </span>
-                          <span className="queue-detail-item-value">
-                            {detail.currentlyServingStudentNumber || "—"}
-                          </span>
-                        </div>
-                        <div className="queue-detail-item">
-                          <span className="queue-detail-item-label">
-                            Waiting
-                          </span>
-                          <span className="queue-detail-item-value">
-                            {detail.currentCount} students
-                          </span>
-                        </div>
-                        <div className="queue-detail-item">
-                          <span className="queue-detail-item-label">
-                            Avg Service
-                          </span>
-                          <span className="queue-detail-item-value">
-                            {formatAvgService(detail.avgServiceMinutes)}
-                          </span>
-                        </div>
-                        {detail.location && (
-                          <div className="queue-detail-item">
-                            <span className="queue-detail-item-label">
-                              Location
-                            </span>
-                            <span className="queue-detail-item-value">
-                              {detail.location}
-                            </span>
-                          </div>
-                        )}
-                        {detail.serviceHours && (
-                          <div className="queue-detail-item">
-                            <span className="queue-detail-item-label">
-                              Service Hours
-                            </span>
-                            <span className="queue-detail-item-value">
-                              {formatTimeString(detail.serviceHours.start)} -{" "}
-                              {formatTimeString(detail.serviceHours.end)}
-                            </span>
-                          </div>
-                        )}
+                      <div className="queue-detail-heading">
+                        <h3 className="queue-detail-service">{detail.queueType}</h3>
+                        <span className="queue-detail-abbrev">{detail.college}</span>
                       </div>
                     </div>
-                    <button
-                      className="btn-monitor"
-                      onClick={() => { setMonitoringQueueId(detail.id); setEntriesPage(0); }}
-                    >
-                      <AlertCircleIcon />
-                      Monitor
-                    </button>
+
+                    <div className="queue-detail-grid">
+                      <div className="queue-detail-item">
+                        <span className="queue-detail-item-label">Currently Serving</span>
+                        <span className="queue-detail-item-value">
+                          {detail.currentlyServingStudentNumber || "—"}
+                        </span>
+                      </div>
+                      <div className="queue-detail-item">
+                        <span className="queue-detail-item-label">Waiting</span>
+                        <span className="queue-detail-item-value">
+                          {detail.currentCount} students
+                        </span>
+                      </div>
+                      <div className="queue-detail-item">
+                        <span className="queue-detail-item-label">Avg Service</span>
+                        <span className="queue-detail-item-value">
+                          {formatAvgService(detail.avgServiceMinutes)}
+                        </span>
+                      </div>
+                      {detail.location && (
+                        <div className="queue-detail-item">
+                          <span className="queue-detail-item-label">Location</span>
+                          <span className="queue-detail-item-value">
+                            {detail.location}
+                          </span>
+                        </div>
+                      )}
+                      {detail.serviceHours && (
+                        <div className="queue-detail-item">
+                          <span className="queue-detail-item-label">Service Hours</span>
+                          <span className="queue-detail-item-value">
+                            {formatTimeString(detail.serviceHours.start)} -{" "}
+                            {formatTimeString(detail.serviceHours.end)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
+                  <button
+                    className="btn-monitor"
+                    onClick={() => { setMonitoringQueueId(detail.id); setEntriesPage(0); }}
+                  >
+                    <EyeIcon />
+                    View Details
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
     </AdminPageShell>

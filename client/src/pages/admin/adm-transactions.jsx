@@ -50,6 +50,20 @@ const ClipboardListIcon = () => (
     <line x1="8" y1="15" x2="12" y2="15"></line>
   </svg>
 );
+const AlertCircleIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+  </svg>
+);
 const UserGroupIcon = () => (
   <svg
     className="icon"
@@ -418,19 +432,13 @@ export default function AdminTransaction() {
             icon={<ClipboardListIcon />}
             iconClassName="admin-transaction-title-icon"
             title="Transaction History"
-            subtitle="View all recent transactions within the office"
+            subtitle="View all recent transactions within the office."
             headerClassName="admin-transaction-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="admin-transaction-title-section"
             titleClassName="admin-transaction-title"
             subtitleClassName="admin-transaction-subtitle"
           />
-
-          {error && (
-            <div className="dash-error-banner" style={{ marginBottom: "1rem" }}>
-              {error}
-            </div>
-          )}
 
           {/* Department Statistics */}
           <div className="admin-transaction-stats-grid">
@@ -556,7 +564,13 @@ export default function AdminTransaction() {
               {loading ? (
                 <div className="admin-transaction-empty-state">
                   <ActivityIcon />
-                  <p>Loading transactions...</p>
+                  <h3>Loading transactions…</h3>
+                </div>
+              ) : error ? (
+                <div className="admin-transaction-empty-state">
+                  <AlertCircleIcon />
+                  <h3>Could not load transactions</h3>
+                  <p>{error}</p>
                 </div>
               ) : filteredTransactions.length === 0 ? (
                 <div className="admin-transaction-empty-state">

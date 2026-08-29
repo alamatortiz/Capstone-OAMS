@@ -549,11 +549,6 @@
 }
 
 .admin-transaction-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
   padding: 3rem 1.5rem;
   background: var(--card-bg);
   border: 1px solid rgba(34, 197, 94, 0.2);
@@ -566,19 +561,26 @@
   height: 3rem;
   color: var(--text-tertiary);
   stroke: currentColor;
+  margin: 0 auto 1rem;
 }
 
 .admin-transaction-empty-state h3 {
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0;
+  margin: 0 0 0.5rem 0;
 }
 
 .admin-transaction-empty-state p {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-transaction-empty-state {
+    padding: 2rem 1rem;
+  }
 }
 
 .admin-transaction-item {

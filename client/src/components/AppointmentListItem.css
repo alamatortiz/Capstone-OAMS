@@ -82,12 +82,12 @@
 .apt-list-appt-type {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .apt-list-appt-type-label {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
@@ -97,13 +97,19 @@
 
 .apt-list-appt-type-value {
   display: inline-block;
-  padding: 0.15rem 0.6rem;
+  padding: 0.3rem 0.85rem;
   background: rgba(168, 85, 247, 0.12);
   color: #a855f7;
   border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   font-weight: 600;
+}
+
+[data-theme="light"] .apt-list-appt-type-value {
+  color: #9333ea;
+  background: rgba(147, 51, 234, 0.1);
+  border-color: rgba(147, 51, 234, 0.25);
 }
 
 /* ─── Date/Time/Location/Purpose grid ─────────────────────────────────────── */
@@ -154,10 +160,14 @@
 .apt-list-card-field-full p {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #a855f7;
   margin: 0;
   line-height: 1.5;
   transition: color 0.3s ease;
+}
+
+[data-theme="light"] .apt-list-card-field-full p {
+  color: #9333ea;
 }
 
 /* ─── Status badge — duplicated from stud-appointment-status.css, not moved:

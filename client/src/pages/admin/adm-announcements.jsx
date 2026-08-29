@@ -1,16 +1,14 @@
 import { useState, useEffect } from "react";
-import editIcon from "../../assets/edit_icon.png";
-import deleteIcon from "../../assets/delete_icon.png";
 import "./adm-dashboard.css";
 import "./adm-announcements.css";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, HelpCircle, Megaphone } from "lucide-react";
+import { Archive, Calendar, ChevronLeft, ChevronRight, Clock, HelpCircle, Megaphone, Pencil, Trash2 } from "lucide-react";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import api from "../../utils/api";
-import { formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaDateTime, formatManilaTime } from "../../utils/dateTime";
 
 // ── Page-only icons ───────────────────────────────────────────────────────────
 const PlusIconSmall = () => (
@@ -146,6 +144,15 @@ const formatPostedLabel = (announcement) => {
   } catch {
     return `${label}: ${announcement.date}`;
   }
+};
+
+// Per-tab empty-state copy (mirrors stud-announcements.jsx's emptyStateCopy),
+// worded for an admin audience.
+const EMPTY_COPY = {
+  active:   { title: "No Active Announcements",   description: "You haven't posted any active announcements yet." },
+  pinned:   { title: "No Pinned Announcements",   description: "You haven't pinned any announcements yet." },
+  unpinned: { title: "No Unpinned Announcements", description: "Every active announcement is currently pinned." },
+  archived: { title: "No Archived Announcements", description: "You haven't archived any announcements yet." },
 };
 
 export default function AdminAnnouncements() {
@@ -471,7 +478,7 @@ export default function AdminAnnouncements() {
                 <div className="ann-modal-header">
                   <div>
                     <h3 className="ann-modal-title"><EyeIcon /> Announcement Details</h3>
-                    <p className="ann-modal-desc">View complete information about this announcement</p>
+                    <p className="ann-modal-desc">View complete information about this announcement.</p>
                   </div>
                   <button className="ann-modal-close" onClick={() => setViewingAnnouncement(null)} aria-label="Close">
                     <XIcon />
@@ -544,15 +551,15 @@ export default function AdminAnnouncements() {
           {/* Edit Modal */}
           {editingAnnouncement && (
             <div className="ann-modal-overlay">
-              <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="ann-modal ann-modal--form" onClick={(e) => e.stopPropagation()}>
                 <div className="ann-modal-header">
                   <div>
                     <h3 className="ann-modal-title">Edit Announcement</h3>
-                    <p className="ann-modal-desc">Make changes and save when you're done.</p>
                   </div>
                   <button className="ann-modal-close" onClick={closeEdit} aria-label="Close"><XIcon /></button>
                 </div>
 
+                <div className="ann-form-body">
                 <div className="ann-field">
                   <label htmlFor="edit-title">Title *</label>
                   <input id="edit-title" className="ann-input" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
@@ -637,6 +644,7 @@ export default function AdminAnnouncements() {
                   />
                   {editAtLimit && <span className="ann-attachment-hint">Attachment limit reached</span>}
                 </div>
+                </div>
 
                 <div className="ann-modal-footer">
                   <button className="ann-btn-secondary" onClick={closeEdit}>Cancel</button>
@@ -649,15 +657,15 @@ export default function AdminAnnouncements() {
           {/* Create Modal */}
           {isCreating && (
             <div className="ann-modal-overlay">
-              <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="ann-modal ann-modal--form" onClick={(e) => e.stopPropagation()}>
                 <div className="ann-modal-header">
                   <div>
-                    <h3 className="ann-modal-title"><PlusIconSmall /> New Announcement</h3>
-                    <p className="ann-modal-desc">Create a new announcement for your department.</p>
+                    <h3 className="ann-modal-title">New Announcement</h3>
                   </div>
                   <button className="ann-modal-close" onClick={closeCreate} aria-label="Close"><XIcon /></button>
                 </div>
 
+                <div className="ann-form-body">
                 <div className="ann-field">
                   <label htmlFor="create-title">Title *</label>
                   <input id="create-title" className="ann-input" placeholder="Enter announcement title" value={createForm.title} onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })} />
@@ -743,6 +751,7 @@ export default function AdminAnnouncements() {
                   />
                   {createAtLimit && <span className="ann-attachment-hint">Attachment limit reached</span>}
                 </div>
+                </div>
 
                 <div className="ann-modal-footer">
                   <button className="ann-btn-secondary" onClick={closeCreate}>Cancel</button>
@@ -759,6 +768,9 @@ export default function AdminAnnouncements() {
             title="Delete Announcement?"
             message="Delete this announcement permanently? This can't be undone."
             confirmText="Delete"
+            variant="danger"
+            icon={<Trash2 />}
+            centered
           />
         </>
       }
@@ -794,9 +806,9 @@ export default function AdminAnnouncements() {
               <HelpCircle />
             </div>
             <div className="ann-faqs-card-text">
-              <span className="ann-faqs-card-title">Manage FAQs</span>
+              <span className="ann-faqs-card-title">FAQ Management</span>
               <span className="ann-faqs-card-subtitle">
-                Add and edit your department's frequently asked questions.
+                Manage frequently asked questions within your department.
               </span>
             </div>
             <ChevronRight className="ann-faqs-card-chevron" />
@@ -906,7 +918,8 @@ export default function AdminAnnouncements() {
                 {list.length === 0 ? (
                   <div className="ann-empty">
                     <MegaphoneIcon />
-                    <p>No {activeTab} announcements found.</p>
+                    <h3>{(EMPTY_COPY[activeTab] ?? EMPTY_COPY.active).title}</h3>
+                    <p>{(EMPTY_COPY[activeTab] ?? EMPTY_COPY.active).description}</p>
                   </div>
                 ) : (
                   list.map((a) => {
@@ -933,16 +946,17 @@ export default function AdminAnnouncements() {
                           </div>
                           <p className="ann-item-desc">{a.content}</p>
                           <div className="ann-item-meta">
-                            <span><CalendarIcon />{formatPostedLabel(a)}</span>
-                            <span>•</span>
-                            <span>By: {a.createdBy || "Admin Office"}</span>
+                            <span className="ann-item-meta-label">{a.isReposted ? "Reposted" : "Posted"}</span>
+                            <span className="ann-item-meta-date"><Calendar />{formatManilaDate(a.date, { month: "short", day: "numeric", year: "numeric" })}</span>
+                            <span className="ann-item-meta-time"><Clock />{formatManilaTime(a.date)}</span>
+                            <span className="ann-item-meta-author">Posted by {a.createdBy || "Admin Office"}</span>
                           </div>
                           <div className="ann-item-actions">
                             <button className="ann-action-btn" onClick={() => setViewingAnnouncement(a)}>
                               <EyeIcon /> View
                             </button>
-                            <button className="ann-action-btn" onClick={() => openEdit(a)}>
-                              <img src={editIcon} alt="" /> Edit
+                            <button className="ann-action-btn ann-action-edit" onClick={() => openEdit(a)}>
+                              <Pencil /> Edit
                             </button>
                             {a.status === "active" ? (
                               <>
@@ -953,7 +967,7 @@ export default function AdminAnnouncements() {
                                   <PinIcon /> {a.isPinned ? "Unpin" : "Pin"}
                                 </button>
                                 <button className="ann-action-btn ann-action-archive" onClick={() => handleArchive(a.id)}>
-                                  <img src={deleteIcon} alt="" /> Archive
+                                  <Archive /> Archive
                                 </button>
                               </>
                             ) : (
@@ -962,7 +976,7 @@ export default function AdminAnnouncements() {
                                   Restore
                                 </button>
                                 <button className="ann-action-btn ann-action-delete" onClick={() => setDeleteId(a.id)}>
-                                  <img src={deleteIcon} alt="" /> Delete
+                                  <Trash2 /> Delete
                                 </button>
                               </>
                             )}

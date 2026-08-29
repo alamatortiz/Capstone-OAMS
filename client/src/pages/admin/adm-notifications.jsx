@@ -149,7 +149,7 @@ export default function AdminNotifications() {
           icon={<Bell />}
           iconClassName="notif-title-icon"
           title="Notifications"
-          subtitle="Stay updated on queue, document, appointment, and announcement activity"
+          subtitle="Stay updated on queue, document, appointment, and announcement activity."
           headerClassName="notif-header"
           breadcrumbClassName="page-breadcrumb"
           titleSectionClassName="notif-title-section"
@@ -160,7 +160,7 @@ export default function AdminNotifications() {
         <div className="filters-card">
           <div className="filters-header">
             <h3 className="filters-title">Notification Filter</h3>
-            <p className="filters-description">Filter your notifications by category</p>
+            <p className="filters-description">Filter your notifications by category.</p>
           </div>
           <div className="filters-row">
             <div className="filters-grid">

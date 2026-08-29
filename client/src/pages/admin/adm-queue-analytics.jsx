@@ -309,7 +309,7 @@ export default function AdminQueueAnalytics() {
             icon={<BarChartIcon />}
             iconClassName="aqa-title-icon"
             title="Queue Analytics"
-            subtitle="Real-time queue performance metrics and insights"
+            subtitle="Real-time queue performance metrics and insights."
             headerClassName="aqa-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="aqa-title-section"
@@ -322,7 +322,7 @@ export default function AdminQueueAnalytics() {
             <div className="aqa-filters-header">
               <div>
                 <p className="aqa-filters-title">Analytics Filters</p>
-                <p className="aqa-filters-sub">Customize your analytics view</p>
+                <p className="aqa-filters-sub">Customize your analytics view.</p>
               </div>
               <div className="aqa-filters-actions">
                 <button className="aqa-btn-outline" onClick={handleExportReport}>

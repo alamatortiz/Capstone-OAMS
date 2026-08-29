@@ -408,7 +408,7 @@ export default function AdminScanDocument() {
             icon={<QRScanIcon />}
             iconClassName="asd-title-icon"
             title="Document Scanner"
-            subtitle="Scan QR codes to verify and view document details"
+            subtitle="Scan QR codes to verify and view document details."
             headerClassName="asd-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="asd-title-section"

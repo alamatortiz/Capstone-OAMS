@@ -7,7 +7,7 @@ import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import {
@@ -127,11 +127,12 @@ function AppointmentCard({
         </div>
         <div className="appt-card-title-section">
           <h3 className="appt-card-name">{appointment.studentName}</h3>
-          <p className="appt-card-sub">
-            {appointment.studentId}
-            {appointment.course ? ` · ${appointment.course}` : ""}
-            {appointment.appointmentType ? ` · ${appointment.appointmentType}` : ""}
-          </p>
+          {appointment.studentId && (
+            <span className="appt-card-student-id-badge">{appointment.studentId}</span>
+          )}
+          {appointment.course && (
+            <p className="appt-card-sub">{appointment.course}</p>
+          )}
         </div>
         <span
           className={`appt-status-badge appt-status-badge--${appointment.status}`}
@@ -139,6 +140,15 @@ function AppointmentCard({
           {statusLabel}
         </span>
       </div>
+
+      {appointment.appointmentType && (
+        <div className="appt-card-appt-type">
+          <span className="appt-card-appt-type-label">Type:</span>
+          <span className="appt-card-appt-type-value">
+            {appointment.appointmentType}
+          </span>
+        </div>
+      )}
 
       {/* Info grid */}
       <div className="appt-info-grid">
@@ -198,9 +208,27 @@ function AppointmentCard({
             </button>
           </>
         )}
-        <span className="appt-requested-at">
-          Requested: {appointment.requestedAt}
-        </span>
+        <div className="appt-requested-meta">
+          <span className="appt-requested-label">Requested</span>
+          {appointment.requestedAtRaw ? (
+            <>
+              <span className="appt-requested-date">
+                <Calendar />
+                {formatManilaDate(appointment.requestedAtRaw, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+              <span className="appt-requested-time">
+                <Clock />
+                {formatManilaTime(appointment.requestedAtRaw)}
+              </span>
+            </>
+          ) : (
+            <span className="appt-requested-date">{appointment.requestedAt}</span>
+          )}
+        </div>
       </div>
     </div>
   );

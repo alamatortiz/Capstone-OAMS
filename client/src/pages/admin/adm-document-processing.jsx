@@ -720,7 +720,7 @@ export default function AdminDocumentProcessing() {
             icon={<FileText className="adp-icon-lg" />}
             iconClassName="adp-title-icon"
             title="Document Processing"
-            subtitle="Process and manage document requests"
+            subtitle="Process and manage document requests and submissions within your department."
             headerClassName="adp-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="adp-title-section"

@@ -990,7 +990,7 @@ export default function AdminDataManagement() {
             icon={<DatabaseIcon />}
             iconClassName="adm-title-icon"
             title="Data Management"
-            subtitle={`${user?.college} (${user?.departmentAbbrev}) — Configure document types and queue services`}
+            subtitle={`${user?.college} (${user?.departmentAbbrev}) — Configure document types and queue services.`}
             headerClassName="adm-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="adm-title-section"
@@ -1031,7 +1031,7 @@ export default function AdminDataManagement() {
                 <div className="adm-card-header">
                   <div>
                     <h2 className="adm-card-title">Document Type Management</h2>
-                    <p className="adm-card-desc">Configure available document types and requirements for {user?.departmentAbbrev}</p>
+                    <p className="adm-card-desc">Configure available document types and requirements for {user?.departmentAbbrev}.</p>
                   </div>
                   <button className="adm-btn-primary" onClick={openAddDocModal}>
                     <PlusIcon />
@@ -1096,7 +1096,7 @@ export default function AdminDataManagement() {
                 <div className="adm-card-header">
                   <div>
                     <h2 className="adm-card-title">Service Configuration</h2>
-                    <p className="adm-card-desc">Manage queue services for {user?.departmentAbbrev}</p>
+                    <p className="adm-card-desc">Manage queue services for {user?.departmentAbbrev}.</p>
                   </div>
                   <button className="adm-btn-primary" onClick={openAddServiceModal}>
                     <PlusIcon />
@@ -1141,7 +1141,7 @@ export default function AdminDataManagement() {
                 <div className="adm-card-header">
                   <div>
                     <h2 className="adm-card-title">System Audit Logs</h2>
-                    <p className="adm-card-desc">Track all administrative actions for {user?.departmentAbbrev}</p>
+                    <p className="adm-card-desc">Track all administrative actions for {user?.departmentAbbrev}.</p>
                   </div>
                   <button className="adm-btn-outline" onClick={handleExportLogs}>
                     <DownloadIcon />

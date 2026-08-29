@@ -288,25 +288,25 @@ html, body {
 /* ── Source Toggle ───────────────────────────────────────────────────────── */
 .adp-source-toggle {
   display: inline-flex;
-  gap: 0.25rem;
+  gap: 0.35rem;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  padding: 0.25rem;
+  border-radius: 0.875rem;
+  padding: 0.35rem;
   width: fit-content;
 }
 .adp-source-btn {
-  padding: 0.5rem 1.1rem;
+  padding: 0.65rem 1.6rem;
   background: transparent;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.6rem;
   color: var(--text-tertiary);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 .adp-source-btn:hover:not(.adp-source-btn-active) { color: var(--text-primary); }

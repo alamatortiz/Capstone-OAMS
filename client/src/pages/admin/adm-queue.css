@@ -178,6 +178,9 @@ body {
   font-size: 1.05rem;
   font-weight: 600;
   font-family: inherit;
+  /* <a> inherits the root's computed line-height; a <button> would fall back to
+     the UA `normal` and sit ~4px shorter — pin both to the same value. */
+  line-height: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -292,7 +295,7 @@ body {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -316,205 +319,186 @@ body {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0.25rem 0 0 0;
-}
-
-/* ===== Back Button ===== */
-.admin-back-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  align-self: flex-start;
-  margin-bottom: 1rem;
-  padding: 0.5rem 1rem 0.5rem 0.625rem;
-  background: transparent;
-  border: 1px solid var(--card-border);
-  border-radius: 0.5rem;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.admin-back-btn:hover {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.admin-back-btn svg {
-  width: 1rem;
-  height: 1rem;
-  stroke: currentColor;
-  flex-shrink: 0;
-}
-
-/* ===== Queue Page Header ===== */
-.queue-page-header {
-  margin-bottom: 2rem;
+  /* Without this the subtitle inherits the global `#root { text-align: center }`
+     (index.css) — the title above it dodges that with its own `text-align: start`. */
   text-align: left;
 }
 
-.queue-page-header h1 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.5rem 0;
-  text-align: left;
-}
-
-.queue-page-header p {
-  font-size: 0.95rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  text-align: left;
-}
-
-/* ===== Queue System Stats ===== */
+/* ===== Queue System Stats (mirrors admin-transaction-stats-grid) ===== */
 .queue-system-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
-  margin-bottom: 2rem;
 }
 
 .queue-stat-box {
   background: var(--card-bg);
   border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 1rem;
-  padding: 1.25rem;
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   transition: all 0.3s ease;
 }
 
 .queue-stat-box:hover {
   border-color: rgba(59, 130, 246, 0.45);
-  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.1);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
 }
 
-.queue-stat-box-content {
+.queue-stat-box-icon-box,
+.queue-stat-card-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: nowrap;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
 }
 
-.queue-stat-box-text {
-  flex: 1;
-  text-align: left;
+.queue-stat-box-icon-box svg,
+.queue-stat-card-icon-box svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
 }
 
 .queue-stat-box-label {
-  font-size: 0.875rem;
+  font-size: 0.7rem;
   color: var(--text-tertiary);
-  margin: 0 0 0.5rem 0;
-  font-weight: 500;
-  text-align: left;
+  margin: 0 0 0.375rem 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
 }
 
 .queue-stat-box-value {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
   color: #3b82f6;
   margin: 0;
-  text-align: left;
+  text-align: center;
 }
 
-.queue-stat-box-icon {
-  width: 1.5rem !important;
-  height: 1.5rem !important;
-  min-width: 1.25rem;
-  min-height: 1.25rem;
-  flex-shrink: 0;
-}
-
-/* ===== Queue Overview Section ===== */
-.queue-overview-section {
+/* ===== Filter Card (mirrors adm-transactions' container-scoped filters-card, retinted blue) ===== */
+.queue-page-container .filters-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 1rem;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
+  padding: 1rem 1.5rem 1.5rem;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.08);
   transition: all 0.3s ease;
 }
 
-.queue-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
+.queue-page-container .filters-header {
+  margin-bottom: 1.25rem;
+  text-align: center;
 }
 
-.queue-section-title {
-  text-align: left;
-}
-
-.queue-section-title h2 {
-  font-size: 1.125rem;
+.queue-page-container .filters-title {
+  font-size: 1.375rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
-  text-align: left;
-}
-
-.queue-section-title p {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
   margin: 0;
-  text-align: left;
 }
 
-.queue-section-controls {
-  display: flex;
-  align-items: center;
+.queue-page-container .filters-description {
+  font-size: 0.9375rem;
+  color: var(--text-tertiary);
+  margin: 0.4rem 0 0 0;
+}
+
+.queue-page-container .filters-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
-.queue-filter-wrapper {
-  position: relative;
+.queue-page-container .filter-group {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.queue-filter-select {
-  appearance: none;
-  background: var(--input-background);
-  border: 1px solid var(--card-border);
-  color: var(--text-primary);
-  padding: 0.625rem 2.25rem 0.625rem 0.875rem;
-  border-radius: 0.75rem;
-  font-family: inherit;
+.queue-page-container .filter-label {
   font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 180px;
+  font-weight: 600;
+  color: var(--text-primary);
   text-align: left;
 }
 
-.queue-filter-select:hover {
-  border-color: var(--primary-color);
+.queue-page-container .filter-select-wrapper {
+  position: relative;
+  width: 100%;
 }
 
-.queue-filter-select:focus {
+.queue-page-container .filter-select {
+  width: 100%;
+  padding: 0.75rem 2.75rem 0.75rem 1.25rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
-.queue-filter-icon {
+.queue-page-container .filter-select:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.queue-page-container .filter-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.queue-page-container .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.queue-page-container .filter-chevron {
   position: absolute;
-  right: 0.875rem;
+  right: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 0.9rem;
-  height: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
   color: var(--text-tertiary);
   pointer-events: none;
-  z-index: 2;
-  display: flex;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+.queue-page-container .filter-chevron svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.queue-page-container .filter-select:focus + .filter-chevron {
+  color: #3b82f6;
 }
 
 .btn-refresh-queue {
@@ -529,10 +513,6 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-}
-
-.queue-monitoring-refresh {
-  margin-left: auto;
 }
 
 .btn-refresh-queue {
@@ -577,60 +557,78 @@ body {
   stroke: currentColor;
 }
 
-/* ===== Queue Details Section ===== */
-.queue-details-section {
-  background: var(--card-bg);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-}
-
+/* ===== Active Queue Rows ===== */
 .queue-details-list {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
+/* Empty state — matches the student Queues screen's .no-queues-card. The explicit
+   background/border also cancels the latent bleed from stud-queue-status.css's
+   bare .queue-empty-state (that file's chunk styles background/border/radius). */
 .admin-queue-with-sidebar .queue-empty-state {
+  background: var(--card-bg);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 1rem;
+  padding: 3rem 1.5rem;
   text-align: center;
-  padding: 3rem 2rem;
 }
 
 .admin-queue-with-sidebar .queue-empty-state svg {
-  width: 2rem;
-  height: 2rem;
+  width: 3rem;
+  height: 3rem;
   color: var(--text-tertiary);
-  margin-bottom: 1rem;
-  opacity: 0.3;
+  opacity: 1;
+  display: block;
+  margin: 0 auto 1rem;
   stroke: currentColor;
+}
+
+.admin-queue-with-sidebar .queue-empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
 }
 
 .admin-queue-with-sidebar .queue-empty-state p {
   color: var(--text-tertiary);
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .admin-queue-with-sidebar .queue-empty-state {
+    padding: 2rem 1rem;
+  }
 }
 
 .queue-detail-row {
-  background: rgba(59, 130, 246, 0.06);
+  background: var(--card-bg);
   border: 1.5px solid rgba(59, 130, 246, 0.3);
   border-radius: 1rem;
   padding: 1.25rem;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: space-between;
   gap: 1.5rem;
   transition: all 0.3s ease;
 }
 
+.queue-detail-row .btn-monitor {
+  align-self: flex-start;
+}
+
 .queue-detail-row:hover {
-  background: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.15);
 }
 
 .queue-detail-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -640,13 +638,21 @@ body {
 .queue-detail-header-row {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.875rem;
 }
 
-/* College logo shown on the left of queue detail header */
+.queue-detail-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* College logo shown at the left of the queue detail header */
 .queue-detail-college-logo {
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 3.5rem;
+  height: 3.5rem;
   flex-shrink: 0;
   object-fit: contain;
   display: block;
@@ -654,23 +660,20 @@ body {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 
-/* Keep the existing icon sizing usable if used elsewhere */
-.queue-detail-icon {
-  width: 1.25rem !important;
-  height: 1.25rem !important;
-  min-width: 1rem;
-  min-height: 1rem;
-  flex-shrink: 0;
-}
-
-.queue-detail-abbrev {
-  font-weight: 600;
-  font-size: 0.875rem;
+/* Service name — now the row's primary heading (plain text) */
+.queue-detail-service {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text-primary);
   text-align: left;
+  background: none;
+  padding: 0;
+  border-radius: 0;
 }
 
-.queue-detail-service {
+/* Department — now a blue badge (the look the service name used to have) */
+.queue-detail-abbrev {
   background: rgba(59, 130, 246, 0.15);
   color: #3b82f6;
   padding: 0.375rem 0.75rem;
@@ -681,56 +684,68 @@ body {
   text-align: center;
 }
 
-.queue-detail-grid {
+.queue-detail-row .queue-detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 1rem;
   margin-top: 0.5rem;
 }
 
-.queue-detail-item {
+.queue-detail-row .queue-detail-item {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.25rem;
-  text-align: left;
+  text-align: center;
+  /* Neutralise the chip styling bleeding in from stud-queue.css's bare
+     .queue-detail-item (bg/border/padding/shadow/blur) — these cells are plain
+     centred columns. */
+  background: none;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
-.queue-detail-item-label {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
+.queue-detail-row .queue-detail-item-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--blue);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  text-align: left;
+  text-align: center;
 }
 
-.queue-detail-item-value {
+.queue-detail-row .queue-detail-item-value {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
-  text-align: left;
+  text-align: center;
 }
 
 .btn-monitor {
-  padding: 0.75rem 1.25rem;
+  padding: 0.5rem 1rem;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   border: none;
   border-radius: 0.75rem;
-  color: white;
+  color: #fff;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
+  font-family: inherit;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
 .btn-monitor:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
 }
 
 .btn-monitor svg {
@@ -744,98 +759,15 @@ body {
 
 /* ===== Queue Monitoring Detail View ===== */
 .queue-monitoring-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  position: relative;
 }
 
-.btn-back-queue {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  background: transparent;
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  font-family: "Akt", sans-serif;
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-back-queue:hover {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: var(--primary-color);
-}
-
-.btn-back-queue svg {
-  width: 1rem;
-  height: 1rem;
-  stroke: currentColor;
-}
-
-.queue-monitoring-header {
-  margin-bottom: 1.5rem;
-}
-
-.queue-header-content {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.queue-monitoring-title-icon {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 0.75rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  color: #fff;
-}
-
-.queue-monitoring-title-icon svg {
-  width: 1.75rem;
-  height: 1.75rem;
-  stroke: #fff;
-  color: #fff;
-}
-
-.queue-header-text {
-  flex: 1;
-  text-align: left;
-}
-
-.queue-monitoring-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
-  text-align: left;
-  transition: color 0.3s ease;
-}
-
-.queue-monitoring-service {
-  font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.9);
-  margin: 0;
-  text-align: left;
-}
-
-.queue-monitoring-college {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0 0;
-  text-align: left;
-  transition: color 0.3s ease;
+/* Compound selector: must out-specify the bare `.btn-refresh-queue`
+   position rule declared later in this file. */
+.queue-monitoring-topbar .queue-monitoring-refresh {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .queue-monitoring-status-note {
@@ -854,60 +786,45 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
-  margin-bottom: 2rem;
 }
 
 .queue-stat-card {
   background: var(--card-bg);
-  border: 1.5px solid rgba(59, 130, 246, 0.3);
-  border-radius: 1rem;
-  padding: 1.25rem;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 0.875rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  align-items: center;
+  text-align: center;
+  gap: 0.375rem;
+  transition: all 0.3s ease;
+}
+
+.queue-stat-card:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
 }
 
 .queue-stat-label {
-  font-size: 0.875rem;
+  font-size: 0.7rem;
   color: var(--text-tertiary);
   margin: 0;
-  text-align: left;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
 }
 
 .queue-stat-value {
   font-size: 1.875rem;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1;
   color: #3b82f6;
   margin: 0;
-  text-align: left;
-}
-
-.queue-stat-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-  color: var(--text-tertiary);
-  opacity: 0.25;
-  align-self: flex-end;
-  stroke: currentColor;
-  flex-shrink: 0;
-}
-
-.queue-monitoring-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 1.5rem;
-}
-
-.queue-monitoring-left {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.queue-monitoring-right {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  text-align: center;
+  word-break: break-word;
 }
 
 .queue-detail-card {
@@ -916,7 +833,6 @@ body {
   border-radius: 1rem;
   padding: 1.5rem;
   transition: all 0.3s ease;
-  margin-right: 0.5rem;
 }
 
 .queue-detail-card:hover {
@@ -926,6 +842,7 @@ body {
 .queue-detail-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 1rem;
   padding-bottom: 1rem;
@@ -951,11 +868,65 @@ body {
   flex-shrink: 0;
 }
 
+/* Queue Overview reads as the section's lead heading — a step larger. */
+.queue-overview-card .queue-detail-header h3 {
+  font-size: 1.25rem;
+}
+.queue-overview-card .queue-detail-header svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+/* Count pill in the "Queue Entries" heading (flex child of .queue-detail-header h3). */
+.queue-entries-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .queue-detail-content {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   text-align: left;
+}
+
+/* ===== Queue Overview card (monitor view — full-width summary strip) ===== */
+.queue-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.queue-overview-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.queue-overview-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--blue);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.queue-overview-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 /* ===== Queue Entries (per-student roster within the monitored queue) ===== */
@@ -1088,8 +1059,9 @@ body {
   padding: 0.3rem 0.65rem;
   border-radius: 0.375rem;
   font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: capitalize;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1123,14 +1095,19 @@ body {
   border: 0.5px solid rgba(239, 68, 68, 0.4);
 }
 
+/* Same pill treatment as .queue-entry-status, keyed blue like --waiting. */
 .queue-entry-queue-number {
   padding: 0.3rem 0.65rem;
-  border: 1px solid var(--card-border);
   border-radius: 0.375rem;
   font-family: "Inter", sans-serif;
   font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-tertiary);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--blue);
+  border: 0.5px solid rgba(59, 130, 246, 0.4);
 }
 
 .queue-entry-details {
@@ -1163,45 +1140,16 @@ body {
   stroke: currentColor;
 }
 
-.progress-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--card-border);
-}
-
-.progress-stat {
-  display: flex;
-  flex-direction: column;
-  text-align: center;
-  gap: 0.25rem;
-  padding-right: 0.75rem;
-}
-
-.progress-stat:last-child {
-  padding-right: 0;
-}
-
-.progress-stat-label {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  text-align: center;
-}
-
-.progress-stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-align: center;
-}
-
 .queue-actions-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  .queue-actions-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .queue-action-btn {
@@ -1218,11 +1166,6 @@ body {
   justify-content: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
-  margin-right: 0.5rem;
-}
-
-.queue-action-btn:nth-child(2n) {
-  margin-right: 0;
 }
 
 .queue-action-btn:hover {
@@ -1294,51 +1237,15 @@ body {
   color: var(--text-primary);
 }
 
-.queue-detail-text {
-  color: var(--text-primary);
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  text-align: left;
-  padding-right: 0.75rem;
-}
-
-.service-hours-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--card-border);
-  padding-right: 0.75rem;
-}
-
-.service-hours-row:last-child {
-  border-bottom: none;
-  padding-right: 0;
-}
-
-.service-hours-label {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  text-align: left;
-}
-
-.service-hours-value {
-  font-weight: 600;
-  color: var(--text-primary);
-  text-align: right;
-}
-
-.professor-name {
+.queue-serving-name {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
   text-align: left;
-  padding-right: 0.75rem;
 }
 
-.professor-label {
+.queue-serving-label {
   font-size: 0.8rem;
   color: var(--text-tertiary);
   margin: 0.25rem 0 0 0;
@@ -1351,15 +1258,16 @@ body {
   justify-content: center;
   padding: 0.625rem 1.25rem;
   border-radius: 0.5rem;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.875rem;
+  text-transform: uppercase;
   text-align: center;
 }
 
 .status-badge--open {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.4);
 }
 
 .status-badge--paused {
@@ -1375,12 +1283,7 @@ body {
   border: 1px solid rgba(249, 115, 22, 0.4);
 }
 
-.status-badge--completed {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-}
-
+.status-badge--completed,
 .status-badge--closed,
 .status-badge--cancelled {
   background: rgba(239, 68, 68, 0.2);
@@ -1393,10 +1296,6 @@ body {
 
   .queue-system-stats {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .queue-monitoring-grid {
-    grid-template-columns: 1fr;
   }
 
   .queue-monitoring-stats {
@@ -1415,42 +1314,17 @@ body {
     gap: 0.75rem;
   }
 
-  .queue-section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
+  .queue-detail-row .queue-detail-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .queue-section-controls {
-    width: 100%;
-  }
-
-  .queue-filter-wrapper {
-    flex: 1;
-  }
-
-  .queue-filter-select {
-    width: 100%;
-  }
-
-  .queue-detail-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .queue-detail-grid {
+  .queue-overview-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
   .btn-monitor {
     width: 100%;
     justify-content: center;
-  }
-
-  .queue-header-content {
-    flex-direction: column;
-    align-items: flex-start;
-    text-align: left;
   }
 
   .queue-monitoring-stats {
@@ -1477,28 +1351,24 @@ body {
     padding: 1rem;
   }
 
-  .queue-stat-box-label {
-    font-size: 0.75rem;
-  }
-
   .queue-stat-box-value {
     font-size: 1.5rem;
   }
 
-  .queue-stat-box-icon {
-    width: 1.25rem;
-    height: 1.25rem;
+  .queue-detail-college-logo {
+    width: 3rem;
+    height: 3rem;
   }
 
-  .queue-detail-grid {
+  .queue-detail-row .queue-detail-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .queue-detail-item-label {
+  .queue-detail-row .queue-detail-item-label {
     font-size: 0.7rem;
   }
 
-  .queue-detail-item-value {
+  .queue-detail-row .queue-detail-item-value {
     font-size: 0.85rem;
   }
 

@@ -168,14 +168,14 @@ const quickActions = [
     icon: QRCodeIcon,
     iconColor: "bg-scan-doc",
     title: "Scan Document",
-    description: "Verify QR codes and view document details",
+    description: "Verify QR codes and view document details.",
     path: "/admin/scan-document",
   },
   {
     icon: HostQueueIcon,
     iconColor: "bg-blue-500",
     title: "Host Queue",
-    description: "Manage and host student queues",
+    description: "Manage and host student queues.",
     path: "/admin/queue-hosting",
   },
 ];
@@ -407,7 +407,7 @@ export default function AdminDashboard() {
                 <div className="section-title-admin-text">
                   <h2>Admin Management</h2>
                   <p className="section-subtitle">
-                    System administration and configuration tools
+                    System administration and configuration tools.
                   </p>
                 </div>
               </div>
@@ -447,7 +447,7 @@ export default function AdminDashboard() {
                 <div className="section-title-admin-text">
                   <h2>Quick Actions</h2>
                   <p className="section-subtitle">
-                    Access frequently used admin tools
+                    Access frequently used admin tools.
                   </p>
                 </div>
               </div>

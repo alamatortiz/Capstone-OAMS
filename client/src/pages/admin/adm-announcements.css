@@ -4,7 +4,7 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.45rem;
+  gap: 1.5rem;
   text-align: left;
 }
 
@@ -80,12 +80,12 @@
   font-size: 1.875rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.375rem 0;
+  margin: 0 0 0.25rem 0;
   text-align: left;
 }
 
 .ann-page-subtitle {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0;
   text-align: left;
@@ -248,7 +248,7 @@
   color: var(--text-primary);
 }
 .ann-source-btn-active {
-  background: var(--primary-color);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   color: #fff;
   cursor: default;
 }
@@ -596,17 +596,40 @@
   gap: 1rem;
 }
 
+/* Per-tab empty state — matches stud-announcements' .ann-empty-state card. */
 .ann-empty {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 3rem 1.5rem;
   text-align: center;
-  padding: 3rem 1rem;
-  color: var(--text-tertiary);
 }
 
 .ann-empty svg {
   width: 3rem;
   height: 3rem;
-  opacity: 0.25;
-  margin-bottom: 0.75rem;
+  color: var(--text-tertiary);
+  opacity: 1;
+  margin: 0 auto 1rem;
+}
+
+.ann-empty h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.ann-empty p {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .ann-empty {
+    padding: 2rem 1rem;
+  }
 }
 
 /* ===== Announcement item =====
@@ -689,7 +712,7 @@
 }
 
 .ann-item-title {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -698,19 +721,20 @@
 }
 
 .ann-pin-flag {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 1.1rem;
+  height: 1.1rem;
   color: var(--primary-color);
   flex-shrink: 0;
 }
 
 .ann-badge {
   flex-shrink: 0;
-  padding: 0.3rem 0.65rem;
-  border-radius: 0.4rem;
-  font-size: 0.68rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   white-space: nowrap;
 }
 
@@ -740,7 +764,7 @@
   border: 0.5px solid rgba(34, 197, 94, 0.4);
 }
 .ann-item-desc {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--text-secondary);
   margin: 0 0 0.75rem 0;
   line-height: 1.6;
@@ -749,25 +773,44 @@
   word-break: break-word;
 }
 
+/* Posted/Reposted timestamp — vertical icon+text stack, mirrors
+   adm-appointment's .admin-appointment-requested-meta. */
 .ann-item-meta {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
   margin-bottom: 0.75rem;
 }
 
-.ann-item-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+.ann-item-meta-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-tertiary);
 }
 
-.ann-item-meta svg {
-  width: 0.8rem;
-  height: 0.8rem;
+.ann-item-meta-date,
+.ann-item-meta-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.ann-item-meta-date svg,
+.ann-item-meta-time svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.ann-item-meta-author {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-top: 0.15rem;
 }
 
 .ann-item-actions {
@@ -780,9 +823,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
+  padding: 0.45rem 0.85rem;
   border-radius: 0.55rem;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid var(--border);
@@ -811,6 +854,15 @@
   color: var(--primary-color);
   border-color: rgba(34, 197, 94, 0.45);
   background: rgba(34, 197, 94, 0.1);
+}
+
+.ann-action-edit {
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.ann-action-edit:hover {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 .ann-action-archive {
@@ -920,6 +972,44 @@
 .ann-modal-close svg {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+/* Form-modal shell — Create/Edit adopt the adm-appointment view-details modal
+   structure (sticky header + scrolling body + sticky footer). Scoped so the
+   View modal keeps the plain .ann-modal layout. */
+.ann-modal--form {
+  max-width: 42rem;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ann-modal--form .ann-modal-header {
+  padding: 1.5rem 1.5rem 1.25rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+.ann-modal--form .ann-modal-title {
+  font-size: 1.125rem;
+  margin: 0;
+}
+.ann-form-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+.ann-form-body .ann-field {
+  margin-bottom: 0;
+}
+.ann-modal--form .ann-modal-footer {
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--card-border);
+  flex-shrink: 0;
 }
 
 .ann-field {

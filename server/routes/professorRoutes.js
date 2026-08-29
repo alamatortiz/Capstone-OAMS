@@ -387,6 +387,9 @@ router.get(
           minute: "2-digit",
           hour12: true,
         }),
+        // Raw instant for the client to format itself (calendar/clock split) --
+        // same interpretation as requestedAt above, which stays for older clients.
+        requestedAtRaw: r.created_at,
       })));
     } catch (err) {
       sendServerError(res, err, "GET /appointments error:");

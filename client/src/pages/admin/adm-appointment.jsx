@@ -15,7 +15,7 @@ import "./adm-appointment.css";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { connectSocket } from "../../utils/socket";
@@ -56,12 +56,6 @@ const AlertCircleIcon = () => (
   </svg>
 );
 
-const CheckCircleIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-  </svg>
-);
 const CANCELLED_BY_LABELS = {
   student: "Student",
   faculty: "Faculty",
@@ -173,35 +167,18 @@ export default function AdminAppointment() {
       : rangeFiltered.filter((a) => a.status === status);
 
   const getStatusBadge = (status) => {
-    const statusConfig = {
-      pending: {
-        color: "admin-appointment-badge-pending",
-        icon: AlertCircleIcon,
-      },
-      approved: {
-        color: "admin-appointment-badge-approved",
-        icon: CheckCircleIcon,
-      },
-      rejected: {
-        color: "admin-appointment-badge-rejected",
-        icon: AlertCircleIcon,
-      },
-      completed: {
-        color: "admin-appointment-badge-completed",
-        icon: CheckCircleIcon,
-      },
-      cancelled: {
-        color: "admin-appointment-badge-cancelled",
-        icon: AlertCircleIcon,
-      },
+    const statusColors = {
+      pending: "admin-appointment-badge-pending",
+      approved: "admin-appointment-badge-approved",
+      rejected: "admin-appointment-badge-rejected",
+      completed: "admin-appointment-badge-completed",
+      cancelled: "admin-appointment-badge-cancelled",
     };
 
-    const config = statusConfig[status] || statusConfig.pending;
-    const Icon = config.icon;
+    const colorClass = statusColors[status] || statusColors.pending;
 
     return (
-      <div className={`admin-appointment-status-badge ${config.color}`}>
-        <Icon />
+      <div className={`admin-appointment-status-badge ${colorClass}`}>
         <span>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
       </div>
     );
@@ -215,14 +192,20 @@ export default function AdminAppointment() {
             <div className="admin-appointment-card-left">
               <div className="admin-appointment-student-info">
                 <h4 className="admin-appointment-student-name">
-                  {appointment.studentName}
+                  {appointment.professor}
                 </h4>
-                <span className="admin-appointment-student-id-badge">
-                  {appointment.studentId}
-                </span>
+                {appointment.professorId && (
+                  /* purple id pill — reused here to hold the faculty employee_id */
+                  <span className="admin-appointment-student-id-badge">
+                    {appointment.professorId}
+                  </span>
+                )}
               </div>
 
-              <p className="admin-appointment-purpose">{appointment.purpose}</p>
+              <div className="admin-appointment-purpose-row">
+                <span className="admin-appointment-purpose-label">Purpose</span>
+                <p className="admin-appointment-purpose">{appointment.purpose}</p>
+              </div>
             </div>
             <div className="admin-appointment-card-right">
               {getStatusBadge(appointment.status)}
@@ -231,10 +214,15 @@ export default function AdminAppointment() {
 
           <div className="admin-appointment-card-details">
             <div className="admin-appointment-detail-item">
-              <span className="admin-appointment-detail-label">Professor</span>
+              <span className="admin-appointment-detail-label">Student</span>
               <span className="admin-appointment-detail-value">
-                {appointment.professor}
+                {appointment.studentName}
               </span>
+              {appointment.studentId && (
+                <span className="admin-appointment-detail-id-badge">
+                  {appointment.studentId}
+                </span>
+              )}
             </div>
             <div className="admin-appointment-detail-item">
               <span className="admin-appointment-detail-label">Date</span>
@@ -257,9 +245,29 @@ export default function AdminAppointment() {
           </div>
 
           <div className="admin-appointment-card-footer">
-            <span className="admin-appointment-requested-text">
-              Requested: {appointment.requestedAt}
-            </span>
+            <div className="admin-appointment-requested-meta">
+              <span className="admin-appointment-requested-label">Requested</span>
+              {appointment.requestedAtRaw ? (
+                <>
+                  <span className="admin-appointment-requested-date">
+                    <Calendar />
+                    {formatManilaDate(appointment.requestedAtRaw, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span className="admin-appointment-requested-time">
+                    <Clock />
+                    {formatManilaTime(appointment.requestedAtRaw)}
+                  </span>
+                </>
+              ) : (
+                <span className="admin-appointment-requested-date">
+                  {appointment.requestedAt}
+                </span>
+              )}
+            </div>
             <button
               className="admin-appointment-view-btn"
               onClick={() => onViewDetails(appointment)}
@@ -320,10 +328,14 @@ export default function AdminAppointment() {
                     </div>
                     <div className="admin-appointment-modal-field">
                       <span className="admin-appointment-modal-label">Student</span>
-                      <span className="admin-appointment-modal-value">
-                        {selectedAppointment.studentName} (
-                        {selectedAppointment.studentId})
-                      </span>
+                      <div className="admin-appointment-modal-value admin-appointment-modal-student">
+                        <span>{selectedAppointment.studentName}</span>
+                        {selectedAppointment.studentId && (
+                          <span className="admin-appointment-student-id-badge">
+                            {selectedAppointment.studentId}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="admin-appointment-modal-field">
                       <span className="admin-appointment-modal-label">Course</span>
@@ -333,9 +345,14 @@ export default function AdminAppointment() {
                     </div>
                     <div className="admin-appointment-modal-field">
                       <span className="admin-appointment-modal-label">Faculty</span>
-                      <span className="admin-appointment-modal-value">
-                        {selectedAppointment.professor}
-                      </span>
+                      <div className="admin-appointment-modal-value admin-appointment-modal-student">
+                        <span>{selectedAppointment.professor}</span>
+                        {selectedAppointment.professorId && (
+                          <span className="admin-appointment-student-id-badge">
+                            {selectedAppointment.professorId}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {selectedAppointment.facultyEmail && (
                       <div className="admin-appointment-modal-field">
@@ -426,7 +443,7 @@ export default function AdminAppointment() {
             icon={<Calendar />}
             iconClassName="admin-appointment-title-icon"
             title="Department Appointments Overview"
-            subtitle="Monitor appointments within your department"
+            subtitle="Monitor appointments within your department."
             headerClassName="admin-appointment-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="admin-appointment-title-section"

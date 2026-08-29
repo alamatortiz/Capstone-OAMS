@@ -128,7 +128,7 @@ export default function AdminProfessorAvailability() {
             icon={<UsersIcon className="apa-icon-lg" />}
             iconClassName="apa-title-icon"
             title="Faculty Availability"
-            subtitle="Monitor faculty consultation schedules and availability for your department"
+            subtitle="Monitor faculty consultation schedules and availability for your department."
             headerClassName="apa-page-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="apa-title-section"

@@ -1097,6 +1097,7 @@ router.get(
           s.course AS student_course,
           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
           f.position AS faculty_position,
+          f.employee_id AS faculty_employee_id,
           f.email AS faculty_email,
           d.department_name,
           d.department_abbreviation,
@@ -1129,6 +1130,7 @@ router.get(
           studentId: r.student_number,
           studentCourse: r.student_course,
           professor: `${r.faculty_position ?? "Prof."} ${r.faculty_name}`,
+          professorId: r.faculty_employee_id,
           facultyEmail: r.faculty_email,
           serviceName: r.service_name ?? null,
           purpose: r.notes || "No purpose specified",
@@ -1145,6 +1147,9 @@ router.get(
             minute: "2-digit",
             hour12: true,
           }),
+          // Raw instant for client-side calendar/clock formatting -- same
+          // interpretation as requestedAt above, kept for older clients.
+          requestedAtRaw: r.created_at,
           isToday: dateStr === todayStr,
         };
       });
