@@ -20,6 +20,7 @@ import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
+import { formatManilaDate, formatManilaTime } from '@/utils/date';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
@@ -91,6 +92,7 @@ interface Appointment {
   purpose: string;
   status: AppointmentStatus;
   requestedAt: string;
+  requestedAtRaw: string | null;
 }
 
 interface NavItem {
@@ -512,11 +514,12 @@ export default function ProfessorAppointmentScreen() {
                       </View>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.studentName}>{apt.studentName}</Text>
-                        <Text style={styles.studentSub}>
-                          {apt.studentId}
-                          {apt.course ? ` · ${apt.course}` : ''}
-                          {apt.appointmentType ? ` · ${apt.appointmentType}` : ''}
-                        </Text>
+                        {apt.studentId && (
+                          <View style={styles.studentIdBadge}>
+                            <Text style={styles.studentIdBadgeText}>{apt.studentId}</Text>
+                          </View>
+                        )}
+                        {apt.course && <Text style={styles.studentSub}>{apt.course}</Text>}
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
                         <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>
@@ -524,6 +527,13 @@ export default function ProfessorAppointmentScreen() {
                         </Text>
                       </View>
                     </View>
+
+                    {apt.appointmentType && (
+                      <View style={styles.apptTypeRow}>
+                        <Text style={styles.apptTypeLabel}>Type:</Text>
+                        <Text style={styles.apptTypeValue}>{apt.appointmentType}</Text>
+                      </View>
+                    )}
 
                     <View style={styles.apptInfoGrid}>
                       <View style={styles.apptInfoField}>
@@ -570,7 +580,31 @@ export default function ProfessorAppointmentScreen() {
                           </Pressable>
                         </View>
                       )}
-                      <Text style={styles.requestedText}>Requested: {apt.requestedAt}</Text>
+                      <View style={styles.requestedMeta}>
+                        <Text style={styles.requestedLabel}>Requested</Text>
+                        {apt.requestedAtRaw ? (
+                          <>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="calendar-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>
+                                {formatManilaDate(apt.requestedAtRaw, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </Text>
+                            </View>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="time-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>
+                                {formatManilaTime(apt.requestedAtRaw)}
+                              </Text>
+                            </View>
+                          </>
+                        ) : (
+                          <Text style={styles.requestedText}>{apt.requestedAt}</Text>
+                        )}
+                      </View>
                     </View>
                   </View>
                 );
@@ -961,7 +995,27 @@ function createStyles(theme: ThemePalette) {
       flexShrink: 0,
     },
     studentName: { fontSize: 16, fontWeight: '700', color: '#a855f7' },
+    studentIdBadge: {
+      alignSelf: 'flex-start',
+      marginTop: 4,
+      borderWidth: 1,
+      borderRadius: 6,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      borderColor: 'rgba(168, 85, 247, 0.3)',
+    },
+    studentIdBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#a855f7',
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+    },
     studentSub: { fontSize: 13, color: theme.tertiary, marginTop: 2 },
+    apptTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    apptTypeLabel: { fontSize: 12.5, fontWeight: '600', color: theme.tertiary },
+    apptTypeValue: { fontSize: 12.5, fontWeight: '600', color: theme.text },
     statusBadge: {
       minWidth: 76,
       alignItems: 'center',
@@ -1004,7 +1058,10 @@ function createStyles(theme: ThemePalette) {
     apptBtnCancel: { borderWidth: 1, borderColor: theme.border },
     apptBtnText: { fontSize: 12.5, fontWeight: '600', color: '#ffffff' },
     apptBtnCancelText: { fontSize: 12.5, fontWeight: '600', color: theme.text },
-    requestedText: { fontSize: 11.5, color: theme.tertiary, marginLeft: 'auto' },
+    requestedMeta: { gap: 3, marginLeft: 'auto' },
+    requestedLabel: { fontSize: 9.5, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
+    requestedRowItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    requestedText: { fontSize: 11.5, color: theme.tertiary },
 
     // Range picker modal
     rangeModalCard: {

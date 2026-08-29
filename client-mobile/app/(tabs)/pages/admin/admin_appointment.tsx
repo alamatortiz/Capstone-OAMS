@@ -35,6 +35,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import { formatManilaDate, formatManilaTime } from '@/utils/date';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
@@ -101,6 +102,7 @@ interface Appointment {
   studentId: string;
   studentCourse: string;
   professor: string;
+  professorId: string | null;
   facultyEmail: string | null;
   serviceName: string | null;
   purpose: string;
@@ -108,6 +110,7 @@ interface Appointment {
   time: string;
   status: AppointmentStatus;
   requestedAt: string;
+  requestedAtRaw: string | null;
   isToday: boolean;
   cancelledBy: 'student' | 'faculty' | 'system' | null;
 }
@@ -498,12 +501,17 @@ export default function AdminAppointmentScreen() {
                     <View style={styles.apptCardHeaderRow}>
                       <View style={{ flex: 1, gap: 6 }}>
                         <View style={styles.studentInfoRow}>
-                          <Text style={styles.studentName}>{appointment.studentName}</Text>
-                          <View style={styles.studentIdBadge}>
-                            <Text style={styles.studentIdBadgeText}>{appointment.studentId}</Text>
-                          </View>
+                          <Text style={styles.studentName}>{appointment.professor}</Text>
+                          {appointment.professorId && (
+                            <View style={styles.studentIdBadge}>
+                              <Text style={styles.studentIdBadgeText}>{appointment.professorId}</Text>
+                            </View>
+                          )}
                         </View>
-                        <Text style={styles.purposeText}>{appointment.purpose}</Text>
+                        <View style={styles.purposeRow}>
+                          <Text style={styles.purposeLabel}>Purpose</Text>
+                          <Text style={styles.purposeText}>{appointment.purpose}</Text>
+                        </View>
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
                         <statusTint.icon size={12} color={statusTint.color} />
@@ -515,8 +523,15 @@ export default function AdminAppointmentScreen() {
 
                     <View style={styles.apptDetailsGrid}>
                       <View style={styles.apptDetailItem}>
-                        <Text style={styles.apptDetailLabel}>Professor</Text>
-                        <Text style={styles.apptDetailValue}>{appointment.professor}</Text>
+                        <Text style={styles.apptDetailLabel}>Student</Text>
+                        <View style={styles.apptDetailValueRow}>
+                          <Text style={styles.apptDetailValue}>{appointment.studentName}</Text>
+                          {appointment.studentId && (
+                            <View style={styles.detailIdBadge}>
+                              <Text style={styles.detailIdBadgeText}>{appointment.studentId}</Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                       <View style={styles.apptDetailItem}>
                         <Text style={styles.apptDetailLabel}>Date</Text>
@@ -527,13 +542,39 @@ export default function AdminAppointmentScreen() {
                         <Text style={styles.apptDetailValue}>{appointment.time}</Text>
                       </View>
                       <View style={styles.apptDetailItem}>
-                        <Text style={styles.apptDetailLabel}>Location</Text>
-                        <Text style={styles.apptDetailValue}>{appointment.location}</Text>
+                        <Text style={styles.apptDetailLabel}>Type</Text>
+                        <Text style={styles.apptDetailValue}>
+                          {appointment.serviceName ?? 'General consultation'}
+                        </Text>
                       </View>
                     </View>
 
                     <View style={styles.apptCardFooter}>
-                      <Text style={styles.requestedText}>Requested: {appointment.requestedAt}</Text>
+                      <View style={styles.requestedMeta}>
+                        <Text style={styles.requestedLabel}>Requested</Text>
+                        {appointment.requestedAtRaw ? (
+                          <>
+                            <View style={styles.requestedRowItem}>
+                              <Calendar size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>
+                                {formatManilaDate(appointment.requestedAtRaw, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </Text>
+                            </View>
+                            <View style={styles.requestedRowItem}>
+                              <Clock size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>
+                                {formatManilaTime(appointment.requestedAtRaw)}
+                              </Text>
+                            </View>
+                          </>
+                        ) : (
+                          <Text style={styles.requestedText}>{appointment.requestedAt}</Text>
+                        )}
+                      </View>
                       <Pressable onPress={() => setSelectedAppointment(appointment)}>
                         <LinearGradient
                           colors={['#a855f7', '#9333ea']}
@@ -693,9 +734,14 @@ function AppointmentDetailsModal({
               </View>
               <View style={styles.detailsField}>
                 <Text style={styles.detailsLabel}>Student</Text>
-                <Text style={styles.detailsValue}>
-                  {appointment.studentName} ({appointment.studentId})
-                </Text>
+                <View style={styles.detailsValueRow}>
+                  <Text style={styles.detailsValue}>{appointment.studentName}</Text>
+                  {appointment.studentId && (
+                    <View style={styles.studentIdBadge}>
+                      <Text style={styles.studentIdBadgeText}>{appointment.studentId}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
               <View style={styles.detailsField}>
                 <Text style={styles.detailsLabel}>Course</Text>
@@ -703,7 +749,14 @@ function AppointmentDetailsModal({
               </View>
               <View style={styles.detailsField}>
                 <Text style={styles.detailsLabel}>Faculty</Text>
-                <Text style={styles.detailsValue}>{appointment.professor}</Text>
+                <View style={styles.detailsValueRow}>
+                  <Text style={styles.detailsValue}>{appointment.professor}</Text>
+                  {appointment.professorId && (
+                    <View style={styles.studentIdBadge}>
+                      <Text style={styles.studentIdBadgeText}>{appointment.professorId}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
               {appointment.facultyEmail && (
                 <View style={styles.detailsField}>
@@ -735,7 +788,28 @@ function AppointmentDetailsModal({
               )}
               <View style={[styles.detailsField, styles.detailsFieldFull]}>
                 <Text style={styles.detailsLabel}>Requested At</Text>
-                <Text style={styles.detailsValue}>{appointment.requestedAt}</Text>
+                {appointment.requestedAtRaw ? (
+                  <View style={styles.requestedRow}>
+                    <View style={styles.requestedRowItem}>
+                      <Calendar size={12} color={theme.subtext} />
+                      <Text style={styles.detailsValue}>
+                        {formatManilaDate(appointment.requestedAtRaw, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.requestedRowItem}>
+                      <Clock size={12} color={theme.subtext} />
+                      <Text style={styles.detailsValue}>
+                        {formatManilaTime(appointment.requestedAtRaw)}
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={styles.detailsValue}>{appointment.requestedAt}</Text>
+                )}
               </View>
               {appointment.status === 'cancelled' && appointment.cancelledBy && (
                 <View style={[styles.detailsField, styles.detailsFieldFull]}>
@@ -1056,6 +1130,8 @@ function createStyles(theme: ThemePalette) {
       letterSpacing: 0.3,
       textTransform: 'uppercase',
     },
+    purposeRow: { gap: 2 },
+    purposeLabel: { fontSize: 9.5, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
     purposeText: { fontSize: 12.5, fontWeight: '500', color: theme.subtext },
     statusBadge: {
       flexDirection: 'row',
@@ -1079,6 +1155,16 @@ function createStyles(theme: ThemePalette) {
     apptDetailItem: { width: '46%', gap: 2 },
     apptDetailLabel: { fontSize: 9.5, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
     apptDetailValue: { fontSize: 12.5, fontWeight: '600', color: theme.text },
+    apptDetailValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    detailIdBadge: {
+      borderWidth: 1,
+      borderRadius: 5,
+      paddingVertical: 1.5,
+      paddingHorizontal: 6,
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      borderColor: 'rgba(168, 85, 247, 0.3)',
+    },
+    detailIdBadgeText: { fontSize: 9, fontWeight: '700', color: '#a855f7', letterSpacing: 0.2 },
 
     apptCardFooter: {
       flexDirection: 'row',
@@ -1088,7 +1174,11 @@ function createStyles(theme: ThemePalette) {
       borderTopWidth: 1,
       borderTopColor: 'rgba(168, 85, 247, 0.2)',
     },
-    requestedText: { fontSize: 11, color: theme.tertiary, flexShrink: 1, paddingRight: 8 },
+    requestedMeta: { gap: 3, flexShrink: 1, paddingRight: 8 },
+    requestedLabel: { fontSize: 9, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
+    requestedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    requestedRowItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    requestedText: { fontSize: 11, color: theme.tertiary },
     viewBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1143,6 +1233,7 @@ function createStyles(theme: ThemePalette) {
     detailsFieldFull: { width: '100%' },
     detailsLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
     detailsValue: { fontSize: 13, color: theme.text },
+    detailsValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
     detailsModalFooter: {
       flexDirection: 'row',
       justifyContent: 'flex-end',

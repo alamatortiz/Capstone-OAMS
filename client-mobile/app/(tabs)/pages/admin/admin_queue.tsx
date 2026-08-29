@@ -29,6 +29,7 @@ import {
   MapPin,
   PlusCircle,
   RefreshCw,
+  SlidersHorizontal,
   TrendingUp,
   Users,
   X,
@@ -207,13 +208,17 @@ export default function AdminQueueScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [monitoringQueueId, setMonitoringQueueId] = useState<number | null>(null);
+  // Where the monitor view was opened from: "hosting" when reached via a
+  // Queue Hosting card (route param), null for an in-page Manage click.
+  // Drives the monitor-view back button's target/label.
+  const [monitorCameFrom, setMonitorCameFrom] = useState<'hosting' | null>(null);
   const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([]);
   const [entriesPage, setEntriesPage] = useState(0);
   const [collegeOverviewFilter, setCollegeOverviewFilter] = useState('all');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
   const router = useRouter();
-  const { monitorQueueId } = useLocalSearchParams<{ monitorQueueId?: string }>();
+  const { monitorQueueId, from } = useLocalSearchParams<{ monitorQueueId?: string; from?: string }>();
   const { user, logout } = useAuth();
 
   const fetchEntries = useCallback(async (slotId: number) => {
@@ -361,21 +366,22 @@ export default function AdminQueueScreen() {
   const entriesStartIndex = currentEntriesPage * ENTRIES_PER_PAGE;
   const paginatedEntries = queueEntries.slice(entriesStartIndex, entriesStartIndex + ENTRIES_PER_PAGE);
 
-  const openMonitor = (id: number) => {
+  const openMonitor = (id: number, cameFrom: 'hosting' | null = null) => {
     setMonitoringQueueId(id);
     setEntriesPage(0);
+    setMonitorCameFrom(cameFrom);
   };
 
   // Lets admin_queue_hosting.tsx's cards jump straight into the monitor view
   // for a specific queue (mirrors adm-queue.jsx's location.state handling).
-  // Clears the param after consuming it so navigating back and forward again
-  // doesn't silently re-trigger the monitor view.
+  // Clears the params after consuming them so navigating back and forward
+  // again doesn't silently re-trigger the monitor view.
   useEffect(() => {
     if (!monitorQueueId) return;
-    openMonitor(Number(monitorQueueId));
-    router.setParams({ monitorQueueId: undefined });
+    openMonitor(Number(monitorQueueId), from === 'hosting' ? 'hosting' : null);
+    router.setParams({ monitorQueueId: undefined, from: undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monitorQueueId]);
+  }, [monitorQueueId, from]);
 
   // ── Queue actions — real API calls against the admin's own department ──
   const handleCallNext = async (id: number) => {
@@ -525,9 +531,20 @@ export default function AdminQueueScreen() {
 
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.monitorTopbar}>
-              <Pressable style={styles.backBtn} onPress={() => setMonitoringQueueId(null)}>
+              <Pressable
+                style={styles.backBtn}
+                onPress={() => {
+                  if (monitorCameFrom === 'hosting') {
+                    router.push('/pages/admin/admin_queue_hosting');
+                    return;
+                  }
+                  setMonitoringQueueId(null);
+                }}
+              >
                 <ArrowLeft size={16} color={theme.text} />
-                <Text style={styles.backBtnText}>Back to Queue List</Text>
+                <Text style={styles.backBtnText}>
+                  {monitorCameFrom === 'hosting' ? 'Back to Queue Hosting' : 'Back to Queue List'}
+                </Text>
               </Pressable>
               <Pressable
                 style={styles.refreshBtn}
@@ -937,18 +954,21 @@ export default function AdminQueueScreen() {
               <Clock size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
-              <Text style={styles.pageTitle}>Centralized Queue Management</Text>
-              <Text style={styles.pageSubtitle}>Monitor and control queues for {user?.departmentName ?? ''}</Text>
+              <Text style={styles.pageTitle}>Queue Management</Text>
+              <Text style={styles.pageSubtitle}>Manage and monitor queues within your department.</Text>
             </View>
           </View>
 
-          <Pressable style={styles.hostQueueBtn} onPress={() => router.push('/pages/admin/admin_queue_hosting')}>
+          <Pressable
+            style={styles.hostQueueBtn}
+            onPress={() => router.push({ pathname: '/pages/admin/admin_queue_hosting', params: { from: 'queue' } })}
+          >
             <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.hostQueueIconBox}>
               <PlusCircle size={20} color="#ffffff" />
             </LinearGradient>
             <View style={{ flex: 1 }}>
-              <Text style={styles.hostQueueTitle}>Host Queue</Text>
-              <Text style={styles.hostQueueSubtitle}>Open a new queue line and manage service slots</Text>
+              <Text style={styles.hostQueueTitle}>Queue Hosting</Text>
+              <Text style={styles.hostQueueSubtitle}>Host and manage queues within your department.</Text>
             </View>
             <ChevronRight size={20} color={theme.blue} />
           </Pressable>
@@ -1116,8 +1136,8 @@ export default function AdminQueueScreen() {
                     </View>
 
                     <Pressable style={styles.monitorBtn} onPress={() => openMonitor(detail.id)}>
-                      <AlertCircle size={16} color="#ffffff" />
-                      <Text style={styles.monitorBtnText}>Monitor</Text>
+                      <SlidersHorizontal size={16} color="#ffffff" />
+                      <Text style={styles.monitorBtnText}>Manage</Text>
                     </Pressable>
                   </View>
                 ))}

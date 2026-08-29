@@ -192,6 +192,10 @@ export default function ProfessorScheduleManagerScreen() {
   const [addDays, setAddDays] = useState<string[]>([]);
   const [addStart, setAddStart] = useState('');
   const [addEnd, setAddEnd] = useState('');
+  // End Time picked via "Custom time…" (free time input) instead of the
+  // fixed-duration list.
+  const [endCustom, setEndCustom] = useState(false);
+  const [endCustomPickerOpen, setEndCustomPickerOpen] = useState(false);
   const [addLocation, setAddLocation] = useState('');
   const [showOtherLocation, setShowOtherLocation] = useState(false);
   const [addMaxStudents, setAddMaxStudents] = useState('');
@@ -278,6 +282,7 @@ export default function ProfessorScheduleManagerScreen() {
     setAddDays(day ? [day] : []);
     setAddStart('');
     setAddEnd('');
+    setEndCustom(false);
     setAddLocation('');
     setShowOtherLocation(false);
     setAddMaxStudents('');
@@ -292,6 +297,7 @@ export default function ProfessorScheduleManagerScreen() {
     setAddDays([day]);
     setAddStart(slot.start_time.slice(0, 5));
     setAddEnd(slot.end_time.slice(0, 5));
+    setEndCustom(false);
     setAddLocation(slot.location);
     setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
     setAddMaxStudents(String(slot.max_students));
@@ -318,6 +324,7 @@ export default function ProfessorScheduleManagerScreen() {
     setEditingId(null);
     setStartPickerOpen(false);
     setEndPickerOpen(false);
+    setEndCustomPickerOpen(false);
     setLocationPickerOpen(false);
     setShowSaveConfirm(false);
   };
@@ -465,7 +472,7 @@ export default function ProfessorScheduleManagerScreen() {
 
   const selectedLocationLabel = showOtherLocation ? 'Other (type your own)…' : addLocation || 'Select a location';
 
-  const endOptions = getEndTimeOptions(addStart, addEnd);
+  const endOptions = getEndTimeOptions(addStart, endCustom ? '' : addEnd);
   // Locks the Add/Edit modal's fields while the save-confirmation overlay is
   // showing, so a keyboard/switch-access user can't reach fields hidden
   // behind it and change them while a stale summary is displayed.
@@ -710,7 +717,7 @@ export default function ProfessorScheduleManagerScreen() {
                     </Text>
                     <Ionicons name="chevron-down" size={16} color={theme.subtext} />
                   </Pressable>
-                  {!!addStart && endOptions.length === 0 && (
+                  {!!addStart && !endCustom && endOptions.length === 0 && (
                     <Text style={styles.fieldHintWarning}>
                       No end times available — pick a start time before 11:59 PM.
                     </Text>
@@ -864,12 +871,12 @@ export default function ProfessorScheduleManagerScreen() {
                 <Text style={styles.pickerModalTitle}>End Time</Text>
                 <ScrollView style={{ maxHeight: 320 }}>
                   {endOptions.map((opt) => {
-                    const selected = opt.value === addEnd;
+                    const selected = !endCustom && opt.value === addEnd;
                     return (
                       <Pressable
                         key={opt.value}
                         style={[styles.pickerOption, selected && styles.pickerOptionActive]}
-                        onPress={() => { setAddEnd(opt.value); setEndPickerOpen(false); }}
+                        onPress={() => { setEndCustom(false); setAddEnd(opt.value); setEndPickerOpen(false); }}
                       >
                         <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>
                           {fmt12(opt.value)} ({formatDuration(opt.duration)})
@@ -878,6 +885,21 @@ export default function ProfessorScheduleManagerScreen() {
                       </Pressable>
                     );
                   })}
+                  {!!addStart && (
+                    <Pressable
+                      style={[styles.pickerOption, endCustom && styles.pickerOptionActive]}
+                      onPress={() => {
+                        setEndCustom(true);
+                        setEndPickerOpen(false);
+                        setEndCustomPickerOpen(true);
+                      }}
+                    >
+                      <Text style={[styles.pickerOptionText, endCustom && styles.pickerOptionTextActive]}>
+                        Custom time…
+                      </Text>
+                      {endCustom && <Ionicons name="checkmark" size={16} color="#a855f7" />}
+                    </Pressable>
+                  )}
                 </ScrollView>
                 <Pressable style={styles.pickerModalClose} onPress={() => setEndPickerOpen(false)}>
                   <Text style={styles.pickerModalCloseText}>Close</Text>
@@ -928,6 +950,16 @@ export default function ProfessorScheduleManagerScreen() {
         value={addStart}
         onSelect={(t) => { handleStartChange(t); setStartPickerOpen(false); }}
         onClose={() => setStartPickerOpen(false)}
+        styles={styles}
+      />
+
+      {/* Custom End Time Picker (free entry, chosen via "Custom time…") */}
+      <TimePickerModal
+        visible={endCustomPickerOpen}
+        title="End Time"
+        value={addEnd || addStart}
+        onSelect={(t) => { setAddEnd(t); setEndCustomPickerOpen(false); }}
+        onClose={() => setEndCustomPickerOpen(false)}
         styles={styles}
       />
 

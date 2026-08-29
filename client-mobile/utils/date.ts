@@ -37,3 +37,21 @@ export const formatManilaDate = (
     ...opts,
   });
 };
+
+// Renders an API timestamp as a Manila wall-clock time ("3:45 PM"). Same
+// input contract as formatManilaDate; mirrors web's formatManilaTime.
+export const formatManilaTime = (
+  value?: string | null,
+  opts: Intl.DateTimeFormatOptions = {},
+): string => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Manila',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...opts,
+  });
+};

@@ -202,6 +202,13 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'archived', label: 'Archived' },
 ];
 
+const EMPTY_COPY: Record<TabKey, { title: string; description: string }> = {
+  active: { title: 'No Active Announcements', description: "You haven't posted any active announcements yet." },
+  pinned: { title: 'No Pinned Announcements', description: "You haven't pinned any announcements yet." },
+  unpinned: { title: 'No Unpinned Announcements', description: 'Every active announcement is currently pinned.' },
+  archived: { title: 'No Archived Announcements', description: "You haven't archived any announcements yet." },
+};
+
 const TYPE_FILTER_OPTIONS = [
   { value: 'all', label: 'All Types' },
   { value: 'important', label: 'Important' },
@@ -774,7 +781,10 @@ export default function AdminAnnouncementScreen() {
           ) : list.length === 0 ? (
             <View style={styles.emptyCard}>
               <Megaphone size={32} color={theme.tertiary} />
-              <Text style={styles.emptyTitle}>No {activeTab} announcements found.</Text>
+              <Text style={styles.emptyStateTitle}>{(EMPTY_COPY[activeTab] ?? EMPTY_COPY.active).title}</Text>
+              <Text style={styles.emptyStateDescription}>
+                {(EMPTY_COPY[activeTab] ?? EMPTY_COPY.active).description}
+              </Text>
             </View>
           ) : (
             <View style={styles.list}>
@@ -1682,6 +1692,8 @@ function createStyles(theme: ThemePalette) {
       gap: 8,
     },
     emptyTitle: { fontSize: 13, color: theme.tertiary, textAlign: 'center' },
+    emptyStateTitle: { fontSize: 15, fontWeight: '700', color: theme.text, textAlign: 'center' },
+    emptyStateDescription: { fontSize: 13, color: theme.tertiary, textAlign: 'center' },
 
     // Nav drawer
     drawerOverlay: { flex: 1, flexDirection: 'row' },

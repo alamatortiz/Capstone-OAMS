@@ -31,7 +31,7 @@ import {
   Search,
   X,
 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -182,6 +182,10 @@ export default function AdminQueueHostingScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
+  // Origin-aware breadcrumb: "Queue Management" when opened from admin_queue's
+  // Host Queue card (route param), "Home" otherwise (dashboard, direct nav).
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const cameFromQueue = from === 'queue';
   const { user, logout } = useAuth();
   const {
     queues,
@@ -458,9 +462,15 @@ export default function AdminQueueHostingScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <Pressable style={styles.breadcrumb} onPress={goToDashboard} hitSlop={8}>
+          <Pressable
+            style={styles.breadcrumb}
+            onPress={() =>
+              cameFromQueue ? router.push('/pages/admin/admin_queue') : goToDashboard()
+            }
+            hitSlop={8}
+          >
             <ChevronLeft size={18} color={theme.subtext} />
-            <Text style={styles.breadcrumbText}>Home</Text>
+            <Text style={styles.breadcrumbText}>{cameFromQueue ? 'Queue Management' : 'Home'}</Text>
           </Pressable>
 
           <View style={styles.titleRow}>
@@ -468,11 +478,8 @@ export default function AdminQueueHostingScreen() {
               <Clock size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
-              <Text style={styles.pageTitle}>Queue Hosting Management</Text>
-              <Text style={styles.pageSubtitle}>
-                {user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''}) — open, manage, and close your
-                department&apos;s queue lines
-              </Text>
+              <Text style={styles.pageTitle}>Queue Hosting</Text>
+              <Text style={styles.pageSubtitle}>Host and manage queues within your department.</Text>
             </View>
           </View>
 
@@ -556,7 +563,7 @@ export default function AdminQueueHostingScreen() {
                   <Pressable
                     key={queue.id}
                     style={[styles.queueCard, styles.queueCardActive]}
-                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id), from: 'hosting' } })}
                   >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
@@ -598,7 +605,7 @@ export default function AdminQueueHostingScreen() {
                         <Text style={styles.queueStatValueSm}>{queue.createdAt}</Text>
                       </View>
                       <View style={[styles.queueStat, { minWidth: '100%' }]}>
-                        <Text style={styles.queueStatLabel}>Capacity</Text>
+                        <Text style={styles.queueStatLabel}>Occupied Slots</Text>
                         <View style={styles.capacityBarTrack}>
                           <View
                             style={[
@@ -641,7 +648,7 @@ export default function AdminQueueHostingScreen() {
                   <Pressable
                     key={queue.id}
                     style={[styles.queueCard, styles.queueCardPaused]}
-                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id), from: 'hosting' } })}
                   >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
@@ -717,7 +724,7 @@ export default function AdminQueueHostingScreen() {
                     <Pressable
                       key={queue.id}
                       style={[styles.queueCard, styles.queueCardStillServing]}
-                      onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                      onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id), from: 'hosting' } })}
                     >
                       <View style={styles.queueCardTopRow}>
                         <View style={styles.queueCardTitleRow}>
@@ -782,7 +789,7 @@ export default function AdminQueueHostingScreen() {
                   <Pressable
                     key={queue.id}
                     style={[styles.queueCard, styles.queueCardCompleted]}
-                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id), from: 'hosting' } })}
                   >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
@@ -834,7 +841,7 @@ export default function AdminQueueHostingScreen() {
                   <Pressable
                     key={queue.id}
                     style={[styles.queueCard, styles.queueCardClosed]}
-                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id) } })}
+                    onPress={() => router.push({ pathname: '/pages/admin/admin_queue', params: { monitorQueueId: String(queue.id), from: 'hosting' } })}
                   >
                     <View style={styles.queueCardTopRow}>
                       <View style={styles.queueCardTitleRow}>
