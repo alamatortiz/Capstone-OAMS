@@ -911,11 +911,7 @@ export default function AdminAnnouncementScreen() {
           <View style={styles.viewModalCard}>
             {viewingAnnouncement && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.modalHeaderRow}>
-                  <View style={styles.modalHeaderText}>
-                    <Text style={styles.modalTitle}>Announcement Details</Text>
-                    <Text style={styles.modalDesc}>View complete information about this announcement</Text>
-                  </View>
+                <View style={[styles.modalHeaderRow, { justifyContent: 'flex-end' }]}>
                   <Pressable onPress={() => setViewingAnnouncement(null)} hitSlop={8}>
                     <X size={20} color={theme.subtext} />
                   </Pressable>
@@ -1774,9 +1770,7 @@ function createStyles(theme: ThemePalette) {
       gap: 12,
       marginBottom: 16,
     },
-    modalHeaderText: { flex: 1, gap: 3 },
     modalTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
-    modalDesc: { fontSize: 12, color: theme.tertiary },
 
     // View modal
     viewModalCard: {
