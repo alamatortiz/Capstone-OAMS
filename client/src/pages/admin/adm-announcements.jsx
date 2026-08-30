@@ -476,20 +476,16 @@ export default function AdminAnnouncements() {
             <div className="ann-modal-overlay">
               <div className="ann-modal ann-modal--view" onClick={(e) => e.stopPropagation()}>
                 <div className="ann-modal-header">
-                  <div>
-                    <h3 className="ann-modal-title"><EyeIcon /> Announcement Details</h3>
-                    <p className="ann-modal-desc">View complete information about this announcement.</p>
-                    <div className="ann-modal-header-badges">
-                      {viewingAnnouncement.audience === "students" && (
-                        <span className={`ann-badge ${TYPE_META[viewingAnnouncement.type].badgeClass}`}>
-                          {TYPE_META[viewingAnnouncement.type].label}
-                        </span>
-                      )}
-                      <span className={`ann-pin-badge ${viewingAnnouncement.isPinned ? "ann-pin-badge--on" : "ann-pin-badge--off"}`}>
-                        {viewingAnnouncement.isPinned && <PinIcon />}
-                        {viewingAnnouncement.isPinned ? "Pinned" : "Not Pinned"}
+                  <div className="ann-modal-header-badges">
+                    {viewingAnnouncement.audience === "students" && (
+                      <span className={`ann-badge ${TYPE_META[viewingAnnouncement.type].badgeClass}`}>
+                        {TYPE_META[viewingAnnouncement.type].label}
                       </span>
-                    </div>
+                    )}
+                    <span className={`ann-pin-badge ${viewingAnnouncement.isPinned ? "ann-pin-badge--on" : "ann-pin-badge--off"}`}>
+                      {viewingAnnouncement.isPinned && <PinIcon />}
+                      {viewingAnnouncement.isPinned ? "Pinned" : "Not Pinned"}
+                    </span>
                   </div>
                   <button className="ann-modal-close" onClick={() => setViewingAnnouncement(null)} aria-label="Close">
                     <XIcon />

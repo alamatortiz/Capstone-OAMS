@@ -92,6 +92,10 @@ export default function AdminQueueHosting() {
   // host link (nav state), "Home" otherwise (dashboard quick action, direct
   // URL, refresh).
   const cameFromQueue = location.state?.from === "queue";
+  // Open the monitor view on adm-queue, tagging the origin so its breadcrumb
+  // links back here ("Queue Hosting") instead of the in-page queue list.
+  const openMonitor = (id) =>
+    navigate("/admin/queue", { state: { monitorQueueId: id, from: "hosting" } });
   const { user: authUser } = useAuth();
   const user = authUser
     ? {
@@ -649,7 +653,7 @@ export default function AdminQueueHosting() {
                   <div
                     key={queue.id}
                     className="aqh-queue-card aqh-card-active aqh-queue-card--clickable"
-                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
+                    onClick={() => openMonitor(queue.id)}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -748,7 +752,7 @@ export default function AdminQueueHosting() {
                   <div
                     key={queue.id}
                     className="aqh-queue-card aqh-card-paused aqh-queue-card--clickable"
-                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
+                    onClick={() => openMonitor(queue.id)}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -822,7 +826,7 @@ export default function AdminQueueHosting() {
                   <div
                     key={queue.id}
                     className="aqh-queue-card aqh-card-still-serving aqh-queue-card--clickable"
-                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
+                    onClick={() => openMonitor(queue.id)}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -893,7 +897,7 @@ export default function AdminQueueHosting() {
                   <div
                     key={queue.id}
                     className="aqh-queue-card aqh-card-completed aqh-queue-card--clickable"
-                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
+                    onClick={() => openMonitor(queue.id)}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">
@@ -943,7 +947,7 @@ export default function AdminQueueHosting() {
                   <div
                     key={queue.id}
                     className="aqh-queue-card aqh-card-closed aqh-queue-card--clickable"
-                    onClick={() => navigate('/admin/queue', { state: { monitorQueueId: queue.id } })}
+                    onClick={() => openMonitor(queue.id)}
                   >
                     <div className="aqh-queue-card-top">
                       <div className="aqh-queue-card-title-row">

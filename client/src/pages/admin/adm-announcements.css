@@ -947,13 +947,6 @@
   color: var(--primary-color);
 }
 
-.ann-modal-desc {
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  text-align: left;
-}
-
 .ann-modal-close {
   background: transparent;
   border: none;
@@ -1025,6 +1018,7 @@
   margin-bottom: 0;
   border-bottom: 1px solid var(--card-border);
   flex-shrink: 0;
+  align-items: center;
 }
 .ann-modal--view .ann-modal-close:hover {
   background: rgba(239, 68, 68, 0.1);
@@ -1035,7 +1029,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.6rem;
+  margin-top: 0;
 }
 .ann-pin-badge {
   display: inline-flex;
