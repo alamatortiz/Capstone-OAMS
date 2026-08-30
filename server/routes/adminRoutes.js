@@ -3787,14 +3787,18 @@ router.get(
              AND (? IS NULL OR s.service_name = ?)`,
           [deptId, slotDateParam, slotDateParam, service, service],
         ),
-        // Per-service served / no-shows / avg wait.
+        // Per-service served / no-shows / avg wait. Each metric requires the
+        // timestamp that proves the entry actually ran its course
+        // (completed_at / called_at), so a malformed row -- e.g. status
+        // 'completed' with a null completed_at -- can't inflate the counts.
         pool.query(
           `SELECT s.service_id, s.service_name,
-             COALESCE(SUM(q.status = 'completed'
+             COALESCE(SUM(q.status = 'completed' AND q.completed_at IS NOT NULL
                AND (? IS NULL OR q.completed_at >= ?)), 0) AS students_served,
-             COALESCE(SUM(q.status = 'no_show'
+             COALESCE(SUM(q.status = 'no_show' AND q.called_at IS NOT NULL
                AND (? IS NULL OR q.called_at >= ?)), 0) AS no_shows,
-             AVG(CASE WHEN q.status = 'completed'
+             AVG(CASE WHEN q.status = 'completed' AND q.completed_at IS NOT NULL
+               AND q.called_at IS NOT NULL
                AND (? IS NULL OR q.completed_at >= ?)
                THEN TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at) END) AS avg_wait_minutes
            FROM services s
@@ -3822,12 +3826,17 @@ router.get(
            GROUP BY qs.service_id`,
           [deptId, slotDateParam, slotDateParam, service, service],
         ),
-        // Peak hour -- busiest Manila clock-hour by queue join time.
+        // Peak hour -- busiest Manila clock-hour by queue join time, over
+        // entries that actually reached a service window (`called_at` set:
+        // every real served / no-show entry has one). Excludes still-waiting
+        // and malformed rows, so a stray entry can't manufacture a "peak
+        // hour" while every headline count reads 0.
         pool.query(
           `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr, COUNT(*) AS cnt
            FROM queues q
            JOIN services s ON q.service_id = s.service_id
            WHERE s.department_id = ?
+             AND q.called_at IS NOT NULL
              AND (? IS NULL OR q.created_at >= ?)
              AND (? IS NULL OR s.service_name = ?)
            GROUP BY hr
