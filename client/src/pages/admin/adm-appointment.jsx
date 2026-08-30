@@ -18,7 +18,12 @@ import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
-import { connectSocket } from "../../utils/socket";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
+
+const APPOINTMENT_LIVE_EVENTS = [
+  "appointment:slot-updated",
+  "appointment:status-updated",
+];
 
 // ── Icons (All SVG Components) ──────────────────────────────────────────────
 const CalendarIconNav = () => (
@@ -121,21 +126,8 @@ export default function AdminAppointment() {
     if (authUser) fetchAppointments();
   }, [authUser, fetchAppointments]);
 
-  // ── Live updates: refetch when a booking or status change affects this dept ──
-  useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
-    if (!authUser || !token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = ["appointment:slot-updated", "appointment:status-updated"];
-    events.forEach((event) => socket.on(event, fetchAppointments));
-
-    return () => {
-      events.forEach((event) => socket.off(event, fetchAppointments));
-    };
-  }, [authUser, fetchAppointments]);
+  // ── Live updates (also reconciles on socket reconnect). ──
+  useLiveRefetch(APPOINTMENT_LIVE_EVENTS, fetchAppointments);
 
   const searchFiltered = searchQuery
     ? appointments.filter((a) => {
@@ -443,7 +435,7 @@ export default function AdminAppointment() {
             breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
             icon={<Calendar />}
             iconClassName="admin-appointment-title-icon"
-            title="Department Appointments Overview"
+            title="Appointments Overview"
             subtitle="Monitor appointments within your department."
             headerClassName="admin-appointment-page-header"
             breadcrumbClassName="page-breadcrumb"

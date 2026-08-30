@@ -9,7 +9,13 @@ import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import FilterSelect from "../../components/FilterSelect";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
-import { connectSocket } from "../../utils/socket";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
+
+const DOCUMENT_LIVE_EVENTS = [
+  "document:new-request",
+  "document:status-updated",
+  "document:cancelled",
+];
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
 
@@ -241,21 +247,8 @@ export default function AdminDocumentProcessing() {
     fetchDocuments();
   }, [fetchDocuments]);
 
-  // ── Live updates: refetch when a student submits/cancels a document request ──
-  useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
-    if (!token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = ["document:new-request", "document:cancelled"];
-    events.forEach((event) => socket.on(event, fetchDocuments));
-
-    return () => {
-      events.forEach((event) => socket.off(event, fetchDocuments));
-    };
-  }, [fetchDocuments]);
+  // ── Live updates (also reconciles on socket reconnect). ──
+  useLiveRefetch(DOCUMENT_LIVE_EVENTS, fetchDocuments);
 
   // ── Date buckets ──────────────────────────────────────────────────────────
   // Monday-anchored this-week/next-week windows (same pattern as

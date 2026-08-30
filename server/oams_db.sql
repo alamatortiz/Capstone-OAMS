@@ -251,8 +251,12 @@ CREATE TABLE queue_slots (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (service_id) REFERENCES services(service_id),
     FOREIGN KEY (admin_id)   REFERENCES administrators(admin_id),
-    -- prevents duplicate slots for the same service on the same day/time window
-    UNIQUE KEY uq_slot_window (service_id, slot_date, start_time)
+    -- Non-unique on purpose. A UNIQUE key here would let a completed/closed slot
+    -- permanently block re-hosting that same window ("Host Again"). Uniqueness
+    -- among *live* queues is enforced in POST /queue-hosting by the status-aware
+    -- overlap check, serialized by a SELECT ... FOR UPDATE on the owning service
+    -- row. The index still speeds that overlap lookup and backs the service_id FK.
+    INDEX idx_slot_window (service_id, slot_date, start_time)
 );
 
 -- ─────────────────────────────────────────────────────────────

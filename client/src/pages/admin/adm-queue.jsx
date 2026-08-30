@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAdminQueueHosting } from "../../hooks/useAdminQueueHosting";
 import AdminPageShell from "../../components/AdminPageShell";
+import LoadingOverlay from "../../components/LoadingOverlay";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
@@ -778,9 +779,7 @@ export default function AdminQueue() {
         outerClassName="admin-queue-with-sidebar"
         mainClassName="admin-queue-main"
       >
-        <div className="queue-monitoring-container">
-          <p className="queue-monitoring-status-note">Loading queue…</p>
-        </div>
+        <LoadingOverlay label="Loading queue…" />
       </AdminPageShell>
     );
   }

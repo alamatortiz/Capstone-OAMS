@@ -1,718 +1,344 @@
 import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import "./adm-queue-analytics.css";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
+import FilterSelect from "../../components/FilterSelect";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import { connectSocket } from "../../utils/socket";
+import { useAuth } from "../../context/AuthContext";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import { getManilaDateString } from "../../utils/dateTime";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-const DownloadIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="16"
-    height="16"
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-    <polyline points="7 10 12 15 17 10"></polyline>
-    <line x1="12" y1="15" x2="12" y2="3"></line>
-  </svg>
-);
-const RefreshIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="16"
-    height="16"
-  >
-    <polyline points="23 4 23 10 17 10"></polyline>
-    <polyline points="1 20 1 14 7 14"></polyline>
-    <path d="M3.51 9a9 9 0 0 1 14.8-3.72L23 10M1 14l4.69 4.72A9 9 0 0 0 20.49 15"></path>
-  </svg>
-);
-const TrendUpIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="16"
-    height="16"
-  >
-    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-    <polyline points="17 6 23 6 23 12"></polyline>
-  </svg>
-);
-const AlertTriangleIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="16"
-    height="16"
-  >
-    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-    <line x1="12" y1="9" x2="12" y2="13"></line>
-    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-  </svg>
-);
 const BarChartIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+  <svg className="aqa-title-svg" viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
     <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z" />
   </svg>
 );
-const UsersIcon2 = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="20"
-    height="20"
-  >
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-    <circle cx="9" cy="7" r="4"></circle>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+const CheckCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
-const ClockIcon2 = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="20"
-    height="20"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
+const AlarmIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l2 2" />
+    <path d="M5 3 2 6" />
+    <path d="m22 6-3-3" />
+    <path d="M6.38 18.7 4 21" />
+    <path d="M17.64 18.67 20 21" />
   </svg>
 );
-const SmileIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="20"
-    height="20"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-    <line x1="9" y1="9" x2="9.01" y2="9"></line>
-    <line x1="15" y1="9" x2="15.01" y2="9"></line>
+const UsersIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
-const ActivityIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="20"
-    height="20"
-  >
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+const UserXIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <line x1="17" y1="8" x2="22" y2="13" />
+    <line x1="22" y1="8" x2="17" y2="13" />
   </svg>
 );
-const CalendarIcon2 = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    width="16"
-    height="16"
-  >
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-    <line x1="16" y1="2" x2="16" y2="6"></line>
-    <line x1="8" y1="2" x2="8" y2="6"></line>
-    <line x1="3" y1="10" x2="21" y2="10"></line>
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+const DownloadIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+const ChevronDownIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
-// ── Static Data ───────────────────────────────────────────────────────────────
-const timePeriods = ["Today", "This Week", "This Month", "This Semester"];
+const RANGE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "all", label: "All Time" },
+];
+
+// A queue metric moves whenever a student is called / served / no-showed or a
+// slot's lifecycle changes; useLiveRefetch also reconciles on socket reconnect.
+const ANALYTICS_LIVE_EVENTS = [
+  "queue:called",
+  "queue:served",
+  "queue:no-show",
+  "queue:slot-status",
+  "queue:student-joined",
+  "queue:student-left",
+];
 
 export default function AdminQueueAnalytics() {
-  const { user: authUser, token } = useAuth();
+  const { user: authUser } = useAuth();
   const user = authUser
     ? {
         ...authUser,
         college: authUser.departmentName ?? "N/A College",
-        employeeId: authUser.employeeId ?? "",
         departmentAbbrev: authUser.departmentAbbrev ?? "CCS",
       }
-    : {
-        name: "Admin",
-        role: "admin",
-        college: "",
-        employeeId: "",
-        departmentAbbrev: "CCS",
-      };
+    : { name: "Admin", college: "", departmentAbbrev: "CCS" };
 
-  // Filters
-  const [timePeriod, setTimePeriod] = useState("Today");
+  const [range, setRange] = useState("today");
   const [serviceType, setServiceType] = useState("All Services");
-  const [timePeriodOpen, setTimePeriodOpen] = useState(false);
-  const [serviceTypeOpen, setServiceTypeOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("insights");
-
-  // Analytics data from API
   const [serviceTypes, setServiceTypes] = useState(["All Services"]);
-  const [analyticsData, setAnalyticsData] = useState({
-    performance: [],
-    positiveInsights: [],
-    improvementAreas: [],
-    trends: { peakActivityTime: "N/A", bestServiceTime: "N/A", weeklyComparison: [] },
+  const [totals, setTotals] = useState({
+    accomplishedQueues: 0,
+    overtimeQueues: 0,
+    studentsServed: 0,
+    noShows: 0,
+    peakHour: "N/A",
   });
-  // Starts true (not false) so the very first load still shows a loading
-  // state -- fetchAnalytics itself no longer re-arms this on later calls,
-  // so subsequent poll/socket/filter-driven refreshes update silently.
-  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [byService, setByService] = useState([]);
+  // Starts true so the first load shows a loading state; later refreshes
+  // (filter change / socket / reconnect) update silently.
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchSummary = useCallback(async () => {
     try {
-      const res = await api.get("/admin/queue-analytics", {
-        params: { period: timePeriod, service: serviceType },
+      setError(null);
+      const res = await api.get("/admin/queue-analytics/summary", {
+        params: { range, service: serviceType },
       });
-      setAnalyticsData({
-        performance: res.data.performance ?? [],
-        positiveInsights: res.data.positiveInsights ?? [],
-        improvementAreas: res.data.improvementAreas ?? [],
-        trends: res.data.trends ?? { peakActivityTime: "N/A", bestServiceTime: "N/A", weeklyComparison: [] },
-      });
+      setTotals(res.data.totals);
+      setByService(res.data.byService ?? []);
       if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
     } catch (err) {
-      console.error("Queue analytics fetch error:", err);
+      console.error("Queue analytics summary fetch error:", err);
+      setError("Could not load queue analytics.");
     } finally {
-      setAnalyticsLoading(false);
+      setLoading(false);
     }
-  }, [timePeriod, serviceType]);
+  }, [range, serviceType]);
 
+  // Initial + filter-driven fetch (fetchSummary changes identity with range /
+  // serviceType), plus live socket updates + reconnect reconciliation.
   useEffect(() => {
-    if (!authUser) return;
-    fetchAnalytics();
-  }, [authUser, fetchAnalytics]);
+    if (authUser) fetchSummary();
+  }, [authUser, fetchSummary]);
+  useLiveRefetch(ANALYTICS_LIVE_EVENTS, fetchSummary);
 
-  // ── Live updates: this page previously only refetched when a filter
-  // changed, so it could show a stale snapshot while an admin actively
-  // worked the same department's live queue in another tab.
-  useEffect(() => {
-    if (!authUser || !token) return;
-    const socket = connectSocket(token);
-    if (!socket) return;
+  const rangeLabel = range === "today" ? "Today" : "All time";
 
-    const events = ["queue:called", "queue:served", "queue:no-show"];
-    events.forEach((event) => socket.on(event, fetchAnalytics));
-    return () => {
-      events.forEach((event) => socket.off(event, fetchAnalytics));
-    };
-  }, [authUser, token, fetchAnalytics]);
-
-  // ── Fallback poll: covers a silently-dropped/blocked WebSocket connection,
-  // same pattern as QueueProvider.jsx / stud-dashboard.jsx ──
-  useEffect(() => {
-    if (!authUser) return;
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        fetchAnalytics();
-      }
-    }, 45000);
-    return () => clearInterval(interval);
-  }, [authUser, fetchAnalytics]);
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const handler = () => {
-      setTimePeriodOpen(false);
-      setServiceTypeOpen(false);
-    };
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, []);
-
-  const performance = analyticsData.performance;
-  const positiveInsights = analyticsData.positiveInsights;
-  const improvementAreas = analyticsData.improvementAreas;
-
-  // Summary stats derived from live performance data
-  const totalServed = performance.reduce((sum, p) => sum + (p.studentsServed || 0), 0);
-  const avgWaitAll = performance.length > 0
-    ? Math.round(performance.reduce((sum, p) => sum + (parseInt(p.avgWait) || 0), 0) / performance.length)
-    : 0;
-  const avgSatisfaction = performance.length > 0
-    ? Math.round(performance.reduce((sum, p) => sum + (p.satisfaction || 0), 0) / performance.length)
-    : 0;
-
-  // Prefixes a leading =/+/-/@ with a single quote so spreadsheet apps
-  // (Excel, Sheets) treat the cell as literal text instead of a formula --
-  // user-entered fields like names have no format restriction at registration.
+  // Prefixes a leading =/+/-/@ so spreadsheet apps treat the cell as text.
   const csvEscape = (value) => {
     let str = String(value ?? "");
     if (/^[=+\-@]/.test(str)) str = `'${str}`;
     return `"${str.replace(/"/g, '""')}"`;
   };
-  const handleExportReport = () => {
-    const header = ["Service", "College", "Status", "Students Served", "Avg Wait", "Peak Hours", "Satisfaction"];
-    const rows = performance.map((item) => [
-      item.service,
-      item.college,
-      item.status,
-      item.studentsServed,
-      item.avgWait,
-      item.peakHours,
-      item.satisfaction,
+  const handleExport = () => {
+    const header = ["Service", "Students Served", "Overtime Queues", "No-Shows", "Avg Wait (min)"];
+    const rows = byService.map((r) => [
+      r.service,
+      r.studentsServed,
+      r.overtimeQueues,
+      r.noShows,
+      r.avgWaitMinutes,
     ]);
-    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `queue-analytics-${getManilaDateString()}.csv`;
+    link.download = `queue-analytics-${range}-${getManilaDateString()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success("Export complete");
   };
 
-  const getStatusColor = (status) => {
-    if (status === "excellent") return "aqa-status-excellent";
-    if (status === "good") return "aqa-status-good";
-    return "aqa-status-needs";
-  };
-
-  const getSatisfactionColor = (val) => {
-    if (val >= 90) return "#22c55e";
-    if (val >= 80) return "#3b82f6";
-    return "#f97316";
-  };
+  const statCards = [
+    {
+      label: "Accomplished Queues",
+      value: totals.accomplishedQueues,
+      icon: <CheckCircleIcon />,
+      tone: "blue",
+    },
+    {
+      label: "Overtime Queues",
+      value: totals.overtimeQueues,
+      icon: <AlarmIcon />,
+      tone: "amber",
+    },
+    {
+      label: "Students Served",
+      value: totals.studentsServed,
+      icon: <UsersIcon />,
+      tone: "blue",
+    },
+    {
+      label: "No-Shows",
+      value: totals.noShows,
+      icon: <UserXIcon />,
+      tone: "red",
+    },
+    {
+      label: "Peak Hour",
+      value: totals.peakHour,
+      icon: <ClockIcon />,
+      tone: "blue",
+      isText: true,
+    },
+  ];
 
   return (
-    <AdminPageShell
-      outerClassName="aqa-layout"
-      mainClassName="aqa-main"
-    >
-        <div className="aqa-content">
-          <PageHeader
-            breadcrumb={<Link to="/admin/dashboard" className="page-breadcrumb-link"><ChevronLeft />Home</Link>}
-            icon={<BarChartIcon />}
-            iconClassName="aqa-title-icon"
-            title="Queue Analytics"
-            subtitle="Real-time queue performance metrics and insights."
-            headerClassName="aqa-page-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="aqa-title-section"
-            titleClassName="aqa-page-title"
-            subtitleClassName="aqa-page-subtitle"
-          />
+    <AdminPageShell outerClassName="aqa-layout" mainClassName="aqa-main">
+      <div className="aqa-content">
+        <PageHeader
+          breadcrumb={
+            <Link to="/admin/dashboard" className="page-breadcrumb-link">
+              <ChevronLeft />
+              Home
+            </Link>
+          }
+          icon={<BarChartIcon />}
+          iconClassName="aqa-title-icon"
+          title="Queue Analytics"
+          subtitle="Queue performance for your department."
+          headerClassName="aqa-page-header"
+          breadcrumbClassName="page-breadcrumb"
+          titleSectionClassName="aqa-title-section"
+          titleClassName="aqa-page-title"
+          subtitleClassName="aqa-page-subtitle"
+        />
 
-          {/* Filters */}
-          <div className="aqa-filters-card">
-            <div className="aqa-filters-header">
-              <div>
-                <p className="aqa-filters-title">Analytics Filters</p>
-                <p className="aqa-filters-sub">Customize your analytics view.</p>
-              </div>
-              <div className="aqa-filters-actions">
-                <button className="aqa-btn-outline" onClick={handleExportReport}>
-                  <DownloadIcon /> Export Report
-                </button>
-                <button className="aqa-btn-outline">
-                  <RefreshIcon /> Refresh
-                </button>
-              </div>
-            </div>
-            <div className="aqa-filters-row">
-              {/* Department (read-only) */}
-              <div className="aqa-filter-group">
-                <label className="aqa-filter-label">Department</label>
-                <div className="aqa-filter-display">
-                  {user?.college} ({user?.departmentAbbrev})
-                </div>
-              </div>
-
-              {/* Time Period */}
-              <div className="aqa-filter-group">
-                <label className="aqa-filter-label">Time Period</label>
-                <div
-                  className="aqa-dropdown-wrapper"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTimePeriodOpen((p) => !p);
-                    setServiceTypeOpen(false);
-                  }}
-                >
-                  <div className="aqa-dropdown-trigger">
-                    <span>{timePeriod}</span>
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="14"
-                      height="14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </div>
-                  {timePeriodOpen && (
-                    <div className="aqa-dropdown-menu">
-                      {timePeriods.map((t) => (
-                        <div
-                          key={t}
-                          className={`aqa-dropdown-item ${timePeriod === t ? "selected" : ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTimePeriod(t);
-                            setTimePeriodOpen(false);
-                          }}
-                        >
-                          {t}
-                          {timePeriod === t && (
-                            <svg
-                              viewBox="0 0 24 24"
-                              width="14"
-                              height="14"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
-                              <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Service Type */}
-              <div className="aqa-filter-group">
-                <label className="aqa-filter-label">Service Type</label>
-                <div
-                  className="aqa-dropdown-wrapper"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setServiceTypeOpen((p) => !p);
-                    setTimePeriodOpen(false);
-                  }}
-                >
-                  <div className="aqa-dropdown-trigger">
-                    <span>{serviceType}</span>
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="14"
-                      height="14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </div>
-                  {serviceTypeOpen && (
-                    <div className="aqa-dropdown-menu">
-                      {serviceTypes.map((s) => (
-                        <div
-                          key={s}
-                          className={`aqa-dropdown-item ${serviceType === s ? "selected" : ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setServiceType(s);
-                            setServiceTypeOpen(false);
-                          }}
-                        >
-                          {s}
-                          {serviceType === s && (
-                            <svg
-                              viewBox="0 0 24 24"
-                              width="14"
-                              height="14"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
-                              <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Row */}
-          <div className="aqa-stats-row">
-            <div className="aqa-stat-card">
-              <div className="aqa-stat-header">
-                <UsersIcon2 />
-                <span className="aqa-stat-label">Total Served</span>
-              </div>
-              <div className="aqa-stat-value aqa-stat-green">
-                {analyticsLoading ? "—" : totalServed}
-              </div>
-              <div className="aqa-stat-sub">{timePeriod}</div>
-            </div>
-            <div className="aqa-stat-card">
-              <div className="aqa-stat-header">
-                <ClockIcon2 />
-                <span className="aqa-stat-label">Avg Wait Time</span>
-              </div>
-              <div className="aqa-stat-value aqa-stat-blue">
-                {analyticsLoading ? "—" : avgWaitAll > 0 ? `${avgWaitAll} min` : "N/A"}
-              </div>
-              <div className="aqa-stat-sub">Across services</div>
-            </div>
-            <div className="aqa-stat-card">
-              <div className="aqa-stat-header">
-                <SmileIcon />
-                <span className="aqa-stat-label">Satisfaction</span>
-              </div>
-              <div className="aqa-stat-value aqa-stat-green">
-                {analyticsLoading ? "—" : avgSatisfaction > 0 ? `${avgSatisfaction}%` : "N/A"}
-              </div>
-              <div className="aqa-stat-sub">Average score</div>
-            </div>
-            <div className="aqa-stat-card">
-              <div className="aqa-stat-header">
-                <ActivityIcon />
-                <span className="aqa-stat-label">Services Tracked</span>
-              </div>
-              <div className="aqa-stat-value aqa-stat-purple">
-                {analyticsLoading ? "—" : performance.length}
-              </div>
-              <div className="aqa-stat-sub">{user.departmentAbbrev} department</div>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="aqa-tabs">
-            <button
-              className={`aqa-tab ${activeTab === "performance" ? "aqa-tab-active" : ""}`}
-              onClick={() => setActiveTab("performance")}
+        {/* Stat cards */}
+        <div className="aqa-stats-grid">
+          {statCards.map((card) => (
+            <div
+              key={card.label}
+              className={`aqa-stat-card aqa-stat-${card.tone}`}
             >
-              <TrendUpIcon /> Performance
-            </button>
-            <button
-              className={`aqa-tab ${activeTab === "trends" ? "aqa-tab-active" : ""}`}
-              onClick={() => setActiveTab("trends")}
-            >
-              <CalendarIcon2 /> Trends
-            </button>
-            <button
-              className={`aqa-tab ${activeTab === "insights" ? "aqa-tab-active" : ""}`}
-              onClick={() => setActiveTab("insights")}
-            >
-              <AlertTriangleIcon /> Insights
-            </button>
-          </div>
-
-          {/* Tab: Insights */}
-          {activeTab === "insights" && (
-            <div className="aqa-insights-grid">
-              <div className="aqa-insights-col">
-                <div className="aqa-insights-card aqa-insights-positive">
-                  <div className="aqa-insights-card-header">
-                    <TrendUpIcon />
-                    <div>
-                      <p className="aqa-insights-card-title">
-                        Positive Insights
-                      </p>
-                      <p className="aqa-insights-card-sub">
-                        What's working well
-                      </p>
-                    </div>
-                  </div>
-                  <div className="aqa-insights-list">
-                    {analyticsLoading ? (
-                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>Loading...</p>
-                    ) : positiveInsights.length === 0 ? (
-                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>No data available for this period.</p>
-                    ) : positiveInsights.map((item, idx) => (
-                      <div
-                        key={`${item.title}-${item.desc}`}
-                        className="aqa-insight-item aqa-insight-green"
-                      >
-                        <p className="aqa-insight-title">{item.title}</p>
-                        <p className="aqa-insight-desc">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className={`aqa-stat-icon-box aqa-icon-box-${card.tone}`}>
+                {card.icon}
               </div>
-              <div className="aqa-insights-col">
-                <div className="aqa-insights-card aqa-insights-warning">
-                  <div className="aqa-insights-card-header">
-                    <AlertTriangleIcon />
-                    <div>
-                      <p className="aqa-insights-card-title">
-                        Areas for Improvement
-                      </p>
-                      <p className="aqa-insights-card-sub">
-                        Recommendations and action items
-                      </p>
-                    </div>
-                  </div>
-                  <div className="aqa-insights-list">
-                    {analyticsLoading ? (
-                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>Loading...</p>
-                    ) : improvementAreas.length === 0 ? (
-                      <p style={{ color: "var(--text-secondary)", padding: "0.5rem" }}>No improvement areas detected.</p>
-                    ) : improvementAreas.map((item, idx) => (
-                      <div
-                        key={`${item.title}-${item.desc}`}
-                        className="aqa-insight-item aqa-insight-orange"
-                      >
-                        <p className="aqa-insight-title">{item.title}</p>
-                        <p className="aqa-insight-desc">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tab: Trends */}
-          {activeTab === "trends" && (
-            <div className="aqa-trends-grid">
-              <div className="aqa-trend-card">
-                <p className="aqa-trend-title">Daily Trends</p>
-                <p className="aqa-trend-sub">Queue activity over time</p>
-                <div className="aqa-trend-item aqa-trend-item-blue">
-                  <p className="aqa-trend-item-label">Peak Activity Time</p>
-                  <p
-                    className="aqa-trend-item-value"
-                    style={{ color: "#3b82f6" }}
-                  >
-                    {analyticsData.trends.peakActivityTime}
-                  </p>
-                  <p className="aqa-trend-item-note">
-                    Highest queue volume period
-                  </p>
-                </div>
-                <div className="aqa-trend-item aqa-trend-item-green">
-                  <p className="aqa-trend-item-label">Best Service Time</p>
-                  <p
-                    className="aqa-trend-item-value"
-                    style={{ color: "#22c55e" }}
-                  >
-                    {analyticsData.trends.bestServiceTime}
-                  </p>
-                  <p className="aqa-trend-item-note">
-                    Shortest average wait times
-                  </p>
-                </div>
-              </div>
-              <div className="aqa-trend-card">
-                <p className="aqa-trend-title">Period Comparison</p>
-                <p className="aqa-trend-sub">Performance vs the previous {timePeriod.toLowerCase()}</p>
-                {analyticsData.trends.weeklyComparison.length > 0 ? (
-                  analyticsData.trends.weeklyComparison.map((row, idx) => (
-                    <div key={row.label} className="aqa-weekly-row">
-                      <span className="aqa-weekly-label">{row.label}</span>
-                      <div className="aqa-weekly-right">
-                        <span
-                          className="aqa-weekly-value"
-                          style={{ color: row.color }}
-                        >
-                          {row.value}
-                        </span>
-                        <span className="aqa-weekly-change">{row.change}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="aqa-trend-sub">No data available for this period yet.</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Tab: Performance */}
-          {activeTab === "performance" && (
-            <div className="aqa-performance-section">
-              <p className="aqa-perf-title">Queue Performance Metrics</p>
-              <p className="aqa-perf-sub">
-                Detailed breakdown by service and college
+              <p className="aqa-stat-label">{card.label}</p>
+              <p
+                className={`aqa-stat-value aqa-val-${card.tone} ${card.isText ? "aqa-stat-value-text" : ""}`}
+              >
+                {loading ? "—" : card.value}
               </p>
-              <div className="aqa-perf-list">
-                {analyticsLoading ? (
-                  <p style={{ color: "var(--text-secondary)", padding: "1rem" }}>Loading...</p>
-                ) : performance.length === 0 ? (
-                  <p style={{ color: "var(--text-secondary)", padding: "1rem" }}>No completed queue data for this period.</p>
-                ) : null}
-                {performance.map((item, idx) => (
-                  <div key={`${item.service}-${item.college}`} className="aqa-perf-card">
-                    <div className="aqa-perf-card-header">
-                      <span className="aqa-perf-service">{item.service}</span>
-                      <span className="aqa-perf-college">{item.college}</span>
-                      <span
-                        className={`aqa-perf-status ${getStatusColor(item.status)}`}
-                      >
-                        {item.status}
-                      </span>
-                    </div>
-                    <div className="aqa-perf-metrics">
-                      <div className="aqa-perf-metric">
-                        <span className="aqa-perf-metric-label">
-                          Students Served
-                        </span>
-                        <span className="aqa-perf-metric-value aqa-stat-green">
-                          {item.studentsServed}
-                        </span>
-                      </div>
-                      <div className="aqa-perf-metric">
-                        <span className="aqa-perf-metric-label">
-                          Avg Wait Time
-                        </span>
-                        <span className="aqa-perf-metric-value aqa-stat-blue">
-                          {item.avgWait}
-                        </span>
-                      </div>
-                      <div className="aqa-perf-metric">
-                        <span className="aqa-perf-metric-label">
-                          Peak Hours
-                        </span>
-                        <span className="aqa-perf-metric-value">
-                          {item.peakHours}
-                        </span>
-                      </div>
-                      <div className="aqa-perf-metric">
-                        <span className="aqa-perf-metric-label">
-                          Satisfaction
-                        </span>
-                        <span
-                          className="aqa-perf-metric-value"
-                          style={{
-                            color: getSatisfactionColor(item.satisfaction),
-                          }}
-                        >
-                          {item.satisfaction}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="aqa-stat-sub">{rangeLabel}</p>
             </div>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="aqa-filters-card">
+          <div className="aqa-filters-header">
+            <div className="aqa-filters-header-text">
+              <h3 className="aqa-filters-title">Analytics Filters</h3>
+              <p className="aqa-filters-description">
+                {user.college} ({user.departmentAbbrev})
+              </p>
+            </div>
+            <button
+              className="aqa-export-btn"
+              onClick={handleExport}
+              disabled={byService.length === 0}
+            >
+              <DownloadIcon />
+              Export Report
+            </button>
+          </div>
+          <div className="aqa-filters-grid">
+            <FilterSelect
+              id="aqa-filter-range"
+              label="Time Range"
+              value={range}
+              onChange={(e) => setRange(e.target.value)}
+              options={RANGE_OPTIONS}
+              chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+            />
+            <FilterSelect
+              id="aqa-filter-service"
+              label="Service Type"
+              value={serviceType}
+              onChange={(e) => setServiceType(e.target.value)}
+              options={serviceTypes.map((s) => ({ value: s, label: s }))}
+              chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+            />
+          </div>
+        </div>
+
+        {/* Per-service breakdown */}
+        <div className="aqa-svc-list">
+          <div className="aqa-svc-list-head">
+            <h3 className="aqa-svc-list-title">Service Breakdown</h3>
+            <p className="aqa-svc-list-sub">
+              Per-service queue metrics — {rangeLabel.toLowerCase()}.
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="aqa-empty-state">
+              <BarChartIcon />
+              <h3>Loading analytics…</h3>
+            </div>
+          ) : error ? (
+            <div className="aqa-empty-state">
+              <BarChartIcon />
+              <h3>Could not load analytics</h3>
+              <p>{error}</p>
+            </div>
+          ) : byService.length === 0 ? (
+            <div className="aqa-empty-state">
+              <BarChartIcon />
+              <h3>No services yet</h3>
+              <p>Your department has no queue services configured.</p>
+            </div>
+          ) : (
+            byService.map((row) => (
+              <div key={row.service} className="aqa-svc-card">
+                <div className="aqa-svc-card-head">
+                  <span className="aqa-svc-name">{row.service}</span>
+                </div>
+                <div className="aqa-svc-metrics">
+                  <div className="aqa-svc-metric">
+                    <span className="aqa-svc-metric-label">Students Served</span>
+                    <span className="aqa-svc-metric-value aqa-val-blue">
+                      {row.studentsServed}
+                    </span>
+                  </div>
+                  <div className="aqa-svc-metric">
+                    <span className="aqa-svc-metric-label">Overtime Queues</span>
+                    <span className="aqa-svc-metric-value aqa-val-amber">
+                      {row.overtimeQueues}
+                    </span>
+                  </div>
+                  <div className="aqa-svc-metric">
+                    <span className="aqa-svc-metric-label">No-Shows</span>
+                    <span className="aqa-svc-metric-value aqa-val-red">
+                      {row.noShows}
+                    </span>
+                  </div>
+                  <div className="aqa-svc-metric">
+                    <span className="aqa-svc-metric-label">Avg Wait</span>
+                    <span className="aqa-svc-metric-value">
+                      {row.avgWaitMinutes > 0 ? `${row.avgWaitMinutes} min` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
           )}
         </div>
+      </div>
     </AdminPageShell>
   );
 }

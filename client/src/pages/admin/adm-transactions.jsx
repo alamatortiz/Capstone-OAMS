@@ -12,7 +12,7 @@ import "./adm-transactions.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { getManilaDateString, formatManilaDate, formatManilaTime } from "../../utils/dateTime";
-import { connectSocket } from "../../utils/socket";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
@@ -204,8 +204,22 @@ const DATE_OPTIONS = [
   { value: "all", label: "All Time" },
 ];
 
+const TRANSACTION_LIVE_EVENTS = [
+  "queue:called",
+  "queue:served",
+  "queue:no-show",
+  "queue:student-joined",
+  "queue:student-left",
+  "queue:slot-status",
+  "appointment:status-updated",
+  "document:status-updated",
+  "document:cancelled",
+  "announcement:changed",
+  "faq:changed",
+];
+
 export default function AdminTransaction() {
-  const { user: authUser, token } = useAuth();
+  const { user: authUser } = useAuth();
 
   // ── Transaction Page State ────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -257,34 +271,9 @@ export default function AdminTransaction() {
     if (authUser) init();
   }, [authUser, fetchTransactions]);
 
-  // ── Live updates: this log previously only refreshed on filter change or
-  // manual reload, unlike the rest of the socket-driven queue feature area —
-  // a queue/appointment/document event elsewhere wouldn't show up here until
-  // the admin changed a filter. A lightweight refetch-on-event is enough
-  // (this view doesn't need per-second freshness, just eventual consistency).
-  useEffect(() => {
-    if (!authUser || !token) return;
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = [
-      "queue:called",
-      "queue:served",
-      "queue:no-show",
-      "queue:student-joined",
-      "queue:student-left",
-      "appointment:status-updated",
-      "document:status-updated",
-      "document:cancelled",
-      "announcement:changed",
-      "faq:changed",
-      "queue:slot-status",
-    ];
-    events.forEach((event) => socket.on(event, fetchTransactions));
-    return () => {
-      events.forEach((event) => socket.off(event, fetchTransactions));
-    };
-  }, [authUser, token, fetchTransactions]);
+  // ── Live updates (also reconciles on socket reconnect). This log just needs
+  // eventual consistency, not per-second freshness. ──
+  useLiveRefetch(TRANSACTION_LIVE_EVENTS, fetchTransactions);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   // ── Statistics (computed server-side over the admin's full department) ───

@@ -217,7 +217,7 @@ body {
   overflow: hidden;
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
   border-radius: 1.5rem;
-  padding: 2rem;
+  padding: 1.5rem;
   color: white;
   box-shadow: 0 10px 30px rgba(34, 197, 94, 0.2);
   transition: all 0.3s ease;
@@ -280,7 +280,8 @@ body {
   font-weight: 700;
   margin: 0;
   line-height: 1.1;
-  text-align: left;
+  text-align: justify;
+  text-justify: inter-word;
 }
 
 @media (min-width: 768px) {
@@ -655,12 +656,6 @@ body {
   fill: currentColor;
 }
 
-/* Scan Document quick-action — light green */
-.action-icon.bg-scan-doc {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);
-}
-
 .tool-title {
   font-size: 0.95rem;
   font-weight: 600;
@@ -688,29 +683,43 @@ body {
   transition: all 0.3s ease;
 }
 
-.quick-actions-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
+/* Plain section header — mirrors prof-dashboard.css .section-header (bare class
+   is scoped per-role on the other dashboards). */
+.admin-dashboard .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
 }
 
-@media (max-width: 768px) {
-  .quick-actions-grid {
-    grid-template-columns: 1fr;
-  }
+.admin-dashboard .section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* Scoped so the 3-up grid does not leak onto the student / professor
+   dashboards, which define their own bare .quick-actions-grid. */
+.admin-dashboard .quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
 }
 
 .quick-action-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1rem;
-  padding: 1.5rem;
+  padding: 1.25rem;
   transition: all 0.3s ease;
   cursor: pointer;
   display: flex;
   flex-direction: row;
   gap: 0.75rem;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .quick-action-text {
@@ -719,6 +728,7 @@ body {
   flex-direction: column;
   gap: 0.25rem;
   align-items: flex-start;
+  text-align: left;
 }
 
 .quick-action-text .action-description {
@@ -746,10 +756,22 @@ body {
 
 .action-icon.bg-green-500 {
   background: #22c55e;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
 .action-icon.bg-blue-500 {
   background: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.action-icon.bg-orange-500 {
+  background: #f97316;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+.action-icon.bg-purple-500 {
+  background: #a855f7;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
 }
 
 .action-icon svg {
@@ -938,7 +960,8 @@ body {
   border-radius: 9999px;
   font-size: 0.72rem;
   font-weight: 700;
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1159,6 +1182,11 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .admin-dashboard .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* superadmin dashboard reuses this stylesheet */
   .admin-tools-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1171,19 +1199,19 @@ body {
   }
 
   .banner-title {
-    font-size: 1.5rem;
+    font-size: 1.875rem;
   }
 
   .admin-dashboard .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .admin-tools-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .admin-dashboard .quick-actions-grid {
+    grid-template-columns: 1fr;
   }
 
-  .quick-actions-grid {
-    grid-template-columns: 1fr;
+  .admin-tools-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1199,7 +1227,7 @@ body {
   }
 
   .banner-title {
-    font-size: 1.25rem;
+    font-size: 1.75rem;
   }
 
   .admin-dashboard .stats-grid {
@@ -1215,7 +1243,7 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .quick-actions-grid {
+  .admin-dashboard .quick-actions-grid {
     grid-template-columns: 1fr;
   }
 }

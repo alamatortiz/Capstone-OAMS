@@ -12,8 +12,7 @@ import {
 } from "../../components/NotificationBell";
 import api from "../../utils/api";
 import { formatManilaDateTime } from "../../utils/dateTime";
-import { useAuth } from "../../context/AuthContext";
-import { connectSocket } from "../../utils/socket";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 
 import "./adm-notifications.css";
 
@@ -47,7 +46,6 @@ const TYPE_PATHS = {
 };
 
 export default function AdminNotifications() {
-  const { token } = useAuth();
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState("all");
   const [page, setPage] = useState(1);
@@ -86,15 +84,8 @@ export default function AdminNotifications() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  useEffect(() => {
-    if (!token) return undefined;
-    const socket = connectSocket(token);
-    if (!socket) return undefined;
-    NOTIFICATION_EVENTS.forEach((event) => socket.on(event, fetchNotifications));
-    return () => {
-      NOTIFICATION_EVENTS.forEach((event) => socket.off(event, fetchNotifications));
-    };
-  }, [token, fetchNotifications]);
+  // Live updates (also reconciles on socket reconnect).
+  useLiveRefetch(NOTIFICATION_EVENTS, fetchNotifications);
 
   useEffect(() => {
     const interval = setInterval(() => {

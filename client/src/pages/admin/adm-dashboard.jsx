@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { FileText } from "lucide-react";
+import { FileText, Users, Calendar, Megaphone } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "./adm-dashboard.css";
 import api from "../../utils/api";
-import { connectSocket } from "../../utils/socket";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import { getCollegeLogo } from "../../data/collegeLogo";
 import { parseOfficeHoursSchedule } from "../../utils/dateTime";
 import AdminPageShell from "../../components/AdminPageShell";
@@ -61,21 +61,6 @@ const CheckIcon = () => (
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
 );
-const AlertIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 9v4"></path>
-    <path d="M12 17h.01"></path>
-    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-  </svg>
-);
 const DatabaseIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -101,63 +86,116 @@ const QRCodeIcon = () => (
     <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2zM15 15h2v2h-2zM13 17h2v2h-2zM17 17h2v2h-2zM19 13h2v2h-2z" />
   </svg>
 );
-const HostQueueIcon = () => (
-  <svg
-    className="tool-icon-svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="9" cy="7" r="4"></circle>
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+// Host Queue tile — same glyph as adm-queue-hosting's PageHeader icon.
+const PlusCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="16"></line>
+    <line x1="8" y1="12" x2="16" y2="12"></line>
+  </svg>
+);
+// Transaction History tile — same glyph as adm-transactions' PageHeader icon.
+const ClipboardListIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    <line x1="8" y1="11" x2="16" y2="11"></line>
+    <line x1="8" y1="15" x2="12" y2="15"></line>
   </svg>
 );
 
-// ── Static tool/action arrays ─────────────────────────────────────────────────
-// User Management and Pinnacle Sync moved to the separate superadmin area
-// (see pages/superadmin/) -- both are system-wide, cross-department tools,
-// not the kind of thing a department-scoped admin ("secretary" role)
-// should be managing.
-const adminTools = [
+// ── Merged Quick Actions grid ────────────────────────────────────────────────
+// One card (Quick Actions style) combining the old "Quick Actions" and "Admin
+// Management" tiles. Each tile's `description` is the destination screen's own
+// PageHeader subtitle, and `iconColor` mirrors that screen's accent.
+// User Management and Pinnacle Sync live in the separate superadmin area.
+const quickActions = [
   {
     icon: DatabaseIcon,
-    iconColor: "bg-data-mgmt",
+    iconColor: "bg-green-500",
     title: "Data Management",
-    description: "Configure settings",
+    description: "Configure document types and queue services.",
     path: "/admin/data-management",
   },
   {
     icon: QueueAnalyticsIcon,
-    iconColor: "bg-blue-600",
+    iconColor: "bg-blue-500",
     title: "Queue Analytics",
-    description: "Performance metrics",
+    description: "Real-time queue performance metrics and insights.",
     path: "/admin/queue-analytics",
   },
-];
-const quickActions = [
+  {
+    icon: PlusCircleIcon,
+    iconColor: "bg-blue-500",
+    title: "Host Queue",
+    description: "Host and manage queues within your department.",
+    path: "/admin/queue-hosting",
+  },
+  {
+    icon: Users,
+    iconColor: "bg-blue-500",
+    title: "Queue Management",
+    description: "Manage and monitor queues within your department.",
+    path: "/admin/queue",
+  },
+  {
+    icon: FileText,
+    iconColor: "bg-orange-500",
+    title: "Document Processing",
+    description:
+      "Process and manage document requests and submissions within your department.",
+    path: "/admin/document-processing",
+  },
   {
     icon: QRCodeIcon,
-    iconColor: "bg-scan-doc",
+    iconColor: "bg-orange-500",
     title: "Scan Document",
-    description: "Verify QR codes and view document details.",
+    description: "Scan QR codes to verify and view document details.",
     path: "/admin/scan-document",
   },
   {
-    icon: HostQueueIcon,
-    iconColor: "bg-blue-500",
-    title: "Host Queue",
-    description: "Manage and host student queues.",
-    path: "/admin/queue-hosting",
+    icon: Calendar,
+    iconColor: "bg-purple-500",
+    title: "Appointments Overview",
+    description: "Monitor appointments within your department.",
+    path: "/admin/appointments",
+  },
+  {
+    icon: Megaphone,
+    iconColor: "bg-green-500",
+    title: "Announcements & FAQs",
+    description: "Manage department announcements and frequently asked questions.",
+    path: "/admin/announcements",
+  },
+  {
+    icon: ClipboardListIcon,
+    iconColor: "bg-green-500",
+    title: "Transaction History",
+    description: "View all recent transactions within the office.",
+    path: "/admin/transactions",
   },
 ];
 
+// Every source feeding a dashboard stat tile / the Faculty Availability preview.
+const DASHBOARD_LIVE_EVENTS = [
+  "queue:slot-opened",
+  "queue:slot-status",
+  "queue:called",
+  "queue:served",
+  "queue:no-show",
+  "queue:student-joined",
+  "queue:student-left",
+  "faculty:availability-status-changed",
+  "appointment:status-updated",
+  "appointment:slot-updated",
+  "appointment:slot-removed",
+  "document:new-request",
+  "document:status-updated",
+  "document:cancelled",
+];
+
 export default function AdminDashboard() {
-  const { user: authUser, token } = useAuth();
+  const { user: authUser } = useAuth();
   const user = authUser
     ? {
         ...authUser,
@@ -205,28 +243,11 @@ export default function AdminDashboard() {
     if (authUser) fetchStats();
   }, [authUser, fetchStats]);
 
-  // ── Live updates: the "Active Queues" stat and "Current Hosted Queues"
-  // list previously only populated on mount with no socket or poll, so they
-  // could sit arbitrarily stale until the admin navigated away and back.
-  useEffect(() => {
-    if (!authUser || !token) return;
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = [
-      "queue:slot-opened",
-      "queue:slot-status",
-      "queue:called",
-      "queue:served",
-      "queue:no-show",
-      "queue:student-joined",
-      "queue:student-left",
-    ];
-    events.forEach((event) => socket.on(event, fetchStats));
-    return () => {
-      events.forEach((event) => socket.off(event, fetchStats));
-    };
-  }, [authUser, token, fetchStats]);
+  // ── Live updates: every stat tile + the Faculty Availability preview should
+  // track its source in real time. Previously only queue events were wired, so
+  // faculty toggles / appointment / document changes sat stale until the 45s
+  // poll. useLiveRefetch also refetches on socket reconnect.
+  useLiveRefetch(DASHBOARD_LIVE_EVENTS, fetchStats);
 
   // ── Fallback poll: covers a silently-dropped/blocked WebSocket connection,
   // same pattern as QueueProvider.jsx / stud-dashboard.jsx ──
@@ -393,58 +414,10 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* Admin Management */}
-          <section className="admin-management-section">
-            <div className="section-header-admin">
-              <div className="section-title-admin">
-                <AlertIcon />
-                <div className="section-title-admin-text">
-                  <h2>Admin Management</h2>
-                  <p className="section-subtitle">
-                    System administration and configuration tools.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="admin-tools-grid">
-              {adminTools.map((tool) => (
-                <div
-                  key={tool.title}
-                  className="admin-tool-card"
-                  onClick={() => tool.path && navigate(tool.path)}
-                  role={tool.path ? "button" : undefined}
-                  tabIndex={tool.path ? 0 : undefined}
-                  style={tool.path ? { cursor: "pointer" } : undefined}
-                  onKeyPress={(e) => {
-                    if (tool.path && (e.key === "Enter" || e.key === " ")) {
-                      navigate(tool.path);
-                    }
-                  }}
-                >
-                  <div className={`admin-tool-icon ${tool.iconColor}`}>
-                    <tool.icon />
-                  </div>
-                  <div className="admin-tool-text">
-                    <h3 className="tool-title">{tool.title}</h3>
-                    <p className="tool-description">{tool.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Quick Actions */}
+          {/* Quick Actions — merged tools + management grid */}
           <section className="quick-actions-section">
-            <div className="section-header-admin">
-              <div className="section-title-admin">
-                <CheckIcon />
-                <div className="section-title-admin-text">
-                  <h2>Quick Actions</h2>
-                  <p className="section-subtitle">
-                    Access frequently used admin tools.
-                  </p>
-                </div>
-              </div>
+            <div className="section-header">
+              <h2>Quick Actions</h2>
             </div>
             <div className="quick-actions-grid">
               {quickActions.map((action) => (

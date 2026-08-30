@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
-import { connectSocket } from "../utils/socket";
+import { useLiveRefetch } from "./useLiveRefetch";
 
 // Shared by adm-queue.jsx (queue monitoring) and adm-queue-hosting.jsx
 // (queue lifecycle management) -- both fetch the same GET /admin/queue-hosting
@@ -23,7 +23,7 @@ const QUEUE_HOSTING_EVENTS = [
 ];
 
 export function useAdminQueueHosting({ onLiveUpdate } = {}) {
-  const { user: authUser, token } = useAuth();
+  const { user: authUser } = useAuth();
 
   const [queues, setQueues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,25 +50,12 @@ export function useAdminQueueHosting({ onLiveUpdate } = {}) {
     if (authUser) init();
   }, [authUser, fetchQueues]);
 
-  // ── Live updates: refetch when a socket event affects this dept's queues ──
-  // Reads `token` reactively from useAuth() (rather than a one-off
-  // sessionStorage.getItem() outside React's dependency tracking) so the
-  // socket reconnects with a fresh token if it's ever rotated mid-session.
-  useEffect(() => {
-    if (!authUser || !token) return;
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const refetch = () => {
-      fetchQueues();
-      onLiveUpdate?.();
-    };
-
-    QUEUE_HOSTING_EVENTS.forEach((event) => socket.on(event, refetch));
-    return () => {
-      QUEUE_HOSTING_EVENTS.forEach((event) => socket.off(event, refetch));
-    };
-  }, [authUser, token, fetchQueues, onLiveUpdate]);
+  // ── Live updates: refetch when a socket event affects this dept's queues,
+  // and also on socket reconnect (server restart / dropped connection). ──
+  useLiveRefetch(QUEUE_HOSTING_EVENTS, () => {
+    fetchQueues();
+    onLiveUpdate?.();
+  });
 
   // ── Pause/Resume/Close (shared reason-modal flow) ─────────────────────────
   const [reasonModal, setReasonModal] = useState(null); // { mode: 'pause'|'close', id }

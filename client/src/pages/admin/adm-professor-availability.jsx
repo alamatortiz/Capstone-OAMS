@@ -6,7 +6,7 @@ import "./adm-professor-availability.css";
 import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
-import { connectSocket } from "../../utils/socket";
+import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -52,13 +52,6 @@ const CalendarSmallIcon = ({ className }) => (
     <line x1="3" y1="10" x2="21" y2="10"></line>
   </svg>
 );
-const MailIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M4 4h16v16H4z" opacity="0"></path>
-    <path d="M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6z"></path>
-    <polyline points="22 6 12 13 2 6"></polyline>
-  </svg>
-);
 const MapPinIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -67,6 +60,15 @@ const MapPinIcon = ({ className }) => (
 );
 
 const STATUS_TABS = ["all", "available", "busy", "unavailable"];
+
+// A professor's row here changes on a status toggle / login / logout
+// (faculty:availability-status-changed) or a weekly consultation-slot edit
+// (appointment:slot-updated / -removed).
+const FACULTY_LIVE_EVENTS = [
+  "faculty:availability-status-changed",
+  "appointment:slot-updated",
+  "appointment:slot-removed",
+];
 
 // The next upcoming calendar date for a weekday name, anchored to Manila
 // "today" -- never a date already passed. Copied from stud-professor-schedules
@@ -136,27 +138,8 @@ export default function AdminProfessorAvailability() {
     fetchFaculty();
   }, [fetchFaculty]);
 
-  // ── Live updates: refetch when a professor toggles status / logs out, or
-  // when a schedule slot changes. `faculty:availability-status-changed` is what
-  // makes the logged-out => unavailable rule land here without a reload.
-  useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
-    if (!token) return;
-
-    const socket = connectSocket(token);
-    if (!socket) return;
-
-    const events = [
-      "faculty:availability-status-changed",
-      "appointment:slot-updated",
-      "appointment:slot-removed",
-    ];
-    events.forEach((event) => socket.on(event, fetchFaculty));
-
-    return () => {
-      events.forEach((event) => socket.off(event, fetchFaculty));
-    };
-  }, [fetchFaculty]);
+  // ── Live updates (also reconciles on socket reconnect). ──
+  useLiveRefetch(FACULTY_LIVE_EVENTS, fetchFaculty);
 
   // ── Fallback poll: the "Busy" state is time-based (an appointment window
   // opening/closing fires no socket event), and a student/admin on another
@@ -254,10 +237,7 @@ export default function AdminProfessorAvailability() {
                       {f.specialization && (
                         <p className="apa-faculty-spec">{f.specialization}</p>
                       )}
-                      <p className="apa-faculty-email">
-                        <MailIcon className="apa-email-icon" />
-                        {f.email}
-                      </p>
+                      <p className="apa-faculty-email">{f.email}</p>
                     </div>
                   </div>
 
