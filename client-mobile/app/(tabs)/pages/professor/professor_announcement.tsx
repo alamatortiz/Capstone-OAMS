@@ -21,6 +21,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -139,6 +140,7 @@ const navItems: NavItem[] = [
 export default function ProfessorAnnouncementScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
   const { user, token, logout } = useAuth();

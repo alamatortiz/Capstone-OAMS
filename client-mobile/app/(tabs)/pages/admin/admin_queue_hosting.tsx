@@ -35,6 +35,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
@@ -180,6 +181,7 @@ type SelectField = 'service' | 'status' | 'type' | null;
 export default function AdminQueueHostingScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
   // Origin-aware breadcrumb: "Queue Management" when opened from admin_queue's

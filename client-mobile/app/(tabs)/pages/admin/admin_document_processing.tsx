@@ -37,6 +37,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
@@ -218,6 +219,7 @@ type ConfirmStatus = 'processing' | 'ready' | 'claimed' | 'rejected';
 export default function AdminDocumentProcessingScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [documents, setDocuments] = useState<DocumentRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1455,7 +1457,11 @@ function createStyles(theme: ThemePalette) {
     },
     detailsModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
     detailsModalSubtitle: { fontSize: 11.5, color: theme.subtext, marginTop: 3 },
-    detailsModalBody: { padding: 18 },
+    // flex: 1 bounds this ScrollView to the space left inside detailsModalCard's
+    // maxHeight (instead of growing to its own content height), so a tall
+    // details section stays scrollable instead of pushing detailsModalFooter
+    // out of reach.
+    detailsModalBody: { flex: 1, padding: 18 },
     detailsStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
     detailsTracking: { fontSize: 12, color: theme.subtext },
     detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },

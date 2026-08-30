@@ -321,6 +321,7 @@ function buildQueueActivityTitle(row) {
 function buildAppointmentActivityTitle(row) {
   if (row.status === "cancelled") {
     if (row.cancelled_by === "system") return `Appointment with ${row.professor_name} auto-cancelled — schedule changed`;
+    if (row.cancelled_by === "system_expired") return `Appointment with ${row.professor_name} auto-cancelled — expired without a response`;
     if (row.cancelled_by === "faculty") return `Appointment cancelled by ${row.professor_name}`;
     return `You cancelled the appointment with ${row.professor_name}`;
   }

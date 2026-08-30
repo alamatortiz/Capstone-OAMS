@@ -24,6 +24,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -214,6 +215,7 @@ type ActiveTab = 'slots' | 'bookings';
 export default function StudentAppointmentsScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
   const params = useLocalSearchParams<{ activeTab?: string }>();
@@ -1524,7 +1526,12 @@ function createStyles(theme: ThemePalette) {
       padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border,
     },
     dialogHeaderTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    dialogBody: { padding: 18 },
+    // flex: 1 is load-bearing: without it this ScrollView sizes to its own
+    // content height instead of the space left over inside dialogCard's
+    // maxHeight, so tall content gets clipped by overflow:'hidden' instead
+    // of becoming scrollable -- cutting off the footer with no way to reach
+    // it. Same bug/fix as student_documents.tsx's dialogBody.
+    dialogBody: { flex: 1, padding: 18 },
     slotSummary: {
       backgroundColor: 'rgba(168, 85, 247, 0.08)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)',
       borderRadius: 14, padding: 14, gap: 10, marginBottom: 16,

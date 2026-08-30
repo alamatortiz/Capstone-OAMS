@@ -22,6 +22,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -180,6 +181,7 @@ type SelectField = 'college' | 'type' | null;
 export default function StudentDocumentsScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
   const { user, token, logout } = useAuth();
@@ -1361,7 +1363,13 @@ function createStyles(theme: ThemePalette) {
       padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border,
     },
     dialogHeaderTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    dialogBody: { padding: 18 },
+    // flex: 1 is load-bearing: without it this ScrollView sizes to its own
+    // content height instead of the space left over inside dialogCard's
+    // maxHeight, so once a growing section (e.g. the Requirements hint box
+    // below) pushes total content past that cap, the overflow gets clipped
+    // by dialogCard's overflow:'hidden' instead of becoming scrollable --
+    // cutting off dialogActions (Cancel/Submit) with no way to reach them.
+    dialogBody: { flex: 1, padding: 18 },
     formGroup: { gap: 8, marginBottom: 16 },
     formLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
     formSelect: {

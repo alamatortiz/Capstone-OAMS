@@ -2,9 +2,21 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { AuthProvider, useAuth, getRouteRole } from '../context/AuthContext';
 import { QueueProvider } from '../context/QueueContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { emitDrawerSwipeOpen } from '../utils/drawerSwipeBus';
+
+// A swipe starting within this many px of the left edge counts as an
+// edge-swipe attempt; standard iOS/Android back-gesture width, narrow enough
+// to mostly avoid stealing touches from horizontal ScrollViews/tab strips
+// elsewhere on screen (those don't normally start flush against the edge).
+const EDGE_WIDTH = 24;
+// Minimum rightward drag before an edge-swipe counts as "open the drawer",
+// so a stray touch near the edge doesn't pop it open by accident.
+const OPEN_THRESHOLD = 60;
 
 // Routes reachable without being logged in.
 const PUBLIC_SEGMENTS = new Set(['login', 'unauthorized']);
@@ -61,16 +73,39 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  // Global left-edge swipe-right -> "open the current screen's nav drawer".
+  // Every screen owns its own `menuOpen` state (no shared drawer state in
+  // this app), so this only broadcasts the event via drawerSwipeBus -- each
+  // screen's useDrawerSwipeOpen() decides whether/how to react.
+  const startedAtEdge = useSharedValue(false);
+  const edgeSwipeGesture = Gesture.Pan()
+    .activeOffsetX(20)
+    .failOffsetY([-20, 20])
+    .onBegin((e) => {
+      startedAtEdge.value = e.x <= EDGE_WIDTH;
+    })
+    .onEnd((e) => {
+      if (startedAtEdge.value && e.translationX > OPEN_THRESHOLD) {
+        runOnJS(emitDrawerSwipeOpen)();
+      }
+    });
+
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <QueueProvider>
-          <AuthGate>
-            <Stack screenOptions={{ headerShown: false }} />
-          </AuthGate>
-          <Toast />
-        </QueueProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureDetector gesture={edgeSwipeGesture}>
+        <View style={{ flex: 1 }}>
+          <ThemeProvider>
+            <AuthProvider>
+              <QueueProvider>
+                <AuthGate>
+                  <Stack screenOptions={{ headerShown: false }} />
+                </AuthGate>
+                <Toast />
+              </QueueProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </View>
+      </GestureDetector>
+    </GestureHandlerRootView>
   );
 }

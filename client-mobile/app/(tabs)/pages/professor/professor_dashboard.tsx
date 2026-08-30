@@ -21,6 +21,7 @@ import { Calendar, CheckCircle, ChevronRight, ClipboardList, Clock, FileText, Me
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -224,6 +225,7 @@ const navItems: NavItem[] = [
 export default function ProfessorDashboardScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const router = useRouter();

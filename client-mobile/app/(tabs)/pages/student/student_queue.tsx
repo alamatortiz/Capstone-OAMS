@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import { useQueue } from '@/context/QueueContext';
 import api from '@/utils/api';
 import QueueConcernModal from '@/components/QueueConcernModal';
@@ -130,11 +131,17 @@ const navItems: NavItem[] = [
 ];
 
 type FilterKind = 'college' | 'service' | null;
+type TabKey = 'available' | 'active';
 
 export default function StudentQueueScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  // "Queues" (available, joinable) vs "Participating Queues" (already joined)
+  // -- mirrors web's stud-queue.jsx tab split instead of showing both
+  // sections stacked on one continuous scroll.
+  const [activeTab, setActiveTab] = useState<TabKey>('available');
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
@@ -373,17 +380,33 @@ export default function StudentQueueScreen() {
             </View>
           </View>
 
-          {/* My Active Queues */}
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Clock size={16} color={theme.primary} />
-              <Text style={styles.sectionTitle}>My Active Queues</Text>
-            </View>
-            <View style={styles.sectionCountPill}>
-              <Text style={styles.sectionCountText}>{myQueues.length}</Text>
-            </View>
+          {/* Tabs */}
+          <View style={styles.tabsRow}>
+            <Pressable
+              style={[styles.tab, activeTab === 'available' && styles.tabActive]}
+              onPress={() => setActiveTab('available')}
+            >
+              <Users size={15} color={activeTab === 'available' ? theme.blue : theme.subtext} />
+              <Text style={[styles.tabText, activeTab === 'available' && styles.tabTextActive]}>Queues</Text>
+              <View style={styles.tabCountPill}>
+                <Text style={styles.tabCountText}>{filteredQueues.length}</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={[styles.tab, activeTab === 'active' && styles.tabActive]}
+              onPress={() => setActiveTab('active')}
+            >
+              <Clock size={15} color={activeTab === 'active' ? theme.blue : theme.subtext} />
+              <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>Participating Queues</Text>
+              <View style={styles.tabCountPill}>
+                <Text style={styles.tabCountText}>{myQueues.length}</Text>
+              </View>
+            </Pressable>
           </View>
 
+          {/* My Active Queues */}
+          {activeTab === 'active' && (
+          <>
           {queuesLoading ? (
             <View style={styles.emptyCard}>
               <SpinningLoader size={28} color={theme.tertiary} />
@@ -501,8 +524,12 @@ export default function StudentQueueScreen() {
               </Text>
             </View>
           )}
+          </>
+          )}
 
           {/* Filters */}
+          {activeTab === 'available' && (
+          <>
           <View style={styles.filtersCard}>
             <Text style={styles.filtersTitle}>Queues Filter</Text>
             <Text style={styles.filtersDescription}>Select a queue to view service details and join.</Text>
@@ -630,6 +657,8 @@ export default function StudentQueueScreen() {
                   : 'There are no open queues yet.'}
               </Text>
             </View>
+          )}
+          </>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -1075,35 +1104,20 @@ function createStyles(theme: ThemePalette) {
       marginTop: 3,
     },
 
-    // Section header
-    sectionHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+    // Tabs
+    tabsRow: { flexDirection: 'row', gap: 8, borderBottomWidth: 2, borderBottomColor: theme.border },
+    tab: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -2,
     },
-    sectionTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
+    tabActive: { borderBottomColor: theme.blue },
+    tabText: { fontSize: 12, fontWeight: '700', color: theme.subtext, textTransform: 'uppercase', letterSpacing: 0.3 },
+    tabTextActive: { color: theme.blue },
+    tabCountPill: {
+      minWidth: 20, height: 20, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+      paddingHorizontal: 5, backgroundColor: 'rgba(59, 130, 246, 0.15)',
     },
-    sectionTitle: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: theme.text,
-    },
-    sectionCountPill: {
-      backgroundColor: 'rgba(22, 163, 74, 0.12)',
-      borderRadius: 999,
-      minWidth: 24,
-      alignItems: 'center',
-      paddingVertical: 4,
-      paddingHorizontal: 10,
-    },
-    sectionCountText: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: theme.primary,
-    },
+    tabCountText: { fontSize: 10, fontWeight: '700', color: theme.blue },
 
     // Queue list / cards
     queueList: {

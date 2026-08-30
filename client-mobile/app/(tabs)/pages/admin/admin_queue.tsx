@@ -38,6 +38,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { useAdminQueueHosting } from '@/hooks/useAdminQueueHosting';
@@ -206,6 +207,7 @@ type FilterKind = 'collegeOverview' | 'serviceType' | null;
 export default function AdminQueueScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [monitoringQueueId, setMonitoringQueueId] = useState<number | null>(null);
   // Where the monitor view was opened from: "hosting" when reached via a

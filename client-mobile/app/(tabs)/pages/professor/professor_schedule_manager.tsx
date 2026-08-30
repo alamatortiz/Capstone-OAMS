@@ -20,6 +20,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -180,6 +181,7 @@ export default function ProfessorScheduleManagerScreen() {
 
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -652,18 +654,18 @@ export default function ProfessorScheduleManagerScreen() {
       <Modal visible={showAddSlot} animationType="fade" transparent onRequestClose={closeAddSlotModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.formDialogCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.requestDialogHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.confirmTitle}>{editingId ? 'Edit Time Slot' : 'Add Time Slot'}</Text>
-                  <Text style={styles.requestDialogSubtitle}>
-                    {editingId ? 'Update this recurring weekly slot' : 'Set your recurring weekly availability'}
-                  </Text>
-                </View>
-                <Pressable onPress={closeAddSlotModal} hitSlop={8} disabled={modalLocked}>
-                  <Ionicons name="close" size={20} color={theme.subtext} />
-                </Pressable>
+            <View style={styles.requestDialogHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.requestDialogTitle}>{editingId ? 'Edit Time Slot' : 'Add Time Slot'}</Text>
+                <Text style={styles.requestDialogSubtitle}>
+                  {editingId ? 'Update this recurring weekly slot' : 'Set your recurring weekly availability'}
+                </Text>
               </View>
+              <Pressable onPress={closeAddSlotModal} hitSlop={8} disabled={modalLocked}>
+                <Ionicons name="close" size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.formDialogScroll}>
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{editingId ? 'Day of Week' : 'Day(s) of Week'}</Text>
@@ -795,22 +797,22 @@ export default function ProfessorScheduleManagerScreen() {
                 </View>
                 <Text style={styles.fieldHint}>Students will choose from these types when booking. Leave empty for no restriction.</Text>
               </View>
-
-              <View style={styles.dialogActionsRow}>
-                <Pressable
-                  style={styles.cancelBtn}
-                  onPress={closeAddSlotModal}
-                  disabled={modalLocked}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable style={styles.submitBtn} onPress={handleValidateAndOpenConfirm} disabled={modalLocked}>
-                  <Text style={styles.confirmBtnText}>
-                    {addSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Slot'}
-                  </Text>
-                </Pressable>
-              </View>
             </ScrollView>
+
+            <View style={styles.dialogActionsRow}>
+              <Pressable
+                style={styles.cancelBtn}
+                onPress={closeAddSlotModal}
+                disabled={modalLocked}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleValidateAndOpenConfirm} disabled={modalLocked}>
+                <Text style={styles.confirmBtnText}>
+                  {addSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Slot'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Location picker, rendered inside this same Modal (not a separate
@@ -1404,6 +1406,16 @@ function createStyles(theme: ThemePalette) {
       padding: 22,
     },
     requestDialogHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 18 },
+    // flex: 1 bounds the scrollable form body to the space left inside
+    // formDialogCard's maxHeight once the pinned header/footer take their
+    // own space, instead of growing to its own content height.
+    formDialogScroll: { flex: 1 },
+    // Left-aligned, unlike confirmTitle (centered -- built for the
+    // icon-above-title confirm dialogs elsewhere in this file). This header
+    // sits in a flexDirection:'row' with the subtitle stacked underneath it,
+    // so a centered title drifts out of alignment with the left-aligned
+    // subtitle right below it.
+    requestDialogTitle: { fontSize: 18, fontWeight: '800', color: theme.text },
     requestDialogSubtitle: { fontSize: 12.5, color: theme.subtext, marginTop: 4 },
 
     formGroup: { gap: 8, marginBottom: 16 },
@@ -1472,7 +1484,14 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: '#a855f7',
     },
 
-    dialogActionsRow: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
+    // Pinned footer, outside the scrollable form body (mirrors web's
+    // separate sa-modal-footer, and this app's own formModalFooter/
+    // dialogActions convention elsewhere) -- so Cancel/Save stay reachable
+    // without scrolling to the very end of a long form.
+    dialogActionsRow: {
+      flexDirection: 'row', gap: 10, justifyContent: 'flex-end',
+      marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.border,
+    },
     submitBtn: {
       alignItems: 'center',
       justifyContent: 'center',

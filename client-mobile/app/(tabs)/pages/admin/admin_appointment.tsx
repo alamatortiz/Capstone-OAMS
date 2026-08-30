@@ -33,6 +33,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { formatManilaDate, formatManilaTime } from '@/utils/date';
@@ -112,13 +113,14 @@ interface Appointment {
   requestedAt: string;
   requestedAtRaw: string | null;
   isToday: boolean;
-  cancelledBy: 'student' | 'faculty' | 'system' | null;
+  cancelledBy: 'student' | 'faculty' | 'system' | 'system_expired' | null;
 }
 
 const CANCELLED_BY_LABELS: Record<string, string> = {
   student: 'Student',
   faculty: 'Faculty',
   system: 'System (schedule change)',
+  system_expired: 'System (expired, no response)',
 };
 
 type LucideIconType = typeof Clock;
@@ -195,6 +197,7 @@ function formatDate(dateStr: string) {
 export default function AdminAppointmentScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1217,7 +1220,11 @@ function createStyles(theme: ThemePalette) {
       borderBottomColor: theme.border,
     },
     detailsModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    detailsModalBody: { padding: 18 },
+    // flex: 1 bounds this ScrollView to the space left inside detailsModalCard's
+    // maxHeight (instead of growing to its own content height), so a tall
+    // details section stays scrollable instead of pushing detailsModalFooter
+    // out of reach.
+    detailsModalBody: { flex: 1, padding: 18 },
     detailsHero: { borderRadius: 14, padding: 16, marginBottom: 16 },
     detailsHeroLabel: {
       fontSize: 10,

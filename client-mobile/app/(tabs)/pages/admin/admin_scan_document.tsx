@@ -35,6 +35,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
@@ -149,6 +150,7 @@ const navItems: NavItem[] = [
 export default function AdminScanDocumentScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
 
@@ -1047,7 +1049,11 @@ function createStyles(theme: ThemePalette) {
     },
     docModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
     docModalSubtitle: { fontSize: 11.5, color: theme.subtext, marginTop: 3 },
-    docModalBody: { padding: 18 },
+    // flex: 1 bounds this ScrollView to the space left inside docModalCard's
+    // maxHeight (instead of growing to its own content height), so tall
+    // content stays scrollable instead of pushing the Close button out of
+    // reach.
+    docModalBody: { flex: 1, padding: 18 },
 
     verifiedBanner: {
       alignItems: 'center',

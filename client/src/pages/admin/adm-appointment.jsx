@@ -60,6 +60,7 @@ const CANCELLED_BY_LABELS = {
   student: "Student",
   faculty: "Faculty",
   system: "System (schedule change)",
+  system_expired: "System (expired, no response)",
 };
 
 const TAB_ICON_MAP = {

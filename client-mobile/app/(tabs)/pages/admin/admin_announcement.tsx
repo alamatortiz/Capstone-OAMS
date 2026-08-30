@@ -23,6 +23,7 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -294,6 +295,7 @@ interface PickerState {
 export default function AdminAnnouncementScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -910,7 +912,8 @@ export default function AdminAnnouncementScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.viewModalCard}>
             {viewingAnnouncement && (
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <>
+              <ScrollView showsVerticalScrollIndicator={false} style={styles.formModalScroll}>
                 <View style={[styles.modalHeaderRow, { justifyContent: 'flex-end' }]}>
                   <Pressable onPress={() => setViewingAnnouncement(null)} hitSlop={8}>
                     <X size={20} color={theme.subtext} />
@@ -982,22 +985,23 @@ export default function AdminAnnouncementScreen() {
                   </View>
                 </View>
 
-                <View style={styles.modalFooterRow}>
-                  <Pressable
-                    style={styles.secondaryBtn}
-                    onPress={() => {
-                      const a = viewingAnnouncement;
-                      setViewingAnnouncement(null);
-                      openEdit(a);
-                    }}
-                  >
-                    <Text style={styles.secondaryBtnText}>Edit Announcement</Text>
-                  </Pressable>
-                  <Pressable style={styles.primaryBtn} onPress={() => setViewingAnnouncement(null)}>
-                    <Text style={styles.primaryBtnText}>Close</Text>
-                  </Pressable>
-                </View>
               </ScrollView>
+              <View style={styles.modalFooterRow}>
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => {
+                    const a = viewingAnnouncement;
+                    setViewingAnnouncement(null);
+                    openEdit(a);
+                  }}
+                >
+                  <Text style={styles.secondaryBtnText}>Edit Announcement</Text>
+                </Pressable>
+                <Pressable style={styles.primaryBtn} onPress={() => setViewingAnnouncement(null)}>
+                  <Text style={styles.primaryBtnText}>Close</Text>
+                </Pressable>
+              </View>
+              </>
             )}
           </View>
         </View>
@@ -1012,14 +1016,13 @@ export default function AdminAnnouncementScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.formModalCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>Edit Announcement</Text>
-                <Pressable onPress={closeEdit} hitSlop={8}>
-                  <X size={20} color={theme.subtext} />
-                </Pressable>
-              </View>
-
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Edit Announcement</Text>
+              <Pressable onPress={closeEdit} hitSlop={8}>
+                <X size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.formModalScroll}>
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Title *</Text>
                 <TextInput
@@ -1097,16 +1100,16 @@ export default function AdminAnnouncementScreen() {
                 )}
               </View>
 
-              <View style={styles.modalFooterRow}>
-                <Pressable style={styles.secondaryBtn} onPress={closeEdit}>
-                  <Text style={styles.secondaryBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable style={styles.primaryBtn} onPress={saveEdit}>
-                  <CheckCircle size={15} color="#ffffff" />
-                  <Text style={styles.primaryBtnText}>Save Changes</Text>
-                </Pressable>
-              </View>
             </ScrollView>
+            <View style={styles.modalFooterRow}>
+              <Pressable style={styles.secondaryBtn} onPress={closeEdit}>
+                <Text style={styles.secondaryBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.primaryBtn} onPress={saveEdit}>
+                <CheckCircle size={15} color="#ffffff" />
+                <Text style={styles.primaryBtnText}>Save Changes</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1115,14 +1118,13 @@ export default function AdminAnnouncementScreen() {
       <Modal visible={isCreating} animationType="fade" transparent onRequestClose={closeCreate}>
         <View style={styles.modalOverlay}>
           <View style={styles.formModalCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>New Announcement</Text>
-                <Pressable onPress={closeCreate} hitSlop={8}>
-                  <X size={20} color={theme.subtext} />
-                </Pressable>
-              </View>
-
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>New Announcement</Text>
+              <Pressable onPress={closeCreate} hitSlop={8}>
+                <X size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.formModalScroll}>
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Title *</Text>
                 <TextInput
@@ -1228,16 +1230,16 @@ export default function AdminAnnouncementScreen() {
                 )}
               </View>
 
-              <View style={styles.modalFooterRow}>
-                <Pressable style={styles.secondaryBtn} onPress={closeCreate}>
-                  <Text style={styles.secondaryBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable style={styles.primaryBtn} onPress={saveCreate}>
-                  <CheckCircle size={15} color="#ffffff" />
-                  <Text style={styles.primaryBtnText}>Save Announcement</Text>
-                </Pressable>
-              </View>
             </ScrollView>
+            <View style={styles.modalFooterRow}>
+              <Pressable style={styles.secondaryBtn} onPress={closeCreate}>
+                <Text style={styles.secondaryBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.primaryBtn} onPress={saveCreate}>
+                <CheckCircle size={15} color="#ffffff" />
+                <Text style={styles.primaryBtnText}>Save Announcement</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1771,6 +1773,11 @@ function createStyles(theme: ThemePalette) {
       marginBottom: 16,
     },
     modalTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
+    // flex: 1 bounds this ScrollView to the space left inside its card's
+    // maxHeight once the pinned header/footer take their own space, instead
+    // of growing to its own content height and pushing the footer out of
+    // reach. Shared by the View/Edit/Create modal cards below.
+    formModalScroll: { flex: 1 },
 
     // View modal
     viewModalCard: {

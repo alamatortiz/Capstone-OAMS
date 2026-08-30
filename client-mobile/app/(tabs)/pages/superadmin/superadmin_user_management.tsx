@@ -37,6 +37,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -195,6 +196,7 @@ function formatDateTime(dateStr: string) {
 export default function SuperadminUserManagementScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1143,7 +1145,10 @@ function createStyles(theme: ThemePalette) {
     formModalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border },
     detailsModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
     detailsModalSubtitle: { fontSize: 11.5, color: theme.subtext, marginTop: 3 },
-    formModalBody: { padding: 18 },
+    // flex: 1 bounds this ScrollView to the space left inside formModalCard's
+    // maxHeight (instead of growing to its own content height), so a tall
+    // form stays scrollable instead of pushing formModalFooter out of reach.
+    formModalBody: { flex: 1, padding: 18 },
     formGroup: { gap: 6, marginBottom: 14 },
     formLabel: { fontSize: 12.5, fontWeight: '600', color: theme.subtext },
     formInput: {

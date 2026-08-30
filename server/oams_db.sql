@@ -354,7 +354,12 @@ CREATE TABLE appointments (
     appointment_date    DATE         NOT NULL,
     appointment_time    TIME         NOT NULL,
     status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
-    cancelled_by        ENUM('student','faculty','system') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
+    -- 'system' = auto-cancelled because the availability slot it was booked
+    -- against got edited/deleted out from under it; 'system_expired' = never
+    -- approved/rejected and the appointment's own date+time has now passed
+    -- (appointmentReminderSweeper.js) -- kept distinct from 'system' since
+    -- the two need different activity-feed/notification copy.
+    cancelled_by        ENUM('student','faculty','system','system_expired') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
     notes               TEXT,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Auto-touched on any change to this row. Lets the transactions feeds

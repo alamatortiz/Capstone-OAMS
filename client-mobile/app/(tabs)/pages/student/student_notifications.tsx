@@ -22,6 +22,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell, {
@@ -142,6 +143,7 @@ const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
 export default function StudentNotificationsScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);

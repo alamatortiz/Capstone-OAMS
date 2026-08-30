@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
@@ -174,6 +175,7 @@ const emptyFormData: { typeId: number | ''; purpose: string; copies: string; nee
 export default function ProfessorDocumentsScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
@@ -824,16 +826,15 @@ export default function ProfessorDocumentsScreen() {
       <Modal visible={dialogOpen} animationType="fade" transparent onRequestClose={() => setDialogOpen(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.requestDialogCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.requestDialogHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.confirmTitle}>Request a Document</Text>
-                </View>
-                <Pressable onPress={() => setDialogOpen(false)} hitSlop={8}>
-                  <Ionicons name="close" size={20} color={theme.subtext} />
-                </Pressable>
+            <View style={styles.requestDialogHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.requestDialogTitle}>Request a Document</Text>
               </View>
-
+              <Pressable onPress={() => setDialogOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.requestDialogScroll}>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Document Type</Text>
                 <Pressable style={styles.selectTrigger} onPress={() => setTypePickerOpen(true)}>
@@ -919,19 +920,19 @@ export default function ProfessorDocumentsScreen() {
                 />
               </View>
 
-              <View style={styles.dialogActionsRow}>
-                <Pressable style={styles.cancelBtn} onPress={() => setDialogOpen(false)}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
-                  onPress={handleSubmitRequest}
-                  disabled={!canSubmit || submitting}
-                >
-                  <Text style={styles.confirmBtnText}>{submitting ? 'Submitting…' : 'Submit Request'}</Text>
-                </Pressable>
-              </View>
             </ScrollView>
+            <View style={styles.dialogActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setDialogOpen(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
+                onPress={handleSubmitRequest}
+                disabled={!canSubmit || submitting}
+              >
+                <Text style={styles.confirmBtnText}>{submitting ? 'Submitting…' : 'Submit Request'}</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Document Type picker, rendered inside this same Modal (not a
@@ -973,16 +974,15 @@ export default function ProfessorDocumentsScreen() {
       <Modal visible={sendDialogOpen} animationType="fade" transparent onRequestClose={() => setSendDialogOpen(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.requestDialogCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.requestDialogHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.confirmTitle}>Send a Document</Text>
-                </View>
-                <Pressable onPress={() => setSendDialogOpen(false)} hitSlop={8}>
-                  <Ionicons name="close" size={20} color={theme.subtext} />
-                </Pressable>
+            <View style={styles.requestDialogHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.requestDialogTitle}>Send a Document</Text>
               </View>
-
+              <Pressable onPress={() => setSendDialogOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.requestDialogScroll}>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Title</Text>
                 <TextInput
@@ -1061,19 +1061,19 @@ export default function ProfessorDocumentsScreen() {
                 <Text style={styles.attachHintText}>Each file up to 10MB.</Text>
               </View>
 
-              <View style={styles.dialogActionsRow}>
-                <Pressable style={styles.cancelBtn} onPress={() => setSendDialogOpen(false)} disabled={sendSubmitting}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.submitBtn, (!sendFormData.title.trim() || !sendFormData.purpose.trim() || sendSubmitting) && styles.submitBtnDisabled]}
-                  onPress={handleSubmitSendDocument}
-                  disabled={!sendFormData.title.trim() || !sendFormData.purpose.trim() || sendSubmitting}
-                >
-                  <Text style={styles.confirmBtnText}>{sendSubmitting ? 'Sending…' : 'Send Document'}</Text>
-                </Pressable>
-              </View>
             </ScrollView>
+            <View style={styles.dialogActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setSendDialogOpen(false)} disabled={sendSubmitting}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.submitBtn, (!sendFormData.title.trim() || !sendFormData.purpose.trim() || sendSubmitting) && styles.submitBtnDisabled]}
+                onPress={handleSubmitSendDocument}
+                disabled={!sendFormData.title.trim() || !sendFormData.purpose.trim() || sendSubmitting}
+              >
+                <Text style={styles.confirmBtnText}>{sendSubmitting ? 'Sending…' : 'Send Document'}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1472,6 +1472,15 @@ function createStyles(theme: ThemePalette) {
       padding: 22,
     },
     requestDialogHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 18 },
+    // Left-aligned, unlike confirmTitle (centered -- built for the
+    // icon-above-title confirm dialogs elsewhere in this file). This header
+    // sits in a flexDirection:'row' with nothing else centered next to it,
+    // so a centered title looks visually misaligned.
+    requestDialogTitle: { fontSize: 18, fontWeight: '800', color: theme.text },
+    // flex: 1 bounds the scrollable form body to the space left inside
+    // requestDialogCard's maxHeight once the pinned header/footer take
+    // their own space, instead of growing to its own content height.
+    requestDialogScroll: { flex: 1 },
 
     formGroup: { gap: 8, marginBottom: 16 },
     formLabel: { fontSize: 13.5, fontWeight: '700', color: theme.text },
@@ -1527,7 +1536,12 @@ function createStyles(theme: ThemePalette) {
     },
     reqTagOptionalText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
 
-    dialogActionsRow: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
+    // Pinned footer, outside the scrollable form body -- so Cancel/Submit
+    // stay reachable without scrolling to the very end of the form.
+    dialogActionsRow: {
+      flexDirection: 'row', gap: 10, justifyContent: 'flex-end',
+      marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.border,
+    },
     submitBtn: {
       alignItems: 'center',
       justifyContent: 'center',

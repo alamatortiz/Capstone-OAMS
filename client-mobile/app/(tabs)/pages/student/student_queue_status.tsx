@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import { useQueue } from '@/context/QueueContext';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -186,6 +187,7 @@ function getStatusMeta(queue: QueueRecord, theme: ThemePalette) {
 export default function StudentQueueStatusScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [selectedQueueId, setSelectedQueueId] = useState<number | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);

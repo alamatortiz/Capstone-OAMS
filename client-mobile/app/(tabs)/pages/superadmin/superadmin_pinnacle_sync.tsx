@@ -31,6 +31,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -108,6 +109,7 @@ const navItems: NavItem[] = [
 export default function SuperadminPinnacleSyncScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const [activeTab, setActiveTab] = useState<PinnacleTab>('configuration');

@@ -302,6 +302,7 @@ function buildActivityTitle(row) {
     // caused by editing/deleting the schedule slot the appointment was in --
     // without this, all three used to render as "cancelled by {student}".
     if (row.cancelled_by === "system") return `Appointment with ${row.student_name} auto-cancelled — schedule changed`;
+    if (row.cancelled_by === "system_expired") return `Appointment with ${row.student_name} auto-cancelled — you never responded`;
     if (row.cancelled_by === "faculty") return `You cancelled the appointment with ${row.student_name}`;
     return `Appointment cancelled by ${row.student_name}`;
   }

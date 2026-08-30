@@ -22,6 +22,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -115,6 +116,7 @@ const navItems: NavItem[] = [
 export default function AdminFaqScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -366,14 +368,13 @@ export default function AdminFaqScreen() {
       <Modal visible={isCreating} animationType="fade" transparent onRequestClose={closeCreate}>
         <View style={styles.modalOverlay}>
           <View style={styles.formModalCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>New FAQ</Text>
-                <Pressable onPress={closeCreate} hitSlop={8}>
-                  <X size={20} color={theme.subtext} />
-                </Pressable>
-              </View>
-
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>New FAQ</Text>
+              <Pressable onPress={closeCreate} hitSlop={8}>
+                <X size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.formModalScroll}>
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Question *</Text>
                 <TextInput
@@ -397,17 +398,16 @@ export default function AdminFaqScreen() {
                   textAlignVertical="top"
                 />
               </View>
-
-              <View style={styles.modalFooterRow}>
-                <Pressable style={styles.secondaryBtn} onPress={closeCreate}>
-                  <Text style={styles.secondaryBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable style={styles.primaryBtn} onPress={saveCreate} disabled={saving}>
-                  <CheckCircle size={15} color="#ffffff" />
-                  <Text style={styles.primaryBtnText}>{saving ? 'Saving…' : 'Save FAQ'}</Text>
-                </Pressable>
-              </View>
             </ScrollView>
+            <View style={styles.modalFooterRow}>
+              <Pressable style={styles.secondaryBtn} onPress={closeCreate}>
+                <Text style={styles.secondaryBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.primaryBtn} onPress={saveCreate} disabled={saving}>
+                <CheckCircle size={15} color="#ffffff" />
+                <Text style={styles.primaryBtnText}>{saving ? 'Saving…' : 'Save FAQ'}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -416,14 +416,13 @@ export default function AdminFaqScreen() {
       <Modal visible={!!editingFaq} animationType="fade" transparent onRequestClose={closeEdit}>
         <View style={styles.modalOverlay}>
           <View style={styles.formModalCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>Edit FAQ</Text>
-                <Pressable onPress={closeEdit} hitSlop={8}>
-                  <X size={20} color={theme.subtext} />
-                </Pressable>
-              </View>
-
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Edit FAQ</Text>
+              <Pressable onPress={closeEdit} hitSlop={8}>
+                <X size={20} color={theme.subtext} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.formModalScroll}>
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Question *</Text>
                 <TextInput
@@ -445,17 +444,16 @@ export default function AdminFaqScreen() {
                   textAlignVertical="top"
                 />
               </View>
-
-              <View style={styles.modalFooterRow}>
-                <Pressable style={styles.secondaryBtn} onPress={closeEdit}>
-                  <Text style={styles.secondaryBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable style={styles.primaryBtn} onPress={saveEdit} disabled={saving}>
-                  <CheckCircle size={15} color="#ffffff" />
-                  <Text style={styles.primaryBtnText}>{saving ? 'Saving…' : 'Save Changes'}</Text>
-                </Pressable>
-              </View>
             </ScrollView>
+            <View style={styles.modalFooterRow}>
+              <Pressable style={styles.secondaryBtn} onPress={closeEdit}>
+                <Text style={styles.secondaryBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.primaryBtn} onPress={saveEdit} disabled={saving}>
+                <CheckCircle size={15} color="#ffffff" />
+                <Text style={styles.primaryBtnText}>{saving ? 'Saving…' : 'Save Changes'}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -842,6 +840,10 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 20,
       padding: 20,
     },
+    // flex: 1 bounds the scrollable form body to the space left inside
+    // formModalCard's maxHeight once the pinned header/footer take their
+    // own space, instead of growing to its own content height.
+    formModalScroll: { flex: 1 },
     formField: { gap: 6, marginBottom: 14 },
     formLabel: { fontSize: 12, fontWeight: '700', color: theme.subtext, marginBottom: 6 },
     formInput: {
