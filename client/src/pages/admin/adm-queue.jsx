@@ -137,11 +137,19 @@ export default function AdminQueue() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [monitoringQueueId, setMonitoringQueueId] = useState(null);
+  // Seed synchronously from the nav state on the very first render (lazy
+  // initializer), not in the effect below -- otherwise render #1 has no
+  // monitored id and briefly falls through to the queue-list view before the
+  // effect runs (the "flash" bug when arriving from a Queue Hosting card).
+  const [monitoringQueueId, setMonitoringQueueId] = useState(
+    () => location.state?.monitorQueueId ?? null,
+  );
   // Where the monitor view was opened from: "hosting" when reached via a Queue
   // Hosting card (nav state), null for an in-page Manage click. Drives the
   // monitor-view breadcrumb target/label.
-  const [monitorCameFrom, setMonitorCameFrom] = useState(null);
+  const [monitorCameFrom, setMonitorCameFrom] = useState(
+    () => (location.state?.from === "hosting" ? "hosting" : null),
+  );
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
 
   // ── Queue entries (individual students waiting) for the monitored queue ──
@@ -755,6 +763,24 @@ export default function AdminQueue() {
               )}
             </div>
           </div>
+      </AdminPageShell>
+    );
+  }
+
+  // A monitor open is pending (arrived via a Queue Hosting card's nav state, or
+  // an in-page Manage click) but the shared live queue list hasn't resolved
+  // yet -- hold on a neutral loading screen instead of flashing the queue-list
+  // view underneath. `loading` from useAdminQueueHosting() is raised only on the
+  // first mount fetch, never on socket refetches, so this fires once on entry.
+  if (monitoringQueueId && !monitoringQueue && loading) {
+    return (
+      <AdminPageShell
+        outerClassName="admin-queue-with-sidebar"
+        mainClassName="admin-queue-main"
+      >
+        <div className="queue-monitoring-container">
+          <p className="queue-monitoring-status-note">Loading queue…</p>
+        </div>
       </AdminPageShell>
     );
   }

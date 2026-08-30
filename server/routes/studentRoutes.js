@@ -2109,6 +2109,12 @@ router.get(
            f.email,
            f.department_id,
            f.availability_status,
+           EXISTS (
+             SELECT 1 FROM user_sessions us
+             WHERE us.user_id = f.faculty_id
+               AND us.logout_at IS NULL
+               AND us.expires_at > NOW()
+           ) AS has_active_session,
            fa.availability_id,
            fa.day_of_week,
            fa.start_time,
@@ -2133,7 +2139,12 @@ router.get(
             specialization: row.specialization,
             email: row.email,
             departmentId: row.department_id,
-            availabilityStatus: row.availability_status,
+            // Login-session-derived: a professor who has logged out, whose
+            // session has expired, or who has never logged in reads as
+            // unavailable regardless of their stored toggle.
+            availabilityStatus: row.has_active_session
+              ? row.availability_status
+              : "unavailable",
             availability: [],
           });
         }

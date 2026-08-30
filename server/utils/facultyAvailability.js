@@ -33,14 +33,21 @@ function computeIsBusy(avails, appts, currentTimeStr) {
 // in an approved appointment window; available otherwise. Used by both the
 // admin dashboard summary and the dedicated Faculty Availability page so
 // they can never disagree with each other.
-async function getFacultyAvailabilityToday(deptId) {
+async function getFacultyAvailabilityToday(deptId, { includeWeekly = false } = {}) {
   const [facultyList] = await pool.query(
     `SELECT
        f.faculty_id,
        CONCAT(f.first_name, ' ', f.last_name) AS name,
        f.position,
+       f.specialization,
        f.email,
        f.availability_status,
+       EXISTS (
+         SELECT 1 FROM user_sessions us
+         WHERE us.user_id = f.faculty_id
+           AND us.logout_at IS NULL
+           AND us.expires_at > NOW()
+       ) AS has_active_session,
        d.department_name,
        d.department_abbreviation
      FROM faculty f
@@ -75,6 +82,31 @@ async function getFacultyAvailabilityToday(deptId) {
      ORDER BY a.faculty_id, a.appointment_time`,
     [facultyIds, manilaToday],
   );
+
+  // Full weekly consultation schedule (all weekdays, not just today) -- only
+  // fetched when a caller needs it (the Faculty Availability page's day-grouped
+  // card view), so the dashboard summary doesn't pay for a query it won't use.
+  const weeklyMap = {};
+  if (includeWeekly) {
+    const [weeklyRows] = await pool.query(
+      `SELECT faculty_id, day_of_week, start_time, end_time, location
+       FROM faculty_availability
+       WHERE faculty_id IN (?)
+       ORDER BY faculty_id,
+         FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'),
+         start_time`,
+      [facultyIds],
+    );
+    weeklyRows.forEach((row) => {
+      if (!weeklyMap[row.faculty_id]) weeklyMap[row.faculty_id] = [];
+      weeklyMap[row.faculty_id].push({
+        day: row.day_of_week,
+        timeStart: formatTime(row.start_time),
+        timeEnd: formatTime(row.end_time),
+        location: row.location ?? "TBA",
+      });
+    });
+  }
 
   const availMap = {};
   availabilityRows.forEach((row) => {
@@ -125,36 +157,43 @@ async function getFacultyAvailabilityToday(deptId) {
       }
     }
 
-    // The professor's own toggle (faculty.availability_status) takes
-    // precedence over whatever the schedule/appointments would otherwise
-    // compute -- if they've marked themselves unavailable, admin sees that.
+    // Login-session-derived availability: a professor only reads as available
+    // when they've toggled themselves available AND currently hold a live
+    // (non-logged-out, unexpired) session. Logout / token expiry /
+    // never-logged-in => unavailable. Their own "unavailable" toggle still wins
+    // outright. "Busy" (mid approved-appointment) is an admin-only layer on top.
+    const isPresent = !!f.has_active_session;
     const isToggledUnavailable = f.availability_status === "unavailable";
 
-    const status = isToggledUnavailable
-      ? "unavailable"
-      : isBusy
-      ? "busy"
-      : avails.length === 0
-      ? "unavailable"
-      : "available";
+    const status =
+      !isPresent || isToggledUnavailable
+        ? "unavailable"
+        : isBusy
+        ? "busy"
+        : "available";
 
     return {
       id: f.faculty_id,
       name: f.name,
       position: f.position,
+      specialization: f.specialization,
       college: `${f.department_name} (${f.department_abbreviation})`,
       status,
-      currentActivity: isToggledUnavailable
+      currentActivity: !isPresent
+        ? "Currently offline"
+        : isToggledUnavailable
         ? "Marked unavailable by professor"
         : isBusy
         ? "In consultation with student"
         : null,
-      nextAvailableSlot: isToggledUnavailable
-        ? "Unavailable"
-        : nextAvailableSlot ||
-          (avails.length === 0 ? "No schedule today" : "No more slots today"),
+      nextAvailableSlot:
+        !isPresent || isToggledUnavailable
+          ? "Unavailable"
+          : nextAvailableSlot ||
+            (avails.length === 0 ? "No schedule today" : "No more slots today"),
       email: f.email,
       todaySchedule: schedule,
+      weeklyAvailability: weeklyMap[f.faculty_id] || [],
     };
   });
 }

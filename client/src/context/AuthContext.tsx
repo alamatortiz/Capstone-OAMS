@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role: raw.role,
             firstName: raw.first_name,
             lastName: raw.last_name,
-            name: `${raw.first_name} ${raw.last_name}`,
+            name: `${raw.first_name} ${raw.last_name}`.trim(),
             email: raw.email,
             departmentName: raw.department_name ?? undefined,
             departmentAbbrev: raw.department_abbreviation ?? undefined,
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: raw.role,
         firstName: raw.first_name,
         lastName: raw.last_name,
-        name: `${raw.first_name} ${raw.last_name}`, // ← dashboards use user.name
+        name: `${raw.first_name} ${raw.last_name}`.trim(), // ← dashboards use user.name
         email: raw.email,
         departmentName: raw.department_name ?? undefined,
         departmentAbbrev: raw.department_abbreviation ?? undefined,

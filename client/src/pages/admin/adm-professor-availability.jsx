@@ -7,6 +7,7 @@ import api from "../../utils/api";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import { connectSocket } from "../../utils/socket";
+import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const UsersIcon = ({ className }) => (
@@ -15,6 +16,12 @@ const UsersIcon = ({ className }) => (
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+  </svg>
+);
+const UserIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+    <circle cx="12" cy="7" r="4"></circle>
   </svg>
 );
 const ClockIcon = ({ className }) => (
@@ -28,6 +35,13 @@ const XCircleIcon = ({ className }) => (
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="15" y1="9" x2="9" y2="15"></line>
     <line x1="9" y1="9" x2="15" y2="15"></line>
+  </svg>
+);
+const AlertCircleIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
   </svg>
 );
 const CalendarSmallIcon = ({ className }) => (
@@ -54,11 +68,47 @@ const MapPinIcon = ({ className }) => (
 
 const STATUS_TABS = ["all", "available", "busy", "unavailable"];
 
+// The next upcoming calendar date for a weekday name, anchored to Manila
+// "today" -- never a date already passed. Copied from stud-professor-schedules
+// so the two screens label consultation days identically.
+const DAY_ORDER_FULL = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+const nextOccurrenceDateStr = (dayName, anchorStr) => {
+  const [y, m, d] = anchorStr.split("-").map(Number);
+  const anchor = new Date(y, m - 1, d);
+  const diff = (DAY_ORDER_FULL.indexOf(dayName) - anchor.getDay() + 7) % 7;
+  anchor.setDate(anchor.getDate() + diff);
+  return `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`;
+};
+
+// Groups a faculty member's flat weeklyAvailability[] into day-ordered buckets.
+const getDaySchedules = (faculty) => {
+  const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const groupedByDay = {};
+  (faculty.weeklyAvailability ?? []).forEach((slot) => {
+    if (!groupedByDay[slot.day]) groupedByDay[slot.day] = [];
+    groupedByDay[slot.day].push(slot);
+  });
+  return dayOrder
+    .filter((day) => groupedByDay[day])
+    .map((day) => ({ day, schedules: groupedByDay[day] }));
+};
+
 export default function AdminProfessorAvailability() {
   const [faculty, setFaculty] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  // Tracks the Manila calendar date so the next-occurrence day math recomputes
+  // if the tab is left open across a midnight rollover.
+  const [todayAnchor, setTodayAnchor] = useState(() => getManilaDateString());
 
   // Mirrors `faculty` for the catch block below, without making fetchFaculty
   // depend on (and change identity with) the state itself.
@@ -86,7 +136,9 @@ export default function AdminProfessorAvailability() {
     fetchFaculty();
   }, [fetchFaculty]);
 
-  // ── Live updates: refetch when a faculty member's schedule changes ────────
+  // ── Live updates: refetch when a professor toggles status / logs out, or
+  // when a schedule slot changes. `faculty:availability-status-changed` is what
+  // makes the logged-out => unavailable rule land here without a reload.
   useEffect(() => {
     const token = sessionStorage.getItem("oams_token");
     if (!token) return;
@@ -94,7 +146,11 @@ export default function AdminProfessorAvailability() {
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const events = ["appointment:slot-updated", "appointment:slot-removed"];
+    const events = [
+      "faculty:availability-status-changed",
+      "appointment:slot-updated",
+      "appointment:slot-removed",
+    ];
     events.forEach((event) => socket.on(event, fetchFaculty));
 
     return () => {
@@ -102,20 +158,25 @@ export default function AdminProfessorAvailability() {
     };
   }, [fetchFaculty]);
 
+  // ── Fallback poll: the "Busy" state is time-based (an appointment window
+  // opening/closing fires no socket event), and a student/admin on another
+  // college's page isn't in this professor's socket room. Same 45s pattern as
+  // stud-professor-schedules.jsx; also advances todayAnchor across midnight.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      fetchFaculty();
+      const nowStr = getManilaDateString();
+      setTodayAnchor((prev) => (prev === nowStr ? prev : nowStr));
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [fetchFaculty]);
+
   const filteredFaculty = faculty.filter((f) =>
     statusFilter === "all" || f.status === statusFilter
   );
 
   const getStatusBadgeClass = (status) => `apa-status-badge apa-status-${status}`;
-  const getSlotClass = (status) => `apa-slot apa-slot-${status}`;
-
-  const getInitials = (name) =>
-    name
-      .split(" ")
-      .filter((n) => /^[A-Za-z]/.test(n))
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 3);
 
   return (
     <AdminPageShell
@@ -169,67 +230,91 @@ export default function AdminProfessorAvailability() {
               </div>
             )}
 
-            {!loading && !error && filteredFaculty.map((f) => (
-              <div key={f.id} className="apa-faculty-card">
-                <div className="apa-faculty-top">
-                  <div className="apa-faculty-identity">
-                    <div className="apa-faculty-avatar">{getInitials(f.name)}</div>
+            {!loading && !error && filteredFaculty.map((f) => {
+              const isUnavailable = f.status === "unavailable";
+              const daySchedules = getDaySchedules(f);
+              return (
+                <div
+                  key={f.id}
+                  className={`apa-faculty-card${isUnavailable ? " apa-faculty-card-unavailable" : ""}`}
+                >
+                  <div className="apa-faculty-header">
+                    <div className="apa-faculty-avatar">
+                      <UserIcon className="apa-avatar-icon" />
+                    </div>
                     <div className="apa-faculty-identity-text">
-                      <h3 className="apa-faculty-name">{f.name}</h3>
+                      <div className="apa-faculty-name-row">
+                        <h3 className="apa-faculty-name">{f.name}</h3>
+                        <span className={getStatusBadgeClass(f.status)}>
+                          <span className="apa-status-dot"></span>
+                          {f.status}
+                        </span>
+                      </div>
                       <p className="apa-faculty-position">{f.position}</p>
-                      <p className="apa-faculty-college">{f.college}</p>
+                      {f.specialization && (
+                        <p className="apa-faculty-spec">{f.specialization}</p>
+                      )}
+                      <p className="apa-faculty-email">
+                        <MailIcon className="apa-email-icon" />
+                        {f.email}
+                      </p>
                     </div>
                   </div>
-                  <span className={getStatusBadgeClass(f.status)}>
-                    <span className="apa-status-dot"></span>
-                    {f.status}
-                  </span>
-                </div>
 
-                {f.currentActivity && (
-                  <div className="apa-current-activity">
-                    <strong>Current:</strong>&nbsp;{f.currentActivity}
-                  </div>
-                )}
-
-                <div className="apa-faculty-meta">
-                  <div className="apa-meta-row">
-                    <CalendarSmallIcon className="apa-meta-icon" />
-                    <span className="apa-meta-label">Next Available:</span>
-                    <span className="apa-meta-value">{f.nextAvailableSlot}</span>
-                  </div>
-                  <div className="apa-meta-row apa-meta-row-contact">
-                    <span className="apa-meta-contact">
-                      <MailIcon className="apa-meta-icon" />
-                      {f.email}
-                    </span>
-                  </div>
-                </div>
-
-                {f.todaySchedule.length > 0 && (
-                  <div className="apa-schedule-section">
-                    <p className="apa-schedule-label">Today's Schedule</p>
-                    <div className="apa-schedule-grid">
-                      {f.todaySchedule.map((slot, idx) => (
-                        <div key={`${slot.time}-${slot.activity}`} className={getSlotClass(slot.status)}>
-                          <div className="apa-slot-time-row">
-                            <ClockIcon className="apa-slot-icon" />
-                            <span className="apa-slot-time">{slot.time}</span>
-                          </div>
-                          <p className="apa-slot-activity">{slot.activity}</p>
-                          {slot.location && slot.location !== "N/A" && (
-                            <div className="apa-slot-location-row">
-                              <MapPinIcon className="apa-slot-icon" />
-                              <span className="apa-slot-location">{slot.location}</span>
+                  <div className="apa-consult-section">
+                    <h4 className="apa-consult-title">Consultation Hours</h4>
+                    {isUnavailable ? (
+                      <div className="apa-consult-unavailable">
+                        <AlertCircleIcon className="apa-consult-unavailable-icon" />
+                        <p>
+                          This professor is currently unavailable and is not
+                          accepting consultations right now.
+                        </p>
+                      </div>
+                    ) : daySchedules.length === 0 ? (
+                      <p className="apa-consult-empty">
+                        No consultation hours have been set yet.
+                      </p>
+                    ) : (
+                      <div className="apa-schedule-list">
+                        {daySchedules.map(({ day, schedules }) => (
+                          <div key={day} className="apa-day-schedule">
+                            <div className="apa-day-header">
+                              <CalendarSmallIcon className="apa-day-icon" />
+                              <span className="apa-day-name">{day}</span>
+                              <span className="apa-day-date">
+                                {formatManilaDate(
+                                  nextOccurrenceDateStr(day, todayAnchor),
+                                  { month: "short", day: "numeric" },
+                                )}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                            <div className="apa-day-slots">
+                              {schedules.map((slot, idx) => (
+                                <div key={idx} className="apa-sched-slot">
+                                  <div className="apa-slot-time-block">
+                                    <ClockIcon className="apa-slot-icon" />
+                                    <span className="apa-slot-time-range">
+                                      {slot.timeStart} – {slot.timeEnd}
+                                    </span>
+                                  </div>
+                                  <div className="apa-slot-loc-block">
+                                    <MapPinIcon className="apa-slot-icon" />
+                                    <span className="apa-slot-loc">
+                                      {slot.location}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
 
             {!loading && !error && filteredFaculty.length === 0 && (
               <div className="apa-empty-state">

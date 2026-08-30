@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const pool = require("../db");
 const { sendServerError } = require("../utils/errorResponse");
+const { emitToDept } = require("../sockets");
 
 // Per the capstone paper's User Login Activity Diagram: "a three-tries limit
 // before a temporary lockout of the account." The paper doesn't specify an
@@ -439,10 +440,31 @@ const logout = async (req, res) => {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
     if (token) {
+      const hashed = hashToken(token);
       await pool.query(
         `UPDATE user_sessions SET logout_at = NOW() WHERE session_token = ? AND logout_at IS NULL`,
-        [hashToken(token)],
+        [hashed],
       );
+
+      // If this was a faculty session, tell the department room so the student
+      // Professor Schedules / admin Faculty Availability screens refetch and
+      // immediately show the professor as unavailable (they now have no live
+      // session). Fire-and-forget -- a hiccup here must not break logout.
+      const [[row]] = await pool.query(
+        `SELECT us.user_id AS faculty_id, u.role, f.department_id
+         FROM user_sessions us
+         JOIN users u ON u.user_id = us.user_id
+         LEFT JOIN faculty f ON f.faculty_id = us.user_id
+         WHERE us.session_token = ?
+         ORDER BY us.session_id DESC LIMIT 1`,
+        [hashed],
+      );
+      if (row?.role === "faculty" && row.department_id) {
+        emitToDept(row.department_id, "faculty:availability-status-changed", {
+          facultyId: Number(row.faculty_id),
+          availabilityStatus: "unavailable",
+        });
+      }
     }
   } catch (error) {
     console.error("Logout session update error:", error.message);

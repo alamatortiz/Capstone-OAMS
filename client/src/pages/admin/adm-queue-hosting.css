@@ -684,6 +684,10 @@
   color: #ef4444;
 }
 
+.aqh-action-btn--repeat {
+  text-transform: uppercase;
+}
+
 .aqh-action-btn--repeat:hover {
   background: rgba(34, 197, 94, 0.12);
   border-color: var(--primary-color);

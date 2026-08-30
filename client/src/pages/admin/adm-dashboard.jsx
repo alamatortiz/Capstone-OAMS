@@ -4,10 +4,10 @@ import { FileText } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "./adm-dashboard.css";
-import editIcon from "../../assets/edit_icon.png";
-import deleteIcon from "../../assets/delete_icon.png";
 import api from "../../utils/api";
 import { connectSocket } from "../../utils/socket";
+import { getCollegeLogo } from "../../data/collegeLogo";
+import { parseOfficeHoursSchedule } from "../../utils/dateTime";
 import AdminPageShell from "../../components/AdminPageShell";
 
 // ── Icons (all unchanged from original) ──────────────────────────────────────
@@ -36,18 +36,6 @@ const UsersIcon = () => (
     <circle cx="9" cy="7" r="4"></circle>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-  </svg>
-);
-const BellIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
   </svg>
 );
 const ChevronRightIcon = () => (
@@ -86,18 +74,6 @@ const AlertIcon = () => (
     <path d="M12 9v4"></path>
     <path d="M12 17h.01"></path>
     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-  </svg>
-);
-const PlusIcon = () => (
-  <svg
-    className="icon"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="12" y1="5" x2="12" y2="19"></line>
-    <line x1="5" y1="12" x2="19" y2="12"></line>
   </svg>
 );
 const DatabaseIcon = () => (
@@ -264,6 +240,29 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [authUser, fetchStats]);
 
+  // ── Office hours (mirrors stud-dashboard.jsx / prof-dashboard.jsx) ────────
+  const [officeHours, setOfficeHours] = useState(null);
+  const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
+  const [officeHoursError, setOfficeHoursError] = useState(null);
+
+  const fetchOfficeHours = useCallback(async () => {
+    try {
+      setOfficeHoursLoading(true);
+      const res = await api.get("/admin/office-hours");
+      setOfficeHours(res.data);
+      setOfficeHoursError(null);
+    } catch (err) {
+      console.error("Failed to fetch office hours:", err);
+      setOfficeHoursError("Could not load office hours.");
+    } finally {
+      setOfficeHoursLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser) fetchOfficeHours();
+  }, [authUser, fetchOfficeHours]);
+
   // ── Derived values ────────────────────────────────────────────────────────
   const s = dashStats?.stats;
   const loading = dashLoading;
@@ -272,7 +271,9 @@ export default function AdminDashboard() {
     {
       title: "Active Queues",
       value: loading ? "—" : String(s?.activeQueues ?? 0),
-      description: "Across all colleges",
+      description: loading
+        ? ""
+        : `${s?.activeQueuesFull ?? 0} full · ${s?.activeQueuesPaused ?? 0} paused`,
       icon: ClockIcon,
       bgColor: "bg-blue-50",
       isClickable: true,
@@ -281,7 +282,7 @@ export default function AdminDashboard() {
     {
       title: "Pending Documents",
       value: loading ? "—" : String(s?.pendingDocuments ?? 0),
-      description: "Awaiting processing",
+      description: loading ? "" : `${s?.pendingProcessing ?? 0} processing`,
       icon: FileTextIcon,
       bgColor: "bg-orange-50",
       isClickable: true,
@@ -297,20 +298,17 @@ export default function AdminDashboard() {
       ctaAriaLabel: "View faculty availability",
     },
     {
-      title: "Announcements",
-      value: loading ? "—" : String(s?.announcements ?? 0),
-      description: "Published",
-      icon: BellIcon,
+      title: "Completed",
+      value: loading ? "—" : String(s?.completedToday ?? 0),
+      description: "Completed today",
+      icon: CheckIcon,
       bgColor: "bg-green-50",
       isClickable: true,
-      ctaAriaLabel: "View announcement management",
+      ctaAriaLabel: "View transactions",
     },
   ];
 
-  const pendingDocuments = dashStats?.pendingDocuments ?? [];
-  const hostedQueues = dashStats?.hostedQueues ?? [];
   const facultyAvailability = dashStats?.facultyAvailability ?? [];
-  const announcements = dashStats?.announcements ?? [];
 
   // ── Handler for clicking stat cards ────────────────────────────────────────
   const handleStatCardClick = (statTitle) => {
@@ -326,8 +324,8 @@ export default function AdminDashboard() {
       navigate("/admin/professor-availability");
       return;
     }
-    if (statTitle === "Announcements") {
-      navigate("/admin/announcements");
+    if (statTitle === "Completed") {
+      navigate("/admin/transactions");
     }
   };
 
@@ -344,22 +342,18 @@ export default function AdminDashboard() {
             <div className="banner-backdrop banner-backdrop-1"></div>
             <div className="banner-backdrop banner-backdrop-2"></div>
             <div className="banner-content">
-              <h1 className="banner-title">Admin Dashboard</h1>
-              <p className="banner-subtitle">{user?.college}</p>
+              <p className="banner-greeting">Good day!</p>
+              <div className="banner-title-row">
+                <img
+                  src={getCollegeLogo(user?.college)}
+                  alt="College Logo"
+                  className="banner-ccs-logo"
+                />
+                <h1 className="banner-title">{user?.name ?? "Administrator"}</h1>
+              </div>
               <div className="banner-badges">
-                <div className="welcome-admin-badge">
-                  <img
-                    src={
-                      new URL(
-                        `../../assets/${user?.departmentAbbrev || "CCS"}.png`,
-                        import.meta.url,
-                      ).href
-                    }
-                    alt="College Logo"
-                    className="welcome-admin-logo"
-                  />
-                  <span className="badge">Administrator</span>
-                </div>
+                <span className="badge">Admin Portal</span>
+                <span className="badge">{user?.employeeId}</span>
               </div>
             </div>
           </div>
@@ -479,206 +473,106 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          {/* Announcement Management */}
-          <section className="announcement-management-section">
-            <div className="section-header-admin">
-              <div className="section-title-admin">
-                <BellIcon />
-                <h2>Announcement Management</h2>
-              </div>
-              <button
-                className="btn-new-announcement"
-                onClick={() => navigate("/admin/announcements")}
+          {/* Faculty Availability — professor-dashboard "appointments preview" style, purple */}
+          <section className="faculty-avail-preview-card">
+            <div className="faculty-avail-card-header">
+              <h3 className="faculty-avail-card-title">
+                <UsersIcon />
+                Faculty Availability Today
+              </h3>
+              <a
+                href="/admin/professor-availability"
+                className="faculty-avail-view-all"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/admin/professor-availability");
+                }}
               >
-                <PlusIcon />
-                New Announcement
-              </button>
+                View All <ChevronRightIcon />
+              </a>
             </div>
-            <div className="announcements-list">
+            <div className="faculty-avail-card-content">
               {loading ? (
-                <p className="activity-loading">Loading announcements...</p>
-              ) : announcements.length === 0 ? (
-                <p className="activity-empty">No announcements yet.</p>
+                <p className="activity-loading">Loading faculty availability...</p>
+              ) : facultyAvailability.length === 0 ? (
+                <div className="faculty-avail-empty">
+                  <div className="faculty-avail-empty-icon">
+                    <UsersIcon />
+                  </div>
+                  <p>No faculty data available.</p>
+                </div>
               ) : (
-                announcements.map((ann) => (
-                  <div key={ann.id} className="announcement-item">
-                    <div className="announcement-content">
-                      <h4 className="announcement-title">
-                        {ann.isPinned && (
-                          <span style={{ marginRight: "0.3rem" }}>📌</span>
-                        )}
-                        {ann.title}
-                      </h4>
-                      <p className="announcement-description">
-                        {ann.description}
-                      </p>
-                      <div className="announcement-important-date">
-                        <span className={`announcement-tag tag-audience-${ann.audience || "students"}`}>
-                          {ann.audience === "faculty" ? "Faculty" : "Students"}
-                        </span>
-                        {(ann.audience || "students") === "students" && (
-                          <span
-                            className={`announcement-tag tag-${ann.isPinned ? "pinned" : ann.tag || "general"}`}
-                          >
-                            {ann.tag || "general"}
-                          </span>
-                        )}
-                        <span className="announcement-date">{ann.date}</span>
-                      </div>
+                facultyAvailability.map((f) => (
+                  <div key={f.id} className="faculty-avail-item">
+                    <div className="faculty-avail-item-icon">
+                      <UsersIcon />
                     </div>
-                    <div className="announcement-actions">
-                      <button
-                        type="button"
-                        className="btn-announcement-icon btn-announcement-edit"
-                        aria-label={`Edit: ${ann.title}`}
-                        onClick={() => navigate("/admin/announcements")}
-                      >
-                        <img
-                          className="btn-announcement-icon-img"
-                          src={editIcon}
-                          alt=""
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-announcement-icon btn-announcement-delete"
-                        aria-label={`Delete: ${ann.title}`}
-                        onClick={() => navigate("/admin/announcements")}
-                      >
-                        <img
-                          className="btn-announcement-icon-img"
-                          src={deleteIcon}
-                          alt=""
-                        />
-                      </button>
+                    <div className="faculty-avail-item-details">
+                      <p className="faculty-avail-item-name">{f.name}</p>
+                      <p className="faculty-avail-item-college">{f.college}</p>
                     </div>
+                    <span
+                      className={`faculty-avail-item-badge faculty-avail-item-badge--${f.status}`}
+                    >
+                      <span className="faculty-avail-item-dot"></span>
+                      {f.status}
+                    </span>
                   </div>
                 ))
               )}
             </div>
           </section>
 
-          {/* Two Column: Pending Docs + Hosted Queues */}
-          <div className="admin-grid-2col">
-            <section className="pending-documents-section">
-              <div className="card-header-admin">
-                <h3>Pending Requested Documents</h3>
-                <a
-                  href="/admin/document-processing"
-                  className="view-all-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/admin/document-processing");
-                  }}
-                >
-                  View All <ChevronRightIcon />
-                </a>
-              </div>
-              <div className="documents-list">
-                {loading ? (
-                  <p className="activity-loading">Loading...</p>
-                ) : pendingDocuments.length === 0 ? (
-                  <p className="activity-empty">No pending documents.</p>
-                ) : (
-                  pendingDocuments.map((doc) => (
-                    <div key={doc.id} className="document-item">
-                      <div className="document-info">
-                        <p className="document-name">
-                          {doc.name}
-                          {doc.requesterType === "faculty" && (
-                            <span className="document-requester-badge">Faculty</span>
-                          )}
-                        </p>
-                        <p className="document-type">{doc.document}</p>
-                        <div className="document-meta-row">
-                          <span
-                            className={`document-college college-${doc.college}`}
-                          >
-                            {doc.college}
-                          </span>
-                          <span className="document-date">{doc.date}</span>
+          {/* Office Hours — mirrors stud/prof dashboards */}
+          <section className="adm-office-hours-card">
+            <div className="adm-hours-header">
+              <h2 className="adm-hours-title">
+                <ClockIcon />
+                Office Hours
+              </h2>
+              {!officeHoursLoading && officeHours && (
+                <span className="adm-hours-dept">
+                  {officeHours.departmentName} ({officeHours.departmentAbbrev})
+                </span>
+              )}
+            </div>
+            <div className="adm-hours-body">
+              {officeHoursLoading ? (
+                <p className="adm-hours-loading">Loading office hours...</p>
+              ) : officeHoursError ? (
+                <p className="adm-hours-empty">
+                  {officeHoursError}{" "}
+                  <button
+                    type="button"
+                    className="adm-hours-retry"
+                    onClick={fetchOfficeHours}
+                  >
+                    Retry
+                  </button>
+                </p>
+              ) : !officeHours ? (
+                <p className="adm-hours-empty">No office hours available.</p>
+              ) : (
+                <>
+                  <div className="adm-hours-schedule">
+                    {parseOfficeHoursSchedule(officeHours.officeHours).map(
+                      (entry, i) => (
+                        <div key={i} className="adm-hours-item">
+                          <p className="adm-hours-day">{entry.day}</p>
+                          <p className="adm-hours-time">{entry.time}</p>
                         </div>
-                      </div>
-                      <span className={`document-badge badge-${doc.status}`}>
-                        {doc.status}
+                      ),
+                    )}
+                  </div>
+                  {officeHours.officeLocation && (
+                    <div className="adm-hours-location">
+                      <span className="adm-hours-location-label">Location:</span>
+                      <span className="adm-hours-location-value">
+                        {officeHours.officeLocation}
                       </span>
                     </div>
-                  ))
-                )}
-              </div>
-            </section>
-
-            <section className="hosted-queues-section">
-              <div className="card-header-admin">
-                <h3>Current Hosted Queues</h3>
-                <a
-                  href="/admin/queue"
-                  className="view-all-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/admin/queue");
-                  }}
-                >
-                  Manage <ChevronRightIcon />
-                </a>
-              </div>
-              <div className="admin-queues-list">
-                {loading ? (
-                  <p className="activity-loading">Loading...</p>
-                ) : hostedQueues.length === 0 ? (
-                  <p className="activity-empty">No active queues today.</p>
-                ) : (
-                  hostedQueues.map((queue) => (
-                    <div key={queue.id} className="queue-item">
-                      <div className="queue-info">
-                        <p className="queue-name">{queue.name}</p>
-                      </div>
-                      <div className="queue-status-info">
-                        <span
-                          className={`queue-badge badge-${queue.status.toLowerCase()}`}
-                        >
-                          {queue.status}
-                        </span>
-                        <span className="queue-count">{queue.count}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* Faculty Availability */}
-          <section className="faculty-availability-section">
-            <div className="card-header-admin">
-              <h3>Faculty Availability Today</h3>
-              <a
-                href="/admin/professor-availability"
-                className="view-all-link"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate("/admin/professor-availability");
-                }}
-              >
-                View All Faculty <ChevronRightIcon />
-              </a>
-            </div>
-            <div className="faculty-grid">
-              {loading ? (
-                <p className="activity-loading">Loading...</p>
-              ) : facultyAvailability.length === 0 ? (
-                <p className="activity-empty">No faculty data available.</p>
-              ) : (
-                facultyAvailability.map((f) => (
-                  <div key={f.id} className="faculty-card">
-                    <div
-                      className={`faculty-indicator ${f.status.toLowerCase()}`}
-                    ></div>
-                    <p className="faculty-name">{f.name}</p>
-                    <p className="faculty-college">{f.college}</p>
-                    <p className="faculty-time">{f.time}</p>
-                  </div>
-                ))
+                  )}
+                </>
               )}
             </div>
           </section>

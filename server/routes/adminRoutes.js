@@ -61,36 +61,103 @@ router.get(
       );
       const deptId = adminRow?.department_id;
 
-      // 1. Active queues (open slots today in this department)
+      // 1. Active queues today in this department. "Live / servicing" = slots
+      // that are still 'open', OR are 'full'/'expired' (closed to new joins)
+      // but still have unserved students in line -- the "hours ended / capacity
+      // reached but we're still serving everyone already here" case. The 30s
+      // queueExpirySweeper flips 'open'->'expired' at end_time, so an overtime
+      // queue carries 'expired', not 'open'. `paused` is deliberately NOT in
+      // the headline count -- it's broken out into the card's sub-text instead.
       const [[queueRow]] = await pool.query(
-        `SELECT COUNT(*) AS active_queue_count
+        `SELECT
+           SUM(
+             qs.status = 'open'
+             OR (qs.status IN ('full','expired') AND (
+                  SELECT COUNT(*) FROM queues q
+                  WHERE q.slot_id = qs.slot_id AND q.status IN ('waiting','serving')
+                ) > 0)
+           ) AS active_queue_count,
+           SUM(
+             qs.status = 'full' AND (
+               SELECT COUNT(*) FROM queues q
+               WHERE q.slot_id = qs.slot_id AND q.status IN ('waiting','serving')
+             ) > 0
+           ) AS full_queue_count,
+           SUM(qs.status = 'paused') AS paused_queue_count
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
          WHERE qs.slot_date = ?
-           AND qs.status = 'open'
            AND (? IS NULL OR s.department_id = ?)`,
         [manilaToday, deptId, deptId],
       );
 
-      // 2. Pending documents (student requests + faculty requests + student
-      // "sent" submissions, in this department's services)
+      // 2. Documents by state (student requests + faculty requests + student
+      // "sent" submissions, in this department). `pending` and `processing`
+      // are split so the card can show the pending count with a "N processing"
+      // sub-text.
       const [[docRow]] = await pool.query(
         `SELECT
            (SELECT COUNT(*) FROM document_requests dr
               JOIN document_services s ON dr.service_id = s.service_id
-              WHERE dr.status IN ('pending', 'processing')
+              WHERE dr.status = 'pending'
                 AND (? IS NULL OR s.department_id = ?))
            +
            (SELECT COUNT(*) FROM faculty_document_requests fdr
               JOIN document_services s ON fdr.service_id = s.service_id
-              WHERE fdr.status IN ('pending', 'processing')
+              WHERE fdr.status = 'pending'
                 AND (? IS NULL OR s.department_id = ?))
            +
            (SELECT COUNT(*) FROM document_submissions ds
-              WHERE ds.status IN ('pending', 'processing')
+              WHERE ds.status = 'pending'
                 AND (? IS NULL OR ds.department_id = ?))
-           AS pending_doc_count`,
-        [deptId, deptId, deptId, deptId, deptId, deptId],
+           AS pending_doc_count,
+           (SELECT COUNT(*) FROM document_requests dr
+              JOIN document_services s ON dr.service_id = s.service_id
+              WHERE dr.status = 'processing'
+                AND (? IS NULL OR s.department_id = ?))
+           +
+           (SELECT COUNT(*) FROM faculty_document_requests fdr
+              JOIN document_services s ON fdr.service_id = s.service_id
+              WHERE fdr.status = 'processing'
+                AND (? IS NULL OR s.department_id = ?))
+           +
+           (SELECT COUNT(*) FROM document_submissions ds
+              WHERE ds.status = 'processing'
+                AND (? IS NULL OR ds.department_id = ?))
+           AS processing_doc_count`,
+        [deptId, deptId, deptId, deptId, deptId, deptId,
+         deptId, deptId, deptId, deptId, deptId, deptId],
+      );
+
+      // 2b. Completed transactions for THIS department, THIS Manila day only
+      // (resets at Manila midnight; the adm-transactions history is untouched).
+      // Mirrors the admin /transactions feed's "completed" derivation: queue
+      // 'completed', appointment 'completed', document requests / submissions
+      // 'claimed'. event_time is a real UTC instant, so "today" is anchored to
+      // Manila midnight-as-UTC, same pattern as GET /transactions.
+      const manilaMidnightUTC = new Date(`${manilaToday}T00:00:00+08:00`);
+      const [[completedRow]] = await pool.query(
+        `SELECT
+           (SELECT COUNT(*) FROM queues q
+              JOIN services s ON q.service_id = s.service_id
+              WHERE s.department_id = ? AND q.status = 'completed' AND q.updated_at >= ?)
+           +
+           (SELECT COUNT(*) FROM appointments a
+              WHERE a.department_id = ? AND a.status = 'completed' AND a.updated_at >= ?)
+           +
+           (SELECT COUNT(*) FROM document_requests dr
+              JOIN document_services s ON dr.service_id = s.service_id
+              WHERE s.department_id = ? AND dr.status = 'claimed' AND dr.updated_at >= ?)
+           +
+           (SELECT COUNT(*) FROM faculty_document_requests fdr
+              JOIN document_services s ON fdr.service_id = s.service_id
+              WHERE s.department_id = ? AND fdr.status = 'claimed' AND fdr.updated_at >= ?)
+           +
+           (SELECT COUNT(*) FROM document_submissions ds
+              WHERE ds.department_id = ? AND ds.status = 'claimed' AND ds.updated_at >= ?)
+           AS completed_today_count`,
+        [deptId, manilaMidnightUTC, deptId, manilaMidnightUTC, deptId, manilaMidnightUTC,
+         deptId, manilaMidnightUTC, deptId, manilaMidnightUTC],
       );
 
       // 3. Faculty available today -- shares the exact same schedule/toggle
@@ -201,9 +268,15 @@ router.get(
 
       res.json({
         stats: {
-          activeQueues: queueRow.active_queue_count || 0,
+          activeQueues: Number(queueRow.active_queue_count) || 0,
+          activeQueuesFull: Number(queueRow.full_queue_count) || 0,
+          activeQueuesPaused: Number(queueRow.paused_queue_count) || 0,
           pendingDocuments: docRow.pending_doc_count || 0,
+          pendingProcessing: docRow.processing_doc_count || 0,
+          completedToday: completedRow.completed_today_count || 0,
           facultyAvailable: facultyAvailableCount,
+          // Kept for the mobile admin dashboard, which still renders an
+          // Announcements stat card + list. The web dashboard no longer uses it.
           announcements: annRow.announcement_count || 0,
         },
         pendingDocuments: pendingDocuments.map((d) => ({
@@ -2252,10 +2325,41 @@ router.get(
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
 
-      const faculty = await getFacultyAvailabilityToday(deptId);
+      const faculty = await getFacultyAvailabilityToday(deptId, { includeWeekly: true });
       res.json({ faculty });
     } catch (error) {
       sendServerError(res, error, "Faculty availability fetch error:");
+    }
+  },
+);
+
+// GET /api/admin/office-hours
+// The logged-in admin's own department office hours/location -- mirrors
+// GET /api/student/office-hours and GET /api/professor/office-hours, joined
+// through the administrators table.
+router.get(
+  "/office-hours",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const adminId = req.user.userId;
+    try {
+      const [[dept]] = await pool.query(
+        `SELECT d.department_name, d.department_abbreviation, d.office_location, d.office_hours
+         FROM administrators a
+         JOIN departments d ON a.department_id = d.department_id
+         WHERE a.admin_id = ?`,
+        [adminId],
+      );
+      if (!dept) return res.status(404).json({ message: "Department not found" });
+      res.json({
+        departmentName: dept.department_name,
+        departmentAbbrev: dept.department_abbreviation,
+        officeLocation: dept.office_location ?? "",
+        officeHours: dept.office_hours ?? "",
+      });
+    } catch (error) {
+      sendServerError(res, error, "Admin office hours error:");
     }
   },
 );

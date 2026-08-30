@@ -250,23 +250,47 @@ body {
   z-index: 1;
 }
 
-.banner-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 0 0 0.5rem 0;
-  line-height: 1.2;
+/* Greeting + logo + name row -- mirrors stud-dashboard / prof-dashboard banners */
+.admin-dashboard .banner-greeting {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.5rem;
+  font-weight: 400;
+  margin-bottom: 0.15rem;
   text-align: left;
 }
 
-.banner-subtitle {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.95rem;
-  font-weight: 400;
-  margin-bottom: 1rem;
+.admin-dashboard .banner-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-start;
+}
+
+.banner-title-row .banner-ccs-logo {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+}
+
+.banner-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.1;
   text-align: left;
+}
+
+@media (min-width: 768px) {
+  .banner-title {
+    font-size: 2.75rem;
+  }
 }
 
 .banner-badges {
+  margin-top: 1rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -281,19 +305,6 @@ body {
   font-weight: 500;
   border: 1px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
-}
-
-.welcome-admin-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.welcome-admin-logo {
-  width: 3rem;
-  height: 3rem;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
 }
 
 /* ===== Stats Grid ===== */
@@ -762,609 +773,353 @@ body {
   transition: color 0.3s ease;
 }
 
-/* ===== Announcement Management Section ===== */
-.announcement-management-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.05) 100%);
-  border: 1.5px solid rgba(34, 197, 94, 0.3);
-  border-radius: 1rem;
-  transition: all 0.3s ease;
-}
-
-.btn-new-announcement {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1rem;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: white;
-  border: none;
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-}
-
-.btn-new-announcement:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.3);
-}
-
-.btn-new-announcement .icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-.announcements-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.announcement-item {
+/* ===== Faculty Availability preview card — prof-dashboard "appointments
+   preview" style, ported to purple, full width ===== */
+.faculty-avail-preview-card {
   background: var(--card-bg);
-  border: 1px solid rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.2);
   border-radius: 1rem;
-  padding: 1.25rem;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1.5rem;
-  transition: all 0.3s ease;
-}
-
-.announcement-management-section .section-title-admin .icon {
-  color: #22c55e;
-}
-
-.announcement-item:hover {
-  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.3);
-}
-
-.announcement-content {
-  flex: 1;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-.announcement-title {
-  font-size: 0.975rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.announcement-description {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0;
-  transition: color 0.3s ease;
-  line-height: 1.5;
-}
-
-.announcement-important-date {
+.faculty-avail-card-header {
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-top: 0.5rem;
-  width: 100%;
+  padding: 1.25rem 1.25rem 1rem;
 }
 
-.announcement-important-date .announcement-tag {
-  flex-shrink: 0;
-}
-
-.announcement-date {
-  margin-left: auto;
-}
-
-.announcement-actions {
+.faculty-avail-card-title {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 0.5rem;
-  align-items: flex-end;
-  flex-shrink: 0;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
-.btn-announcement-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.6rem;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  background: rgba(0, 0, 0, 0.02);
+.faculty-avail-card-title .icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--purple);
+}
+
+.faculty-avail-view-all {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  padding: 0;
-}
-
-.btn-announcement-icon-img {
-  width: 1.1rem;
-  height: 1.1rem;
-  object-fit: contain;
-  display: block;
-}
-
-.btn-announcement-edit {
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.12);
-}
-
-.btn-announcement-edit:hover {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.55);
-  transform: translateY(-1px);
-}
-
-.btn-announcement-delete {
-  border-color: rgba(239, 68, 68, 0.45);
-  background: rgba(239, 68, 68, 0.12);
-}
-
-.btn-announcement-delete:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.65);
-  transform: translateY(-1px);
-}
-
-.announcement-tag {
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: capitalize;
-  transition: all 0.3s ease;
-}
-
-.announcement-tag.tag-important {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  border: 0.5px solid rgba(239, 68, 68, 0.4);
-}
-
-.announcement-tag.tag-event {
-  background: rgba(249, 115, 22, 0.2);
-  color: #f97316;
-  border: 0.5px solid rgba(249, 115, 22, 0.4);
-}
-
-.announcement-tag.tag-reminder {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-  border: 0.5px solid rgba(59, 130, 246, 0.4);
-}
-
-.announcement-tag.tag-general {
-  background: rgba(148, 163, 184, 0.2);
-  color: #94a3b8;
-  border: 0.5px solid rgba(148, 163, 184, 0.4);
-}
-
-.announcement-tag.tag-pinned {
-  background: rgba(34, 197, 94, 0.2);
-  color: var(--primary-color);
-  border: 0.5px solid rgba(34, 197, 94, 0.4);
-}
-
-/* This preview list blends student- and faculty-audience announcements
-   together -- this tag is what keeps a faculty row's meaningless 'general'
-   type tag from reading as a real category. */
-.announcement-tag.tag-audience-students {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-  border: 0.5px solid rgba(59, 130, 246, 0.4);
-}
-
-.announcement-tag.tag-audience-faculty {
-  background: rgba(139, 92, 246, 0.2);
-  color: #8b5cf6;
-  border: 0.5px solid rgba(139, 92, 246, 0.4);
-}
-
-.announcement-date {
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
-  transition: color 0.3s ease;
-}
-
-/* ===== Two Column Grid ===== */
-.admin-grid-2col {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.5rem;
-}
-
-@media (min-width: 1024px) {
-  .admin-grid-2col {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* ===== Pending Documents Section ===== */
-.pending-documents-section {
-  background: var(--card-bg);
-  border: 1px solid rgba(249, 115, 22, 0.2);
-  border-radius: 1rem;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.pending-documents-section:hover {
-  border-color: rgba(249, 115, 22, 0.35);
-  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.08);
-}
-
-.hosted-queues-section {
-  background: var(--card-bg);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 1rem;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.hosted-queues-section:hover {
-  border-color: rgba(59, 130, 246, 0.35);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.08);
-}
-
-.card-header-admin {
-  padding: 1.25rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: border-color 0.3s ease;
-}
-
-[data-theme="light"] .card-header-admin {
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.card-header-admin h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.view-all-link {
-  display: flex;
-  align-items: center;
   gap: 0.25rem;
-  color: var(--primary-color);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--purple);
   text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: gap 0.2s ease;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.5rem;
+  transition: background 0.2s ease;
 }
 
-.view-all-link:hover {
-  gap: 0.5rem;
+.faculty-avail-view-all:hover {
+  background: rgba(168, 85, 247, 0.1);
 }
 
-.view-all-link .icon {
-  width: 0.75rem;
-  height: 0.75rem;
+.faculty-avail-view-all .icon {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
-.section-desc {
-  padding: 0 1.25rem 0.75rem 1.25rem;
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  transition: color 0.3s ease;
-  text-align: left;
-}
-
-.documents-list,
-.admin-queues-list {
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.document-item {
-  padding: 1rem;
-  border: 1.5px solid rgba(249, 115, 22, 0.25);
-  border-radius: 0.75rem;
-  background-color: rgba(249, 115, 22, 0.05);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  transition: all 0.3s ease;
-}
-
-[data-theme="light"] .document-item {
-  border-color: rgba(249, 115, 22, 0.2);
-  background-color: rgba(249, 115, 22, 0.04);
-}
-
-.document-item:hover {
-  background-color: rgba(249, 115, 22, 0.1);
-  border-color: rgba(249, 115, 22, 0.45);
-}
-
-.queue-item {
-  padding: 1rem;
-  border: 1.5px solid rgba(59, 130, 246, 0.25);
-  border-radius: 0.75rem;
-  background-color: rgba(59, 130, 246, 0.05);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  transition: all 0.3s ease;
-}
-
-[data-theme="light"] .queue-item {
-  border-color: rgba(59, 130, 246, 0.2);
-  background-color: rgba(59, 130, 246, 0.04);
-}
-
-.queue-item:hover {
-  background-color: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.45);
-}
-
-.document-info,
-.queue-info {
+.faculty-avail-card-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
-  text-align: left;
+  padding: 0 1.25rem 1.25rem;
 }
 
-.document-name,
-.queue-name {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
-  line-height: 1.2;
-}
-
-.document-type,
-.queue-code {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin: 0;
-  transition: color 0.3s ease;
-  line-height: 1.2;
-}
-
-.document-college,
-.document-date {
-  font-size: 0.75rem;
+.faculty-avail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 0;
   color: var(--text-tertiary);
-  margin: 0;
-  transition: color 0.3s ease;
-  display: block;
-  margin-top: 0.1rem;
+  font-size: 0.875rem;
 }
 
-.document-meta-row {
+.faculty-avail-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
+  justify-content: center;
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--purple);
 }
 
-.document-college {
+.faculty-avail-empty-icon .icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.faculty-avail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
+  border-radius: 0.75rem;
+  background-color: rgba(168, 85, 247, 0.06);
+  transition: all 0.3s ease;
+  margin-bottom: 0.75rem;
+}
+
+.faculty-avail-item:last-child {
+  margin-bottom: 0;
+}
+
+.faculty-avail-item:hover {
+  background-color: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.faculty-avail-item-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.15) 100%);
+  color: var(--purple);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
+}
+
+.faculty-avail-item-icon .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.faculty-avail-item-details {
   flex: 1;
   min-width: 0;
-}
-
-.document-date {
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.document-college.college-CCS  { color: #f97316; }
-.document-college.college-CBAA { color: #facc15; }
-.document-college.college-COED { color: #2563eb; }
-.document-college.college-COE  { color: #ef4444; }
-.document-college.college-CAS  { color: #7f1d1d; }
-.document-college.college-CHAS { color: #22c55e; }
-
-.document-requester-badge {
-  padding: 0.1rem 0.4rem;
-  border-radius: 0.375rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  white-space: nowrap;
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
-  border: 0.5px solid rgba(249, 115, 22, 0.3);
-  margin-left: 0.4rem;
-}
-
-.document-badge,
-.queue-badge {
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: capitalize;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-/* Queue badge colors are unchanged from before the split — only document-badge
-   below picks up the new stud-documents/stud-document-status doc-badge palette. */
-.queue-badge.badge-pending {
-  background: rgba(245, 158, 11, 0.2);
-  color: var(--warning);
-  border: 0.5px solid rgba(245, 158, 11, 0.4);
-}
-
-.queue-badge.badge-processing {
-  background: rgba(59, 130, 246, 0.2);
-  color: var(--blue);
-  border: 0.5px solid rgba(59, 130, 246, 0.4);
-}
-
-.document-badge.badge-pending {
-  background: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
-  border: 0.5px solid rgba(251, 191, 36, 0.3);
-  text-transform: uppercase;
-}
-
-.document-badge.badge-processing {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border: 0.5px solid rgba(59, 130, 246, 0.3);
-  text-transform: uppercase;
-}
-
-[data-theme="light"] .document-badge.badge-pending {
-  background: rgba(217, 119, 6, 0.1);
-  color: #92400e;
-  border-color: rgba(217, 119, 6, 0.3);
-}
-
-[data-theme="light"] .document-badge.badge-processing {
-  background: rgba(37, 99, 235, 0.1);
-  color: #1d4ed8;
-  border-color: rgba(37, 99, 235, 0.25);
-}
-
-.queue-badge.badge-active {
-  background: rgba(34, 197, 94, 0.2);
-  color: var(--primary-color);
-  border: 0.5px solid rgba(34, 197, 94, 0.4);
-}
-
-.queue-badge.badge-paused {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 0.5px solid rgba(245, 158, 11, 0.4);
-}
-
-.queue-status-info {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 0.15rem;
-  white-space: nowrap;
-}
-
-.queue-count {
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
-  transition: color 0.3s ease;
-  margin-top: -0.05rem;
-}
-
-/* ===== Faculty Availability Section ===== */
-.faculty-availability-section {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-}
-
-.faculty-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-top: 1.5rem;
+  align-items: flex-start;
   text-align: left;
+  gap: 0.2rem;
 }
 
-@media (max-width: 1024px) {
-  .faculty-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .faculty-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.faculty-card {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  border-radius: 0.75rem;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  position: relative;
-  transition: all 0.3s ease;
-}
-
-.faculty-card:hover {
-  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.5);
-}
-
-.faculty-indicator {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-}
-
-.faculty-indicator.available {
-  background: #10b981;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
-}
-
-.faculty-indicator.busy {
-  background: #ef4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
-}
-
-.faculty-name {
+.faculty-avail-item-name {
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text-primary);
   margin: 0;
-  transition: color 0.3s ease;
-  padding-right: 1.5rem;
+  line-height: 1.2;
+  text-align: left;
 }
 
-.faculty-college {
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.faculty-time {
+.faculty-avail-item-college {
   font-size: 0.8rem;
   color: var(--text-secondary);
   margin: 0;
-  transition: color 0.3s ease;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.faculty-avail-item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.faculty-avail-item-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.faculty-avail-item-badge--available {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.faculty-avail-item-badge--busy {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.faculty-avail-item-badge--unavailable {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* ===== Office Hours (full-width, green-themed, mirrors stud/prof dashboards) ===== */
+.adm-office-hours-card {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  color: white;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.adm-office-hours-card::before {
+  content: '';
+  position: absolute;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  top: -3rem;
+  right: -3rem;
+  pointer-events: none;
+}
+
+.adm-office-hours-card::after {
+  content: '';
+  position: absolute;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  bottom: -2rem;
+  right: 8rem;
+  pointer-events: none;
+}
+
+.adm-hours-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.adm-hours-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.adm-hours-title .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.adm-hours-dept {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.adm-hours-body {
+  position: relative;
+  z-index: 1;
+}
+
+.adm-hours-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.adm-hours-item {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  flex: 1;
+  min-width: 180px;
+  backdrop-filter: blur(4px);
+}
+
+.adm-hours-day {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 0.25rem 0;
+}
+
+.adm-hours-time {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+.adm-hours-location {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.adm-hours-location-label {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.4px;
+}
+
+.adm-hours-location-value {
   font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.adm-hours-loading,
+.adm-hours-empty {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.adm-hours-retry {
+  display: inline;
+  padding: 0;
+  background: none;
+  border: none;
+  color: white;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
 }
 
 /* ===== Error banner ===== */
@@ -1407,10 +1162,6 @@ body {
   .admin-tools-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .faculty-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 @media (max-width: 768px) {
@@ -1433,14 +1184,6 @@ body {
 
   .quick-actions-grid {
     grid-template-columns: 1fr;
-  }
-
-  .admin-grid-2col {
-    grid-template-columns: 1fr;
-  }
-
-  .faculty-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1474,31 +1217,5 @@ body {
 
   .quick-actions-grid {
     grid-template-columns: 1fr;
-  }
-
-  .faculty-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .announcement-item {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .announcement-actions {
-    align-items: flex-start;
-    flex-direction: row;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .announcement-important-date {
-    align-items: flex-start;
-  }
-
-  .document-item,
-  .queue-item {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }

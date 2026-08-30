@@ -513,6 +513,17 @@ body {
   border: 1px solid rgba(34, 197, 94, 0.35);
 }
 
+/* Green/red status dot -- inherits the badge's own colour via currentColor */
+.professor-available-badge .prof-avail-dot,
+.professor-unavailable-badge .prof-avail-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 0.4rem;
+  flex-shrink: 0;
+}
+
 .consultation-unavailable-notice {
   display: flex;
   align-items: flex-start;

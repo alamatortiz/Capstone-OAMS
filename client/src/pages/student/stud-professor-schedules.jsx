@@ -358,10 +358,12 @@ export default function ProfessorSchedule() {
                               <h3 className="professor-name">{professor.name}</h3>
                               {isUnavailable ? (
                                 <span className="professor-unavailable-badge">
+                                  <span className="prof-avail-dot" />
                                   Unavailable
                                 </span>
                               ) : (
                                 <span className="professor-available-badge">
+                                  <span className="prof-avail-dot" />
                                   Available
                                 </span>
                               )}
