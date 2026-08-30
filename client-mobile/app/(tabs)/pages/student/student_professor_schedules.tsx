@@ -29,6 +29,7 @@ import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import { formatManilaDate, getManilaDateString, nextOccurrenceDateStr } from '@/utils/date';
 
 type LucideIconType = typeof GraduationCap;
 
@@ -167,6 +168,8 @@ export default function StudentProfessorSchedulesScreen() {
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('departments');
+  // Anchors the next-occurrence day math below to "today" in Manila time.
+  const [todayAnchor] = useState(() => getManilaDateString());
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -470,6 +473,12 @@ export default function StudentProfessorSchedulesScreen() {
                                   <View style={styles.dayHeaderRow}>
                                     <Calendar size={15} color={theme.purple} />
                                     <Text style={styles.dayName}>{day}</Text>
+                                    <Text style={styles.dayDate}>
+                                      {formatManilaDate(nextOccurrenceDateStr(day, todayAnchor), {
+                                        month: 'short',
+                                        day: 'numeric',
+                                      })}
+                                    </Text>
                                   </View>
                                   <View style={styles.daySlots}>
                                     {schedules.map((schedule, idx) => (
@@ -752,6 +761,7 @@ function createStyles(theme: ThemePalette) {
     },
     dayHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
     dayName: { fontSize: 13, fontWeight: '700', color: theme.purple },
+    dayDate: { fontSize: 11.5, color: theme.tertiary },
     daySlots: { gap: 8, marginLeft: 20 },
     scheduleSlot: {
       backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,

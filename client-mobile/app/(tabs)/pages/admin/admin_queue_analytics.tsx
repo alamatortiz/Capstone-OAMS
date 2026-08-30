@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   BarChart3,
   Calendar,
+  CheckCircle,
   ChevronDown,
   ChevronLeft,
   Clock,
@@ -25,10 +26,8 @@ import {
   History,
   Home as HomeIcon,
   RefreshCw,
-  Smile,
-  TrendingUp,
   Users,
-  Activity,
+  UserX,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -85,76 +84,48 @@ function OamsLogo({
   );
 }
 
-// GET /api/admin/queue-analytics (adminRoutes.js) is scoped strictly to the
-// signed-in admin's own department — it aggregates completed queues for that
-// one department only, filtered by period/service, with no cross-college
-// breakdown, and returns performance/insights/serviceTypes pre-computed.
-type PerfStatus = 'excellent' | 'good' | 'needs improvement';
-
-interface ServicePerformance {
-  service: string;
-  college: string;
-  status: PerfStatus;
+// GET /api/admin/queue-analytics/summary (adminRoutes.js) is scoped strictly
+// to the signed-in admin's own department -- it aggregates queues for that
+// one department only, filtered by range/service, and returns
+// totals/byService/serviceTypes pre-computed. Mirrors web's current
+// adm-queue-analytics.jsx exactly (web replaced its older, richer
+// performance/trends/insights view with this simpler operational-metrics
+// one; the older /admin/queue-analytics endpoint this screen used to call
+// still exists server-side for backward compat, but neither web nor this
+// screen use it anymore).
+interface Totals {
+  accomplishedQueues: number;
+  overtimeQueues: number;
   studentsServed: number;
-  avgWait: string;
-  peakHours: string;
-  satisfaction: number;
+  noShows: number;
+  peakHour: string;
 }
 
-interface Insight {
-  title: string;
-  desc: string;
-}
-
-const TIME_PERIODS = ['Today', 'This Week', 'This Month', 'This Semester'] as const;
-type TimePeriod = (typeof TIME_PERIODS)[number];
-
-type SelectField = 'period' | 'service' | null;
-
-const STATUS_TINTS: Record<PerfStatus, { bg: string; border: string; color: string }> = {
-  excellent: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.35)', color: '#22c55e' },
-  good: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.35)', color: '#3b82f6' },
-  'needs improvement': { bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.35)', color: '#f97316' },
+const DEFAULT_TOTALS: Totals = {
+  accomplishedQueues: 0,
+  overtimeQueues: 0,
+  studentsServed: 0,
+  noShows: 0,
+  peakHour: 'N/A',
 };
 
-function getSatisfactionColor(val: number) {
-  if (val >= 90) return '#22c55e';
-  if (val >= 80) return '#3b82f6';
-  return '#f97316';
+interface ByServiceRow {
+  service: string;
+  studentsServed: number;
+  overtimeQueues: number;
+  noShows: number;
+  avgWaitMinutes: number;
 }
 
-const STAT_TINTS = {
-  served: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' },
-  wait: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
-  satisfaction: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)', color: '#22c55e' },
-  services: { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7' },
-} as const;
+const RANGE_OPTIONS = [
+  { value: 'today', label: 'Today' },
+  { value: 'all', label: 'All Time' },
+] as const;
+type RangeValue = (typeof RANGE_OPTIONS)[number]['value'];
 
-const ANALYTICS_TABS = ['performance', 'trends', 'insights'] as const;
-type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
+type SelectField = 'range' | 'service' | null;
 
 type LucideIconType = typeof Clock;
-
-const TAB_META: Record<AnalyticsTab, { label: string; icon: LucideIconType }> = {
-  performance: { label: 'Performance', icon: TrendingUp },
-  trends: { label: 'Trends', icon: Calendar },
-  insights: { label: 'Insights', icon: AlertTriangle },
-};
-
-interface WeeklyComparisonRow {
-  label: string;
-  value: string;
-  change: string;
-  color: string;
-}
-
-interface Trends {
-  peakActivityTime: string;
-  bestServiceTime: string;
-  weeklyComparison: WeeklyComparisonRow[];
-}
-
-const DEFAULT_TRENDS: Trends = { peakActivityTime: 'N/A', bestServiceTime: 'N/A', weeklyComparison: [] };
 
 interface NavItem {
   key: string;
@@ -175,52 +146,53 @@ export default function AdminQueueAnalyticsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('Today');
+  const [range, setRange] = useState<RangeValue>('today');
   const [serviceType, setServiceType] = useState('All Services');
   const [selectField, setSelectField] = useState<SelectField>(null);
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('performance');
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
-  const [performance, setPerformance] = useState<ServicePerformance[]>([]);
-  const [positiveInsights, setPositiveInsights] = useState<Insight[]>([]);
-  const [improvementAreas, setImprovementAreas] = useState<Insight[]>([]);
+  const [totals, setTotals] = useState<Totals>(DEFAULT_TOTALS);
+  const [byService, setByService] = useState<ByServiceRow[]>([]);
   const [serviceTypes, setServiceTypes] = useState<string[]>(['All Services']);
-  const [trends, setTrends] = useState<Trends>(DEFAULT_TRENDS);
+  // Starts true so the first load shows a loading state; later refreshes
+  // (filter change / socket / reconnect) update silently -- mirrors web.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const requestIdRef = useRef(0);
 
   const fetchAnalytics = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     try {
-      const res = await api.get('/admin/queue-analytics', {
-        params: { period: timePeriod, service: serviceType },
+      setLoadError(null);
+      const res = await api.get('/admin/queue-analytics/summary', {
+        params: { range, service: serviceType },
       });
       if (requestId !== requestIdRef.current) return;
-      setPerformance(res.data.performance ?? []);
-      setPositiveInsights(res.data.positiveInsights ?? []);
-      setImprovementAreas(res.data.improvementAreas ?? []);
-      setServiceTypes(res.data.serviceTypes ?? ['All Services']);
-      setTrends(res.data.trends ?? DEFAULT_TRENDS);
+      setTotals(res.data.totals ?? DEFAULT_TOTALS);
+      setByService(res.data.byService ?? []);
+      if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
       console.error('Failed to fetch queue analytics:', error);
+      setLoadError('Could not load queue analytics.');
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [timePeriod, serviceType]);
+  }, [range, serviceType]);
 
   const handleExportReport = async () => {
     try {
       await exportRowsAsCsv(
-        performance.map((p) => ({
-          service: p.service,
-          college: p.college,
-          status: p.status,
-          studentsServed: p.studentsServed,
-          avgWait: p.avgWait,
-          peakHours: p.peakHours,
-          satisfaction: p.satisfaction,
+        byService.map((r) => ({
+          service: r.service,
+          studentsServed: r.studentsServed,
+          overtimeQueues: r.overtimeQueues,
+          noShows: r.noShows,
+          avgWaitMinutes: r.avgWaitMinutes,
         })),
-        `queue-analytics-${timePeriod.replace(/\s+/g, '-').toLowerCase()}.csv`,
+        `queue-analytics-${range}.csv`,
       );
     } catch (error: any) {
       Alert.alert('Export failed', error?.message ?? 'Could not export the report.');
@@ -236,10 +208,23 @@ export default function AdminQueueAnalyticsScreen() {
     const socket = connectSocket(token);
     if (!socket) return;
     const refetch = () => fetchAnalytics();
-    const events = ['queue:called', 'queue:served', 'queue:no-show'];
+    // A queue metric moves whenever a student is called / served / no-showed
+    // or a slot's lifecycle changes -- mirrors web's ANALYTICS_LIVE_EVENTS.
+    const events = [
+      'queue:called',
+      'queue:served',
+      'queue:no-show',
+      'queue:slot-status',
+      'queue:student-joined',
+      'queue:student-left',
+    ];
     events.forEach((event) => socket.on(event, refetch));
+    // Reconciles state after a dropped connection -- mirrors web's
+    // useLiveRefetch, which refetches on socket "connect" for this reason.
+    socket.on('connect', refetch);
     return () => {
       events.forEach((event) => socket.off(event, refetch));
+      socket.off('connect', refetch);
     };
   }, [user, token, fetchAnalytics]);
 
@@ -283,25 +268,15 @@ export default function AdminQueueAnalyticsScreen() {
     router.replace('/login');
   };
 
-  const filteredPerformance = performance;
+  const rangeLabel = RANGE_OPTIONS.find((r) => r.value === range)?.label ?? 'Today';
 
-  const totalServed = filteredPerformance.reduce((sum, p) => sum + p.studentsServed, 0);
-  const parseAvgWait = (avgWait: string) => parseFloat(avgWait) || 0;
-  const avgWaitAll =
-    filteredPerformance.length > 0
-      ? Math.round(filteredPerformance.reduce((sum, p) => sum + parseAvgWait(p.avgWait), 0) / filteredPerformance.length)
-      : 0;
-  const avgSatisfaction =
-    filteredPerformance.length > 0
-      ? Math.round(filteredPerformance.reduce((sum, p) => sum + p.satisfaction, 0) / filteredPerformance.length)
-      : 0;
-
-  const selectOptions: string[] = selectField === 'period' ? [...TIME_PERIODS] : serviceTypes;
-  const selectTitle = selectField === 'period' ? 'Select Time Period' : 'Select Service Type';
-  const selectCurrentValue = selectField === 'period' ? timePeriod : serviceType;
+  const selectOptions: { value: string; label: string }[] =
+    selectField === 'range' ? [...RANGE_OPTIONS] : serviceTypes.map((s) => ({ value: s, label: s }));
+  const selectTitle = selectField === 'range' ? 'Select Time Range' : 'Select Service Type';
+  const selectCurrentValue = selectField === 'range' ? range : serviceType;
 
   const chooseOption = (value: string) => {
-    if (selectField === 'period') setTimePeriod(value as TimePeriod);
+    if (selectField === 'range') setRange(value as RangeValue);
     else if (selectField === 'service') setServiceType(value);
     setSelectField(null);
   };
@@ -348,7 +323,61 @@ export default function AdminQueueAnalyticsScreen() {
             </LinearGradient>
             <View style={styles.titleTextWrap}>
               <Text style={styles.pageTitle}>Queue Analytics</Text>
-              <Text style={styles.pageSubtitle}>Real-time queue performance metrics and insights</Text>
+              <Text style={styles.pageSubtitle}>Queue performance for your department.</Text>
+            </View>
+          </View>
+
+          {/* Stat cards */}
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { borderColor: 'rgba(59, 130, 246, 0.3)' }]}>
+              <View style={styles.statCardTop}>
+                <CheckCircle size={16} color={theme.subtext} />
+                <Text style={styles.statCardLabel}>Accomplished Queues</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: '#3b82f6' }]}>
+                {loading ? '—' : totals.accomplishedQueues}
+              </Text>
+              <Text style={styles.statCardSub}>{rangeLabel}</Text>
+            </View>
+            <View style={[styles.statCard, { borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
+              <View style={styles.statCardTop}>
+                <AlertTriangle size={16} color={theme.subtext} />
+                <Text style={styles.statCardLabel}>Overtime Queues</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: '#f59e0b' }]}>
+                {loading ? '—' : totals.overtimeQueues}
+              </Text>
+              <Text style={styles.statCardSub}>{rangeLabel}</Text>
+            </View>
+            <View style={[styles.statCard, { borderColor: 'rgba(59, 130, 246, 0.3)' }]}>
+              <View style={styles.statCardTop}>
+                <Users size={16} color={theme.subtext} />
+                <Text style={styles.statCardLabel}>Students Served</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: '#3b82f6' }]}>
+                {loading ? '—' : totals.studentsServed}
+              </Text>
+              <Text style={styles.statCardSub}>{rangeLabel}</Text>
+            </View>
+            <View style={[styles.statCard, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+              <View style={styles.statCardTop}>
+                <UserX size={16} color={theme.subtext} />
+                <Text style={styles.statCardLabel}>No-Shows</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: '#ef4444' }]}>
+                {loading ? '—' : totals.noShows}
+              </Text>
+              <Text style={styles.statCardSub}>{rangeLabel}</Text>
+            </View>
+            <View style={[styles.statCard, styles.statCardWide, { borderColor: 'rgba(59, 130, 246, 0.3)' }]}>
+              <View style={styles.statCardTop}>
+                <Clock size={16} color={theme.subtext} />
+                <Text style={styles.statCardLabel}>Peak Hour</Text>
+              </View>
+              <Text style={[styles.statCardValue, styles.statCardValueText, { color: '#3b82f6' }]}>
+                {loading ? '—' : totals.peakHour}
+              </Text>
+              <Text style={styles.statCardSub}>{rangeLabel}</Text>
             </View>
           </View>
 
@@ -357,11 +386,17 @@ export default function AdminQueueAnalyticsScreen() {
             <View style={styles.filtersHeaderRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitleText}>Analytics Filters</Text>
-                <Text style={styles.cardSubtitleText}>Customize your analytics view</Text>
+                <Text style={styles.cardSubtitleText}>
+                  {user?.departmentName ?? ''} ({user?.departmentAbbrev ?? ''})
+                </Text>
               </View>
             </View>
             <View style={styles.filtersActionsRow}>
-              <Pressable style={styles.outlineBtn} onPress={handleExportReport}>
+              <Pressable
+                style={[styles.outlineBtn, byService.length === 0 && styles.outlineBtnDisabled]}
+                onPress={handleExportReport}
+                disabled={byService.length === 0}
+              >
                 <Download size={14} color={theme.text} />
                 <Text style={styles.outlineBtnText}>Export Report</Text>
               </Pressable>
@@ -372,16 +407,9 @@ export default function AdminQueueAnalyticsScreen() {
             </View>
 
             <View style={styles.filterField}>
-              <Text style={styles.filterLabel}>Department</Text>
-              <View style={styles.filterDisplay}>
-                <Text style={styles.filterDisplayText}>{user?.departmentName ?? ''}</Text>
-              </View>
-            </View>
-
-            <View style={styles.filterField}>
-              <Text style={styles.filterLabel}>Time Period</Text>
-              <Pressable style={styles.filterSelect} onPress={() => setSelectField('period')}>
-                <Text style={styles.filterSelectText} numberOfLines={1}>{timePeriod}</Text>
+              <Text style={styles.filterLabel}>Time Range</Text>
+              <Pressable style={styles.filterSelect} onPress={() => setSelectField('range')}>
+                <Text style={styles.filterSelectText} numberOfLines={1}>{rangeLabel}</Text>
                 <ChevronDown size={16} color={theme.text} />
               </Pressable>
             </View>
@@ -395,208 +423,59 @@ export default function AdminQueueAnalyticsScreen() {
             </View>
           </View>
 
-          {/* Stats */}
-          <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { borderColor: STAT_TINTS.served.border }]}>
-              <View style={styles.statCardTop}>
-                <Users size={16} color={theme.subtext} />
-                <Text style={styles.statCardLabel}>Total Served</Text>
+          {/* Service Breakdown */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitleText}>Service Breakdown</Text>
+            <Text style={styles.cardSubtitleText}>
+              Per-service queue metrics — {rangeLabel.toLowerCase()}.
+            </Text>
+            {loading ? (
+              <View style={styles.emptyCard}>
+                <BarChart3 size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Loading analytics…</Text>
               </View>
-              <Text style={[styles.statCardValue, { color: STAT_TINTS.served.color }]}>{totalServed}</Text>
-              <Text style={styles.statCardSub}>{timePeriod}</Text>
-            </View>
-            <View style={[styles.statCard, { borderColor: STAT_TINTS.wait.border }]}>
-              <View style={styles.statCardTop}>
-                <Clock size={16} color={theme.subtext} />
-                <Text style={styles.statCardLabel}>Avg Wait Time</Text>
+            ) : loadError ? (
+              <View style={styles.emptyCard}>
+                <BarChart3 size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>Could not load analytics</Text>
+                <Text style={styles.emptyText}>{loadError}</Text>
               </View>
-              <Text style={[styles.statCardValue, { color: STAT_TINTS.wait.color }]}>
-                {avgWaitAll > 0 ? `${avgWaitAll} min` : 'N/A'}
-              </Text>
-              <Text style={styles.statCardSub}>Across services</Text>
-            </View>
-            <View style={[styles.statCard, { borderColor: STAT_TINTS.satisfaction.border }]}>
-              <View style={styles.statCardTop}>
-                <Smile size={16} color={theme.subtext} />
-                <Text style={styles.statCardLabel}>Satisfaction</Text>
+            ) : byService.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <BarChart3 size={28} color={theme.tertiary} />
+                <Text style={styles.emptyTitle}>No services yet</Text>
+                <Text style={styles.emptyText}>Your department has no queue services configured.</Text>
               </View>
-              <Text style={[styles.statCardValue, { color: STAT_TINTS.satisfaction.color }]}>
-                {avgSatisfaction > 0 ? `${avgSatisfaction}%` : 'N/A'}
-              </Text>
-              <Text style={styles.statCardSub}>Average score</Text>
-            </View>
-            <View style={[styles.statCard, { borderColor: STAT_TINTS.services.border }]}>
-              <View style={styles.statCardTop}>
-                <Activity size={16} color={theme.subtext} />
-                <Text style={styles.statCardLabel}>Services Tracked</Text>
+            ) : (
+              <View style={styles.perfList}>
+                {byService.map((row) => (
+                  <View key={row.service} style={styles.perfCard}>
+                    <Text style={styles.perfService}>{row.service}</Text>
+                    <View style={styles.perfMetricsGrid}>
+                      <View style={styles.perfMetric}>
+                        <Text style={styles.perfMetricLabel}>Students Served</Text>
+                        <Text style={[styles.perfMetricValue, { color: '#3b82f6' }]}>{row.studentsServed}</Text>
+                      </View>
+                      <View style={styles.perfMetric}>
+                        <Text style={styles.perfMetricLabel}>Overtime Queues</Text>
+                        <Text style={[styles.perfMetricValue, { color: '#f59e0b' }]}>{row.overtimeQueues}</Text>
+                      </View>
+                      <View style={styles.perfMetric}>
+                        <Text style={styles.perfMetricLabel}>No-Shows</Text>
+                        <Text style={[styles.perfMetricValue, { color: '#ef4444' }]}>{row.noShows}</Text>
+                      </View>
+                      <View style={styles.perfMetric}>
+                        <Text style={styles.perfMetricLabel}>Avg Wait</Text>
+                        <Text style={styles.perfMetricValue}>
+                          {row.avgWaitMinutes > 0 ? `${row.avgWaitMinutes} min` : '—'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
-              <Text style={[styles.statCardValue, { color: STAT_TINTS.services.color }]}>{filteredPerformance.length}</Text>
-              <Text style={styles.statCardSub}>{user?.departmentAbbrev ?? ''} department</Text>
-            </View>
+            )}
           </View>
-
-          {/* Tabs */}
-          <View style={styles.tabsPill}>
-            {ANALYTICS_TABS.map((tab) => {
-              const active = activeTab === tab;
-              const meta = TAB_META[tab];
-              return (
-                <Pressable
-                  key={tab}
-                  style={[styles.tabPill, active && styles.tabPillActive]}
-                  onPress={() => setActiveTab(tab)}
-                >
-                  <meta.icon size={14} color={active ? theme.primary : theme.subtext} />
-                  <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>{meta.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Tab: Performance */}
-          {activeTab === 'performance' && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitleText}>Queue Performance Metrics</Text>
-              <Text style={styles.cardSubtitleText}>Detailed breakdown by service and college</Text>
-              {filteredPerformance.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <BarChart3 size={28} color={theme.tertiary} />
-                  <Text style={styles.emptyTitle}>No completed queue data</Text>
-                  <Text style={styles.emptyText}>Try a different filter.</Text>
-                </View>
-              ) : (
-                <View style={styles.perfList}>
-                  {filteredPerformance.map((item, idx) => {
-                    const statusTint = STATUS_TINTS[item.status];
-                    return (
-                      <View key={idx} style={styles.perfCard}>
-                        <View style={styles.perfHeaderRow}>
-                          <Text style={styles.perfService}>{item.service}</Text>
-                          <View style={styles.perfCollegeBadge}>
-                            <Text style={styles.perfCollegeBadgeText}>{item.college}</Text>
-                          </View>
-                          <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
-                            <Text style={[styles.statusBadgeText, { color: statusTint.color }]}>{item.status}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.perfMetricsGrid}>
-                          <View style={styles.perfMetric}>
-                            <Text style={styles.perfMetricLabel}>Students Served</Text>
-                            <Text style={[styles.perfMetricValue, { color: '#22c55e' }]}>{item.studentsServed}</Text>
-                          </View>
-                          <View style={styles.perfMetric}>
-                            <Text style={styles.perfMetricLabel}>Avg Wait Time</Text>
-                            <Text style={[styles.perfMetricValue, { color: '#3b82f6' }]}>{item.avgWait}</Text>
-                          </View>
-                          <View style={styles.perfMetric}>
-                            <Text style={styles.perfMetricLabel}>Peak Hours</Text>
-                            <Text style={styles.perfMetricValue}>{item.peakHours}</Text>
-                          </View>
-                          <View style={styles.perfMetric}>
-                            <Text style={styles.perfMetricLabel}>Satisfaction</Text>
-                            <Text style={[styles.perfMetricValue, { color: getSatisfactionColor(item.satisfaction) }]}>
-                              {item.satisfaction}%
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Tab: Trends */}
-          {activeTab === 'trends' && (
-            <>
-              <View style={styles.card}>
-                <Text style={styles.cardTitleText}>Daily Trends</Text>
-                <Text style={styles.cardSubtitleText}>Queue activity over time</Text>
-                <View style={[styles.trendItem, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-                  <Text style={styles.trendItemLabel}>Peak Activity Time</Text>
-                  <Text style={[styles.trendItemValue, { color: '#3b82f6' }]}>{trends.peakActivityTime}</Text>
-                  <Text style={styles.trendItemNote}>Highest queue volume period</Text>
-                </View>
-                <View style={[styles.trendItem, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
-                  <Text style={styles.trendItemLabel}>Best Service Time</Text>
-                  <Text style={[styles.trendItemValue, { color: '#22c55e' }]}>{trends.bestServiceTime}</Text>
-                  <Text style={styles.trendItemNote}>Shortest average wait times</Text>
-                </View>
-              </View>
-
-              <View style={styles.card}>
-                <Text style={styles.cardTitleText}>Period Comparison</Text>
-                <Text style={styles.cardSubtitleText}>Performance vs the previous {timePeriod.toLowerCase()}</Text>
-                {trends.weeklyComparison.length === 0 ? (
-                  <Text style={styles.cardSubtitleText}>No data available for this period yet.</Text>
-                ) : (
-                  <View style={styles.weeklyList}>
-                    {trends.weeklyComparison.map((row, idx) => (
-                      <View key={idx} style={styles.weeklyRow}>
-                        <Text style={styles.weeklyLabel}>{row.label}</Text>
-                        <View style={styles.weeklyRight}>
-                          <Text style={[styles.weeklyValue, { color: row.color }]}>{row.value}</Text>
-                          <View style={styles.weeklyChangePill}>
-                            <Text style={styles.weeklyChangeText}>{row.change}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </>
-          )}
-
-          {/* Tab: Insights */}
-          {activeTab === 'insights' && (
-            <>
-              <View style={[styles.card, styles.insightsCardPositive]}>
-                <View style={styles.insightsHeaderRow}>
-                  <TrendingUp size={18} color="#22c55e" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitleText}>Positive Insights</Text>
-                    <Text style={styles.cardSubtitleText}>What&apos;s working well</Text>
-                  </View>
-                </View>
-                {positiveInsights.length === 0 ? (
-                  <Text style={styles.emptyInlineText}>No data available for this period.</Text>
-                ) : (
-                  <View style={styles.insightsList}>
-                    {positiveInsights.map((item, idx) => (
-                      <View key={idx} style={styles.insightItemGreen}>
-                        <Text style={styles.insightTitle}>{item.title}</Text>
-                        <Text style={styles.insightDesc}>{item.desc}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              <View style={[styles.card, styles.insightsCardWarning]}>
-                <View style={styles.insightsHeaderRow}>
-                  <AlertTriangle size={18} color="#f97316" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitleText}>Areas for Improvement</Text>
-                    <Text style={styles.cardSubtitleText}>Recommendations and action items</Text>
-                  </View>
-                </View>
-                {improvementAreas.length === 0 ? (
-                  <Text style={styles.emptyInlineText}>No improvement areas detected.</Text>
-                ) : (
-                  <View style={styles.insightsList}>
-                    {improvementAreas.map((item, idx) => (
-                      <View key={idx} style={styles.insightItemOrange}>
-                        <Text style={styles.insightTitle}>{item.title}</Text>
-                        <Text style={styles.insightDesc}>{item.desc}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </>
-          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -611,22 +490,22 @@ export default function AdminQueueAnalyticsScreen() {
         adminDepartmentName={user?.departmentName ?? ''}
       />
 
-      {/* Filter Options Modal (Time Period / Service Type) */}
+      {/* Filter Options Modal (Time Range / Service Type) */}
       <Modal visible={selectField !== null} animationType="fade" transparent onRequestClose={() => setSelectField(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.filterModalCard}>
             <Text style={styles.confirmTitle}>{selectTitle}</Text>
             <ScrollView style={styles.filterOptionsList}>
               {selectOptions.map((opt) => {
-                const selected = opt === selectCurrentValue;
+                const selected = opt.value === selectCurrentValue;
                 return (
                   <Pressable
-                    key={opt}
+                    key={opt.value}
                     style={[styles.filterOptionRow, selected && styles.filterOptionRowActive]}
-                    onPress={() => chooseOption(opt)}
+                    onPress={() => chooseOption(opt.value)}
                   >
                     <Text style={[styles.filterOptionText, selected && styles.filterOptionTextActive]} numberOfLines={2}>
-                      {opt}
+                      {opt.label}
                     </Text>
                     {selected && <Ionicons name="checkmark" size={16} color={theme.primary} />}
                   </Pressable>
@@ -860,18 +739,9 @@ function createStyles(theme: ThemePalette) {
       borderColor: theme.border,
     },
     outlineBtnText: { fontSize: 12, fontWeight: '600', color: theme.text },
+    outlineBtnDisabled: { opacity: 0.5 },
     filterField: { gap: 6 },
     filterLabel: { fontSize: 12, fontWeight: '600', color: theme.subtext },
-    filterDisplay: {
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.background,
-      opacity: 0.75,
-    },
-    filterDisplayText: { fontSize: 13, color: theme.text },
     filterSelect: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -898,32 +768,14 @@ function createStyles(theme: ThemePalette) {
     statCardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     statCardLabel: { fontSize: 11, fontWeight: '600', color: theme.subtext, flex: 1 },
     statCardValue: { fontSize: 22, fontWeight: '800' },
+    statCardValueText: { fontSize: 16 },
     statCardSub: { fontSize: 11, color: theme.tertiary },
+    // Peak Hour's value is text ("2:00 PM - 3:00 PM"), not a number, so it
+    // gets the full row width instead of sharing the 47% two-up grid slot.
+    statCardWide: { width: '100%' },
 
-    // Segmented tabs (mirrors admin-queue-analytics.css .aqa-tabs)
-    tabsPill: {
-      flexDirection: 'row',
-      gap: 4,
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 12,
-      padding: 4,
-      alignSelf: 'flex-start',
-    },
-    tabPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderRadius: 9,
-    },
-    tabPillActive: { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
-    tabPillText: { fontSize: 12.5, fontWeight: '600', color: theme.subtext },
-    tabPillTextActive: { color: theme.primary },
-
-    // Performance list
+    // Service breakdown list (matches web's flat aqa-svc-list, replacing the
+    // old Performance/Trends/Insights tabbed view)
     perfList: { gap: 12 },
     perfCard: {
       backgroundColor: theme.background,
@@ -931,72 +783,11 @@ function createStyles(theme: ThemePalette) {
       padding: 14,
       gap: 12,
     },
-    perfHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
     perfService: { fontSize: 14, fontWeight: '700', color: theme.text },
-    perfCollegeBadge: {
-      backgroundColor: 'rgba(34, 197, 94, 0.15)',
-      borderRadius: 999,
-      paddingVertical: 2,
-      paddingHorizontal: 8,
-    },
-    perfCollegeBadgeText: { fontSize: 10.5, fontWeight: '700', color: theme.primary },
-    statusBadge: { borderWidth: 1, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 },
-    statusBadgeText: { fontSize: 10.5, fontWeight: '700', textTransform: 'capitalize' },
     perfMetricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     perfMetric: { width: '45%', gap: 3 },
     perfMetricLabel: { fontSize: 10.5, color: theme.tertiary },
     perfMetricValue: { fontSize: 14, fontWeight: '700', color: theme.text },
-
-    // Trends
-    trendItem: { borderRadius: 12, padding: 14, gap: 4 },
-    trendItemLabel: { fontSize: 12.5, fontWeight: '600', color: theme.text },
-    trendItemValue: { fontSize: 18, fontWeight: '800' },
-    trendItemNote: { fontSize: 11, color: theme.tertiary },
-    weeklyList: { gap: 10 },
-    weeklyRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: theme.background,
-      borderRadius: 10,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-    },
-    weeklyLabel: { fontSize: 13, color: theme.text },
-    weeklyRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    weeklyValue: { fontSize: 14, fontWeight: '700' },
-    weeklyChangePill: {
-      backgroundColor: 'rgba(34, 197, 94, 0.15)',
-      borderRadius: 999,
-      paddingVertical: 2,
-      paddingHorizontal: 8,
-    },
-    weeklyChangeText: { fontSize: 10.5, fontWeight: '700', color: theme.primary },
-
-    // Insights
-    insightsCardPositive: { borderColor: 'rgba(34, 197, 94, 0.25)' },
-    insightsCardWarning: { borderColor: 'rgba(249, 115, 22, 0.25)' },
-    insightsHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-    insightsList: { gap: 10 },
-    insightItemGreen: {
-      borderLeftWidth: 3,
-      borderLeftColor: '#22c55e',
-      backgroundColor: 'rgba(34, 197, 94, 0.07)',
-      borderRadius: 8,
-      padding: 12,
-      gap: 4,
-    },
-    insightItemOrange: {
-      borderLeftWidth: 3,
-      borderLeftColor: '#f97316',
-      backgroundColor: 'rgba(249, 115, 22, 0.07)',
-      borderRadius: 8,
-      padding: 12,
-      gap: 4,
-    },
-    insightTitle: { fontSize: 13, fontWeight: '700', color: theme.text },
-    insightDesc: { fontSize: 12, color: theme.subtext, lineHeight: 17 },
-    emptyInlineText: { fontSize: 12.5, color: theme.tertiary },
 
     // Empty state
     emptyCard: {

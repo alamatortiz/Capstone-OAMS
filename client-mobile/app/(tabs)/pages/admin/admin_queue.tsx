@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ImageSourcePropType,
@@ -209,18 +210,26 @@ export default function AdminQueueScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [monitoringQueueId, setMonitoringQueueId] = useState<number | null>(null);
+  const router = useRouter();
+  const { monitorQueueId, from } = useLocalSearchParams<{ monitorQueueId?: string; from?: string }>();
+  // Seeded synchronously from the route params on the very first render (lazy
+  // initializer), not only in the effect below -- otherwise render #1 has no
+  // monitored id and briefly falls through to the queue-list view before the
+  // effect runs (the "flash" bug when arriving from a Queue Hosting card).
+  const [monitoringQueueId, setMonitoringQueueId] = useState<number | null>(
+    () => (monitorQueueId ? Number(monitorQueueId) : null),
+  );
   // Where the monitor view was opened from: "hosting" when reached via a
   // Queue Hosting card (route param), null for an in-page Manage click.
   // Drives the monitor-view back button's target/label.
-  const [monitorCameFrom, setMonitorCameFrom] = useState<'hosting' | null>(null);
+  const [monitorCameFrom, setMonitorCameFrom] = useState<'hosting' | null>(
+    () => (from === 'hosting' ? 'hosting' : null),
+  );
   const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([]);
   const [entriesPage, setEntriesPage] = useState(0);
   const [collegeOverviewFilter, setCollegeOverviewFilter] = useState('all');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
-  const router = useRouter();
-  const { monitorQueueId, from } = useLocalSearchParams<{ monitorQueueId?: string; from?: string }>();
   const { user, logout } = useAuth();
 
   const fetchEntries = useCallback(async (slotId: number) => {
@@ -241,6 +250,7 @@ export default function AdminQueueScreen() {
 
   const {
     queues: queueDetails,
+    loading: queueHostingLoading,
     error: queueHostingError,
     fetchQueues,
     reasonModal,
@@ -492,6 +502,25 @@ export default function AdminQueueScreen() {
           confirmText: 'Stop Queue',
           confirmColor: '#ef4444',
         };
+
+  // A monitor open is pending (arrived via a Queue Hosting card's route param,
+  // or an in-page Manage tap) but the shared live queue list hasn't resolved
+  // yet -- hold on a neutral loading screen instead of flashing the queue-list
+  // view underneath. `queueHostingLoading` is only true on the first mount
+  // fetch, never on socket refetches, so this fires once on entry.
+  if (monitoringQueueId && !monitoringQueue && queueHostingLoading) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <View style={[styles.emptyCard, { flex: 1, margin: 20, justifyContent: 'center' }]}>
+            <ActivityIndicator color={theme.primary} />
+            <Text style={styles.emptyTitle}>Loading queue…</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   // ─────────────────────────── Monitor detail view ───────────────────────────
   if (monitoringQueue) {

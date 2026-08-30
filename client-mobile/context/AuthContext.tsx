@@ -54,7 +54,7 @@ function normalizeUser(raw: any): UserData {
     role: raw.role,
     firstName: raw.first_name,
     lastName: raw.last_name,
-    name: `${raw.first_name} ${raw.last_name}`,
+    name: `${raw.first_name} ${raw.last_name}`.trim(),
     email: raw.email,
     departmentName: raw.department_name ?? undefined,
     departmentAbbrev: raw.department_abbreviation ?? undefined,

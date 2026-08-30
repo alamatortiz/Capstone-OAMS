@@ -62,8 +62,14 @@ export function useAdminQueueHosting({ onLiveUpdate }: { onLiveUpdate?: () => vo
     };
 
     QUEUE_HOSTING_EVENTS.forEach((event) => socket.on(event, refetch));
+    // Reconciles state after a dropped connection (server restart, phone
+    // losing/regaining signal) -- matches web's useLiveRefetch, which
+    // refetches on socket "connect" for exactly this reason. Without this,
+    // any queue events that fired while disconnected are silently missed.
+    socket.on("connect", refetch);
     return () => {
       QUEUE_HOSTING_EVENTS.forEach((event) => socket.off(event, refetch));
+      socket.off("connect", refetch);
     };
   }, [authUser, token, fetchQueues, onLiveUpdate]);
 

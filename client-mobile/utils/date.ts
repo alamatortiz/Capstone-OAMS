@@ -55,3 +55,33 @@ export const formatManilaTime = (
     ...opts,
   });
 };
+
+const MANILA_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Manila',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+// Returns the Manila calendar date (YYYY-MM-DD) for a given instant,
+// defaulting to now. Use this instead of comparing Date objects for "is this
+// today" checks -- the device's local "today" can differ from Manila's near
+// the day boundary. Mirrors web's dateTime.js getManilaDateString.
+export const getManilaDateString = (date: Date = new Date()): string =>
+  MANILA_DATE_FORMATTER.format(date);
+
+const DAY_ORDER_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// The next upcoming calendar date (as "YYYY-MM-DD") for a weekday name,
+// anchored to a "YYYY-MM-DD" today string -- never a date already passed
+// (today itself counts as "next" if it's the matching weekday). Mirrors
+// web's adm-professor-availability.jsx/stud-professor-schedules.jsx helper
+// of the same name, so both mobile screens showing a professor's weekly
+// consultation schedule label days identically to web.
+export const nextOccurrenceDateStr = (dayName: string, anchorStr: string): string => {
+  const [y, m, d] = anchorStr.split('-').map(Number);
+  const anchor = new Date(y, (m || 1) - 1, d || 1);
+  const diff = (DAY_ORDER_FULL.indexOf(dayName) - anchor.getDay() + 7) % 7;
+  anchor.setDate(anchor.getDate() + diff);
+  return toLocalYMD(anchor);
+};

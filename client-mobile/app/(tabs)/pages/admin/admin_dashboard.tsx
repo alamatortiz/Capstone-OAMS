@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
 import {
   Alert,
+  AppState,
   Image,
   ImageSourcePropType,
   Modal,
@@ -16,18 +17,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  AlertTriangle,
   BarChart3,
-  Bell,
   Calendar,
   Check,
   ChevronRight,
   Clock,
+  ClipboardList,
   Database,
   FileText,
   History,
   Home as HomeIcon,
-  Plus,
+  Megaphone,
+  PlusCircle,
   QrCode,
   Users,
 } from 'lucide-react-native';
@@ -50,8 +51,11 @@ const coedLogo = require('@/assets/COED.png');
 const coeLogo = require('@/assets/COE.png');
 const casLogo = require('@/assets/CAS.png');
 const chasLogo = require('@/assets/CHAS.png');
-const editIcon = require('@/assets/edit_icon.png');
-const deleteIcon = require('@/assets/delete_icon.png');
+
+// 45s fallback poll interval -- covers a silently-dropped/blocked WebSocket
+// connection, mirrors QueueContext.tsx's FALLBACK_POLL_INTERVAL_MS and web's
+// own equivalent in adm-dashboard.jsx.
+const FALLBACK_POLL_INTERVAL_MS = 45000;
 
 const collegeLogos: Record<string, ImageSourcePropType> = {
   CCS: ccsLogo,
@@ -129,76 +133,42 @@ interface ToolItem {
   gradient: readonly [string, string];
 }
 
-// User Management and Pinnacle Sync moved to the separate superadmin area
-// (mirrors adm-dashboard.jsx's own comment on the web side).
-// Icon backgrounds mirror admin-dashboard.css: bg-data-mgmt, bg-blue-600
-const adminTools: ToolItem[] = [
-  { key: 'data-management', title: 'Data Management', description: 'Configure settings', icon: Database, gradient: ['#475569', '#334155'] },
-  { key: 'queue-analytics', title: 'Queue Analytics', description: 'Performance metrics', icon: BarChart3, gradient: ['#3b82f6', '#2563eb'] },
-];
-
-// Icon backgrounds mirror admin-dashboard.css: bg-scan-doc, bg-blue-500
+// User Management and Pinnacle Sync live in the separate superadmin area
+// (mirrors adm-dashboard.jsx's own comment on the web side). One merged grid
+// (mirrors web's merged quickActions array, which combined the old separate
+// "Admin Management" and "Quick Actions" tile sets into one) -- each tile's
+// description is the destination screen's own subtitle.
 const quickActions: ToolItem[] = [
-  { key: 'scan-document', title: 'Scan Document', description: 'Verify QR codes and view document details', icon: QrCode, gradient: ['#34d399', '#10b981'] },
-  { key: 'host-queue', title: 'Host Queue', description: 'Manage and host student queues', icon: Users, gradient: ['#3b82f6', '#2563eb'] },
+  { key: 'data-management', title: 'Data Management', description: 'Configure document types and queue services.', icon: Database, gradient: ['#475569', '#334155'] },
+  { key: 'queue-analytics', title: 'Queue Analytics', description: 'Real-time queue performance metrics and insights.', icon: BarChart3, gradient: ['#3b82f6', '#2563eb'] },
+  { key: 'host-queue', title: 'Host Queue', description: 'Host and manage queues within your department.', icon: PlusCircle, gradient: ['#3b82f6', '#2563eb'] },
+  { key: 'queue-management', title: 'Queue Management', description: 'Manage and monitor queues within your department.', icon: Users, gradient: ['#3b82f6', '#2563eb'] },
+  { key: 'document-processing', title: 'Document Processing', description: 'Process and manage document requests and submissions within your department.', icon: FileText, gradient: ['#fb923c', '#f97316'] },
+  { key: 'scan-document', title: 'Scan Document', description: 'Scan QR codes to verify and view document details.', icon: QrCode, gradient: ['#fb923c', '#f97316'] },
+  { key: 'appointments', title: 'Appointments Overview', description: 'Monitor appointments within your department.', icon: Calendar, gradient: ['#a855f7', '#9333ea'] },
+  { key: 'announcements', title: 'Announcements & FAQs', description: 'Manage department announcements and frequently asked questions.', icon: Megaphone, gradient: ['#34d399', '#10b981'] },
+  { key: 'transactions', title: 'Transaction History', description: 'View all recent transactions within the office.', icon: ClipboardList, gradient: ['#34d399', '#10b981'] },
 ];
 
-const ANNOUNCEMENT_TAG_TINTS: Record<string, { bg: string; border: string; color: string }> = {
-  important: { bg: 'rgba(239, 68, 68, 0.2)', border: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' },
-  event: { bg: 'rgba(249, 115, 22, 0.2)', border: 'rgba(249, 115, 22, 0.4)', color: '#f97316' },
-  reminder: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
-  general: { bg: 'rgba(148, 163, 184, 0.2)', border: 'rgba(148, 163, 184, 0.4)', color: '#94a3b8' },
-  pinned: { bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' },
-};
-
-// This preview list blends student- and faculty-audience announcements
-// together (the "Announcements" stat total isn't audience-split either) --
-// this tag is what keeps a faculty row's meaningless 'general' type tag from
-// reading as a real category.
-const AUDIENCE_TAG_TINTS: Record<string, { bg: string; border: string; color: string }> = {
-  students: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
-  faculty: { bg: 'rgba(139, 92, 246, 0.2)', border: 'rgba(139, 92, 246, 0.4)', color: '#8b5cf6' },
-};
-
-interface AnnouncementItem {
-  id: string;
-  title: string;
-  description: string;
-  tag: string;
-  audience?: 'students' | 'faculty';
-  date: string;
-  isPinned?: boolean;
+interface OfficeHoursData {
+  departmentName: string;
+  departmentAbbrev: string;
+  schedule: { day: string; time: string }[];
+  location: string;
 }
 
-const DOCUMENT_STATUS_TINTS: Record<string, { bg: string; border: string; color: string }> = {
-  pending: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' },
-  processing: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 0.4)', color: '#3b82f6' },
-};
-
-const COLLEGE_TEXT_COLORS: Record<string, string> = {
-  CCS: '#f97316',
-  CBAA: '#facc15',
-  COED: '#2563eb',
-  COE: '#ef4444',
-  CAS: '#7f1d1d',
-  CHAS: '#22c55e',
-};
-
-interface PendingDocument {
-  id: string;
-  name: string;
-  document: string;
-  college: string;
-  requesterType?: 'student' | 'faculty';
-  date: string;
-  status: string;
-}
-
-interface HostedQueue {
-  id: string;
-  name: string;
-  status: string;
-  count: string;
+// Splits only on a comma followed by a weekday name -- mirrors both the web
+// parser (dateTime.js's parseOfficeHoursSchedule) and professor_dashboard.tsx/
+// student_dashboard.tsx's own local copy, so free-text office hours strings
+// render the same way everywhere.
+function parseSchedule(hoursStr?: string): { day: string; time: string }[] {
+  if (!hoursStr) return [];
+  const weekdayNames = 'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+  return hoursStr.split(new RegExp(`,\\s*(?=(?:${weekdayNames})\\b)`)).map((entry) => {
+    const colonIdx = entry.indexOf(': ');
+    if (colonIdx === -1) return { day: entry.trim(), time: '' };
+    return { day: entry.substring(0, colonIdx).trim(), time: entry.substring(colonIdx + 2).trim() };
+  });
 }
 
 interface FacultyMember {
@@ -261,6 +231,12 @@ export default function AdminDashboardScreen() {
     if (user) fetchStats();
   }, [user, fetchStats]);
 
+  // Every source feeding a dashboard stat tile / the Faculty Availability
+  // preview -- previously only queue + a subset of document events were
+  // wired, so faculty toggles / appointment / other document changes sat
+  // stale until the 45s fallback poll below. Mirrors web's
+  // DASHBOARD_LIVE_EVENTS exactly (minus announcement:changed, which web
+  // also dropped once it removed its Announcements stat/preview list).
   useEffect(() => {
     if (!user || !token) return;
     const socket = connectSocket(token);
@@ -273,29 +249,72 @@ export default function AdminDashboardScreen() {
       'queue:no-show',
       'queue:student-joined',
       'queue:student-left',
+      'faculty:availability-status-changed',
+      'appointment:status-updated',
+      'appointment:slot-updated',
+      'appointment:slot-removed',
       'document:new-request',
+      'document:status-updated',
       'document:cancelled',
-      'announcement:changed',
     ];
     events.forEach((event) => socket.on(event, fetchStats));
+    // Reconciles state after a dropped connection -- mirrors web's
+    // useLiveRefetch, which refetches on socket "connect" for this reason.
+    socket.on('connect', fetchStats);
     return () => {
       events.forEach((event) => socket.off(event, fetchStats));
+      socket.off('connect', fetchStats);
     };
   }, [user, token, fetchStats]);
+
+  // Fallback poll: covers a silently-dropped/blocked WebSocket connection,
+  // same pattern as QueueContext.tsx / web's adm-dashboard.jsx.
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') fetchStats();
+    }, FALLBACK_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user, fetchStats]);
+
+  // Office hours (mirrors student_dashboard.tsx / professor_dashboard.tsx)
+  const [officeHours, setOfficeHours] = useState<OfficeHoursData | null>(null);
+  const [officeHoursLoading, setOfficeHoursLoading] = useState(true);
+  const [officeHoursError, setOfficeHoursError] = useState<string | null>(null);
+
+  const fetchOfficeHours = useCallback(async () => {
+    setOfficeHoursLoading(true);
+    try {
+      const { data } = await api.get('/admin/office-hours');
+      setOfficeHours({
+        departmentName: data.departmentName,
+        departmentAbbrev: data.departmentAbbrev,
+        schedule: parseSchedule(data.officeHours),
+        location: data.officeLocation ?? '',
+      });
+      setOfficeHoursError(null);
+    } catch (err) {
+      console.error('Failed to fetch office hours:', err);
+      setOfficeHoursError('Could not load office hours.');
+    } finally {
+      setOfficeHoursLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchOfficeHours();
+  }, [user, fetchOfficeHours]);
 
   const s = dashStats?.stats;
   const loading = dashLoading;
 
   const stats: StatItem[] = [
-    { key: 'queues', title: 'Active Queues', value: loading ? '—' : String(s?.activeQueues ?? 0), description: `In ${user?.departmentName ?? ''}`, icon: Clock, tint: 'blue' },
-    { key: 'documents', title: 'Pending Documents', value: loading ? '—' : String(s?.pendingDocuments ?? 0), description: 'Awaiting processing', icon: FileText, tint: 'orange' },
+    { key: 'queues', title: 'Active Queues', value: loading ? '—' : String(s?.activeQueues ?? 0), description: loading ? '' : `${s?.activeQueuesFull ?? 0} full · ${s?.activeQueuesPaused ?? 0} paused`, icon: Clock, tint: 'blue' },
+    { key: 'documents', title: 'Pending Documents', value: loading ? '—' : String(s?.pendingDocuments ?? 0), description: loading ? '' : `${s?.pendingProcessing ?? 0} processing`, icon: FileText, tint: 'orange' },
     { key: 'faculty', title: 'Faculty Available', value: loading ? '—' : String(s?.facultyAvailable ?? 0), description: 'Today', icon: Users, tint: 'emerald' },
-    { key: 'announcements', title: 'Announcements', value: loading ? '—' : String(s?.announcements ?? 0), description: 'Published', icon: Bell, tint: 'green' },
+    { key: 'completed', title: 'Completed', value: loading ? '—' : String(s?.completedToday ?? 0), description: 'Completed today', icon: Check, tint: 'green' },
   ];
 
-  const announcements: AnnouncementItem[] = dashStats?.announcements ?? [];
-  const pendingDocuments: PendingDocument[] = dashStats?.pendingDocuments ?? [];
-  const hostedQueues: HostedQueue[] = dashStats?.hostedQueues ?? [];
   const facultyAvailability: FacultyMember[] = dashStats?.facultyAvailability ?? [];
 
   const theme = isDarkMode ? darkPalette : lightPalette;
@@ -309,16 +328,16 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_queue');
       return;
     }
-    if (key === 'announcements') {
-      router.push('/pages/admin/admin_announcement');
-      return;
-    }
     if (key === 'faculty') {
       router.push('/pages/admin/admin_professor_availability');
       return;
     }
     if (key === 'documents') {
       router.push('/pages/admin/admin_document_processing');
+      return;
+    }
+    if (key === 'completed') {
+      router.push('/pages/admin/admin_transactions');
       return;
     }
     comingSoon();
@@ -333,16 +352,32 @@ export default function AdminDashboardScreen() {
       router.push('/pages/admin/admin_queue_analytics');
       return;
     }
-    comingSoon();
-  };
-
-  const handleQuickActionPress = (key: string) => {
+    if (key === 'host-queue') {
+      router.push('/pages/admin/admin_queue_hosting');
+      return;
+    }
+    if (key === 'queue-management') {
+      router.push('/pages/admin/admin_queue');
+      return;
+    }
+    if (key === 'document-processing') {
+      router.push('/pages/admin/admin_document_processing');
+      return;
+    }
     if (key === 'scan-document') {
       router.push('/pages/admin/admin_scan_document');
       return;
     }
-    if (key === 'host-queue') {
-      router.push('/pages/admin/admin_queue_hosting');
+    if (key === 'appointments') {
+      router.push('/pages/admin/admin_appointment');
+      return;
+    }
+    if (key === 'announcements') {
+      router.push('/pages/admin/admin_announcement');
+      return;
+    }
+    if (key === 'transactions') {
+      router.push('/pages/admin/admin_transactions');
       return;
     }
     comingSoon();
@@ -459,42 +494,18 @@ export default function AdminDashboardScreen() {
             })}
           </View>
 
-          {/* Admin Management */}
-          <View style={[styles.tintedSection, styles.adminMgmtSection]}>
-            <View style={styles.sectionTitleRow}>
-              <AlertTriangle size={20} color={theme.primary} />
-              <View style={styles.sectionTitleText}>
-                <Text style={styles.sectionTitle}>Admin Management</Text>
-                <Text style={styles.sectionSubtitle}>System administration and configuration tools</Text>
-              </View>
-            </View>
-            <View style={styles.toolsGrid}>
-              {adminTools.map((tool) => (
-                <Pressable key={tool.key} style={styles.adminToolCard} onPress={() => handleToolPress(tool.key)}>
-                  <LinearGradient colors={tool.gradient} style={styles.toolIcon}>
-                    <tool.icon size={24} color="#ffffff" />
-                  </LinearGradient>
-                  <View style={styles.toolText}>
-                    <Text style={styles.toolTitle}>{tool.title}</Text>
-                    <Text style={styles.toolDescription}>{tool.description}</Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Quick Actions */}
+          {/* Quick Actions — merged tools + management grid, matching web's
+              single combined quickActions array */}
           <View style={[styles.tintedSection, styles.quickActionsSection]}>
             <View style={styles.sectionTitleRow}>
               <Check size={20} color={theme.primary} />
               <View style={styles.sectionTitleText}>
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
-                <Text style={styles.sectionSubtitle}>Access frequently used admin tools</Text>
               </View>
             </View>
             <View style={styles.toolsGrid}>
               {quickActions.map((action) => (
-                <Pressable key={action.key} style={styles.quickActionCard} onPress={() => handleQuickActionPress(action.key)}>
+                <Pressable key={action.key} style={styles.quickActionCard} onPress={() => handleToolPress(action.key)}>
                   <LinearGradient colors={action.gradient} style={styles.toolIcon}>
                     <action.icon size={24} color="#ffffff" />
                   </LinearGradient>
@@ -503,140 +514,6 @@ export default function AdminDashboardScreen() {
                     <Text style={styles.toolDescription}>{action.description}</Text>
                   </View>
                 </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Announcement Management */}
-          <View style={[styles.tintedSection, styles.announcementSection]}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionTitleRow}>
-                <Bell size={20} color="#3b82f6" />
-                <Text style={styles.sectionTitle}>Announcement Management</Text>
-              </View>
-              <Pressable onPress={() => router.push('/pages/admin/admin_announcement')}>
-                <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.newAnnouncementBtn}
-                >
-                  <Plus size={14} color="#ffffff" />
-                  <Text style={styles.newAnnouncementBtnText}>New</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-            <View style={styles.announcementsList}>
-              {announcements.map((ann) => {
-                const tint = ann.isPinned ? ANNOUNCEMENT_TAG_TINTS.pinned : (ANNOUNCEMENT_TAG_TINTS[ann.tag] ?? ANNOUNCEMENT_TAG_TINTS.general);
-                const audience = ann.audience ?? 'students';
-                const audienceTint = AUDIENCE_TAG_TINTS[audience];
-                return (
-                  <View key={ann.id} style={styles.announcementItem}>
-                    <View style={styles.announcementBody}>
-                      <Text style={styles.announcementTitle}>
-                        {ann.isPinned ? '📌 ' : ''}
-                        {ann.title}
-                      </Text>
-                      <Text style={styles.announcementDescription}>{ann.description}</Text>
-                      <View style={styles.announcementMetaRow}>
-                        <View style={[styles.tagPill, { backgroundColor: audienceTint.bg, borderColor: audienceTint.border }]}>
-                          <Text style={[styles.tagPillText, { color: audienceTint.color }]}>
-                            {audience === 'faculty' ? 'Faculty' : 'Students'}
-                          </Text>
-                        </View>
-                        {audience === 'students' && (
-                          <View style={[styles.tagPill, { backgroundColor: tint.bg, borderColor: tint.border }]}>
-                            <Text style={[styles.tagPillText, { color: tint.color }]}>{ann.tag}</Text>
-                          </View>
-                        )}
-                        <Text style={styles.announcementDate}>{ann.date}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.announcementActions}>
-                      <Pressable
-                        style={[styles.iconActionBtn, styles.iconActionBtnEdit]}
-                        onPress={() => router.push('/pages/admin/admin_announcement')}
-                        hitSlop={6}
-                      >
-                        <Image source={editIcon} style={styles.iconActionImg} />
-                      </Pressable>
-                      <Pressable
-                        style={[styles.iconActionBtn, styles.iconActionBtnDelete]}
-                        onPress={() => router.push('/pages/admin/admin_announcement')}
-                        hitSlop={6}
-                      >
-                        <Image source={deleteIcon} style={styles.iconActionImg} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Pending Requested Documents */}
-          <View style={[styles.card, styles.pendingDocsCard]}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitleText}>Pending Requested Documents</Text>
-              <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/admin/admin_document_processing')} hitSlop={8}>
-                <Text style={styles.viewAllText}>View All</Text>
-                <ChevronRight size={14} color={theme.primary} />
-              </Pressable>
-            </View>
-            <View style={styles.listGap}>
-              {pendingDocuments.map((doc) => {
-                const tint = DOCUMENT_STATUS_TINTS[doc.status] ?? DOCUMENT_STATUS_TINTS.pending;
-                return (
-                  <View key={doc.id} style={styles.documentItem}>
-                    <View style={styles.documentInfo}>
-                      <View style={styles.documentNameRow}>
-                        <Text style={styles.documentName}>{doc.name}</Text>
-                        {doc.requesterType === 'faculty' && (
-                          <View style={styles.facultyBadge}>
-                            <Text style={styles.facultyBadgeText}>Faculty</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.documentType}>{doc.document}</Text>
-                      <View style={styles.documentMetaRow}>
-                        <Text style={[styles.documentCollege, { color: COLLEGE_TEXT_COLORS[doc.college] }]}>
-                          {doc.college}
-                        </Text>
-                        <Text style={styles.documentDate}>{doc.date}</Text>
-                      </View>
-                    </View>
-                    <View style={[styles.badgePill, { backgroundColor: tint.bg, borderColor: tint.border }]}>
-                      <Text style={[styles.badgePillText, { color: tint.color }]}>{doc.status}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Current Hosted Queues */}
-          <View style={[styles.card, styles.hostedQueuesCard]}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitleText}>Current Hosted Queues</Text>
-              <Pressable style={styles.viewAllRow} onPress={() => router.push('/pages/admin/admin_queue')} hitSlop={8}>
-                <Text style={styles.viewAllText}>Manage</Text>
-                <ChevronRight size={14} color={theme.primary} />
-              </Pressable>
-            </View>
-            <View style={styles.listGap}>
-              {hostedQueues.map((queue) => (
-                <View key={queue.id} style={styles.queueItem}>
-                  <View style={styles.queueInfo}>
-                    <Text style={styles.queueName}>{queue.name}</Text>
-                  </View>
-                  <View style={styles.queueStatusInfo}>
-                    <View style={styles.queueActiveBadge}>
-                      <Text style={styles.queueActiveBadgeText}>{queue.status}</Text>
-                    </View>
-                    <Text style={styles.queueCount}>{queue.count}</Text>
-                  </View>
-                </View>
               ))}
             </View>
           </View>
@@ -666,6 +543,57 @@ export default function AdminDashboardScreen() {
               ))}
             </View>
           </View>
+
+          {/* Office Hours (mirrors student_dashboard.tsx / professor_dashboard.tsx) */}
+          <LinearGradient
+            colors={[theme.primary, theme.success]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hoursCard}
+          >
+            <View style={styles.hoursHeaderRow}>
+              <View style={styles.hoursTitleRow}>
+                <Clock size={18} color="#ffffff" />
+                <Text style={styles.hoursTitle}>Office Hours</Text>
+              </View>
+              {!officeHoursLoading && officeHours && (
+                <View style={styles.hoursDeptPill}>
+                  <Text style={styles.hoursDeptText}>
+                    {officeHours.departmentName} ({officeHours.departmentAbbrev})
+                  </Text>
+                </View>
+              )}
+            </View>
+            {officeHoursLoading ? (
+              <Text style={styles.hoursTime}>Loading office hours...</Text>
+            ) : officeHoursError ? (
+              <View>
+                <Text style={styles.hoursTime}>{officeHoursError}</Text>
+                <Pressable onPress={fetchOfficeHours} hitSlop={8}>
+                  <Text style={styles.viewAllText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : !officeHours ? (
+              <Text style={styles.hoursTime}>No office hours available.</Text>
+            ) : (
+              <>
+                <View style={styles.hoursSchedule}>
+                  {officeHours.schedule.map((entry, i) => (
+                    <View key={i} style={styles.hoursItem}>
+                      <Text style={styles.hoursDay}>{entry.day}</Text>
+                      <Text style={styles.hoursTime}>{entry.time}</Text>
+                    </View>
+                  ))}
+                </View>
+                {officeHours.location && (
+                  <View style={styles.hoursLocationRow}>
+                    <Text style={styles.hoursLocationLabel}>Location:</Text>
+                    <Text style={styles.hoursLocationValue}>{officeHours.location}</Text>
+                  </View>
+                )}
+              </>
+            )}
+          </LinearGradient>
         </ScrollView>
       </SafeAreaView>
 
@@ -966,26 +894,16 @@ function createStyles(theme: ThemePalette) {
       marginTop: 6,
     },
 
-    // Tinted sections (Admin Management / Quick Actions / Announcements)
+    // Tinted section (Quick Actions -- merged tools+management grid)
     tintedSection: {
       borderWidth: 1.5,
       borderRadius: 16,
       padding: 16,
       gap: 14,
     },
-    // .admin-management-section background is maroon-tinted rgba(127,29,29,...),
-    // only the border/icon accents use bright red
-    adminMgmtSection: {
-      backgroundColor: 'rgba(127, 29, 29, 0.065)',
-      borderColor: 'rgba(239, 68, 68, 0.3)',
-    },
     quickActionsSection: {
       backgroundColor: 'rgba(34, 197, 94, 0.06)',
       borderColor: 'rgba(34, 197, 94, 0.3)',
-    },
-    announcementSection: {
-      backgroundColor: 'rgba(59, 130, 246, 0.06)',
-      borderColor: 'rgba(59, 130, 246, 0.3)',
     },
     sectionTitleRow: {
       flexDirection: 'row',
@@ -1002,31 +920,10 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '800',
       color: theme.text,
     },
-    sectionSubtitle: {
-      fontSize: 12,
-      color: theme.subtext,
-    },
-    sectionHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
-    },
 
-    // Tool / action cards (grid inside tinted sections)
+    // Tool / action cards (grid inside the tinted section)
     toolsGrid: {
       gap: 12,
-    },
-    // .admin-tool-card: 1.5px green-tinted border, icon top-aligned, 1.25rem pad
-    adminToolCard: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 12,
-      backgroundColor: theme.card,
-      borderWidth: 1.5,
-      borderColor: 'rgba(34, 197, 94, 0.25)',
-      borderRadius: 16,
-      padding: 20,
     },
     // .quick-action-card: 1px plain card border, icon vertically centered, 1.5rem pad
     quickActionCard: {
@@ -1062,95 +959,7 @@ function createStyles(theme: ThemePalette) {
       lineHeight: 17,
     },
 
-    // Announcements
-    newAnnouncementBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      borderRadius: 12,
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-    },
-    newAnnouncementBtnText: {
-      color: '#ffffff',
-      fontSize: 12,
-      fontWeight: '700',
-    },
-    announcementsList: {
-      gap: 12,
-    },
-    announcementItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 12,
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: 'rgba(59, 130, 246, 0.18)',
-      borderRadius: 14,
-      padding: 14,
-    },
-    announcementBody: {
-      flex: 1,
-      gap: 6,
-    },
-    announcementTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.text,
-    },
-    announcementDescription: {
-      fontSize: 12,
-      color: theme.subtext,
-      lineHeight: 18,
-    },
-    announcementMetaRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 4,
-    },
-    announcementDate: {
-      fontSize: 11,
-      color: theme.tertiary,
-    },
-    announcementActions: {
-      gap: 8,
-      alignItems: 'flex-end',
-    },
-    iconActionBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 9,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    iconActionBtnEdit: {
-      backgroundColor: 'rgba(59, 130, 246, 0.12)',
-      borderColor: 'rgba(59, 130, 246, 0.35)',
-    },
-    iconActionBtnDelete: {
-      backgroundColor: 'rgba(239, 68, 68, 0.12)',
-      borderColor: 'rgba(239, 68, 68, 0.45)',
-    },
-    iconActionImg: {
-      width: 15,
-      height: 15,
-    },
-    tagPill: {
-      borderWidth: 0.5,
-      borderRadius: 8,
-      paddingVertical: 4,
-      paddingHorizontal: 9,
-    },
-    tagPillText: {
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'capitalize',
-    },
-
-    // Generic card (pending documents / hosted queues / faculty)
+    // Generic card (Faculty Availability)
     card: {
       backgroundColor: theme.card,
       borderWidth: 1,
@@ -1158,12 +967,6 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 16,
       padding: 16,
       gap: 14,
-    },
-    pendingDocsCard: {
-      borderColor: 'rgba(249, 115, 22, 0.2)',
-    },
-    hostedQueuesCard: {
-      borderColor: 'rgba(59, 130, 246, 0.2)',
     },
     cardHeaderRow: {
       flexDirection: 'row',
@@ -1180,125 +983,6 @@ function createStyles(theme: ThemePalette) {
       fontSize: 12,
       fontWeight: '700',
       color: theme.primary,
-    },
-    listGap: {
-      gap: 12,
-    },
-
-    // Pending documents
-    documentItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 10,
-      backgroundColor: 'rgba(249, 115, 22, 0.05)',
-      borderWidth: 1.5,
-      borderColor: 'rgba(249, 115, 22, 0.25)',
-      borderRadius: 12,
-      padding: 12,
-    },
-    documentInfo: {
-      flex: 1,
-      gap: 3,
-    },
-    documentName: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.text,
-    },
-    documentNameRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    facultyBadge: {
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 6,
-      backgroundColor: 'rgba(139, 92, 246, 0.15)',
-      borderWidth: 1,
-      borderColor: 'rgba(139, 92, 246, 0.35)',
-    },
-    facultyBadgeText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: '#8b5cf6',
-    },
-    documentType: {
-      fontSize: 12,
-      color: theme.subtext,
-    },
-    documentMetaRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 2,
-    },
-    documentCollege: {
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    documentDate: {
-      fontSize: 11,
-      color: theme.tertiary,
-    },
-    badgePill: {
-      borderWidth: 0.5,
-      borderRadius: 8,
-      paddingVertical: 4,
-      paddingHorizontal: 9,
-    },
-    badgePillText: {
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'capitalize',
-    },
-
-    // Hosted queues
-    queueItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 10,
-      backgroundColor: 'rgba(59, 130, 246, 0.05)',
-      borderWidth: 1.5,
-      borderColor: 'rgba(59, 130, 246, 0.25)',
-      borderRadius: 12,
-      padding: 12,
-    },
-    queueInfo: {
-      flex: 1,
-      gap: 3,
-    },
-    queueName: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.text,
-    },
-    queueCode: {
-      fontSize: 12,
-      color: theme.subtext,
-    },
-    queueStatusInfo: {
-      alignItems: 'flex-end',
-      gap: 5,
-    },
-    queueActiveBadge: {
-      backgroundColor: 'rgba(34, 197, 94, 0.2)',
-      borderWidth: 0.5,
-      borderColor: 'rgba(34, 197, 94, 0.4)',
-      borderRadius: 8,
-      paddingVertical: 4,
-      paddingHorizontal: 9,
-    },
-    queueActiveBadgeText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: theme.primary,
-    },
-    queueCount: {
-      fontSize: 11,
-      color: theme.tertiary,
     },
 
     // Faculty availability
@@ -1336,6 +1020,90 @@ function createStyles(theme: ThemePalette) {
       fontSize: 12,
       fontWeight: '500',
       color: theme.subtext,
+    },
+
+    // Office Hours (mirrors student_dashboard.tsx / professor_dashboard.tsx)
+    hoursCard: {
+      borderRadius: 18,
+      padding: 20,
+    },
+    hoursHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 10,
+      marginBottom: 18,
+    },
+    hoursTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    hoursTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
+    hoursDeptPill: {
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      borderRadius: 999,
+      paddingVertical: 5,
+      paddingHorizontal: 12,
+      flexShrink: 1,
+    },
+    hoursDeptText: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: 'rgba(255,255,255,0.85)',
+    },
+    hoursSchedule: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginBottom: 14,
+    },
+    hoursItem: {
+      flexGrow: 1,
+      minWidth: 140,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.15)',
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    hoursDay: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: 'rgba(255,255,255,0.65)',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
+    hoursTime: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    hoursLocationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'wrap',
+    },
+    hoursLocationLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: 'rgba(255,255,255,0.65)',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    hoursLocationValue: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: 'rgba(255,255,255,0.9)',
     },
 
     // Nav drawer

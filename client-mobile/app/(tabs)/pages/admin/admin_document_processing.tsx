@@ -288,7 +288,7 @@ export default function AdminDocumentProcessingScreen() {
     const socket = connectSocket(token);
     if (!socket) return;
     const refetch = () => fetchDocuments();
-    const events = ['document:new-request', 'document:cancelled'];
+    const events = ['document:new-request', 'document:status-updated', 'document:cancelled'];
     events.forEach((event) => socket.on(event, refetch));
     const onNewRequest = () => notify('New document request', 'A new document request has come in.');
     socket.on('document:new-request', onNewRequest);

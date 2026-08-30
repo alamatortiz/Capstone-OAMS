@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  AlertCircle,
   Calendar,
   ChevronLeft,
   Clock,
@@ -31,6 +32,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import { formatManilaDate, getManilaDateString, nextOccurrenceDateStr } from '@/utils/date';
 import NotificationBell from '@/components/NotificationBell';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
@@ -79,36 +81,51 @@ function OamsLogo({
   );
 }
 
-// ─── Field shapes documented here mirror what The real server route,
-// GET /api/admin/faculty-availability (adminRoutes.js), is scoped strictly to
-// the signed-in admin's own department — it returns
-// id/name/position/college/status/currentActivity/nextAvailableSlot/email/
-// todaySchedule (time/activity/location/status), with no phone number and no
-// cross-college data, unlike the design-mockup TeacherAvailabilityPage.tsx.
-// This mirrors the actual wired admin-professor-availability.jsx: one
-// department only, filtered with status tabs (all/available/busy/unavailable)
-// rather than a college dropdown, since the response only ever contains one
-// college. ───
+// ─── Field shapes documented here mirror what the real server route,
+// GET /api/admin/faculty-availability (adminRoutes.js, backed by
+// server/utils/facultyAvailability.js's getFacultyAvailabilityToday), is
+// scoped strictly to the signed-in admin's own department — it returns
+// id/name/position/specialization/college/status/currentActivity/email/
+// weeklyAvailability (day/timeStart/timeEnd/location), with no phone number
+// and no cross-college data, unlike the design-mockup
+// TeacherAvailabilityPage.tsx. This mirrors the actual wired
+// admin-professor-availability.jsx: one department only, filtered with
+// status tabs (all/available/busy/unavailable) rather than a college
+// dropdown, since the response only ever contains one college. Web replaced
+// its old "today's schedule with per-slot booked/free status" view with a
+// full weekly consultation-hours view (day-grouped, no per-slot status) —
+// the server still also returns the older todaySchedule/nextAvailableSlot
+// fields for backward compat, but neither web nor this screen render them
+// anymore. ───
 type FacultyStatus = 'available' | 'busy' | 'unavailable';
-type SlotStatus = 'free' | 'booked' | 'unavailable';
 
-interface ScheduleSlot {
-  time: string;
-  activity: string;
+interface AvailabilitySlot {
+  day: string;
+  timeStart: string;
+  timeEnd: string;
   location: string;
-  status: SlotStatus;
 }
 
 interface FacultyMember {
   id: string;
   name: string;
   position: string;
+  specialization: string | null;
   college: string;
   status: FacultyStatus;
   currentActivity: string | null;
-  nextAvailableSlot: string;
   email: string;
-  todaySchedule: ScheduleSlot[];
+  weeklyAvailability: AvailabilitySlot[];
+}
+
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function getDaySchedules(faculty: FacultyMember) {
+  const grouped: Record<string, AvailabilitySlot[]> = {};
+  faculty.weeklyAvailability.forEach((slot) => {
+    (grouped[slot.day] ||= []).push(slot);
+  });
+  return DAY_ORDER.filter((day) => grouped[day]).map((day) => ({ day, schedules: grouped[day] }));
 }
 
 const STATUS_TABS = ['all', 'available', 'busy', 'unavailable'] as const;
@@ -118,12 +135,6 @@ const STATUS_TINTS: Record<FacultyStatus, { bg: string; border: string; color: s
   available: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.35)', color: '#10b981' },
   busy: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.35)', color: '#f59e0b' },
   unavailable: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.35)', color: '#ef4444' },
-};
-
-const SLOT_TINTS: Record<SlotStatus, { bg: string; border: string }> = {
-  free: { bg: 'rgba(16, 185, 129, 0.07)', border: 'rgba(16, 185, 129, 0.45)' },
-  booked: { bg: 'rgba(59, 130, 246, 0.07)', border: 'rgba(59, 130, 246, 0.45)' },
-  unavailable: { bg: 'rgba(107, 114, 128, 0.08)', border: 'rgba(107, 114, 128, 0.45)' },
 };
 
 type LucideIconType = typeof Clock;
@@ -160,6 +171,8 @@ export default function AdminProfessorAvailabilityScreen() {
   const [facultyList, setFacultyList] = useState<FacultyMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Anchors the next-occurrence day math below to "today" in Manila time.
+  const [todayAnchor] = useState(() => getManilaDateString());
   const router = useRouter();
   const { user, token, logout } = useAuth();
   const adminName = user?.name ?? 'Admin';
@@ -192,7 +205,15 @@ export default function AdminProfessorAvailabilityScreen() {
     const socket = connectSocket(token);
     if (!socket) return;
     const refetch = () => fetchFaculty();
-    const events = ['appointment:slot-updated', 'appointment:slot-removed'];
+    // A faculty row changes on a status toggle / login / logout
+    // (faculty:availability-status-changed) or a weekly consultation-slot
+    // edit (appointment:slot-updated / -removed) -- mirrors web's
+    // FACULTY_LIVE_EVENTS in adm-professor-availability.jsx.
+    const events = [
+      'faculty:availability-status-changed',
+      'appointment:slot-updated',
+      'appointment:slot-removed',
+    ];
     events.forEach((event) => socket.on(event, refetch));
     return () => {
       events.forEach((event) => socket.off(event, refetch));
@@ -341,6 +362,8 @@ export default function AdminProfessorAvailabilityScreen() {
             <View style={styles.facultyList}>
               {visibleFaculty.map((f) => {
                 const statusTint = STATUS_TINTS[f.status];
+                const isUnavailable = f.status === 'unavailable';
+                const daySchedules = getDaySchedules(f);
                 return (
                   <View key={f.id} style={styles.facultyCard}>
                     <View style={styles.facultyTop}>
@@ -351,7 +374,13 @@ export default function AdminProfessorAvailabilityScreen() {
                         <View style={styles.facultyIdentityText}>
                           <Text style={styles.facultyName}>{f.name}</Text>
                           <Text style={styles.facultyPosition}>{f.position}</Text>
-                          <Text style={styles.facultyCollege}>{f.college}</Text>
+                          {!!f.specialization && (
+                            <Text style={styles.facultySpecialization}>{f.specialization}</Text>
+                          )}
+                          <View style={styles.metaRow}>
+                            <Mail size={13} color={theme.tertiary} />
+                            <Text style={styles.metaEmail}>{f.email}</Text>
+                          </View>
                         </View>
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: statusTint.bg, borderColor: statusTint.border }]}>
@@ -360,53 +389,53 @@ export default function AdminProfessorAvailabilityScreen() {
                       </View>
                     </View>
 
-                    {f.currentActivity && (
-                      <View style={styles.currentActivityBanner}>
-                        <Text style={styles.currentActivityText}>
-                          <Text style={styles.currentActivityLabel}>Current: </Text>
-                          {f.currentActivity}
-                        </Text>
-                      </View>
-                    )}
-
-                    <View style={styles.facultyMeta}>
-                      <View style={styles.metaRow}>
-                        <Calendar size={14} color={theme.primary} />
-                        <Text style={styles.metaLabel}>Next Available:</Text>
-                        <Text style={styles.metaValue}>{f.nextAvailableSlot}</Text>
-                      </View>
-                      <View style={styles.metaRow}>
-                        <Mail size={14} color={theme.tertiary} />
-                        <Text style={styles.metaEmail}>{f.email}</Text>
-                      </View>
-                    </View>
-
-                    {f.todaySchedule.length > 0 && (
-                      <View style={styles.scheduleSection}>
-                        <Text style={styles.scheduleLabel}>Today&apos;s Schedule</Text>
-                        <View style={styles.scheduleGrid}>
-                          {f.todaySchedule.map((slot, idx) => {
-                            const slotTint = SLOT_TINTS[slot.status];
-                            return (
-                              <View
-                                key={idx}
-                                style={[styles.slot, { backgroundColor: slotTint.bg, borderColor: slotTint.border }]}
-                              >
-                                <View style={styles.slotTimeRow}>
-                                  <Clock size={12} color={theme.tertiary} />
-                                  <Text style={styles.slotTime}>{slot.time}</Text>
-                                </View>
-                                <Text style={styles.slotActivity}>{slot.activity}</Text>
-                                <View style={styles.slotLocationRow}>
-                                  <MapPin size={11} color={theme.tertiary} />
-                                  <Text style={styles.slotLocation}>{slot.location}</Text>
-                                </View>
-                              </View>
-                            );
-                          })}
+                    <View style={styles.scheduleSection}>
+                      <Text style={styles.scheduleLabel}>Consultation Hours</Text>
+                      {isUnavailable ? (
+                        <View style={styles.unavailableNotice}>
+                          <AlertCircle size={16} color="#ef4444" />
+                          <Text style={styles.unavailableNoticeText}>
+                            This professor is currently unavailable and is not accepting
+                            consultations right now.
+                          </Text>
                         </View>
-                      </View>
-                    )}
+                      ) : daySchedules.length === 0 ? (
+                        <Text style={styles.noHoursText}>No consultation hours have been set yet.</Text>
+                      ) : (
+                        <View style={styles.scheduleList}>
+                          {daySchedules.map(({ day, schedules }) => (
+                            <View key={day} style={styles.dayCard}>
+                              <View style={styles.dayHeaderRow}>
+                                <Calendar size={14} color={theme.primary} />
+                                <Text style={styles.dayName}>{day}</Text>
+                                <Text style={styles.dayDate}>
+                                  {formatManilaDate(nextOccurrenceDateStr(day, todayAnchor), {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </Text>
+                              </View>
+                              <View style={styles.daySlots}>
+                                {schedules.map((slot, idx) => (
+                                  <View key={idx} style={styles.scheduleSlot}>
+                                    <View style={styles.slotDetailRow}>
+                                      <Clock size={12} color={theme.tertiary} />
+                                      <Text style={styles.slotTime}>
+                                        {slot.timeStart} – {slot.timeEnd}
+                                      </Text>
+                                    </View>
+                                    <View style={styles.slotDetailRow}>
+                                      <MapPin size={12} color={theme.tertiary} />
+                                      <Text style={styles.slotLocation}>{slot.location}</Text>
+                                    </View>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
                 );
               })}
@@ -680,7 +709,7 @@ function createStyles(theme: ThemePalette) {
     facultyIdentityText: { flex: 1, gap: 2 },
     facultyName: { fontSize: 15, fontWeight: '700', color: theme.text },
     facultyPosition: { fontSize: 12.5, color: theme.subtext },
-    facultyCollege: { fontSize: 11.5, color: theme.tertiary },
+    facultySpecialization: { fontSize: 11.5, color: theme.tertiary, fontStyle: 'italic' },
     statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -693,20 +722,7 @@ function createStyles(theme: ThemePalette) {
     statusDot: { width: 7, height: 7, borderRadius: 4 },
     statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
 
-    currentActivityBanner: {
-      padding: 10,
-      borderRadius: 10,
-      backgroundColor: 'rgba(245, 158, 11, 0.12)',
-      borderWidth: 1,
-      borderColor: 'rgba(245, 158, 11, 0.35)',
-    },
-    currentActivityText: { fontSize: 12.5, color: '#f59e0b' },
-    currentActivityLabel: { fontWeight: '700' },
-
-    facultyMeta: { gap: 6 },
-    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-    metaLabel: { fontSize: 12.5, color: theme.subtext },
-    metaValue: { fontSize: 12.5, fontWeight: '700', color: theme.text },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
     metaEmail: { fontSize: 12, color: theme.tertiary },
 
     scheduleSection: { gap: 8 },
@@ -717,19 +733,42 @@ function createStyles(theme: ThemePalette) {
       textTransform: 'uppercase',
       letterSpacing: 0.3,
     },
-    scheduleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    slot: {
-      width: '47.5%',
-      borderWidth: 1.5,
+    unavailableNotice: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      padding: 10,
       borderRadius: 10,
-      padding: 9,
-      gap: 3,
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.3)',
     },
-    slotTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    slotTime: { fontSize: 11, fontWeight: '700', color: theme.text },
-    slotActivity: { fontSize: 11.5, fontWeight: '600', color: theme.subtext },
-    slotLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    slotLocation: { fontSize: 10.5, color: theme.tertiary },
+    unavailableNoticeText: { flex: 1, fontSize: 12, color: theme.subtext, lineHeight: 17 },
+    noHoursText: { fontSize: 12.5, color: theme.tertiary },
+    scheduleList: { gap: 10 },
+    dayCard: {
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 10,
+      padding: 10,
+      gap: 8,
+    },
+    dayHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dayName: { fontSize: 12.5, fontWeight: '700', color: theme.primary },
+    dayDate: { fontSize: 11, color: theme.tertiary, marginLeft: 'auto' },
+    daySlots: { gap: 6 },
+    scheduleSlot: {
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      padding: 8,
+      gap: 4,
+    },
+    slotDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    slotTime: { fontSize: 11.5, fontWeight: '700', color: theme.text },
+    slotLocation: { fontSize: 11, color: theme.tertiary },
 
     // Generic card
     card: {
