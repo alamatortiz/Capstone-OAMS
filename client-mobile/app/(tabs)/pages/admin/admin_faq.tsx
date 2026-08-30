@@ -840,10 +840,15 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 20,
       padding: 20,
     },
-    // flex: 1 bounds the scrollable form body to the space left inside
-    // formModalCard's maxHeight once the pinned header/footer take their
-    // own space, instead of growing to its own content height.
-    formModalScroll: { flex: 1 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    formModalScroll: { flexShrink: 1 },
     formField: { gap: 6, marginBottom: 14 },
     formLabel: { fontSize: 12, fontWeight: '700', color: theme.subtext, marginBottom: 6 },
     formInput: {

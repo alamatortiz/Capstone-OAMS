@@ -1526,12 +1526,15 @@ function createStyles(theme: ThemePalette) {
       padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border,
     },
     dialogHeaderTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    // flex: 1 is load-bearing: without it this ScrollView sizes to its own
-    // content height instead of the space left over inside dialogCard's
-    // maxHeight, so tall content gets clipped by overflow:'hidden' instead
-    // of becoming scrollable -- cutting off the footer with no way to reach
-    // it. Same bug/fix as student_documents.tsx's dialogBody.
-    dialogBody: { flex: 1, padding: 18 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    dialogBody: { flexShrink: 1, padding: 18 },
     slotSummary: {
       backgroundColor: 'rgba(168, 85, 247, 0.08)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)',
       borderRadius: 14, padding: 14, gap: 10, marginBottom: 16,

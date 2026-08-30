@@ -1477,10 +1477,15 @@ function createStyles(theme: ThemePalette) {
     // sits in a flexDirection:'row' with nothing else centered next to it,
     // so a centered title looks visually misaligned.
     requestDialogTitle: { fontSize: 18, fontWeight: '800', color: theme.text },
-    // flex: 1 bounds the scrollable form body to the space left inside
-    // requestDialogCard's maxHeight once the pinned header/footer take
-    // their own space, instead of growing to its own content height.
-    requestDialogScroll: { flex: 1 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    requestDialogScroll: { flexShrink: 1 },
 
     formGroup: { gap: 8, marginBottom: 16 },
     formLabel: { fontSize: 13.5, fontWeight: '700', color: theme.text },

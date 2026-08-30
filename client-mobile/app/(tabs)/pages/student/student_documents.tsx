@@ -1363,13 +1363,15 @@ function createStyles(theme: ThemePalette) {
       padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border,
     },
     dialogHeaderTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    // flex: 1 is load-bearing: without it this ScrollView sizes to its own
-    // content height instead of the space left over inside dialogCard's
-    // maxHeight, so once a growing section (e.g. the Requirements hint box
-    // below) pushes total content past that cap, the overflow gets clipped
-    // by dialogCard's overflow:'hidden' instead of becoming scrollable --
-    // cutting off dialogActions (Cancel/Submit) with no way to reach them.
-    dialogBody: { flex: 1, padding: 18 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    dialogBody: { flexShrink: 1, padding: 18 },
     formGroup: { gap: 8, marginBottom: 16 },
     formLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
     formSelect: {

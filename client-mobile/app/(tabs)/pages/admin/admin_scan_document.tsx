@@ -1049,11 +1049,15 @@ function createStyles(theme: ThemePalette) {
     },
     docModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
     docModalSubtitle: { fontSize: 11.5, color: theme.subtext, marginTop: 3 },
-    // flex: 1 bounds this ScrollView to the space left inside docModalCard's
-    // maxHeight (instead of growing to its own content height), so tall
-    // content stays scrollable instead of pushing the Close button out of
-    // reach.
-    docModalBody: { flex: 1, padding: 18 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    docModalBody: { flexShrink: 1, padding: 18 },
 
     verifiedBanner: {
       alignItems: 'center',

@@ -1773,11 +1773,15 @@ function createStyles(theme: ThemePalette) {
       marginBottom: 16,
     },
     modalTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
-    // flex: 1 bounds this ScrollView to the space left inside its card's
-    // maxHeight once the pinned header/footer take their own space, instead
-    // of growing to its own content height and pushing the footer out of
-    // reach. Shared by the View/Edit/Create modal cards below.
-    formModalScroll: { flex: 1 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    formModalScroll: { flexShrink: 1 },
 
     // View modal
     viewModalCard: {

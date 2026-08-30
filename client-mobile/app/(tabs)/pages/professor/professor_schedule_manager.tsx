@@ -1406,10 +1406,15 @@ function createStyles(theme: ThemePalette) {
       padding: 22,
     },
     requestDialogHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 18 },
-    // flex: 1 bounds the scrollable form body to the space left inside
-    // formDialogCard's maxHeight once the pinned header/footer take their
-    // own space, instead of growing to its own content height.
-    formDialogScroll: { flex: 1 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    formDialogScroll: { flexShrink: 1 },
     // Left-aligned, unlike confirmTitle (centered -- built for the
     // icon-above-title confirm dialogs elsewhere in this file). This header
     // sits in a flexDirection:'row' with the subtitle stacked underneath it,

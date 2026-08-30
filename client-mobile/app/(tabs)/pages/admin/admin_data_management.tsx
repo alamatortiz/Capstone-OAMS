@@ -1902,10 +1902,15 @@ function createStyles(theme: ThemePalette) {
     formModalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: theme.border },
     formModalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
     formModalSubtitle: { fontSize: 11.5, color: theme.subtext, marginTop: 3 },
-    // flex: 1 bounds this ScrollView to the space left inside formModalCard's
-    // maxHeight (instead of growing to its own content height), so a tall
-    // form stays scrollable instead of pushing formModalFooter out of reach.
-    formModalBody: { flex: 1, padding: 18 },
+    // flexShrink: 1 -- deliberately NOT the flex:1 shorthand, which sets
+    // flexBasis:0% and collapses this ScrollView to zero height (a column
+    // container with only maxHeight, no explicit height, sizes itself to its
+    // non-flex children only -- the flex:1 child contributes nothing to that
+    // measurement, so there's never any "extra" space left for it to grow
+    // into). flexShrink:1 instead sizes this ScrollView to its own content
+    // normally, only compressing -- and becoming internally scrollable for
+    // the overflow -- once content would push the card past its maxHeight cap.
+    formModalBody: { flexShrink: 1, padding: 18 },
     formGroup: { gap: 6, marginBottom: 14 },
     formLabel: { fontSize: 12.5, fontWeight: '600', color: theme.subtext },
     formInput: {
