@@ -2008,8 +2008,11 @@ router.delete(
       await conn.beginTransaction();
 
       const [[appt]] = await conn.query(
-        `SELECT appointment_id, student_id, status, faculty_id, department_id
-         FROM appointments WHERE appointment_id = ? FOR UPDATE`,
+        `SELECT a.appointment_id, a.student_id, a.status, a.faculty_id, a.department_id,
+                a.appointment_date, a.appointment_time, s.first_name, s.last_name
+         FROM appointments a
+         JOIN students s ON a.student_id = s.student_id
+         WHERE a.appointment_id = ? FOR UPDATE`,
         [appointmentId],
       );
 
@@ -2052,7 +2055,11 @@ router.delete(
         appointmentId,
         status: "cancelled",
       });
-      createNotification(appt.faculty_id, "A student cancelled their appointment with you.", "appointment");
+      createNotification(
+        appt.faculty_id,
+        `${appt.first_name} ${appt.last_name} cancelled their appointment with you on ${getManilaDateString(appt.appointment_date)} at ${formatTime12h(appt.appointment_time)}.`,
+        "appointment",
+      );
 
       res.json({
         message: "Appointment cancelled successfully",
@@ -2700,7 +2707,24 @@ router.post(
         date: appointmentDate,
         spotsLeft: newSpotsLeft,
       });
-      createNotification(slot.faculty_id, "A student booked an appointment with you.", "appointment");
+      const [[bookedByStudent]] = await pool.query(
+        `SELECT first_name, last_name FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+      let bookedServiceName = null;
+      if (chosenServiceId) {
+        const [[svc]] = await pool.query(
+          `SELECT service_name FROM appointment_services WHERE service_id = ?`,
+          [chosenServiceId],
+        );
+        bookedServiceName = svc?.service_name ?? null;
+      }
+      const bookedServicePart = bookedServiceName ? ` a ${bookedServiceName}` : "";
+      createNotification(
+        slot.faculty_id,
+        `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${getManilaDateString(appointmentDate)} at ${formatTime12h(appointmentTime)}.`,
+        "appointment",
+      );
 
       // Read the just-written snapshot directly off the appointment row --
       // no join needed, since we populated it ourselves a moment ago.

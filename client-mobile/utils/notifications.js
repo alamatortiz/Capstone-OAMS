@@ -18,12 +18,6 @@ import api from './api';
 // become no-ops instead of throwing; a real dev client picks up the real
 // implementation automatically.
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-// TEMP DIAGNOSTIC (remove once push registration is confirmed working on a
-// real device): the isExpoGo/Notifications-null path returns from every
-// exported function here with zero logging, which is indistinguishable from
-// "ran fine, nothing to report" in logcat. This line at least proves which
-// branch a given build actually took.
-console.log('[notifications] executionEnvironment:', Constants.executionEnvironment, '| isExpoGo:', isExpoGo);
 
 let Notifications = null;
 if (!isExpoGo) {
@@ -48,26 +42,20 @@ let permissionRequested = false;
 async function registerPushToken() {
   try {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    console.log('[notifications] requesting push token for projectId:', projectId);
     const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
-    console.log('[notifications] got push token:', data);
-    const res = await api.post('/auth/push-token', { expoPushToken: data });
-    console.log('[notifications] server registration response:', res.status, res.data);
+    await api.post('/auth/push-token', { expoPushToken: data });
   } catch (err) {
-    console.error('Push token registration failed:', err?.message, err?.response?.status, err?.response?.data);
+    console.error('Push token registration failed:', err);
   }
 }
 
 export async function ensureNotificationPermission() {
-  console.log('[notifications] ensureNotificationPermission called. Notifications loaded:', !!Notifications, '| already requested:', permissionRequested);
   if (!Notifications || permissionRequested) return;
   permissionRequested = true;
   try {
     let { status } = await Notifications.getPermissionsAsync();
-    console.log('[notifications] current permission status:', status);
     if (status !== 'granted') {
       ({ status } = await Notifications.requestPermissionsAsync());
-      console.log('[notifications] status after requesting:', status);
     }
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
@@ -77,8 +65,6 @@ export async function ensureNotificationPermission() {
     }
     if (status === 'granted') {
       await registerPushToken();
-    } else {
-      console.log('[notifications] permission not granted, skipping token registration. Final status:', status);
     }
   } catch (err) {
     console.error('Notification permission request failed:', err);

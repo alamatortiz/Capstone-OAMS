@@ -7,9 +7,6 @@ const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const STALE_HOURS = 24;
 const ESCALATION_DAYS = 7;
 
-const PICKUP_MESSAGE =
-  "Your document request is ready for pickup. Please claim it as soon as possible.";
-
 // Finds every document request (student-side and faculty-side) that's been
 // sitting in 'generated' (ready for pickup) for longer than STALE_HOURS and
 // reminds the requester. Neither table has a dedicated "became ready"
@@ -21,21 +18,29 @@ const PICKUP_MESSAGE =
 async function sweepDocumentPickups() {
   try {
     const [studentStale] = await pool.query(
-      `SELECT request_id, student_id AS user_id
-       FROM document_requests
-       WHERE status = 'generated' AND updated_at <= (NOW() - INTERVAL ? HOUR)`,
+      `SELECT dr.request_id, dr.student_id AS user_id, dr.tracking_number, s.service_name
+       FROM document_requests dr
+       JOIN document_services s ON dr.service_id = s.service_id
+       WHERE dr.status = 'generated' AND dr.updated_at <= (NOW() - INTERVAL ? HOUR)`,
       [STALE_HOURS],
     );
     const [facultyStale] = await pool.query(
-      `SELECT request_id, faculty_id AS user_id
-       FROM faculty_document_requests
-       WHERE status = 'generated' AND updated_at <= (NOW() - INTERVAL ? HOUR)`,
+      `SELECT fdr.request_id, fdr.faculty_id AS user_id, fdr.tracking_number, s.service_name
+       FROM faculty_document_requests fdr
+       JOIN document_services s ON fdr.service_id = s.service_id
+       WHERE fdr.status = 'generated' AND fdr.updated_at <= (NOW() - INTERVAL ? HOUR)`,
       [STALE_HOURS],
     );
 
     const stale = [...studentStale, ...facultyStale];
     if (stale.length > 0) {
-      stale.forEach((row) => createNotification(row.user_id, PICKUP_MESSAGE, "document"));
+      stale.forEach((row) =>
+        createNotification(
+          row.user_id,
+          `Your ${row.service_name} request (${row.tracking_number}) is ready for pickup. Please claim it as soon as possible.`,
+          "document",
+        ),
+      );
       console.log(
         `[documentPickupSweeper] Reminded ${stale.length} stale pickup${stale.length === 1 ? "" : "s"}`,
       );

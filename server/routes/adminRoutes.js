@@ -616,7 +616,11 @@ router.patch(
         const uncalledPayload = { slotId, queueId: serving.queue_id, studentId: serving.student_id };
         emitToSlot(slotId, "queue:uncalled", uncalledPayload);
         emitToUser(serving.student_id, "queue:uncalled", uncalledPayload);
-        createNotification(serving.student_id, "The queue was paused while you were being served. You've been moved back to waiting.", "queue");
+        createNotification(
+          serving.student_id,
+          `The ${slot.service_name} queue was paused while you were being served. You've been moved back to waiting.`,
+          "queue",
+        );
       }
       res.json({
         message: "Queue paused",
@@ -737,7 +741,7 @@ router.patch(
       for (const entry of affected) {
         const stoppedPayload = { slotId, queueId: entry.queue_id, studentId: entry.student_id, reason };
         emitToUser(entry.student_id, "queue:queue-stopped", stoppedPayload);
-        createNotification(entry.student_id, `The queue you were in was stopped: ${reason}`, "queue");
+        createNotification(entry.student_id, `The ${slot.service_name} queue you were in was stopped: ${reason}`, "queue");
       }
 
       res.json({
@@ -794,9 +798,12 @@ router.patch(
       }
 
       const [[next]] = await conn.query(
-        `SELECT queue_id, student_id FROM queues
-         WHERE slot_id = ? AND status = 'waiting'
-         ORDER BY queue_number ASC
+        `SELECT q.queue_id, q.student_id, s.service_name, l.location_name
+         FROM queues q
+         JOIN services s ON q.service_id = s.service_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
+         WHERE q.slot_id = ? AND q.status = 'waiting'
+         ORDER BY q.queue_number ASC
          LIMIT 1
          FOR UPDATE`,
         [slotId],
@@ -834,11 +841,16 @@ router.patch(
       emitToSlot(slotId, "queue:called", calledPayload);
       emitToUser(next.student_id, "queue:called", calledPayload);
       emitToDept(deptId, "queue:called", calledPayload);
-      createNotification(next.student_id, "You've been called! Please proceed to the counter.", "queue");
+      const calledLocationPart = next.location_name ? ` at ${next.location_name}` : "";
+      createNotification(
+        next.student_id,
+        `You've been called for ${next.service_name}! Please proceed${calledLocationPart}.`,
+        "queue",
+      );
       sendPushNotification(
         next.student_id,
         "You've been called!",
-        "Please proceed to the counter.",
+        `${next.service_name} — please proceed${calledLocationPart}.`,
         { type: "queue:called", slotId, queueId: next.queue_id },
       );
 
@@ -977,7 +989,7 @@ router.patch(
       emitToSlot(slotId, "queue:served", servedPayload);
       emitToUser(serving.student_id, "queue:served", servedPayload);
       emitToDept(deptId, "queue:served", servedPayload);
-      createNotification(serving.student_id, "Your queue service has been completed.", "queue");
+      createNotification(serving.student_id, `Your ${slot.service_name} service has been completed.`, "queue");
 
       if (settleResult) {
         const settledPayload = { slotId, status: settleResult.newStatus };
@@ -1050,6 +1062,7 @@ router.patch(
           studentId: serving.student_id,
           deptId,
           settleResult: result.settleResult,
+          serviceName: slot.service_name,
         });
       }
 
@@ -1819,7 +1832,7 @@ router.patch(
       }
 
       const [[request]] = await pool.query(
-        `SELECT fdr.request_id, fdr.status, fdr.faculty_id, s.department_id, s.requires_coding
+        `SELECT fdr.request_id, fdr.status, fdr.faculty_id, fdr.tracking_number, s.department_id, s.requires_coding, s.service_name
          FROM faculty_document_requests fdr
          JOIN document_services s ON fdr.service_id = s.service_id
          WHERE fdr.request_id = ?`,
@@ -1879,7 +1892,11 @@ router.patch(
       }
 
       emitToUser(request.faculty_id, "document:status-updated", { requestId, status });
-      createNotification(request.faculty_id, `Your document request is now ${status}.`, "document");
+      createNotification(
+        request.faculty_id,
+        `Your ${request.service_name} request (${request.tracking_number}) is now ${status}.`,
+        "document",
+      );
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -1912,7 +1929,7 @@ router.patch(
       }
 
       const [[request]] = await pool.query(
-        `SELECT dr.request_id, dr.student_id, dr.status, s.department_id, s.requires_coding
+        `SELECT dr.request_id, dr.student_id, dr.status, dr.tracking_number, s.department_id, s.requires_coding, s.service_name
          FROM document_requests dr
          JOIN document_services s ON dr.service_id = s.service_id
          WHERE dr.request_id = ?`,
@@ -1972,7 +1989,11 @@ router.patch(
       }
 
       emitToUser(request.student_id, "document:status-updated", { requestId, status });
-      createNotification(request.student_id, `Your document request is now ${status}.`, "document");
+      createNotification(
+        request.student_id,
+        `Your ${request.service_name} request (${request.tracking_number}) is now ${status}.`,
+        "document",
+      );
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
@@ -2103,7 +2124,7 @@ router.patch(
       }
 
       const [[submission]] = await pool.query(
-        `SELECT submission_id, student_id, faculty_id, status, department_id FROM document_submissions WHERE submission_id = ?`,
+        `SELECT submission_id, student_id, faculty_id, status, department_id, title, tracking_number FROM document_submissions WHERE submission_id = ?`,
         [submissionId],
       );
 
@@ -2182,7 +2203,11 @@ router.patch(
       // the submitter_type CHECK constraint) -- notify whichever one sent it.
       const submitterId = submission.student_id ?? submission.faculty_id;
       emitToUser(submitterId, "document:status-updated", { requestId: submissionId, status });
-      createNotification(submitterId, `Your sent document is now ${status}.`, "document");
+      createNotification(
+        submitterId,
+        `Your sent document "${submission.title}" (${submission.tracking_number}) is now ${status}.`,
+        "document",
+      );
 
       res.json({ message: "Document submission status updated", submissionId, status });
     } catch (error) {

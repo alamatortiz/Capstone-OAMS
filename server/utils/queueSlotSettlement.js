@@ -45,10 +45,10 @@ async function settleSlotAfterEntryChange(db, slotId) {
 // queue-hosting mutation route (pause/resume/close/call-next/mark-arrived/
 // serve/skip). On failure, rolls back and writes the 404/403 response
 // itself, returning null so the caller can just `if (!slot) return;`.
-// Returns the row ({ slot_id, status, department_id }) on success.
+// Returns the row ({ slot_id, status, department_id, service_name }) on success.
 async function getOwnedSlotOrRespond(conn, res, { slotId, deptId }) {
   const [[slot]] = await conn.query(
-    `SELECT qs.slot_id, qs.status, s.department_id
+    `SELECT qs.slot_id, qs.status, s.department_id, s.service_name
      FROM queue_slots qs
      JOIN services s ON qs.service_id = s.service_id
      WHERE qs.slot_id = ? FOR UPDATE`,

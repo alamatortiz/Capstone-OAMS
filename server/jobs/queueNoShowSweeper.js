@@ -42,12 +42,17 @@ async function voidQueueEntry(db, { queueId, slotId, changedBy = null, note }) {
 
 // Socket/notification side effects for a successful voidQueueEntry() call.
 // Call this only after the surrounding transaction (if any) has committed.
-function emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult }) {
+function emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult, serviceName }) {
   const noShowPayload = { slotId, queueId, studentId };
   emitToSlot(slotId, "queue:no-show", noShowPayload);
   emitToUser(studentId, "queue:no-show", noShowPayload);
   emitToDept(deptId, "queue:no-show", noShowPayload);
-  createNotification(studentId, "You were marked as a no-show and your queue ticket was voided.", "queue");
+  const noShowServicePart = serviceName ? ` for ${serviceName}` : "";
+  createNotification(
+    studentId,
+    `You were marked as a no-show${noShowServicePart} and your queue ticket was voided.`,
+    "queue",
+  );
 
   if (settleResult) {
     const settledPayload = { slotId, status: settleResult.newStatus };
@@ -66,7 +71,7 @@ function emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult }) {
 async function sweepNoShows() {
   try {
     const [stale] = await pool.query(
-      `SELECT q.queue_id, q.slot_id, q.student_id, s.department_id
+      `SELECT q.queue_id, q.slot_id, q.student_id, s.department_id, s.service_name
        FROM queues q
        JOIN queue_slots qs ON q.slot_id = qs.slot_id
        JOIN services s ON qs.service_id = s.service_id
@@ -80,7 +85,7 @@ async function sweepNoShows() {
 
     let voidedCount = 0;
     for (const row of stale) {
-      const { queue_id: queueId, slot_id: slotId, student_id: studentId, department_id: deptId } = row;
+      const { queue_id: queueId, slot_id: slotId, student_id: studentId, department_id: deptId, service_name: serviceName } = row;
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
@@ -93,7 +98,7 @@ async function sweepNoShows() {
         await conn.commit();
         if (result.voided) {
           voidedCount += 1;
-          emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult: result.settleResult });
+          emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult: result.settleResult, serviceName });
         }
       } catch (entryError) {
         await conn.rollback();

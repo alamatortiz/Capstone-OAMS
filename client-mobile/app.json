@@ -53,7 +53,13 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#7e14ff"
+        }
+      ],
       "expo-secure-store"
     ],
     "experiments": {

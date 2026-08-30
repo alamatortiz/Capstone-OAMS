@@ -416,8 +416,11 @@ router.patch(
       await conn.beginTransaction();
 
       const [[appt]] = await conn.query(
-        `SELECT student_id, department_id, status, availability_id, appointment_date
-         FROM appointments WHERE appointment_id = ? AND faculty_id = ? FOR UPDATE`,
+        `SELECT a.student_id, a.department_id, a.status, a.availability_id, a.appointment_date,
+                a.appointment_time, sv.service_name
+         FROM appointments a
+         LEFT JOIN appointment_services sv ON a.service_id = sv.service_id
+         WHERE a.appointment_id = ? AND a.faculty_id = ? FOR UPDATE`,
         [id, facultyId],
       );
       if (!appt) {
@@ -474,7 +477,13 @@ router.patch(
 
       emitToUser(appt.student_id, "appointment:status-updated", { appointmentId: Number(id), status });
       emitToDept(appt.department_id, "appointment:status-updated", { appointmentId: Number(id), status });
-      createNotification(appt.student_id, `Your appointment has been ${status}.`, "appointment");
+      const apptServicePart = appt.service_name ? `${appt.service_name} appointment` : "appointment";
+      const apptWhenPart = ` on ${getManilaDateString(appt.appointment_date)} at ${formatTime(appt.appointment_time)}`;
+      createNotification(
+        appt.student_id,
+        `Your ${apptServicePart}${apptWhenPart} has been ${status}.`,
+        "appointment",
+      );
 
       res.json({ message: "Status updated" });
     } catch (err) {
