@@ -2708,68 +2708,105 @@ router.post(
 
       await conn.commit();
 
+      // ── Everything below is best-effort side-effects / response
+      // formatting -- the booking itself is already committed at this
+      // point. A failure here must NOT roll back (there's nothing left to
+      // roll back) and must NOT surface as an error to the student, who
+      // has already been successfully booked. Previously this code ran
+      // inside the same try block as the transaction: if any of it threw
+      // (a socket emit, a notification query, etc.), execution fell into
+      // the catch block below, which called conn.rollback() on an
+      // already-committed connection and sent the client a failure
+      // response/toast -- even though the appointment row was already
+      // committed to the database. That's why the booking only ever
+      // appeared after a manual refresh.
       const newSpotsLeft = slot.max_students != null ? slot.max_students - (total + 1) : null;
-      emitToDept(facultyRow.department_id, "appointment:slot-updated", {
-        availabilityId,
-        date: appointmentDate,
-        spotsLeft: newSpotsLeft,
-      });
-      emitToUser(slot.faculty_id, "appointment:slot-updated", {
-        availabilityId,
-        date: appointmentDate,
-        spotsLeft: newSpotsLeft,
-      });
-      const [[bookedByStudent]] = await pool.query(
-        `SELECT first_name, last_name FROM students WHERE student_id = ?`,
-        [studentId],
-      );
-      let bookedServiceName = null;
-      if (chosenServiceId) {
-        const [[svc]] = await pool.query(
-          `SELECT service_name FROM appointment_services WHERE service_id = ?`,
-          [chosenServiceId],
+      try {
+        emitToDept(facultyRow.department_id, "appointment:slot-updated", {
+          availabilityId,
+          date: appointmentDate,
+          spotsLeft: newSpotsLeft,
+        });
+        emitToUser(slot.faculty_id, "appointment:slot-updated", {
+          availabilityId,
+          date: appointmentDate,
+          spotsLeft: newSpotsLeft,
+        });
+        const [[bookedByStudent]] = await pool.query(
+          `SELECT first_name, last_name FROM students WHERE student_id = ?`,
+          [studentId],
         );
-        bookedServiceName = svc?.service_name ?? null;
+        let bookedServiceName = null;
+        if (chosenServiceId) {
+          const [[svc]] = await pool.query(
+            `SELECT service_name FROM appointment_services WHERE service_id = ?`,
+            [chosenServiceId],
+          );
+          bookedServiceName = svc?.service_name ?? null;
+        }
+        const bookedServicePart = bookedServiceName ? ` a ${bookedServiceName}` : "";
+        createNotification(
+          slot.faculty_id,
+          `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${getManilaDateString(appointmentDate)} at ${formatTime12h(appointmentTime)}.`,
+          "appointment",
+        );
+      } catch (sideEffectError) {
+        console.error("Book slot post-commit side-effect error:", sideEffectError);
       }
-      const bookedServicePart = bookedServiceName ? ` a ${bookedServiceName}` : "";
-      createNotification(
-        slot.faculty_id,
-        `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${getManilaDateString(appointmentDate)} at ${formatTime12h(appointmentTime)}.`,
-        "appointment",
-      );
 
       // Read the just-written snapshot directly off the appointment row --
       // no join needed, since we populated it ourselves a moment ago.
-      const [[newRow]] = await pool.query(
-        `SELECT
-           a.appointment_id, a.appointment_date, a.status, a.notes,
-           a.window_start_snapshot AS window_start, a.window_end_snapshot AS window_end,
-           a.location_snapshot AS location,
-           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
-           f.specialization AS faculty_role,
-           d.department_name AS college
-         FROM appointments a
-         JOIN faculty f ON a.faculty_id = f.faculty_id
-         JOIN departments d ON f.department_id = d.department_id
-         WHERE a.appointment_id = ?`,
-        [appointmentId],
-      );
+      let newRow = null;
+      try {
+        [[newRow]] = await pool.query(
+          `SELECT
+             a.appointment_id, a.appointment_date, a.status, a.notes,
+             a.window_start_snapshot AS window_start, a.window_end_snapshot AS window_end,
+             a.location_snapshot AS location,
+             CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+             f.specialization AS faculty_role,
+             d.department_name AS college
+           FROM appointments a
+           JOIN faculty f ON a.faculty_id = f.faculty_id
+           JOIN departments d ON f.department_id = d.department_id
+           WHERE a.appointment_id = ?`,
+          [appointmentId],
+        );
+      } catch (readError) {
+        console.error("Book slot confirmation read error:", readError);
+      }
 
-      res.status(201).json({
+      // Even if the confirmation read above failed, the booking itself is
+      // already committed -- fall back to data we already have in hand
+      // (from the slot row locked/fetched earlier) so the student still
+      // gets a real success response instead of a false error.
+      return res.status(201).json({
         message: "Appointment booked successfully",
-        appointment: {
-          id: newRow.appointment_id,
-          title: newRow.faculty_role ?? "Faculty Consultation",
-          professorName: newRow.faculty_name,
-          personRole: newRow.faculty_role ?? "Faculty",
-          college: newRow.college,
-          date: String(newRow.appointment_date).split("T")[0],
-          windowStart: formatTime12h(newRow.window_start),
-          windowEnd: formatTime12h(newRow.window_end),
-          location: newRow.location ?? "TBA",
-          purpose: newRow.notes ?? "",
-          status: newRow.status,
-        },
+        appointment: newRow
+          ? {
+              id: newRow.appointment_id,
+              title: newRow.faculty_role ?? "Faculty Consultation",
+              professorName: newRow.faculty_name,
+              personRole: newRow.faculty_role ?? "Faculty",
+              college: newRow.college,
+              date: String(newRow.appointment_date).split("T")[0],
+              windowStart: formatTime12h(newRow.window_start),
+              windowEnd: formatTime12h(newRow.window_end),
+              location: newRow.location ?? "TBA",
+              purpose: newRow.notes ?? "",
+              status: newRow.status,
+            }
+          : {
+              id: appointmentId,
+              title: "Faculty Consultation",
+              college: null,
+              date: appointmentDate,
+              windowStart: formatTime12h(slot.start_time),
+              windowEnd: formatTime12h(slot.end_time),
+              location: slot.location ?? "TBA",
+              purpose: purpose?.trim() || "",
+              status: "pending",
+            },
       });
     } catch (error) {
       await conn.rollback();
