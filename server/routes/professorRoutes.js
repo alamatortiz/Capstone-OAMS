@@ -5,14 +5,25 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
-const { getManilaDateString, formatTime12h: formatTime, formatRelativeTime } = require("../utils/dateTime");
-const { createNotification } = require("../utils/notifications");
+const {
+  getManilaDateString,
+  formatTime12h: formatTime,
+  formatRelativeTime,
+} = require("../utils/dateTime");
+// const { createNotification } = require("../utils/notifications");
+const {
+  createNotification,
+  notifyDepartmentAdmins,
+} = require("../utils/notifications");
 const notificationsController = require("../controllers/notificationsController");
 const { emitToUser, emitToDept } = require("../sockets");
 const { isValidTransition } = require("../utils/appointmentStatus");
 const { cancelOwnDocumentRequest } = require("../utils/documentStatus");
 const { sendServerError } = require("../utils/errorResponse");
-const { getAttachmentsMap, serveAnnouncementAttachment } = require("../utils/announcementAttachments");
+const {
+  getAttachmentsMap,
+  serveAnnouncementAttachment,
+} = require("../utils/announcementAttachments");
 const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
 const {
   getFilesMap,
@@ -23,8 +34,23 @@ const {
   serveFacultyDocumentSubmissionFile,
 } = require("../utils/documentSubmissionAttachments");
 
-const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const VALID_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+const VALID_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 // GET /api/professor/dashboard-stats
 router.get(
@@ -198,7 +224,10 @@ router.get(
         recentActivity: recentActivity.map((row, i) => ({
           id: i + 1,
           type: row.type,
-          title: row.type === "document" ? buildDocumentActivityTitle(row) : buildActivityTitle(row),
+          title:
+            row.type === "document"
+              ? buildDocumentActivityTitle(row)
+              : buildActivityTitle(row),
           status: row.status,
           time: formatRelativeTime(new Date(row.event_time)),
         })),
@@ -248,7 +277,8 @@ router.get(
          WHERE f.faculty_id = ?`,
         [facultyId],
       );
-      if (!dept) return res.status(404).json({ message: "Department not found" });
+      if (!dept)
+        return res.status(404).json({ message: "Department not found" });
       res.json({
         departmentName: dept.department_name,
         departmentAbbrev: dept.department_abbreviation,
@@ -273,7 +303,9 @@ router.patch(
     const facultyId = req.user.userId;
     const { status } = req.body;
     if (!["available", "unavailable"].includes(status)) {
-      return res.status(400).json({ message: "status must be 'available' or 'unavailable'" });
+      return res
+        .status(400)
+        .json({ message: "status must be 'available' or 'unavailable'" });
     }
     try {
       const [[fac]] = await pool.query(
@@ -288,7 +320,10 @@ router.patch(
         facultyId: Number(facultyId),
         availabilityStatus: status,
       });
-      res.json({ message: "Availability status updated", availabilityStatus: status });
+      res.json({
+        message: "Availability status updated",
+        availabilityStatus: status,
+      });
     } catch (err) {
       sendServerError(res, err, "PATCH /availability-status error:");
     }
@@ -301,9 +336,12 @@ function buildActivityTitle(row) {
     // faculty member triggered themselves, or an automatic cancellation
     // caused by editing/deleting the schedule slot the appointment was in --
     // without this, all three used to render as "cancelled by {student}".
-    if (row.cancelled_by === "system") return `Appointment with ${row.student_name} auto-cancelled — schedule changed`;
-    if (row.cancelled_by === "system_expired") return `Appointment with ${row.student_name} auto-cancelled — you never responded`;
-    if (row.cancelled_by === "faculty") return `You cancelled the appointment with ${row.student_name}`;
+    if (row.cancelled_by === "system")
+      return `Appointment with ${row.student_name} auto-cancelled — schedule changed`;
+    if (row.cancelled_by === "system_expired")
+      return `Appointment with ${row.student_name} auto-cancelled — you never responded`;
+    if (row.cancelled_by === "faculty")
+      return `You cancelled the appointment with ${row.student_name}`;
     return `Appointment cancelled by ${row.student_name}`;
   }
   const map = {
@@ -362,40 +400,42 @@ router.get(
       }
       sql += " ORDER BY a.appointment_date DESC, a.appointment_time ASC";
       const [rows] = await pool.query(sql, params);
-      res.json(rows.map((r) => ({
-        id: r.appointment_id,
-        studentName: `${r.first_name} ${r.last_name}`,
-        studentId: r.student_number,
-        course: r.course,
-        appointmentType: r.appointment_type ?? null,
-        purpose: r.notes || "No purpose specified",
-        date:
-          r.appointment_date instanceof Date
-            ? getManilaDateString(r.appointment_date)
-            : String(r.appointment_date).split("T")[0],
-        time:
-          r.window_start && r.window_end
-            ? `${formatTime(r.window_start)} – ${formatTime(r.window_end)}`
-            : formatTime(r.appointment_time),
-        location: r.location ?? "TBA",
-        status: r.status,
-        requestedAt: new Date(r.created_at).toLocaleString("en-US", {
-          timeZone: "Asia/Manila",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        }),
-        // Raw instant for the client to format itself (calendar/clock split) --
-        // same interpretation as requestedAt above, which stays for older clients.
-        requestedAtRaw: r.created_at,
-      })));
+      res.json(
+        rows.map((r) => ({
+          id: r.appointment_id,
+          studentName: `${r.first_name} ${r.last_name}`,
+          studentId: r.student_number,
+          course: r.course,
+          appointmentType: r.appointment_type ?? null,
+          purpose: r.notes || "No purpose specified",
+          date:
+            r.appointment_date instanceof Date
+              ? getManilaDateString(r.appointment_date)
+              : String(r.appointment_date).split("T")[0],
+          time:
+            r.window_start && r.window_end
+              ? `${formatTime(r.window_start)} – ${formatTime(r.window_end)}`
+              : formatTime(r.appointment_time),
+          location: r.location ?? "TBA",
+          status: r.status,
+          requestedAt: new Date(r.created_at).toLocaleString("en-US", {
+            timeZone: "Asia/Manila",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          }),
+          // Raw instant for the client to format itself (calendar/clock split) --
+          // same interpretation as requestedAt above, which stays for older clients.
+          requestedAtRaw: r.created_at,
+        })),
+      );
     } catch (err) {
       sendServerError(res, err, "GET /appointments error:");
     }
-  }
+  },
 );
 
 // PATCH /api/professor/appointments/:id/status
@@ -431,15 +471,20 @@ router.patch(
 
       if (!isValidTransition(appt.status, status)) {
         await conn.rollback();
-        return res.status(409).json({ error: `Cannot change status from ${appt.status} to ${status}` });
+        return res.status(409).json({
+          error: `Cannot change status from ${appt.status} to ${status}`,
+        });
       }
 
-      const apptDateStr = appt.appointment_date instanceof Date
-        ? getManilaDateString(appt.appointment_date)
-        : String(appt.appointment_date).split("T")[0];
+      const apptDateStr =
+        appt.appointment_date instanceof Date
+          ? getManilaDateString(appt.appointment_date)
+          : String(appt.appointment_date).split("T")[0];
       if (status === "completed" && apptDateStr > getManilaDateString()) {
         await conn.rollback();
-        return res.status(400).json({ error: "Cannot mark a future appointment as completed" });
+        return res
+          .status(400)
+          .json({ error: "Cannot mark a future appointment as completed" });
       }
 
       // Re-check capacity when reviving a pending request into approved --
@@ -461,7 +506,9 @@ router.patch(
           );
           if (slot.max_students != null && total >= slot.max_students) {
             await conn.rollback();
-            return res.status(409).json({ error: "This availability window is now fully booked" });
+            return res
+              .status(409)
+              .json({ error: "This availability window is now fully booked" });
           }
         }
       }
@@ -476,9 +523,17 @@ router.patch(
 
       await conn.commit();
 
-      emitToUser(appt.student_id, "appointment:status-updated", { appointmentId: Number(id), status });
-      emitToDept(appt.department_id, "appointment:status-updated", { appointmentId: Number(id), status });
-      const apptServicePart = appt.service_name ? `${appt.service_name} appointment` : "appointment";
+      emitToUser(appt.student_id, "appointment:status-updated", {
+        appointmentId: Number(id),
+        status,
+      });
+      emitToDept(appt.department_id, "appointment:status-updated", {
+        appointmentId: Number(id),
+        status,
+      });
+      const apptServicePart = appt.service_name
+        ? `${appt.service_name} appointment`
+        : "appointment";
       const apptWhenPart = ` on ${getManilaDateString(appt.appointment_date)} at ${formatTime(appt.appointment_time)}`;
       createNotification(
         appt.student_id,
@@ -493,13 +548,12 @@ router.patch(
     } finally {
       conn.release();
     }
-  }
+  },
 );
 
 // ─────────────────────────────────────────────────────────────
 // DOCUMENT REQUESTS (student requests in faculty's department)
 // ─────────────────────────────────────────────────────────────
-
 
 // ─────────────────────────────────────────────────────────────
 // TRANSACTIONS (combined appointment + document history)
@@ -537,8 +591,15 @@ router.get(
           LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
           WHERE a.faculty_id = ?`;
         const params = [facultyId];
-        if (filterStatus !== "all") { sql += " AND a.status = ?"; params.push(filterStatus); }
-        if (search) { sql += " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_number LIKE ?)"; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+        if (filterStatus !== "all") {
+          sql += " AND a.status = ?";
+          params.push(filterStatus);
+        }
+        if (search) {
+          sql +=
+            " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_number LIKE ?)";
+          params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
         const [appts] = await pool.query(sql, params);
         rows = rows.concat(appts);
       }
@@ -559,8 +620,15 @@ router.get(
           JOIN document_services ds ON fdr.service_id = ds.service_id
           WHERE fdr.faculty_id = ?`;
         const params = [facultyId];
-        if (filterStatus !== "all") { sql += " AND fdr.status = ?"; params.push(filterStatus); }
-        if (search) { sql += " AND (ds.service_name LIKE ? OR fdr.purpose LIKE ? OR fdr.tracking_number LIKE ?)"; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+        if (filterStatus !== "all") {
+          sql += " AND fdr.status = ?";
+          params.push(filterStatus);
+        }
+        if (search) {
+          sql +=
+            " AND (ds.service_name LIKE ? OR fdr.purpose LIKE ? OR fdr.tracking_number LIKE ?)";
+          params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
         const [docs] = await pool.query(sql, params);
         rows = rows.concat(docs);
       }
@@ -582,8 +650,14 @@ router.get(
           FROM document_submissions sub
           WHERE sub.faculty_id = ? AND sub.submitter_type = 'faculty'`;
         const params = [facultyId];
-        if (filterStatus !== "all") { sql += " AND sub.status = ?"; params.push(filterStatus); }
-        if (search) { sql += " AND sub.title LIKE ?"; params.push(`%${search}%`); }
+        if (filterStatus !== "all") {
+          sql += " AND sub.status = ?";
+          params.push(filterStatus);
+        }
+        if (search) {
+          sql += " AND sub.title LIKE ?";
+          params.push(`%${search}%`);
+        }
         const [subs] = await pool.query(sql, params);
         rows = rows.concat(subs);
       }
@@ -593,7 +667,7 @@ router.get(
     } catch (err) {
       sendServerError(res, err, "GET /transactions error:");
     }
-  }
+  },
 );
 
 // GET /api/professor/transactions/stats
@@ -630,7 +704,9 @@ router.get(
   async (req, res) => {
     const facultyId = req.user.userId;
     try {
-      const [manilaYear, manilaMonth] = getManilaDateString().split("-").map(Number);
+      const [manilaYear, manilaMonth] = getManilaDateString()
+        .split("-")
+        .map(Number);
       const monthStartUTC = new Date(
         `${manilaYear}-${String(manilaMonth).padStart(2, "0")}-01T00:00:00+08:00`,
       );
@@ -647,7 +723,14 @@ router.get(
            UNION ALL
            (SELECT sub.status AS raw_status, sub.updated_at AS event_time FROM document_submissions sub WHERE sub.faculty_id = ? AND sub.submitter_type = 'faculty')
          ) AS combined`,
-        [TXN_STATUS_GROUPS.completed, TXN_STATUS_GROUPS.ongoing, monthStartUTC, facultyId, facultyId, facultyId],
+        [
+          TXN_STATUS_GROUPS.completed,
+          TXN_STATUS_GROUPS.ongoing,
+          monthStartUTC,
+          facultyId,
+          facultyId,
+          facultyId,
+        ],
       );
       res.json({
         total: statsRow.total || 0,
@@ -691,11 +774,13 @@ router.get(
          ORDER BY department_id IS NULL, location_name ASC`,
         [deptId],
       );
-      res.json({ locations: rows.map((r) => ({
-        id: r.location_id,
-        name: r.location_name,
-        isGlobal: r.department_id === null,
-      })) });
+      res.json({
+        locations: rows.map((r) => ({
+          id: r.location_id,
+          name: r.location_name,
+          isGlobal: r.department_id === null,
+        })),
+      });
     } catch (err) {
       sendServerError(res, err, "GET /locations error:");
     }
@@ -721,7 +806,10 @@ router.post(
         [facultyId],
       );
       const deptId = fac?.department_id ?? null;
-      if (!deptId) return res.status(403).json({ message: "Faculty has no department assigned" });
+      if (!deptId)
+        return res
+          .status(403)
+          .json({ message: "Faculty has no department assigned" });
 
       await pool.query(
         `INSERT INTO locations (department_id, location_name) VALUES (?, ?)
@@ -732,7 +820,11 @@ router.post(
         `SELECT location_id, location_name FROM locations WHERE department_id = ? AND location_name = ?`,
         [deptId, name],
       );
-      res.status(201).json({ id: loc.location_id, name: loc.location_name, isGlobal: false });
+      res.status(201).json({
+        id: loc.location_id,
+        name: loc.location_name,
+        isGlobal: false,
+      });
     } catch (err) {
       sendServerError(res, err, "POST /locations error:");
     }
@@ -749,7 +841,7 @@ router.get(
     try {
       const [rows] = await pool.query(
         "SELECT * FROM faculty_availability WHERE faculty_id = ? ORDER BY FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'), start_time",
-        [facultyId]
+        [facultyId],
       );
 
       if (rows.length === 0) return res.json([]);
@@ -762,11 +854,14 @@ router.get(
          JOIN appointment_services aps ON fas.service_id = aps.service_id
          WHERE fas.availability_id IN (?)
          ORDER BY fas.id ASC`,
-        [ids]
+        [ids],
       );
       const svcMap = {};
       for (const s of svcRows) {
-        (svcMap[s.availability_id] ||= []).push({ id: s.service_id, name: s.service_name });
+        (svcMap[s.availability_id] ||= []).push({
+          id: s.service_id,
+          name: s.service_name,
+        });
       }
 
       // Current worst-case (highest-booked) future date per template, so the
@@ -782,7 +877,8 @@ router.get(
       );
       const maxBookedMap = {};
       for (const b of bookingCounts) {
-        if ((maxBookedMap[b.availability_id] ?? 0) < b.booked) maxBookedMap[b.availability_id] = b.booked;
+        if ((maxBookedMap[b.availability_id] ?? 0) < b.booked)
+          maxBookedMap[b.availability_id] = b.booked;
       }
 
       const result = rows.map((r) => ({
@@ -794,7 +890,7 @@ router.get(
     } catch (err) {
       sendServerError(res, err, "GET /availability error:");
     }
-  }
+  },
 );
 
 // POST /api/professor/availability
@@ -805,15 +901,26 @@ router.post(
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { day_of_week, start_time, end_time, location, max_students, appointmentTypes } = req.body;
+    const {
+      day_of_week,
+      start_time,
+      end_time,
+      location,
+      max_students,
+      appointmentTypes,
+    } = req.body;
     if (!day_of_week || !start_time || !end_time) {
-      return res.status(400).json({ message: "day_of_week, start_time, end_time are required" });
+      return res
+        .status(400)
+        .json({ message: "day_of_week, start_time, end_time are required" });
     }
     if (!VALID_DAYS.includes(day_of_week)) {
       return res.status(400).json({ message: "Invalid day_of_week" });
     }
     if (end_time <= start_time) {
-      return res.status(400).json({ message: "end_time must be after start_time" });
+      return res
+        .status(400)
+        .json({ message: "end_time must be after start_time" });
     }
 
     if (max_students == null || max_students === "") {
@@ -821,12 +928,18 @@ router.post(
     }
     const maxStu = Number(max_students);
     if (!Number.isInteger(maxStu) || maxStu < 1) {
-      return res.status(400).json({ message: "max_students must be a positive integer" });
+      return res
+        .status(400)
+        .json({ message: "max_students must be a positive integer" });
     }
 
     // Sanitize appointment types: unique, non-empty strings, max 20
     const types = Array.isArray(appointmentTypes)
-      ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
+      ? [
+          ...new Set(
+            appointmentTypes.map((t) => String(t).trim()).filter(Boolean),
+          ),
+        ].slice(0, 20)
       : [];
 
     const conn = await pool.getConnection();
@@ -839,7 +952,7 @@ router.post(
       // it exists, so the faculty row is used as the serialization point.
       const [[fac]] = await conn.query(
         "SELECT department_id FROM faculty WHERE faculty_id = ? FOR UPDATE",
-        [facultyId]
+        [facultyId],
       );
 
       // Reject any slot whose window intersects an existing slot on the same
@@ -847,7 +960,7 @@ router.post(
       // once (different rooms/caps/types would make booking ambiguous).
       const [sameDay] = await conn.query(
         "SELECT start_time, end_time FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ?",
-        [facultyId, day_of_week]
+        [facultyId, day_of_week],
       );
       const overlap = sameDay.find((s) => {
         const sStart = String(s.start_time).slice(0, 5);
@@ -862,7 +975,14 @@ router.post(
       }
       const [result] = await conn.query(
         "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES (?,?,?,?,?,?)",
-        [facultyId, day_of_week, start_time, end_time, location ?? null, maxStu]
+        [
+          facultyId,
+          day_of_week,
+          start_time,
+          end_time,
+          location ?? null,
+          maxStu,
+        ],
       );
       const newId = result.insertId;
       const linkedServices = [];
@@ -870,25 +990,27 @@ router.post(
         // Find existing service for this faculty with the same name, or create it
         let [[svc]] = await conn.query(
           "SELECT service_id, service_name FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
-          [facultyId, name]
+          [facultyId, name],
         );
         if (!svc) {
           const [ins] = await conn.query(
             "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
-            [name, facultyId]
+            [name, facultyId],
           );
           svc = { service_id: ins.insertId, service_name: name };
         }
         await conn.query(
           "INSERT IGNORE INTO faculty_availability_services (availability_id, service_id) VALUES (?, ?)",
-          [newId, svc.service_id]
+          [newId, svc.service_id],
         );
         linkedServices.push({ id: svc.service_id, name: svc.service_name });
       }
 
       await conn.commit();
 
-      emitToDept(fac?.department_id, "appointment:slot-updated", { availabilityId: newId });
+      emitToDept(fac?.department_id, "appointment:slot-updated", {
+        availabilityId: newId,
+      });
 
       res.status(201).json({
         availability_id: newId,
@@ -902,7 +1024,7 @@ router.post(
     } finally {
       conn.release();
     }
-  }
+  },
 );
 
 // PATCH /api/professor/availability/:id
@@ -914,7 +1036,14 @@ router.patch(
   async (req, res) => {
     const facultyId = req.user.userId;
     const { id } = req.params;
-    const { day_of_week, start_time, end_time, location, max_students, appointmentTypes } = req.body;
+    const {
+      day_of_week,
+      start_time,
+      end_time,
+      location,
+      max_students,
+      appointmentTypes,
+    } = req.body;
 
     if (day_of_week !== undefined && !VALID_DAYS.includes(day_of_week)) {
       return res.status(400).json({ message: "Invalid day_of_week" });
@@ -924,13 +1053,19 @@ router.patch(
     if (max_students !== undefined) {
       maxStu = Number(max_students);
       if (!Number.isInteger(maxStu) || maxStu < 1) {
-        return res.status(400).json({ message: "max_students must be a positive integer" });
+        return res
+          .status(400)
+          .json({ message: "max_students must be a positive integer" });
       }
     }
 
     const replaceTypes = Array.isArray(appointmentTypes);
     const types = replaceTypes
-      ? [...new Set(appointmentTypes.map((t) => String(t).trim()).filter(Boolean))].slice(0, 20)
+      ? [
+          ...new Set(
+            appointmentTypes.map((t) => String(t).trim()).filter(Boolean),
+          ),
+        ].slice(0, 20)
       : null;
 
     const conn = await pool.getConnection();
@@ -939,11 +1074,14 @@ router.patch(
 
       // Lock this faculty member's row so a concurrent create/edit can't
       // slip an overlapping slot past the check below before this commits.
-      await conn.query("SELECT department_id FROM faculty WHERE faculty_id = ? FOR UPDATE", [facultyId]);
+      await conn.query(
+        "SELECT department_id FROM faculty WHERE faculty_id = ? FOR UPDATE",
+        [facultyId],
+      );
 
       const [[current]] = await conn.query(
         "SELECT day_of_week, start_time, end_time FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
-        [id, facultyId]
+        [id, facultyId],
       );
       if (!current) {
         await conn.rollback();
@@ -954,16 +1092,19 @@ router.patch(
       // back to the current row for any field not included in the request),
       // then apply the same overlap rule as creation — see POST /availability.
       const effectiveDay = day_of_week ?? current.day_of_week;
-      const effectiveStart = start_time ?? String(current.start_time).slice(0, 5);
+      const effectiveStart =
+        start_time ?? String(current.start_time).slice(0, 5);
       const effectiveEnd = end_time ?? String(current.end_time).slice(0, 5);
       if (effectiveEnd <= effectiveStart) {
         await conn.rollback();
-        return res.status(400).json({ message: "end_time must be after start_time" });
+        return res
+          .status(400)
+          .json({ message: "end_time must be after start_time" });
       }
 
       const [sameDay] = await conn.query(
         "SELECT start_time, end_time FROM faculty_availability WHERE faculty_id = ? AND day_of_week = ? AND availability_id != ?",
-        [facultyId, effectiveDay, id]
+        [facultyId, effectiveDay, id],
       );
       const overlap = sameDay.find((s) => {
         const sStart = String(s.start_time).slice(0, 5);
@@ -989,7 +1130,10 @@ router.patch(
         [id],
       );
       const noLongerFits = bookings.filter((b) => {
-        const dateObj = b.appointment_date instanceof Date ? b.appointment_date : new Date(`${b.appointment_date}T00:00:00`);
+        const dateObj =
+          b.appointment_date instanceof Date
+            ? b.appointment_date
+            : new Date(`${b.appointment_date}T00:00:00`);
         const weekday = WEEKDAY_NAMES[dateObj.getDay()];
         if (weekday !== effectiveDay) return true;
         const apptTime = String(b.appointment_time).slice(0, 5);
@@ -1021,9 +1165,10 @@ router.patch(
         );
         if (worst && maxStu < worst.booked) {
           await conn.rollback();
-          const dateStr = worst.appointment_date instanceof Date
-            ? getManilaDateString(worst.appointment_date)
-            : String(worst.appointment_date).split("T")[0];
+          const dateStr =
+            worst.appointment_date instanceof Date
+              ? getManilaDateString(worst.appointment_date)
+              : String(worst.appointment_date).split("T")[0];
           return res.status(409).json({
             message: `Cannot set max students to ${maxStu} — ${worst.booked} students are already booked on ${dateStr}.`,
           });
@@ -1038,7 +1183,15 @@ router.patch(
              location = COALESCE(?, location),
              max_students = COALESCE(?, max_students)
          WHERE availability_id = ? AND faculty_id = ?`,
-        [day_of_week ?? null, start_time ?? null, end_time ?? null, location ?? null, maxStu ?? null, id, facultyId]
+        [
+          day_of_week ?? null,
+          start_time ?? null,
+          end_time ?? null,
+          location ?? null,
+          maxStu ?? null,
+          id,
+          facultyId,
+        ],
       );
       if (result.affectedRows === 0) {
         await conn.rollback();
@@ -1046,22 +1199,25 @@ router.patch(
       }
 
       if (replaceTypes) {
-        await conn.query("DELETE FROM faculty_availability_services WHERE availability_id = ?", [id]);
+        await conn.query(
+          "DELETE FROM faculty_availability_services WHERE availability_id = ?",
+          [id],
+        );
         for (const name of types) {
           let [[svc]] = await conn.query(
             "SELECT service_id FROM appointment_services WHERE faculty_id = ? AND service_name = ?",
-            [facultyId, name]
+            [facultyId, name],
           );
           if (!svc) {
             const [ins] = await conn.query(
               "INSERT INTO appointment_services (service_name, faculty_id) VALUES (?, ?)",
-              [name, facultyId]
+              [name, facultyId],
             );
             svc = { service_id: ins.insertId };
           }
           await conn.query(
             "INSERT IGNORE INTO faculty_availability_services (availability_id, service_id) VALUES (?, ?)",
-            [id, svc.service_id]
+            [id, svc.service_id],
           );
         }
       }
@@ -1070,14 +1226,17 @@ router.patch(
 
       const [[fac]] = await pool.query(
         "SELECT department_id FROM faculty WHERE faculty_id = ?",
-        [facultyId]
+        [facultyId],
       );
-      emitToDept(fac?.department_id, "appointment:slot-updated", { availabilityId: Number(id) });
+      emitToDept(fac?.department_id, "appointment:slot-updated", {
+        availabilityId: Number(id),
+      });
 
       for (const b of noLongerFits) {
-        const dateStr = b.appointment_date instanceof Date
-          ? getManilaDateString(b.appointment_date)
-          : String(b.appointment_date).split("T")[0];
+        const dateStr =
+          b.appointment_date instanceof Date
+            ? getManilaDateString(b.appointment_date)
+            : String(b.appointment_date).split("T")[0];
         emitToUser(b.student_id, "appointment:status-updated", {
           appointmentId: b.appointment_id,
           status: "cancelled",
@@ -1090,14 +1249,17 @@ router.patch(
         );
       }
 
-      res.json({ message: "Availability updated", cancelledAppointments: noLongerFits.length });
+      res.json({
+        message: "Availability updated",
+        cancelledAppointments: noLongerFits.length,
+      });
     } catch (err) {
       await conn.rollback();
       sendServerError(res, err, "PATCH /availability/:id error:");
     } finally {
       conn.release();
     }
-  }
+  },
 );
 
 // DELETE /api/professor/availability/:id
@@ -1114,7 +1276,7 @@ router.delete(
 
       const [[slot]] = await conn.query(
         "SELECT availability_id FROM faculty_availability WHERE availability_id = ? AND faculty_id = ? FOR UPDATE",
-        [id, facultyId]
+        [id, facultyId],
       );
       if (!slot) {
         await conn.rollback();
@@ -1142,7 +1304,7 @@ router.delete(
 
       const [result] = await conn.query(
         "DELETE FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
-        [id, facultyId]
+        [id, facultyId],
       );
       if (result.affectedRows === 0) {
         await conn.rollback();
@@ -1153,14 +1315,17 @@ router.delete(
 
       const [[fac]] = await pool.query(
         "SELECT department_id FROM faculty WHERE faculty_id = ?",
-        [facultyId]
+        [facultyId],
       );
-      emitToDept(fac?.department_id, "appointment:slot-removed", { availabilityId: Number(id) });
+      emitToDept(fac?.department_id, "appointment:slot-removed", {
+        availabilityId: Number(id),
+      });
 
       for (const appt of affected) {
-        const dateStr = appt.appointment_date instanceof Date
-          ? getManilaDateString(appt.appointment_date)
-          : String(appt.appointment_date).split("T")[0];
+        const dateStr =
+          appt.appointment_date instanceof Date
+            ? getManilaDateString(appt.appointment_date)
+            : String(appt.appointment_date).split("T")[0];
         emitToUser(appt.student_id, "appointment:status-updated", {
           appointmentId: appt.appointment_id,
           status: "cancelled",
@@ -1173,14 +1338,17 @@ router.delete(
         );
       }
 
-      res.json({ message: "Availability deleted", cancelledAppointments: affected.length });
+      res.json({
+        message: "Availability deleted",
+        cancelledAppointments: affected.length,
+      });
     } catch (err) {
       await conn.rollback();
       sendServerError(res, err, "DELETE /availability/:id error:");
     } finally {
       conn.release();
     }
-  }
+  },
 );
 
 // ─────────────────────────────────────────────────────────────
@@ -1197,11 +1365,11 @@ router.get(
     try {
       const [[fac]] = await pool.query(
         "SELECT department_id FROM faculty WHERE faculty_id = ?",
-        [facultyId]
+        [facultyId],
       );
       const [rows] = await pool.query(
         "SELECT service_id, service_name, description, department_id, is_cross_college, recipient_type, status, processing_time, requires_coding FROM document_services WHERE (department_id = ? OR is_cross_college = TRUE) AND recipient_type IN ('faculty', 'both') AND status = 'active' ORDER BY service_name",
-        [fac.department_id]
+        [fac.department_id],
       );
 
       const serviceIds = rows.map((r) => r.service_id);
@@ -1209,10 +1377,11 @@ router.get(
       if (serviceIds.length > 0) {
         const [reqRows] = await pool.query(
           "SELECT service_id, requirement_name, description, is_mandatory FROM document_requirements WHERE service_id IN (?) ORDER BY is_mandatory DESC, requirement_id ASC",
-          [serviceIds]
+          [serviceIds],
         );
         for (const req of reqRows) {
-          if (!requirementsMap[req.service_id]) requirementsMap[req.service_id] = [];
+          if (!requirementsMap[req.service_id])
+            requirementsMap[req.service_id] = [];
           requirementsMap[req.service_id].push({
             name: req.requirement_name,
             description: req.description,
@@ -1221,11 +1390,16 @@ router.get(
         }
       }
 
-      res.json(rows.map((r) => ({ ...r, requirements: requirementsMap[r.service_id] ?? [] })));
+      res.json(
+        rows.map((r) => ({
+          ...r,
+          requirements: requirementsMap[r.service_id] ?? [],
+        })),
+      );
     } catch (err) {
       sendServerError(res, err, "GET /documents/service-types error:");
     }
-  }
+  },
 );
 
 // GET /api/professor/documents
@@ -1290,7 +1464,9 @@ router.get(
         [facultyId, facultyId],
       );
 
-      const submissionIds = rows.filter((r) => r.kind === "submission").map((r) => r.request_id);
+      const submissionIds = rows
+        .filter((r) => r.kind === "submission")
+        .map((r) => r.request_id);
       const [facultyFilesMap, adminFilesMap] = await Promise.all([
         getFilesMap(submissionIds, "student_upload"),
         getFilesMap(submissionIds, "admin_return"),
@@ -1298,7 +1474,10 @@ router.get(
 
       const documents = rows.map((r) => {
         const rawId = r.request_id;
-        const doc = { ...r, request_id: `${r.kind === "submission" ? "sub" : "req"}-${rawId}` };
+        const doc = {
+          ...r,
+          request_id: `${r.kind === "submission" ? "sub" : "req"}-${rawId}`,
+        };
         if (r.kind === "submission") {
           doc.faculty_files = facultyFilesMap[rawId] || [];
           doc.admin_files = adminFilesMap[rawId] || [];
@@ -1310,7 +1489,7 @@ router.get(
     } catch (err) {
       sendServerError(res, err, "GET /documents error:");
     }
-  }
+  },
 );
 
 // POST /api/professor/documents
@@ -1321,20 +1500,32 @@ router.post(
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { service_id, request_type, purpose, notes, needed_by, copies } = req.body;
-    if (!service_id || !purpose) return res.status(400).json({ message: "service_id and purpose are required" });
+    const { service_id, request_type, purpose, notes, needed_by, copies } =
+      req.body;
+    if (!service_id || !purpose)
+      return res
+        .status(400)
+        .json({ message: "service_id and purpose are required" });
     if (purpose.length > 255) {
-      return res.status(400).json({ message: "Purpose must be 255 characters or fewer" });
+      return res
+        .status(400)
+        .json({ message: "Purpose must be 255 characters or fewer" });
     }
 
     const copyCount = copies === undefined ? 1 : parseInt(copies, 10);
     if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 20) {
-      return res.status(400).json({ message: "Number of copies must be a whole number between 1 and 20" });
+      return res.status(400).json({
+        message: "Number of copies must be a whole number between 1 and 20",
+      });
     }
 
-    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const tomorrow = getManilaDateString(
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+    );
     if (needed_by && needed_by < tomorrow) {
-      return res.status(400).json({ message: "Needed-by date must be at least tomorrow" });
+      return res
+        .status(400)
+        .json({ message: "Needed-by date must be at least tomorrow" });
     }
 
     try {
@@ -1343,16 +1534,18 @@ router.post(
       // filters this way, but the server shouldn't just trust whatever id it's sent.
       const [[fac]] = await pool.query(
         `SELECT department_id FROM faculty WHERE faculty_id = ?`,
-        [facultyId]
+        [facultyId],
       );
       const [[svc]] = await pool.query(
         `SELECT service_id, department_id FROM document_services
          WHERE service_id = ? AND status = 'active' AND recipient_type IN ('faculty','both')
            AND (department_id = ? OR is_cross_college = TRUE)`,
-        [service_id, fac?.department_id]
+        [service_id, fac?.department_id],
       );
       if (!svc) {
-        return res.status(404).json({ message: "No matching service configuration found" });
+        return res
+          .status(404)
+          .json({ message: "No matching service configuration found" });
       }
 
       // Guard against a double-click/double-tap firing this twice before the client's
@@ -1362,23 +1555,41 @@ router.post(
          WHERE faculty_id = ? AND service_id = ? AND purpose = ?
            AND created_at >= NOW() - INTERVAL 10 SECOND
          LIMIT 1`,
-        [facultyId, service_id, purpose]
+        [facultyId, service_id, purpose],
       );
       if (recentDup) {
-        return res.status(409).json({ message: "This request was already submitted a moment ago" });
+        return res
+          .status(409)
+          .json({ message: "This request was already submitted a moment ago" });
       }
 
       const [result] = await pool.query(
         `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, copies, notes, needed_by)
          VALUES (?,?,?,?,?,?,?)`,
-        [facultyId, service_id, request_type ?? "General", purpose, copyCount, notes ?? null, needed_by || null]
+        [
+          facultyId,
+          service_id,
+          request_type ?? "General",
+          purpose,
+          copyCount,
+          notes ?? null,
+          needed_by || null,
+        ],
       );
       const [[newRequest]] = await pool.query(
         `SELECT request_id, tracking_number, copies FROM faculty_document_requests WHERE request_id = ?`,
-        [result.insertId]
+        [result.insertId],
       );
 
-      emitToDept(svc.department_id, "document:new-request", { requestId: newRequest.request_id });
+      emitToDept(svc.department_id, "document:new-request", {
+        requestId: newRequest.request_id,
+      });
+
+      notifyDepartmentAdmins(
+        svc.department_id,
+        `New faculty document request: ${request_type ?? "General"} (${newRequest.tracking_number})`,
+        "document",
+      );
 
       res.status(201).json({
         request_id: newRequest.request_id,
@@ -1389,7 +1600,7 @@ router.post(
     } catch (err) {
       sendServerError(res, err, "POST /documents error:");
     }
-  }
+  },
 );
 
 // DELETE /api/professor/documents/:requestId
@@ -1425,7 +1636,10 @@ router.delete(
       }
 
       emitToUser(facultyId, "document:cancelled", { requestId, facultyId });
-      emitToDept(result.departmentId, "document:cancelled", { requestId, facultyId });
+      emitToDept(result.departmentId, "document:cancelled", {
+        requestId,
+        facultyId,
+      });
 
       res.json({
         message: "Document request cancelled successfully",
@@ -1437,7 +1651,7 @@ router.delete(
     } finally {
       conn.release();
     }
-  }
+  },
 );
 
 // POST /api/professor/document-submissions ("Send a Document")
@@ -1457,21 +1671,31 @@ router.post(
 
     if (!title || !purpose) {
       deleteFiles(req.files);
-      return res.status(400).json({ message: "title and purpose are required" });
+      return res
+        .status(400)
+        .json({ message: "title and purpose are required" });
     }
     if (title.length > 255) {
       deleteFiles(req.files);
-      return res.status(400).json({ message: "Title must be 255 characters or fewer" });
+      return res
+        .status(400)
+        .json({ message: "Title must be 255 characters or fewer" });
     }
     if (purpose.length > 255) {
       deleteFiles(req.files);
-      return res.status(400).json({ message: "Purpose must be 255 characters or fewer" });
+      return res
+        .status(400)
+        .json({ message: "Purpose must be 255 characters or fewer" });
     }
 
-    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const tomorrow = getManilaDateString(
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+    );
     if (neededBy && neededBy < tomorrow) {
       deleteFiles(req.files);
-      return res.status(400).json({ message: "Needed-by date must be at least tomorrow" });
+      return res
+        .status(400)
+        .json({ message: "Needed-by date must be at least tomorrow" });
     }
 
     const budgetError = validateBudget(req.files || []);
@@ -1504,7 +1728,9 @@ router.post(
       );
       if (recentDup) {
         deleteFiles(req.files);
-        return res.status(409).json({ message: "This document was already sent a moment ago" });
+        return res
+          .status(409)
+          .json({ message: "This document was already sent a moment ago" });
       }
 
       const conn = await pool.getConnection();
@@ -1517,7 +1743,13 @@ router.post(
           [facultyId, departmentId, title, purpose, neededBy || null],
         );
 
-        await insertFiles(result.insertId, "student_upload", req.files, facultyId, conn);
+        await insertFiles(
+          result.insertId,
+          "student_upload",
+          req.files,
+          facultyId,
+          conn,
+        );
         await conn.commit();
         committed = true;
 
@@ -1529,9 +1761,20 @@ router.post(
            WHERE ds.submission_id = ?`,
           [result.insertId],
         );
-        const facultyFiles = await getFiles(newSub.submission_id, "student_upload");
+        const facultyFiles = await getFiles(
+          newSub.submission_id,
+          "student_upload",
+        );
 
-        emitToDept(departmentId, "document:new-request", { requestId: newSub.submission_id });
+        emitToDept(departmentId, "document:new-request", {
+          requestId: newSub.submission_id,
+        });
+
+        notifyDepartmentAdmins(
+          departmentId,
+          `New document sent by faculty: ${newSub.title} (${newSub.tracking_number})`,
+          "document",
+        );
 
         res.status(201).json({
           message: "Document sent successfully",
@@ -1582,7 +1825,11 @@ router.get(
       return res.status(400).json({ message: "Invalid submission or file id" });
     }
     try {
-      await serveFacultyDocumentSubmissionFile(res, { submissionId, fileId, facultyId });
+      await serveFacultyDocumentSubmissionFile(res, {
+        submissionId,
+        fileId,
+        facultyId,
+      });
     } catch (error) {
       sendServerError(res, error, "Get document submission file error");
     }
@@ -1600,10 +1847,13 @@ router.get(
   authorizeRoles("faculty"),
   async (req, res) => {
     try {
-      const result = await notificationsController.getNotifications(req.user.userId, {
-        type: req.query.type,
-        page: req.query.page,
-      });
+      const result = await notificationsController.getNotifications(
+        req.user.userId,
+        {
+          type: req.query.type,
+          page: req.query.page,
+        },
+      );
       res.json(result);
     } catch (error) {
       sendServerError(res, error, "GET /notifications error:");
@@ -1684,7 +1934,8 @@ router.get(
       );
       const facultyDeptId = fac?.department_id ?? null;
 
-      const whereClause = "WHERE a.department_id = ? AND a.status = 'active' AND a.audience = 'faculty'";
+      const whereClause =
+        "WHERE a.department_id = ? AND a.status = 'active' AND a.audience = 'faculty'";
       const filterParams = [facultyDeptId];
 
       const baseSelect = `
@@ -1713,7 +1964,10 @@ router.get(
           `SELECT COUNT(*) AS total FROM announcements a ${whereClause}`,
           filterParams,
         );
-        totalPages = Math.max(1, Math.ceil(total / FACULTY_ANNOUNCEMENTS_PAGE_SIZE));
+        totalPages = Math.max(
+          1,
+          Math.ceil(total / FACULTY_ANNOUNCEMENTS_PAGE_SIZE),
+        );
         [rows] = await pool.query(`${baseSelect} LIMIT ? OFFSET ?`, [
           ...filterParams,
           FACULTY_ANNOUNCEMENTS_PAGE_SIZE,
@@ -1723,7 +1977,9 @@ router.get(
         [rows] = await pool.query(baseSelect, filterParams);
       }
 
-      const attachmentsMap = await getAttachmentsMap(rows.map((row) => row.announcement_id));
+      const attachmentsMap = await getAttachmentsMap(
+        rows.map((row) => row.announcement_id),
+      );
 
       const announcements = rows.map((row) => ({
         id: String(row.announcement_id),
@@ -1731,7 +1987,9 @@ router.get(
         description: row.content,
         isPinned: !!row.is_pinned,
         date: row.updated_at,
-        isReposted: new Date(row.updated_at).getTime() !== new Date(row.created_at).getTime(),
+        isReposted:
+          new Date(row.updated_at).getTime() !==
+          new Date(row.created_at).getTime(),
         departmentId: row.department_id,
         departmentName: row.department_name,
         departmentAbbrev: row.department_abbreviation,
@@ -1739,7 +1997,11 @@ router.get(
         attachments: attachmentsMap[row.announcement_id] || [],
       }));
 
-      res.json(req.query.page ? { announcements, page, totalPages } : { announcements });
+      res.json(
+        req.query.page
+          ? { announcements, page, totalPages }
+          : { announcements },
+      );
     } catch (error) {
       sendServerError(res, error, "Fetch faculty announcements error");
     }
@@ -1758,7 +2020,9 @@ router.get(
     const announcementId = parseInt(req.params.id, 10);
     const attachmentId = parseInt(req.params.attachmentId, 10);
     if (isNaN(announcementId) || isNaN(attachmentId)) {
-      return res.status(400).json({ error: "Invalid announcement or attachment id" });
+      return res
+        .status(400)
+        .json({ error: "Invalid announcement or attachment id" });
     }
     try {
       const [[fac]] = await pool.query(

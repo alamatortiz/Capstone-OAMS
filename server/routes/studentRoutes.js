@@ -6,13 +6,28 @@ const {
   authorizeRoles,
 } = require("../middleware/authMiddleware");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
-const { getManilaDateString, getManilaTimeString, formatTime12h, formatRelativeTime } = require("../utils/dateTime");
+const {
+  getManilaDateString,
+  getManilaTimeString,
+  formatTime12h,
+  formatRelativeTime,
+} = require("../utils/dateTime");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
-const { STATUS_LABEL_MAP, cancelOwnDocumentRequest } = require("../utils/documentStatus");
-const { createNotification } = require("../utils/notifications");
+const {
+  STATUS_LABEL_MAP,
+  cancelOwnDocumentRequest,
+} = require("../utils/documentStatus");
+// const { createNotification } = require("../utils/notifications");
+const {
+  createNotification,
+  notifyDepartmentAdmins,
+} = require("../utils/notifications");
 const notificationsController = require("../controllers/notificationsController");
-const { getAttachmentsMap, serveAnnouncementAttachment } = require("../utils/announcementAttachments");
+const {
+  getAttachmentsMap,
+  serveAnnouncementAttachment,
+} = require("../utils/announcementAttachments");
 const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
 const {
   getFilesMap,
@@ -96,7 +111,12 @@ router.get(
            SUM(CASE WHEN status IN ('pending', 'approved') AND appointment_date >= ? THEN 1 ELSE 0 END) AS active_count
          FROM appointments
          WHERE student_id = ?`,
-        [getManilaDateString(), getManilaDateString(), getManilaDateString(), studentId],
+        [
+          getManilaDateString(),
+          getManilaDateString(),
+          getManilaDateString(),
+          studentId,
+        ],
       );
 
       const [[docRow]] = await pool.query(
@@ -215,10 +235,10 @@ router.get(
         ? (() => {
             const deptAbbrev = closestQueue.department_abbreviation;
             const serviceCode = closestQueue.service_name
-              .split(' ')[0]
+              .split(" ")[0]
               .substring(0, 3)
               .toUpperCase();
-            return `${deptAbbrev}-${serviceCode}-${String(closestQueue.queue_number).padStart(3, '0')}`;
+            return `${deptAbbrev}-${serviceCode}-${String(closestQueue.queue_number).padStart(3, "0")}`;
           })()
         : null;
 
@@ -237,14 +257,20 @@ router.get(
           queueNumberBadge: closestQueueNumberBadge,
           activeQueueCount: activeQueues.length,
           appointments: {
-            upcoming: Number(apptRow.pending_count || 0) + Number(apptRow.approved_count || 0),
+            upcoming:
+              Number(apptRow.pending_count || 0) +
+              Number(apptRow.approved_count || 0),
             pending: Number(apptRow.pending_count || 0),
             approved: Number(apptRow.approved_count || 0),
             active: Number(apptRow.active_count || 0),
           },
           documents: (() => {
-            const pendingOnly = Number(docRow.pending_only_count || 0) + Number(subRow.pending_only_count || 0);
-            const processing = Number(docRow.processing_count || 0) + Number(subRow.processing_count || 0);
+            const pendingOnly =
+              Number(docRow.pending_only_count || 0) +
+              Number(subRow.pending_only_count || 0);
+            const processing =
+              Number(docRow.processing_count || 0) +
+              Number(subRow.processing_count || 0);
             const ready = Number(docRow.ready_count || 0);
             const released = Number(docRow.released_count || 0);
             const total = pendingOnly + processing + ready + released;
@@ -284,10 +310,13 @@ router.get(
           id: i + 1,
           type: row.type,
           title:
-            row.type === "queue" ? buildQueueActivityTitle(row) :
-            row.type === "appointment" ? buildAppointmentActivityTitle(row) :
-            row.type === "submission" ? buildSubmissionActivityTitle(row) :
-            buildDocumentActivityTitle(row),
+            row.type === "queue"
+              ? buildQueueActivityTitle(row)
+              : row.type === "appointment"
+                ? buildAppointmentActivityTitle(row)
+                : row.type === "submission"
+                  ? buildSubmissionActivityTitle(row)
+                  : buildDocumentActivityTitle(row),
           college: row.college,
           status: row.status,
           time: formatRelativeTime(new Date(row.event_time)),
@@ -307,7 +336,9 @@ function buildQueueActivityTitle(row) {
   if (row.status === "cancelled") {
     // "Queue Stopped" matches the exact wording the student /transactions
     // endpoint already uses for the same admin_reason-not-null signal.
-    return row.admin_reason ? "Queue Stopped" : `You left the queue at ${row.service_name}`;
+    return row.admin_reason
+      ? "Queue Stopped"
+      : `You left the queue at ${row.service_name}`;
   }
   const map = {
     waiting: `Joined queue at ${row.service_name}`,
@@ -320,9 +351,12 @@ function buildQueueActivityTitle(row) {
 
 function buildAppointmentActivityTitle(row) {
   if (row.status === "cancelled") {
-    if (row.cancelled_by === "system") return `Appointment with ${row.professor_name} auto-cancelled — schedule changed`;
-    if (row.cancelled_by === "system_expired") return `Appointment with ${row.professor_name} auto-cancelled — expired without a response`;
-    if (row.cancelled_by === "faculty") return `Appointment cancelled by ${row.professor_name}`;
+    if (row.cancelled_by === "system")
+      return `Appointment with ${row.professor_name} auto-cancelled — schedule changed`;
+    if (row.cancelled_by === "system_expired")
+      return `Appointment with ${row.professor_name} auto-cancelled — expired without a response`;
+    if (row.cancelled_by === "faculty")
+      return `Appointment cancelled by ${row.professor_name}`;
     return `You cancelled the appointment with ${row.professor_name}`;
   }
   const map = {
@@ -392,7 +426,11 @@ router.get(
       );
       const studentDeptId = stu?.department_id ?? null;
 
-      const filterClauses = ["a.department_id = ?", "a.status = 'active'", "a.audience = 'students'"];
+      const filterClauses = [
+        "a.department_id = ?",
+        "a.status = 'active'",
+        "a.audience = 'students'",
+      ];
       const filterParams = [studentDeptId];
       if (category === "pinned") {
         filterClauses.push("a.is_pinned = 1");
@@ -439,7 +477,9 @@ router.get(
         [rows] = await pool.query(baseSelect, filterParams);
       }
 
-      const attachmentsMap = await getAttachmentsMap(rows.map((row) => row.announcement_id));
+      const attachmentsMap = await getAttachmentsMap(
+        rows.map((row) => row.announcement_id),
+      );
 
       const announcements = rows.map((row) => ({
         id: String(row.announcement_id),
@@ -448,7 +488,9 @@ router.get(
         category: row.type,
         isPinned: !!row.is_pinned,
         date: row.updated_at,
-        isReposted: new Date(row.updated_at).getTime() !== new Date(row.created_at).getTime(),
+        isReposted:
+          new Date(row.updated_at).getTime() !==
+          new Date(row.created_at).getTime(),
         departmentId: row.department_id,
         departmentName: row.department_name,
         departmentAbbrev: row.department_abbreviation,
@@ -456,7 +498,9 @@ router.get(
         attachments: attachmentsMap[row.announcement_id] || [],
       }));
 
-      res.json(category ? { announcements, page, totalPages } : { announcements });
+      res.json(
+        category ? { announcements, page, totalPages } : { announcements },
+      );
     } catch (error) {
       sendServerError(res, error, "Fetch announcements error");
     }
@@ -475,7 +519,9 @@ router.get(
     const announcementId = parseInt(req.params.id, 10);
     const attachmentId = parseInt(req.params.attachmentId, 10);
     if (isNaN(announcementId) || isNaN(attachmentId)) {
-      return res.status(400).json({ error: "Invalid announcement or attachment id" });
+      return res
+        .status(400)
+        .json({ error: "Invalid announcement or attachment id" });
     }
     try {
       const [[stu]] = await pool.query(
@@ -604,7 +650,9 @@ router.get(
         [studentId, studentId],
       );
 
-      const submissionIds = rows.filter((d) => d.kind === "submission").map((d) => d.id);
+      const submissionIds = rows
+        .filter((d) => d.kind === "submission")
+        .map((d) => d.id);
       const [studentFilesMap, adminFilesMap] = await Promise.all([
         getFilesMap(submissionIds, "student_upload"),
         getFilesMap(submissionIds, "admin_return"),
@@ -664,12 +712,14 @@ router.post(
 
     const copyCount = copies === undefined ? 1 : Number(copies);
     if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 20) {
-      return res
-        .status(400)
-        .json({ error: "Number of copies must be a whole number between 1 and 20" });
+      return res.status(400).json({
+        error: "Number of copies must be a whole number between 1 and 20",
+      });
     }
 
-    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const tomorrow = getManilaDateString(
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+    );
     if (neededBy && neededBy < tomorrow) {
       return res
         .status(400)
@@ -767,7 +817,15 @@ router.post(
         `INSERT INTO document_requests
            (student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, created_at)
          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, NOW())`,
-        [studentId, serviceId, type, purpose, copyCount, estimatedCompletion, neededBy || null],
+        [
+          studentId,
+          serviceId,
+          type,
+          purpose,
+          copyCount,
+          estimatedCompletion,
+          neededBy || null,
+        ],
       );
 
       const [[newDoc]] = await pool.query(
@@ -782,8 +840,14 @@ router.post(
         [result.insertId],
       );
 
-      emitToDept(newDoc.department_id, "document:new-request", { requestId: newDoc.request_id });
-
+      emitToDept(newDoc.department_id, "document:new-request", {
+        requestId: newDoc.request_id,
+      });
+      notifyDepartmentAdmins(
+        newDoc.department_id,
+        `New document request: ${newDoc.request_type} (${newDoc.tracking_number})`,
+        "document",
+      );
       res.status(201).json({
         message: "Document request submitted successfully",
         document: {
@@ -827,17 +891,25 @@ router.post(
     }
     if (title.length > 255) {
       deleteFiles(req.files);
-      return res.status(400).json({ error: "Title must be 255 characters or fewer" });
+      return res
+        .status(400)
+        .json({ error: "Title must be 255 characters or fewer" });
     }
     if (purpose.length > 255) {
       deleteFiles(req.files);
-      return res.status(400).json({ error: "Purpose must be 255 characters or fewer" });
+      return res
+        .status(400)
+        .json({ error: "Purpose must be 255 characters or fewer" });
     }
 
-    const tomorrow = getManilaDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const tomorrow = getManilaDateString(
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+    );
     if (neededBy && neededBy < tomorrow) {
       deleteFiles(req.files);
-      return res.status(400).json({ error: "Needed-by date must be at least tomorrow" });
+      return res
+        .status(400)
+        .json({ error: "Needed-by date must be at least tomorrow" });
     }
 
     const budgetError = validateBudget(req.files || []);
@@ -870,7 +942,9 @@ router.post(
       );
       if (recentDup) {
         deleteFiles(req.files);
-        return res.status(409).json({ error: "This document was already sent a moment ago" });
+        return res
+          .status(409)
+          .json({ error: "This document was already sent a moment ago" });
       }
 
       const conn = await pool.getConnection();
@@ -883,7 +957,13 @@ router.post(
           [studentId, departmentId, title, purpose, neededBy || null],
         );
 
-        await insertFiles(result.insertId, "student_upload", req.files, studentId, conn);
+        await insertFiles(
+          result.insertId,
+          "student_upload",
+          req.files,
+          studentId,
+          conn,
+        );
         await conn.commit();
         committed = true;
 
@@ -895,9 +975,20 @@ router.post(
            WHERE ds.submission_id = ?`,
           [result.insertId],
         );
-        const studentFiles = await getFiles(newSub.submission_id, "student_upload");
+        const studentFiles = await getFiles(
+          newSub.submission_id,
+          "student_upload",
+        );
 
-        emitToDept(departmentId, "document:new-request", { requestId: newSub.submission_id });
+        emitToDept(departmentId, "document:new-request", {
+          requestId: newSub.submission_id,
+        });
+
+        notifyDepartmentAdmins(
+          departmentId,
+          `New document sent: ${newSub.title} (${newSub.tracking_number})`,
+          "document",
+        );
 
         res.status(201).json({
           message: "Document sent successfully",
@@ -948,7 +1039,11 @@ router.get(
       return res.status(400).json({ error: "Invalid submission or file id" });
     }
     try {
-      await serveStudentDocumentSubmissionFile(res, { submissionId, fileId, studentId });
+      await serveStudentDocumentSubmissionFile(res, {
+        submissionId,
+        fileId,
+        studentId,
+      });
     } catch (error) {
       sendServerError(res, error, "Get document submission file error");
     }
@@ -1001,7 +1096,8 @@ router.get(
           [serviceIds],
         );
         for (const req of reqRows) {
-          if (!requirementsMap[req.service_id]) requirementsMap[req.service_id] = [];
+          if (!requirementsMap[req.service_id])
+            requirementsMap[req.service_id] = [];
           requirementsMap[req.service_id].push({
             name: req.requirement_name,
             description: req.description,
@@ -1065,7 +1161,10 @@ router.delete(
       }
 
       emitToUser(studentId, "document:cancelled", { requestId, studentId });
-      emitToDept(result.departmentId, "document:cancelled", { requestId, studentId });
+      emitToDept(result.departmentId, "document:cancelled", {
+        requestId,
+        studentId,
+      });
 
       res.json({
         message: "Document request cancelled successfully",
@@ -1192,8 +1291,7 @@ router.get(
           status: slot.status,
           waitingCount,
           currentlyServing,
-          avgWaitTime:
-            waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
+          avgWaitTime: waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
           voidTimeoutMinutes: slot.no_show_timeout_minutes,
         };
       });
@@ -1474,7 +1572,10 @@ router.post(
         `SELECT department_id FROM students WHERE student_id = ?`,
         [studentId],
       );
-      if (!slot.is_cross_college && slot.service_department_id !== stu?.department_id) {
+      if (
+        !slot.is_cross_college &&
+        slot.service_department_id !== stu?.department_id
+      ) {
         await conn.rollback();
         return res
           .status(403)
@@ -1775,7 +1876,10 @@ router.post(
       // entry from the unserved count -- settle the slot: reopen it if it
       // was 'full' and there's room again (and hours haven't ended), or
       // mark it 'completed' if nobody's left waiting/serving.
-      const settleResult = await settleSlotAfterEntryChange(conn, entry.slot_id);
+      const settleResult = await settleSlotAfterEntryChange(
+        conn,
+        entry.slot_id,
+      );
 
       // 4. Write audit log
       await conn.query(
@@ -1798,7 +1902,10 @@ router.post(
       emitToSlot(entry.slot_id, "queue:student-left", leftPayload);
       emitToDept(deptRow?.department_id, "queue:student-left", leftPayload);
       if (settleResult) {
-        const settledPayload = { slotId: entry.slot_id, status: settleResult.newStatus };
+        const settledPayload = {
+          slotId: entry.slot_id,
+          status: settleResult.newStatus,
+        };
         emitToSlot(entry.slot_id, "queue:slot-status", settledPayload);
         emitToDept(deptRow?.department_id, "queue:slot-status", settledPayload);
       }
@@ -1978,9 +2085,7 @@ router.get(
         location: row.location ?? "TBA",
         purpose: row.notes ?? "",
         status: row.status,
-        createdAt: row.created_at
-          ? getManilaDateString(row.created_at)
-          : null,
+        createdAt: row.created_at ? getManilaDateString(row.created_at) : null,
       }));
 
       res.json({ appointments: formatted });
@@ -2042,7 +2147,8 @@ router.delete(
       if (result.affectedRows === 0) {
         await conn.rollback();
         return res.status(409).json({
-          error: "This appointment was just updated elsewhere. Please refresh and try again.",
+          error:
+            "This appointment was just updated elsewhere. Please refresh and try again.",
         });
       }
 
@@ -2057,8 +2163,8 @@ router.delete(
         status: "cancelled",
       });
       createNotification(
-        appt.faculty_id,
-        `${appt.first_name} ${appt.last_name} cancelled their appointment with you on ${getManilaDateString(appt.appointment_date)} at ${formatTime12h(appt.appointment_time)}.`,
+        slot.faculty_id,
+        `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${appointmentDate} at ${formatTime12h(appointmentTime)}.`,
         "appointment",
       );
 
@@ -2217,7 +2323,10 @@ router.get(
     }
 
     const { search, type, status } = req.query;
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 20, 1),
+      100,
+    );
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const offset = (page - 1) * limit;
 
@@ -2288,7 +2397,10 @@ router.get(
     try {
       const filterClauses = [];
       const filterParams = [];
-      if (type && ["queue", "appointment", "document", "submission"].includes(type)) {
+      if (
+        type &&
+        ["queue", "appointment", "document", "submission"].includes(type)
+      ) {
         filterClauses.push("type = ?");
         filterParams.push(type);
       }
@@ -2320,7 +2432,15 @@ router.get(
          ${whereClause}
          ORDER BY event_time DESC
          LIMIT ? OFFSET ?`,
-        [studentId, studentId, studentId, studentId, ...filterParams, limit, offset],
+        [
+          studentId,
+          studentId,
+          studentId,
+          studentId,
+          ...filterParams,
+          limit,
+          offset,
+        ],
       );
 
       const transactions = rows.map((row) => {
@@ -2400,7 +2520,15 @@ router.get(
 // only the day-of-week pattern is actually stored.)
 // ─────────────────────────────────────────────────────────────
 
-const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 // GET /api/student/appointments/available-slots
 // Returns open availability windows with occupancy counts.
@@ -2433,7 +2561,10 @@ router.get(
         JOIN faculty f ON fa.faculty_id = f.faculty_id
         JOIN departments d ON f.department_id = d.department_id`;
       const tmplParams = [];
-      if (facultyId) { tmplQuery += " WHERE fa.faculty_id = ?"; tmplParams.push(facultyId); }
+      if (facultyId) {
+        tmplQuery += " WHERE fa.faculty_id = ?";
+        tmplParams.push(facultyId);
+      }
       tmplQuery += " ORDER BY fa.faculty_id, fa.start_time";
 
       const [templates] = await pool.query(tmplQuery, tmplParams);
@@ -2452,7 +2583,10 @@ router.get(
       );
       const typeMap = {};
       for (const t of typeRows) {
-        (typeMap[t.availability_id] ||= []).push({ id: t.service_id, name: t.service_name });
+        (typeMap[t.availability_id] ||= []).push({
+          id: t.service_id,
+          name: t.service_name,
+        });
       }
 
       // Count confirmed bookings per (template, specific date) pair across the
@@ -2471,20 +2605,23 @@ router.get(
       );
       const bookedMap = {};
       for (const b of bookingCounts) {
-        const dStr = b.appointment_date instanceof Date
-          ? getManilaDateString(b.appointment_date)
-          : String(b.appointment_date).split("T")[0];
+        const dStr =
+          b.appointment_date instanceof Date
+            ? getManilaDateString(b.appointment_date)
+            : String(b.appointment_date).split("T")[0];
         bookedMap[`${b.availability_id}_${dStr}`] = b.booked;
       }
 
       const slots = [];
 
       // Project each template onto every matching weekday within the window.
-      const datesToCheck = date ? [date] : Array.from({ length: DAYS_AHEAD }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() + i);
-        return getManilaDateString(d);
-      });
+      const datesToCheck = date
+        ? [date]
+        : Array.from({ length: DAYS_AHEAD }, (_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            return getManilaDateString(d);
+          });
 
       for (const dateStr of datesToCheck) {
         const weekday = WEEKDAY_NAMES[new Date(`${dateStr}T00:00:00`).getDay()];
@@ -2505,8 +2642,12 @@ router.get(
           }
 
           const totalBooked = bookedMap[`${t.availability_id}_${dateStr}`] ?? 0;
-          const spotsLeft = t.max_students != null ? Math.max(0, t.max_students - totalBooked) : null;
-          const isFull = t.max_students != null && totalBooked >= t.max_students;
+          const spotsLeft =
+            t.max_students != null
+              ? Math.max(0, t.max_students - totalBooked)
+              : null;
+          const isFull =
+            t.max_students != null && totalBooked >= t.max_students;
 
           slots.push({
             availabilityId: t.availability_id,
@@ -2530,7 +2671,9 @@ router.get(
         }
       }
 
-      slots.sort((a, b) => a.date.localeCompare(b.date) || a.professorId - b.professorId);
+      slots.sort(
+        (a, b) => a.date.localeCompare(b.date) || a.professorId - b.professorId,
+      );
 
       res.json({ slots });
     } catch (error) {
@@ -2551,7 +2694,8 @@ router.post(
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { availabilityId, appointmentDate, purpose, appointmentType } = req.body;
+    const { availabilityId, appointmentDate, purpose, appointmentType } =
+      req.body;
 
     if (!availabilityId || !appointmentDate) {
       return res.status(400).json({
@@ -2559,7 +2703,9 @@ router.post(
       });
     }
     if (appointmentDate < getManilaDateString()) {
-      return res.status(400).json({ error: "Appointment date cannot be in the past" });
+      return res
+        .status(400)
+        .json({ error: "Appointment date cannot be in the past" });
     }
     if (typeof purpose === "string" && purpose.length > 255) {
       return res
@@ -2588,10 +2734,13 @@ router.post(
       // The chosen date must actually fall on this template's weekday —
       // guards against a tampered/stale request pairing a template with an
       // unrelated date.
-      const weekday = WEEKDAY_NAMES[new Date(`${appointmentDate}T00:00:00`).getDay()];
+      const weekday =
+        WEEKDAY_NAMES[new Date(`${appointmentDate}T00:00:00`).getDay()];
       if (weekday !== slot.day_of_week) {
         await conn.rollback();
-        return res.status(400).json({ error: `${appointmentDate} is not a ${slot.day_of_week}` });
+        return res
+          .status(400)
+          .json({ error: `${appointmentDate} is not a ${slot.day_of_week}` });
       }
 
       // Reject a same-day booking whose window has already ended — mirrors
@@ -2603,7 +2752,9 @@ router.post(
         const windowEnd = new Date(`${appointmentDate}T${slot.end_time}+08:00`);
         if (windowEnd <= new Date()) {
           await conn.rollback();
-          return res.status(409).json({ error: "This availability window has already ended for today" });
+          return res.status(409).json({
+            error: "This availability window has already ended for today",
+          });
         }
       }
 
@@ -2615,7 +2766,9 @@ router.post(
       );
       if (facultyStatus?.availability_status === "unavailable") {
         await conn.rollback();
-        return res.status(409).json({ error: "This professor is currently unavailable for booking" });
+        return res.status(409).json({
+          error: "This professor is currently unavailable for booking",
+        });
       }
 
       // Enforce capacity: count active bookings for this (template, date) pair
@@ -2626,7 +2779,9 @@ router.post(
       );
       if (slot.max_students != null && total >= slot.max_students) {
         await conn.rollback();
-        return res.status(409).json({ error: "This availability window is fully booked" });
+        return res
+          .status(409)
+          .json({ error: "This availability window is fully booked" });
       }
 
       // Guard: student cannot book the same (template, date) pair twice
@@ -2650,14 +2805,23 @@ router.post(
         [availabilityId],
       );
       const validServiceIds = tmplServices.map((r) => r.service_id);
-      const chosenServiceId = appointmentType ? parseInt(appointmentType, 10) : null;
+      const chosenServiceId = appointmentType
+        ? parseInt(appointmentType, 10)
+        : null;
       if (validServiceIds.length > 0 && !chosenServiceId) {
         await conn.rollback();
-        return res.status(400).json({ error: "Please select an appointment type" });
+        return res
+          .status(400)
+          .json({ error: "Please select an appointment type" });
       }
-      if (validServiceIds.length > 0 && !validServiceIds.includes(chosenServiceId)) {
+      if (
+        validServiceIds.length > 0 &&
+        !validServiceIds.includes(chosenServiceId)
+      ) {
         await conn.rollback();
-        return res.status(400).json({ error: "Invalid appointment type for this slot" });
+        return res
+          .status(400)
+          .json({ error: "Invalid appointment type for this slot" });
       }
 
       const [[facultyRow]] = await conn.query(
@@ -2720,7 +2884,8 @@ router.post(
       // response/toast -- even though the appointment row was already
       // committed to the database. That's why the booking only ever
       // appeared after a manual refresh.
-      const newSpotsLeft = slot.max_students != null ? slot.max_students - (total + 1) : null;
+      const newSpotsLeft =
+        slot.max_students != null ? slot.max_students - (total + 1) : null;
       try {
         emitToDept(facultyRow.department_id, "appointment:slot-updated", {
           availabilityId,
@@ -2744,14 +2909,19 @@ router.post(
           );
           bookedServiceName = svc?.service_name ?? null;
         }
-        const bookedServicePart = bookedServiceName ? ` a ${bookedServiceName}` : "";
+        const bookedServicePart = bookedServiceName
+          ? ` a ${bookedServiceName}`
+          : "";
         createNotification(
           slot.faculty_id,
-          `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${getManilaDateString(appointmentDate)} at ${formatTime12h(appointmentTime)}.`,
+          `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${appointmentDate} at ${formatTime12h(appointmentTime)}.`,
           "appointment",
         );
       } catch (sideEffectError) {
-        console.error("Book slot post-commit side-effect error:", sideEffectError);
+        console.error(
+          "Book slot post-commit side-effect error:",
+          sideEffectError,
+        );
       }
 
       // Read the just-written snapshot directly off the appointment row --
@@ -2985,8 +3155,7 @@ router.get(
             hasCapacity:
               slot.status === "open" && claimedCount < slot.max_capacity,
             status: slot.status,
-            avgWaitTime:
-              waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
+            avgWaitTime: waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
             currentlyServingNumber: slot.currently_serving_number ?? null,
             voidTimeoutMinutes: slot.no_show_timeout_minutes,
           });
@@ -3080,10 +3249,13 @@ router.get(
   authorizeRoles("student"),
   async (req, res) => {
     try {
-      const result = await notificationsController.getNotifications(req.user.userId, {
-        type: req.query.type,
-        page: req.query.page,
-      });
+      const result = await notificationsController.getNotifications(
+        req.user.userId,
+        {
+          type: req.query.type,
+          page: req.query.page,
+        },
+      );
       res.json(result);
     } catch (error) {
       sendServerError(res, error, "Get notifications error");

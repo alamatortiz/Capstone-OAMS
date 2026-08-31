@@ -624,3 +624,57 @@ INSERT INTO announcements (title, content, type, is_pinned, audience, department
 INSERT INTO audit_logs (admin_id, action, target_table, target_record_id, old_values, new_values) VALUES
 (103, 'CREATE', 'announcements', LAST_INSERT_ID(), NULL, JSON_OBJECT('title', 'Queue System Downtime Advisory'));
 
+INSERT INTO document_requests (student_id, service_id, request_type, purpose, copies, status, official_code, released_at, claimed_at) VALUES
+    (105, 1, 'Good Moral Certificate',    'Job application', 1, 'generated', 'CCS-2026-00201', NULL, NULL),
+    (108, 3, 'Certificate of Enrollment', 'Scholarship',     1, 'claimed',   'CCS-2026-00202', NOW() - INTERVAL 5 HOUR, NOW() - INTERVAL 4 HOUR);
+ 
+INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, copies, status, official_code, released_at, claimed_at) VALUES
+    (107, 5, 'Certificate of Employment', 'Visa application', 1, 'released', 'CCS-2026-00301', NOW() - INTERVAL 2 HOUR, NULL);
+ 
+-- Retro-assign an official_code to the pre-existing released request
+-- (REQ-00001, student 104) so it has something to encode into a QR.
+UPDATE document_requests
+SET official_code = 'CCS-2026-00101'
+WHERE tracking_number = 'REQ-00001';
+ 
+-- ─────────────────────────────────────────────────────────────
+-- Generated files (QR codes)
+-- Note: FDR-00001 (faculty 106, still 'processing') is left out on
+-- purpose -- a document that hasn't been generated yet has no QR.
+-- ─────────────────────────────────────────────────────────────
+ 
+INSERT INTO generated_files (request_id, faculty_request_id, qr_code, generated_at)
+SELECT request_id, NULL, 'QR-REQ-00001', NOW() - INTERVAL 1 DAY
+FROM document_requests WHERE tracking_number = 'REQ-00001';
+ 
+INSERT INTO generated_files (request_id, faculty_request_id, qr_code, generated_at)
+SELECT request_id, NULL, 'QR-REQ-00002', NOW() - INTERVAL 2 HOUR
+FROM document_requests WHERE tracking_number = 'REQ-00002';
+ 
+INSERT INTO generated_files (request_id, faculty_request_id, qr_code, generated_at)
+SELECT request_id, NULL, 'QR-REQ-00003', NOW() - INTERVAL 5 HOUR
+FROM document_requests WHERE tracking_number = 'REQ-00003';
+ 
+INSERT INTO generated_files (request_id, faculty_request_id, qr_code, generated_at)
+SELECT NULL, request_id, 'QR-FDR-00002', NOW() - INTERVAL 2 HOUR
+FROM faculty_document_requests WHERE tracking_number = 'FDR-00002';
+ 
+-- ─────────────────────────────────────────────────────────────
+-- QR tracking logs -- scans recorded so far
+-- (QR-REQ-00002 is intentionally left unscanned to test a
+--  first-time scan against a "generated" but not-yet-released request)
+-- ─────────────────────────────────────────────────────────────
+ 
+INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time)
+SELECT gf.file_id, 103, 'Registrar Office Window 1', NOW() - INTERVAL 1 DAY
+FROM generated_files gf WHERE gf.qr_code = 'QR-REQ-00001';
+ 
+INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time)
+SELECT gf.file_id, 103, 'Registrar Office Window 1', NOW() - INTERVAL 4 HOUR
+FROM generated_files gf WHERE gf.qr_code = 'QR-REQ-00003';
+ 
+INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time)
+SELECT gf.file_id, 103, 'CCS Office', NOW() - INTERVAL 1 HOUR
+FROM generated_files gf WHERE gf.qr_code = 'QR-FDR-00002';
+
+

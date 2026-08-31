@@ -27,10 +27,34 @@ async function createNotificationsBatch(userIds, message, type) {
   if (ids.length === 0 || !message || !type) return;
   try {
     const values = ids.map((id) => [id, message, type]);
-    await pool.query(`INSERT INTO notifications (user_id, message, type) VALUES ?`, [values]);
+    await pool.query(
+      `INSERT INTO notifications (user_id, message, type) VALUES ?`,
+      [values],
+    );
   } catch (err) {
     console.error("Notification batch insert error:", err.message);
   }
 }
 
-module.exports = { createNotification, createNotificationsBatch };
+async function notifyDepartmentAdmins(departmentId, message, type) {
+  if (!departmentId) return;
+  try {
+    const [rows] = await pool.query(
+      `SELECT admin_id AS user_id FROM administrators WHERE department_id = ?`,
+      [departmentId],
+    );
+    await createNotificationsBatch(
+      rows.map((row) => row.user_id),
+      message,
+      type,
+    );
+  } catch (err) {
+    console.error("Notify department admins error:", err.message);
+  }
+}
+
+module.exports = {
+  createNotification,
+  createNotificationsBatch,
+  notifyDepartmentAdmins,
+};

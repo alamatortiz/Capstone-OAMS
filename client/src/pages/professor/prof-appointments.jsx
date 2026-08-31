@@ -7,7 +7,11 @@ import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
-import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
+import {
+  formatManilaDate,
+  formatManilaTime,
+  getManilaDateString,
+} from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import {
@@ -68,27 +72,46 @@ const ALL_RANGE_LABELS = {
 const CONFIRM_META = {
   approve: (apt) => ({
     title: "Approve Appointment?",
-    message: <>Approve the appointment request from <strong>{apt.studentName}</strong>?</>,
+    message: (
+      <>
+        Approve the appointment request from <strong>{apt.studentName}</strong>?
+      </>
+    ),
     confirmText: "Approve",
     icon: <CheckCircle2 style={{ width: 22, height: 22 }} />,
     variant: "success",
   }),
   reject: (apt) => ({
     title: "Reject Appointment?",
-    message: <>Reject the appointment request from <strong>{apt.studentName}</strong>? This action cannot be undone.</>,
+    message: (
+      <>
+        Reject the appointment request from <strong>{apt.studentName}</strong>?
+        This action cannot be undone.
+      </>
+    ),
     confirmText: "Reject",
     icon: <XCircle style={{ width: 22, height: 22 }} />,
   }),
   complete: (apt) => ({
     title: "Mark as Completed?",
-    message: <>Mark the appointment with <strong>{apt.studentName}</strong> as completed?</>,
+    message: (
+      <>
+        Mark the appointment with <strong>{apt.studentName}</strong> as
+        completed?
+      </>
+    ),
     confirmText: "Mark Complete",
     icon: <CheckCircle2 style={{ width: 22, height: 22 }} />,
     variant: "success",
   }),
   cancel: (apt) => ({
     title: "Cancel Appointment?",
-    message: <>Cancel the appointment with <strong>{apt.studentName}</strong>? This action cannot be undone.</>,
+    message: (
+      <>
+        Cancel the appointment with <strong>{apt.studentName}</strong>? This
+        action cannot be undone.
+      </>
+    ),
     confirmText: "Cancel Appointment",
     cancelText: "Keep Appointment",
     icon: <XCircle style={{ width: 22, height: 22 }} />,
@@ -128,7 +151,9 @@ function AppointmentCard({
         <div className="appt-card-title-section">
           <h3 className="appt-card-name">{appointment.studentName}</h3>
           {appointment.studentId && (
-            <span className="appt-card-student-id-badge">{appointment.studentId}</span>
+            <span className="appt-card-student-id-badge">
+              {appointment.studentId}
+            </span>
           )}
           {appointment.course && (
             <p className="appt-card-sub">{appointment.course}</p>
@@ -196,7 +221,11 @@ function AppointmentCard({
               className="appt-btn appt-btn-complete"
               onClick={() => onComplete(appointment.id)}
               disabled={isFutureDate}
-              title={isFutureDate ? "This appointment hasn't happened yet" : undefined}
+              title={
+                isFutureDate
+                  ? "This appointment hasn't happened yet"
+                  : undefined
+              }
             >
               <CheckCircle2Icon /> Mark Complete
             </button>
@@ -226,7 +255,9 @@ function AppointmentCard({
               </span>
             </>
           ) : (
-            <span className="appt-requested-date">{appointment.requestedAt}</span>
+            <span className="appt-requested-date">
+              {appointment.requestedAt}
+            </span>
           )}
         </div>
       </div>
@@ -237,7 +268,7 @@ function AppointmentCard({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ProfessorAppointmentsPage() {
   const [activeTab, setActiveTab] = useState("all");
-  const [allRange, setAllRange] = useState("week");
+  const [allRange, setAllRange] = useState("all");
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -277,7 +308,14 @@ export default function ProfessorAppointmentsPage() {
     };
   }, [fetchAppointments]);
 
-  const TABS = ["all", "pending", "approved", "completed", "rejected", "cancelled"];
+  const TABS = [
+    "all",
+    "pending",
+    "approved",
+    "completed",
+    "rejected",
+    "cancelled",
+  ];
 
   // The This Week/This Month/All Time control governs every tab, not just
   // "All" — otherwise a tab's badge count and its rendered list would come
@@ -297,7 +335,11 @@ export default function ProfessorAppointmentsPage() {
       if (successMsg)
         toast.success(successMsg.replace("{name}", apt?.studentName ?? ""));
     } catch (err) {
-      toast.error(err?.response?.data?.error ?? errorMsg ?? "Failed to update appointment.");
+      toast.error(
+        err?.response?.data?.error ??
+          errorMsg ??
+          "Failed to update appointment.",
+      );
     }
   };
 
@@ -328,7 +370,9 @@ export default function ProfessorAppointmentsPage() {
     setConfirmAction(null);
   };
 
-  const confirmMeta = confirmAction ? CONFIRM_META[confirmAction.type](confirmAction.apt) : null;
+  const confirmMeta = confirmAction
+    ? CONFIRM_META[confirmAction.type](confirmAction.apt)
+    : null;
 
   return (
     <ProfessorPageShell
@@ -343,7 +387,9 @@ export default function ProfessorAppointmentsPage() {
             title={confirmMeta?.title}
             message={confirmMeta?.message}
             icon={confirmMeta?.icon}
-            confirmText={confirmSaving ? "Please wait…" : confirmMeta?.confirmText}
+            confirmText={
+              confirmSaving ? "Please wait…" : confirmMeta?.confirmText
+            }
             cancelText={confirmMeta?.cancelText}
             confirmDisabled={confirmSaving}
             variant={confirmMeta?.variant ?? "danger"}
@@ -351,146 +397,158 @@ export default function ProfessorAppointmentsPage() {
         </>
       }
     >
-        <div className="appt-page-content">
-          {/* Header */}
-          <PageHeader
-            breadcrumb={
-              <Link to="/professor/dashboard" className="breadcrumb-link">
-                <ChevronLeft className="breadcrumb-icon" />
-                Home
-              </Link>
-            }
-            icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
-            iconClassName="appt-title-icon"
-            title="Appointment Manager"
-            subtitle="Review and manage student appointment requests."
-            headerClassName="appt-header"
-            breadcrumbClassName="page-breadcrumb"
-            titleSectionClassName="appt-title-section"
-            titleClassName="appt-title"
-            subtitleClassName="appt-subtitle"
-          />
+      <div className="appt-page-content">
+        {/* Header */}
+        <PageHeader
+          breadcrumb={
+            <Link to="/professor/dashboard" className="breadcrumb-link">
+              <ChevronLeft className="breadcrumb-icon" />
+              Home
+            </Link>
+          }
+          icon={<Calendar style={{ width: "1.75rem", height: "1.75rem" }} />}
+          iconClassName="appt-title-icon"
+          title="Appointment Manager"
+          subtitle="Review and manage student appointment requests."
+          headerClassName="appt-header"
+          breadcrumbClassName="page-breadcrumb"
+          titleSectionClassName="appt-title-section"
+          titleClassName="appt-title"
+          subtitleClassName="appt-subtitle"
+        />
 
-          {/* Schedule Manager card */}
-          <Link
-            to="/professor/schedule-manager"
-            state={{ from: "/professor/appointments", fromLabel: "Appointment Manager" }}
-            className="appt-sched-avail-card"
-          >
-            <div className="appt-sched-avail-card-icon">
-              <CalendarClock />
-            </div>
-            <div className="appt-sched-avail-card-text">
-              <span className="appt-sched-avail-card-title">Schedule Manager</span>
-              <span className="appt-sched-avail-card-subtitle">Set your weekly availability schedule for appointments.</span>
-            </div>
-            <ChevronRight className="appt-sched-avail-card-chevron" />
-          </Link>
+        {/* Schedule Manager card */}
+        <Link
+          to="/professor/schedule-manager"
+          state={{
+            from: "/professor/appointments",
+            fromLabel: "Appointment Manager",
+          }}
+          className="appt-sched-avail-card"
+        >
+          <div className="appt-sched-avail-card-icon">
+            <CalendarClock />
+          </div>
+          <div className="appt-sched-avail-card-text">
+            <span className="appt-sched-avail-card-title">
+              Schedule Manager
+            </span>
+            <span className="appt-sched-avail-card-subtitle">
+              Set your weekly availability schedule for appointments.
+            </span>
+          </div>
+          <ChevronRight className="appt-sched-avail-card-chevron" />
+        </Link>
 
-          {/* Tabs */}
-          <div className="appt-tabs-nav">
-            <div className="appt-tabs-list">
-              {TABS.map((tab) => {
-                const TabIcon = TAB_ICON_MAP[tab];
+        {/* Tabs */}
+        <div className="appt-tabs-nav">
+          <div className="appt-tabs-list">
+            {TABS.map((tab) => {
+              const TabIcon = TAB_ICON_MAP[tab];
 
-                if (tab === "all") {
-                  return (
-                    <div
-                      key={tab}
-                      role="button"
-                      tabIndex={0}
-                      className={`appt-tab-trigger appt-tab-trigger--dropdown${activeTab === tab ? " active" : ""}`}
-                      onClick={() => setActiveTab("all")}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") setActiveTab("all");
+              if (tab === "all") {
+                return (
+                  <div
+                    key={tab}
+                    role="button"
+                    tabIndex={0}
+                    className={`appt-tab-trigger appt-tab-trigger--dropdown${activeTab === tab ? " active" : ""}`}
+                    onClick={() => setActiveTab("all")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ")
+                        setActiveTab("all");
+                    }}
+                  >
+                    {TabIcon && <TabIcon className="appt-tab-icon" />}
+                    <select
+                      className="appt-range-select"
+                      value={allRange}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        setAllRange(e.target.value);
+                        setActiveTab("all");
                       }}
                     >
-                      {TabIcon && <TabIcon className="appt-tab-icon" />}
-                      <select
-                        className="appt-range-select"
-                        value={allRange}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => {
-                          setAllRange(e.target.value);
-                          setActiveTab("all");
-                        }}
-                      >
-                        {Object.entries(ALL_RANGE_LABELS).map(([value, label]) => (
+                      {Object.entries(ALL_RANGE_LABELS).map(
+                        ([value, label]) => (
                           <option key={value} value={value}>
                             {label}
                           </option>
-                        ))}
-                      </select>
-                      <span className="appt-tab-count">
-                        {loading ? "—" : rangeFilteredAppointments.length}
-                      </span>
-                    </div>
-                  );
-                }
-
-                const count = rangeFilteredAppointments.filter((a) => a.status === tab).length;
-                return (
-                  <button
-                    key={tab}
-                    className={`appt-tab-trigger${activeTab === tab ? " active" : ""}`}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {TabIcon && <TabIcon className="appt-tab-icon" />}
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        ),
+                      )}
+                    </select>
                     <span className="appt-tab-count">
-                      {loading ? "—" : count}
+                      {loading ? "—" : rangeFilteredAppointments.length}
                     </span>
-                  </button>
+                  </div>
                 );
-              })}
-            </div>
-          </div>
+              }
 
-          {/* List */}
-          <div className="appt-list">
-            {loading ? (
-              <div className="appt-empty-state">
-                <Loader2
-                  className="appt-empty-icon"
-                  style={{ animation: "spin 1s linear infinite" }}
-                />
-                <p className="appt-empty-text">Loading appointments…</p>
-              </div>
-            ) : filteredAppointments.length === 0 ? (
-              <div className="appt-empty-state">
-                <Calendar className="appt-empty-icon" />
-                <h3 className="appt-empty-title">
-                  {activeTab === "all"
-                    ? "No Appointments"
-                    : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
-                  {allRange !== "all"
-                    ? ` ${ALL_RANGE_LABELS[allRange]}`
-                    : activeTab === "all"
-                      ? " Yet"
-                      : ""}
-                </h3>
-                <p className="appt-empty-text">
-                  {allRange !== "all"
-                    ? `You have no appointments in this range — switch to "All Time" to see everything.`
-                    : activeTab === "all"
-                      ? "New appointment requests from students will appear here."
-                      : `You have no ${activeTab} appointments.`}
-                </p>
-              </div>
-            ) : (
-              filteredAppointments.map((apt) => (
-                <AppointmentCard
-                  key={apt.id}
-                  appointment={apt}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  onComplete={handleComplete}
-                  onCancel={handleCancel}
-                />
-              ))
-            )}
+              const count = rangeFilteredAppointments.filter(
+                (a) => a.status === tab,
+              ).length;
+              return (
+                <button
+                  key={tab}
+                  className={`appt-tab-trigger${activeTab === tab ? " active" : ""}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {TabIcon && <TabIcon className="appt-tab-icon" />}
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  <span className="appt-tab-count">
+                    {loading ? "—" : count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
+
+        {/* List */}
+        <div className="appt-list">
+          {loading ? (
+            <div className="appt-empty-state">
+              <Loader2
+                className="appt-empty-icon"
+                style={{ animation: "spin 1s linear infinite" }}
+              />
+              <p className="appt-empty-text">Loading appointments…</p>
+            </div>
+          ) : filteredAppointments.length === 0 ? (
+            <div className="appt-empty-state">
+              <Calendar className="appt-empty-icon" />
+              <h3 className="appt-empty-title">
+                {activeTab === "all"
+                  ? "No Appointments"
+                  : `No ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Appointments`}
+                {allRange !== "all"
+                  ? ` ${ALL_RANGE_LABELS[allRange]}`
+                  : activeTab === "all"
+                    ? " Yet"
+                    : ""}
+              </h3>
+              <p className="appt-empty-text">
+                {allRange !== "all"
+                  ? `You have no appointments in this range — switch to "All Time" to see everything.`
+                  : activeTab === "all"
+                    ? "New appointment requests from students will appear here."
+                    : `You have no ${activeTab} appointments.`}
+              </p>
+            </div>
+          ) : (
+            filteredAppointments.map((apt) => (
+              <AppointmentCard
+                key={apt.id}
+                appointment={apt}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onComplete={handleComplete}
+                onCancel={handleCancel}
+              />
+            ))
+          )}
+        </div>
+      </div>
     </ProfessorPageShell>
   );
 }
