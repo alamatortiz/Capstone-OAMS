@@ -1,4 +1,3 @@
-
 /* ===== SHARED SIDEBAR & LAYOUT STYLES ===== */
 
 :root,
@@ -48,7 +47,7 @@
   --purple: #a855f7;
   --violet: #7c3aed;
   --pink: #ec4899;
-  
+
   /* Icon Colors */
   --icon-sun-color: #fbbf24;
   --icon-moon-color: #64748b;
@@ -100,7 +99,7 @@
   --purple: #9333ea;
   --violet: #6d28d9;
   --pink: #db2777;
-  
+
   /* Icon Colors */
   --icon-sun-color: #fbbf24;
   --icon-moon-color: #1e293b;
@@ -115,8 +114,10 @@
 body {
   background-color: var(--dark-bg);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: "Inter", sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* ===== Dashboard Layout ===== */
@@ -280,7 +281,11 @@ body {
   gap: 1.3rem;
   padding: 1.3rem 1.7rem;
   cursor: pointer;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(168, 85, 247, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.12) 0%,
+    rgba(168, 85, 247, 0.08) 100%
+  );
   border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 0.875rem;
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
@@ -288,19 +293,31 @@ body {
 }
 
 .department-card:hover {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(168, 85, 247, 0.14) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.2) 0%,
+    rgba(168, 85, 247, 0.14) 100%
+  );
   border-color: rgba(168, 85, 247, 0.55);
   box-shadow: 0 6px 20px rgba(124, 58, 237, 0.22);
   transform: translateY(-2px);
 }
 
 [data-theme="light"] .department-card {
-  background: linear-gradient(135deg, rgba(109, 40, 217, 0.07) 0%, rgba(147, 51, 234, 0.04) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(109, 40, 217, 0.07) 0%,
+    rgba(147, 51, 234, 0.04) 100%
+  );
   border-color: rgba(147, 51, 234, 0.25);
 }
 
 [data-theme="light"] .department-card:hover {
-  background: linear-gradient(135deg, rgba(109, 40, 217, 0.13) 0%, rgba(147, 51, 234, 0.09) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(109, 40, 217, 0.13) 0%,
+    rgba(147, 51, 234, 0.09) 100%
+  );
   border-color: rgba(147, 51, 234, 0.45);
 }
 
@@ -447,7 +464,6 @@ body {
   line-height: 1.2;
 }
 
-
 /* Professors List */
 .professors-list {
   display: flex;
@@ -563,7 +579,11 @@ body {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.2) 0%,
+    rgba(168, 85, 247, 0.1) 100%
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -769,6 +789,8 @@ body {
   .department-card {
     padding: 1.15rem 1.35rem;
     gap: 1.15rem;
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
   }
 
   .card-logo-wrap {
@@ -778,6 +800,9 @@ body {
 
   .card-meta {
     gap: 0.5rem;
+    flex-basis: 100%;
+    justify-content: space-between;
+    padding-left: calc(3.2rem + 1.15rem);
   }
 
   .professor-card {

@@ -1,4 +1,3 @@
-
 /* ===== DARK MODE (DEFAULT) ===== */
 :root,
 [data-theme="dark"] {
@@ -47,7 +46,7 @@
   --purple: #a855f7;
   --violet: #7c3aed;
   --pink: #ec4899;
-  
+
   /* Icon Colors */
   --icon-sun-color: #fbbf24;
   --icon-moon-color: #64748b;
@@ -100,7 +99,7 @@
   --purple: #9333ea;
   --violet: #6d28d9;
   --pink: #db2777;
-  
+
   /* Icon Colors */
   --icon-sun-color: #fbbf24;
   --icon-moon-color: #1e293b;
@@ -115,8 +114,10 @@
 body {
   background-color: var(--dark-bg);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: "Inter", sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* ===== Dashboard With Sidebar Layout ===== */
@@ -160,7 +161,6 @@ body {
   height: 1.25rem;
 }
 
-
 /* ===== Main Content ===== */
 .dashboard-main {
   flex: 1;
@@ -198,7 +198,11 @@ body {
 .professor-dashboard .welcome-banner {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   border-radius: 1.5rem;
   padding: 1.5rem;
   color: white;
@@ -328,10 +332,14 @@ body {
 }
 
 .professor-dashboard .dash-stat-card::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, transparent 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.08) 0%,
+    transparent 100%
+  );
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -360,47 +368,79 @@ body {
 }
 
 .professor-dashboard .stat-icon.bg-violet-50 {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(124, 58, 237, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.2) 0%,
+    rgba(124, 58, 237, 0.08) 100%
+  );
   color: var(--violet);
   border: 1px solid rgba(124, 58, 237, 0.2);
 }
 
 [data-theme="light"] .professor-dashboard .stat-icon.bg-violet-50 {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(124, 58, 237, 0.04) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.12) 0%,
+    rgba(124, 58, 237, 0.04) 100%
+  );
   border: 1px solid rgba(124, 58, 237, 0.15);
 }
 
 .professor-dashboard .stat-icon.bg-emerald-50 {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.2) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
   color: var(--success);
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 [data-theme="light"] .professor-dashboard .stat-icon.bg-emerald-50 {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.12) 0%,
+    rgba(16, 185, 129, 0.04) 100%
+  );
   border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
 .professor-dashboard .stat-icon.bg-orange-50 {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(249, 115, 22, 0.2) 0%,
+    rgba(249, 115, 22, 0.08) 100%
+  );
   color: #f97316;
   border: 1px solid rgba(249, 115, 22, 0.2);
 }
 
 [data-theme="light"] .professor-dashboard .stat-icon.bg-orange-50 {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.04) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(249, 115, 22, 0.12) 0%,
+    rgba(249, 115, 22, 0.04) 100%
+  );
   border: 1px solid rgba(249, 115, 22, 0.15);
   color: #ea580c;
 }
 
 .professor-dashboard .stat-icon.bg-green-50 {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.2) 0%,
+    rgba(34, 197, 94, 0.08) 100%
+  );
   color: var(--primary-color);
   border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
 [data-theme="light"] .professor-dashboard .stat-icon.bg-green-50 {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(34, 197, 94, 0.04) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.12) 0%,
+    rgba(34, 197, 94, 0.04) 100%
+  );
   border: 1px solid rgba(34, 197, 94, 0.15);
 }
 
@@ -424,8 +464,13 @@ body {
 }
 
 @keyframes statPulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 /* Ported from stud-dashboard.css for structural parity — no current
@@ -595,7 +640,9 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .professor-dashboard .appointments-preview-card .card-header {
@@ -652,14 +699,22 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.15) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.25) 0%,
+    rgba(168, 85, 247, 0.15) 100%
+  );
   color: var(--purple);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   transition: all 0.3s ease;
 }
 
 .professor-dashboard .appointment-item .appointment-icon:hover {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(168, 85, 247, 0.25) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.35) 0%,
+    rgba(168, 85, 247, 0.25) 100%
+  );
   border-color: rgba(168, 85, 247, 0.5);
 }
 
@@ -774,8 +829,16 @@ body {
   transition: all 0.3s ease;
 }
 
-.professor-dashboard .appt-status-badge--pending   { background: rgba(251, 191, 36, 0.2);  color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.4); }
-.professor-dashboard .appt-status-badge--approved  { background: rgba(34, 197, 94, 0.18);  color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
+.professor-dashboard .appt-status-badge--pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+.professor-dashboard .appt-status-badge--approved {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
 /* completed/cancelled/no_show match stud-dashboard.css's .activity-status-*
    formula exactly (Recent Activity is the only place these three statuses
    actually render on this page -- Today's Appointments only ever shows
@@ -783,14 +846,42 @@ body {
    [data-theme="light"] override for any of the three: completed's color
    already adapts via the var(--success) token, and the red used for
    cancelled/no_show is intentionally theme-invariant. */
-.professor-dashboard .appt-status-badge--completed { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
-.professor-dashboard .appt-status-badge--rejected  { background: rgba(239, 68, 68, 0.18);  color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
-.professor-dashboard .appt-status-badge--cancelled { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
-.professor-dashboard .appt-status-badge--no_show   { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+.professor-dashboard .appt-status-badge--completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.professor-dashboard .appt-status-badge--rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.professor-dashboard .appt-status-badge--cancelled {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.professor-dashboard .appt-status-badge--no_show {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
 
-[data-theme="light"] .professor-dashboard .appt-status-badge--pending   { background: rgba(217, 119, 6, 0.1);  color: #92400e; border-color: rgba(217, 119, 6, 0.3); }
-[data-theme="light"] .professor-dashboard .appt-status-badge--approved  { background: rgba(5, 150, 105, 0.1);  color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
-[data-theme="light"] .professor-dashboard .appt-status-badge--rejected  { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .professor-dashboard .appt-status-badge--pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+[data-theme="light"] .professor-dashboard .appt-status-badge--approved {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .professor-dashboard .appt-status-badge--rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
 
 /* Document-only Recent Activity badges, namespaced separately from
    appt-status-badge--* above so document statuses (processing/generated/
@@ -801,21 +892,77 @@ body {
    no student-side precedent (faculty_document_requests-only status), so
    its color is sourced from prof-documents.css's .doc-badge-cancelled --
    the module's own authoritative palette for this exact status. */
-.professor-dashboard .activity-status-doc-pending { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
-.professor-dashboard .activity-status-doc-processing { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-.professor-dashboard .activity-status-doc-generated { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 1px solid rgba(34, 197, 94, 0.35); }
-.professor-dashboard .activity-status-doc-released { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 1px solid rgba(34, 197, 94, 0.35); }
-.professor-dashboard .activity-status-doc-claimed { background: rgba(34, 197, 94, 0.18); color: var(--primary-color); border: 1px solid rgba(34, 197, 94, 0.35); }
-.professor-dashboard .activity-status-doc-rejected { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
-.professor-dashboard .activity-status-doc-cancelled { background: rgba(239, 68, 68, 0.18); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.35); }
+.professor-dashboard .activity-status-doc-pending {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.professor-dashboard .activity-status-doc-processing {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.professor-dashboard .activity-status-doc-generated {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.professor-dashboard .activity-status-doc-released {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.professor-dashboard .activity-status-doc-claimed {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.professor-dashboard .activity-status-doc-rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.professor-dashboard .activity-status-doc-cancelled {
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
 
-[data-theme="light"] .professor-dashboard .activity-status-doc-pending { background: rgba(217, 119, 6, 0.1); color: #92400e; border-color: rgba(217, 119, 6, 0.3); }
-[data-theme="light"] .professor-dashboard .activity-status-doc-processing { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; border-color: rgba(37, 99, 235, 0.25); }
-[data-theme="light"] .professor-dashboard .activity-status-doc-generated { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
-[data-theme="light"] .professor-dashboard .activity-status-doc-released { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
-[data-theme="light"] .professor-dashboard .activity-status-doc-claimed { background: rgba(5, 150, 105, 0.1); color: #065f46; border-color: rgba(5, 150, 105, 0.25); }
-[data-theme="light"] .professor-dashboard .activity-status-doc-rejected { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
-[data-theme="light"] .professor-dashboard .activity-status-doc-cancelled { background: rgba(220, 38, 38, 0.08); color: #991b1b; border-color: rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .professor-dashboard .activity-status-doc-pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.3);
+}
+[data-theme="light"] .professor-dashboard .activity-status-doc-processing {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+[data-theme="light"] .professor-dashboard .activity-status-doc-generated {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .professor-dashboard .activity-status-doc-released {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .professor-dashboard .activity-status-doc-claimed {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .professor-dashboard .activity-status-doc-rejected {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+[data-theme="light"] .professor-dashboard .activity-status-doc-cancelled {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
 
 /* "+N more" link, mirrors stud-dashboard.css's .pinned-more-link, reused by
    both the Today's Appointments and Pinned Announcements preview cards. */
@@ -833,7 +980,6 @@ body {
 .professor-dashboard .pinned-more-link:hover {
   background: rgba(34, 197, 94, 0.1);
 }
-
 
 /* ===== Quick Actions ===== */
 .professor-dashboard .quick-actions-section {
@@ -872,10 +1018,14 @@ body {
 }
 
 .professor-dashboard .quick-action-card::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, transparent 0%, rgba(34, 197, 94, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(34, 197, 94, 0.05) 100%
+  );
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -907,7 +1057,9 @@ body {
   justify-content: center;
   flex-shrink: 0;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
   z-index: 1;
 }
 
@@ -930,10 +1082,18 @@ body {
    scheduling tiles, mirrors student dashboard's own precedent of
    Appointment Booking and Professor Schedules sharing one violet value),
    Document Request=orange/warning. */
-.professor-dashboard .action-gradient-1 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
-.professor-dashboard .action-gradient-2 { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
-.professor-dashboard .action-gradient-3 { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
-.professor-dashboard .action-gradient-4 { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+.professor-dashboard .action-gradient-1 {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+.professor-dashboard .action-gradient-2 {
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+}
+.professor-dashboard .action-gradient-3 {
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+}
+.professor-dashboard .action-gradient-4 {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
 
 .professor-dashboard .action-body {
   display: flex;
@@ -980,20 +1140,36 @@ body {
   border-color: rgba(168, 85, 247, 0.25);
 }
 
-.professor-dashboard .quick-action-card:has(.action-gradient-2):hover .action-badge,
-.professor-dashboard .quick-action-card:has(.action-gradient-3):hover .action-badge {
+.professor-dashboard
+  .quick-action-card:has(.action-gradient-2):hover
+  .action-badge,
+.professor-dashboard
+  .quick-action-card:has(.action-gradient-3):hover
+  .action-badge {
   background: rgba(168, 85, 247, 0.25);
 }
 
-[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-2) .action-badge,
-[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-3) .action-badge {
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-2)
+  .action-badge,
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-3)
+  .action-badge {
   background: rgba(147, 51, 234, 0.1);
   color: #7c3aed;
   border-color: rgba(147, 51, 234, 0.25);
 }
 
-[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-2):hover .action-badge,
-[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-3):hover .action-badge {
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-2):hover
+  .action-badge,
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-3):hover
+  .action-badge {
   background: rgba(147, 51, 234, 0.2);
 }
 
@@ -1004,17 +1180,25 @@ body {
   border-color: rgba(249, 115, 22, 0.3);
 }
 
-.professor-dashboard .quick-action-card:has(.action-gradient-4):hover .action-badge {
+.professor-dashboard
+  .quick-action-card:has(.action-gradient-4):hover
+  .action-badge {
   background: rgba(249, 115, 22, 0.25);
 }
 
-[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-4) .action-badge {
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-4)
+  .action-badge {
   background: rgba(234, 88, 12, 0.1);
   color: #ea580c;
   border-color: rgba(234, 88, 12, 0.3);
 }
 
-[data-theme="light"] .professor-dashboard .quick-action-card:has(.action-gradient-4):hover .action-badge {
+[data-theme="light"]
+  .professor-dashboard
+  .quick-action-card:has(.action-gradient-4):hover
+  .action-badge {
   background: rgba(234, 88, 12, 0.2);
 }
 
@@ -1050,7 +1234,9 @@ body {
   color: var(--primary-color);
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  transition: gap 0.2s ease, color 0.2s ease;
+  transition:
+    gap 0.2s ease,
+    color 0.2s ease;
 }
 
 .professor-dashboard .action-cta svg {
@@ -1082,7 +1268,9 @@ body {
   border: 1px solid var(--card-border);
   border-radius: 1rem;
   overflow: hidden;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .professor-dashboard .card-header {
@@ -1366,7 +1554,11 @@ body {
 /* ===== Office Hours (full-width, green-themed, mirrors
    stud-dashboard.css's .stud-office-hours-card) ===== */
 .professor-dashboard .prof-office-hours-card {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--success) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--success) 100%
+  );
   border: 1px solid rgba(34, 197, 94, 0.4);
   border-radius: 1rem;
   padding: 1.5rem 2rem;
@@ -1378,7 +1570,7 @@ body {
 }
 
 .professor-dashboard .prof-office-hours-card::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 12rem;
   height: 12rem;
@@ -1390,7 +1582,7 @@ body {
 }
 
 .professor-dashboard .prof-office-hours-card::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 7rem;
   height: 7rem;
@@ -1403,9 +1595,10 @@ body {
 
 .professor-dashboard .prof-hours-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-bottom: 1.25rem;
   position: relative;
   z-index: 1;
@@ -1433,9 +1626,10 @@ body {
   padding: 0.375rem 0.875rem;
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  white-space: nowrap;
+  white-space: normal;
   font-weight: 700;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  max-width: 100%;
 }
 
 .professor-dashboard .prof-hours-body {
@@ -1506,7 +1700,6 @@ body {
 
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
-
   .dashboard-main {
     padding-left: 0;
     padding-top: 0;
@@ -1532,6 +1725,10 @@ body {
   }
 
   .professor-dashboard .preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .professor-dashboard .quick-actions-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -7,7 +7,8 @@ const multer = require("multer");
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = (process.env.CLIENT_ORIGINS || "http://localhost:5173")
+const allowedOrigins = (process.env.CLIENT_ORIGINS || "http://localhost:5173",
+"https://capstone-coams-pnc.onrender.com")
   .split(",")
   .map((o) => o.trim());
 
@@ -38,8 +39,12 @@ const { sendServerError } = require("./utils/errorResponse");
 const { startNoShowSweeper } = require("./jobs/queueNoShowSweeper");
 const { startExpirySweeper } = require("./jobs/queueExpirySweeper");
 const { startDocumentPickupSweeper } = require("./jobs/documentPickupSweeper");
-const { startDocumentSubmissionStaleSweeper } = require("./jobs/documentSubmissionStaleSweeper");
-const { startAppointmentReminderSweeper } = require("./jobs/appointmentReminderSweeper");
+const {
+  startDocumentSubmissionStaleSweeper,
+} = require("./jobs/documentSubmissionStaleSweeper");
+const {
+  startAppointmentReminderSweeper,
+} = require("./jobs/appointmentReminderSweeper");
 const { initSocketServer } = require("./sockets");
 
 app.use("/api/auth", authRoutes);
@@ -53,7 +58,9 @@ app.use("/api/admin", adminRoutes);
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ error: "Each file must be 10MB or smaller" });
+      return res
+        .status(400)
+        .json({ error: "Each file must be 10MB or smaller" });
     }
     if (err.code === "LIMIT_FILE_COUNT") {
       return res.status(400).json({ error: "You can attach up to 5 files" });
