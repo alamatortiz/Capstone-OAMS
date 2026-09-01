@@ -1773,6 +1773,10 @@ body {
     gap: 1rem;
   }
 
+  .student-dashboard .quick-actions-grid {
+    grid-template-columns: 1fr;
+  } 
+
   .student-dashboard .dash-stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;

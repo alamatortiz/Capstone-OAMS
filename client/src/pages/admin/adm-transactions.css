@@ -109,6 +109,8 @@
 .admin-transaction-with-sidebar {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -116,8 +118,10 @@
 /* ===== Main Content ===== */
 .admin-transaction-main {
   flex: 1;
+  min-width: 0;           /* prevents flex child from overflowing parent */
   margin-left: var(--sidebar-width);
   overflow-y: auto;
+  overflow-x: hidden;
   transition: margin-left 0.3s ease;
 }
 
@@ -225,6 +229,25 @@
     grid-template-columns: repeat(5, 1fr);
   }
 }
+
+@media (max-width: 1024px) {
+  .admin-transaction-main {
+    margin-left: 0;
+    margin-top: 4rem;
+  }
+
+  .admin-transaction-container {
+    padding: 1rem;
+  }
+
+  .admin-transaction-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
+
+
 
 .admin-transaction-stat-card {
   background: var(--card-bg);
@@ -714,6 +737,8 @@
   font-size: 1rem;
   color: var(--text-primary);
   margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
   transition: color 0.3s ease;
   word-break: break-word;
 }
