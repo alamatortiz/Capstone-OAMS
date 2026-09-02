@@ -7,8 +7,10 @@ const multer = require("multer");
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = (process.env.CLIENT_ORIGINS || "http://localhost:5173",
-"https://capstone-coams-pnc.onrender.com")
+const allowedOrigins = (
+  process.env.CLIENT_ORIGINS ||
+  "http://localhost:5173,https://capstone-coams-pnc.onrender.com"
+)
   .split(",")
   .map((o) => o.trim());
 
