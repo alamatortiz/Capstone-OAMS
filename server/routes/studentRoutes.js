@@ -29,6 +29,7 @@ const {
   serveAnnouncementAttachment,
 } = require("../utils/announcementAttachments");
 const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
+const { nextTrackingNumber } = require("../utils/trackingNumber");
 const {
   getFilesMap,
   getFiles,
@@ -813,11 +814,13 @@ router.post(
         new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       );
 
+      const trackingNumber = await nextTrackingNumber(pool, "document_requests", "request_id", "REQ");
       const [result] = await pool.query(
         `INSERT INTO document_requests
-           (student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, created_at)
-         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, NOW())`,
+           (tracking_number, student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())`,
         [
+          trackingNumber,
           studentId,
           serviceId,
           type,
@@ -951,10 +954,11 @@ router.post(
       try {
         await conn.beginTransaction();
 
+        const submissionTrackingNumber = await nextTrackingNumber(conn, "document_submissions", "submission_id", "SUB");
         const [result] = await conn.query(
-          `INSERT INTO document_submissions (student_id, department_id, title, purpose, needed_by, status, created_at)
-           VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
-          [studentId, departmentId, title, purpose, neededBy || null],
+          `INSERT INTO document_submissions (tracking_number, student_id, department_id, title, purpose, needed_by, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+          [submissionTrackingNumber, studentId, departmentId, title, purpose, neededBy || null],
         );
 
         await insertFiles(

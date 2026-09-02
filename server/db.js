@@ -1,9 +1,13 @@
 const fs = require("fs");
 const mysql = require("mysql2/promise");
 
-// Aiven (and most managed MySQL hosts) require SSL; local Docker MySQL does
-// not use or need it. Only attach ssl when a CA cert path is actually given,
-// so this stays a no-op against docker-compose's local db service.
+// TiDB Cloud (and most managed MySQL hosts) require SSL; local Docker MySQL
+// does not use or need it. Only attach ssl when a CA cert path is actually
+// given, so this stays a no-op against docker-compose's local db service.
+// (TiDB Cloud's cert is publicly signed, unlike Aiven's -- Node's own
+// trusted CA store would likely accept it without DB_SSL_CA_PATH at all,
+// but pointing this at a plain CA bundle, e.g. curl.se's cacert.pem, works
+// too and is what's actually configured/tested.)
 const ssl = process.env.DB_SSL_CA_PATH
   ? { ca: fs.readFileSync(process.env.DB_SSL_CA_PATH) }
   : undefined;

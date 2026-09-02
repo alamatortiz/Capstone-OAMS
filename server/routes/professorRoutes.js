@@ -25,6 +25,7 @@ const {
   serveAnnouncementAttachment,
 } = require("../utils/announcementAttachments");
 const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
+const { nextTrackingNumber } = require("../utils/trackingNumber");
 const {
   getFilesMap,
   getFiles,
@@ -1563,10 +1564,12 @@ router.post(
           .json({ message: "This request was already submitted a moment ago" });
       }
 
+      const fdrTrackingNumber = await nextTrackingNumber(pool, "faculty_document_requests", "request_id", "FDR");
       const [result] = await pool.query(
-        `INSERT INTO faculty_document_requests (faculty_id, service_id, request_type, purpose, copies, notes, needed_by)
-         VALUES (?,?,?,?,?,?,?)`,
+        `INSERT INTO faculty_document_requests (tracking_number, faculty_id, service_id, request_type, purpose, copies, notes, needed_by)
+         VALUES (?,?,?,?,?,?,?,?)`,
         [
+          fdrTrackingNumber,
           facultyId,
           service_id,
           request_type ?? "General",
@@ -1737,10 +1740,11 @@ router.post(
       try {
         await conn.beginTransaction();
 
+        const facSubmissionTrackingNumber = await nextTrackingNumber(conn, "document_submissions", "submission_id", "SUB");
         const [result] = await conn.query(
-          `INSERT INTO document_submissions (faculty_id, submitter_type, department_id, title, purpose, needed_by, status, created_at)
-           VALUES (?, 'faculty', ?, ?, ?, ?, 'pending', NOW())`,
-          [facultyId, departmentId, title, purpose, neededBy || null],
+          `INSERT INTO document_submissions (tracking_number, faculty_id, submitter_type, department_id, title, purpose, needed_by, status, created_at)
+           VALUES (?, ?, 'faculty', ?, ?, ?, ?, 'pending', NOW())`,
+          [facSubmissionTrackingNumber, facultyId, departmentId, title, purpose, neededBy || null],
         );
 
         await insertFiles(
