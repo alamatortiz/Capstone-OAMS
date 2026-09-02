@@ -297,7 +297,11 @@ html, body {
   text-align: center;
 }
 
-.transactions-page .txn-export-btn {
+/* Grid placement lives on the ExportMenu wrapper now, not the button itself
+   -- the button is no longer a direct child of .filters-header's grid once
+   wrapped in the CSV/PDF dropdown, so grid-column/justify-self on the
+   button alone would be silently ignored by the browser. */
+.transactions-page .export-menu {
   grid-column: 3;
   justify-self: end;
 }
@@ -808,7 +812,7 @@ html, body {
     grid-column: 1;
   }
 
-  .transactions-page .txn-export-btn {
+  .transactions-page .export-menu {
     grid-column: 1;
     justify-self: center;
   }

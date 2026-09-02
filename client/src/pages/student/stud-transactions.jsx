@@ -7,12 +7,14 @@ import {
 import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import Pagination from "../../components/Pagination";
+import ExportMenu from "../../components/ExportMenu";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { exportTransactionsPdf } from "../../utils/exportPdf";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -81,14 +83,6 @@ const CalendarIcon = () => (
     <line x1="16" y1="2" x2="16" y2="6"></line>
     <line x1="8" y1="2" x2="8" y2="6"></line>
     <line x1="3" y1="10" x2="21" y2="10"></line>
-  </svg>
-);
-
-const DownloadIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 
@@ -211,27 +205,38 @@ export default function TransactionsPage() {
     [debouncedSearch, filterType, filterStatus, page],
   );
 
-  // ── Export (CSV of everything matching the current filters, not just the
-  // current page -- mirrors prof/admin's export, adapted for this page's
+  // ── Export (CSV/PDF of everything matching the current filters, not just
+  // the current page -- mirrors prof/admin's export, adapted for this page's
   // server-side pagination by issuing its own request at the server's max
-  // page size instead of reading the paginated `transactions` state). ─────
+  // page size instead of reading the paginated `transactions` state). Note:
+  // `limit: 100` is this endpoint's own hard cap (see studentRoutes.js), so
+  // a student with more than 100 transactions matching the active filter
+  // would still only get the first 100 -- accepted as a rare edge case
+  // rather than plumbing a raise-the-cap/paginated-export path for it. Both
+  // formats share this one fetch so a future column change only has to be
+  // made once. ──────────────────────────────────────────────────────────
+  const header = ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
   const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-  const handleExport = async () => {
+
+  const fetchExportRows = async () => {
+    const res = await api.get("/student/transactions", {
+      params: {
+        search: debouncedSearch || undefined,
+        type: filterType !== "all" ? filterType : undefined,
+        status: filterStatus !== "all" ? filterStatus : undefined,
+        limit: 100,
+        page: 1,
+      },
+    });
+    return (res.data.transactions ?? []).map((t) => [
+      t.type, t.title, t.details, t.status, t.college, t.date, t.time,
+    ]);
+  };
+
+  const handleExportCsv = async () => {
     setIsExporting(true);
     try {
-      const res = await api.get("/student/transactions", {
-        params: {
-          search: debouncedSearch || undefined,
-          type: filterType !== "all" ? filterType : undefined,
-          status: filterStatus !== "all" ? filterStatus : undefined,
-          limit: 100,
-          page: 1,
-        },
-      });
-      const header = ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
-      const rows = (res.data.transactions ?? []).map((t) => [
-        t.type, t.title, t.details, t.status, t.college, t.date, t.time,
-      ]);
+      const rows = await fetchExportRows();
       const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -240,6 +245,25 @@ export default function TransactionsPage() {
       link.download = `transactions-${getManilaDateString()}.csv`;
       link.click();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export transactions:", err);
+      toast.error("Could not export your transaction history.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const rows = await fetchExportRows();
+      exportTransactionsPdf({
+        title: "Transaction History",
+        subtitle: `${user?.name ?? "Student"} — Generated ${getManilaDateString()}`,
+        columns: header,
+        rows,
+        filename: `transactions-${getManilaDateString()}.pdf`,
+      });
     } catch (err) {
       console.error("Failed to export transactions:", err);
       toast.error("Could not export your transaction history.");
@@ -397,14 +421,13 @@ export default function TransactionsPage() {
                   Search and filter your transactions.
                 </p>
               </div>
-              <button
-                className="tx-export-btn"
-                onClick={handleExport}
+              <ExportMenu
+                triggerClassName="tx-export-btn"
+                label={isExporting ? "Exporting…" : "Export"}
                 disabled={isExporting || transactions.length === 0}
-              >
-                <DownloadIcon />
-                {isExporting ? "Exporting…" : "Export"}
-              </button>
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+              />
             </div>
             <div className="filters-grid">
               <div className="filter-group">

@@ -5,10 +5,12 @@ import { ChevronLeft, FileText } from "lucide-react";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
+import ExportMenu from "../../components/ExportMenu";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
+import { exportTransactionsPdf } from "../../utils/exportPdf";
 import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
 
@@ -19,13 +21,6 @@ const CalendarSmIcon = () => (
     <line x1="16" y1="2" x2="16" y2="6" />
     <line x1="8" y1="2" x2="8" y2="6" />
     <line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-);
-const DownloadIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 const SearchIcon = () => (
@@ -206,20 +201,20 @@ export default function ProfessorTransactionsPage() {
 
   // Exports exactly what's currently on screen (the server-filtered list
   // already held in state) — no new backend endpoint needed.
+  const exportHeader = ["Type", "Title", "Details", "Status", "Student/Tracking", "Date", "Time"];
+  const exportRows = filtered.map((t) => [
+    typeLabel(t.type),
+    t.title,
+    t.details,
+    statusLabel(t.status),
+    t.type === "document" || t.type === "submission" ? t.trackingNumber : `${t.studentName ?? ""} (${t.studentId ?? ""})`,
+    t.dateLabel,
+    t.timeLabel,
+  ]);
   const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
 
-  const handleExport = () => {
-    const header = ["Type", "Title", "Details", "Status", "Student/Tracking", "Date", "Time"];
-    const rows = filtered.map((t) => [
-      typeLabel(t.type),
-      t.title,
-      t.details,
-      statusLabel(t.status),
-      t.type === "document" || t.type === "submission" ? t.trackingNumber : `${t.studentName ?? ""} (${t.studentId ?? ""})`,
-      t.dateLabel,
-      t.timeLabel,
-    ]);
-    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+  const handleExportCsv = () => {
+    const csv = [exportHeader, ...exportRows].map((row) => row.map(csvEscape).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -227,6 +222,16 @@ export default function ProfessorTransactionsPage() {
     link.download = `transactions-${getManilaDateString()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = () => {
+    exportTransactionsPdf({
+      title: "Transaction History",
+      subtitle: `${authUser?.name ?? "Professor"} — Generated ${getManilaDateString()}`,
+      columns: exportHeader,
+      rows: exportRows,
+      filename: `transactions-${getManilaDateString()}.pdf`,
+    });
   };
 
   return (
@@ -286,10 +291,13 @@ export default function ProfessorTransactionsPage() {
                 <h3 className="filters-title">Transaction Filter</h3>
                 <p className="filters-description">Search and filter your transactions.</p>
               </div>
-              <button className="txn-export-btn" onClick={handleExport} disabled={filtered.length === 0}>
-                <DownloadIcon />
-                Export
-              </button>
+              <ExportMenu
+                triggerClassName="txn-export-btn"
+                label="Export"
+                disabled={filtered.length === 0}
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+              />
             </div>
             <div className="filters-grid">
               <div className="filter-group">

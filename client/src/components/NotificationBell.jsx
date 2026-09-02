@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { connectSocket } from "../utils/socket";
 import api from "../utils/api";
 import { formatManilaDateTime } from "../utils/dateTime";
+import { playNotificationPing } from "../utils/notificationSound";
 import "./NotificationBell.css";
 
 const BellIcon = () => (
@@ -26,6 +27,7 @@ export const NOTIFICATION_EVENTS = [
   "appointment:status-updated",
   "appointment:slot-updated",
   "document:status-updated",
+  "announcement:changed",
 ];
 
 // Live updates are pushed over WebSocket; this is only a safety-net poll in
@@ -34,6 +36,12 @@ export const NOTIFICATION_EVENTS = [
 // so a blocked/dropped WebSocket meant the bell would never update again
 // without a manual reload).
 const FALLBACK_POLL_INTERVAL_MS = 45000;
+
+// Matches the browser tab's base <title> in index.html -- kept as a separate
+// constant (not read back from document.title) so the unread-count effect
+// below always knows the exact plain string to restore on unmount/zero,
+// regardless of what's currently displayed.
+const APP_TITLE = "OAMS";
 
 // The bell and the full Notifications page each keep their own independent
 // `notifications` state, so marking read/all-read in one previously left the
@@ -68,10 +76,26 @@ export default function NotificationBell({ endpointBase, viewAllPath, onOpen, ty
   const dropdownRef = useRef(null);
   const [dropdownStyle, setDropdownStyle] = useState(null);
 
+  // Highest notification_id seen so far, used to detect a genuinely NEW
+  // notification (for the sound ping) regardless of which effect triggered
+  // this fetch. This deliberately does NOT try to guess "was this refetch
+  // caused by a new event vs. a read-marking sync" -- it doesn't need to:
+  // marking read/unread never changes which ids exist, only is_read, so the
+  // max id only advances when a real new row lands. null until the first
+  // fetch establishes a baseline, so page load never pings for pre-existing
+  // unread notifications.
+  const seenMaxIdRef = useRef(null);
+
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await api.get(`/${endpointBase}/notifications`);
-      setNotifications(res.data.notifications);
+      const list = res.data.notifications;
+      const maxId = list.reduce((max, n) => Math.max(max, n.notification_id), 0);
+      if (seenMaxIdRef.current !== null && maxId > seenMaxIdRef.current) {
+        playNotificationPing();
+      }
+      seenMaxIdRef.current = maxId;
+      setNotifications(list);
     } catch {
       // Silent -- a failed notification fetch shouldn't disrupt the page.
     }
@@ -156,6 +180,22 @@ export default function NotificationBell({ endpointBase, viewAllPath, onOpen, ty
   }, [open]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  // Tab-title badge, like Gmail/Messenger's "(3) Inbox" -- makes an unread
+  // notification visible even when this tab isn't focused. Both the desktop
+  // and mobile bell instances run this independently (each has its own
+  // fetch), but since they read the same endpoint they converge on the same
+  // count, so the redundancy is harmless. Reset on unmount so a logout
+  // doesn't leave a stale count showing on the (bell-less) login page.
+  useEffect(() => {
+    document.title = unreadCount > 0 ? `(${unreadCount > 99 ? "99+" : unreadCount}) ${APP_TITLE}` : APP_TITLE;
+  }, [unreadCount]);
+
+  useEffect(() => {
+    return () => {
+      document.title = APP_TITLE;
+    };
+  }, []);
 
   const markRead = async (id) => {
     setNotifications((prev) =>

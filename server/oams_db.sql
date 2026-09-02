@@ -132,6 +132,22 @@ CREATE TABLE push_tokens (
     UNIQUE KEY uq_push_tokens_token (expo_push_token)
 );
 
+-- Browser Web Push subscriptions (mobile's Expo push above is a separate,
+-- incompatible mechanism -- Expo's proprietary push service vs. the W3C
+-- Push API, so this is its own table rather than a shared one). One row per
+-- browser/device a user has enabled notifications on; unique on endpoint
+-- (not user_id) for the same reason push_tokens is unique on token.
+CREATE TABLE web_push_subscriptions (
+    subscription_id INT          AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT          NOT NULL,
+    endpoint        VARCHAR(500) NOT NULL,
+    p256dh          VARCHAR(255) NOT NULL,
+    auth            VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_web_push_endpoint (endpoint)
+);
+
 CREATE TABLE login_logs (
     log_id           INT          AUTO_INCREMENT PRIMARY KEY,
     user_id          INT          NULL,               -- NULL on failed attempt for unknown user

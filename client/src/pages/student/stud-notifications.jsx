@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Bell, Clock, FileText, Calendar, Megaphone } from "lucide-react";
+import { ChevronLeft, Bell, Clock, FileText, Calendar, Megaphone, BellRing } from "lucide-react";
+import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
@@ -14,6 +15,7 @@ import api from "../../utils/api";
 import { formatManilaDateTime } from "../../utils/dateTime";
 import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
+import { getPushToggleState, subscribeToPush, unsubscribeFromPush } from "../../utils/webPush";
 
 import "./stud-notifications.css";
 
@@ -58,6 +60,44 @@ export default function StudentNotifications() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Persistent push-notification toggle -- reflects the ACTUAL current
+  // subscription (not just permission, which stays "granted" forever even
+  // after toggling off), so it always shows the true on/off state whenever
+  // this page is visited, rather than a one-time banner that disappears
+  // once acted on.
+  const [pushState, setPushState] = useState({ supported: true, permission: "default", subscribed: false });
+  const [pushBusy, setPushBusy] = useState(false);
+
+  const refreshPushState = useCallback(async () => {
+    setPushState(await getPushToggleState());
+  }, []);
+
+  useEffect(() => {
+    refreshPushState();
+  }, [refreshPushState]);
+
+  const handleTogglePush = async (nextOn) => {
+    setPushBusy(true);
+    try {
+      if (nextOn) {
+        const result = await subscribeToPush();
+        if (result.ok) {
+          toast.success("Notifications enabled for this browser.");
+        } else if (result.reason === "denied") {
+          toast.error("Notifications were blocked. You can re-enable them from your browser's site settings.");
+        } else if (result.reason !== "dismissed") {
+          toast.error("Could not enable notifications. Please try again.");
+        }
+      } else {
+        await unsubscribeFromPush();
+        toast.message("Notifications disabled for this browser.");
+      }
+    } finally {
+      await refreshPushState();
+      setPushBusy(false);
+    }
+  };
 
   // Guards against out-of-order responses: e.g. changing the type filter and
   // then the page before the first request resolves would otherwise let the
@@ -159,6 +199,32 @@ export default function StudentNotifications() {
           titleClassName="notif-title"
           subtitleClassName="notif-subtitle"
         />
+
+        {pushState.supported && (
+          <div className="notif-push-banner">
+            <BellRing className="notif-push-banner-icon" />
+            <div className="notif-push-banner-text">
+              <h3>Browser Notifications</h3>
+              <p>
+                {pushState.permission === "denied"
+                  ? "Blocked in your browser's site settings — enable them there to turn this on."
+                  : "Get notified even when this tab is closed."}
+              </p>
+            </div>
+            <label className={`notif-push-toggle ${pushBusy ? "notif-push-toggle--busy" : ""}`}>
+              <input
+                type="checkbox"
+                checked={pushState.subscribed}
+                disabled={pushBusy || pushState.permission === "denied"}
+                onChange={(e) => handleTogglePush(e.target.checked)}
+                aria-label="Toggle browser notifications"
+              />
+              <span className="notif-push-toggle-track">
+                <span className="notif-push-toggle-thumb" />
+              </span>
+            </label>
+          </div>
+        )}
 
         <div className="filters-card">
           <div className="filters-header">

@@ -275,6 +275,111 @@ body {
   text-align: center;
 }
 
+/* ===== Push notification opt-in banner ===== */
+.notif-push-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--card-bg);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 1rem;
+  padding: 1.1rem 1.5rem;
+  margin-bottom: 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.notif-push-banner-icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  color: var(--primary-color);
+}
+
+.notif-push-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-push-banner-text h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.notif-push-banner-text p {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* Toggle switch -- a real checkbox underneath for accessibility/keyboard
+   support, visually replaced by the track+thumb pair via the sibling
+   selectors below. */
+.notif-push-toggle {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-block;
+  width: 2.75rem;
+  height: 1.5rem;
+  cursor: pointer;
+}
+
+.notif-push-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.notif-push-toggle input:disabled {
+  cursor: not-allowed;
+}
+
+.notif-push-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--card-border);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.notif-push-toggle input:checked + .notif-push-toggle-track {
+  background: var(--primary-color);
+}
+
+.notif-push-toggle input:disabled + .notif-push-toggle-track {
+  opacity: 0.5;
+}
+
+.notif-push-toggle-thumb {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.notif-push-toggle input:checked + .notif-push-toggle-track .notif-push-toggle-thumb {
+  transform: translateX(1.25rem);
+}
+
+.notif-push-toggle--busy {
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .notif-push-banner {
+    align-items: flex-start;
+  }
+}
+
 .stud-notifications-container .filters-row {
   display: flex;
   align-items: flex-end;

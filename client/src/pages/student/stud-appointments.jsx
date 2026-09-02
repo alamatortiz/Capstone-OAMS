@@ -386,7 +386,7 @@ export default function AppointmentsPage() {
             <Calendar style={{ width: "1.5rem", height: "1.5rem", color: "var(--text-tertiary)" }} />
             <h3>{formatDate(date)}</h3>
           </div>
-          <p className="date-count date-count--disabled">{isPastDate(date) ? "This day has already passed" : "No slots available"}</p>
+          <p className="date-count date-count--disabled">No slots available</p>
         </div>
       );
     }
@@ -634,13 +634,13 @@ export default function AppointmentsPage() {
                     <div className="week-section-header">
                       <span className="appointment-booking-badge this-week">This Week</span>
                     </div>
-                    {twoWeekDates.thisWeek.map(renderDateGroup)}
+                    {twoWeekDates.thisWeek.filter((d) => !isPastDate(d)).map(renderDateGroup)}
                   </div>
                   <div className="week-section">
                     <div className="week-section-header">
                       <span className="appointment-booking-badge next-week">Next Week</span>
                     </div>
-                    {twoWeekDates.nextWeek.map(renderDateGroup)}
+                    {twoWeekDates.nextWeek.filter((d) => !isPastDate(d)).map(renderDateGroup)}
                   </div>
                 </>
               )}

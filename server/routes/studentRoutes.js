@@ -3308,4 +3308,56 @@ router.patch(
   },
 );
 
+// ─────────────────────────────────────────────────────────────
+// WEB PUSH (browser notifications, even when the site is closed)
+// ─────────────────────────────────────────────────────────────
+
+// POST /api/student/push-subscription
+// Body: the raw PushSubscription.toJSON() shape -- { endpoint, keys: { p256dh, auth } }.
+// Upserts by endpoint (same device re-subscribing, e.g. after clearing site
+// data, replaces its own row rather than erroring on the unique constraint).
+router.post(
+  "/push-subscription",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const { endpoint, keys } = req.body || {};
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ message: "endpoint and keys.p256dh/auth are required" });
+    }
+    try {
+      await pool.query(
+        `INSERT INTO web_push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), p256dh = VALUES(p256dh), auth = VALUES(auth)`,
+        [req.user.userId, endpoint, keys.p256dh, keys.auth],
+      );
+      res.status(201).json({ message: "Subscribed" });
+    } catch (error) {
+      sendServerError(res, error, "Save push subscription error");
+    }
+  },
+);
+
+// DELETE /api/student/push-subscription
+// Body: { endpoint } -- removes this device's subscription (explicit
+// "disable notifications" action, or the browser reports it as expired).
+router.delete(
+  "/push-subscription",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const { endpoint } = req.body || {};
+    if (!endpoint) return res.status(400).json({ message: "endpoint is required" });
+    try {
+      await pool.query(
+        `DELETE FROM web_push_subscriptions WHERE user_id = ? AND endpoint = ?`,
+        [req.user.userId, endpoint],
+      );
+      res.json({ message: "Unsubscribed" });
+    } catch (error) {
+      sendServerError(res, error, "Remove push subscription error");
+    }
+  },
+);
+
 module.exports = router;

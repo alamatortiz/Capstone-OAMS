@@ -1,0 +1,56 @@
+.export-menu {
+  position: relative;
+  display: inline-block;
+}
+
+/* Deliberately unstyled beyond layout -- triggerClassName supplies each
+   page's own button colors/padding so this drops in without changing how
+   the existing Export button looks. */
+.export-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.export-menu-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.export-menu-caret {
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-left: 0.1rem;
+  opacity: 0.8;
+}
+
+.export-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 11rem;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.6rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.export-menu-item {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.4rem;
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #1f2937);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.export-menu-item:hover {
+  background: var(--hover-bg, #f3f4f6);
+}
