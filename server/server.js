@@ -9,7 +9,7 @@ const server = http.createServer(app);
 
 const allowedOrigins = (
   process.env.CLIENT_ORIGINS ||
-  "http://localhost:5173,https://capstone-coams-pnc.onrender.com"
+  "https://capstone-coams-pnc.onrender.com,http://localhost:5173"
 )
   .split(",")
   .map((o) => o.trim());
