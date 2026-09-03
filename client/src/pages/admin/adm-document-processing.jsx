@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import QueueReasonModal from "../../components/QueueReasonModal";
 import FilterSelect from "../../components/FilterSelect";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { useLiveRefetch } from "../../hooks/useLiveRefetch";
@@ -254,6 +255,12 @@ export default function AdminDocumentProcessing() {
   // ── Status-change confirmation ───────────────────────────────────────────
   const [confirmStatus, setConfirmStatus] = useState(null); // target status or null
   const [confirmSaving, setConfirmSaving] = useState(false);
+  // Reject is routed separately from the other confirmStatus-driven actions
+  // above -- it needs a required reason (the requester sees it), which
+  // ActionConfirmModal has no room for. Independent of the shared,
+  // optional "Processing Notes" textarea used by every other transition.
+  const [rejectSaving, setRejectSaving] = useState(false);
+  const [showRejectReasonModal, setShowRejectReasonModal] = useState(false);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   // Guards against a stale response landing after a newer one -- switching
@@ -386,10 +393,18 @@ export default function AdminDocumentProcessing() {
     setShowDetailsModal(true);
   };
 
-  const handleUpdateStatus = async (newStatus) => {
+  // `notesOverride`, when passed, is sent instead of the shared Processing
+  // Notes textarea's value -- used by the Reject flow, which captures its
+  // own required reason via QueueReasonModal rather than relying on
+  // whatever (if anything) happens to already be sitting in that shared,
+  // optional field. Reading it as a parameter (not by first calling
+  // setProcessingNotes then invoking this) sidesteps the stale-closure
+  // problem of relying on a state update that hasn't committed yet.
+  const handleUpdateStatus = async (newStatus, notesOverride) => {
     if (!selectedDocument) return;
     const isSubmission = selectedDocument._kind === "submission";
     const needsCode = newStatus === "ready" && selectedDocument.requiresCoding;
+    const notesToSend = notesOverride !== undefined ? notesOverride : processingNotes;
     // Re-sending the document's own current status is how "Attach Files"
     // works without also changing the status -- same endpoint doubles as
     // both actions, mirroring PUT /admin/announcements/:id.
@@ -406,7 +421,7 @@ export default function AdminDocumentProcessing() {
       if (isSubmission) {
         const body = new FormData();
         body.append("status", newStatus);
-        body.append("notes", processingNotes);
+        body.append("notes", notesToSend);
         returnFiles.forEach((f) => body.append("returnFiles", f.file));
         await api.patch(
           `/admin/${selectedDocument._endpoint}/${rawId}/status`,
@@ -417,7 +432,7 @@ export default function AdminDocumentProcessing() {
           `/admin/${selectedDocument._endpoint}/${rawId}/status`,
           {
             status: newStatus,
-            notes: processingNotes,
+            notes: notesToSend,
             ...(needsCode ? { officialCode } : {}),
           },
         );
@@ -484,6 +499,13 @@ export default function AdminDocumentProcessing() {
     setConfirmStatus("ready");
   };
 
+  const confirmReject = async (reason) => {
+    setRejectSaving(true);
+    await handleUpdateStatus("rejected", reason);
+    setRejectSaving(false);
+    setShowRejectReasonModal(false);
+  };
+
   const runConfirmStatusChange = async () => {
     if (!confirmStatus) return;
     setConfirmSaving(true);
@@ -539,18 +561,6 @@ export default function AdminDocumentProcessing() {
         confirmText: "Mark as Ready",
         icon: <CheckCircleIcon />,
         variant: "success",
-      },
-      rejected: {
-        title: "Reject Request?",
-        message: (
-          <>
-            Reject the <strong>{selectedDocument.documentType}</strong> request
-            from <strong>{selectedDocument.requesterName}</strong>? This action
-            cannot be undone.
-          </>
-        ),
-        confirmText: "Reject Request",
-        icon: <XCircleIcon />,
       },
       claimed:
         selectedDocument._kind === "submission"
@@ -980,7 +990,7 @@ export default function AdminDocumentProcessing() {
                       selectedDocument.status === "processing") && (
                       <button
                         className="adp-modal-btn adp-modal-btn--danger"
-                        onClick={() => setConfirmStatus("rejected")}
+                        onClick={() => setShowRejectReasonModal(true)}
                       >
                         Reject Request
                       </button>
@@ -1021,6 +1031,24 @@ export default function AdminDocumentProcessing() {
             }
             confirmDisabled={confirmSaving}
             variant={DOC_CONFIRM_META?.variant ?? "danger"}
+          />
+
+          <QueueReasonModal
+            show={showRejectReasonModal}
+            onCancel={() => setShowRejectReasonModal(false)}
+            onConfirm={confirmReject}
+            title="Reject Request?"
+            message={
+              selectedDocument && (
+                <>
+                  Reject the <strong>{selectedDocument.documentType}</strong>{" "}
+                  request from <strong>{selectedDocument.requesterName}</strong>?
+                  They will see this reason.
+                </>
+              )
+            }
+            confirmText={rejectSaving ? "Please wait…" : "Reject Request"}
+            submitting={rejectSaving}
           />
         </>
       }

@@ -381,6 +381,11 @@ CREATE TABLE appointments (
     -- (appointmentReminderSweeper.js) -- kept distinct from 'system' since
     -- the two need different activity-feed/notification copy.
     cancelled_by        ENUM('student','faculty','system','system_expired') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
+    -- Separate from `notes` below (which is the student's own booking
+    -- purpose, set once at creation and never a good place to also store
+    -- the faculty member's rejection reason -- unlike document_requests.notes,
+    -- this column has no such dual-purpose precedent).
+    rejection_reason    TEXT         NULL,
     notes               TEXT,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Auto-touched on any change to this row. Lets the transactions feeds

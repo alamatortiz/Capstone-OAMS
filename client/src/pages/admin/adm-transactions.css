@@ -739,15 +739,36 @@
   flex-wrap: wrap;
 }
 
+/* Wraps the title + reference/tracking number so they read as one
+   identifying line, taking the same flex slot .admin-transaction-item-title
+   used to occupy directly (pushes .admin-transaction-item-badges to the
+   right edge of the header row). */
+.admin-transaction-item-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .admin-transaction-item-title {
   font-weight: 700;
   font-size: 1rem;
   color: var(--text-primary);
   margin: 0;
   min-width: 0;
-  flex: 1 1 auto;
   transition: color 0.3s ease;
   word-break: break-word;
+}
+
+/* Inside .admin-transaction-item-title-group specifically, the title must
+   NOT grow to fill the group's box (that's what pushed the ref badge all
+   the way to the group's far edge instead of sitting right after the
+   text) -- shrink only, size to content, let the group's own flex:1
+   handle claiming space from the header row. */
+.admin-transaction-item-title-group .admin-transaction-item-title {
+  flex: 0 1 auto;
 }
 
 .admin-transaction-item-badges {

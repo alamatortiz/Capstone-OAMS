@@ -591,9 +591,19 @@ export default function AdminTransaction() {
 
                       <div className="admin-transaction-item-content">
                         <div className="admin-transaction-item-header">
-                          <h3 className="admin-transaction-item-title">
-                            {transaction.action}
-                          </h3>
+                          <div className="admin-transaction-item-title-group">
+                            <h3 className="admin-transaction-item-title">
+                              {transaction.action}
+                            </h3>
+                            {/* Reference/tracking number reads as part of the
+                                title line, not a disconnected paragraph
+                                further down the card. */}
+                            {refBadge && (
+                              <span className={getIdBadgeClass(transaction.type)}>
+                                {refBadge}
+                              </span>
+                            )}
+                          </div>
                           <div className="admin-transaction-item-badges">
                             {getTypeBadge(transaction.type)}
                             {getStatusBadge(transaction.status, transaction.type)}
@@ -628,20 +638,20 @@ export default function AdminTransaction() {
                           )}
                         </div>
 
-                        <p className="admin-transaction-item-details">
-                          {transaction.details}
-                        </p>
-                        {refBadge && (
-                          <span className={getIdBadgeClass(transaction.type)}>
-                            {refBadge}
-                          </span>
-                        )}
+                        {/* Promoted up from the bottom of the card -- who
+                            handled this is "who's involved" info, grouped
+                            with the student/college row above rather than
+                            left as trailing small print. */}
                         <p className="admin-transaction-item-processor">
                           {transaction.processorRole === "admin"
                             ? `Processed by: Admin ${transaction.processor}`
                             : transaction.processorRole === "faculty"
                               ? `Processed by: Faculty ${transaction.processor}`
                               : "Processed by: Not yet processed"}
+                        </p>
+
+                        <p className="admin-transaction-item-details">
+                          {transaction.details}
                         </p>
                       </div>
 

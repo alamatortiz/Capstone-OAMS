@@ -1346,7 +1346,8 @@ router.get(
               CONCAT(st.first_name, ' ', st.last_name) AS student_name,
               st.student_number AS student_id,
               CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
-              COALESCE(a.notes, 'No purpose specified') AS details,
+              CASE WHEN a.status = 'rejected' THEN COALESCE(a.rejection_reason, a.notes, 'No purpose specified')
+                   ELSE COALESCE(a.notes, 'No purpose specified') END AS details,
               CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
               NULL AS queue_number,
               NULL AS raw_service_name,
