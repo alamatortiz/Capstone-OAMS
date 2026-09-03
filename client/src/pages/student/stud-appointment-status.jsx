@@ -155,6 +155,17 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
               </h3>
               <span className={`apst-badge ${statusCls}`}>{statusLabel}</span>
             </div>
+            {appt.status === "rejected" && appt.rejectionReason && (
+              <div className="apst-card-content">
+                <div className="apst-reject-notice">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <div>
+                    <p>This appointment request was rejected.</p>
+                    <p className="apst-reject-reason">Reason: {appt.rejectionReason}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {canCancel && (

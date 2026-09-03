@@ -2109,6 +2109,7 @@ router.get(
            a.appointment_date,
            a.status,
            a.notes,
+           a.rejection_reason,
            a.created_at,
            f.faculty_id,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
@@ -2144,6 +2145,7 @@ router.get(
         location: row.location ?? "TBA",
         purpose: row.notes ?? "",
         status: row.status,
+        rejectionReason: row.rejection_reason ?? null,
         createdAt: row.created_at ? getManilaDateString(row.created_at) : null,
       }));
 
