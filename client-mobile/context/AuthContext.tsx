@@ -98,9 +98,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const response = await api.get("/auth/me");
           await saveAuthData(normalizeUser(response.data.user), storedToken);
-        } catch (error) {
-          console.error("Failed to restore session:", error);
-          await clearAuthData();
+        } catch (error: any) {
+          // A response means the server actually looked at the token and
+          // rejected it (expired/invalid/revoked) -- that's a real logout,
+          // same as before. No response at all (network unreachable, DNS
+          // failure, timeout) means we never even got to ask, so falling
+          // back to the last-known user keeps the app usable offline rather
+          // than bouncing a signed-in-but-temporarily-offline user to the
+          // login screen. A later successful /auth/me (reconnect, next
+          // foreground) resyncs normally and overwrites this.
+          const serverRejectedToken = !!error?.response;
+          if (serverRejectedToken) {
+            console.error("Failed to restore session:", error);
+            await clearAuthData();
+          } else {
+            console.error("Session restore skipped session validation (offline):", error);
+            const storedUserRaw = await SecureStore.getItemAsync("oams_user");
+            if (storedUserRaw) {
+              setUser(JSON.parse(storedUserRaw));
+              setToken(storedToken);
+            } else {
+              // No cached user to fall back to -- nothing usable to show, so
+              // this behaves the same as the "server rejected" case.
+              await clearAuthData();
+            }
+          }
         } finally {
           setIsLoading(false);
         }

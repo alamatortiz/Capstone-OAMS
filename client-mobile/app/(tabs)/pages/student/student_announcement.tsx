@@ -32,6 +32,8 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
+import { readCache, writeCache, CACHE_KEYS } from '@/utils/offlineCache';
+import OfflineBanner from '@/components/OfflineBanner';
 
 type LucideIconType = typeof Megaphone;
 
@@ -213,6 +215,7 @@ export default function StudentAnnouncementScreen() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [offlineCachedAt, setOfflineCachedAt] = useState<string | null>(null);
 
   // Mirrors `announcements` for the catch block below, without making
   // fetchAnnouncements depend on (and change identity with) the state itself.
@@ -244,13 +247,28 @@ export default function StudentAnnouncementScreen() {
       setAnnouncements((prev) => (pageNum > 1 ? [...prev, ...fetched] : fetched));
       setPage(data.page ?? pageNum);
       setTotalPages(data.totalPages ?? 1);
+      setOfflineCachedAt(null);
+      // Only the page-1 view is cached (not every tab/page combination) --
+      // that's what a student reasonably expects to still see offline.
+      if (pageNum === 1) writeCache(CACHE_KEYS.studentAnnouncements, fetched);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error('Fetch announcements error:', err);
+      let usedCache = false;
       if (announcementsRef.current.length === 0) {
-        setError('Could not load announcements. Please try again.');
-      } else {
-        Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
+        const cached = await readCache<Announcement[]>(CACHE_KEYS.studentAnnouncements);
+        if (cached) {
+          setAnnouncements(cached.data);
+          setOfflineCachedAt(cached.cachedAt);
+          usedCache = true;
+        }
+      }
+      if (!usedCache) {
+        if (announcementsRef.current.length === 0) {
+          setError('Could not load announcements. Please try again.');
+        } else {
+          Toast.show({ type: 'error', text1: 'Could not refresh announcements.' });
+        }
       }
     } finally {
       if (requestId === requestIdRef.current) {
@@ -279,6 +297,8 @@ export default function StudentAnnouncementScreen() {
       const last = responses[responses.length - 1]?.data;
       setPage(last?.page ?? upTo);
       setTotalPages(last?.totalPages ?? 1);
+      setOfflineCachedAt(null);
+      writeCache(CACHE_KEYS.studentAnnouncements, merged);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error('Failed to refresh announcements:', err);
@@ -537,6 +557,8 @@ export default function StudentAnnouncementScreen() {
               );
             })}
           </View>
+
+          {offlineCachedAt && <OfflineBanner cachedAt={offlineCachedAt} theme={theme} />}
 
           {error && (
             <View style={styles.emptyCard}>

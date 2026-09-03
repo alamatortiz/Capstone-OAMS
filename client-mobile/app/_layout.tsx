@@ -7,6 +7,7 @@ import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { AuthProvider, useAuth, getRouteRole } from '../context/AuthContext';
 import { QueueProvider } from '../context/QueueContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { NetworkProvider } from '../context/NetworkContext';
 import { emitDrawerSwipeOpen } from '../utils/drawerSwipeBus';
 
 // A swipe starting within this many px of the left edge counts as an
@@ -95,14 +96,16 @@ export default function RootLayout() {
       <GestureDetector gesture={edgeSwipeGesture}>
         <View style={{ flex: 1 }}>
           <ThemeProvider>
-            <AuthProvider>
-              <QueueProvider>
-                <AuthGate>
-                  <Stack screenOptions={{ headerShown: false }} />
-                </AuthGate>
-                <Toast />
-              </QueueProvider>
-            </AuthProvider>
+            <NetworkProvider>
+              <AuthProvider>
+                <QueueProvider>
+                  <AuthGate>
+                    <Stack screenOptions={{ headerShown: false }} />
+                  </AuthGate>
+                  <Toast />
+                </QueueProvider>
+              </AuthProvider>
+            </NetworkProvider>
           </ThemeProvider>
         </View>
       </GestureDetector>

@@ -482,7 +482,7 @@ export default function StudentQueueScreen() {
                       </View>
                     </View>
 
-                    {queue.voidTimeoutMinutes != null && (
+                    {queue.voidTimeoutMinutes != null && !(queue.status === 'serving' && queue.arrivedAt) && (
                       <View style={styles.activeVoidWarningBox}>
                         <AlertCircle size={14} color={theme.tertiary} />
                         <Text style={styles.activeVoidWarningText}>
@@ -739,7 +739,7 @@ export default function StudentQueueScreen() {
                 )}
               </View>
 
-              {detailSlot?.voidTimeoutMinutes != null && (
+              {detailSlot?.voidTimeoutMinutes != null && !(detailSlot.status === 'serving' && detailSlot.arrivedAt) && (
                 <View style={styles.voidWarningBox}>
                   <AlertCircle size={14} color={theme.tertiary} />
                   <Text style={styles.voidWarningText}>

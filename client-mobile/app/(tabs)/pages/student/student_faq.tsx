@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -26,6 +26,8 @@ import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import { readCache, writeCache, CACHE_KEYS } from '@/utils/offlineCache';
+import OfflineBanner from '@/components/OfflineBanner';
 
 type LucideIconType = typeof Calendar;
 
@@ -139,6 +141,13 @@ export default function StudentFaqScreen() {
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [offlineCachedAt, setOfflineCachedAt] = useState<string | null>(null);
+  // Mirrors `faqs` so fetchFaqs can check "do we already have something on
+  // screen?" without depending on `faqs` itself -- that dependency would
+  // change fetchFaqs's identity on every successful fetch, which would
+  // re-trigger the mount effect below and refetch in a loop.
+  const hasFaqsRef = useRef(false);
+  useEffect(() => { hasFaqsRef.current = faqs.length > 0; }, [faqs]);
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -147,10 +156,26 @@ export default function StudentFaqScreen() {
     setError(null);
     try {
       const { data } = await api.get('/student/faqs');
-      setFaqs(data.faqs ?? []);
+      const list = data.faqs ?? [];
+      setFaqs(list);
+      setOfflineCachedAt(null);
+      writeCache(CACHE_KEYS.studentFaqs, list);
     } catch (err) {
       console.error('Failed to load FAQs:', err);
-      setError('Could not load FAQs. Please try again.');
+      // Only fall back to the cache when there's nothing on screen yet --
+      // a background refresh failure with an already-loaded list keeps
+      // today's behavior (error card) rather than silently swapping in
+      // possibly-stale data over a list the student is already looking at.
+      let usedCache = false;
+      if (!hasFaqsRef.current) {
+        const cached = await readCache<FaqItem[]>(CACHE_KEYS.studentFaqs);
+        if (cached) {
+          setFaqs(cached.data);
+          setOfflineCachedAt(cached.cachedAt);
+          usedCache = true;
+        }
+      }
+      if (!usedCache) setError('Could not load FAQs. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -285,6 +310,8 @@ export default function StudentFaqScreen() {
               onChangeText={setSearchQuery}
             />
           </View>
+
+          {offlineCachedAt && <OfflineBanner cachedAt={offlineCachedAt} theme={theme} />}
 
           {error && (
             <View style={styles.emptyCard}>

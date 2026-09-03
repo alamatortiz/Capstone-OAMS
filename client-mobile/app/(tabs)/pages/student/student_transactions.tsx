@@ -28,6 +28,8 @@ import NotificationBell from '@/components/NotificationBell';
 import ExportMenu from '@/components/ExportMenu';
 import { exportRowsAsCsv } from '@/utils/csvExport';
 import { exportRowsAsPdf } from '@/utils/pdfExport';
+import { readCache, writeCache, CACHE_KEYS } from '@/utils/offlineCache';
+import OfflineBanner from '@/components/OfflineBanner';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 type LucideIconType = typeof ClipboardList;
@@ -168,6 +170,7 @@ export default function StudentTransactionsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
   const [exporting, setExporting] = useState(false);
+  const [offlineCachedAt, setOfflineCachedAt] = useState<string | null>(null);
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -225,13 +228,28 @@ export default function StudentTransactionsScreen() {
       setTotalPages(data.totalPages ?? 1);
       if (data.stats) setTxStats(data.stats);
       setTxError(null);
+      setOfflineCachedAt(null);
+      // Only the page-1 view is cached (not every filter/search combination)
+      // -- that's what a student reasonably expects to still see offline.
+      if (pageNum === 1) writeCache(CACHE_KEYS.studentTransactions, newTransactions);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error('Failed to fetch transactions:', err);
+      let usedCache = false;
       if (transactionsRef.current.length === 0) {
-        setTxError('Could not load your transaction history.');
-      } else {
-        Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
+        const cached = await readCache<Transaction[]>(CACHE_KEYS.studentTransactions);
+        if (cached) {
+          setTransactions(cached.data);
+          setOfflineCachedAt(cached.cachedAt);
+          usedCache = true;
+        }
+      }
+      if (!usedCache) {
+        if (transactionsRef.current.length === 0) {
+          setTxError('Could not load your transaction history.');
+        } else {
+          Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
+        }
       }
     } finally {
       if (requestId === requestIdRef.current) {
@@ -270,6 +288,8 @@ export default function StudentTransactionsScreen() {
       setTotalPages(last?.totalPages ?? 1);
       if (last?.stats) setTxStats(last.stats);
       setTxError(null);
+      setOfflineCachedAt(null);
+      writeCache(CACHE_KEYS.studentTransactions, merged);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error('Failed to refresh transactions:', err);
@@ -528,6 +548,8 @@ export default function StudentTransactionsScreen() {
               </Pressable>
             </View>
           </View>
+
+          {offlineCachedAt && <OfflineBanner cachedAt={offlineCachedAt} theme={theme} />}
 
           {/* Transaction List */}
           {txLoading ? (
