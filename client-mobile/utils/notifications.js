@@ -27,7 +27,7 @@ if (!isExpoGo) {
       shouldShowAlert: true,
       shouldShowBanner: true,
       shouldShowList: true,
-      shouldPlaySound: false,
+      shouldPlaySound: true,
       shouldSetBadge: false,
     }),
   });
@@ -58,9 +58,14 @@ export async function ensureNotificationPermission() {
       ({ status } = await Notifications.requestPermissionsAsync());
     }
     if (Platform.OS === 'android') {
+      // HIGH importance + an explicit sound are both required for Android to
+      // actually play a sound and show a heads-up alert -- DEFAULT importance
+      // alone silently drops both, even though the push payload itself
+      // already requests sound: "default" (server/utils/pushNotifications.js).
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
-        importance: Notifications.AndroidImportance.DEFAULT,
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: 'default',
       });
     }
     if (status === 'granted') {
@@ -75,7 +80,7 @@ export async function notify(title, body) {
   if (!Notifications) return;
   try {
     await Notifications.scheduleNotificationAsync({
-      content: { title, body },
+      content: { title, body, sound: 'default' },
       trigger: null,
     });
   } catch (err) {

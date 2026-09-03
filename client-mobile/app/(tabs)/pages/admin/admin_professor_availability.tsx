@@ -116,6 +116,7 @@ interface FacultyMember {
   currentActivity: string | null;
   email: string;
   weeklyAvailability: AvailabilitySlot[];
+  unavailableReason?: string | null;
 }
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -397,6 +398,7 @@ export default function AdminProfessorAvailabilityScreen() {
                           <Text style={styles.unavailableNoticeText}>
                             This professor is currently unavailable and is not accepting
                             consultations right now.
+                            {f.unavailableReason ? `\nReason: ${f.unavailableReason}` : ''}
                           </Text>
                         </View>
                       ) : daySchedules.length === 0 ? (

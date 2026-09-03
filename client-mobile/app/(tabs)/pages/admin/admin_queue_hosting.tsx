@@ -1606,7 +1606,10 @@ function createStyles(theme: ThemePalette) {
     formModalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 },
     formModalTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
     formModalCloseBtn: { padding: 6, borderRadius: 8 },
-    formScroll: { flexGrow: 0 },
+    // flexShrink: 1, not flexGrow: 0 -- matches the fix applied to every
+    // other modal's scrollable body in this codebase (size to content,
+    // only compress/scroll once the card's own maxHeight is actually hit).
+    formScroll: { flexShrink: 1 },
 
     formErrorBox: {
       flexDirection: 'row',

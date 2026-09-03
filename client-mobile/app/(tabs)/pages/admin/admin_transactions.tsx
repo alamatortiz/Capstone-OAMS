@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -33,9 +34,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import NotificationBell from '@/components/NotificationBell';
+import ExportMenu from '@/components/ExportMenu';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
+import { exportRowsAsCsv } from '@/utils/csvExport';
+import { exportRowsAsPdf } from '@/utils/pdfExport';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
@@ -205,6 +209,7 @@ export default function AdminTransactionsScreen() {
   const [stats, setStats] = useState({ total: 0, queue: 0, appointments: 0, documents: 0, adminActions: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const router = useRouter();
   const { user, token, logout } = useAuth();
   const adminName = user?.name ?? 'Admin';
@@ -324,6 +329,55 @@ export default function AdminTransactionsScreen() {
     return matchesSearch;
   });
 
+  // Shared by both export formats -- same header/rows every time, PDF is
+  // just a second consumer of the identical data (mirrors web's
+  // exportPdf.js/ExportMenu.jsx pairing).
+  const buildExportRows = () => {
+    const header = ['Type', 'Action', 'Requester', 'Processor', 'Details', 'Status', 'Tracking', 'Timestamp'];
+    const rows = filteredTransactions.map((t) => [
+      TYPE_META[t.type]?.label ?? DEFAULT_TYPE_META.label,
+      t.action,
+      t.studentName ? `${t.studentName} (${t.studentId ?? ''})` : '',
+      t.processor,
+      t.details,
+      STATUS_META[t.status]?.label ?? DEFAULT_STATUS_META.label,
+      t.trackingNumber ?? '',
+      t.timestamp,
+    ]);
+    return { header, rows };
+  };
+
+  const handleExportCsv = async () => {
+    if (filteredTransactions.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const { header, rows } = buildExportRows();
+      const csvRows = rows.map((row) => Object.fromEntries(header.map((h, i) => [h, row[i]])));
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+      await exportRowsAsCsv(csvRows, fileName);
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Alert.alert('Error', 'Could not export transactions.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (filteredTransactions.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const { header, rows } = buildExportRows();
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
+      await exportRowsAsPdf({ title: 'Transaction Log', subtitle: adminDepartmentAbbrev, columns: header, rows, filename: fileName });
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Alert.alert('Error', 'Could not export transactions.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     setPage(0);
   }, [searchQuery, filterType, filterStatus, dateRange]);
@@ -434,10 +488,23 @@ export default function AdminTransactionsScreen() {
 
           {/* Filters */}
           <View style={styles.card}>
-            <Text style={styles.cardTitleText}>Transaction Log</Text>
-            <Text style={styles.cardSubtitleText}>
-              Complete history of activity in {adminDepartmentAbbrev}
-            </Text>
+            <View style={styles.filtersHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitleText}>Transaction Log</Text>
+                <Text style={styles.cardSubtitleText}>
+                  Complete history of activity in {adminDepartmentAbbrev}
+                </Text>
+              </View>
+              <ExportMenu
+                theme={theme}
+                triggerStyle={[styles.exportBtn, filteredTransactions.length === 0 && styles.exportBtnDisabled]}
+                triggerTextStyle={styles.exportBtnText}
+                disabled={filteredTransactions.length === 0 || exporting}
+                busy={exporting}
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+              />
+            </View>
 
             <View style={styles.filterField}>
               <View style={styles.searchWrapper}>
@@ -839,6 +906,20 @@ function createStyles(theme: ThemePalette) {
     },
     cardTitleText: { fontSize: 17, fontWeight: '800', color: theme.text },
     cardSubtitleText: { fontSize: 12, color: theme.tertiary, marginTop: -8 },
+    filtersHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
+    exportBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      flexShrink: 0,
+    },
+    exportBtnText: { fontSize: 12, fontWeight: '700', color: theme.text },
+    exportBtnDisabled: { opacity: 0.5 },
 
     // Filters
     filterField: { gap: 6 },

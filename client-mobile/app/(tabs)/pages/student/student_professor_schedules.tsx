@@ -126,6 +126,7 @@ interface Faculty {
   email: string;
   availabilityStatus: 'available' | 'unavailable';
   availability: AvailabilitySlot[];
+  unavailableReason?: string | null;
 }
 
 interface Department {
@@ -462,6 +463,7 @@ export default function StudentProfessorSchedulesScreen() {
                               <AlertCircle size={18} color="#ef4444" />
                               <Text style={styles.unavailableNoticeText}>
                                 This professor is currently unavailable and is not accepting consultations right now.
+                                {professor.unavailableReason ? `\nReason: ${professor.unavailableReason}` : ''}
                               </Text>
                             </View>
                           ) : daySchedules.length === 0 ? (

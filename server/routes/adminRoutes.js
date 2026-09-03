@@ -38,7 +38,6 @@ const {
   SUBMISSION_REQUIRED_PRIOR_STATUS,
 } = require("../utils/documentStatus");
 const { createNotification, createNotificationsBatch } = require("../utils/notifications");
-const { sendPushNotification } = require("../utils/pushNotifications");
 const { getFacultyAvailabilityToday } = require("../utils/facultyAvailability");
 const { sendServerError } = require("../utils/errorResponse");
 
@@ -910,16 +909,14 @@ router.patch(
       emitToUser(next.student_id, "queue:called", calledPayload);
       emitToDept(deptId, "queue:called", calledPayload);
       const calledLocationPart = next.location_name ? ` at ${next.location_name}` : "";
+      // createNotification() below also fires the mobile Expo push (with
+      // sound) and the browser web push for this event -- no separate
+      // sendPushNotification() call needed here anymore, since that would
+      // double-send. See notifications.js for the shared push hook.
       createNotification(
         next.student_id,
         `You've been called for ${next.service_name}! Please proceed${calledLocationPart}.`,
         "queue",
-      );
-      sendPushNotification(
-        next.student_id,
-        "You've been called!",
-        `${next.service_name} — please proceed${calledLocationPart}.`,
-        { type: "queue:called", slotId, queueId: next.queue_id },
       );
 
       res.json({ message: "Next student called", queueId: next.queue_id });

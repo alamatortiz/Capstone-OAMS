@@ -1,16 +1,18 @@
 const pool = require("../db");
 const { sendWebPush } = require("./webPush");
+const { sendPushNotification } = require("./pushNotifications");
 
 // `type` is required (not defaulted) so every call site states its category
 // explicitly -- a forgotten conversion fails loudly here instead of silently
 // miscategorizing a notification under some other type.
 //
-// Also fires a browser Web Push notification for whichever devices this
-// user has subscribed on -- fire-and-forget, since sendWebPush already
-// no-ops for any user with zero subscriptions (every non-student role,
-// until a later round adds their own opt-in UI) and never throws back up.
-// Hooking it here rather than at each of this function's ~15+ call sites
-// means every existing notification type gets push coverage for free.
+// Also fires a browser Web Push notification and a mobile Expo push
+// notification (with sound -- see pushNotifications.js) for whichever
+// devices/subscriptions this user has -- fire-and-forget, since both
+// senders already no-op for a user with zero tokens/subscriptions and
+// never throw back up. Hooking both here rather than at each of this
+// function's ~15+ call sites means every existing notification type gets
+// full push coverage, on every platform, for free.
 async function createNotification(userId, message, type) {
   if (!userId || !message || !type) return;
   try {
@@ -20,6 +22,9 @@ async function createNotification(userId, message, type) {
     );
     sendWebPush(userId, "OAMS", message, { type }).catch((err) =>
       console.error("Web push dispatch error:", err.message),
+    );
+    sendPushNotification(userId, "OAMS", message, { type }).catch((err) =>
+      console.error("Mobile push dispatch error:", err.message),
     );
   } catch (err) {
     console.error("Notification insert error:", err.message);
@@ -42,11 +47,14 @@ async function createNotificationsBatch(userIds, message, type) {
       `INSERT INTO notifications (user_id, message, type) VALUES ?`,
       [values],
     );
-    ids.forEach((id) =>
+    ids.forEach((id) => {
       sendWebPush(id, "OAMS", message, { type }).catch((err) =>
         console.error("Web push dispatch error:", err.message),
-      ),
-    );
+      );
+      sendPushNotification(id, "OAMS", message, { type }).catch((err) =>
+        console.error("Mobile push dispatch error:", err.message),
+      );
+    });
   } catch (err) {
     console.error("Notification batch insert error:", err.message);
   }

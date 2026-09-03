@@ -25,6 +25,8 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import ExportMenu from '@/components/ExportMenu';
+import { exportRowsAsPdf } from '@/utils/pdfExport';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -289,19 +291,27 @@ export default function ProfessorTransactionsScreen() {
     };
   }, [user, token, fetchTransactions, fetchStats]);
 
-  const handleExport = async () => {
+  // Shared by both export formats -- same header/rows CSV always built,
+  // PDF is just a second consumer of the identical data (mirrors web's
+  // exportPdf.js/ExportMenu.jsx pairing).
+  const buildExportRows = () => {
+    const header = ['Type', 'Status', 'Details', 'Student/Tracking', 'Date', 'Time'];
+    const rows = filtered.map((t) => [
+      TYPE_META[t.type].label,
+      STATUS_META[t.status].label,
+      t.details,
+      t.type === 'document' || t.type === 'submission' ? t.trackingNumber ?? '' : `${t.studentName ?? ''} (${t.studentId ?? ''})`,
+      formatDateOnly(t.date),
+      formatTimeOnly(t.date),
+    ]);
+    return { header, rows };
+  };
+
+  const handleExportCsv = async () => {
     if (filtered.length === 0 || exporting) return;
     setExporting(true);
     try {
-      const header = ['Type', 'Status', 'Details', 'Student/Tracking', 'Date', 'Time'];
-      const rows = filtered.map((t) => [
-        TYPE_META[t.type].label,
-        STATUS_META[t.status].label,
-        t.details,
-        t.type === 'document' || t.type === 'submission' ? t.trackingNumber ?? '' : `${t.studentName ?? ''} (${t.studentId ?? ''})`,
-        formatDateOnly(t.date),
-        formatTimeOnly(t.date),
-      ]);
+      const { header, rows } = buildExportRows();
       const csv = [header, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
       const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
       const uri = `${FileSystem.cacheDirectory}${fileName}`;
@@ -312,6 +322,21 @@ export default function ProfessorTransactionsScreen() {
         return;
       }
       await Sharing.shareAsync(uri, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text' });
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Toast.show({ type: 'error', text1: 'Could not export transactions.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (filtered.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const { header, rows } = buildExportRows();
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
+      await exportRowsAsPdf({ title: 'Transaction History', columns: header, rows, filename: fileName });
     } catch (err) {
       console.error('Export transactions error:', err);
       Toast.show({ type: 'error', text1: 'Could not export transactions.' });
@@ -431,14 +456,15 @@ export default function ProfessorTransactionsScreen() {
                 <Text style={styles.filtersTitle}>Transaction Filter</Text>
                 <Text style={styles.filtersDescription}>Search and filter transactions</Text>
               </View>
-              <Pressable
-                style={[styles.exportBtn, filtered.length === 0 && styles.exportBtnDisabled]}
-                onPress={handleExport}
+              <ExportMenu
+                theme={theme}
+                triggerStyle={[styles.exportBtn, filtered.length === 0 && styles.exportBtnDisabled]}
+                triggerTextStyle={styles.exportBtnText}
                 disabled={filtered.length === 0 || exporting}
-              >
-                <Ionicons name="download-outline" size={14} color={theme.text} />
-                <Text style={styles.exportBtnText}>{exporting ? 'Exporting…' : 'Export'}</Text>
-              </Pressable>
+                busy={exporting}
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+              />
             </View>
 
             <View style={styles.filterField}>

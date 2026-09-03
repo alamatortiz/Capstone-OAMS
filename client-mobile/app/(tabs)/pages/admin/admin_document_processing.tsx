@@ -165,6 +165,8 @@ interface DocumentRequest {
   officialCode?: string | null;
   studentFiles?: DocumentAttachment[];
   adminFiles?: DocumentAttachment[];
+  isDigitalDelivery?: boolean;
+  deliveryCode?: string | null;
 }
 
 interface NavItem {
@@ -531,6 +533,35 @@ export default function AdminDocumentProcessingScreen() {
       if (isSubmission) await fetchDocuments();
     } catch {
       Alert.alert('Error', 'Failed to update document status.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // "Skip the physical hand-off" shortcut -- mirrors adm-document-processing.jsx's
+  // handleGenerateDocument. Only valid from 'ready' and only for actual
+  // requests (not submissions, which have no delivery-code column at all).
+  // Leaves the detail modal open (unlike handleUpdateStatus) so the returned
+  // deliveryCode can be shown immediately.
+  const handleGenerateDocument = async () => {
+    if (!selectedDocument || selectedDocument.source === 'submission') return;
+    const endpoint = selectedDocument.source === 'faculty'
+      ? `/admin/faculty-document-processing/${selectedDocument.id}/generate`
+      : `/admin/document-processing/${selectedDocument.id}/generate`;
+    setUpdating(true);
+    try {
+      const { data } = await api.patch(endpoint);
+      const todayStr = weekDates.todayStr;
+      const patch = {
+        status: 'released' as DocumentStatus,
+        releasedDate: todayStr,
+        isDigitalDelivery: true,
+        deliveryCode: data.deliveryCode as string,
+      };
+      setDocuments((prev) => prev.map((d) => (d.id === selectedDocument.id ? { ...d, ...patch } : d)));
+      setSelectedDocument((prev) => (prev ? { ...prev, ...patch } : prev));
+    } catch {
+      Alert.alert('Error', 'Failed to generate document.');
     } finally {
       setUpdating(false);
     }
@@ -1041,6 +1072,24 @@ export default function AdminDocumentProcessingScreen() {
                       <Text style={styles.detailsActionBtnTextPrimary}>Mark as Released</Text>
                     </Pressable>
                   )}
+                  {selectedDocument.status === 'ready' && selectedDocument.source !== 'submission' && (
+                    <Pressable
+                      style={[styles.detailsActionBtn, styles.detailsActionBtnOutline, updating && { opacity: 0.6 }]}
+                      onPress={() =>
+                        Alert.alert(
+                          'Generate Document',
+                          "Skip the physical hand-off and generate a QR + text pickup code instead? This is a testing prototype, not the normal release process.",
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Generate', onPress: handleGenerateDocument },
+                          ],
+                        )
+                      }
+                      disabled={updating}
+                    >
+                      <Text style={styles.detailsActionBtnTextOutline}>Generate Document</Text>
+                    </Pressable>
+                  )}
                   {selectedDocument.status === 'released' && (
                     <Pressable style={[styles.detailsActionBtn, styles.detailsActionBtnSuccess]} onPress={() => setConfirmStatus('claimed')}>
                       <Text style={styles.detailsActionBtnTextPrimary}>Mark as Claimed</Text>
@@ -1062,6 +1111,13 @@ export default function AdminDocumentProcessingScreen() {
                     </Pressable>
                   )}
                 </View>
+
+                {!!selectedDocument.isDigitalDelivery && !!selectedDocument.deliveryCode && (
+                  <View style={styles.deliveryCodeBox}>
+                    <Text style={styles.deliveryCodeLabel}>Digital Pickup Code</Text>
+                    <Text style={styles.deliveryCodeValue}>{selectedDocument.deliveryCode}</Text>
+                  </View>
+                )}
               </ScrollView>
 
               <View style={styles.detailsModalFooter}>
@@ -1506,8 +1562,20 @@ function createStyles(theme: ThemePalette) {
     detailsActionBtnPrimary: { backgroundColor: '#f97316' },
     detailsActionBtnSuccess: { backgroundColor: '#059669' },
     detailsActionBtnDanger: { borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)', backgroundColor: 'rgba(239, 68, 68, 0.08)' },
+    detailsActionBtnOutline: { borderWidth: 1, borderColor: 'rgba(124, 58, 237, 0.4)', backgroundColor: 'rgba(124, 58, 237, 0.08)' },
     detailsActionBtnTextPrimary: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
     detailsActionBtnTextDanger: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    detailsActionBtnTextOutline: { fontSize: 13, fontWeight: '700', color: '#7c3aed' },
+    deliveryCodeBox: {
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(124, 58, 237, 0.3)',
+      backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    },
+    deliveryCodeLabel: { fontSize: 11, fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+    deliveryCodeValue: { fontSize: 13, fontWeight: '700', color: theme.text, fontFamily: 'monospace' },
 
     detailsModalFooter: {
       flexDirection: 'row',

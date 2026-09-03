@@ -25,6 +25,9 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import ExportMenu from '@/components/ExportMenu';
+import { exportRowsAsCsv } from '@/utils/csvExport';
+import { exportRowsAsPdf } from '@/utils/pdfExport';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 type LucideIconType = typeof ClipboardList;
@@ -164,6 +167,7 @@ export default function StudentTransactionsScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
+  const [exporting, setExporting] = useState(false);
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -346,6 +350,57 @@ export default function StudentTransactionsScreen() {
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
   const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
+  // Export needs the student's whole (filtered) history, not just whatever
+  // page is currently loaded on-screen -- mirrors stud-transactions.jsx's
+  // own fetchExportRows(), a separate one-shot fetch capped at 100 rows.
+  const fetchExportRows = async () => {
+    const { data } = await api.get('/student/transactions', {
+      params: {
+        search: debouncedSearch || undefined,
+        type: filterType !== 'all' ? filterType : undefined,
+        status: filterStatus !== 'all' ? filterStatus : undefined,
+        limit: 100,
+        page: 1,
+      },
+    });
+    const header = ['Type', 'Title', 'Details', 'Status', 'College', 'Date', 'Time'];
+    const rows = (data.transactions ?? []).map((t: Transaction) => [
+      t.type, t.title, t.details, t.status, t.college, t.date, t.time,
+    ]);
+    return { header, rows };
+  };
+
+  const handleExportCsv = async () => {
+    if (transactions.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const { header, rows } = await fetchExportRows();
+      const csvRows = rows.map((row: string[]) => Object.fromEntries(header.map((h, i) => [h, row[i]])));
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+      await exportRowsAsCsv(csvRows, fileName);
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Toast.show({ type: 'error', text1: 'Could not export your transaction history.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (transactions.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      const { header, rows } = await fetchExportRows();
+      const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
+      await exportRowsAsPdf({ title: 'Transaction History', subtitle: user?.name ?? 'Student', columns: header, rows, filename: fileName });
+    } catch (err) {
+      console.error('Export transactions error:', err);
+      Toast.show({ type: 'error', text1: 'Could not export your transaction history.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Search/type/status filtering already happened server-side, so `transactions`
   // is the page to render as-is.
   const stats: { key: string; label: string; value: number; icon: LucideIconType; color: string; bg: string; border: string }[] = [
@@ -427,8 +482,21 @@ export default function StudentTransactionsScreen() {
 
           {/* Filters */}
           <View style={styles.filtersCard}>
-            <Text style={styles.filtersTitle}>Transaction Filter</Text>
-            <Text style={styles.filtersDescription}>Search and filter your transactions.</Text>
+            <View style={styles.filtersHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.filtersTitle}>Transaction Filter</Text>
+                <Text style={styles.filtersDescription}>Search and filter your transactions.</Text>
+              </View>
+              <ExportMenu
+                theme={theme}
+                triggerStyle={[styles.exportBtn, transactions.length === 0 && styles.exportBtnDisabled]}
+                triggerTextStyle={styles.exportBtnText}
+                disabled={transactions.length === 0 || exporting}
+                busy={exporting}
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+              />
+            </View>
 
             <View style={styles.filterField}>
               <Text style={styles.filterLabel}>Search</Text>
@@ -784,6 +852,20 @@ function createStyles(theme: ThemePalette) {
     },
     filtersTitle: { fontSize: 17, fontWeight: '800', color: theme.text, textAlign: 'center' },
     filtersDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', marginTop: -8 },
+    filtersHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
+    exportBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      flexShrink: 0,
+    },
+    exportBtnText: { fontSize: 12, fontWeight: '700', color: theme.text },
+    exportBtnDisabled: { opacity: 0.5 },
     filterField: { gap: 6 },
     filterLabel: { fontSize: 12, fontWeight: '700', color: theme.text },
     searchWrapper: {

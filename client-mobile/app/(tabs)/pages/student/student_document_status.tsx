@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import QRCode from 'react-native-qrcode-svg';
 import {
   AlertCircle, Calendar, CheckCircle, ChevronLeft, FileText, Home as HomeIcon, Loader2,
   Megaphone, MessageSquare, Users, XCircle, ClipboardList,
@@ -143,6 +144,8 @@ interface DocumentRecord {
   releasedDate?: string;
   studentFiles?: DocumentAttachment[];
   adminFiles?: DocumentAttachment[];
+  isDigitalDelivery?: boolean;
+  deliveryCode?: string;
 }
 
 interface DocumentRequirement {
@@ -207,6 +210,7 @@ export default function StudentDocumentStatusScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, DocumentTypeOption[]>>({});
   const [reqLoading, setReqLoading] = useState(true);
   const router = useRouter();
@@ -344,6 +348,22 @@ export default function StudentDocumentStatusScreen() {
     }
   };
 
+  const confirmReceipt = async () => {
+    if (!selectedDoc || confirmingReceipt) return;
+    setConfirmingReceipt(true);
+    try {
+      await api.patch(`/student/documents/${selectedDoc.id}/confirm-receipt`);
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === selectedDoc.id ? { ...d, status: 'claimed' } : d)),
+      );
+    } catch (err: any) {
+      console.error('Confirm receipt error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? 'Could not confirm receipt.');
+    } finally {
+      setConfirmingReceipt(false);
+    }
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -382,6 +402,8 @@ export default function StudentDocumentStatusScreen() {
               backLabel={fromDocumentsPage ? 'Document Requests' : 'All Documents'}
               onBack={() => (fromDocumentsPage ? router.push('/pages/student/student_documents') : setSelectedDocId(null))}
               onCancel={() => setShowCancelDialog(true)}
+              onConfirmReceipt={confirmReceipt}
+              confirmingReceipt={confirmingReceipt}
               requirements={selectedDocRequirements}
               reqLoading={reqLoading}
             />
@@ -714,6 +736,8 @@ function DocumentDetail({
   backLabel,
   onBack,
   onCancel,
+  onConfirmReceipt,
+  confirmingReceipt,
   requirements,
   reqLoading,
 }: {
@@ -725,6 +749,8 @@ function DocumentDetail({
   backLabel: string;
   onBack: () => void;
   onCancel: () => void;
+  onConfirmReceipt: () => void;
+  confirmingReceipt: boolean;
   requirements: DocumentRequirement[];
   reqLoading: boolean;
 }) {
@@ -821,6 +847,37 @@ function DocumentDetail({
             Your document has been released to the designated location — visit to complete pickup.
           </Text>
         </LinearGradient>
+      )}
+
+      {/* Digital Pickup Code -- shown once an admin used "Generate Document" instead of a physical hand-off */}
+      {doc.isDigitalDelivery && doc.deliveryCode && (doc.status === 'released' || doc.status === 'claimed') && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="qr-code-outline" size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Digital Pickup Code</Text>
+            </View>
+          </View>
+          <View style={styles.qrWrap}>
+            <View style={styles.qrBox}>
+              <QRCode value={doc.deliveryCode} size={160} />
+            </View>
+            <Text style={styles.deliveryCodeText}>{doc.deliveryCode}</Text>
+            {doc.status === 'released' ? (
+              <Pressable
+                style={[styles.confirmReceiptBtn, confirmingReceipt && { opacity: 0.6 }]}
+                onPress={onConfirmReceipt}
+                disabled={confirmingReceipt}
+              >
+                <Text style={styles.confirmReceiptBtnText}>
+                  {confirmingReceipt ? 'Confirming…' : 'Confirm Received'}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.claimedNote}>Receipt confirmed — kept here as a record.</Text>
+            )}
+          </View>
+        </View>
       )}
 
       {/* Request details */}
@@ -1184,6 +1241,17 @@ function createStyles(theme: ThemePalette) {
       borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background,
     },
     attachChipText: { flex: 1, fontSize: 12.5, color: theme.text },
+
+    // Digital Pickup Code card (QR + text code, "Confirm Received" button)
+    qrWrap: { alignItems: 'center', paddingVertical: 8, gap: 12 },
+    qrBox: { padding: 12, backgroundColor: '#ffffff', borderRadius: 12 },
+    deliveryCodeText: { fontSize: 15, fontWeight: '700', color: theme.text, fontFamily: 'monospace', letterSpacing: 1 },
+    confirmReceiptBtn: {
+      alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
+      borderRadius: 12, backgroundColor: '#059669', width: '100%', marginTop: 4,
+    },
+    confirmReceiptBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    claimedNote: { fontSize: 12, color: theme.subtext, textAlign: 'center', marginTop: 4 },
     reqDescText: { fontSize: 11.5, color: theme.tertiary, opacity: 0.85 },
     hintRequirementNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     reqTagRequired: {

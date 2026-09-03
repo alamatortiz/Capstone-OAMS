@@ -25,6 +25,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
+import QueueReasonModal from '@/components/QueueReasonModal';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -228,6 +229,9 @@ export default function ProfessorDashboardScreen() {
   useDrawerSwipeOpen(() => setMenuOpen(true));
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [unavailableReasonModalOpen, setUnavailableReasonModalOpen] = useState(false);
+  const [unavailableReasonText, setUnavailableReasonText] = useState('');
+  const [unavailableReasonSubmitting, setUnavailableReasonSubmitting] = useState(false);
   const router = useRouter();
   const { user, logout, token } = useAuth();
 
@@ -379,17 +383,40 @@ export default function ProfessorDashboardScreen() {
   const comingSoon = () =>
     Alert.alert('Coming soon', 'This section is not wired up yet on mobile.');
 
+  // Going Available needs no reason and fires immediately. Going Unavailable
+  // requires one -- the server 400s otherwise (professorRoutes.js) -- so that
+  // path just opens the reason modal instead; the actual PATCH happens in
+  // confirmMarkUnavailable() once the professor submits a reason.
   const toggleAvailability = async (value: boolean) => {
+    if (!value) {
+      setUnavailableReasonText('');
+      setUnavailableReasonModalOpen(true);
+      return;
+    }
     const prev = isAvailable;
-    setIsAvailable(value);
+    setIsAvailable(true);
     try {
-      await api.patch('/professor/availability-status', {
-        status: value ? 'available' : 'unavailable',
-      });
+      await api.patch('/professor/availability-status', { status: 'available' });
     } catch (err) {
       console.error('Update availability error:', err);
       setIsAvailable(prev);
       Alert.alert('Error', 'Could not update availability status.');
+    }
+  };
+
+  const confirmMarkUnavailable = async (reason: string) => {
+    if (!reason.trim() || unavailableReasonSubmitting) return;
+    setUnavailableReasonSubmitting(true);
+    try {
+      await api.patch('/professor/availability-status', { status: 'unavailable', reason: reason.trim() });
+      setIsAvailable(false);
+      setUnavailableReasonModalOpen(false);
+      setUnavailableReasonText('');
+    } catch (err) {
+      console.error('Update availability error:', err);
+      Alert.alert('Error', 'Could not update availability status.');
+    } finally {
+      setUnavailableReasonSubmitting(false);
     }
   };
 
@@ -925,6 +952,24 @@ export default function ProfessorDashboardScreen() {
           </View>
         </View>
       </Modal>
+
+      <QueueReasonModal
+        visible={unavailableReasonModalOpen}
+        title="Mark Yourself Unavailable"
+        message="Let students and admins know why you're unavailable right now. This reason will be shown wherever your schedule is visible."
+        confirmText={unavailableReasonSubmitting ? 'Submitting...' : 'Confirm'}
+        confirmColor="#ef4444"
+        reason={unavailableReasonText}
+        onChangeReason={setUnavailableReasonText}
+        onCancel={() => {
+          setUnavailableReasonModalOpen(false);
+          setUnavailableReasonText('');
+        }}
+        onConfirm={() => confirmMarkUnavailable(unavailableReasonText)}
+        theme={theme}
+        styles={styles}
+        submitting={unavailableReasonSubmitting}
+      />
     </View>
   );
 }
@@ -1708,5 +1753,56 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '700',
       color: '#ffffff',
     },
+
+    // Availability-reason modal chrome (shared shape with QueueReasonModal's
+    // other consumer, admin_queue_hosting.tsx) -- reuses logoutOverlay's
+    // backdrop as its own `modalOverlay` prop.
+    modalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 24,
+    },
+    confirmModalCard: {
+      width: '100%',
+      maxWidth: 340,
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+    },
+    confirmIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    confirmTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 8, textAlign: 'center' },
+    confirmDescription: { fontSize: 13, color: theme.subtext, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    confirmActionsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    cancelBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+    },
+    cancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    confirmBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
+    confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    formSubmitBtnDisabled: { opacity: 0.6 },
   });
 }

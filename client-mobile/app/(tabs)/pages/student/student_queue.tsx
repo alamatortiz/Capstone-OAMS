@@ -1728,7 +1728,15 @@ function createStyles(theme: ThemePalette) {
     },
     dialogHeaderTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
     dialogHeaderSubtitle: { fontSize: 12, color: theme.tertiary, marginTop: 4 },
-    dialogBody: { padding: 18 },
+    // flexShrink: 1 -- deliberately NOT bare padding, which lets this
+    // ScrollView grow to its full unclipped content height (Requirements +
+    // Procedure Steps are backend-configured, open-ended text). Combined with
+    // dialogCard's maxHeight + overflow: 'hidden' above, that clips
+    // dialogActions -- including the primary "Join Queue" button -- off the
+    // bottom of the card once content gets long enough. flexShrink: 1 sizes
+    // this normally and only compresses (becoming internally scrollable) once
+    // the card's maxHeight cap is actually hit, keeping the footer visible.
+    dialogBody: { flexShrink: 1, padding: 18 },
     dialogActions: {
       flexDirection: 'row', gap: 10, justifyContent: 'flex-end',
       padding: 18, borderTopWidth: 1, borderTopColor: theme.border,
