@@ -18,6 +18,7 @@ import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { getDocStatusDetailMeta } from "../../utils/documentStatus";
+import { QRCodeSVG } from "qrcode.react";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 
@@ -71,7 +72,7 @@ async function openSubmissionFile(submissionId, file) {
 }
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Documents", requirements, reqLoading }) {
+function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, confirmingReceipt, backLabel = "All Documents", requirements, reqLoading }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const statusMeta = getDocStatusDetailMeta(doc.status);
   const canCancel = doc.status === "pending" || doc.status === "processing";
@@ -154,6 +155,48 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, backLabel = "All Do
         >
           <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
           Your document has been released to the designated location — visit to complete pickup.
+        </div>
+      )}
+
+      {/* Digital delivery: QR + text code, prototype for testing --
+          replaces the in-person "Mark as Claimed" step with the faculty
+          member confirming receipt themselves. Kept visible (not just while
+          "released") even after being claimed -- it doubles as a
+          verification/audit record either side can point back to if the
+          claimed status itself is ever in question. Only the action button
+          goes away once there's nothing left to confirm. */}
+      {doc.isDigitalDelivery && (doc.status === "released" || doc.status === "claimed") && (
+        <div className="dss-card">
+          <div className="dss-card-header">
+            <h3 className="dss-card-title">
+              <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem" }} />
+              Digital Pickup Code
+            </h3>
+          </div>
+          <div
+            className="dss-card-content"
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}
+          >
+            <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: 0, textAlign: "center" }}>
+              {doc.status === "claimed"
+                ? "Receipt already confirmed. Kept here for verification purposes."
+                : "Show this QR code (or read out the text code) to the office, then confirm below once you've received your document. (Testing prototype — not the normal pickup process.)"}
+            </p>
+            <QRCodeSVG value={doc.deliveryCode} size={160} />
+            <p style={{ fontWeight: 700, fontSize: "1rem", letterSpacing: "0.03em", margin: 0 }}>
+              {doc.deliveryCode}
+            </p>
+            {doc.status === "released" && (
+              <button
+                type="button"
+                className="dss-confirm-receipt-btn"
+                disabled={confirmingReceipt}
+                onClick={() => onConfirmReceipt(doc.id)}
+              >
+                {confirmingReceipt ? "Confirming…" : "Confirm Received"}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -401,6 +444,7 @@ export default function ProfessorDocumentStatus() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const [documentTypes, setDocumentTypes] = useState([]);
   const [reqLoading, setReqLoading] = useState(true);
 
@@ -445,6 +489,8 @@ export default function ProfessorDocumentStatus() {
           neededBy: r.needed_by || undefined,
           releasedDate: r.released_at || undefined,
           claimedDate: r.claimed_at || undefined,
+          isDigitalDelivery: !!r.is_digital_delivery,
+          deliveryCode: r.delivery_code || undefined,
           facultyFiles: r.faculty_files || [],
           adminFiles: r.admin_files || [],
         })),
@@ -527,6 +573,26 @@ export default function ProfessorDocumentStatus() {
     }
   };
 
+  // "Generate Document" prototype -- self-service counterpart to admin's
+  // Generate Document action. doc.id is prefixed ("req-12") from GET
+  // /documents; confirm-receipt only ever applies to requests, so the
+  // prefix is stripped here rather than teaching the route to parse it.
+  const handleConfirmReceipt = async (docId) => {
+    const rawId = docId.replace(/^req-/, "");
+    setConfirmingReceipt(true);
+    try {
+      await api.patch(`/professor/documents/${rawId}/confirm-receipt`);
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === docId ? { ...d, status: "claimed" } : d)),
+      );
+      toast.success("Receipt confirmed — thanks!");
+    } catch (err) {
+      toast.error(err?.response?.data?.message ?? "Failed to confirm receipt.");
+    } finally {
+      setConfirmingReceipt(false);
+    }
+  };
+
   const activeDocuments = documents.filter(
     (d) => d.status !== "claimed" && d.status !== "rejected" && d.status !== "cancelled",
   );
@@ -551,6 +617,8 @@ export default function ProfessorDocumentStatus() {
             }
             onCancel={handleCancel}
             cancelling={cancelling}
+            onConfirmReceipt={handleConfirmReceipt}
+            confirmingReceipt={confirmingReceipt}
             requirements={selectedDocRequirements}
             reqLoading={reqLoading}
           />

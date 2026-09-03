@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronLeft, CalendarClock } from "lucide-react";
+import { ChevronLeft, CalendarClock, ChevronDown } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
@@ -48,9 +49,16 @@ function fmt12(t) {
   return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
 }
 
-// ── End-time picker (Google-Calendar-style fixed durations) ────────────────────
-const DURATION_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90];
-const END_CAP_MIN = 23 * 60 + 59; // 11:59 PM -- never crosses into the next day
+// ── End-time picker (common durations: 5/10/15/30 min, then every 30 min) ──────
+// 5, 10, 15, 30, 60, 90, 120, ... -- generous upper bound (24h) so the ladder
+// always reaches END_CAP_MIN regardless of how early the chosen start time
+// is; getEndTimeOptions trims anything past it.
+const DURATION_MINUTES = (() => {
+  const list = [5, 10, 15, 30];
+  for (let d = 60; d <= 24 * 60; d += 30) list.push(d);
+  return list;
+})();
+const END_CAP_MIN = 20 * 60; // 8:00 PM -- the office's latest suggested consultation end time
 
 function toMinutes(t) {
   const [h, m] = t.split(":").map(Number);
@@ -66,25 +74,127 @@ function formatDuration(min) {
   const h = Math.floor(min / 60), rem = min % 60;
   return rem === 0 ? `${h} hr` : `${h} hr ${rem} min`;
 }
-// Generates the fixed-duration end-time options for a given start time, capped
-// at 11:59 PM. currentEnd (when editing an existing slot) is injected as its
-// own option if its duration doesn't match any of the standard ones, so a
-// legacy/non-standard slot length is never silently dropped from the list.
+// Generates the ladder of end-time options for a given start time, capped at
+// the absolute 8:00 PM cutoff (not a duration relative to start) -- so a
+// start time late in the day naturally offers a shorter ladder. The cap
+// itself is always included as the final option even when it doesn't land
+// exactly on one of the standard durations from this particular start time,
+// so "...and so on til 8:00 PM" is always reachable without falling back to
+// Custom time.
+// currentEnd (when editing an existing slot) is injected as its own option
+// if it doesn't already match one on the ladder, so a legacy/custom slot
+// length is never silently dropped from the list.
 function getEndTimeOptions(startTime, currentEnd) {
   if (!startTime) return [];
   const startMin = toMinutes(startTime);
-  let opts = DURATION_MINUTES
+  const opts = DURATION_MINUTES
     .map((dur) => startMin + dur)
     .filter((end) => end <= END_CAP_MIN)
     .map((end) => ({ value: toHHMM(end), duration: end - startMin }));
-  if (opts.length === 0 && startMin < END_CAP_MIN) {
-    opts = [{ value: toHHMM(END_CAP_MIN), duration: END_CAP_MIN - startMin }];
+  if (startMin < END_CAP_MIN && !opts.some((o) => o.value === toHHMM(END_CAP_MIN))) {
+    opts.push({ value: toHHMM(END_CAP_MIN), duration: END_CAP_MIN - startMin });
   }
   if (currentEnd && !opts.some((o) => o.value === currentEnd)) {
     const dur = toMinutes(currentEnd) - startMin;
     if (dur > 0) opts.push({ value: currentEnd, duration: dur });
   }
   return opts.sort((a, b) => a.duration - b.duration);
+}
+
+// Custom dropdown for End Time, in place of a plain native <select> --
+// a native select's popup list is rendered by the OS and its height can't be
+// constrained by CSS, so with ~28 generated durations it opened as one huge
+// overwhelming list. This shows only ~5 rows at a time (Google-Calendar-
+// style) with the rest reachable by scrolling inside the panel. Portaled to
+// <body> with position:fixed (mirrors NotificationBell.jsx's dropdown) since
+// the Add/Edit Slot modal (.sa-modal) has overflow-y:auto and would
+// otherwise clip the panel wherever it extends past the modal's own bounds.
+function EndTimePicker({ options, value, disabled, placeholder, onSelect, onCustomSelect }) {
+  const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState(null);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClickOutside = (e) => {
+      const insideTrigger = triggerRef.current?.contains(e.target);
+      const insidePanel = panelRef.current?.contains(e.target);
+      if (!insideTrigger && !insidePanel) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) {
+      setPanelStyle(null);
+      return;
+    }
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPanelStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value);
+  const label = selected ? `${fmt12(selected.value)} (${formatDuration(selected.duration)})` : placeholder;
+
+  return (
+    <div ref={triggerRef} className="sa-endtime-picker">
+      <button
+        type="button"
+        className="sa-input sa-select sa-endtime-trigger"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{label}</span>
+        <ChevronDown className="sa-endtime-chevron" />
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            className="sa-endtime-panel"
+            ref={panelRef}
+            style={panelStyle ?? { position: "fixed", visibility: "hidden" }}
+            role="listbox"
+          >
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={o.value === value}
+                className={`sa-endtime-option${o.value === value ? " is-selected" : ""}`}
+                onClick={() => {
+                  onSelect(o.value);
+                  setOpen(false);
+                }}
+              >
+                {fmt12(o.value)} <span className="sa-endtime-duration">({formatDuration(o.duration)})</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="sa-endtime-option sa-endtime-option--custom"
+              onClick={() => {
+                onCustomSelect();
+                setOpen(false);
+              }}
+            >
+              Custom time…
+            </button>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -586,32 +696,19 @@ export default function ProfessorScheduleManager() {
                 </div>
                 <div className="sa-form-group">
                   <label>End Time *</label>
-                  <select
-                    className="sa-input sa-select"
-                    value={endCustom ? "__custom__" : addEnd}
+                  <EndTimePicker
+                    options={endOptions}
+                    value={endCustom ? "" : addEnd}
                     disabled={!addStart || modalLocked}
-                    onChange={(e) => {
-                      if (e.target.value === "__custom__") {
-                        setEndCustom(true);
-                        setAddEnd("");
-                      } else {
-                        setEndCustom(false);
-                        setAddEnd(e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="">
-                      {!addStart ? "Select a start time first"
+                    placeholder={
+                      !addStart ? "Select a start time first"
+                        : endCustom ? "Custom time…"
                         : endOptions.length === 0 ? "No end times available"
-                        : "Select end time"}
-                    </option>
-                    {endOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {fmt12(o.value)} ({formatDuration(o.duration)})
-                      </option>
-                    ))}
-                    {addStart && <option value="__custom__">Custom time…</option>}
-                  </select>
+                        : "Select end time"
+                    }
+                    onSelect={(val) => { setEndCustom(false); setAddEnd(val); }}
+                    onCustomSelect={() => { setEndCustom(true); setAddEnd(""); }}
+                  />
                   {endCustom && (
                     <input
                       className="sa-input"
@@ -624,7 +721,7 @@ export default function ProfessorScheduleManager() {
                   )}
                   {addStart && !endCustom && endOptions.length === 0 && (
                     <p className="sa-field-hint sa-field-hint--warning">
-                      No end times available — pick a start time before 11:59 PM.
+                      No end times available — pick a start time before 8:00 PM.
                     </p>
                   )}
                 </div>

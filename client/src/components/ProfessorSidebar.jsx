@@ -5,6 +5,7 @@ import { FileText as LucideFileText, Megaphone as LucideMegaphone } from "lucide
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
+import QueueReasonModal from "./QueueReasonModal";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import api from "../utils/api";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
@@ -131,6 +132,10 @@ export default function ProfessorSidebar() {
   // ── Availability status (quick Available/Unavailable toggle) ──────────────
   const [profStatus, setProfStatus] = useState("available");
   const [statusSaving, setStatusSaving] = useState(false);
+  // Going unavailable requires a reason (shown to admin/students downstream);
+  // going back to available never needs one, so only this direction opens a
+  // modal -- mirrors QueueReasonModal's other call site (pausing a queue).
+  const [showUnavailableModal, setShowUnavailableModal] = useState(false);
 
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
@@ -148,20 +153,40 @@ export default function ProfessorSidebar() {
     if (authUser) fetchStatus();
   }, [authUser]);
 
+  // Going to unavailable needs a reason first, so this only handles the
+  // available -> unavailable direction by opening the modal; the actual PATCH
+  // for that direction happens in confirmMarkUnavailable below once a reason
+  // is submitted. The other direction (back to available) never needs a
+  // reason, so it still PATCHes immediately here.
   const handleToggleStatus = async () => {
-    const next = profStatus === "available" ? "unavailable" : "available";
-    const previous = profStatus;
-    setProfStatus(next); // optimistic
+    if (profStatus === "available") {
+      setShowUnavailableModal(true);
+      return;
+    }
+    setProfStatus("available"); // optimistic
     setStatusSaving(true);
     try {
-      await api.patch("/professor/availability-status", { status: next });
-      toast.success(
-        next === "available"
-          ? "You're marked Available to students"
-          : "You're marked Unavailable — your slots are hidden from students",
-      );
+      await api.patch("/professor/availability-status", { status: "available" });
+      toast.success("You're marked Available to students");
     } catch {
-      setProfStatus(previous); // revert
+      setProfStatus("unavailable"); // revert
+      toast.error("Failed to update availability status");
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
+  const confirmMarkUnavailable = async (reason) => {
+    setStatusSaving(true);
+    try {
+      await api.patch("/professor/availability-status", {
+        status: "unavailable",
+        reason,
+      });
+      setProfStatus("unavailable");
+      setShowUnavailableModal(false);
+      toast.success("You're marked Unavailable — your slots are hidden from students");
+    } catch {
       toast.error("Failed to update availability status");
     } finally {
       setStatusSaving(false);
@@ -321,6 +346,16 @@ export default function ProfessorSidebar() {
         show={showLogoutConfirm}
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <QueueReasonModal
+        show={showUnavailableModal}
+        onConfirm={confirmMarkUnavailable}
+        onCancel={() => setShowUnavailableModal(false)}
+        title="Mark yourself Unavailable?"
+        message="Students won't be able to book you while unavailable. Let them know why:"
+        confirmText="Mark Unavailable"
+        submitting={statusSaving}
       />
     </>
   );

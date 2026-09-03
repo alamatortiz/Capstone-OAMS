@@ -295,18 +295,27 @@ router.get(
 // PATCH /api/professor/availability-status
 // Global Available/Unavailable toggle. When 'unavailable', the professor's
 // weekly slots are hidden from student browsing/booking without deleting them.
-// Body: { status: 'available' | 'unavailable' }
+// Body: { status: 'available' | 'unavailable', reason? }
+// Going unavailable requires a non-blank reason (surfaced to admin/students
+// downstream); going back to available always clears it -- mirrors
+// queue_slots' pause_reason/close_reason, set on pause and NULL'd on resume.
 router.patch(
   "/availability-status",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { status } = req.body;
+    const { status, reason } = req.body;
     if (!["available", "unavailable"].includes(status)) {
       return res
         .status(400)
         .json({ message: "status must be 'available' or 'unavailable'" });
+    }
+    const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+    if (status === "unavailable" && !trimmedReason) {
+      return res
+        .status(400)
+        .json({ message: "A reason is required to mark yourself unavailable" });
     }
     try {
       const [[fac]] = await pool.query(
@@ -314,12 +323,13 @@ router.patch(
         [facultyId],
       );
       await pool.query(
-        "UPDATE faculty SET availability_status = ? WHERE faculty_id = ?",
-        [status, facultyId],
+        "UPDATE faculty SET availability_status = ?, unavailable_reason = ? WHERE faculty_id = ?",
+        [status, status === "unavailable" ? trimmedReason : null, facultyId],
       );
       emitToDept(fac?.department_id, "faculty:availability-status-changed", {
         facultyId: Number(facultyId),
         availabilityStatus: status,
+        unavailableReason: status === "unavailable" ? trimmedReason : null,
       });
       res.json({
         message: "Availability status updated",
@@ -1433,10 +1443,13 @@ router.get(
                fdr.claimed_at,
                fdr.notes,
                fdr.created_at,
+               fdr.is_digital_delivery,
+               gf.qr_code AS delivery_code,
                d.department_name AS college
              FROM faculty_document_requests fdr
              JOIN document_services ds ON fdr.service_id = ds.service_id
              JOIN departments d ON ds.department_id = d.department_id
+             LEFT JOIN generated_files gf ON gf.faculty_request_id = fdr.request_id
              WHERE fdr.faculty_id = ?
            )
            UNION ALL
@@ -1455,6 +1468,8 @@ router.get(
                dsub.claimed_at,
                dsub.notes,
                dsub.created_at,
+               NULL AS is_digital_delivery,
+               NULL AS delivery_code,
                d.department_name AS college
              FROM document_submissions dsub
              JOIN departments d ON dsub.department_id = d.department_id
@@ -1653,6 +1668,54 @@ router.delete(
       sendServerError(res, err, "DELETE /documents/:requestId error:");
     } finally {
       conn.release();
+    }
+  },
+);
+
+// PATCH /api/professor/documents/:requestId/confirm-receipt
+// Self-service counterpart to admin's "Generate Document" prototype (see
+// adminRoutes.js) -- mirrors studentRoutes.js's own confirm-receipt route.
+// Only succeeds for the faculty member's own request, only when it's
+// currently 'released' AND was digitally delivered, and only moves it to
+// 'claimed'.
+router.patch(
+  "/documents/:requestId/confirm-receipt",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const requestId = parseInt(req.params.requestId, 10);
+
+    try {
+      const [[request]] = await pool.query(
+        `SELECT fdr.request_id, fdr.status, fdr.is_digital_delivery, fdr.tracking_number, s.department_id, s.service_name
+         FROM faculty_document_requests fdr
+         JOIN document_services s ON fdr.service_id = s.service_id
+         WHERE fdr.request_id = ? AND fdr.faculty_id = ?`,
+        [requestId, facultyId],
+      );
+      if (!request) {
+        return res.status(404).json({ message: "Document request not found" });
+      }
+      if (request.status !== "released" || !request.is_digital_delivery) {
+        return res.status(409).json({ message: "This document isn't ready to be confirmed as received" });
+      }
+
+      await pool.query(
+        `UPDATE faculty_document_requests SET status = 'claimed', claimed_at = NOW() WHERE request_id = ?`,
+        [requestId],
+      );
+
+      emitToDept(request.department_id, "document:status-updated", { requestId, status: "claimed" });
+      createNotification(
+        facultyId,
+        `You confirmed receipt of your ${request.service_name} request (${request.tracking_number}).`,
+        "document",
+      );
+
+      res.json({ message: "Receipt confirmed", requestId, status: "claimed" });
+    } catch (err) {
+      sendServerError(res, err, "Confirm document receipt error:");
     }
   },
 );

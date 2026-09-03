@@ -699,6 +699,28 @@
   border-color: rgba(239, 68, 68, 0.5);
 }
 
+.dss-confirm-receipt-btn {
+  background: #22c55e;
+  border: 1px solid #22c55e;
+  color: white;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dss-confirm-receipt-btn:hover {
+  background-color: #16a34a;
+  border-color: #16a34a;
+}
+
+.dss-confirm-receipt-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ─── Attachments (Send a Document) ─────────────────────────────────────── */
 .dss-attach-list {
   display: flex;

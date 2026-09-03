@@ -802,6 +802,92 @@ select.sa-input {
 
 .sa-textarea { resize: vertical; min-height: 70px; }
 
+/* ── End Time custom dropdown (5 rows visible, then scroll) ─────────── */
+.sa-endtime-picker { position: relative; width: 100%; }
+
+.sa-endtime-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sa-endtime-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sa-endtime-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sa-endtime-chevron {
+  width: 1rem;
+  height: 1rem;
+  color: #a855f7;
+  flex-shrink: 0;
+}
+
+/* Portaled to <body>, so this is positioned via inline style (fixed,
+   anchored under the trigger) -- only visual styling lives here. Height is
+   capped at 5 rows (each ~2.5rem incl. border) so a ~28-entry duration list
+   scrolls instead of opening as one overwhelming popup, mirroring Google
+   Calendar's end-time picker. */
+.sa-endtime-panel {
+  z-index: 1100;
+  max-height: 10.5rem;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 0.625rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sa-endtime-option {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  background: transparent;
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sa-endtime-option:hover { background: rgba(168, 85, 247, 0.12); }
+
+.sa-endtime-option.is-selected {
+  background: rgba(168, 85, 247, 0.16);
+  font-weight: 600;
+}
+
+.sa-endtime-duration {
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+}
+
+.sa-endtime-option--custom {
+  border-top: 1px solid var(--card-border);
+  border-radius: 0;
+  margin-top: 0.15rem;
+  padding-top: 0.6rem;
+  color: #a855f7;
+  font-weight: 600;
+}
+
 /* ── Modal buttons ───────────────────────────────────────── */
 .sa-btn {
   display: inline-flex;
