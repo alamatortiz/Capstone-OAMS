@@ -1739,6 +1739,8 @@ router.get(
            dr.released_at,
            dr.claimed_at,
            dr.official_code,
+           dr.is_digital_delivery,
+           gf.qr_code AS delivery_code,
            s.requires_coding,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number AS student_id,
@@ -1747,6 +1749,7 @@ router.get(
          JOIN students st ON dr.student_id = st.student_id
          JOIN document_services s ON dr.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN generated_files gf ON gf.request_id = dr.request_id
          WHERE s.department_id = ?
          ORDER BY dr.created_at DESC`,
         [deptId],
@@ -1774,6 +1777,8 @@ router.get(
         claimedDate: r.claimed_at || null,
         requiresCoding: !!r.requires_coding,
         officialCode: r.official_code || null,
+        isDigitalDelivery: !!r.is_digital_delivery,
+        deliveryCode: r.delivery_code || null,
       }));
 
       res.json({ documents });
@@ -1810,6 +1815,8 @@ router.get(
            fdr.released_at,
            fdr.claimed_at,
            fdr.official_code,
+           fdr.is_digital_delivery,
+           gf.qr_code AS delivery_code,
            s.requires_coding,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            f.employee_id AS faculty_employee_id,
@@ -1818,6 +1825,7 @@ router.get(
          JOIN faculty f ON fdr.faculty_id = f.faculty_id
          JOIN document_services s ON fdr.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN generated_files gf ON gf.faculty_request_id = fdr.request_id
          WHERE s.department_id = ?
          ORDER BY fdr.created_at DESC`,
         [deptId],
@@ -1843,6 +1851,8 @@ router.get(
         claimedDate: r.claimed_at || null,
         requiresCoding: !!r.requires_coding,
         officialCode: r.official_code || null,
+        isDigitalDelivery: !!r.is_digital_delivery,
+        deliveryCode: r.delivery_code || null,
       }));
 
       res.json({ documents });
@@ -1874,6 +1884,31 @@ async function linkOfficialCode(isFaculty, requestId, officialCode) {
   } catch (err) {
     console.error("Official code linking error (status change still applied):", err);
   }
+}
+
+// "Generate Document" prototype -- unlike linkOfficialCode above (which only
+// ever runs for requires_coding services, keyed off the admin-typed official
+// code), this unconditionally gives ANY request its own scannable/claimable
+// generated_files row, keyed off the tracking number. Reuses an existing row
+// if one already exists (e.g. a requires_coding request that also got
+// digitally generated) rather than inserting a duplicate. Returns the code
+// so the caller can hand it back in the response.
+async function upsertDeliveryCode(isFaculty, requestId, trackingNumber) {
+  const linkColumn = isFaculty ? "faculty_request_id" : "request_id";
+  const code = `QR-${trackingNumber}`;
+  const [[existing]] = await pool.query(
+    `SELECT file_id FROM generated_files WHERE ${linkColumn} = ?`,
+    [requestId],
+  );
+  if (existing) {
+    await pool.query(`UPDATE generated_files SET qr_code = ? WHERE file_id = ?`, [code, existing.file_id]);
+  } else {
+    await pool.query(
+      `INSERT INTO generated_files (${linkColumn}, qr_code) VALUES (?, ?)`,
+      [requestId, code],
+    );
+  }
+  return code;
 }
 
 // PATCH /api/admin/faculty-document-processing/:requestId/status
@@ -1973,6 +2008,67 @@ router.patch(
   },
 );
 
+// PATCH /api/admin/faculty-document-processing/:requestId/generate
+// "Generate Document" prototype -- an alternative to the normal Ready ->
+// Released -> Claimed hand-off. Only valid from "ready" (DB: 'generated');
+// attaches a QR/text code and jumps straight to "released" flagged as a
+// digital delivery, so the faculty member can self-claim it from their own
+// Documents page instead of an admin manually marking it claimed.
+router.patch(
+  "/faculty-document-processing/:requestId/generate",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const requestId = parseInt(req.params.requestId, 10);
+    const adminId = req.user.userId;
+
+    try {
+      const deptId = await getAdminDepartmentId(adminId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[request]] = await pool.query(
+        `SELECT fdr.request_id, fdr.status, fdr.faculty_id, fdr.tracking_number, s.department_id, s.service_name
+         FROM faculty_document_requests fdr
+         JOIN document_services s ON fdr.service_id = s.service_id
+         WHERE fdr.request_id = ?`,
+        [requestId],
+      );
+
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.department_id !== deptId) {
+        return res.status(403).json({ error: "You can only update documents for your own department" });
+      }
+      if (request.status !== "generated") {
+        return res.status(409).json({ error: "Document must be Ready before it can be digitally generated" });
+      }
+
+      const deliveryCode = await upsertDeliveryCode(true, requestId, request.tracking_number);
+
+      await pool.query(
+        `UPDATE faculty_document_requests SET status = 'released', is_digital_delivery = TRUE, released_at = NOW() WHERE request_id = ?`,
+        [requestId],
+      );
+
+      await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: "released", is_digital_delivery: true });
+
+      emitToUser(request.faculty_id, "document:status-updated", { requestId, status: "released" });
+      createNotification(
+        request.faculty_id,
+        `Your ${request.service_name} request (${request.tracking_number}) is ready -- check your Documents page for your pickup code.`,
+        "document",
+      );
+
+      res.json({ message: "Document generated and released digitally", requestId, deliveryCode });
+    } catch (error) {
+      sendServerError(res, error, "Faculty document generate error:");
+    }
+  },
+);
+
 // PATCH /api/admin/document-processing/:requestId/status
 // Body: { status, notes }
 // Validates the request belongs to the admin's department before updating.
@@ -2066,6 +2162,67 @@ router.patch(
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
       sendServerError(res, error, "Document status update error:");
+    }
+  },
+);
+
+// PATCH /api/admin/document-processing/:requestId/generate
+// "Generate Document" prototype -- see the faculty-document-processing
+// equivalent above for the full explanation. Only valid from "ready" (DB:
+// 'generated'); attaches a QR/text code and jumps straight to "released"
+// flagged as a digital delivery, so the student can self-claim it from their
+// own Documents page instead of an admin manually marking it claimed.
+router.patch(
+  "/document-processing/:requestId/generate",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const requestId = parseInt(req.params.requestId, 10);
+    const adminId = req.user.userId;
+
+    try {
+      const deptId = await getAdminDepartmentId(adminId);
+      if (!deptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[request]] = await pool.query(
+        `SELECT dr.request_id, dr.status, dr.student_id, dr.tracking_number, s.department_id, s.service_name
+         FROM document_requests dr
+         JOIN document_services s ON dr.service_id = s.service_id
+         WHERE dr.request_id = ?`,
+        [requestId],
+      );
+
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.department_id !== deptId) {
+        return res.status(403).json({ error: "You can only update documents for your own department" });
+      }
+      if (request.status !== "generated") {
+        return res.status(409).json({ error: "Document must be Ready before it can be digitally generated" });
+      }
+
+      const deliveryCode = await upsertDeliveryCode(false, requestId, request.tracking_number);
+
+      await pool.query(
+        `UPDATE document_requests SET status = 'released', is_digital_delivery = TRUE, released_at = NOW() WHERE request_id = ?`,
+        [requestId],
+      );
+
+      await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: "released", is_digital_delivery: true });
+
+      emitToUser(request.student_id, "document:status-updated", { requestId, status: "released" });
+      createNotification(
+        request.student_id,
+        `Your ${request.service_name} request (${request.tracking_number}) is ready -- check your Documents page for your pickup code.`,
+        "document",
+      );
+
+      res.json({ message: "Document generated and released digitally", requestId, deliveryCode });
+    } catch (error) {
+      sendServerError(res, error, "Document generate error:");
     }
   },
 );

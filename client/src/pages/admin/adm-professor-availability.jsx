@@ -246,10 +246,17 @@ export default function AdminProfessorAvailability() {
                     {isUnavailable ? (
                       <div className="apa-consult-unavailable">
                         <AlertCircleIcon className="apa-consult-unavailable-icon" />
-                        <p>
-                          This professor is currently unavailable and is not
-                          accepting consultations right now.
-                        </p>
+                        <div>
+                          <p>
+                            This professor is currently unavailable and is not
+                            accepting consultations right now.
+                          </p>
+                          {f.unavailableReason && (
+                            <p className="apa-consult-unavailable-reason">
+                              Reason: {f.unavailableReason}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     ) : daySchedules.length === 0 ? (
                       <p className="apa-consult-empty">

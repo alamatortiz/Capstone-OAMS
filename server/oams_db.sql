@@ -68,6 +68,7 @@ CREATE TABLE faculty (
     email               VARCHAR(100) NOT NULL UNIQUE,
     department_id       INT          NOT NULL,
     availability_status ENUM('available','unavailable') NOT NULL DEFAULT 'available',
+    unavailable_reason  VARCHAR(255) NULL,
     FOREIGN KEY (faculty_id)    REFERENCES users(user_id)       ON DELETE CASCADE,
     FOREIGN KEY (department_id) REFERENCES departments(department_id),
     INDEX idx_faculty_dept (department_id)
@@ -451,6 +452,11 @@ CREATE TABLE document_requests (
     claimed_at              TIMESTAMP    NULL,
     notes                   TEXT         NULL,
     official_code           VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
+    -- TRUE when admin used "Generate Document" (QR/text-code prototype) instead
+    -- of the normal physical Mark as Released -> Mark as Claimed flow -- lets
+    -- the requester's own "Confirm Received" self-claim the request, and gates
+    -- the QR/code display on the requester's document status page.
+    is_digital_delivery     BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Auto-touched on any change to this row (status, notes, etc). Lets the
     -- transactions feeds sort by "most recently modified" instead of only
@@ -476,7 +482,13 @@ CREATE TABLE document_requests (
 CREATE TABLE generated_files (
     file_id         INT          AUTO_INCREMENT PRIMARY KEY,
     request_id      INT          NULL,
-    qr_code         VARCHAR(255),
+    -- UNIQUE (not just unique-by-convention via the QR-<tracking_number>
+    -- scheme) so a collision is a loud DB error instead of a silent
+    -- data-integrity gap -- codes double as a verification record even
+    -- after a document is claimed, so two requests must never share one.
+    -- NULLs don't count toward uniqueness in MySQL, so pre-existing NULL
+    -- rows (no code ever generated for that request) are unaffected.
+    qr_code         VARCHAR(255) UNIQUE,
     generated_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (request_id) REFERENCES document_requests(request_id) ON DELETE CASCADE
 );
@@ -706,6 +718,9 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     claimed_at           TIMESTAMP    NULL,
     notes                TEXT         NULL,
     official_code        VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
+    -- See document_requests.is_digital_delivery for the full explanation --
+    -- identical prototype behavior, mirrored here for faculty-sourced requests.
+    is_digital_delivery  BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at           TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Auto-touched on any change to this row. Lets the transactions feeds
     -- sort by "most recently modified" instead of only "most recently created".

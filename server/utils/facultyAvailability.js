@@ -42,6 +42,7 @@ async function getFacultyAvailabilityToday(deptId, { includeWeekly = false } = {
        f.specialization,
        f.email,
        f.availability_status,
+       f.unavailable_reason,
        EXISTS (
          SELECT 1 FROM user_sessions us
          WHERE us.user_id = f.faculty_id
@@ -186,6 +187,7 @@ async function getFacultyAvailabilityToday(deptId, { includeWeekly = false } = {
         : isBusy
         ? "In consultation with student"
         : null,
+      unavailableReason: isToggledUnavailable ? f.unavailable_reason : null,
       nextAvailableSlot:
         !isPresent || isToggledUnavailable
           ? "Unavailable"
