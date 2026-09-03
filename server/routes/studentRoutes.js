@@ -619,10 +619,13 @@ router.get(
                dr.claimed_at,
                dr.notes,
                dr.created_at,
+               dr.is_digital_delivery,
+               gf.qr_code AS delivery_code,
                d.department_name AS college
              FROM document_requests dr
              JOIN document_services s ON dr.service_id = s.service_id
              JOIN departments d ON s.department_id = d.department_id
+             LEFT JOIN generated_files gf ON gf.request_id = dr.request_id
              WHERE dr.student_id = ?
            )
            UNION ALL
@@ -641,6 +644,8 @@ router.get(
                ds.claimed_at,
                ds.notes,
                ds.created_at,
+               NULL AS is_digital_delivery,
+               NULL AS delivery_code,
                d.department_name AS college
              FROM document_submissions ds
              JOIN departments d ON ds.department_id = d.department_id
@@ -675,6 +680,8 @@ router.get(
           neededBy: d.needed_by || undefined,
           releasedDate: d.released_at || undefined,
           claimedDate: d.claimed_at || undefined,
+          isDigitalDelivery: !!d.is_digital_delivery,
+          deliveryCode: d.delivery_code || undefined,
         };
         if (d.kind === "submission") {
           doc.studentFiles = studentFilesMap[d.id] || [];
@@ -1179,6 +1186,54 @@ router.delete(
       sendServerError(res, error, "Cancel document request error");
     } finally {
       conn.release();
+    }
+  },
+);
+
+// PATCH /api/student/documents/:requestId/confirm-receipt
+// Self-service counterpart to admin's "Generate Document" prototype (see
+// adminRoutes.js) -- only succeeds for the student's own request, only when
+// it's currently 'released' AND was digitally delivered, and only moves it
+// to 'claimed'. Nothing else (physically-released documents still require
+// admin to mark them claimed in person).
+router.patch(
+  "/documents/:requestId/confirm-receipt",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const requestId = parseInt(req.params.requestId, 10);
+
+    try {
+      const [[request]] = await pool.query(
+        `SELECT dr.request_id, dr.status, dr.is_digital_delivery, dr.tracking_number, s.department_id, s.service_name
+         FROM document_requests dr
+         JOIN document_services s ON dr.service_id = s.service_id
+         WHERE dr.request_id = ? AND dr.student_id = ?`,
+        [requestId, studentId],
+      );
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.status !== "released" || !request.is_digital_delivery) {
+        return res.status(409).json({ error: "This document isn't ready to be confirmed as received" });
+      }
+
+      await pool.query(
+        `UPDATE document_requests SET status = 'claimed', claimed_at = NOW() WHERE request_id = ?`,
+        [requestId],
+      );
+
+      emitToDept(request.department_id, "document:status-updated", { requestId, status: "claimed" });
+      createNotification(
+        studentId,
+        `You confirmed receipt of your ${request.service_name} request (${request.tracking_number}).`,
+        "document",
+      );
+
+      res.json({ message: "Receipt confirmed", requestId, status: "claimed" });
+    } catch (error) {
+      sendServerError(res, error, "Confirm document receipt error");
     }
   },
 );
@@ -2219,6 +2274,7 @@ router.get(
            f.email,
            f.department_id,
            f.availability_status,
+           f.unavailable_reason,
            EXISTS (
              SELECT 1 FROM user_sessions us
              WHERE us.user_id = f.faculty_id
@@ -2255,6 +2311,10 @@ router.get(
             availabilityStatus: row.has_active_session
               ? row.availability_status
               : "unavailable",
+            unavailableReason:
+              row.has_active_session && row.availability_status === "unavailable"
+                ? row.unavailable_reason
+                : null,
             availability: [],
           });
         }

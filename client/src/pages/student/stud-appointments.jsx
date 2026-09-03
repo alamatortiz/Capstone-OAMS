@@ -634,13 +634,13 @@ export default function AppointmentsPage() {
                     <div className="week-section-header">
                       <span className="appointment-booking-badge this-week">This Week</span>
                     </div>
-                    {twoWeekDates.thisWeek.filter((d) => !isPastDate(d)).map(renderDateGroup)}
+                    {twoWeekDates.thisWeek.filter((d) => !isPastDate(d) && (slotsByDate[d]?.length ?? 0) > 0).map(renderDateGroup)}
                   </div>
                   <div className="week-section">
                     <div className="week-section-header">
                       <span className="appointment-booking-badge next-week">Next Week</span>
                     </div>
-                    {twoWeekDates.nextWeek.filter((d) => !isPastDate(d)).map(renderDateGroup)}
+                    {twoWeekDates.nextWeek.filter((d) => !isPastDate(d) && (slotsByDate[d]?.length ?? 0) > 0).map(renderDateGroup)}
                   </div>
                 </>
               )}

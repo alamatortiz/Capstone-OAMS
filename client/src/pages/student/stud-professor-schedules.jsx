@@ -386,10 +386,17 @@ export default function ProfessorSchedule() {
                           {isUnavailable ? (
                             <div className="consultation-unavailable-notice">
                               <AlertCircle />
-                              <p>
-                                This professor is currently unavailable and is
-                                not accepting consultations right now.
-                              </p>
+                              <div>
+                                <p>
+                                  This professor is currently unavailable and is
+                                  not accepting consultations right now.
+                                </p>
+                                {professor.unavailableReason && (
+                                  <p className="consultation-unavailable-reason">
+                                    Reason: {professor.unavailableReason}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           ) : getDaySchedules(professor).length === 0 ? (
                             <p style={{ opacity: 0.6, fontSize: "0.85rem" }}>
