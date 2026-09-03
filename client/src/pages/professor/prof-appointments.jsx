@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import QueueReasonModal from "../../components/QueueReasonModal";
 import "./prof-dashboard.css";
 import "./prof-appointments.css";
 import { toast } from "sonner";
@@ -80,17 +81,6 @@ const CONFIRM_META = {
     confirmText: "Approve",
     icon: <CheckCircle2 style={{ width: 22, height: 22 }} />,
     variant: "success",
-  }),
-  reject: (apt) => ({
-    title: "Reject Appointment?",
-    message: (
-      <>
-        Reject the appointment request from <strong>{apt.studentName}</strong>?
-        This action cannot be undone.
-      </>
-    ),
-    confirmText: "Reject",
-    icon: <XCircle style={{ width: 22, height: 22 }} />,
   }),
   complete: (apt) => ({
     title: "Mark as Completed?",
@@ -276,6 +266,13 @@ export default function ProfessorAppointmentsPage() {
   // ── Action confirmation (approve / reject / complete / cancel) ─────────────
   const [confirmAction, setConfirmAction] = useState(null); // { type, apt } or null
   const [confirmSaving, setConfirmSaving] = useState(false);
+  // Reject is routed separately from the other actions above -- it needs a
+  // required reason (the student sees it), which ActionConfirmModal has no
+  // room for. QueueReasonModal is the app's existing required-reason prompt
+  // (already used for admin queue pause/stop and the professor-unavailable
+  // toggle).
+  const [rejectTarget, setRejectTarget] = useState(null); // apt being rejected, or null
+  const [rejectSaving, setRejectSaving] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -349,13 +346,34 @@ export default function ProfessorAppointmentsPage() {
   };
 
   const handleApprove = (id) => requestAction("approve", id);
-  const handleReject = (id) => requestAction("reject", id);
   const handleComplete = (id) => requestAction("complete", id);
   const handleCancel = (id) => requestAction("cancel", id);
 
+  const handleReject = (id) => {
+    const apt = appointments.find((a) => a.id === id);
+    if (apt) setRejectTarget(apt);
+  };
+
+  const confirmReject = async (reason) => {
+    if (!rejectTarget) return;
+    setRejectSaving(true);
+    try {
+      await api.patch(`/professor/appointments/${rejectTarget.id}/status`, {
+        status: "rejected",
+        reason,
+      });
+      await fetchAppointments();
+      toast.success(`Rejected appointment with ${rejectTarget.studentName}.`);
+      setRejectTarget(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to reject appointment.");
+    } finally {
+      setRejectSaving(false);
+    }
+  };
+
   const STATUS_BY_ACTION = {
     approve: ["approved", "Approved appointment with {name}."],
-    reject: ["rejected", null],
     complete: ["completed", "Appointment marked as completed."],
     cancel: ["cancelled", "Appointment cancelled."],
   };
@@ -393,6 +411,24 @@ export default function ProfessorAppointmentsPage() {
             cancelText={confirmMeta?.cancelText}
             confirmDisabled={confirmSaving}
             variant={confirmMeta?.variant ?? "danger"}
+          />
+
+          <QueueReasonModal
+            show={!!rejectTarget}
+            onCancel={() => setRejectTarget(null)}
+            onConfirm={confirmReject}
+            title="Reject Appointment?"
+            message={
+              rejectTarget && (
+                <>
+                  Reject the appointment request from{" "}
+                  <strong>{rejectTarget.studentName}</strong>? The student will
+                  see this reason.
+                </>
+              )
+            }
+            confirmText={rejectSaving ? "Please wait…" : "Reject"}
+            submitting={rejectSaving}
           />
         </>
       }

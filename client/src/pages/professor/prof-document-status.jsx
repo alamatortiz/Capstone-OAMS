@@ -352,8 +352,24 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
             </div>
           )}
 
+          {/* Rejection reason -- emphasized callout, not the plain Notes
+              card below (which stays as-is for every other status). */}
+          {doc.status === "rejected" && doc.notes && (
+            <div className="dss-card">
+              <div className="dss-card-content">
+                <div className="dss-reject-notice">
+                  <XCircle style={{ width: "1.25rem", height: "1.25rem" }} />
+                  <div>
+                    <p>This request was rejected.</p>
+                    <p className="dss-reject-reason">Reason: {doc.notes}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Notes card */}
-          {doc.notes && (
+          {doc.status !== "rejected" && doc.notes && (
             <div className="dss-card">
               <div className="dss-card-header">
                 <h3 className="dss-card-title">

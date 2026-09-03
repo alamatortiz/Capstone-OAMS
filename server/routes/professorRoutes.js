@@ -457,10 +457,14 @@ router.patch(
   async (req, res) => {
     const facultyId = req.user.userId;
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, reason } = req.body;
     const allowed = ["approved", "rejected", "completed", "cancelled"];
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: "Invalid status value" });
+    }
+    const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+    if (status === "rejected" && !trimmedReason) {
+      return res.status(400).json({ error: "A reason is required to reject an appointment" });
     }
 
     const conn = await pool.getConnection();
@@ -527,9 +531,10 @@ router.patch(
       const cancelledBy = status === "cancelled" ? "faculty" : null;
       await conn.query(
         `UPDATE appointments
-         SET status = ?, cancelled_by = COALESCE(?, cancelled_by)
+         SET status = ?, cancelled_by = COALESCE(?, cancelled_by),
+             rejection_reason = ?
          WHERE appointment_id = ? AND faculty_id = ?`,
-        [status, cancelledBy, id, facultyId],
+        [status, cancelledBy, status === "rejected" ? trimmedReason : null, id, facultyId],
       );
 
       await conn.commit();
@@ -546,9 +551,10 @@ router.patch(
         ? `${appt.service_name} appointment`
         : "appointment";
       const apptWhenPart = ` on ${getManilaDateString(appt.appointment_date)} at ${formatTime(appt.appointment_time)}`;
+      const reasonSuffix = status === "rejected" ? ` Reason: ${trimmedReason}` : "";
       createNotification(
         appt.student_id,
-        `Your ${apptServicePart}${apptWhenPart} has been ${status}.`,
+        `Your ${apptServicePart}${apptWhenPart} has been ${status}.${reasonSuffix}`,
         "appointment",
       );
 
