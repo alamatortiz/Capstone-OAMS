@@ -109,10 +109,19 @@ export default function LoginScreen() {
           break;
       }
     } catch (error: any) {
-      Alert.alert(
-        'Sign in failed',
-        error?.response?.data?.error ?? 'Please check your credentials and try again.',
-      );
+      // A response means the server actually checked the credentials and
+      // said no -- show its message (e.g. "Invalid credentials") as before.
+      // No response at all means the request never reached the server
+      // (offline, unreachable API, timeout) -- that's not a credentials
+      // problem, so say so instead of implying the email/password was wrong.
+      if (error?.response) {
+        Alert.alert('Sign in failed', error.response.data?.error ?? 'Please check your credentials and try again.');
+      } else {
+        Alert.alert(
+          "Can't connect",
+          "You're offline or the server can't be reached right now. Check your connection and try again.",
+        );
+      }
     } finally {
       setIsLoading(false);
     }
