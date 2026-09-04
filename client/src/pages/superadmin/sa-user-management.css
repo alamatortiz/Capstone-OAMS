@@ -538,6 +538,7 @@ html, body {
   width: 100%;
   max-width: 640px;
   max-height: 92vh;
+  max-height: 92dvh;
   overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
   transition: background-color 0.3s ease, border-color 0.3s ease;

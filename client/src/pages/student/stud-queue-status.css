@@ -93,6 +93,7 @@ body {
 .qstatus-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -1172,4 +1173,8 @@ body {
   --queue-text-primary: #1e293b;
   --queue-text-secondary: #475569;
   --queue-text-tertiary: #64748b;
+}
+
+@media (max-width: 380px) {
+  .qsl-stats-grid { grid-template-columns: 1fr; }
 }

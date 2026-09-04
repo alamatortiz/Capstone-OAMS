@@ -127,6 +127,7 @@ body {
 .admin-queue-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -1382,6 +1383,18 @@ body {
   .chat-container {
     width: 90vw;
     height: 80vh;
+    height: 80dvh;
     max-height: 32rem;
   }
+}
+
+@media (max-width: 380px) {
+  .queue-overview-grid,
+  .queue-system-stats,
+  .queue-monitoring-stats,
+  .queue-actions-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 380px) {
+  .queue-detail-row .queue-detail-grid { grid-template-columns: 1fr; }
 }

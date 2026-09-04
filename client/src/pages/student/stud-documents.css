@@ -101,6 +101,7 @@ body {
 .documents-container {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--background);
   transition: background-color 0.3s ease;
 }
@@ -305,6 +306,7 @@ body {
   max-width: 38rem;
   width: 100%;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   animation: docSlideUp 0.3s ease;
@@ -1198,4 +1200,9 @@ body {
   .doc-dialog {
     width: 95%;
   }
+}
+/* Two label/value columns leave ~140px each here -- long values (control
+   numbers, dates) wrap mid-token. Single column reads cleanly. */
+@media (max-width: 380px) {
+  .doc-card-grid { grid-template-columns: 1fr; }
 }

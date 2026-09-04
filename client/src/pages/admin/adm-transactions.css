@@ -109,6 +109,7 @@
 .admin-transaction-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   overflow-x: hidden;
   background-color: var(--dark-bg);
@@ -1119,8 +1120,11 @@
 }
 
 @media (max-width: 640px) {
+  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
+     this rule is later in the file, so it won the cascade and padding grew
+     as the screen got smaller. */
   .admin-transaction-container {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .admin-transaction-title {
@@ -1154,4 +1158,8 @@
   .admin-transaction-item-grid {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 380px) {
+  .admin-transaction-stats-grid { grid-template-columns: 1fr; }
 }

@@ -118,6 +118,7 @@ body {
 .qpage-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -1469,4 +1470,16 @@ body {
     flex-direction: column;
     gap: 1rem;
   }
+}
+
+/* ── Phone tiers ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* 3-up detail grid is ~100px per cell at this width -- labels wrap badly. */
+  .queue-details-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+  .qp-stats-grid { gap: 0.5rem; }
+}
+
+@media (max-width: 380px) {
+  .queue-details-grid,
+  .qp-stats-grid { grid-template-columns: 1fr; }
 }

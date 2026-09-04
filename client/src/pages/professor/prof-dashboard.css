@@ -124,6 +124,7 @@ body {
 .dashboard-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -1734,8 +1735,11 @@ body {
 }
 
 @media (max-width: 640px) {
+  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
+     this rule is later in the file, so it won the cascade and padding grew
+     as the screen got smaller. */
   .professor-dashboard {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .professor-dashboard .banner-title {
@@ -1746,4 +1750,23 @@ body {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }
+}
+
+/* ── Phone tiers ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .professor-dashboard { padding: 0.625rem; gap: 0.875rem; }
+
+  .professor-dashboard .welcome-banner { padding: 1.125rem; }
+  .professor-dashboard .banner-title-row { gap: 0.5rem; }
+  /* Logo stays visible, scaled to the narrower banner. */
+  .professor-dashboard .banner-title-row .banner-ccs-logo { width: 3rem; height: 3rem; }
+  .professor-dashboard .banner-title { font-size: 1.4rem; text-align: left; }
+
+  .professor-dashboard .dash-stats-grid { gap: 0.625rem; }
+}
+
+@media (max-width: 380px) {
+  .professor-dashboard .dash-stats-grid { grid-template-columns: 1fr; }
+  .professor-dashboard .banner-title-row .banner-ccs-logo { width: 2.5rem; height: 2.5rem; }
+  .professor-dashboard .banner-title { font-size: 1.25rem; }
 }

@@ -701,3 +701,7 @@ html, body {
 
   .appt-card-name { font-size: 1rem; }
 }
+
+@media (max-width: 380px) {
+  .appt-info-grid { grid-template-columns: 1fr; }
+}

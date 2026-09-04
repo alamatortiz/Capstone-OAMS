@@ -844,3 +844,213 @@ body.dark-mode .footer-tagline {
 body.dark-mode .footer-copy {
   color: #64748b;
 }
+
+/* ================================================
+   RESPONSIVE — landing page (tablet + mobile)
+   ------------------------------------------------
+   Tier ladder used across the whole client:
+     1280  large laptop      1024  tablet landscape
+      768  tablet portrait    640  large phone
+      480  phone              380  small phone
+   Only sizing/flow is adjusted here — colors, borders,
+   radii, shadows and section order are untouched.
+   ================================================ */
+
+/* ── 1280px — laptop: pull in the wide 80px gutters ── */
+@media (max-width: 1280px) {
+  .navbar { padding: 14px 32px; }
+
+  .hero-section { padding: 76px 32px 88px; }
+  .hero-title { font-size: 3.5rem; }
+
+  .about-section,
+  .features-section,
+  .platforms-section,
+  .colleges-section { padding: 0 40px 84px; }
+
+  .about-section,
+  .features-section { margin-top: 60px; }
+
+  .cta-section { margin: 0 40px 84px; }
+  .footer { padding: 28px 32px; }
+}
+
+/* ── 1024px — tablet landscape: 4-up grids become 3-up/2-up ── */
+@media (max-width: 1024px) {
+  .navbar { padding: 12px 24px; }
+  .nav-pnc-img { height: 34px; }
+  .nav-logo-img { height: 40px; }
+
+  .hero-section { padding: 60px 24px 72px; }
+  .hero-pnc-logo-img { height: 112px; }
+  .hero-logo-img { height: 118px; }
+  .hero-title { font-size: 2.9rem; }
+  .hero-subtitle { font-size: 1.08rem; margin-bottom: 32px; }
+
+  .oams-root .section-title { font-size: 2.1rem; margin-bottom: 40px; }
+
+  .about-section,
+  .features-section,
+  .platforms-section,
+  .colleges-section { padding: 0 24px 72px; }
+
+  .about-section,
+  .features-section { margin-top: 52px; }
+
+  /* 4-up key features -> 2-up; 3-up "why"/colleges stay 3-up here */
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .about-grid { grid-template-columns: repeat(3, 1fr); }
+  .colleges-grid { grid-template-columns: repeat(3, 1fr); }
+
+  .college-logo { width: 132px; height: 132px; }
+
+  .cta-section { margin: 0 24px 72px; padding: 52px 32px; }
+  .cta-title { font-size: 2rem; }
+
+  .footer { padding: 24px 24px; }
+  .footer-pnc-logo-img { height: 34px; }
+  .footer-logo-img { height: 40px; }
+}
+
+/* ── 768px — tablet portrait: everything drops to 2-up ── */
+@media (max-width: 768px) {
+  .navbar { padding: 10px 18px; }
+  .navbar-brand { gap: 10px; }
+  .nav-pnc-img { height: 30px; }
+  .nav-logo-img { height: 34px; }
+  .navbar-actions { gap: 8px; }
+  .btn-signin { padding: 8px 16px; font-size: 0.85rem; }
+
+  .hero-section { padding: 48px 20px 60px; }
+  .hero-logos-left { gap: 14px; }
+  .hero-pnc-logo-img { height: 92px; }
+  .hero-logo-img { height: 98px; }
+  .hero-title { font-size: 2.3rem; margin-bottom: 18px; }
+  .hero-subtitle { font-size: 1rem; line-height: 1.65; margin-bottom: 28px; }
+
+  .oams-root .section-title { font-size: 1.8rem; margin-bottom: 32px; }
+
+  .about-section,
+  .features-section,
+  .platforms-section,
+  .colleges-section { padding: 0 20px 60px; }
+
+  .about-section,
+  .features-section { margin-top: 44px; }
+
+  .about-intro,
+  .platforms-description,
+  .colleges-description { font-size: 0.98rem; margin-bottom: 32px; }
+
+  .features-grid,
+  .about-grid,
+  .platforms-grid,
+  .colleges-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+  .feature-card { padding: 24px 20px 32px; }
+
+  .college-card { padding: 26px 16px 30px; gap: 14px; }
+  .college-logo { width: 112px; height: 112px; }
+  .oams-root .college-name { font-size: 1.05rem; }
+
+  .cta-section { margin: 0 20px 60px; padding: 44px 24px; }
+  .cta-icon-img { width: 52px; height: 52px; }
+  .cta-title { font-size: 1.75rem; }
+  .cta-subtitle { font-size: 1rem; margin-bottom: 30px; }
+
+  /* Footer stacks so the logo row and the tagline stop competing for width */
+  .footer {
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px 20px;
+    text-align: center;
+  }
+  .footer-right { align-items: center; text-align: center; }
+  .footer-pnc-logo-img { height: 30px; }
+  .footer-logo-img { height: 34px; }
+}
+
+/* ── 640px — large phone: single column ── */
+@media (max-width: 640px) {
+  .hero-section { padding: 36px 16px 48px; }
+  .hero-pnc-logo-img { height: 74px; }
+  .hero-logo-img { height: 78px; }
+  .hero-title { font-size: 1.95rem; letter-spacing: -0.005em; }
+  .hero-subtitle { font-size: 0.95rem; }
+  .btn-hero { padding: 12px 22px; font-size: 0.95rem; }
+
+  .oams-root .section-title { font-size: 1.6rem; margin-bottom: 26px; }
+
+  .about-section,
+  .features-section,
+  .platforms-section,
+  .colleges-section { padding: 0 16px 52px; }
+
+  .about-section,
+  .features-section { margin-top: 36px; }
+
+  .features-grid,
+  .about-grid,
+  .platforms-grid { grid-template-columns: 1fr; gap: 14px; }
+
+  /* Colleges keep 2-up: the seals stay recognisable and the section
+     doesn't turn into a six-screen scroll. */
+  .colleges-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .college-card { padding: 20px 12px 24px; }
+  .college-logo { width: 92px; height: 92px; }
+  .oams-root .college-name { font-size: 0.9rem; max-width: 100%; }
+
+  .cta-section { margin: 0 16px 52px; padding: 36px 20px; border-radius: 16px; }
+  .cta-title { font-size: 1.5rem; }
+  .cta-subtitle { font-size: 0.95rem; margin-bottom: 26px; }
+}
+
+/* ── 480px — phone ── */
+@media (max-width: 480px) {
+  .navbar { padding: 10px 14px; }
+  .navbar-brand { gap: 8px; }
+  .nav-pnc-img { height: 26px; }
+  .nav-logo-img { height: 30px; }
+  .btn-signin { padding: 8px 13px; font-size: 0.8rem; gap: 6px; }
+  .btn-icon-img { width: 15px; height: 15px; }
+
+  .hero-logos-left { gap: 10px; }
+  .hero-pnc-logo-img { height: 62px; }
+  .hero-logo-img { height: 66px; }
+  .hero-title { font-size: 1.7rem; }
+
+  .oams-root .section-title { font-size: 1.42rem; }
+
+  .feature-card { padding: 20px 16px 26px; }
+  .feature-icon,
+  .feature-icon-img { width: 48px; height: 48px; }
+
+  .college-logo { width: 78px; height: 78px; }
+
+  .cta-title { font-size: 1.35rem; }
+  .btn-cta { padding: 11px 22px; font-size: 0.92rem; }
+
+  .footer-tagline { font-size: 0.82rem; }
+  .footer-copy { font-size: 0.72rem; }
+}
+
+/* ── 380px — small phone: colleges finally go 1-up ── */
+@media (max-width: 380px) {
+  .nav-pnc-img { height: 24px; }
+  .nav-logo-img { height: 27px; }
+  .btn-signin { padding: 7px 11px; font-size: 0.75rem; }
+
+  .hero-pnc-logo-img { height: 54px; }
+  .hero-logo-img { height: 58px; }
+  .hero-title { font-size: 1.5rem; }
+  .hero-subtitle { font-size: 0.9rem; }
+
+  .oams-root .section-title { font-size: 1.3rem; }
+
+  .colleges-grid { grid-template-columns: 1fr; }
+  .college-logo { width: 96px; height: 96px; }
+  .oams-root .college-name { font-size: 1rem; }
+
+  .cta-section { padding: 30px 16px; }
+  .cta-title { font-size: 1.25rem; }
+}

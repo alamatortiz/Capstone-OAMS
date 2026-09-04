@@ -133,6 +133,7 @@
   max-width: 38rem;
   width: 100%;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   animation: docSlideUp 0.3s ease;
@@ -1005,4 +1006,8 @@
   .doc-dialog {
     width: 95%;
   }
+}
+
+@media (max-width: 380px) {
+  .doc-card-grid { grid-template-columns: 1fr; }
 }

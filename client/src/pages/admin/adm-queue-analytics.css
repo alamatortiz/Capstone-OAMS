@@ -59,6 +59,7 @@ html, body {
 .aqa-layout {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--dark-bg);
   color: var(--text-primary);
   font-family: "Inter", sans-serif;
@@ -70,6 +71,7 @@ html, body {
   margin-left: var(--sidebar-width, 14rem);
   padding: 1.5rem;
   min-height: 100vh;
+  min-height: 100dvh;
   box-sizing: border-box;
   overflow-y: auto;
 }
@@ -543,4 +545,9 @@ html, body {
   font-size: 0.875rem;
   color: var(--text-tertiary);
   margin: 0;
+}
+
+@media (max-width: 380px) {
+  .aqa-stats-grid,
+  .aqa-svc-metrics { grid-template-columns: 1fr; }
 }

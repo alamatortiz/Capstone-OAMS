@@ -102,3 +102,28 @@
 .logout-modal-confirm:hover {
   background: #dc2626;
 }
+
+/* ── Responsive (mirrors ActionConfirmModal) ── */
+.logout-modal {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .logout-modal-overlay { padding: 0.75rem; }
+  .logout-modal {
+    padding: 1.5rem 1.25rem 1.25rem;
+    max-height: calc(100dvh - 1.5rem);
+  }
+  .logout-modal-icon { width: 46px; height: 46px; }
+}
+
+@media (max-width: 380px) {
+  .logout-modal { padding: 1.25rem 1rem 1rem; }
+}
+
+@media (max-width: 380px) {
+  .logout-modal-actions { flex-direction: column-reverse; gap: 0.5rem; }
+  .logout-modal-cancel,
+  .logout-modal-confirm { width: 100%; }
+}

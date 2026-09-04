@@ -79,6 +79,7 @@ body {
 .appointment-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -845,7 +846,10 @@ body {
 }
 
 @media (max-width: 640px) {
-  .appointment-content { padding: 1rem; gap: 1rem; }
+  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
+     this rule is later in the file, so it won the cascade and padding grew
+     as the screen got smaller. */
+  .appointment-content { padding: 0.75rem; gap: 1rem; }
   .appt-empty-state { padding: 2rem 1rem; }
 }
 

@@ -103,6 +103,7 @@
 .aqh-dashboard-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   color: var(--text-primary);
   font-family: "Inter", sans-serif;
@@ -814,6 +815,7 @@
   width: 100%;
   max-width: 640px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1107,8 +1109,11 @@
 }
 
 @media (max-width: 640px) {
+  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
+     this rule is later in the file, so it won the cascade and padding grew
+     as the screen got smaller. */
   .aqh-page-container {
-    padding: 1rem;
+    padding: 0.75rem;
   }
   .aqh-title-icon {
     width: 2.75rem;
@@ -1141,4 +1146,13 @@
     min-width: 1.85rem;
     min-height: 1.85rem;
   }
+}
+
+@media (max-width: 380px) {
+  .aqh-summary-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 380px) {
+  .aqh-stats-row-3,
+  .aqh-stats-row-4 { grid-template-columns: 1fr; }
 }

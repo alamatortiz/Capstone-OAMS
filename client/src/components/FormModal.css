@@ -23,6 +23,7 @@
   width: 100%;
   max-width: 42rem;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -195,4 +196,33 @@
 .fm-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .fm-overlay { padding: 0.75rem; }
+  .fm-header { padding: 1.125rem 1.125rem 1rem; }
+  .fm-body { padding: 1.125rem; gap: 1rem; }
+  .fm-title { font-size: 1.05rem; }
+
+  /* 16px keeps iOS Safari from auto-zooming on focus. */
+  .fm-input,
+  .fm-textarea { font-size: 16px; }
+}
+
+@media (max-width: 480px) {
+  .fm-overlay { padding: 0.5rem; }
+
+  .fm-modal { max-height: 92dvh; }
+
+  .fm-header { padding: 1rem 1rem 0.875rem; gap: 0.5rem; }
+  .fm-title-row { gap: 0.6rem; }
+  .fm-icon { width: 2.125rem; height: 2.125rem; }
+  .fm-body { padding: 1rem; }
+
+  /* Full-width stacked buttons beat two cramped ones at this width. */
+  .fm-footer { flex-direction: column-reverse; gap: 0.5rem; }
+  .fm-cancel,
+  .fm-submit { width: 100%; padding: 0.75rem 1rem; }
 }

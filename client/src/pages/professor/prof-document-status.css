@@ -852,3 +852,7 @@
     padding: 1rem;
   }
 }
+
+@media (max-width: 380px) {
+  .dss-list-card-grid { grid-template-columns: 1fr; }
+}

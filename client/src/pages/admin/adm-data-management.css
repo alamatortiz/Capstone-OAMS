@@ -464,6 +464,7 @@ html, body {
   width: 100%;
   max-width: 40rem;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
   transition: background-color 0.3s ease, border-color 0.3s ease;
@@ -943,6 +944,7 @@ html, body {
   .adm-modal {
     margin: 0.5rem;
     max-height: 95vh;
+    max-height: 95dvh;
   }
 
   .adm-modal-header,

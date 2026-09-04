@@ -914,6 +914,7 @@
   width: 100%;
   max-width: 640px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -1498,4 +1499,8 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+@media (max-width: 380px) {
+  .ann-stats-grid { grid-template-columns: 1fr; }
 }

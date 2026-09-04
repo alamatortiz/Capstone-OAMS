@@ -123,6 +123,7 @@ body {
 .ann-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -507,8 +508,11 @@ body {
 }
 
 @media (max-width: 640px) {
+  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
+     this rule is later in the file, so it won the cascade and padding grew
+     as the screen got smaller. */
   .announcements-page {
-    padding: 1rem;
+    padding: 0.75rem;
     gap: 1rem;
   }
 
@@ -562,6 +566,7 @@ body {
   width: 100%;
   max-width: 32rem;
   max-height: 85vh;
+  max-height: 85dvh;
   overflow-y: auto;
   text-align: left;
 }

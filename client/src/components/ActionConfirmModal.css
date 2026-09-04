@@ -167,3 +167,36 @@
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+/* ── Responsive ───────────────────────────────────────────────────────────
+   The modal had no height ceiling, so a long message (e.g. a rejection
+   reason) ran past the bottom of the viewport with no way to scroll to the
+   buttons — most visible on a phone in landscape. Cap it to the visible
+   viewport and let the body scroll instead. */
+.acm-modal {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .acm-overlay { padding: 0.75rem; }
+
+  .acm-modal {
+    padding: 1.5rem 1.25rem 1.25rem;
+    max-height: calc(100dvh - 1.5rem);
+  }
+
+  .acm-icon { width: 46px; height: 46px; }
+  .acm-title { font-size: 1.05rem; }
+  .acm-message { margin-bottom: 1.25rem; }
+}
+
+/* Side-by-side actions get too cramped for labels like
+   "Confirm Rejection" once the modal is ~256px of usable width. */
+@media (max-width: 380px) {
+  .acm-modal { padding: 1.25rem 1rem 1rem; }
+
+  .acm-actions { flex-direction: column-reverse; gap: 0.5rem; }
+  .acm-cancel,
+  .acm-confirm { width: 100%; }
+}

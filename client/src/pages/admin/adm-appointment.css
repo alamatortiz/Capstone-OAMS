@@ -126,6 +126,7 @@ body {
 .admin-appointment-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -173,6 +174,7 @@ body {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   transition: background-color 0.3s ease, border-color 0.3s ease;
   max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   text-align: left;
@@ -1012,8 +1014,11 @@ body {
 }
 
 @media (max-width: 640px) {
+  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
+     this rule is later in the file, so it won the cascade and padding grew
+     as the screen got smaller. */
   .admin-appointment-container {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .admin-appointment-page-title {
@@ -1053,4 +1058,8 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+@media (max-width: 380px) {
+  .admin-appointment-card-details { grid-template-columns: 1fr; }
 }

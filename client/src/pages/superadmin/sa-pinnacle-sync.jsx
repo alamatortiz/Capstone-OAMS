@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
+// Supplies the .admin-dashboard-with-sidebar / .admin-dashboard-main shell
+// classes and their <=1024px mobile-header offset (see sa-dashboard.jsx,
+// which already does this). Lazy-loaded route, so it needs its own import.
+import "../admin/adm-dashboard.css";
 import "./sa-pinnacle-sync.css";
 import SuperadminPageShell from "../../components/SuperadminPageShell";
 import api from "../../utils/api";

@@ -5,6 +5,7 @@
 /* ── Page root ── */
 .login-root {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -508,8 +509,50 @@ body.dark-mode .login-optional {
   height: auto;
 }
 
-/* ── Responsive: stack on mobile/tablet ── */
+/* ================================================
+   RESPONSIVE LADDER — login / register
+   ------------------------------------------------
+   Tiers, widest to narrowest:
+     900 / 768   two-column layout, tighter gutters
+     680         stacks to a single column
+     480 / 380   phone
+
+   The 900 and 768 tiers are bounded with min-width: 681px
+   on purpose: they only tune the TWO-COLUMN gutters. Without
+   that bound they also match below 680px and — being later in
+   the file — would re-apply a left margin and right padding
+   after the 680px tier has already centred the stacked card.
+
+   Values step monotonically across every boundary (logos
+   110>92>84>80>66>56, card padding 36>32>30>28>22>18) so the
+   form scales smoothly from tablet down to a small phone
+   instead of jumping at a breakpoint.
+   ================================================ */
+
+/* ── 900px — tablet landscape (still two columns) ── */
+@media (max-width: 900px) and (min-width: 681px) {
+  .login-root { padding: 28px 20px; }
+  .login-branding { padding-right: 32px; }
+  .login-card { margin-left: 32px; padding: 32px; }
+  .login-divider { height: 220px; }
+  .login-pnc-logo,
+  .login-coams-logo { height: 92px; }
+}
+
+/* ── 768px — tablet portrait (still two columns) ── */
+@media (max-width: 768px) and (min-width: 681px) {
+  .login-branding { padding-right: 24px; }
+  .login-card { margin-left: 24px; padding: 30px; }
+  .login-divider { height: 200px; }
+  .login-pnc-logo,
+  .login-coams-logo { height: 84px; }
+  .login-university-name { font-size: 0.9rem; }
+}
+
+/* ── 680px — stack to a single column ── */
 @media (max-width: 680px) {
+  .login-root { padding: 24px 18px; }
+
   .login-wrapper {
     flex-direction: column;
     align-items: center;
@@ -517,9 +560,7 @@ body.dark-mode .login-optional {
   }
 
   /* Hide the vertical divider, show nothing between branding and card */
-  .login-divider {
-    display: none;
-  }
+  .login-divider { display: none; }
 
   /* Branding: center everything, remove right-side padding */
   .login-branding {
@@ -530,11 +571,17 @@ body.dark-mode .login-optional {
 
   .login-logos {
     justify-content: center;
+    gap: 16px;
+    margin-bottom: 16px;
   }
 
   .login-university-name {
     text-align: center;
+    font-size: 0.9rem;
   }
+
+  .login-pnc-logo,
+  .login-coams-logo { height: 80px; }
 
   /* Card: full width, no left margin */
   .login-card {
@@ -548,4 +595,47 @@ body.dark-mode .login-optional {
     flex-direction: column;
     gap: 18px;
   }
+}
+
+/* ── 480px — phone ── */
+@media (max-width: 480px) {
+  .login-root { padding: 20px 14px; }
+
+  .login-wrapper { gap: 20px; }
+
+  .login-logos { gap: 12px; margin-bottom: 14px; }
+  .login-pnc-logo,
+  .login-coams-logo { height: 66px; }
+
+  .login-university-name { font-size: 0.85rem; line-height: 1.45; }
+
+  .login-card { padding: 22px 16px; }
+
+  /* font-size only. The `padding` shorthand would reset the 40px
+     padding-right that .login-input--password relies on to clear the
+     eye toggle, so the password text would run under the button.
+     16px is also the threshold below which iOS Safari auto-zooms on
+     focus and never zooms back out. */
+  .login-input { font-size: 16px; }
+
+  .login-field-row { gap: 14px; }
+  .login-btn-submit { padding: 12px; font-size: 0.95rem; }
+  .login-footer-copy { font-size: 0.72rem; }
+  .login-theme-btn { top: 10px; right: 10px; }
+}
+
+/* ── 380px — small phone ── */
+@media (max-width: 380px) {
+  .login-root { padding: 18px 12px; }
+
+  .login-wrapper { gap: 18px; }
+
+  .login-logos { gap: 10px; }
+  .login-pnc-logo,
+  .login-coams-logo { height: 56px; }
+
+  .login-university-name { font-size: 0.8rem; }
+
+  .login-card { padding: 18px 13px; }
+  .login-card-title { font-size: 1.15rem; }
 }

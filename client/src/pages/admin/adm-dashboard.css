@@ -183,6 +183,7 @@ body {
 .admin-dashboard-with-sidebar {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-bg);
   transition: background-color 0.3s ease;
 }
@@ -1218,8 +1219,11 @@ body {
 }
 
 @media (max-width: 640px) {
+  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
+     this rule is later in the file, so it won the cascade and padding grew
+     as the screen got smaller. */
   .admin-dashboard {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .adm-office-hours-card {
@@ -1256,4 +1260,20 @@ body {
   .admin-dashboard .quick-actions-grid {
     grid-template-columns: 1fr;
   }
+}
+/* ── Phone tiers ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .admin-dashboard { padding: 0.625rem; gap: 0.875rem; }
+
+  .welcome-banner.admin-banner { padding: 1.125rem; }
+  .admin-dashboard .banner-title { font-size: 1.4rem; }
+
+  .admin-dashboard .stats-grid { gap: 0.625rem; }
+  .admin-tools-grid { gap: 0.625rem; }
+}
+
+@media (max-width: 380px) {
+  .admin-dashboard .stats-grid,
+  .admin-tools-grid { grid-template-columns: 1fr; }
+  .admin-dashboard .banner-title { font-size: 1.25rem; }
 }

@@ -3,6 +3,11 @@ import jsQR from "jsqr";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
+// Supplies .admin-dashboard-with-sidebar / .admin-dashboard-main (the shell
+// classes used below) plus their <=1024px mobile-header offset. This route is
+// lazy-loaded, so its CSS chunk must pull them in itself -- without this the
+// layout collapses under the sidebar on a direct load of /admin/scan-document.
+import "./adm-dashboard.css";
 import "./adm-scan-document.css";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
