@@ -51,10 +51,12 @@ const formatDateShort = (dateStr) => {
 };
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My Appointments" }) {
+function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, backLabel = "My Appointments" }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const { label: statusLabel, cls: statusCls } = getStatusMeta(appt.status);
   const canCancel = appt.status === "pending" || appt.status === "approved";
+  const canComplete = appt.status === "approved";
 
   return (
     <div className="apst-status-container">
@@ -191,6 +193,31 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
               </div>
             </div>
           )}
+
+          {canComplete && (
+            <div className="apst-card apst-complete-card">
+              <div className="apst-card-header">
+                <h3 className="apst-card-title apst-complete-title">
+                  <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem", color: "#22c55e" }} />
+                  Mark as Completed
+                </h3>
+              </div>
+              <div className="apst-card-content">
+                <p className="apst-cancel-desc">
+                  If your concern has already been addressed and the professor hasn't closed this
+                  out yet, you can mark it completed yourself.
+                </p>
+                <button
+                  className="apst-complete-btn"
+                  onClick={() => setShowCompleteDialog(true)}
+                  disabled={completing === appt.id}
+                >
+                  <CheckCircle2 style={{ width: "1rem", height: "1rem" }} />
+                  {completing === appt.id ? "Marking…" : "Mark Appointment as Completed"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -209,6 +236,24 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, backLabel = "My
         cancelText="Keep Appointment"
         confirmText="Cancel Appointment"
       />
+
+      <ActionConfirmModal
+        show={showCompleteDialog}
+        variant="success"
+        onCancel={() => setShowCompleteDialog(false)}
+        onConfirm={() => { setShowCompleteDialog(false); onComplete(appt.id); }}
+        title="Mark Appointment as Completed?"
+        message={
+          <>
+            Mark your appointment with <strong>{appt.person}</strong> on{" "}
+            <strong>{formatDate(appt.date)}</strong> as completed? Use this only if your concern
+            has already been addressed.
+          </>
+        }
+        icon={<CheckCircle2 width={22} height={22} />}
+        cancelText="Not Yet"
+        confirmText="Mark as Completed"
+      />
     </div>
   );
 }
@@ -226,6 +271,7 @@ export default function AppointmentStatusPage() {
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(navState.appointmentId ?? null);
   const [cancelling, setCancelling] = useState(null);
+  const [completing, setCompleting] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
   const [allRange, setAllRange] = useState("week");
 
@@ -265,6 +311,8 @@ export default function AppointmentStatusPage() {
     const handleStatusUpdate = (payload) => {
       if (payload?.reason === "schedule_removed" || payload?.reason === "schedule_changed") {
         toast.error("An appointment was cancelled because the professor changed their schedule. Please book a new time.");
+      } else if (payload?.reason === "slot_adjusted") {
+        toast.message("A professor adjusted one of your appointment slots — check the new time and location.");
       }
       fetchAppointments();
     };
@@ -297,6 +345,19 @@ export default function AppointmentStatusPage() {
       toast.error(err?.response?.data?.error ?? "Failed to cancel the appointment.");
     } finally {
       setCancelling(null);
+    }
+  };
+
+  const handleComplete = async (id) => {
+    setCompleting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/complete`);
+      toast.success("Appointment marked as completed.");
+      await fetchAppointments();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to mark the appointment as completed.");
+    } finally {
+      setCompleting(null);
     }
   };
 
@@ -347,6 +408,8 @@ export default function AppointmentStatusPage() {
             onBack={() => fromBookings ? navigate("/student/appointments", { state: { activeTab: "bookings" } }) : setSelectedId(null)}
             onCancel={handleCancel}
             cancelling={cancelling}
+            onComplete={handleComplete}
+            completing={completing}
           />
         ) : (
           <div className="apst-status-container">

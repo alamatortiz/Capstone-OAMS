@@ -211,8 +211,6 @@ export default function StudentDocumentStatusScreen() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
-  const [servicesByDepartmentId, setServicesByDepartmentId] = useState<Record<number, DocumentTypeOption[]>>({});
-  const [reqLoading, setReqLoading] = useState(true);
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -245,24 +243,6 @@ export default function StudentDocumentStatusScreen() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
-
-  // Requirements for the selected document's type, looked up by name against
-  // the same service-types catalog student_documents.tsx uses (no stable
-  // service id is exposed on either payload, so name is the shared key).
-  useEffect(() => {
-    const fetchServiceTypes = async () => {
-      setReqLoading(true);
-      try {
-        const { data } = await api.get('/student/documents/service-types');
-        setServicesByDepartmentId(data.servicesByDepartmentId ?? {});
-      } catch (err) {
-        console.error('Failed to fetch document service types:', err);
-      } finally {
-        setReqLoading(false);
-      }
-    };
-    fetchServiceTypes();
-  }, []);
 
   // ── Live updates: refetch + notify when a document's status changes
   // (mirrors stud-document-status.jsx's "document:status-updated"). This is
@@ -312,9 +292,10 @@ export default function StudentDocumentStatusScreen() {
 
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) ?? null : null;
   const collegeLogoFor = (abbrev?: string) => (abbrev ? collegeLogos[abbrev] : undefined) ?? ccsLogo;
-  const selectedDocRequirements: DocumentRequirement[] = selectedDoc
-    ? (Object.values(servicesByDepartmentId).flat().find((t) => t.name === selectedDoc.type)?.requirements ?? [])
-    : [];
+  // Requirements come from the request's own frozen service_snapshot (captured
+  // at submit) -- a later catalogue edit can't retro-change a finished request.
+  const selectedDocRequirements: DocumentRequirement[] =
+    (selectedDoc as any)?.serviceSnapshot?.requirements ?? [];
 
   const activeDocuments = documents.filter(
     (d) => d.status !== 'claimed' && d.status !== 'rejected' && d.status !== 'cancelled',
@@ -405,7 +386,7 @@ export default function StudentDocumentStatusScreen() {
               onConfirmReceipt={confirmReceipt}
               confirmingReceipt={confirmingReceipt}
               requirements={selectedDocRequirements}
-              reqLoading={reqLoading}
+              reqLoading={loading && !selectedDoc}
             />
           ) : (
             <>

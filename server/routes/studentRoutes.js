@@ -17,6 +17,7 @@ const { getQueueDisplayInfo } = require("../utils/queueDisplay");
 const {
   STATUS_LABEL_MAP,
   cancelOwnDocumentRequest,
+  buildDocumentServiceSnapshot,
 } = require("../utils/documentStatus");
 // const { createNotification } = require("../utils/notifications");
 const {
@@ -30,6 +31,7 @@ const {
 } = require("../utils/announcementAttachments");
 const { documentSubmissionUpload, MAX_FILES } = require("../middleware/upload");
 const { nextTrackingNumber } = require("../utils/trackingNumber");
+const { isValidTransition } = require("../utils/appointmentStatus");
 const {
   getFilesMap,
   getFiles,
@@ -67,6 +69,7 @@ router.get(
            q.created_at,
            q.arrived_at,
            s.service_name,
+           q.service_label_snapshot,
            d.department_name,
            d.department_abbreviation,
            qs.max_capacity,
@@ -174,7 +177,7 @@ router.get(
 
       const [recentActivity] = await pool.query(
         `(
-           SELECT 'queue' AS type, s.service_name, NULL AS professor_name, NULL AS request_type,
+           SELECT 'queue' AS type, COALESCE(q.service_label_snapshot, s.service_name) AS service_name, NULL AS professor_name, NULL AS request_type,
                   d.department_name AS college, q.status, q.admin_reason, NULL AS cancelled_by,
                   q.created_at AS event_time
            FROM queues q
@@ -292,7 +295,7 @@ router.get(
               queueId: closestQueue.queue_id,
               queueNumber: closestQueue.queue_number,
               queueNumberBadge: closestQueueNumberBadge,
-              service: closestQueue.service_name,
+              service: closestQueue.service_label_snapshot || closestQueue.service_name,
               college: closestQueue.department_name,
               collegeAbbrev: closestQueue.department_abbreviation,
               status: closestQueue.status,
@@ -620,6 +623,7 @@ router.get(
                dr.notes,
                dr.created_at,
                dr.is_digital_delivery,
+               dr.service_snapshot,
                gf.qr_code AS delivery_code,
                d.department_name AS college
              FROM document_requests dr
@@ -645,6 +649,7 @@ router.get(
                ds.notes,
                ds.created_at,
                NULL AS is_digital_delivery,
+               NULL AS service_snapshot,
                NULL AS delivery_code,
                d.department_name AS college
              FROM document_submissions ds
@@ -682,6 +687,11 @@ router.get(
           claimedDate: d.claimed_at || undefined,
           isDigitalDelivery: !!d.is_digital_delivery,
           deliveryCode: d.delivery_code || undefined,
+          // Frozen catalogue copy captured at submit -- the detail view renders
+          // requirements/processing-time/description from this so a later edit
+          // to the type can't retro-change a finished request. mysql2 returns
+          // JSON columns already parsed.
+          serviceSnapshot: d.service_snapshot ?? null,
         };
         if (d.kind === "submission") {
           doc.studentFiles = studentFilesMap[d.id] || [];
@@ -786,57 +796,80 @@ router.post(
         });
       }
 
-      // Confirm the resolved service is actually one this student is allowed
-      // to use (own department, or cross-college) -- tiers 1-2 above resolve
-      // by whatever college name the client sent, so the server shouldn't
-      // just trust it without re-checking (mirrors professorRoutes.js's
-      // POST /documents, which already does this).
-      const [[svc]] = await pool.query(
-        `SELECT department_id, is_cross_college FROM document_services WHERE service_id = ?`,
-        [serviceId],
-      );
-      if (!svc || (svc.department_id !== ownDeptId && !svc.is_cross_college)) {
-        return res.status(403).json({
-          error: "This service isn't available to your department",
-        });
-      }
-
-      // Guard against a double-click/double-tap firing this twice before the
-      // client's own disabled-button state catches up to the first request.
-      const [[recentDup]] = await pool.query(
-        `SELECT request_id FROM document_requests
-         WHERE student_id = ? AND service_id = ? AND purpose = ?
-           AND status != 'cancelled'
-           AND created_at >= NOW() - INTERVAL 10 SECOND
-         LIMIT 1`,
-        [studentId, serviceId, purpose],
-      );
-      if (recentDup) {
-        return res.status(409).json({
-          error: "This request was already submitted a moment ago",
-        });
-      }
-
       const estimatedCompletion = getManilaDateString(
         new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       );
 
-      const trackingNumber = await nextTrackingNumber(pool, "document_requests", "request_id", "REQ");
-      const [result] = await pool.query(
-        `INSERT INTO document_requests
-           (tracking_number, student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())`,
-        [
-          trackingNumber,
-          studentId,
-          serviceId,
-          type,
-          purpose,
-          copyCount,
-          estimatedCompletion,
-          neededBy || null,
-        ],
-      );
+      const conn = await pool.getConnection();
+      let result;
+      try {
+        await conn.beginTransaction();
+
+        // Lock the resolved service row so a concurrent PUT /deactivate can't
+        // slip its auto-reject sweep in around this new submission. Re-check
+        // scope + active status under the lock -- tiers 1-2 above resolved by
+        // whatever college name the client sent, and the form may be stale.
+        const [[svc]] = await conn.query(
+          `SELECT department_id, is_cross_college, status
+           FROM document_services WHERE service_id = ? FOR UPDATE`,
+          [serviceId],
+        );
+        if (!svc || (svc.department_id !== ownDeptId && !svc.is_cross_college)) {
+          await conn.rollback();
+          return res.status(403).json({
+            error: "This service isn't available to your department",
+          });
+        }
+        if (svc.status !== "active") {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This document type is no longer offered.",
+          });
+        }
+
+        // Guard against a double-click/double-tap firing this twice before the
+        // client's own disabled-button state catches up to the first request.
+        const [[recentDup]] = await conn.query(
+          `SELECT request_id FROM document_requests
+           WHERE student_id = ? AND service_id = ? AND purpose = ?
+             AND status != 'cancelled'
+             AND created_at >= NOW() - INTERVAL 10 SECOND
+           LIMIT 1`,
+          [studentId, serviceId, purpose],
+        );
+        if (recentDup) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This request was already submitted a moment ago",
+          });
+        }
+
+        const serviceSnapshot = await buildDocumentServiceSnapshot(conn, serviceId);
+        const trackingNumber = await nextTrackingNumber(conn, "document_requests", "request_id", "REQ");
+        [result] = await conn.query(
+          `INSERT INTO document_requests
+             (tracking_number, student_id, service_id, request_type, purpose, copies, status, estimated_completion, needed_by, service_snapshot, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
+          [
+            trackingNumber,
+            studentId,
+            serviceId,
+            type,
+            purpose,
+            copyCount,
+            estimatedCompletion,
+            neededBy || null,
+            JSON.stringify(serviceSnapshot),
+          ],
+        );
+
+        await conn.commit();
+      } catch (txErr) {
+        await conn.rollback();
+        throw txErr;
+      } finally {
+        conn.release();
+      }
 
       const [[newDoc]] = await pool.query(
         `SELECT
@@ -1264,73 +1297,82 @@ router.get(
       const studentDeptId = stu?.department_id ?? null;
       const manilaToday = getManilaDateString();
 
-      const [slots] = await pool.query(
-        `SELECT
-           qs.slot_id,
-           qs.service_id,
-           qs.slot_date,
-           qs.start_time,
-           qs.end_time,
-           qs.max_capacity,
-           qs.current_count,
-           qs.status,
-           qs.no_show_timeout_minutes,
-           qs.service_time_minutes,
-           s.service_name,
-           s.is_cross_college,
-           s.description AS service_description,
-           l.location_name AS service_location,
-           d.department_id,
-           d.department_name,
-           d.department_abbreviation,
+      const COUNT_SUBQUERIES = `
            (
-             SELECT q.queue_number
-             FROM queues q
+             SELECT q.queue_number FROM queues q
              WHERE q.slot_id = qs.slot_id AND q.status = 'serving'
-             ORDER BY q.called_at DESC
-             LIMIT 1
+             ORDER BY q.called_at DESC LIMIT 1
            ) AS currently_serving_number,
            (
-             SELECT COUNT(*)
-             FROM queues q2
+             SELECT COUNT(*) FROM queues q2
              WHERE q2.slot_id = qs.slot_id AND q2.status = 'waiting'
            ) AS waiting_count,
            (
-             -- Total daily cap usage: everyone who has claimed a spot today
-             -- (waiting + serving + completed) — this is what max_capacity
-             -- gates against, not just who's currently waiting.
-             SELECT COUNT(*)
-             FROM queues q6
+             SELECT COUNT(*) FROM queues q6
              WHERE q6.slot_id = qs.slot_id AND q6.status IN ('waiting', 'serving', 'completed')
-           ) AS claimed_count
+           ) AS claimed_count`;
+
+      // 1. Normal single-service slots (unchanged scoping).
+      const [slots] = await pool.query(
+        `SELECT
+           qs.slot_id, qs.service_id, qs.slot_date, qs.start_time, qs.end_time,
+           qs.max_capacity, qs.current_count, qs.status, qs.no_show_timeout_minutes,
+           qs.service_time_minutes,
+           s.service_name, s.is_cross_college, s.description AS service_description,
+           l.location_name AS service_location,
+           d.department_id, d.department_name, d.department_abbreviation,
+           ${COUNT_SUBQUERIES}
          FROM queue_slots qs
          JOIN services s ON qs.service_id = s.service_id
          JOIN departments d ON s.department_id = d.department_id
          LEFT JOIN locations l ON s.location_id = l.location_id
          WHERE qs.slot_date = ?
+           AND qs.is_universal = FALSE
            AND qs.status IN ('open', 'paused', 'full')
            AND (s.department_id = ? OR s.is_cross_college = TRUE)
          ORDER BY qs.created_at DESC`,
         [manilaToday, studentDeptId],
       );
 
+      // 2. Universal Service Queue slots -- visible to the hosting dept's own
+      // students, or to anyone if the hosting dept has >=1 cross-college service.
+      const [uniSlots] = await pool.query(
+        `SELECT
+           qs.slot_id, qs.slot_date, qs.start_time, qs.end_time, qs.max_capacity,
+           qs.current_count, qs.status, qs.no_show_timeout_minutes, qs.service_time_minutes,
+           qs.department_id, d.department_name, d.department_abbreviation, d.office_location,
+           ${COUNT_SUBQUERIES}
+         FROM queue_slots qs
+         JOIN departments d ON qs.department_id = d.department_id
+         WHERE qs.slot_date = ?
+           AND qs.is_universal = TRUE
+           AND qs.status IN ('open', 'paused', 'full')
+           AND (
+             qs.department_id = ?
+             OR EXISTS (SELECT 1 FROM services sx
+                        WHERE sx.department_id = qs.department_id AND sx.is_cross_college = TRUE)
+           )
+         ORDER BY qs.created_at DESC`,
+        [manilaToday, studentDeptId],
+      );
+
       const manilaNow = getManilaTimeString();
+      const codeOf = (serviceName) =>
+        serviceName.split(" ")[0].substring(0, 3).toUpperCase();
+
       const formatted = slots.map((slot) => {
         const waitingCount = slot.waiting_count || 0;
         const claimedCount = slot.claimed_count || 0;
         const avgWaitMin = waitingCount * slot.service_time_minutes;
         const deptAbbrev = slot.department_abbreviation;
-        const serviceCode = slot.service_name
-          .split(" ")[0]
-          .substring(0, 3)
-          .toUpperCase();
         const currentlyServing = slot.currently_serving_number
-          ? `${deptAbbrev}-${serviceCode}-${String(slot.currently_serving_number).padStart(3, "0")}`
+          ? `${deptAbbrev}-${codeOf(slot.service_name)}-${String(slot.currently_serving_number).padStart(3, "0")}`
           : "—";
 
         return {
           slotId: slot.slot_id,
           serviceId: slot.service_id,
+          isUniversal: false,
           serviceName: slot.service_name,
           departmentId: slot.department_id,
           departmentName: slot.department_name,
@@ -1343,10 +1385,8 @@ router.get(
           endTime: slot.end_time,
           maxCapacity: slot.max_capacity,
           currentCount: claimedCount,
-          hasCapacity:
-            slot.status === "open" && claimedCount < slot.max_capacity,
-          isWithinHours:
-            manilaNow >= slot.start_time && manilaNow <= slot.end_time,
+          hasCapacity: slot.status === "open" && claimedCount < slot.max_capacity,
+          isWithinHours: manilaNow >= slot.start_time && manilaNow <= slot.end_time,
           status: slot.status,
           waitingCount,
           currentlyServing,
@@ -1354,6 +1394,61 @@ router.get(
           voidTimeoutMinutes: slot.no_show_timeout_minutes,
         };
       });
+
+      for (const slot of uniSlots) {
+        const isOwnDept = slot.department_id === studentDeptId;
+        // The dept's services this student may pick, minus any that currently
+        // have their own live single-service queue today.
+        const [pickable] = await pool.query(
+          `SELECT s.service_id, s.service_name, s.is_cross_college, s.description
+           FROM services s
+           WHERE s.department_id = ?
+             ${isOwnDept ? "" : "AND s.is_cross_college = TRUE"}
+             AND NOT EXISTS (
+               SELECT 1 FROM queue_slots qx
+               WHERE qx.service_id = s.service_id AND qx.slot_date = ?
+                 AND qx.status IN ('open', 'paused', 'full')
+             )
+           ORDER BY s.service_name ASC`,
+          [slot.department_id, manilaToday],
+        );
+        if (pickable.length === 0) continue; // nothing to pick -> hide the card
+
+        const waitingCount = slot.waiting_count || 0;
+        const claimedCount = slot.claimed_count || 0;
+        const avgWaitMin = waitingCount * slot.service_time_minutes;
+
+        formatted.push({
+          slotId: slot.slot_id,
+          serviceId: null,
+          isUniversal: true,
+          serviceName: "Universal Service Queue",
+          departmentId: slot.department_id,
+          departmentName: slot.department_name,
+          departmentAbbrev: slot.department_abbreviation,
+          isCrossCollege: false,
+          description: null,
+          location: slot.office_location || null,
+          slotDate: slot.slot_date,
+          startTime: slot.start_time,
+          endTime: slot.end_time,
+          maxCapacity: slot.max_capacity,
+          currentCount: claimedCount,
+          hasCapacity: slot.status === "open" && claimedCount < slot.max_capacity,
+          isWithinHours: manilaNow >= slot.start_time && manilaNow <= slot.end_time,
+          status: slot.status,
+          waitingCount,
+          currentlyServing: "—",
+          avgWaitTime: waitingCount === 0 ? "No wait" : `~${avgWaitMin} min`,
+          voidTimeoutMinutes: slot.no_show_timeout_minutes,
+          universalServices: pickable.map((s) => ({
+            serviceId: s.service_id,
+            serviceName: s.service_name,
+            isCrossCollege: !!s.is_cross_college,
+            description: s.description || null,
+          })),
+        });
+      }
 
       res.json({ slots: formatted });
     } catch (error) {
@@ -1389,6 +1484,7 @@ router.get(
            qs.pause_reason,
            qs.no_show_timeout_minutes,
            s.service_name,
+           q.service_label_snapshot,
            s.description AS service_description,
            l.location_name AS service_location,
            d.department_name,
@@ -1467,7 +1563,7 @@ router.get(
           queueNumberBadge,
           slotId: row.slot_id,
           serviceId: row.service_id,
-          serviceName: row.service_name,
+          serviceName: row.service_label_snapshot || row.service_name,
           departmentName: row.department_name,
           departmentAbbrev: deptAbbrev,
           status: row.status,
@@ -1520,6 +1616,7 @@ router.get(
            q.completed_at,
            q.cancelled_at,
            s.service_name,
+           q.service_label_snapshot,
            d.department_name,
            d.department_abbreviation
          FROM queues q
@@ -1549,7 +1646,7 @@ router.get(
 
         return {
           id: row.queue_id,
-          service: row.service_name,
+          service: row.service_label_snapshot || row.service_name,
           college: row.department_name,
           queueNumber: `${deptAbbrev}-${serviceCode}-${String(row.queue_number).padStart(3, "0")}`,
           status: row.status,
@@ -1588,6 +1685,11 @@ router.post(
   async (req, res) => {
     const studentId = req.user.userId;
     const { slotId, notes } = req.body;
+    // For a Universal Service Queue the student picks which specific service
+    // they're here for; ignored for a normal single-service slot.
+    const pickedServiceId = req.body.serviceId
+      ? parseInt(req.body.serviceId, 10)
+      : null;
     const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
 
     if (!slotId) {
@@ -1610,11 +1712,11 @@ router.post(
       // a department-exclusive queue can't be joined by guessing/reusing
       // a slotId that was never actually shown to this student).
       const [[slot]] = await conn.query(
-        `SELECT qs.slot_id, qs.service_id, qs.status, qs.current_count, qs.max_capacity,
-                qs.start_time, qs.end_time,
-                s.department_id AS service_department_id, s.is_cross_college
+        `SELECT qs.slot_id, qs.service_id, qs.is_universal, qs.department_id AS slot_department_id,
+                qs.status, qs.current_count, qs.max_capacity, qs.start_time, qs.end_time,
+                s.service_name, s.department_id AS service_department_id, s.is_cross_college
          FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
+         LEFT JOIN services s ON qs.service_id = s.service_id
          WHERE qs.slot_id = ? AND qs.slot_date = ?
          FOR UPDATE`,
         [slotId, getManilaDateString()],
@@ -1631,10 +1733,57 @@ router.post(
         `SELECT department_id FROM students WHERE student_id = ?`,
         [studentId],
       );
-      if (
-        !slot.is_cross_college &&
-        slot.service_department_id !== stu?.department_id
-      ) {
+
+      // Resolve which service this ticket is for + its scope. For a universal
+      // slot the student must pick; for a normal slot it's the slot's service.
+      let queueServiceId;
+      let queueServiceName;
+      let scopeDeptId;
+      let scopeCrossCollege;
+      if (slot.is_universal) {
+        if (!pickedServiceId) {
+          await conn.rollback();
+          return res.status(400).json({ error: "Please choose the specific service you're here for." });
+        }
+        const [[picked]] = await conn.query(
+          `SELECT s.service_id, s.service_name, s.department_id, s.is_cross_college
+           FROM services s WHERE s.service_id = ?`,
+          [pickedServiceId],
+        );
+        // Must belong to the hosting department, and be one this student may use.
+        if (!picked || picked.department_id !== slot.slot_department_id) {
+          await conn.rollback();
+          return res.status(400).json({ error: "That service isn't part of this queue." });
+        }
+        if (!picked.is_cross_college && picked.department_id !== stu?.department_id) {
+          await conn.rollback();
+          return res.status(403).json({ error: "That service isn't available to your department." });
+        }
+        // A service with its own live queue is excluded from the universal picker.
+        const [[ownQueue]] = await conn.query(
+          `SELECT 1 FROM queue_slots
+            WHERE service_id = ? AND slot_date = ? AND status IN ('open','paused','full')
+            LIMIT 1`,
+          [pickedServiceId, getManilaDateString()],
+        );
+        if (ownQueue) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "That service has its own queue open right now — join that one instead.",
+          });
+        }
+        queueServiceId = picked.service_id;
+        queueServiceName = `Universal Service Queue - ${picked.service_name}`;
+        scopeDeptId = picked.department_id;
+        scopeCrossCollege = picked.is_cross_college;
+      } else {
+        queueServiceId = slot.service_id;
+        queueServiceName = slot.service_name;
+        scopeDeptId = slot.service_department_id;
+        scopeCrossCollege = slot.is_cross_college;
+      }
+
+      if (!scopeCrossCollege && scopeDeptId !== stu?.department_id) {
         await conn.rollback();
         return res
           .status(403)
@@ -1700,11 +1849,12 @@ router.post(
       );
       const queueNumber = maxRow.max_num + 1;
 
-      // 4. Insert queue entry
+      // 4. Insert queue entry. service_label_snapshot freezes the display label
+      // at join time so a later service rename never rewrites this ticket.
       const [insertResult] = await conn.query(
-        `INSERT INTO queues (student_id, service_id, slot_id, queue_number, status, notes, created_at)
-         VALUES (?, ?, ?, ?, 'waiting', ?, NOW())`,
-        [studentId, slot.service_id, slotId, queueNumber, trimmedNotes || null],
+        `INSERT INTO queues (student_id, service_id, slot_id, queue_number, status, notes, service_label_snapshot, created_at)
+         VALUES (?, ?, ?, ?, 'waiting', ?, ?, NOW())`,
+        [studentId, queueServiceId, slotId, queueNumber, trimmedNotes || null, queueServiceName],
       );
       const queueId = insertResult.insertId;
 
@@ -1745,6 +1895,7 @@ router.post(
            qs.status AS slot_status,
            qs.no_show_timeout_minutes,
            s.service_name,
+           q.service_label_snapshot,
            d.department_id,
            d.department_name,
            d.department_abbreviation,
@@ -1828,7 +1979,7 @@ router.post(
           queueNumberBadge: `${deptAbbrev}-${serviceCode}-${String(newEntry.queue_number).padStart(3, "0")}`,
           slotId: newEntry.slot_id,
           serviceId: newEntry.service_id,
-          serviceName: newEntry.service_name,
+          serviceName: newEntry.service_label_snapshot || newEntry.service_name,
           departmentName: newEntry.department_name,
           departmentAbbrev: deptAbbrev,
           status: newEntry.status,
@@ -1948,10 +2099,7 @@ router.post(
       );
 
       const [[deptRow]] = await conn.query(
-        `SELECT s.department_id
-         FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ?`,
+        `SELECT department_id FROM queue_slots WHERE slot_id = ?`,
         [entry.slot_id],
       );
 
@@ -2065,18 +2213,16 @@ router.patch(
       ]);
 
       const [[deptRow]] = await conn.query(
-        `SELECT s.department_id
-         FROM queue_slots qs JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ?`,
+        `SELECT department_id FROM queue_slots WHERE slot_id = ?`,
         [entry.slot_id],
       );
 
       await conn.commit();
 
-      emitToDept(deptRow?.department_id, "queue:notes-updated", {
-        queueId,
-        notes: trimmedNotes || null,
-      });
+      const notesPayload = { queueId, notes: trimmedNotes || null };
+      emitToDept(deptRow?.department_id, "queue:notes-updated", notesPayload);
+      // Also nudge the student's own other devices (the dept room doesn't reach them).
+      emitToUser(studentId, "queue:notes-updated", notesPayload);
 
       res.json({ message: "Updated", queueId, notes: trimmedNotes || null });
     } catch (error) {
@@ -2241,6 +2387,109 @@ router.delete(
     } catch (error) {
       await conn.rollback();
       sendServerError(res, error, "Cancel appointment error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// PATCH /api/student/appointments/:appointmentId/complete
+// Lets a student manually close out an APPROVED appointment they've already
+// attended, in case the professor forgets to. Mirrors the professor's
+// approved -> completed transition (same event + notification shape as
+// appointmentReminderSweeper.js:sweepStaleApproved). approved -> completed only.
+router.patch(
+  "/appointments/:appointmentId/complete",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+
+    if (!appointmentId || isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[appt]] = await conn.query(
+        `SELECT appointment_id, student_id, status, faculty_id, department_id, appointment_date
+         FROM appointments WHERE appointment_id = ? FOR UPDATE`,
+        [appointmentId],
+      );
+
+      if (!appt) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (appt.student_id !== studentId) {
+        await conn.rollback();
+        return res
+          .status(403)
+          .json({ error: "You can only update your own appointments" });
+      }
+      // Idempotent: the 3h-grace auto-complete sweep or the professor may have
+      // already finished it -- don't surface that as an error.
+      if (appt.status === "completed") {
+        await conn.rollback();
+        return res.json({
+          message: "Appointment already marked as completed",
+          appointmentId,
+        });
+      }
+      if (!isValidTransition(appt.status, "completed")) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Only an approved appointment can be marked as completed (this one is ${appt.status}).`,
+        });
+      }
+      const apptDate =
+        appt.appointment_date instanceof Date
+          ? getManilaDateString(appt.appointment_date)
+          : String(appt.appointment_date).split("T")[0];
+      if (apptDate > getManilaDateString()) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "This appointment hasn't happened yet — you can only mark a past or same-day appointment as completed.",
+        });
+      }
+
+      const [result] = await conn.query(
+        `UPDATE appointments SET status = 'completed'
+         WHERE appointment_id = ? AND status = 'approved'`,
+        [appointmentId],
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error:
+            "This appointment was just updated elsewhere. Please refresh and try again.",
+        });
+      }
+
+      const [[stu]] = await conn.query(
+        `SELECT first_name, last_name FROM students WHERE student_id = ?`,
+        [studentId],
+      );
+
+      await conn.commit();
+
+      emitToUser(studentId, "appointment:status-updated", { appointmentId, status: "completed" });
+      emitToUser(appt.faculty_id, "appointment:status-updated", { appointmentId, status: "completed" });
+      emitToDept(appt.department_id, "appointment:status-updated", { appointmentId, status: "completed" });
+      createNotification(
+        appt.faculty_id,
+        `${stu?.first_name ?? "A student"} ${stu?.last_name ?? ""}`.trim() +
+          ` marked their appointment on ${apptDate} as completed.`,
+        "appointment",
+      );
+
+      res.json({ message: "Appointment marked as completed", appointmentId });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Complete appointment error");
     } finally {
       conn.release();
     }
@@ -2412,7 +2661,7 @@ router.get(
         SELECT
           'queue' AS type,
           q.queue_id AS id,
-          IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', s.service_name)) AS title,
+          IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', COALESCE(q.service_label_snapshot, s.service_name))) AS title,
           d.department_name AS college,
           q.status AS raw_status,
           COALESCE(q.admin_reason, q.notes) AS details,
@@ -3271,7 +3520,10 @@ router.get(
         });
       }
 
-      const result = [...deptMap.values()].filter((d) => d.services.length > 0);
+      // Every department is returned, even one with no in-scope services yet
+      // (empty `services: []`), so the student Queue screen's college filter can
+      // list all colleges regardless of whether they're hosting a queue today.
+      const result = [...deptMap.values()];
 
       res.json({ departments: result });
     } catch (error) {

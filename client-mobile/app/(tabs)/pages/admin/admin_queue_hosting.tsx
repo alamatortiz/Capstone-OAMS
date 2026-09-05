@@ -266,6 +266,7 @@ export default function AdminQueueHostingScreen() {
   // ── Open Queue Line modal state ──
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [serviceId, setServiceId] = useState('');
+  const [hostAllServices, setHostAllServices] = useState(false);
   const [maxCapacity, setMaxCapacity] = useState('100');
   const [serviceStart, setServiceStart] = useState('08:00');
   const [serviceEnd, setServiceEnd] = useState('17:00');
@@ -280,6 +281,7 @@ export default function AdminQueueHostingScreen() {
 
   const resetForm = () => {
     setServiceId('');
+    setHostAllServices(false);
     setMaxCapacity('100');
     const now = getManilaTimeString();
     const [h, m] = now.split(':').map(Number);
@@ -310,7 +312,8 @@ export default function AdminQueueHostingScreen() {
     // a mysql2 row as a raw number. Casting to string here would silently
     // break that strict-equality lookup and show "Select a service" instead
     // of the pre-filled name.
-    setServiceId(queue.serviceId);
+    setHostAllServices(!!queue.isUniversal);
+    setServiceId(queue.isUniversal ? '' : queue.serviceId);
     setMaxCapacity(String(queue.maxCapacity));
     setServiceTime(String(queue.avgServiceMinutes ?? 15));
     setNoShowTimeout(String(queue.noShowTimeoutMinutes ?? 15));
@@ -325,8 +328,8 @@ export default function AdminQueueHostingScreen() {
   };
 
   const handleOpenQueueSubmit = async () => {
-    if (!serviceId) {
-      setFormError('Please select a service to queue');
+    if (!hostAllServices && !serviceId) {
+      setFormError('Please select a service to queue, or turn on “Host all services”.');
       return;
     }
     const capacityNum = parseInt(maxCapacity, 10);
@@ -356,7 +359,8 @@ export default function AdminQueueHostingScreen() {
     setSubmitting(true);
     try {
       await api.post('/admin/queue-hosting', {
-        serviceId,
+        serviceId: hostAllServices ? null : serviceId,
+        hostAllServices,
         maxCapacity: capacityNum,
         startTime: `${serviceStart}:00`,
         endTime: `${serviceEnd}:00`,
@@ -949,6 +953,8 @@ export default function AdminQueueHostingScreen() {
           setSelectField(null);
         }}
         onCloseServiceSelect={() => setSelectField(null)}
+        hostAllServices={hostAllServices}
+        onToggleHostAll={(v) => { setHostAllServices(v); if (v) setServiceId(''); }}
       />
 
       {/* Shared select modal: status/type filters only -- the service picker
@@ -1096,6 +1102,8 @@ function OpenQueueModal({
   onSelectService,
   onCloseServiceSelect,
   defaultEndClamped,
+  hostAllServices,
+  onToggleHostAll,
 }: {
   visible: boolean;
   selectedServiceName: string;
@@ -1124,6 +1132,8 @@ function OpenQueueModal({
   onSelectService: (value: string) => void;
   onCloseServiceSelect: () => void;
   defaultEndClamped: boolean;
+  hostAllServices: boolean;
+  onToggleHostAll: (v: boolean) => void;
 }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -1151,14 +1161,36 @@ function OpenQueueModal({
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Service *</Text>
-              <Pressable style={styles.selectTrigger} onPress={onOpenServiceSelect}>
+              <Pressable
+                style={[styles.selectTrigger, hostAllServices && { opacity: 0.5 }]}
+                onPress={hostAllServices ? undefined : onOpenServiceSelect}
+                disabled={hostAllServices}
+              >
                 <Text
                   style={[styles.selectTriggerText, !selectedServiceName && styles.selectPlaceholderText]}
                   numberOfLines={1}
                 >
-                  {selectedServiceName || 'Select a service'}
+                  {hostAllServices ? 'All services' : selectedServiceName || 'Select a service'}
                 </Text>
                 <ChevronDown size={14} color={theme.tertiary} />
+              </Pressable>
+              <Pressable
+                onPress={() => onToggleHostAll(!hostAllServices)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}
+              >
+                <View
+                  style={{
+                    width: 18, height: 18, borderRadius: 4, borderWidth: 1.5,
+                    borderColor: hostAllServices ? (theme.primary ?? '#22c55e') : theme.tertiary,
+                    backgroundColor: hostAllServices ? (theme.primary ?? '#22c55e') : 'transparent',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  {hostAllServices && <Check size={12} color="#fff" />}
+                </View>
+                <Text style={[styles.formHint, { marginTop: 0, flex: 1 }]}>
+                  Host all services — one queue covering every service in your department
+                </Text>
               </Pressable>
             </View>
 

@@ -96,6 +96,7 @@ type SlotStatus = 'open' | 'paused' | 'full' | 'expired';
 
 interface QueueRecord {
   queueId: string;
+  serviceId?: number;
   departmentAbbrev: string;
   departmentName: string;
   serviceName: string;
@@ -135,6 +136,7 @@ interface ServiceProcedureStep {
 }
 
 interface ServiceInfo {
+  serviceId?: number;
   serviceName: string;
   requirements: ServiceRequirement[];
   procedureSteps: ServiceProcedureStep[];
@@ -662,30 +664,20 @@ function QueueDetail({
     fetchServices();
   }, []);
 
-  const findService = (serviceName: string) => {
-    const matchesName = (s: ServiceInfo) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase();
-
-    // Prefer the queue's own department first -- a same-named service in a
-    // different college (e.g. two colleges both offering "Certification
-    // Request") would otherwise resolve to whichever department the backend
-    // happens to sort first, showing the wrong college's requirements.
-    const ownDept = servicesData.find(
-      (dept) =>
-        (queue.departmentAbbrev && dept.departmentAbbrev === queue.departmentAbbrev) ||
-        (queue.departmentName && dept.departmentName === queue.departmentName),
-    );
-    const ownMatch = ownDept?.services?.find(matchesName);
-    if (ownMatch) return ownMatch;
-
+  // Match by the queue's stable serviceId -- for a Universal Service Queue
+  // ticket queue.serviceName is the frozen "Universal Service Queue - X" label
+  // and would never name-match.
+  const findService = (serviceId?: number | null) => {
+    if (!serviceId) return null;
     for (const dept of servicesData) {
-      const svc = dept.services?.find(matchesName);
+      const svc = dept.services?.find((s: ServiceInfo) => (s as any).serviceId === serviceId);
       if (svc) return svc;
     }
     return null;
   };
-  const serviceRequirements = findService(queue.serviceName)?.requirements ?? [];
-  const procedureSteps = findService(queue.serviceName)?.procedureSteps ?? [];
-  const isServiceKnown = !!findService(queue.serviceName);
+  const serviceRequirements = findService(queue.serviceId)?.requirements ?? [];
+  const procedureSteps = findService(queue.serviceId)?.procedureSteps ?? [];
+  const isServiceKnown = !!findService(queue.serviceId);
 
   return (
     <>

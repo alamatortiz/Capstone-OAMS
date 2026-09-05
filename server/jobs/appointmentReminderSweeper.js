@@ -156,13 +156,15 @@ async function sweepStalePending() {
 
 // A 'pending' request nobody approved/rejected before its own scheduled
 // date+time arrived and passed can't ever be honored -- there's no slot left
-// to serve it in -- so it's auto-cancelled instead of sitting in 'pending'
+// to serve it in -- so it's auto-REJECTED instead of sitting in 'pending'
 // forever. Distinct from sweepStalePending above (which only nudges faculty
 // while the appointment is still in the future) and from sweepStaleApproved
 // (which resolves an *approved* past-due appointment to 'completed', since
-// that one was actually confirmed to happen). cancelled_by = 'system_expired'
-// keeps this out of the 'system' bucket used for schedule-change cancellations
-// so the activity-feed/notification copy can tell the two apart.
+// that one was actually confirmed to happen). Uses status 'rejected' + a
+// rejection_reason so it reads as "Rejected" everywhere the same way a manual
+// faculty rejection does; cancelled_by stays NULL (matching a manual reject).
+// (Historical rows may still carry cancelled_by = 'system_expired' from before
+// this changed -- the ENUM value is kept for them.)
 async function sweepExpiredPending() {
   const [expired] = await pool.query(
     // Manila-now comparison -- see the note in sweepAppointmentReminders above.
@@ -180,25 +182,28 @@ async function sweepExpiredPending() {
            <= CONVERT_TZ(NOW(), '+00:00', '+08:00')`,
   );
 
-  let cancelledCount = 0;
+  const EXPIRED_REASON =
+    "This request was not answered before its scheduled time passed, so it was automatically declined.";
+
+  let rejectedCount = 0;
   for (const row of expired) {
     const [result] = await pool.query(
-      `UPDATE appointments SET status = 'cancelled', cancelled_by = 'system_expired'
+      `UPDATE appointments SET status = 'rejected', rejection_reason = ?
        WHERE appointment_id = ? AND status = 'pending'`,
-      [row.appointment_id],
+      [EXPIRED_REASON, row.appointment_id],
     );
     if (result.affectedRows === 0) continue;
 
-    emitToUser(row.student_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "cancelled" });
-    emitToUser(row.faculty_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "cancelled" });
-    emitToDept(row.department_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "cancelled" });
-    createNotification(row.student_id, "Your appointment request expired without a response and was automatically cancelled.", "appointment");
-    createNotification(row.faculty_id, "An unanswered appointment request expired and was automatically cancelled.", "appointment");
-    cancelledCount += 1;
+    emitToUser(row.student_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "rejected" });
+    emitToUser(row.faculty_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "rejected" });
+    emitToDept(row.department_id, "appointment:status-updated", { appointmentId: row.appointment_id, status: "rejected" });
+    createNotification(row.student_id, "Your appointment request was automatically declined — its scheduled time passed without a response.", "appointment");
+    createNotification(row.faculty_id, "An unanswered appointment request expired and was automatically declined.", "appointment");
+    rejectedCount += 1;
   }
 
-  if (cancelledCount > 0) {
-    console.log(`[appointmentReminderSweeper] Auto-cancelled ${cancelledCount} expired pending request${cancelledCount === 1 ? "" : "s"}`);
+  if (rejectedCount > 0) {
+    console.log(`[appointmentReminderSweeper] Auto-declined ${rejectedCount} expired pending request${rejectedCount === 1 ? "" : "s"}`);
   }
 }
 

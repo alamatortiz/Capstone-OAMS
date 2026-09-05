@@ -252,7 +252,16 @@ CREATE TABLE document_requirements (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE queue_slots (
     slot_id         INT          AUTO_INCREMENT PRIMARY KEY,
-    service_id      INT          NOT NULL,
+    -- NULL only for a Universal Service Queue slot (is_universal = TRUE), which
+    -- covers every service in department_id rather than one specific service.
+    -- For a normal slot this is the one service being queued for.
+    service_id      INT          NULL,
+    -- The owning department. Always populated (for a normal slot it equals
+    -- services.department_id; for a universal slot it's the only dept link).
+    -- Every queue read path scopes on this instead of joining services, so a
+    -- NULL service_id never drops a universal slot from a dept-scoped query.
+    department_id   INT          NOT NULL,
+    is_universal    BOOLEAN      NOT NULL DEFAULT FALSE,
     admin_id        INT          NOT NULL,
     slot_date       DATE         NOT NULL,
     start_time      TIME         NOT NULL,
@@ -266,14 +275,18 @@ CREATE TABLE queue_slots (
     close_reason    VARCHAR(255) NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (service_id) REFERENCES services(service_id),
-    FOREIGN KEY (admin_id)   REFERENCES administrators(admin_id),
+    FOREIGN KEY (service_id)    REFERENCES services(service_id),
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE RESTRICT,
+    FOREIGN KEY (admin_id)      REFERENCES administrators(admin_id),
     -- Non-unique on purpose. A UNIQUE key here would let a completed/closed slot
     -- permanently block re-hosting that same window ("Host Again"). Uniqueness
     -- among *live* queues is enforced in POST /queue-hosting by the status-aware
     -- overlap check, serialized by a SELECT ... FOR UPDATE on the owning service
     -- row. The index still speeds that overlap lookup and backs the service_id FK.
-    INDEX idx_slot_window (service_id, slot_date, start_time)
+    INDEX idx_slot_window (service_id, slot_date, start_time),
+    -- Backs the dept-scoped lookups used everywhere now that scoping is by
+    -- department_id, and the "one live universal per dept" / overlap checks.
+    INDEX idx_slot_dept_date_status (department_id, slot_date, status)
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -305,6 +318,12 @@ CREATE TABLE queues (
     -- from `notes` (the student's own concern text) so neither overwrites
     -- the other.
     admin_reason    VARCHAR(255) NULL,
+    -- The service label to show for this ticket, frozen at join time. For a
+    -- normal queue it's the service's name as it was then; for a Universal
+    -- Service Queue it's "Universal Service Queue - <picked service>". Every
+    -- student-facing + history read path COALESCEs this over the live
+    -- services.service_name so a later rename never rewrites past tickets.
+    service_label_snapshot VARCHAR(150) NULL,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES services(service_id),
     FOREIGN KEY (slot_id)    REFERENCES queue_slots(slot_id),
@@ -376,10 +395,11 @@ CREATE TABLE appointments (
     appointment_time    TIME         NOT NULL,
     status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
     -- 'system' = auto-cancelled because the availability slot it was booked
-    -- against got edited/deleted out from under it; 'system_expired' = never
-    -- approved/rejected and the appointment's own date+time has now passed
-    -- (appointmentReminderSweeper.js) -- kept distinct from 'system' since
-    -- the two need different activity-feed/notification copy.
+    -- against got edited/deleted out from under it.
+    -- 'system_expired' = LEGACY. A pending request whose scheduled time passed
+    -- unanswered is now auto-*rejected* (status='rejected' + rejection_reason)
+    -- by appointmentReminderSweeper.js, not cancelled -- this value only exists
+    -- for rows written before that change.
     cancelled_by        ENUM('student','faculty','system','system_expired') NULL, -- who/what triggered a 'cancelled' status, for activity-feed attribution
     -- Separate from `notes` below (which is the student's own booking
     -- purpose, set once at creation and never a good place to also store
@@ -457,6 +477,15 @@ CREATE TABLE document_requests (
     claimed_at              TIMESTAMP    NULL,
     notes                   TEXT         NULL,
     official_code           VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
+    -- Frozen copy of the document_services row (+ its requirements) as it stood
+    -- when this request was submitted: { name, description, processingTime,
+    -- recipientType, requiresCoding, isCrossCollege,
+    --   requirements: [{ name, description, isMandatory }] }.
+    -- The student/faculty detail view renders requirements/processing-time from
+    -- here, so a later edit to the catalogue type can't retro-change what a
+    -- finished request shows. Editing a type is blocked while any request for
+    -- it is still pending/processing, so this stays accurate up to that point.
+    service_snapshot        JSON         NULL,
     -- TRUE when admin used "Generate Document" (QR/text-code prototype) instead
     -- of the normal physical Mark as Released -> Mark as Claimed flow -- lets
     -- the requester's own "Confirm Received" self-claim the request, and gates
@@ -723,6 +752,9 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     claimed_at           TIMESTAMP    NULL,
     notes                TEXT         NULL,
     official_code        VARCHAR(100) NULL, -- manually entered by admin, dean-sanctioned; only set when the service requires_coding
+    -- See document_requests.service_snapshot -- identical frozen-catalogue copy,
+    -- mirrored here for faculty-sourced requests.
+    service_snapshot     JSON         NULL,
     -- See document_requests.is_digital_delivery for the full explanation --
     -- identical prototype behavior, mirrored here for faculty-sourced requests.
     is_digital_delivery  BOOLEAN      NOT NULL DEFAULT FALSE,

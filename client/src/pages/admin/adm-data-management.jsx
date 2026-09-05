@@ -334,11 +334,15 @@ export default function AdminDataManagement() {
 
   const handleDeleteDoc = async (doc) => {
     try {
-      await api.delete(`/admin/data-management/document-types/${doc.id}`);
-      toast.success("Document type deleted.");
+      const { data } = await api.patch(`/admin/data-management/document-types/${doc.id}/deactivate`);
+      toast.success(
+        data?.declinedCount
+          ? `Document type set inactive. ${data.declinedCount} in-progress request(s) declined.`
+          : "Document type set inactive.",
+      );
       fetchDocumentTypes(docStatusFilter);
     } catch (err) {
-      toast.error(err?.response?.data?.error || "Failed to delete document type.");
+      toast.error(err?.response?.data?.error || "Failed to set the document type inactive.");
     } finally {
       setDeleteDocTarget(null);
     }
@@ -976,9 +980,15 @@ export default function AdminDataManagement() {
             show={!!deleteDocTarget}
             onCancel={() => setDeleteDocTarget(null)}
             onConfirm={() => handleDeleteDoc(deleteDocTarget)}
-            title="Delete Document Type?"
-            message={deleteDocTarget && <>Delete <strong>{deleteDocTarget.name}</strong>?</>}
-            confirmText="Delete"
+            title="Set Document Type Inactive?"
+            message={deleteDocTarget && (
+              <>
+                Set <strong>{deleteDocTarget.name}</strong> inactive? Any in-progress request for
+                it will be declined, and it will be hidden from the request form. Finished records
+                keep their details, and you can reactivate it later.
+              </>
+            )}
+            confirmText="Set Inactive"
           />
           <ActionConfirmModal
             show={!!deleteServiceTarget}
@@ -1088,7 +1098,7 @@ export default function AdminDataManagement() {
                         <button className="adm-btn-icon adm-btn-edit" onClick={() => openEditDocModal(doc)} title="Edit">
                           <EditSvgIcon />
                         </button>
-                        <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteDocTarget(doc)} title="Delete">
+                        <button className="adm-btn-icon adm-btn-delete" onClick={() => setDeleteDocTarget(doc)} title="Set inactive">
                           <TrashIcon />
                         </button>
                       </div>

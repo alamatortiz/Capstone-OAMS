@@ -15,8 +15,12 @@ export default function QueueConcernModal({
   confirmText = "Join Queue",
   cancelText = "Cancel",
   submitting = false,
+  // When present, this is a Universal Service Queue: the student must pick
+  // which specific service they're here for before joining.
+  universalServices = null,
 }) {
   const [concern, setConcern] = useState("");
+  const [pickedServiceId, setPickedServiceId] = useState("");
   const [wasShown, setWasShown] = useState(show);
 
   useLockBodyScroll(show);
@@ -29,17 +33,25 @@ export default function QueueConcernModal({
   // cause an extra, avoidable render on every close.
   if (show !== wasShown) {
     setWasShown(show);
-    if (!show) setConcern("");
+    if (!show) {
+      setConcern("");
+      setPickedServiceId("");
+    }
   }
 
   if (!show) return null;
 
+  const needsServicePick = Array.isArray(universalServices);
+  const canConfirm = !submitting && (!needsServicePick || !!pickedServiceId);
+
   const handleConfirm = () => {
-    onConfirm(concern.trim());
+    if (!canConfirm) return;
+    onConfirm(concern.trim(), needsServicePick ? Number(pickedServiceId) : null);
   };
 
   const handleCancel = () => {
     setConcern("");
+    setPickedServiceId("");
     onCancel();
   };
 
@@ -51,6 +63,24 @@ export default function QueueConcernModal({
         </div>
         <h3 className="qcm-title">{title}</h3>
         {message && <div className="qcm-message">{message}</div>}
+        {needsServicePick && (
+          <div className="qcm-field">
+            <label className="qcm-label">Which service are you here for? *</label>
+            <select
+              className="qcm-select"
+              value={pickedServiceId}
+              onChange={(e) => setPickedServiceId(e.target.value)}
+              disabled={submitting}
+            >
+              <option value="">Select a service…</option>
+              {universalServices.map((s) => (
+                <option key={s.serviceId} value={s.serviceId}>
+                  {s.serviceName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <textarea
           className="qcm-textarea"
           placeholder="Briefly describe why you're joining this queue (optional)"
@@ -58,14 +88,14 @@ export default function QueueConcernModal({
           onChange={(e) => setConcern(e.target.value)}
           rows={3}
           maxLength={255}
-          autoFocus
+          autoFocus={!needsServicePick}
           disabled={submitting}
         />
         <div className="qcm-actions">
           <button className="qcm-cancel" onClick={handleCancel} disabled={submitting}>
             {cancelText}
           </button>
-          <button className="qcm-confirm" onClick={handleConfirm} disabled={submitting}>
+          <button className="qcm-confirm" onClick={handleConfirm} disabled={!canConfirm}>
             {submitting ? "Joining…" : confirmText}
           </button>
         </div>

@@ -292,6 +292,8 @@ export function QueueProvider({ children }) {
       "queue:slot-status",
       "queue:student-joined",
       "queue:student-left",
+      "queue:notes-updated",
+      "queue:service-updated",
     ];
     events.forEach((event) => socket.on(event, refetch));
 
@@ -333,9 +335,9 @@ export function QueueProvider({ children }) {
 
   // ── Join a queue ──────────────────────────────────────────────────────────
   const joinQueue = useCallback(
-    async (slotId, notes) => {
+    async (slotId, notes, serviceId = null) => {
       try {
-        const { data } = await api.post("/student/queues/join", { slotId, notes });
+        const { data } = await api.post("/student/queues/join", { slotId, notes, serviceId });
         setQueues((prev) => [...prev, data.queue]);
         await fetchAvailableSlots();
         await fetchActiveQueues();

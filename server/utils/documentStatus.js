@@ -133,6 +133,39 @@ async function cancelOwnDocumentRequest(conn, { role, ownerId, requestId }) {
   return { ok: true, departmentId: request.department_id };
 }
 
+// Builds the frozen catalogue copy stored on document_requests.service_snapshot
+// / faculty_document_requests.service_snapshot at submit time. `db` is any
+// query executor (pool or an in-flight transaction connection). Returns a plain
+// object -- callers JSON.stringify it (or pass it straight through, mysql2
+// serialises objects for a JSON column).
+async function buildDocumentServiceSnapshot(db, serviceId) {
+  const [[svc]] = await db.query(
+    `SELECT service_name, description, processing_time, recipient_type,
+            requires_coding, is_cross_college
+     FROM document_services WHERE service_id = ?`,
+    [serviceId],
+  );
+  if (!svc) return null;
+  const [reqs] = await db.query(
+    `SELECT requirement_name, description, is_mandatory
+     FROM document_requirements WHERE service_id = ? ORDER BY requirement_id ASC`,
+    [serviceId],
+  );
+  return {
+    name: svc.service_name,
+    description: svc.description ?? null,
+    processingTime: svc.processing_time ?? null,
+    recipientType: svc.recipient_type,
+    requiresCoding: !!svc.requires_coding,
+    isCrossCollege: !!svc.is_cross_college,
+    requirements: reqs.map((r) => ({
+      name: r.requirement_name,
+      description: r.description ?? null,
+      isMandatory: !!r.is_mandatory,
+    })),
+  };
+}
+
 module.exports = {
   DB_STATUS_MAP,
   STATUS_LABEL_MAP,
@@ -141,4 +174,5 @@ module.exports = {
   SUBMISSION_DB_STATUS_MAP,
   SUBMISSION_REQUIRED_PRIOR_STATUS,
   cancelOwnDocumentRequest,
+  buildDocumentServiceSnapshot,
 };

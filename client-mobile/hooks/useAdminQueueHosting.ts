@@ -19,6 +19,7 @@ const QUEUE_HOSTING_EVENTS = [
   "queue:student-joined",
   "queue:student-left",
   "queue:notes-updated",
+  "queue:service-updated",
 ];
 
 type ReasonModal = { mode: "pause" | "close"; id: any } | null;

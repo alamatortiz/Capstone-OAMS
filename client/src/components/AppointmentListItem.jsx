@@ -1,4 +1,4 @@
-import { Calendar, XCircle } from "lucide-react";
+import { Calendar, XCircle, CheckCircle2 } from "lucide-react";
 import "./AppointmentListItem.css";
 
 const STATUS_META = {
@@ -19,12 +19,16 @@ export default function AppointmentListItem({
   showCancelButton = false,
   onCancel,
   isCancelling = false,
+  showCompleteButton = false,
+  onComplete,
+  isCompleting = false,
 }) {
   const { label, cls } = STATUS_META[appointment.status] ?? {
     label: appointment.status,
     cls: "apt-badge-pending",
   };
   const canCancel = appointment.status === "pending" || appointment.status === "approved";
+  const canComplete = appointment.status === "approved";
 
   return (
     <div
@@ -86,6 +90,21 @@ export default function AppointmentListItem({
         >
           <XCircle style={{ width: "1.3rem", height: "1.3rem", color: "#ef4444", flexShrink: 0 }} />
           {isCancelling ? "Cancelling…" : "Cancel"}
+        </button>
+      )}
+
+      {showCompleteButton && canComplete && (
+        <button
+          type="button"
+          className="apt-list-complete-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onComplete?.(appointment.id);
+          }}
+          disabled={isCompleting}
+        >
+          <CheckCircle2 style={{ width: "1.3rem", height: "1.3rem", flexShrink: 0 }} />
+          {isCompleting ? "Marking…" : "Mark Appointment as Completed"}
         </button>
       )}
     </div>

@@ -40,17 +40,20 @@ async function settleSlotAfterEntryChange(db, slotId) {
   return null;
 }
 
-// Locks a queue_slots row (with its owning service's department_id) and
-// checks the calling admin may manage it -- shared by every admin
-// queue-hosting mutation route (pause/resume/close/call-next/mark-arrived/
-// serve/skip). On failure, rolls back and writes the 404/403 response
-// itself, returning null so the caller can just `if (!slot) return;`.
-// Returns the row ({ slot_id, status, department_id, service_name }) on success.
+// Locks a queue_slots row and checks the calling admin may manage it -- shared
+// by every admin queue-hosting mutation route (pause/resume/close/call-next/
+// mark-arrived/serve/skip). Scopes on qs.department_id (always set) rather than
+// joining services, so a Universal Service Queue slot (NULL service_id) still
+// resolves. On failure, rolls back and writes the 404/403 response itself,
+// returning null so the caller can just `if (!slot) return;`. Returns
+// ({ slot_id, status, department_id, is_universal, service_name }) on success;
+// service_name is null for a universal slot.
 async function getOwnedSlotOrRespond(conn, res, { slotId, deptId }) {
   const [[slot]] = await conn.query(
-    `SELECT qs.slot_id, qs.status, s.department_id, s.service_name
+    `SELECT qs.slot_id, qs.status, qs.department_id, qs.is_universal,
+            CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END AS service_name
      FROM queue_slots qs
-     JOIN services s ON qs.service_id = s.service_id
+     LEFT JOIN services s ON qs.service_id = s.service_id
      WHERE qs.slot_id = ? FOR UPDATE`,
     [slotId],
   );

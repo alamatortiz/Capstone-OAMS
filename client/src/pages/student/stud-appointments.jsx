@@ -96,6 +96,8 @@ export default function AppointmentsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
+  const [completingId, setCompletingId] = useState(null);
+  const [completeConfirmId, setCompleteConfirmId] = useState(null);
   const [selectedApptType, setSelectedApptType] = useState("");
   const [collegeOptions, setCollegeOptions] = useState([]);
 
@@ -212,6 +214,8 @@ export default function AppointmentsPage() {
     const handleStatusUpdate = (payload) => {
       if (payload?.reason === "schedule_removed" || payload?.reason === "schedule_changed") {
         toast.error("An appointment was cancelled because the professor changed their schedule. Please book a new time.");
+      } else if (payload?.reason === "slot_adjusted") {
+        toast.message("A professor adjusted one of your appointment slots — check the new time and location.");
       }
       fetchMyBookings();
     };
@@ -293,6 +297,7 @@ export default function AppointmentsPage() {
   );
 
   const cancelTarget = myBookings.find((b) => b.id === cancelConfirmId) ?? null;
+  const completeTarget = myBookings.find((b) => b.id === completeConfirmId) ?? null;
 
   // Mirrors the server-side dup guard in POST /appointments/book-slot, which
   // blocks rebooking the same (availabilityId, date) pair unless the prior
@@ -387,6 +392,24 @@ export default function AppointmentsPage() {
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to cancel the appointment.");
     } finally { setCancellingId(null); }
+  };
+
+  const doComplete = async () => {
+    const appointmentId = completeConfirmId;
+    if (!appointmentId) return;
+    if (completingId) {
+      toast.info("Please wait for the current update to finish.");
+      return;
+    }
+    setCompleteConfirmId(null);
+    setCompletingId(appointmentId);
+    try {
+      await api.patch(`/student/appointments/${appointmentId}/complete`);
+      toast.success("Appointment marked as completed.");
+      await fetchMyBookings();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to mark the appointment as completed.");
+    } finally { setCompletingId(null); }
   };
 
   const formatDate = (dateString) => formatManilaDate(`${dateString}T00:00:00+08:00`, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -520,6 +543,25 @@ export default function AppointmentsPage() {
             cancelText="Keep Appointment"
             confirmText={cancellingId !== null ? "Cancelling…" : "Cancel Appointment"}
             confirmDisabled={cancellingId !== null}
+          />
+
+          <ActionConfirmModal
+            show={completeConfirmId !== null}
+            variant="success"
+            onCancel={() => setCompleteConfirmId(null)}
+            onConfirm={doComplete}
+            title="Mark Appointment as Completed?"
+            message={
+              <>
+                Mark your appointment with <strong>{completeTarget?.person}</strong> on{" "}
+                <strong>{completeTarget ? formatDate(completeTarget.date) : ""}</strong> as completed?
+                Use this only if your concern has already been addressed.
+              </>
+            }
+            icon={<CheckCircle2 width={22} height={22} />}
+            cancelText="Not Yet"
+            confirmText={completingId !== null ? "Marking…" : "Mark as Completed"}
+            confirmDisabled={completingId !== null}
           />
         </>
       }
@@ -682,6 +724,9 @@ export default function AppointmentsPage() {
                       showCancelButton
                       onCancel={(id) => setCancelConfirmId(id)}
                       isCancelling={cancellingId === booking.id}
+                      showCompleteButton
+                      onComplete={(id) => setCompleteConfirmId(id)}
+                      isCompleting={completingId === booking.id}
                     />
                   ))}
                 </div>

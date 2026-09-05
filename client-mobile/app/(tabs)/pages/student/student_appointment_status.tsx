@@ -235,6 +235,8 @@ export default function StudentAppointmentStatusScreen() {
   const [allRange, setAllRange] = useState<RangeKey>('week');
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null);
+  const [completing, setCompleting] = useState<string | null>(null);
   const router = useRouter();
   const { user, token, logout } = useAuth();
 
@@ -351,6 +353,22 @@ export default function StudentAppointmentStatusScreen() {
       Alert.alert('Error', err?.response?.data?.error ?? 'Failed to cancel the appointment.');
     } finally {
       setCancelling(null);
+    }
+  };
+
+  const doComplete = async () => {
+    const id = completeConfirmId;
+    setCompleteConfirmId(null);
+    if (!id || completing) return;
+    setCompleting(id);
+    try {
+      await api.patch(`/student/appointments/${id}/complete`);
+      await fetchAppointments();
+    } catch (err: any) {
+      console.error('Failed to complete appointment:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to mark the appointment as completed.');
+    } finally {
+      setCompleting(null);
     }
   };
 
@@ -505,6 +523,26 @@ export default function StudentAppointmentStatusScreen() {
                     <Pressable style={styles.cancelBtn} onPress={() => setCancelConfirmId(selectedAppt.id)}>
                       <XCircle size={16} color="#ef4444" />
                       <Text style={styles.cancelBtnText}>Cancel Appointment</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* Mark as Completed */}
+              {selectedAppt.status === 'approved' && (
+                <View style={[styles.infoCard, styles.completeCard]}>
+                  <View style={[styles.infoCardHeader, styles.completeCardHeader]}>
+                    <CheckCircle size={18} color="#22c55e" />
+                    <Text style={[styles.infoCardTitle, { color: '#22c55e' }]}>Mark as Completed</Text>
+                  </View>
+                  <View style={styles.infoCardBody}>
+                    <Text style={styles.cancelDesc}>
+                      If your concern has already been addressed and the professor hasn&apos;t closed
+                      this out yet, you can mark it completed yourself.
+                    </Text>
+                    <Pressable style={styles.completeBtn} onPress={() => setCompleteConfirmId(selectedAppt.id)}>
+                      <CheckCircle size={16} color="#22c55e" />
+                      <Text style={styles.completeBtnText}>Mark Appointment as Completed</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -753,6 +791,31 @@ export default function StudentAppointmentStatusScreen() {
         </View>
       </Modal>
 
+      {/* Mark as Completed Confirm Modal */}
+      <Modal visible={completeConfirmId !== null} animationType="fade" transparent onRequestClose={() => setCompleteConfirmId(null)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={[styles.logoutIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+              <CheckCircle size={26} color="#22c55e" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Mark Appointment as Completed?</Text>
+            <Text style={styles.logoutModalDescription}>
+              {selectedAppt
+                ? `Mark your appointment with ${selectedAppt.person} on ${formatDate(selectedAppt.date)} as completed? Use this only if your concern has already been addressed.`
+                : 'Mark this appointment as completed?'}
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setCompleteConfirmId(null)}>
+                <Text style={styles.logoutCancelBtnText}>Not Yet</Text>
+              </Pressable>
+              <Pressable style={[styles.logoutConfirmBtn, { backgroundColor: '#22c55e' }]} onPress={doComplete} disabled={completing === completeConfirmId}>
+                <Text style={styles.logoutConfirmBtnText}>{completing === completeConfirmId ? 'Marking…' : 'Mark as Completed'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Confirm Logout Modal */}
       <Modal visible={logoutModalVisible} animationType="fade" transparent onRequestClose={() => setLogoutModalVisible(false)}>
         <View style={styles.logoutOverlay}>
@@ -968,6 +1031,14 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: 'rgba(239, 68, 68, 0.05)',
     },
     cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    completeCard: { borderColor: 'rgba(34, 197, 94, 0.25)', backgroundColor: 'rgba(34, 197, 94, 0.04)' },
+    completeCardHeader: { borderBottomColor: 'rgba(34, 197, 94, 0.15)' },
+    completeBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(34, 197, 94, 0.35)',
+      backgroundColor: 'rgba(34, 197, 94, 0.05)',
+    },
+    completeBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e' },
 
     // Nav drawer
     drawerOverlay: { flex: 1, flexDirection: 'row' },

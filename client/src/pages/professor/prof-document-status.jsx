@@ -461,21 +461,13 @@ export default function ProfessorDocumentStatus() {
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
-  const [documentTypes, setDocumentTypes] = useState([]);
-  const [reqLoading, setReqLoading] = useState(true);
-
   const selectedDoc = selectedDocId
     ? (documents.find((d) => d.id === selectedDocId) ?? null)
     : null;
 
-  // Requirements for the selected document's type, looked up by name against
-  // the same document-services catalog prof-documents.jsx uses (no stable
-  // service id is exposed on either payload, so name is the shared key).
-  const getDocRequirements = useCallback(
-    (typeName) => documentTypes.find((t) => t.name === typeName)?.requirements ?? [],
-    [documentTypes],
-  );
-  const selectedDocRequirements = selectedDoc ? getDocRequirements(selectedDoc.type) : [];
+  // Requirements come from the request's own frozen service_snapshot (captured
+  // at submit), so a later catalogue edit can't retro-change a finished request.
+  const selectedDocRequirements = selectedDoc?.serviceSnapshot?.requirements ?? [];
 
   useEffect(() => {
     if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
@@ -507,6 +499,7 @@ export default function ProfessorDocumentStatus() {
           claimedDate: r.claimed_at || undefined,
           isDigitalDelivery: !!r.is_digital_delivery,
           deliveryCode: r.delivery_code || undefined,
+          serviceSnapshot: r.service_snapshot ?? null,
           facultyFiles: r.faculty_files || [],
           adminFiles: r.admin_files || [],
         })),
@@ -527,27 +520,6 @@ export default function ProfessorDocumentStatus() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
-
-  useEffect(() => {
-    const fetchDocumentTypes = async () => {
-      setReqLoading(true);
-      try {
-        const res = await api.get("/professor/documents/service-types");
-        setDocumentTypes(
-          res.data.map((s) => ({
-            id: s.service_id,
-            name: s.service_name,
-            requirements: s.requirements ?? [],
-          })),
-        );
-      } catch (err) {
-        console.error("Failed to fetch document service types:", err);
-      } finally {
-        setReqLoading(false);
-      }
-    };
-    fetchDocumentTypes();
-  }, []);
 
   // ── Live updates: refetch when a document's status changes ────────────────
   useEffect(() => {
@@ -636,7 +608,7 @@ export default function ProfessorDocumentStatus() {
             onConfirmReceipt={handleConfirmReceipt}
             confirmingReceipt={confirmingReceipt}
             requirements={selectedDocRequirements}
-            reqLoading={reqLoading}
+            reqLoading={loading && !selectedDoc}
           />
         ) : (
           <div className="dss-status-container">

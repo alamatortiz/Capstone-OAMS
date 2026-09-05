@@ -220,8 +220,6 @@ export default function ProfessorDocumentsStatusScreen() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
-  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
-  const [reqLoading, setReqLoading] = useState(true);
   const { user, logout, token } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
@@ -263,6 +261,7 @@ export default function ProfessorDocumentsStatusScreen() {
           adminFiles: r.admin_files || undefined,
           isDigitalDelivery: !!r.is_digital_delivery,
           deliveryCode: r.delivery_code || undefined,
+          serviceSnapshot: r.service_snapshot ?? null,
         })),
       );
     } catch (err) {
@@ -277,29 +276,6 @@ export default function ProfessorDocumentsStatusScreen() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
-
-  // Requirements for the selected document's type, looked up by name against
-  // the same document-services catalog professor_documents.tsx uses (no
-  // stable service id is exposed on either payload, so name is the shared key).
-  useEffect(() => {
-    const fetchDocumentTypes = async () => {
-      setReqLoading(true);
-      try {
-        const { data } = await api.get('/professor/documents/service-types');
-        setDocumentTypes(
-          (data ?? []).map((s: any) => ({
-            name: s.service_name,
-            requirements: s.requirements ?? [],
-          })),
-        );
-      } catch (err) {
-        console.error('Fetch document service types error:', err);
-      } finally {
-        setReqLoading(false);
-      }
-    };
-    fetchDocumentTypes();
-  }, []);
 
   // ── Fallback poll (safety net only — sockets drive live updates) ──────────
   useEffect(() => {
@@ -341,11 +317,9 @@ export default function ProfessorDocumentsStatusScreen() {
 
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) ?? null : null;
 
-  const getDocRequirements = useCallback(
-    (typeName: string) => documentTypes.find((t) => t.name === typeName)?.requirements ?? [],
-    [documentTypes],
-  );
-  const selectedDocRequirements = selectedDoc ? getDocRequirements(selectedDoc.type) : [];
+  // Requirements come from the request's own frozen service_snapshot (captured
+  // at submit) -- a later catalogue edit can't retro-change a finished request.
+  const selectedDocRequirements = (selectedDoc as any)?.serviceSnapshot?.requirements ?? [];
 
   const activeDocuments = documents.filter(
     (d) => d.status !== 'claimed' && d.status !== 'rejected' && d.status !== 'cancelled',
@@ -447,7 +421,7 @@ export default function ProfessorDocumentsStatusScreen() {
               onConfirmReceipt={confirmReceipt}
               confirmingReceipt={confirmingReceipt}
               requirements={selectedDocRequirements}
-              reqLoading={reqLoading}
+              reqLoading={loading && !selectedDoc}
             />
           ) : (
             <>

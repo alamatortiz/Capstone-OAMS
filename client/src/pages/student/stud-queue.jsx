@@ -12,6 +12,7 @@ import FilterSelect from "../../components/FilterSelect";
 import PageHeader from "../../components/PageHeader";
 import { QueueIconNav } from "../../components/StudentSidebar";
 import { useQueue } from '../../contexts/QueueContext';
+import { useAuth } from '../../context/AuthContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
 import { formatCollegeLabel } from '../../utils/formatCollege';
 import api from '../../utils/api';
@@ -30,6 +31,7 @@ export default function QueuePage() {
     isAlreadyInQueue,
   } = useQueue();
 
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,27 +51,43 @@ export default function QueuePage() {
 
 
   // ── Filters ───────────────────────────────────────────────────────────────
+  // selectedCollege holds a department ABBREVIATION (e.g. "CCS"), matching the
+  // pattern stud-appointments.jsx uses, so it can be seeded straight from
+  // user.departmentAbbrev. 'all' == "All Colleges".
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
+  const [hasUserSetCollege, setHasUserSetCollege] = useState(false);
 
-  // Derive unique college names from all departments in the database.
-  // Cross-college services (e.g. General Inquiry Counter) still belong to
-  // one real owning department, so they're a selectable filter like any
-  // other -- they also always appear regardless of the selected filter,
-  // handled via slot.isCrossCollege in filteredSlots above.
+  // Default the college filter to the student's own college once auth resolves
+  // -- same approach as stud-appointments.jsx. Only applies until the student
+  // picks a college themselves.
+  useEffect(() => {
+    if (!hasUserSetCollege && user?.departmentAbbrev) {
+      setSelectedCollege(user.departmentAbbrev);
+    }
+  }, [user?.departmentAbbrev, hasUserSetCollege]);
+
+  // Every department in the system, keyed by abbreviation. A cross-college
+  // service still belongs to one owning department, so it appears under that
+  // department's filter -- viewing a different college shows only its
+  // department-wide (cross-college) services, handled in serviceOptions /
+  // filteredSlots below.
   const collegeOptions = useMemo(() => {
     const seen = new Map();
     for (const dept of servicesData) {
-      if (!seen.has(dept.departmentName)) {
-        seen.set(dept.departmentName, dept.departmentAbbrev);
+      if (dept.departmentAbbrev && !seen.has(dept.departmentAbbrev)) {
+        seen.set(dept.departmentAbbrev, dept.departmentName);
       }
     }
     return [...seen.entries()]
-      .map(([name, abbrev]) => ({ name, abbrev }))
+      .map(([abbrev, name]) => ({ abbrev, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [servicesData]);
 
-  // Derive service names scoped to the selected college (or all if none selected)
+  // Service names scoped to the selected college. The /services/by-department
+  // payload already contains only this student's in-scope services per dept
+  // (own dept -> all of them; other dept -> only its cross-college ones), so
+  // matching on departmentAbbrev alone gives the right set.
   const serviceOptions = useMemo(() => {
     const names = [
       ...new Set(
@@ -78,8 +96,7 @@ export default function QueuePage() {
             .filter(
               (s) =>
                 selectedCollege === 'all' ||
-                dept.departmentName === selectedCollege ||
-                s.isCrossCollege,
+                dept.departmentAbbrev === selectedCollege,
             )
             .map((s) => s.serviceName),
         ),
@@ -114,16 +131,23 @@ export default function QueuePage() {
     }
   }, [availableSlots, selectedSlot, isAlreadyInQueue]);
 
-  // Filter available slots client-side
+  // Filter available slots client-side. The /queues/available payload is
+  // already scoped server-side to this student's own department OR any
+  // cross-college service, so matching departmentAbbrev alone yields:
+  // own college -> all its live queues; other college -> only its
+  // department-wide (cross-college) live queues.
   const filteredSlots = useMemo(
     () =>
       availableSlots.filter((slot) => {
         const collegeMatch =
           selectedCollege === 'all' ||
-          slot.departmentName === selectedCollege ||
-          slot.isCrossCollege;
+          slot.departmentAbbrev === selectedCollege;
         const serviceMatch =
-          selectedService === 'all' || slot.serviceName === selectedService;
+          selectedService === 'all'
+            ? true
+            : selectedService === '__universal__'
+              ? slot.isUniversal
+              : slot.serviceName === selectedService;
         const notAlreadyJoined = !isAlreadyInQueue(slot.slotId);
         return collegeMatch && serviceMatch && notAlreadyJoined;
       }),
@@ -153,12 +177,16 @@ export default function QueuePage() {
     fetchServices();
   }, [fetchServices]);
 
-  const isServiceKnown = (serviceName) =>
-    servicesData.some((dept) =>
-      dept.services?.some(
-        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
-      ),
-    );
+  // Match a joined service by its stable id -- for a Universal Service Queue
+  // card the display name is a synthetic label that never name-matches.
+  const findSvc = (serviceId) => {
+    for (const dept of servicesData) {
+      const svc = dept.services?.find((s) => s.serviceId === serviceId);
+      if (svc) return svc;
+    }
+    return null;
+  };
+  const isServiceKnown = (serviceId) => !!findSvc(serviceId);
 
   // ── Actions ───────────────────────────────────────────────────────────────
   // Refs (not just the mirroring state below) so a fast double-click can't
@@ -170,7 +198,7 @@ export default function QueuePage() {
   // Shared by both join entry points (quick card button + detail panel CTA) --
   // both open the concern popup first; this runs once the student confirms.
   const performJoin = useCallback(
-    async (slotId, notes) => {
+    async (slotId, notes, serviceId = null) => {
       if (joiningSlotIdRef.current === slotId) return;
       // Guards the narrow window where a cross-tab/other-device join for
       // this same slot completed while the concern modal was still open.
@@ -183,7 +211,7 @@ export default function QueuePage() {
       joiningSlotIdRef.current = slotId;
       setJoiningSlotId(slotId);
       try {
-        await joinQueue(slotId, notes);
+        await joinQueue(slotId, notes, serviceId);
         toast.success('Successfully joined the queue!');
         setSelectedSlot(null);
         setConcernModal(null);
@@ -216,25 +244,8 @@ export default function QueuePage() {
   );
 
   // ── Service detail helpers ────────────────────────────────────────────────
-  const getServiceRequirements = (serviceName) => {
-    for (const dept of servicesData) {
-      const svc = dept.services?.find(
-        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
-      );
-      if (svc?.requirements?.length) return svc.requirements;
-    }
-    return [];
-  };
-
-  const getProcedureSteps = (serviceName) => {
-    for (const dept of servicesData) {
-      const svc = dept.services?.find(
-        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
-      );
-      if (svc?.procedureSteps?.length) return svc.procedureSteps;
-    }
-    return [];
-  };
+  const getServiceRequirements = (serviceId) => findSvc(serviceId)?.requirements ?? [];
+  const getProcedureSteps = (serviceId) => findSvc(serviceId)?.procedureSteps ?? [];
 
 
   // A slot is only actually joinable while it's 'open', has a free spot,
@@ -301,12 +312,20 @@ export default function QueuePage() {
           <QueueConcernModal
             show={concernModal !== null}
             onCancel={() => setConcernModal(null)}
-            onConfirm={(notes) => performJoin(concernModal.slotId, notes)}
+            onConfirm={(notes, serviceId) => performJoin(concernModal.slotId, notes, serviceId)}
+            universalServices={concernModal?.universalServices ?? null}
             title="What's your concern?"
             message={
-              <>
-                Joining the queue for <strong>{concernModal?.serviceName}</strong>. Let the staff know why you're here — this step is optional.
-              </>
+              concernModal?.isUniversal ? (
+                <>
+                  Joining the <strong>Universal Service Queue</strong>. Pick the specific service
+                  you need, then let the staff know why you're here.
+                </>
+              ) : (
+                <>
+                  Joining the queue for <strong>{concernModal?.serviceName}</strong>. Let the staff know why you're here — this step is optional.
+                </>
+              )
             }
             confirmText={joiningSlotId === concernModal?.slotId ? "Joining…" : "Join Queue"}
             submitting={joiningSlotId === concernModal?.slotId}
@@ -389,7 +408,7 @@ export default function QueuePage() {
                 </div>
                 <button
                   className="avail-services-queue-btn"
-                  onClick={() => setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName })}
+                  onClick={() => setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName, isUniversal: selectedSlot.isUniversal, universalServices: selectedSlot.universalServices ?? null })}
                   disabled={detailJoinBtnDisabled()}
                 >
                   {joiningSlotId === selectedSlot.slotId ? (
@@ -431,8 +450,8 @@ export default function QueuePage() {
                   </div>
                   <div className="avail-services-details-card-content">
                     {(() => {
-                      const reqs = getServiceRequirements(selectedSlot.serviceName);
-                      if (reqs.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceName)) {
+                      const reqs = getServiceRequirements(selectedSlot.serviceId);
+                      if (reqs.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceId)) {
                         return (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
                             <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
@@ -479,8 +498,8 @@ export default function QueuePage() {
                   </div>
                   <div className="avail-services-details-card-content">
                     {(() => {
-                      const steps = getProcedureSteps(selectedSlot.serviceName);
-                      if (steps.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceName)) {
+                      const steps = getProcedureSteps(selectedSlot.serviceId);
+                      if (steps.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceId)) {
                         return (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
                             <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
@@ -725,10 +744,10 @@ export default function QueuePage() {
                         id="college-select"
                         label="College"
                         value={selectedCollege}
-                        onChange={(e) => setSelectedCollege(e.target.value)}
+                        onChange={(e) => { setSelectedCollege(e.target.value); setHasUserSetCollege(true); }}
                         ariaLabel="Filter by college"
                         options={[{ value: "all", label: "All Colleges" }, ...collegeOptions.map((college) => ({
-                          value: college.name,
+                          value: college.abbrev,
                           label: formatCollegeLabel(college.abbrev, college.name),
                         }))]}
                         chevronIcon={<ChevronDown className="filter-chevron" />}
@@ -739,7 +758,11 @@ export default function QueuePage() {
                         value={selectedService}
                         onChange={(e) => setSelectedService(e.target.value)}
                         ariaLabel="Filter by service"
-                        options={[{ value: "all", label: "All Services" }, ...serviceOptions.map((service) => ({ value: service, label: service }))]}
+                        options={[
+                          { value: "all", label: "All Services" },
+                          { value: "__universal__", label: "Universal Service Queue" },
+                          ...serviceOptions.map((service) => ({ value: service, label: service })),
+                        ]}
                         chevronIcon={<ChevronDown className="filter-chevron" />}
                       />
                     </div>
@@ -812,7 +835,7 @@ export default function QueuePage() {
                               </div>
                               <button
                                 className={`queue-join-btn ${(isJoining || isPaused || outsideHours || atCapacity) ? 'disabled' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName }); }}
+                                onClick={(e) => { e.stopPropagation(); setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName, isUniversal: slot.isUniversal, universalServices: slot.universalServices ?? null }); }}
                                 disabled={isJoining || isPaused || outsideHours || atCapacity}
                                 type="button"
                                 aria-label={

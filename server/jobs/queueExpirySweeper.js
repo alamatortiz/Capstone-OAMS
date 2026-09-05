@@ -16,9 +16,8 @@ async function sweepExpiredSlots() {
     const manilaNow = getManilaTimeString();
 
     const [expired] = await pool.query(
-      `SELECT qs.slot_id, s.department_id
+      `SELECT qs.slot_id, qs.department_id
        FROM queue_slots qs
-       JOIN services s ON qs.service_id = s.service_id
        WHERE qs.status IN ('open', 'paused')
          AND qs.slot_date = ?
          AND qs.end_time <= ?`,

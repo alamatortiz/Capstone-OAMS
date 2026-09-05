@@ -123,6 +123,7 @@ interface QueueEntry {
   queueNumber: string;
   studentName: string;
   studentId: string;
+  service?: string | null;
   concern: string;
   status: QueueEntryStatus;
   joinedAt: string;
@@ -811,6 +812,12 @@ export default function AdminQueueScreen() {
                             <Text style={styles.entryQueueNumber}>{entry.queueNumber}</Text>
                           </View>
                         </View>
+                        {monitoringQueue?.isUniversal && entry.service ? (
+                          <Text style={styles.entryConcern}>
+                            <Text style={{ fontWeight: '700' }}>Service: </Text>
+                            {entry.service}
+                          </Text>
+                        ) : null}
                         <Text style={styles.entryConcern}>
                           <Text style={{ fontWeight: '700' }}>Concern: </Text>
                           {entry.concern}

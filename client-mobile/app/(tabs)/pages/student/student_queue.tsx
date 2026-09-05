@@ -142,12 +142,18 @@ export default function StudentQueueScreen() {
   // -- mirrors web's stud-queue.jsx tab split instead of showing both
   // sections stacked on one continuous scroll.
   const [activeTab, setActiveTab] = useState<TabKey>('available');
+  // selectedCollege holds a department ABBREVIATION (e.g. "CCS"), so it can be
+  // seeded from user.departmentAbbrev -- same pattern as student_appointments.tsx.
   const [selectedCollege, setSelectedCollege] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
+  const [hasUserSetCollege, setHasUserSetCollege] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
   const [leaveTarget, setLeaveTarget] = useState<any | null>(null);
-  const [concernModal, setConcernModal] = useState<{ slotId: number; serviceName: string } | null>(null);
+  const [concernModal, setConcernModal] = useState<
+    { slotId: number; serviceName: string; isUniversal?: boolean; universalServices?: any[] } | null
+  >(null);
   const [concernText, setConcernText] = useState('');
+  const [pickedServiceId, setPickedServiceId] = useState<number | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [detailSlot, setDetailSlot] = useState<any | null>(null);
   const [servicesByDept, setServicesByDept] = useState<any[]>([]);
@@ -179,14 +185,23 @@ export default function StudentQueueScreen() {
     fetchServices();
   }, [fetchServices]);
 
+  // Default the college filter to the student's own college once auth resolves,
+  // until they pick one themselves -- mirrors student_appointments.tsx.
+  useEffect(() => {
+    if (!hasUserSetCollege && user?.departmentAbbrev) {
+      setSelectedCollege(user.departmentAbbrev);
+    }
+  }, [user?.departmentAbbrev, hasUserSetCollege]);
+
   // Matched client-side by case-insensitive service name, same as web's
   // getServiceRequirements/getProcedureSteps -- there's no serviceId on the
   // availableSlots payload to join on directly.
-  const findServiceMeta = (serviceName?: string) => {
-    if (!serviceName) return null;
-    const lower = serviceName.toLowerCase();
+  // Match a joined service by its stable id -- for a Universal Service Queue
+  // card the display name is a synthetic label that never name-matches.
+  const findServiceMeta = (serviceId?: number | null) => {
+    if (!serviceId) return null;
     for (const dept of servicesByDept) {
-      const match = (dept.services ?? []).find((s: any) => s.serviceName?.toLowerCase() === lower);
+      const match = (dept.services ?? []).find((s: any) => s.serviceId === serviceId);
       if (match) return match;
     }
     return null;
@@ -218,19 +233,36 @@ export default function StudentQueueScreen() {
     return { alreadyIn, isPaused, atCapacity, outsideHours, canJoin, badgeLabel, joinLabel };
   };
 
+  // Every department in the system (from /services/by-department), so the
+  // college filter lists all colleges regardless of whether they're hosting a
+  // queue today -- matches the web stud-queue behaviour.
   const COLLEGES: College[] = useMemo(() => {
     const seen = new Map<string, string>();
-    for (const slot of availableSlots) {
-      if (!seen.has(slot.departmentAbbrev)) {
-        seen.set(slot.departmentAbbrev, slot.departmentName);
+    for (const dept of servicesByDept) {
+      if (dept.departmentAbbrev && !seen.has(dept.departmentAbbrev)) {
+        seen.set(dept.departmentAbbrev, dept.departmentName);
       }
     }
-    return [...seen.entries()].map(([abbrev, name]) => ({ abbrev, name }));
-  }, [availableSlots]);
+    return [...seen.entries()]
+      .map(([abbrev, name]) => ({ abbrev, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [servicesByDept]);
 
+  // Service names scoped to the selected college. servicesByDept already holds
+  // only this student's in-scope services per dept (own dept -> all; other dept
+  // -> cross-college only), so matching on departmentAbbrev is enough.
   const SERVICES: string[] = useMemo(
-    () => [...new Set<string>(availableSlots.map((slot: any) => slot.serviceName))],
-    [availableSlots],
+    () =>
+      [
+        ...new Set<string>(
+          servicesByDept.flatMap((dept: any) =>
+            selectedCollege === 'all' || dept.departmentAbbrev === selectedCollege
+              ? (dept.services ?? []).map((s: any) => s.serviceName)
+              : [],
+          ),
+        ),
+      ].sort(),
+    [servicesByDept, selectedCollege],
   );
 
   const theme = isDarkMode ? darkPalette : lightPalette;
@@ -278,12 +310,13 @@ export default function StudentQueueScreen() {
     router.replace('/login');
   };
 
-  const handleJoinQueue = async (slotId: number, notes: string) => {
+  const handleJoinQueue = async (slotId: number, notes: string, serviceId: number | null = null) => {
     setIsJoining(true);
     try {
-      await joinQueue(slotId, notes);
+      await joinQueue(slotId, notes, serviceId);
       setConcernModal(null);
       setConcernText('');
+      setPickedServiceId(null);
       Alert.alert('Success', 'Successfully joined the queue!');
     } catch (error: any) {
       Alert.alert('Could not join queue', error?.message ?? 'Please try again.');
@@ -305,10 +338,11 @@ export default function StudentQueueScreen() {
 
   const collegeOptions = [
     { value: 'all', label: 'All Colleges' },
-    ...COLLEGES.map((c) => ({ value: c.name, label: c.name })),
+    ...COLLEGES.map((c) => ({ value: c.abbrev, label: `${c.abbrev} - ${c.name}` })),
   ];
   const serviceOptions = [
     { value: 'all', label: 'All Services' },
+    { value: '__universal__', label: 'Universal Service Queue' },
     ...SERVICES.map((s) => ({ value: s, label: s })),
   ];
   const filterOptions = activeFilter === 'college' ? collegeOptions : serviceOptions;
@@ -316,20 +350,29 @@ export default function StudentQueueScreen() {
   const filterCurrentValue = activeFilter === 'college' ? selectedCollege : selectedService;
 
   const selectFilterOption = (value: string) => {
-    if (activeFilter === 'college') setSelectedCollege(value);
+    if (activeFilter === 'college') { setSelectedCollege(value); setHasUserSetCollege(true); }
     else if (activeFilter === 'service') setSelectedService(value);
     setActiveFilter(null);
   };
 
-  const filteredQueues = availableSlots.filter(
-    (q: any) =>
-      (selectedCollege === 'all' || q.departmentName === selectedCollege) &&
-      (selectedService === 'all' || q.serviceName === selectedService),
-  );
+  // The availableSlots payload is already scoped server-side to the student's
+  // own dept OR cross-college, so matching departmentAbbrev alone gives:
+  // own college -> all its queues; other college -> only cross-college ones.
+  const filteredQueues = availableSlots.filter((q: any) => {
+    const collegeMatch = selectedCollege === 'all' || q.departmentAbbrev === selectedCollege;
+    const serviceMatch =
+      selectedService === 'all'
+        ? true
+        : selectedService === '__universal__'
+          ? q.isUniversal
+          : q.serviceName === selectedService;
+    return collegeMatch && serviceMatch;
+  });
 
   const collegeLogoFor = (abbrev: string) => collegeLogos[abbrev ?? 'CCS'] ?? ccsLogo;
 
-  const selectLabel = (value: string, fallback: string) => (value === 'all' ? fallback : value);
+  const labelFor = (opts: { value: string; label: string }[], value: string, fallback: string) =>
+    opts.find((o) => o.value === value)?.label ?? fallback;
 
   return (
     <View style={styles.root}>
@@ -538,7 +581,7 @@ export default function StudentQueueScreen() {
               <Text style={styles.filterLabel}>College</Text>
               <Pressable style={styles.filterSelect} onPress={() => setActiveFilter('college')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>
-                  {selectLabel(selectedCollege, 'All Colleges')}
+                  {labelFor(collegeOptions, selectedCollege, 'All Colleges')}
                 </Text>
                 <ChevronDown size={16} color={theme.tertiary} />
               </Pressable>
@@ -548,7 +591,7 @@ export default function StudentQueueScreen() {
               <Text style={styles.filterLabel}>Service</Text>
               <Pressable style={styles.filterSelect} onPress={() => setActiveFilter('service')}>
                 <Text style={styles.filterSelectText} numberOfLines={1}>
-                  {selectLabel(selectedService, 'All Services')}
+                  {labelFor(serviceOptions, selectedService, 'All Services')}
                 </Text>
                 <ChevronDown size={16} color={theme.tertiary} />
               </Pressable>
@@ -635,7 +678,7 @@ export default function StudentQueueScreen() {
                       style={[styles.joinBtn, !canJoin && styles.joinBtnDisabled]}
                       onPress={(e) => {
                         e.stopPropagation();
-                        setConcernModal({ slotId: q.slotId, serviceName: q.serviceName });
+                        setConcernModal({ slotId: q.slotId, serviceName: q.serviceName, isUniversal: q.isUniversal, universalServices: q.universalServices });
                       }}
                       disabled={!canJoin}
                     >
@@ -765,13 +808,13 @@ export default function StudentQueueScreen() {
                 </View>
                 {servicesLoading ? (
                   <Text style={styles.detailSectionText}>Loading…</Text>
-                ) : !findServiceMeta(detailSlot?.serviceName) ? (
+                ) : !findServiceMeta(detailSlot?.serviceId) ? (
                   <Text style={styles.detailSectionText}>No requirements information available.</Text>
-                ) : (findServiceMeta(detailSlot?.serviceName)?.requirements ?? []).length === 0 ? (
+                ) : (findServiceMeta(detailSlot?.serviceId)?.requirements ?? []).length === 0 ? (
                   <Text style={styles.detailSectionText}>No specific requirements listed.</Text>
                 ) : (
                   <View style={styles.hintRequirements}>
-                    {(findServiceMeta(detailSlot?.serviceName)?.requirements ?? []).map((req: any) => (
+                    {(findServiceMeta(detailSlot?.serviceId)?.requirements ?? []).map((req: any) => (
                       <View key={req.id ?? req.name} style={styles.hintRequirementRow}>
                         <View style={styles.hintRequirementNameRow}>
                           <Text style={styles.hintText}>{req.name}</Text>
@@ -795,11 +838,11 @@ export default function StudentQueueScreen() {
                 </View>
                 {servicesLoading ? (
                   <Text style={styles.detailSectionText}>Loading…</Text>
-                ) : (findServiceMeta(detailSlot?.serviceName)?.procedureSteps ?? []).length === 0 ? (
+                ) : (findServiceMeta(detailSlot?.serviceId)?.procedureSteps ?? []).length === 0 ? (
                   <Text style={styles.detailSectionText}>No procedure information available.</Text>
                 ) : (
                   <View style={styles.procedureList}>
-                    {(findServiceMeta(detailSlot?.serviceName)?.procedureSteps ?? []).map((step: any) => (
+                    {(findServiceMeta(detailSlot?.serviceId)?.procedureSteps ?? []).map((step: any) => (
                       <View key={step.id ?? step.stepNumber} style={styles.procedureStepRow}>
                         <View style={styles.procedureStepBadge}>
                           <Text style={styles.procedureStepBadgeText}>{step.stepNumber}</Text>
@@ -823,7 +866,7 @@ export default function StudentQueueScreen() {
                 disabled={!!detailSlot && !getJoinState(detailSlot).canJoin}
                 onPress={() => {
                   if (!detailSlot) return;
-                  setConcernModal({ slotId: detailSlot.slotId, serviceName: detailSlot.serviceName });
+                  setConcernModal({ slotId: detailSlot.slotId, serviceName: detailSlot.serviceName, isUniversal: detailSlot.isUniversal, universalServices: detailSlot.universalServices });
                   setDetailSlot(null);
                 }}
               >
@@ -842,15 +885,19 @@ export default function StudentQueueScreen() {
         serviceName={concernModal?.serviceName}
         concern={concernText}
         onChangeConcern={setConcernText}
+        universalServices={concernModal?.isUniversal ? (concernModal?.universalServices ?? []) : null}
+        pickedServiceId={pickedServiceId}
+        onPickService={setPickedServiceId}
         onCancel={() => {
           setConcernModal(null);
           setConcernText('');
+          setPickedServiceId(null);
         }}
         onConfirm={() => {
-          if (concernModal) handleJoinQueue(concernModal.slotId, concernText.trim());
+          if (concernModal) handleJoinQueue(concernModal.slotId, concernText.trim(), pickedServiceId);
         }}
         submitting={isJoining}
-        theme={theme}
+        theme={theme as any}
         styles={styles}
       />
 

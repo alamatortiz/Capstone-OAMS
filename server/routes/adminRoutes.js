@@ -84,9 +84,8 @@ router.get(
            ) AS full_queue_count,
            SUM(qs.status = 'paused') AS paused_queue_count
          FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
          WHERE qs.slot_date = ?
-           AND (? IS NULL OR s.department_id = ?)`,
+           AND (? IS NULL OR qs.department_id = ?)`,
         [manilaToday, deptId, deptId],
       );
 
@@ -238,18 +237,18 @@ router.get(
       const [hostedQueues] = await pool.query(
         `SELECT
            qs.slot_id,
-           s.service_name,
+           CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END AS service_name,
            d.department_abbreviation AS college,
            qs.status,
            qs.current_count,
            qs.max_capacity,
            (SELECT COUNT(*) FROM queues q WHERE q.slot_id = qs.slot_id AND q.status = 'waiting') AS waiting_count
          FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN services s ON qs.service_id = s.service_id
+         JOIN departments d ON qs.department_id = d.department_id
          WHERE qs.slot_date = ?
            AND qs.status IN ('open', 'paused')
-           AND s.department_id = ?
+           AND qs.department_id = ?
          ORDER BY waiting_count DESC
          LIMIT 5`,
         [manilaToday, deptId],
@@ -387,13 +386,14 @@ router.get(
         `SELECT
            qs.slot_id,
            qs.service_id,
+           qs.is_universal,
            qs.max_capacity,
            qs.no_show_timeout_minutes,
            qs.start_time,
            qs.end_time,
            qs.status,
            qs.created_at,
-           s.service_name,
+           CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END AS service_name,
            d.department_name,
            d.department_abbreviation,
            d.office_location,
@@ -426,9 +426,9 @@ router.get(
            ) AS currently_serving_arrived_at,
            qs.service_time_minutes AS avg_service_minutes
          FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
-         WHERE s.department_id = ?
+         LEFT JOIN services s ON qs.service_id = s.service_id
+         JOIN departments d ON qs.department_id = d.department_id
+         WHERE qs.department_id = ?
            AND qs.slot_date = ?
          ORDER BY qs.created_at DESC`,
         [deptId, getManilaDateString()],
@@ -450,6 +450,7 @@ router.get(
         return {
           id: q.slot_id,
           serviceId: q.service_id,
+          isUniversal: !!q.is_universal,
           queueType: q.service_name,
           department: q.department_name
             ? `${q.department_name} (${q.department_abbreviation})`
@@ -496,10 +497,11 @@ router.post(
   async (req, res) => {
     const adminId = req.user.userId;
     const { serviceId, maxCapacity, startTime, endTime, noShowTimeoutMinutes, serviceTimeMinutes } = req.body;
+    const hostAllServices = req.body.hostAllServices === true;
 
-    if (!serviceId || !maxCapacity || !startTime || !endTime || !serviceTimeMinutes) {
+    if ((!hostAllServices && !serviceId) || !maxCapacity || !startTime || !endTime || !serviceTimeMinutes) {
       return res.status(400).json({
-        error: "serviceId, maxCapacity, startTime, endTime, and serviceTimeMinutes are required",
+        error: "serviceId (unless hostAllServices), maxCapacity, startTime, endTime, and serviceTimeMinutes are required",
       });
     }
     const capacityNum = parseInt(maxCapacity, 10);
@@ -546,54 +548,113 @@ router.post(
           .json({ error: "Admin has no department assigned" });
       }
 
-      // Hosting is restricted to the service's own owning department, even if
-      // it's cross-college (is_cross_college only controls who can JOIN it).
-      // Locking this row means two near-simultaneous requests for the same
-      // service serialize here, closing the race that previously let both
-      // pass the overlap check below before either had committed its insert.
-      const [[service]] = await conn.query(
-        `SELECT service_id, department_id, service_name
-         FROM services WHERE service_id = ? FOR UPDATE`,
-        [serviceId],
-      );
-      if (!service) {
-        await conn.rollback();
-        return res.status(404).json({ error: "Service not found" });
-      }
-      if (service.department_id !== deptId) {
-        await conn.rollback();
-        return res
-          .status(403)
-          .json({ error: "You can only host queues for your own department" });
+      const today = getManilaDateString();
+      let service = null;
+
+      if (hostAllServices) {
+        // The dept must own at least one service to have anything to cover.
+        const [[hasSvc]] = await conn.query(
+          `SELECT 1 AS ok FROM services WHERE department_id = ? LIMIT 1`,
+          [deptId],
+        );
+        if (!hasSvc) {
+          await conn.rollback();
+          return res.status(400).json({ error: "Your department has no services to host a universal queue for." });
+        }
+        // Only one live universal queue per department at a time. An expired /
+        // completed / closed universal counts as done.
+        const [[liveUni]] = await conn.query(
+          `SELECT 1 FROM queue_slots
+           WHERE is_universal = TRUE AND department_id = ? AND slot_date = ?
+             AND status IN ('open', 'paused', 'full')
+           LIMIT 1`,
+          [deptId, today],
+        );
+        if (liveUni) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "A Universal Service Queue is already running for your department.",
+          });
+        }
+      } else {
+        // Hosting is restricted to the service's own owning department, even if
+        // it's cross-college (is_cross_college only controls who can JOIN it).
+        // Locking this row serializes near-simultaneous requests for it.
+        [[service]] = await conn.query(
+          `SELECT service_id, department_id, service_name
+           FROM services WHERE service_id = ? FOR UPDATE`,
+          [serviceId],
+        );
+        if (!service) {
+          await conn.rollback();
+          return res.status(404).json({ error: "Service not found" });
+        }
+        if (service.department_id !== deptId) {
+          await conn.rollback();
+          return res
+            .status(403)
+            .json({ error: "You can only host queues for your own department" });
+        }
+
+        const [[overlap]] = await conn.query(
+          `SELECT slot_id FROM queue_slots
+           WHERE service_id = ? AND slot_date = ? AND status IN ('open', 'paused', 'full', 'expired')
+             AND start_time < ? AND end_time > ?
+           LIMIT 1`,
+          [serviceId, today, endTime, startTime],
+        );
+        if (overlap) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This time window overlaps with an existing queue for this service",
+          });
+        }
+
+        // Can't open a single-service queue whose window overlaps a live
+        // Universal Service Queue for the department.
+        const [[uniOverlap]] = await conn.query(
+          `SELECT slot_id FROM queue_slots
+           WHERE is_universal = TRUE AND department_id = ? AND slot_date = ?
+             AND status IN ('open', 'paused', 'full')
+             AND start_time < ? AND end_time > ?
+           LIMIT 1`,
+          [deptId, today, endTime, startTime],
+        );
+        if (uniOverlap) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "A Universal Service Queue is running in this window — close it first, or pick a non-overlapping time.",
+          });
+        }
       }
 
-      const [[overlap]] = await conn.query(
-        `SELECT slot_id FROM queue_slots
-         WHERE service_id = ? AND slot_date = ? AND status IN ('open', 'paused', 'full', 'expired')
-           AND start_time < ? AND end_time > ?
-         LIMIT 1`,
-        [serviceId, getManilaDateString(), endTime, startTime],
-      );
-      if (overlap) {
-        await conn.rollback();
-        return res.status(409).json({
-          error: "This time window overlaps with an existing queue for this service",
-        });
-      }
+      const queueTypeLabel = hostAllServices ? "Universal Service Queue" : service.service_name;
 
       const [result] = await conn.query(
         `INSERT INTO queue_slots
-           (service_id, admin_id, slot_date, start_time, end_time, max_capacity, no_show_timeout_minutes, service_time_minutes, current_count, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'open')`,
-        [serviceId, adminId, getManilaDateString(), startTime, endTime, capacityNum, noShowTimeoutNum, serviceTimeNum],
+           (service_id, department_id, is_universal, admin_id, slot_date, start_time, end_time,
+            max_capacity, no_show_timeout_minutes, service_time_minutes, current_count, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'open')`,
+        [
+          hostAllServices ? null : serviceId,
+          deptId,
+          hostAllServices,
+          adminId,
+          today,
+          startTime,
+          endTime,
+          capacityNum,
+          noShowTimeoutNum,
+          serviceTimeNum,
+        ],
       );
 
       await conn.commit();
 
       emitToDept(deptId, "queue:slot-opened", {
         slotId: result.insertId,
-        serviceId,
-        queueType: service.service_name,
+        serviceId: hostAllServices ? null : serviceId,
+        queueType: queueTypeLabel,
         maxCapacity: capacityNum,
         status: "open",
         serviceHours: { start: startTime, end: endTime },
@@ -603,7 +664,7 @@ router.post(
         message: "Queue line opened successfully",
         queue: {
           id: result.insertId,
-          queueType: service.service_name,
+          queueType: queueTypeLabel,
           maxCapacity: capacityNum,
           noShowTimeoutMinutes: noShowTimeoutNum,
           serviceTimeMinutes: serviceTimeNum,
@@ -790,6 +851,22 @@ router.patch(
         return res
           .status(409)
           .json({ error: "Only an expired queue can be reopened this way" });
+      }
+      // Reopening a universal slot mustn't create a second live universal queue.
+      if (slot.is_universal) {
+        const [[otherUni]] = await conn.query(
+          `SELECT 1 FROM queue_slots
+           WHERE is_universal = TRUE AND department_id = ? AND slot_id != ?
+             AND slot_date = ? AND status IN ('open', 'paused', 'full')
+           LIMIT 1`,
+          [deptId, slotId, getManilaDateString()],
+        );
+        if (otherUni) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "Another Universal Service Queue is already running for your department.",
+          });
+        }
       }
 
       const setClauses = ["status = 'open'", "end_time = ?", "close_reason = NULL"];
@@ -1463,10 +1540,10 @@ router.get(
                    ORDER BY qsl.created_at DESC LIMIT 1),
                   CONCAT(adm.first_name, ' ', adm.last_name)
                 ) AS processor,
-                COALESCE(q.admin_reason, s.service_name) AS details,
+                COALESCE(q.admin_reason, q.service_label_snapshot, s.service_name) AS details,
                 CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
                 q.queue_number AS queue_number,
-                s.service_name AS raw_service_name,
+                COALESCE(q.service_label_snapshot, s.service_name) AS raw_service_name,
                 q.status AS raw_status,
                 q.updated_at AS event_time,
                 'student' AS requester_type
@@ -1808,13 +1885,18 @@ router.get(
 
       const [[slot]] = await pool.query(
         `SELECT qs.slot_id FROM queue_slots qs
-         JOIN services s ON qs.service_id = s.service_id
-         WHERE qs.slot_id = ? AND s.department_id = ?`,
+         WHERE qs.slot_id = ? AND qs.department_id = ?`,
         [slotId, deptId],
       );
       if (!slot) {
         return res.status(404).json({ error: "Queue slot not found or not in your department" });
       }
+
+      const [[deptRow]] = await pool.query(
+        `SELECT department_abbreviation FROM departments WHERE department_id = ?`,
+        [deptId],
+      );
+      const deptAbbrev = deptRow?.department_abbreviation ?? "";
 
       const [rows] = await pool.query(
         `SELECT
@@ -1823,22 +1905,22 @@ router.get(
            q.notes,
            q.created_at,
            q.arrived_at,
+           COALESCE(q.service_label_snapshot, s.service_name) AS service_label,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-           st.student_number,
-           d.department_abbreviation
+           st.student_number
          FROM queues q
          JOIN students st ON q.student_id = st.student_id
-         JOIN services s ON q.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
+         LEFT JOIN services s ON q.service_id = s.service_id
          WHERE q.slot_id = ?
          ORDER BY q.queue_number ASC`,
         [slotId],
       );
 
       const entries = rows.map((r) => ({
-        queueNumber: `${r.department_abbreviation}-${String(r.queue_number).padStart(3, "0")}`,
+        queueNumber: `${deptAbbrev}-${String(r.queue_number).padStart(3, "0")}`,
         studentName: r.student_name,
         studentId: r.student_number,
+        service: r.service_label || null,
         concern: r.notes || "No concern specified",
         joinedAt: formatTime(getManilaTimeString(r.created_at)),
         status: r.status,
@@ -2872,8 +2954,73 @@ router.post(
   },
 );
 
+// Shared: set a document type inactive and auto-decline every in-flight
+// (pending/processing) request for it -- student AND faculty. Runs inside the
+// caller's transaction connection; returns the affected requester rows so the
+// caller can emit/notify after commit.
+const DEACTIVATE_DECLINE_NOTE = "Auto-declined: this document type was retired.";
+async function deactivateDocumentType(db, serviceId) {
+  await db.query(
+    `UPDATE document_services SET status = 'inactive' WHERE service_id = ?`,
+    [serviceId],
+  );
+
+  const [studentReqs] = await db.query(
+    `SELECT request_id, student_id, tracking_number FROM document_requests
+     WHERE service_id = ? AND status IN ('pending', 'processing') FOR UPDATE`,
+    [serviceId],
+  );
+  const [facultyReqs] = await db.query(
+    `SELECT request_id, faculty_id, tracking_number FROM faculty_document_requests
+     WHERE service_id = ? AND status IN ('pending', 'processing') FOR UPDATE`,
+    [serviceId],
+  );
+
+  if (studentReqs.length > 0) {
+    await db.query(
+      `UPDATE document_requests
+         SET status = 'rejected', notes = TRIM(CONCAT(COALESCE(notes, ''), ' ', ?))
+       WHERE request_id IN (?)`,
+      [DEACTIVATE_DECLINE_NOTE, studentReqs.map((r) => r.request_id)],
+    );
+  }
+  if (facultyReqs.length > 0) {
+    await db.query(
+      `UPDATE faculty_document_requests
+         SET status = 'rejected', notes = TRIM(CONCAT(COALESCE(notes, ''), ' ', ?))
+       WHERE request_id IN (?)`,
+      [DEACTIVATE_DECLINE_NOTE, facultyReqs.map((r) => r.request_id)],
+    );
+  }
+
+  return { studentReqs, facultyReqs };
+}
+
+// Emits + notifies for a deactivateDocumentType() result. Call AFTER commit.
+function notifyDeactivatedRequesters(deptId, serviceName, { studentReqs, facultyReqs }) {
+  for (const r of studentReqs) {
+    emitToUser(r.student_id, "document:status-updated", { requestId: r.request_id, status: "rejected" });
+    createNotification(
+      r.student_id,
+      `Your ${serviceName} request (${r.tracking_number}) was declined because that document is no longer offered.`,
+      "document",
+    );
+  }
+  for (const r of facultyReqs) {
+    emitToUser(r.faculty_id, "document:status-updated", { requestId: r.request_id, status: "rejected" });
+    createNotification(
+      r.faculty_id,
+      `Your ${serviceName} request (${r.tracking_number}) was declined because that document is no longer offered.`,
+      "document",
+    );
+  }
+  if (studentReqs.length + facultyReqs.length > 0) {
+    emitToDept(deptId, "document:status-updated", {});
+  }
+}
+
 // PUT /api/admin/data-management/document-types/:id
-// Body: { name, description, processingTime, status, scope, recipientType, requirements[] }
+// Body: { name, description, processingTime, status, isCrossCollege, recipientType, requiresCoding, requirements[] }
 router.put(
   "/data-management/document-types/:id",
   authenticateToken,
@@ -2884,34 +3031,85 @@ router.put(
     if (!name || !description || !processingTime) {
       return res.status(400).json({ error: "name, description, and processingTime are required" });
     }
-    try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
+    const effectiveRecipient = recipientType || "students";
+    const effectiveStatus = status || "active";
 
-      const [[old]] = await pool.query(
-        `SELECT service_name, status, processing_time FROM document_services
-         WHERE service_id = ? AND department_id = ?`,
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const deptId = await getAdminDepartmentId(req.user.userId);
+      if (!deptId) {
+        await conn.rollback();
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+
+      const [[old]] = await conn.query(
+        `SELECT service_name, description, status, processing_time, is_cross_college,
+                recipient_type, requires_coding
+         FROM document_services WHERE service_id = ? AND department_id = ? FOR UPDATE`,
         [serviceId, deptId],
       );
-      if (!old) return res.status(404).json({ error: "Document type not found" });
+      if (!old) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Document type not found" });
+      }
 
-      const effectiveRecipient = recipientType || "students";
+      // What is this save actually changing? `requirements` only counts if the
+      // client sent the key (the modal holds [] transiently while it loads).
+      const nonStatusChanged =
+        name !== old.service_name ||
+        (description ?? "") !== (old.description ?? "") ||
+        (processingTime ?? "") !== (old.processing_time ?? "") ||
+        effectiveRecipient !== old.recipient_type ||
+        !!requiresCoding !== !!old.requires_coding ||
+        !!isCrossCollege !== !!old.is_cross_college ||
+        Array.isArray(requirements);
+      const statusChanged = effectiveStatus !== old.status;
 
-      await pool.query(
+      // A lone active -> inactive flip via the modal's status dropdown runs the
+      // same auto-decline path as the dedicated deactivate endpoint.
+      if (statusChanged && effectiveStatus === "inactive" && !nonStatusChanged) {
+        const result = await deactivateDocumentType(conn, serviceId);
+        await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
+          { status: old.status }, { status: "inactive" });
+        await conn.commit();
+        notifyDeactivatedRequesters(deptId, old.service_name, result);
+        return res.json({ message: "Document type set inactive" });
+      }
+
+      // Editing details (anything but a lone status flip) is blocked while
+      // in-flight requests exist -- deactivate to clear them first. A true
+      // no-op save (nothing changed) skips this check.
+      if (nonStatusChanged) {
+        const [[{ inflight }]] = await conn.query(
+          `SELECT
+             (SELECT COUNT(*) FROM document_requests
+                WHERE service_id = ? AND status IN ('pending','processing'))
+           + (SELECT COUNT(*) FROM faculty_document_requests
+                WHERE service_id = ? AND status IN ('pending','processing')) AS inflight`,
+          [serviceId, serviceId],
+        );
+        if (inflight > 0) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: `${inflight} request(s) are still in progress for this document type. Finish or decline them (or set the type inactive) before editing its details.`,
+          });
+        }
+      }
+
+      await conn.query(
         `UPDATE document_services SET service_name = ?, description = ?, status = ?, processing_time = ?,
          is_cross_college = ?, recipient_type = ?, requires_coding = ? WHERE service_id = ?`,
-        [name, description, status || "active", processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
+        [name, description, effectiveStatus, processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
       );
 
-      // Replace requirements only when the client actually sent the list. An
-      // omitted key means "leave as-is" -- the edit modal briefly holds an
-      // empty list while it fetches the real one, and an early Update must not
-      // wipe every requirement. An explicit [] still means "clear all".
+      // Replace requirements only when the client actually sent the list.
       if (Array.isArray(requirements)) {
-        await pool.query(`DELETE FROM document_requirements WHERE service_id = ?`, [serviceId]);
+        await conn.query(`DELETE FROM document_requirements WHERE service_id = ?`, [serviceId]);
         if (requirements.length > 0) {
           const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
-          await pool.query(
+          await conn.query(
             `INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
             [reqValues],
           );
@@ -2920,37 +3118,119 @@ router.put(
 
       await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
         { name: old.service_name, status: old.status, processingTime: old.processing_time },
-        { name, status, processingTime },
+        { name, status: effectiveStatus, processingTime },
       );
+      await conn.commit();
       res.json({ message: "Document type updated" });
     } catch (error) {
+      await conn.rollback();
       sendServerError(res, error, "Document type update error:");
+    } finally {
+      conn.release();
     }
   },
 );
 
-// DELETE /api/admin/data-management/document-types/:id
+// PATCH /api/admin/data-management/document-types/:id/deactivate
+// PATCH /api/admin/data-management/document-types/:id/reactivate
+// "Delete" in the UI = deactivate. A document type is never row-deleted --
+// that would orphan history and lose the audit trail.
+for (const verb of ["deactivate", "reactivate"]) {
+  router.patch(
+    `/data-management/document-types/:id/${verb}`,
+    authenticateToken,
+    authorizeRoles("admin"),
+    async (req, res) => {
+      const serviceId = parseInt(req.params.id, 10);
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const deptId = await getAdminDepartmentId(req.user.userId);
+        if (!deptId) {
+          await conn.rollback();
+          return res.status(403).json({ error: "Admin has no department assigned" });
+        }
+        const [[svc]] = await conn.query(
+          `SELECT service_name, status FROM document_services
+           WHERE service_id = ? AND department_id = ? FOR UPDATE`,
+          [serviceId, deptId],
+        );
+        if (!svc) {
+          await conn.rollback();
+          return res.status(404).json({ error: "Document type not found" });
+        }
+
+        if (verb === "reactivate") {
+          await conn.query(`UPDATE document_services SET status = 'active' WHERE service_id = ?`, [serviceId]);
+          await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
+            { status: svc.status }, { status: "active" });
+          await conn.commit();
+          return res.json({ message: "Document type reactivated" });
+        }
+
+        let result = { studentReqs: [], facultyReqs: [] };
+        if (svc.status !== "inactive") {
+          result = await deactivateDocumentType(conn, serviceId);
+          await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
+            { status: svc.status }, { status: "inactive" });
+        }
+        await conn.commit();
+        notifyDeactivatedRequesters(deptId, svc.service_name, result);
+        res.json({
+          message: "Document type set inactive",
+          declinedCount: result.studentReqs.length + result.facultyReqs.length,
+        });
+      } catch (error) {
+        await conn.rollback();
+        sendServerError(res, error, `Document type ${verb} error:`);
+      } finally {
+        conn.release();
+      }
+    },
+  );
+}
+
+// DELETE /api/admin/data-management/document-types/:id -> deactivate (see above)
 router.delete(
   "/data-management/document-types/:id",
   authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
     const serviceId = parseInt(req.params.id, 10);
+    const conn = await pool.getConnection();
     try {
+      await conn.beginTransaction();
       const deptId = await getAdminDepartmentId(req.user.userId);
-      if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
-
-      const [[svc]] = await pool.query(
-        `SELECT service_name FROM document_services WHERE service_id = ? AND department_id = ?`,
+      if (!deptId) {
+        await conn.rollback();
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      const [[svc]] = await conn.query(
+        `SELECT service_name, status FROM document_services
+         WHERE service_id = ? AND department_id = ? FOR UPDATE`,
         [serviceId, deptId],
       );
-      if (!svc) return res.status(404).json({ error: "Document type not found" });
-
-      await pool.query(`DELETE FROM document_services WHERE service_id = ?`, [serviceId]);
-      await logAudit(req.user.userId, "DELETE", "document_services", serviceId, { name: svc.service_name }, null);
-      res.json({ message: "Document type deleted" });
+      if (!svc) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Document type not found" });
+      }
+      let result = { studentReqs: [], facultyReqs: [] };
+      if (svc.status !== "inactive") {
+        result = await deactivateDocumentType(conn, serviceId);
+        await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
+          { status: svc.status }, { status: "inactive" });
+      }
+      await conn.commit();
+      notifyDeactivatedRequesters(deptId, svc.service_name, result);
+      res.json({
+        message: "Document type set inactive",
+        declinedCount: result.studentReqs.length + result.facultyReqs.length,
+      });
     } catch (error) {
+      await conn.rollback();
       sendServerError(res, error, "Document type delete error:");
+    } finally {
+      conn.release();
     }
   },
 );
@@ -3092,6 +3372,31 @@ router.post(
   },
 );
 
+// A queue "service" can't have its details/requirements/steps edited while it
+// has a live queue -- open/paused/full/expired for that service today, OR a
+// live universal queue in its department (a universal slot carries a NULL
+// service_id), OR any waiting/serving entry (covers a student who picked this
+// service inside a universal queue). Returns true when blocked.
+async function serviceHasLiveQueue(db, serviceId, deptId) {
+  const [[slot]] = await db.query(
+    `SELECT 1 FROM queue_slots
+      WHERE (service_id = ? OR (is_universal = TRUE AND department_id = ?))
+        AND slot_date = ?
+        AND status IN ('open', 'paused', 'full', 'expired')
+      LIMIT 1`,
+    [serviceId, deptId, getManilaDateString()],
+  );
+  if (slot) return true;
+  const [[entry]] = await db.query(
+    `SELECT 1 FROM queues WHERE service_id = ? AND status IN ('waiting', 'serving') LIMIT 1`,
+    [serviceId],
+  );
+  return !!entry;
+}
+
+const SERVICE_LOCKED_MSG =
+  "A queue for this service is still active. Close the queue before editing the service.";
+
 // PUT /api/admin/data-management/service-types/:id
 router.put(
   "/data-management/service-types/:id",
@@ -3108,10 +3413,21 @@ router.put(
       if (!deptId) return res.status(403).json({ error: "Admin has no department assigned" });
 
       const [[old]] = await pool.query(
-        `SELECT service_name FROM services WHERE service_id = ? AND department_id = ?`,
+        `SELECT service_name, description, is_cross_college, location_id
+         FROM services WHERE service_id = ? AND department_id = ?`,
         [serviceId, deptId],
       );
       if (!old) return res.status(404).json({ error: "Service type not found" });
+
+      const changed =
+        name !== old.service_name ||
+        (description ?? null) !== (old.description ?? null) ||
+        !!isCrossCollege !== !!old.is_cross_college ||
+        (locationId || null) !== (old.location_id ?? null);
+
+      if (changed && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
+        return res.status(409).json({ error: SERVICE_LOCKED_MSG });
+      }
 
       await pool.query(
         `UPDATE services SET service_name = ?, description = ?,
@@ -3123,6 +3439,7 @@ router.put(
         { name: old.service_name },
         { name },
       );
+      emitToDept(deptId, "queue:service-updated", { serviceId });
       res.json({ message: "Service type updated" });
     } catch (error) {
       sendServerError(res, error, "Service type update error:");
@@ -3146,6 +3463,23 @@ router.delete(
         [serviceId, deptId],
       );
       if (!svc) return res.status(404).json({ error: "Service type not found" });
+
+      if (await serviceHasLiveQueue(pool, serviceId, deptId)) {
+        return res.status(409).json({ error: SERVICE_LOCKED_MSG });
+      }
+      // Any queue history at all blocks a hard delete (the FK is RESTRICT, so
+      // the raw DELETE would 500 anyway -- surface a clear message instead).
+      const [[hist]] = await pool.query(
+        `SELECT
+           (SELECT COUNT(*) FROM queue_slots WHERE service_id = ?)
+         + (SELECT COUNT(*) FROM queues WHERE service_id = ?) AS n`,
+        [serviceId, serviceId],
+      );
+      if (hist.n > 0) {
+        return res.status(409).json({
+          error: "This service has queue history and can't be deleted. Edit it instead once no queue is live.",
+        });
+      }
 
       await pool.query(`DELETE FROM services WHERE service_id = ?`, [serviceId]);
       await logAudit(req.user.userId, "DELETE", "services", serviceId, { name: svc.service_name }, null);
@@ -3214,6 +3548,21 @@ router.put(
       // omitted key means "leave as-is" (guards the edit modal's brief empty
       // window). An explicit [] still clears all.
       if (Array.isArray(requirements)) {
+        const [existing] = await pool.query(
+          `SELECT requirement_name AS name, description, is_mandatory AS isMandatory
+           FROM service_requirements WHERE service_id = ? ORDER BY requirement_id ASC`,
+          [serviceId],
+        );
+        const nextNorm = JSON.stringify(
+          requirements.map((r) => [r.name, r.description || null, r.isMandatory !== false]),
+        );
+        const prevNorm = JSON.stringify(
+          existing.map((r) => [r.name, r.description || null, !!r.isMandatory]),
+        );
+        if (nextNorm !== prevNorm && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
+          return res.status(409).json({ error: SERVICE_LOCKED_MSG });
+        }
+
         await pool.query(`DELETE FROM service_requirements WHERE service_id = ?`, [serviceId]);
         if (requirements.length > 0) {
           const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
@@ -3225,6 +3574,7 @@ router.put(
         await logAudit(req.user.userId, "UPDATE", "service_requirements", serviceId,
           null, { requirementCount: requirements.length },
         );
+        emitToDept(deptId, "queue:service-updated", { serviceId });
       }
       res.json({ message: "Service requirements updated" });
     } catch (error) {
@@ -3290,6 +3640,21 @@ router.put(
       // key means "leave as-is" (guards the edit modal's brief empty window).
       // An explicit [] still clears all.
       if (Array.isArray(steps)) {
+        const [existing] = await pool.query(
+          `SELECT step_number, step_title, description FROM service_procedure_steps
+           WHERE service_id = ? ORDER BY step_number ASC`,
+          [serviceId],
+        );
+        const nextNorm = JSON.stringify(
+          steps.map((s, i) => [s.stepNumber ?? i + 1, s.title, s.description || null]),
+        );
+        const prevNorm = JSON.stringify(
+          existing.map((s) => [s.step_number, s.step_title, s.description || null]),
+        );
+        if (nextNorm !== prevNorm && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
+          return res.status(409).json({ error: SERVICE_LOCKED_MSG });
+        }
+
         await pool.query(`DELETE FROM service_procedure_steps WHERE service_id = ?`, [serviceId]);
         if (steps.length > 0) {
           const stepValues = steps.map((s, i) => [serviceId, s.stepNumber ?? i + 1, s.title, s.description || null]);
@@ -3301,6 +3666,7 @@ router.put(
         await logAudit(req.user.userId, "UPDATE", "service_procedure_steps", serviceId,
           null, { stepCount: steps.length },
         );
+        emitToDept(deptId, "queue:service-updated", { serviceId });
       }
       res.json({ message: "Service procedure steps updated" });
     } catch (error) {
@@ -4077,11 +4443,11 @@ router.get(
         pool.query(
           `SELECT COUNT(*) AS n
            FROM queue_slots qs
-           JOIN services s ON qs.service_id = s.service_id
-           WHERE s.department_id = ?
+           LEFT JOIN services s ON qs.service_id = s.service_id
+           WHERE qs.department_id = ?
              AND qs.status = 'completed'
              AND (? IS NULL OR qs.slot_date = ?)
-             AND (? IS NULL OR s.service_name = ?)`,
+             AND (? IS NULL OR (CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END) = ?)`,
           [deptId, slotDateParam, slotDateParam, service, service],
         ),
         // Per-service served / no-shows / avg wait. Each metric requires the
@@ -4111,14 +4477,16 @@ router.get(
             deptId, service, service,
           ],
         ),
-        // Per-service overtime slot counts.
+        // Per-service overtime slot counts (universal slots group under a NULL
+        // service_id -- they don't appear in the per-service breakdown but are
+        // still summed into the total below).
         pool.query(
           `SELECT qs.service_id, COUNT(DISTINCT qs.slot_id) AS overtime_queues
            FROM queue_slots qs
-           JOIN services s ON qs.service_id = s.service_id
-           WHERE s.department_id = ?
+           LEFT JOIN services s ON qs.service_id = s.service_id
+           WHERE qs.department_id = ?
              AND (? IS NULL OR qs.slot_date = ?)
-             AND (? IS NULL OR s.service_name = ?)
+             AND (? IS NULL OR (CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END) = ?)
              AND ${OVERTIME_PREDICATE}
            GROUP BY qs.service_id`,
           [deptId, slotDateParam, slotDateParam, service, service],
@@ -4163,7 +4531,9 @@ router.get(
 
       const totals = {
         accomplishedQueues: Number(accomplishedRow.n) || 0,
-        overtimeQueues: byService.reduce((sum, r) => sum + r.overtimeQueues, 0),
+        // Sum every overtime row (incl. the universal NULL-service bucket that
+        // byService doesn't surface), not just the per-service rows.
+        overtimeQueues: overtimeRows.reduce((sum, r) => sum + Number(r.overtime_queues || 0), 0),
         studentsServed: byService.reduce((sum, r) => sum + r.studentsServed, 0),
         noShows: byService.reduce((sum, r) => sum + r.noShows, 0),
         peakHour:

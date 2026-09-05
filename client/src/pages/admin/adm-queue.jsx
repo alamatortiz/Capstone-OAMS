@@ -725,6 +725,11 @@ export default function AdminQueue() {
                         </div>
                       </div>
                       <div className="queue-entry-details">
+                        {monitoringQueue?.isUniversal && entry.service && (
+                          <p className="queue-entry-concern">
+                            <strong>Service:</strong> {entry.service}
+                          </p>
+                        )}
                         <p className="queue-entry-concern">
                           <strong>Concern:</strong> {entry.concern}
                         </p>

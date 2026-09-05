@@ -147,6 +147,7 @@ export default function AdminQueueHosting() {
   const [showModal, setShowModal] = useState(false);
   useLockBodyScroll(showModal);
   const [serviceId, setServiceId] = useState("");
+  const [hostAllServices, setHostAllServices] = useState(false);
   const [maxCapacity, setMaxCapacity] = useState("100");
   const [serviceStart, setServiceStart] = useState("08:00");
   const [serviceEnd, setServiceEnd] = useState("17:00");
@@ -161,6 +162,7 @@ export default function AdminQueueHosting() {
   // ── Modal handlers ─────────────────────────────────────────────────────────
   const resetForm = () => {
     setServiceId("");
+    setHostAllServices(false);
     setMaxCapacity("100");
     const now = getManilaTimeString();
     const [h, m] = now.split(":").map(Number);
@@ -183,7 +185,8 @@ export default function AdminQueueHosting() {
   // getManilaTimeString() check on submit already covers the one real edge
   // case (re-hosting an old "8am-5pm" queue after 5pm today).
   const openModalWithConfig = (queue) => {
-    setServiceId(String(queue.serviceId));
+    setHostAllServices(!!queue.isUniversal);
+    setServiceId(queue.isUniversal ? "" : String(queue.serviceId));
     setMaxCapacity(String(queue.maxCapacity));
     setServiceTime(String(queue.avgServiceMinutes ?? 15));
     setNoShowTimeout(String(queue.noShowTimeoutMinutes ?? 15));
@@ -198,8 +201,8 @@ export default function AdminQueueHosting() {
   };
 
   const handleOpenQueueSubmit = async () => {
-    if (!serviceId) {
-      toast.error("Please select a service to queue");
+    if (!hostAllServices && !serviceId) {
+      toast.error("Please select a service to queue, or tick “Host all services”.");
       return;
     }
     const capacityNum = parseInt(maxCapacity, 10);
@@ -229,7 +232,8 @@ export default function AdminQueueHosting() {
     setSubmitting(true);
     try {
       await api.post("/admin/queue-hosting", {
-        serviceId,
+        serviceId: hostAllServices ? null : serviceId,
+        hostAllServices,
         maxCapacity: capacityNum,
         startTime: `${serviceStart}:00`,
         endTime: `${serviceEnd}:00`,
@@ -394,6 +398,7 @@ export default function AdminQueueHosting() {
                         className="aqh-form-select"
                         value={serviceId}
                         onChange={(e) => setServiceId(e.target.value)}
+                        disabled={hostAllServices}
                       >
                         <option value="">Select a service</option>
                         {services.map((s) => (
@@ -411,6 +416,17 @@ export default function AdminQueueHosting() {
                         No services configured for your department yet.
                       </p>
                     )}
+                    <label className="aqh-checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+                      <input
+                        type="checkbox"
+                        checked={hostAllServices}
+                        onChange={(e) => {
+                          setHostAllServices(e.target.checked);
+                          if (e.target.checked) setServiceId("");
+                        }}
+                      />
+                      <span>Host all services (one queue covering every service in your department)</span>
+                    </label>
                   </div>
 
                   <div className="aqh-form-group">

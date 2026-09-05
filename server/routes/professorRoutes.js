@@ -19,7 +19,10 @@ const {
 const notificationsController = require("../controllers/notificationsController");
 const { emitToUser, emitToDept } = require("../sockets");
 const { isValidTransition } = require("../utils/appointmentStatus");
-const { cancelOwnDocumentRequest } = require("../utils/documentStatus");
+const {
+  cancelOwnDocumentRequest,
+  buildDocumentServiceSnapshot,
+} = require("../utils/documentStatus");
 const { sendServerError } = require("../utils/errorResponse");
 const {
   getAttachmentsMap,
@@ -1134,7 +1137,7 @@ router.patch(
       );
 
       const [[current]] = await conn.query(
-        "SELECT day_of_week, start_time, end_time FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
+        "SELECT day_of_week, start_time, end_time, location FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
         [id, facultyId],
       );
       if (!current) {
@@ -1149,6 +1152,13 @@ router.patch(
       const effectiveStart =
         start_time ?? String(current.start_time).slice(0, 5);
       const effectiveEnd = end_time ?? String(current.end_time).slice(0, 5);
+      const effectiveLocation = location ?? current.location;
+      // Did the student-visible window/room actually move? Used below to decide
+      // whether to re-sync surviving bookings' snapshots + re-notify.
+      const windowMoved =
+        effectiveStart !== String(current.start_time).slice(0, 5) ||
+        effectiveEnd !== String(current.end_time).slice(0, 5) ||
+        (effectiveLocation ?? "") !== (current.location ?? "");
       if (effectiveEnd <= effectiveStart) {
         await conn.rollback();
         return res
@@ -1198,6 +1208,29 @@ router.patch(
           `UPDATE appointments SET status = 'cancelled', cancelled_by = 'system'
            WHERE appointment_id IN (?)`,
           [noLongerFits.map((b) => b.appointment_id)],
+        );
+      }
+
+      // Bookings that still fit the edited slot: keep them, but re-sync their
+      // captured window/location snapshot to the new values so the student's
+      // card + 24h reminder don't silently keep showing the old room/time.
+      // NOT appointment_time -- it feeds the active_booking_key unique index
+      // and anchors the next edit's "still fits?" check, so it stays as the
+      // student's originally intended start.
+      const noLongerFitsIds = new Set(noLongerFits.map((b) => b.appointment_id));
+      const survivors = bookings.filter((b) => !noLongerFitsIds.has(b.appointment_id));
+      if (windowMoved && survivors.length > 0) {
+        await conn.query(
+          `UPDATE appointments
+             SET window_start_snapshot = ?, window_end_snapshot = ?, location_snapshot = ?,
+                 reminder_sent_at = NULL
+           WHERE appointment_id IN (?)`,
+          [
+            `${effectiveStart}:00`,
+            `${effectiveEnd}:00`,
+            effectiveLocation ?? null,
+            survivors.map((b) => b.appointment_id),
+          ],
         );
       }
 
@@ -1303,9 +1336,28 @@ router.patch(
         );
       }
 
+      if (windowMoved) {
+        for (const b of survivors) {
+          const dateStr =
+            b.appointment_date instanceof Date
+              ? getManilaDateString(b.appointment_date)
+              : String(b.appointment_date).split("T")[0];
+          emitToUser(b.student_id, "appointment:status-updated", {
+            appointmentId: b.appointment_id,
+            reason: "slot_adjusted",
+          });
+          createNotification(
+            b.student_id,
+            `The professor adjusted your appointment slot on ${dateStr} — please review the new time and location.`,
+            "appointment",
+          );
+        }
+      }
+
       res.json({
         message: "Availability updated",
         cancelledAppointments: noLongerFits.length,
+        adjustedAppointments: windowMoved ? survivors.length : 0,
       });
     } catch (err) {
       await conn.rollback();
@@ -1487,6 +1539,7 @@ router.get(
                fdr.notes,
                fdr.created_at,
                fdr.is_digital_delivery,
+               fdr.service_snapshot,
                gf.qr_code AS delivery_code,
                d.department_name AS college
              FROM faculty_document_requests fdr
@@ -1512,6 +1565,7 @@ router.get(
                dsub.notes,
                dsub.created_at,
                NULL AS is_digital_delivery,
+               NULL AS service_snapshot,
                NULL AS delivery_code,
                d.department_name AS college
              FROM document_submissions dsub
@@ -1595,48 +1649,69 @@ router.post(
         `SELECT department_id FROM faculty WHERE faculty_id = ?`,
         [facultyId],
       );
-      const [[svc]] = await pool.query(
-        `SELECT service_id, department_id FROM document_services
-         WHERE service_id = ? AND status = 'active' AND recipient_type IN ('faculty','both')
-           AND (department_id = ? OR is_cross_college = TRUE)`,
-        [service_id, fac?.department_id],
-      );
-      if (!svc) {
-        return res
-          .status(404)
-          .json({ message: "No matching service configuration found" });
-      }
+      const conn = await pool.getConnection();
+      let result;
+      let svc;
+      try {
+        await conn.beginTransaction();
 
-      // Guard against a double-click/double-tap firing this twice before the client's
-      // own disabled-button state catches up to the first request.
-      const [[recentDup]] = await pool.query(
-        `SELECT request_id FROM faculty_document_requests
-         WHERE faculty_id = ? AND service_id = ? AND purpose = ?
-           AND created_at >= NOW() - INTERVAL 10 SECOND
-         LIMIT 1`,
-        [facultyId, service_id, purpose],
-      );
-      if (recentDup) {
-        return res
-          .status(409)
-          .json({ message: "This request was already submitted a moment ago" });
-      }
+        // Lock the service row so a concurrent PUT /deactivate can't race its
+        // auto-reject sweep around this new submission.
+        [[svc]] = await conn.query(
+          `SELECT service_id, department_id FROM document_services
+           WHERE service_id = ? AND status = 'active' AND recipient_type IN ('faculty','both')
+             AND (department_id = ? OR is_cross_college = TRUE)
+           FOR UPDATE`,
+          [service_id, fac?.department_id],
+        );
+        if (!svc) {
+          await conn.rollback();
+          return res
+            .status(404)
+            .json({ message: "No matching service configuration found" });
+        }
 
-      const fdrTrackingNumber = await nextTrackingNumber(pool, "faculty_document_requests", "request_id", "FDR");
-      const [result] = await pool.query(
-        `INSERT INTO faculty_document_requests (tracking_number, faculty_id, service_id, request_type, purpose, copies, notes, needed_by)
-         VALUES (?,?,?,?,?,?,?,?)`,
-        [
-          fdrTrackingNumber,
-          facultyId,
-          service_id,
-          request_type ?? "General",
-          purpose,
-          copyCount,
-          notes ?? null,
-          needed_by || null,
-        ],
-      );
+        // Guard against a double-click/double-tap firing this twice before the client's
+        // own disabled-button state catches up to the first request.
+        const [[recentDup]] = await conn.query(
+          `SELECT request_id FROM faculty_document_requests
+           WHERE faculty_id = ? AND service_id = ? AND purpose = ?
+             AND created_at >= NOW() - INTERVAL 10 SECOND
+           LIMIT 1`,
+          [facultyId, service_id, purpose],
+        );
+        if (recentDup) {
+          await conn.rollback();
+          return res
+            .status(409)
+            .json({ message: "This request was already submitted a moment ago" });
+        }
+
+        const serviceSnapshot = await buildDocumentServiceSnapshot(conn, service_id);
+        const fdrTrackingNumber = await nextTrackingNumber(conn, "faculty_document_requests", "request_id", "FDR");
+        [result] = await conn.query(
+          `INSERT INTO faculty_document_requests (tracking_number, faculty_id, service_id, request_type, purpose, copies, notes, needed_by, service_snapshot)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [
+            fdrTrackingNumber,
+            facultyId,
+            service_id,
+            request_type ?? "General",
+            purpose,
+            copyCount,
+            notes ?? null,
+            needed_by || null,
+            JSON.stringify(serviceSnapshot),
+          ],
+        );
+
+        await conn.commit();
+      } catch (txErr) {
+        await conn.rollback();
+        throw txErr;
+      } finally {
+        conn.release();
+      }
       const [[newRequest]] = await pool.query(
         `SELECT request_id, tracking_number, copies FROM faculty_document_requests WHERE request_id = ?`,
         [result.insertId],

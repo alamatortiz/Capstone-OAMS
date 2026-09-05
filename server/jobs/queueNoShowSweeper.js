@@ -71,10 +71,14 @@ function emitVoidEvents({ slotId, queueId, studentId, deptId, settleResult, serv
 async function sweepNoShows() {
   try {
     const [stale] = await pool.query(
-      `SELECT q.queue_id, q.slot_id, q.student_id, s.department_id, s.service_name
+      // Join services on the ENTRY's service_id (always set), not the slot's
+      // (NULL for a Universal Service Queue slot); department comes from the
+      // slot row directly.
+      `SELECT q.queue_id, q.slot_id, q.student_id, qs.department_id,
+              COALESCE(q.service_label_snapshot, s.service_name) AS service_name
        FROM queues q
        JOIN queue_slots qs ON q.slot_id = qs.slot_id
-       JOIN services s ON qs.service_id = s.service_id
+       LEFT JOIN services s ON q.service_id = s.service_id
        WHERE q.status = 'serving'
          AND q.called_at IS NOT NULL
          AND q.arrived_at IS NULL

@@ -464,24 +464,15 @@ export default function DocumentStatusPage() {
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
-  const [servicesByDepartmentId, setServicesByDepartmentId] = useState({});
-  const [reqLoading, setReqLoading] = useState(true);
 
   const selectedDoc = selectedDocId
     ? (documents.find((d) => d.id === selectedDocId) ?? null)
     : null;
 
-  // Requirements for the selected document's type, looked up by name against
-  // the same service-types catalog stud-documents.jsx uses (no stable service
-  // id is exposed on either payload, so name is the shared key).
-  const getDocRequirements = useCallback(
-    (typeName) => {
-      const allTypes = Object.values(servicesByDepartmentId).flat();
-      return allTypes.find((t) => t.name === typeName)?.requirements ?? [];
-    },
-    [servicesByDepartmentId],
-  );
-  const selectedDocRequirements = selectedDoc ? getDocRequirements(selectedDoc.type) : [];
+  // Requirements come from the request's own frozen service_snapshot (captured
+  // at submit), so a later edit to the catalogue type can't retro-change what
+  // a finished request shows -- and there's nothing to match by name anymore.
+  const selectedDocRequirements = selectedDoc?.serviceSnapshot?.requirements ?? [];
 
   useEffect(() => {
     if (!loading && selectedDocId && !selectedDoc) setSelectedDocId(null);
@@ -512,21 +503,6 @@ export default function DocumentStatusPage() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
-
-  useEffect(() => {
-    const fetchServiceTypes = async () => {
-      setReqLoading(true);
-      try {
-        const res = await api.get("/student/documents/service-types");
-        setServicesByDepartmentId(res.data.servicesByDepartmentId ?? {});
-      } catch (err) {
-        console.error("Failed to fetch document service types:", err);
-      } finally {
-        setReqLoading(false);
-      }
-    };
-    fetchServiceTypes();
-  }, []);
 
   // ── Live updates: refetch when a document's status changes ────────────────
   useEffect(() => {
@@ -614,7 +590,7 @@ export default function DocumentStatusPage() {
             onConfirmReceipt={handleConfirmReceipt}
             confirmingReceipt={confirmingReceipt}
             requirements={selectedDocRequirements}
-            reqLoading={reqLoading}
+            reqLoading={loading && !selectedDoc}
           />
         ) : (
           <div className="dss-status-container">

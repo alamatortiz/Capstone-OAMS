@@ -531,9 +531,9 @@ export default function AdminDataManagementScreen() {
       }
       closeDocModal();
       fetchDocumentTypes(docStatusFilter);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save document type:', err);
-      Alert.alert('Error', 'Failed to save document type.');
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to save document type.');
     } finally {
       setDocSaving(false);
     }
@@ -683,17 +683,28 @@ export default function AdminDataManagementScreen() {
     if (!deleteTarget) return;
     try {
       if (deleteTarget.type === 'document') {
-        await api.delete(`/admin/data-management/document-types/${deleteTarget.id}`);
-        Alert.alert('Success', 'Document type deleted.');
+        const { data } = await api.patch(`/admin/data-management/document-types/${deleteTarget.id}/deactivate`);
+        Alert.alert(
+          'Done',
+          data?.declinedCount
+            ? `Document type set inactive. ${data.declinedCount} in-progress request(s) declined.`
+            : 'Document type set inactive.',
+        );
         fetchDocumentTypes(docStatusFilter);
       } else {
         await api.delete(`/admin/data-management/service-types/${deleteTarget.id}`);
         Alert.alert('Success', 'Service deleted.');
         fetchServiceTypes();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete:', err);
-      Alert.alert('Error', deleteTarget.type === 'document' ? 'Failed to delete document type.' : 'Failed to delete service.');
+      Alert.alert(
+        'Error',
+        err?.response?.data?.error ??
+          (deleteTarget.type === 'document'
+            ? 'Failed to set the document type inactive.'
+            : 'Failed to delete service.'),
+      );
     } finally {
       setDeleteTarget(null);
     }
@@ -745,9 +756,12 @@ export default function AdminDataManagementScreen() {
   })();
 
   const confirmMeta = deleteTarget && {
-    title: deleteTarget.type === 'document' ? 'Delete Document Type?' : 'Delete Service?',
-    description: `Delete ${deleteTarget.name}? This action cannot be undone.`,
-    confirmLabel: 'Delete',
+    title: deleteTarget.type === 'document' ? 'Set Document Type Inactive?' : 'Delete Service?',
+    description:
+      deleteTarget.type === 'document'
+        ? `Set ${deleteTarget.name} inactive? Any in-progress request for it will be declined and it will be hidden from the request form. Finished records keep their details; you can reactivate it later.`
+        : `Delete ${deleteTarget.name}? This action cannot be undone.`,
+    confirmLabel: deleteTarget.type === 'document' ? 'Set Inactive' : 'Delete',
     icon: Trash2,
     color: '#ef4444',
   };

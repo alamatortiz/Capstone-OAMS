@@ -312,6 +312,65 @@
   color: #7f1d1d;
 }
 
+/* ─── Mark-as-Completed card + button (mirrors the cancel card in green) ─── */
+.apst-complete-card {
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+[data-theme="light"] .apst-complete-card {
+  background-color: rgba(34, 197, 94, 0.03);
+}
+
+.apst-complete-card .apst-card-header {
+  border-bottom-color: rgba(34, 197, 94, 0.15);
+}
+
+.apst-complete-title,
+.apst-complete-card .apst-card-title svg {
+  color: #22c55e;
+}
+
+.apst-complete-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 0.75rem;
+  color: #86efac;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.apst-complete-btn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #4ade80;
+}
+
+.apst-complete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .apst-complete-btn {
+  background: rgba(21, 128, 61, 0.08);
+  border-color: rgba(21, 128, 61, 0.25);
+  color: #166534;
+}
+
+[data-theme="light"] .apst-complete-btn:hover:not(:disabled) {
+  background: rgba(21, 128, 61, 0.15);
+  border-color: rgba(21, 128, 61, 0.4);
+  color: #14532d;
+}
+
 /* ─── Icon inside each tab button ────────────────────────────────────────── */
 .apst-tab-icon {
   width: 1rem;

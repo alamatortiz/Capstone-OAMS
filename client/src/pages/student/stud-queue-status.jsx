@@ -75,32 +75,22 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
     fetchServices();
   }, []);
 
-  const isServiceKnown = (serviceName) =>
-    servicesData.some((dept) =>
-      dept.services?.some(
-        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
-      ),
-    );
-
-  const getServiceRequirements = (serviceName) => {
+  // Match the joined service by its stable id, not its name -- for a Universal
+  // Service Queue ticket queue.serviceName is the frozen "Universal Service
+  // Queue - X" label and would never name-match.
+  const findSvc = (serviceId) => {
     for (const dept of servicesData) {
-      const svc = dept.services?.find(
-        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
-      );
-      if (svc?.requirements?.length) return svc.requirements;
+      const svc = dept.services?.find((s) => s.serviceId === serviceId);
+      if (svc) return svc;
     }
-    return [];
+    return null;
   };
 
-  const getProcedureSteps = (serviceName) => {
-    for (const dept of servicesData) {
-      const svc = dept.services?.find(
-        (s) => s.serviceName?.toLowerCase() === serviceName?.toLowerCase(),
-      );
-      if (svc?.procedureSteps?.length) return svc.procedureSteps;
-    }
-    return [];
-  };
+  const isServiceKnown = (serviceId) => !!findSvc(serviceId);
+
+  const getServiceRequirements = (serviceId) => findSvc(serviceId)?.requirements ?? [];
+
+  const getProcedureSteps = (serviceId) => findSvc(serviceId)?.procedureSteps ?? [];
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
@@ -358,8 +348,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             </div>
             <div className="qss-card-content">
               {(() => {
-                const reqs = getServiceRequirements(queue.serviceName);
-                if (reqs.length === 0 && servicesLoading && !isServiceKnown(queue.serviceName)) {
+                const reqs = getServiceRequirements(queue.serviceId);
+                if (reqs.length === 0 && servicesLoading && !isServiceKnown(queue.serviceId)) {
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
                       <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
@@ -407,8 +397,8 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             </div>
             <div className="qss-card-content">
               {(() => {
-                const steps = getProcedureSteps(queue.serviceName);
-                if (steps.length === 0 && servicesLoading && !isServiceKnown(queue.serviceName)) {
+                const steps = getProcedureSteps(queue.serviceId);
+                if (steps.length === 0 && servicesLoading && !isServiceKnown(queue.serviceId)) {
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
                       <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
