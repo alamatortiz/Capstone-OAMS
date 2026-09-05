@@ -375,6 +375,10 @@ html, body {
   .adp-main .filters-grid { grid-template-columns: 1fr; }
 }
 
+.adp-main .filter-group--search {
+  grid-column: 1 / -1;
+}
+
 .adp-main .filter-group {
   display: flex;
   flex-direction: column;

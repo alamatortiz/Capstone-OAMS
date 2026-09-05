@@ -303,11 +303,26 @@ export default function AppointmentsPage() {
       .map((b) => `${b.availabilityId}_${b.date}`)
   ), [myBookings]);
 
+  // Sourced from the full faculty roster (collegeOptions, from
+  // /student/professor-schedules) rather than from `slots` -- that way every
+  // professor in the college shows up as a filter option, not just the ones
+  // who currently have a published/bookable availability slot.
   const availableProfessors = useMemo(() => {
+    const depts = selectedCollege
+      ? collegeOptions.filter((d) => d.departmentAbbrev === selectedCollege)
+      : collegeOptions;
     const seen = new Set();
-    return slots.filter((s) => !selectedCollege || s.college === selectedCollege).filter((s) => { const id = String(s.professorId); if (seen.has(id)) return false; seen.add(id); return true; })
-      .map((s) => ({ id: String(s.professorId), name: s.professorName })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [slots, selectedCollege]);
+    const result = [];
+    for (const dept of depts) {
+      for (const fac of dept.faculty) {
+        const id = String(fac.facultyId);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        result.push({ id, name: fac.name });
+      }
+    }
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }, [collegeOptions, selectedCollege]);
 
   const calendarDays = useMemo(() => {
     if (!selectedProfessorId) return [];
@@ -616,11 +631,11 @@ export default function AppointmentsPage() {
           {activeTab === "slots" && (
             <div className="slots-container">
               {slotsLoading ? (
-                <div className="appt-empty-state"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading available slots…</h3></div>
+                <div className="appt-empty-state appt-empty-state--card"><Loader2Icon style={{ animation: "spin 1s linear infinite" }} /><h3>Loading available slots…</h3></div>
               ) : slotsError ? (
-                <div className="appt-empty-state"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
+                <div className="appt-empty-state appt-empty-state--card"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
               ) : availableSlots.length === 0 ? (
-                <div className="appt-empty-state"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results." : "No professors have published their consultation hours yet."}</p></div>
+                <div className="appt-empty-state appt-empty-state--card"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results." : "No professors have published their consultation hours yet."}</p></div>
               ) : selectedDate ? (
                 <div className="week-section">
                   <div className="week-section-header">

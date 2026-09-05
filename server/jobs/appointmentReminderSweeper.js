@@ -88,10 +88,17 @@ async function sweepAppointmentReminders() {
 async function sweepStaleApproved() {
   const [stale] = await pool.query(
     // Manila-now comparison -- see the note in sweepAppointmentReminders above.
-    `SELECT appointment_id, student_id, department_id
-     FROM appointments
-     WHERE status = 'approved'
-       AND TIMESTAMP(appointment_date, appointment_time)
+    // Anchored to the window's END (own snapshot, falling back to the live
+    // template, then to appointment_time as a last resort), not its start --
+    // appointment_time is always the window's *start* time (see book-slot in
+    // studentRoutes.js), so anchoring the grace period there would force-
+    // complete an approved appointment while the professor's window (which
+    // can span many hours) is still legitimately open.
+    `SELECT a.appointment_id, a.student_id, a.department_id
+     FROM appointments a
+     LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
+     WHERE a.status = 'approved'
+       AND TIMESTAMP(a.appointment_date, COALESCE(a.window_end_snapshot, fda.end_time, a.appointment_time))
            <= (CONVERT_TZ(NOW(), '+00:00', '+08:00') - INTERVAL ? HOUR)`,
     [COMPLETE_GRACE_HOURS],
   );
@@ -159,10 +166,17 @@ async function sweepStalePending() {
 async function sweepExpiredPending() {
   const [expired] = await pool.query(
     // Manila-now comparison -- see the note in sweepAppointmentReminders above.
-    `SELECT appointment_id, student_id, faculty_id, department_id
-     FROM appointments
-     WHERE status = 'pending'
-       AND TIMESTAMP(appointment_date, appointment_time)
+    // Anchored to the window's END, not its start -- appointment_time is
+    // always the window's *start* time (see book-slot in studentRoutes.js),
+    // so anchoring here would auto-cancel a request the instant its window
+    // opens, before the professor has any chance to act on it. A pending
+    // request only becomes truly unactionable once the whole window (during
+    // which the professor could still approve it) has passed.
+    `SELECT a.appointment_id, a.student_id, a.faculty_id, a.department_id
+     FROM appointments a
+     LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
+     WHERE a.status = 'pending'
+       AND TIMESTAMP(a.appointment_date, COALESCE(a.window_end_snapshot, fda.end_time, a.appointment_time))
            <= CONVERT_TZ(NOW(), '+00:00', '+08:00')`,
   );
 

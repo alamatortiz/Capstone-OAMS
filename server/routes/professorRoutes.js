@@ -7,6 +7,7 @@ const {
 } = require("../middleware/authMiddleware");
 const {
   getManilaDateString,
+  getManilaTimeString,
   formatTime12h: formatTime,
   formatRelativeTime,
 } = require("../utils/dateTime");
@@ -473,9 +474,12 @@ router.patch(
 
       const [[appt]] = await conn.query(
         `SELECT a.student_id, a.department_id, a.status, a.availability_id, a.appointment_date,
-                a.appointment_time, sv.service_name
+                a.appointment_time, sv.service_name,
+                COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
+                COALESCE(a.window_end_snapshot,   fda.end_time)   AS window_end
          FROM appointments a
          LEFT JOIN appointment_services sv ON a.service_id = sv.service_id
+         LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
          WHERE a.appointment_id = ? AND a.faculty_id = ? FOR UPDATE`,
         [id, facultyId],
       );
@@ -500,6 +504,36 @@ router.patch(
         return res
           .status(400)
           .json({ error: "Cannot mark a future appointment as completed" });
+      }
+
+      // Approval is only allowed during the professor's own scheduled
+      // consultation window -- approving means "the student should head over
+      // now", so it can't happen before the window opens or after it closes.
+      // Rejection deliberately has no such restriction (a professor must be
+      // able to decline a request at any time). Skipped if the window can't
+      // be resolved at all (e.g. the availability template was deleted with
+      // no snapshot) rather than blocking approval on missing data.
+      if (status === "approved" && appt.window_start && appt.window_end) {
+        const manilaToday = getManilaDateString();
+        const manilaNow = getManilaTimeString();
+        if (apptDateStr !== manilaToday) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: `You can only approve this appointment on its scheduled date (${apptDateStr}).`,
+          });
+        }
+        if (manilaNow < appt.window_start) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: `This appointment's window hasn't opened yet — it opens at ${formatTime(appt.window_start)}.`,
+          });
+        }
+        if (manilaNow > appt.window_end) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This appointment's scheduled window has already ended.",
+          });
+        }
       }
 
       // Re-check capacity when reviving a pending request into approved --
@@ -679,7 +713,10 @@ router.get(
         rows = rows.concat(subs);
       }
 
-      rows.sort((a, b) => new Date(b.event_time) - new Date(a.event_time));
+      rows.sort((a, b) =>
+        new Date(b.event_time) - new Date(a.event_time) ||
+        `${b.type}-${b.id}`.localeCompare(`${a.type}-${a.id}`),
+      );
       res.json(rows);
     } catch (err) {
       sendServerError(res, err, "GET /transactions error:");

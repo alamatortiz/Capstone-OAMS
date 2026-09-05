@@ -261,7 +261,7 @@ CREATE TABLE queue_slots (
     current_count   INT          NOT NULL DEFAULT 0,
     no_show_timeout_minutes INT  NOT NULL DEFAULT 15,
     service_time_minutes INT     NOT NULL DEFAULT 15, -- admin-configured est. time per student for this specific queue instance
-    status          ENUM('open','paused','full','expired','completed','closed','cancelled') DEFAULT 'open',
+    status          ENUM('open','paused','full','expired','completed','closed') DEFAULT 'open',
     pause_reason    VARCHAR(255) NULL,
     close_reason    VARCHAR(255) NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,

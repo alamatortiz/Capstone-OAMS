@@ -462,7 +462,7 @@ router.get(
           totalInQueue,
           queueOccupancyPercent,
           servicedPercent,
-          status: q.status, // 'open' | 'paused' | 'full' | 'expired' | 'completed' | 'closed' | 'cancelled'
+          status: q.status, // 'open' | 'paused' | 'full' | 'expired' | 'completed' | 'closed'
           createdAt: q.created_at,
           location: q.office_location || null,
           currentlyServingStudentNumber:
@@ -767,10 +767,6 @@ router.patch(
       const deptId = await getAdminDepartmentId(adminId);
       const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
       if (!slot) return;
-      if (slot.status === "cancelled") {
-        await conn.rollback();
-        return res.status(409).json({ error: `Queue is already ${slot.status}` });
-      }
 
       // Every student still waiting or being served has their entry force-
       // cancelled with the admin's reason — otherwise these rows would be
@@ -1290,218 +1286,6 @@ router.get(
       // by dateClause above isn't a valid column reference in its WHERE clause.
       const auditDateClause = dateClause ? "AND al.created_at >= ?" : "";
 
-      const unionSql = `
-        SELECT * FROM (
-          (
-            SELECT
-              'queue' AS type,
-              q.queue_id AS id,
-              CASE
-                WHEN q.status = 'cancelled' AND q.admin_reason IS NOT NULL THEN 'Queue Stopped'
-                WHEN q.status = 'completed' THEN 'Completed Queue Service'
-                WHEN q.status = 'cancelled' THEN 'Cancelled Queue Request'
-                WHEN q.status = 'serving'   THEN 'Currently Serving'
-                WHEN q.status = 'no_show'   THEN 'Missed Queue Turn'
-                ELSE 'Queue Joined'
-              END AS action,
-              d.department_abbreviation AS college_abbrev,
-              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-              st.student_number AS student_id,
-              COALESCE(
-                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
-                 FROM queue_status_logs qsl
-                 JOIN administrators adm2 ON qsl.changed_by = adm2.admin_id
-                 WHERE qsl.queue_id = q.queue_id
-                 ORDER BY qsl.created_at DESC LIMIT 1),
-                CONCAT(adm.first_name, ' ', adm.last_name)
-              ) AS processor,
-              COALESCE(q.admin_reason, s.service_name) AS details,
-              CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
-              q.queue_number AS queue_number,
-              s.service_name AS raw_service_name,
-              q.status AS raw_status,
-              q.updated_at AS event_time,
-              'student' AS requester_type
-            FROM queues q
-            JOIN services s ON q.service_id = s.service_id
-            JOIN departments d ON s.department_id = d.department_id
-            LEFT JOIN queue_slots qs ON q.slot_id = qs.slot_id
-            LEFT JOIN administrators adm ON qs.admin_id = adm.admin_id
-            JOIN students st ON q.student_id = st.student_id
-            WHERE s.department_id = ?
-          )
-          UNION ALL
-          (
-            SELECT
-              'appointment' AS type,
-              a.appointment_id AS id,
-              CASE a.status
-                WHEN 'approved'  THEN 'Approved Appointment'
-                WHEN 'completed' THEN 'Completed Appointment'
-                WHEN 'rejected'  THEN 'Rejected Appointment'
-                WHEN 'cancelled' THEN 'Cancelled Appointment'
-                ELSE 'Pending Appointment'
-              END AS action,
-              d.department_abbreviation AS college_abbrev,
-              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-              st.student_number AS student_id,
-              CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
-              CASE WHEN a.status = 'rejected' THEN COALESCE(a.rejection_reason, a.notes, 'No purpose specified')
-                   ELSE COALESCE(a.notes, 'No purpose specified') END AS details,
-              CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
-              NULL AS queue_number,
-              NULL AS raw_service_name,
-              a.status AS raw_status,
-              a.updated_at AS event_time,
-              'student' AS requester_type
-            FROM appointments a
-            JOIN departments d ON a.department_id = d.department_id
-            JOIN students st ON a.student_id = st.student_id
-            JOIN faculty f ON a.faculty_id = f.faculty_id
-            WHERE a.department_id = ?
-          )
-          UNION ALL
-          (
-            SELECT
-              'document' AS type,
-              dr.request_id AS id,
-              CASE dr.status
-                WHEN 'claimed'    THEN 'Claimed Document Request'
-                WHEN 'released'   THEN 'Released Document Request'
-                WHEN 'generated'  THEN 'Generated Document'
-                WHEN 'processing' THEN 'Processing Document Request'
-                WHEN 'cancelled'  THEN 'Cancelled Document Request'
-                ELSE 'Pending Document Request'
-              END AS action,
-              d.department_abbreviation AS college_abbrev,
-              CONCAT(st.first_name, ' ', st.last_name) AS student_name,
-              st.student_number AS student_id,
-              (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
-                 FROM audit_logs al
-                 JOIN administrators adm2 ON al.admin_id = adm2.admin_id
-                 WHERE al.target_table = 'document_requests' AND al.target_record_id = dr.request_id
-                 ORDER BY al.created_at DESC LIMIT 1) AS processor,
-              dr.purpose AS details,
-              dr.tracking_number AS tracking_number,
-              NULL AS queue_number,
-              NULL AS raw_service_name,
-              dr.status AS raw_status,
-              dr.updated_at AS event_time,
-              'student' AS requester_type
-            FROM document_requests dr
-            JOIN document_services s ON dr.service_id = s.service_id
-            JOIN departments d ON s.department_id = d.department_id
-            JOIN students st ON dr.student_id = st.student_id
-            WHERE s.department_id = ?
-          )
-          UNION ALL
-          (
-            SELECT
-              'document' AS type,
-              fdr.request_id AS id,
-              CASE fdr.status
-                WHEN 'claimed'    THEN 'Claimed Document Request'
-                WHEN 'released'   THEN 'Released Document Request'
-                WHEN 'generated'  THEN 'Generated Document'
-                WHEN 'processing' THEN 'Processing Document Request'
-                WHEN 'cancelled'  THEN 'Cancelled Document Request'
-                ELSE 'Pending Document Request'
-              END AS action,
-              d.department_abbreviation AS college_abbrev,
-              CONCAT(f.first_name, ' ', f.last_name) AS student_name,
-              f.employee_id AS student_id,
-              (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
-                 FROM audit_logs al
-                 JOIN administrators adm2 ON al.admin_id = adm2.admin_id
-                 WHERE al.target_table = 'faculty_document_requests' AND al.target_record_id = fdr.request_id
-                 ORDER BY al.created_at DESC LIMIT 1) AS processor,
-              fdr.purpose AS details,
-              fdr.tracking_number AS tracking_number,
-              NULL AS queue_number,
-              NULL AS raw_service_name,
-              fdr.status AS raw_status,
-              fdr.updated_at AS event_time,
-              'faculty' AS requester_type
-            FROM faculty_document_requests fdr
-            JOIN document_services s ON fdr.service_id = s.service_id
-            JOIN departments d ON s.department_id = d.department_id
-            JOIN faculty f ON fdr.faculty_id = f.faculty_id
-            WHERE s.department_id = ?
-          )
-          UNION ALL
-          (
-            SELECT
-              'submission' AS type,
-              ds.submission_id AS id,
-              CASE ds.status
-                WHEN 'claimed'    THEN 'Received Document'
-                WHEN 'processing' THEN 'Processing Sent Document'
-                WHEN 'rejected'   THEN 'Rejected Sent Document'
-                WHEN 'cancelled'  THEN 'Cancelled Sent Document'
-                ELSE 'Sent Document'
-              END AS action,
-              d.department_abbreviation AS college_abbrev,
-              COALESCE(CONCAT(st.first_name, ' ', st.last_name), CONCAT(f.first_name, ' ', f.last_name)) AS student_name,
-              COALESCE(st.student_number, f.employee_id) AS student_id,
-              (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
-                 FROM audit_logs al
-                 JOIN administrators adm2 ON al.admin_id = adm2.admin_id
-                 WHERE al.target_table = 'document_submissions' AND al.target_record_id = ds.submission_id
-                 ORDER BY al.created_at DESC LIMIT 1) AS processor,
-              ds.purpose AS details,
-              ds.tracking_number AS tracking_number,
-              NULL AS queue_number,
-              NULL AS raw_service_name,
-              ds.status AS raw_status,
-              ds.updated_at AS event_time,
-              ds.submitter_type AS requester_type
-            FROM document_submissions ds
-            JOIN departments d ON ds.department_id = d.department_id
-            LEFT JOIN students st ON ds.student_id = st.student_id
-            LEFT JOIN faculty f ON ds.faculty_id = f.faculty_id
-            WHERE ds.department_id = ?
-          )
-        ) AS combined
-        WHERE 1=1 ${dateClause}
-        ORDER BY event_time DESC
-        LIMIT 200
-      `;
-
-      const unionParams = [deptId, deptId, deptId, deptId, deptId];
-      if (dateParam) unionParams.push(dateParam);
-      const [rows] = await pool.query(unionSql, unionParams);
-
-      // "Admin Action" rows -- things admins do to the system itself (post an
-      // announcement, edit an FAQ, pause a queue slot, scan a QR code, edit
-      // service/settings config), sourced from the existing audit_logs table
-      // rather than a UNION branch (it needs different raw columns -- JSON
-      // old/new value blobs -- to feed formatAuditTransaction, not the fixed
-      // per-status CASE shape the 5 branches above share). Deliberately
-      // excludes 'users' (account edits, per product decision -- that feature
-      // may be retired) and the 3 document-ish tables (already surfaced above
-      // via their own correlated audit_logs subqueries -- including them here
-      // too would show every document status change twice).
-      const auditSql = `
-        SELECT al.log_id AS id, al.action AS audit_action, al.target_table, al.target_record_id,
-               al.old_values, al.new_values, al.created_at AS event_time,
-               CONCAT(adm.first_name, ' ', adm.last_name) AS processor,
-               d.department_abbreviation AS college_abbrev
-        FROM audit_logs al
-        JOIN administrators adm ON al.admin_id = adm.admin_id
-        JOIN departments d ON adm.department_id = d.department_id
-        WHERE adm.department_id = ?
-          AND al.target_table IN (
-            'services','document_services','service_requirements','service_procedure_steps',
-            'system_settings','generated_files','announcements','faqs','queue_slots','locations'
-          )
-          ${auditDateClause}
-        ORDER BY al.created_at DESC
-        LIMIT 200
-      `;
-      const auditParams = [deptId];
-      if (dateParam) auditParams.push(dateParam);
-      const [auditRows] = await pool.query(auditSql, auditParams);
-
       // Map raw per-table statuses -> the badge vocabulary the UI uses.
       // Document statuses stay granular (matching /professor/transactions'
       // vocabulary) instead of collapsing pending/processing/generated/
@@ -1511,6 +1295,10 @@ router.get(
       // studentRoutes.js's GET /transactions (which collapses everything
       // into 3 generic badge states) -- this one needs the granular labels
       // for admin's filter dropdown, so the two are intentionally different.
+      // claimed maps to its own "claimed" bucket (not folded into
+      // "completed") to match STATUS_LABEL_MAP's identity mapping used by
+      // the Adm-document-processing endpoints, and so the UI's dedicated
+      // "Claimed" filter option/badge actually has something to match.
       const statusMap = {
         completed: "completed",
         cancelled: "cancelled",
@@ -1523,93 +1311,366 @@ router.get(
         processing: "processing",
         generated: "generated",
         released: "released",
-        claimed: "completed",
+        claimed: "claimed",
       };
-
-      const requestRows = rows.map((r) => {
-        // Queue rows get a student-facing ticket badge (e.g. "CCS-REG-012"),
-        // mirroring the exact format students see when they join a queue
-        // (see studentRoutes.js's queueNumberBadge derivation). Other types
-        // have no equivalent ticket number.
-        const queueNumberBadge =
-          r.type === "queue" && r.queue_number != null && r.raw_service_name
-            ? `${r.college_abbrev}-${r.raw_service_name
-                .split(" ")[0]
-                .substring(0, 3)
-                .toUpperCase()}-${String(r.queue_number).padStart(3, "0")}`
-            : null;
-        return {
-          // requester_type disambiguates 'document' rows sourced from
-          // document_requests (student) vs. faculty_document_requests
-          // (faculty) -- both branches share the same type label but have
-          // independent id sequences, so type+id alone can collide (e.g.
-          // both tables having a row with id 1) and produce duplicate React
-          // keys on the frontend.
-          id: `${r.type}-${r.requester_type}-${r.id}`,
-          type: r.type,
-          action: r.action,
-          collegeAbbrev: r.college_abbrev,
-          studentName: r.student_name,
-          studentId: r.student_id,
-          requesterType: r.requester_type,
-          processor: r.processor,
-          processorRole: r.type === "appointment" ? "faculty" : (r.processor ? "admin" : null),
-          details: r.details || "No additional details provided.",
-          trackingNumber: r.tracking_number || null,
-          queueNumberBadge,
-          status: statusMap[r.raw_status] ?? r.raw_status,
-          rawEventTime: r.event_time,
-        };
-      });
-
-      const adminActionRows = auditRows.map((r) => {
-        const { action, details, status } = formatAuditTransaction(
-          r.target_table, r.audit_action, r.old_values, r.new_values,
-        );
-        return {
-          id: `admin_action-${r.id}`,
-          type: "admin_action",
-          action,
-          collegeAbbrev: r.college_abbrev,
-          studentName: null,
-          studentId: null,
-          requesterType: null,
-          processor: r.processor,
-          processorRole: "admin",
-          details: details || "No additional details provided.",
-          trackingNumber: null,
-          queueNumberBadge: null,
-          status,
-          rawEventTime: r.event_time,
-        };
-      });
-
-      // Merge, cap at 200 by recency -- this combined+capped set (not the
-      // raw per-source rows) is the basis for both the type/status filter
-      // below and the stats block, so stats stay in sync with what a filter
-      // change would reveal, matching the pre-existing "stats reflect the
-      // department total" behavior.
-      const combined = requestRows
-        .concat(adminActionRows)
-        .sort((a, b) => new Date(b.rawEventTime) - new Date(a.rawEventTime))
-        .slice(0, 200);
-
-      // Server-side filtering for type/status (search stays client-side,
-      // matching how the rest of the admin UI already filters in-memory)
-      let transactions = combined;
-      if (type !== "all") {
-        transactions = transactions.filter((t) => t.type === type);
+      // Reverse index of statusMap (e.g. { pending: ["waiting","pending"], ... })
+      // so a selected display-status can be turned back into the raw DB
+      // statuses that produce it, for the SQL IN (?) filter below. Built
+      // dynamically instead of a hand-listed skeleton so it can never miss a
+      // bucket if statusMap's set of output values ever changes again.
+      const STATUS_GROUPS = {};
+      for (const [raw, mapped] of Object.entries(statusMap)) {
+        if (!STATUS_GROUPS[mapped]) STATUS_GROUPS[mapped] = [];
+        STATUS_GROUPS[mapped].push(raw);
       }
-      if (status !== "all") {
-        transactions = transactions.filter((t) => t.status === status);
+      // Mirrors formatAuditTransaction's own internal statusMap exactly.
+      const AUDIT_STATUS_TO_ACTION = { created: "CREATE", updated: "UPDATE", deleted: "DELETE", viewed: "READ" };
+      const REQUEST_TYPES = ["queue", "appointment", "document", "submission"];
+
+      // Runs the 5-branch request UNION plus the admin_action audit query
+      // for one (type, status) filter combination, each capped to its own
+      // 200 most-recent rows. Filtering happens in SQL, before that cap, so
+      // a low-volume type/status can no longer be crowded out of a shared
+      // top-200 window by busier ones. Called once unfiltered (for stats and
+      // the default view) and, only when a filter is actually active, a
+      // second time with the real filter values.
+      async function fetchTransactionRows(filterType, filterStatus) {
+        let requestTypeClause = "";
+        let requestTypeParam = null;
+        if (filterType !== "all") {
+          if (REQUEST_TYPES.includes(filterType)) {
+            requestTypeClause = "AND type = ?";
+            requestTypeParam = filterType;
+          } else {
+            requestTypeClause = "AND 1=0";
+          }
+        }
+        let requestStatusClause = "";
+        let requestStatusParam = null;
+        if (filterStatus !== "all") {
+          const rawStatuses = STATUS_GROUPS[filterStatus] || [];
+          if (rawStatuses.length) {
+            requestStatusClause = "AND raw_status IN (?)";
+            requestStatusParam = rawStatuses;
+          } else {
+            requestStatusClause = "AND 1=0";
+          }
+        }
+
+        const unionSql = `
+          SELECT * FROM (
+            (
+              SELECT
+                'queue' AS type,
+                q.queue_id AS id,
+                CASE
+                  WHEN q.status = 'cancelled' AND q.admin_reason IS NOT NULL THEN 'Queue Stopped'
+                  WHEN q.status = 'completed' THEN 'Completed Queue Service'
+                  WHEN q.status = 'cancelled' THEN 'Cancelled Queue Request'
+                  WHEN q.status = 'serving'   THEN 'Currently Serving'
+                  WHEN q.status = 'no_show'   THEN 'Missed Queue Turn'
+                  ELSE 'Queue Joined'
+                END AS action,
+                d.department_abbreviation AS college_abbrev,
+                CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+                st.student_number AS student_id,
+                COALESCE(
+                  (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                   FROM queue_status_logs qsl
+                   JOIN administrators adm2 ON qsl.changed_by = adm2.admin_id
+                   WHERE qsl.queue_id = q.queue_id
+                   ORDER BY qsl.created_at DESC LIMIT 1),
+                  CONCAT(adm.first_name, ' ', adm.last_name)
+                ) AS processor,
+                COALESCE(q.admin_reason, s.service_name) AS details,
+                CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
+                q.queue_number AS queue_number,
+                s.service_name AS raw_service_name,
+                q.status AS raw_status,
+                q.updated_at AS event_time,
+                'student' AS requester_type
+              FROM queues q
+              JOIN services s ON q.service_id = s.service_id
+              JOIN departments d ON s.department_id = d.department_id
+              LEFT JOIN queue_slots qs ON q.slot_id = qs.slot_id
+              LEFT JOIN administrators adm ON qs.admin_id = adm.admin_id
+              JOIN students st ON q.student_id = st.student_id
+              WHERE s.department_id = ?
+            )
+            UNION ALL
+            (
+              SELECT
+                'appointment' AS type,
+                a.appointment_id AS id,
+                CASE a.status
+                  WHEN 'approved'  THEN 'Approved Appointment'
+                  WHEN 'completed' THEN 'Completed Appointment'
+                  WHEN 'rejected'  THEN 'Rejected Appointment'
+                  WHEN 'cancelled' THEN 'Cancelled Appointment'
+                  ELSE 'Pending Appointment'
+                END AS action,
+                d.department_abbreviation AS college_abbrev,
+                CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+                st.student_number AS student_id,
+                CONCAT(f.position, ' ', f.first_name, ' ', f.last_name) AS processor,
+                CASE WHEN a.status = 'rejected' THEN COALESCE(a.rejection_reason, a.notes, 'No purpose specified')
+                     ELSE COALESCE(a.notes, 'No purpose specified') END AS details,
+                CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
+                NULL AS queue_number,
+                NULL AS raw_service_name,
+                a.status AS raw_status,
+                a.updated_at AS event_time,
+                'student' AS requester_type
+              FROM appointments a
+              JOIN departments d ON a.department_id = d.department_id
+              JOIN students st ON a.student_id = st.student_id
+              JOIN faculty f ON a.faculty_id = f.faculty_id
+              WHERE a.department_id = ?
+            )
+            UNION ALL
+            (
+              SELECT
+                'document' AS type,
+                dr.request_id AS id,
+                CASE dr.status
+                  WHEN 'claimed'    THEN 'Claimed Document Request'
+                  WHEN 'released'   THEN 'Released Document Request'
+                  WHEN 'generated'  THEN 'Generated Document'
+                  WHEN 'processing' THEN 'Processing Document Request'
+                  WHEN 'cancelled'  THEN 'Cancelled Document Request'
+                  ELSE 'Pending Document Request'
+                END AS action,
+                d.department_abbreviation AS college_abbrev,
+                CONCAT(st.first_name, ' ', st.last_name) AS student_name,
+                st.student_number AS student_id,
+                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                   FROM audit_logs al
+                   JOIN administrators adm2 ON al.admin_id = adm2.admin_id
+                   WHERE al.target_table = 'document_requests' AND al.target_record_id = dr.request_id
+                   ORDER BY al.created_at DESC LIMIT 1) AS processor,
+                dr.purpose AS details,
+                dr.tracking_number AS tracking_number,
+                NULL AS queue_number,
+                NULL AS raw_service_name,
+                dr.status AS raw_status,
+                dr.updated_at AS event_time,
+                'student' AS requester_type
+              FROM document_requests dr
+              JOIN document_services s ON dr.service_id = s.service_id
+              JOIN departments d ON s.department_id = d.department_id
+              JOIN students st ON dr.student_id = st.student_id
+              WHERE s.department_id = ?
+            )
+            UNION ALL
+            (
+              SELECT
+                'document' AS type,
+                fdr.request_id AS id,
+                CASE fdr.status
+                  WHEN 'claimed'    THEN 'Claimed Document Request'
+                  WHEN 'released'   THEN 'Released Document Request'
+                  WHEN 'generated'  THEN 'Generated Document'
+                  WHEN 'processing' THEN 'Processing Document Request'
+                  WHEN 'cancelled'  THEN 'Cancelled Document Request'
+                  ELSE 'Pending Document Request'
+                END AS action,
+                d.department_abbreviation AS college_abbrev,
+                CONCAT(f.first_name, ' ', f.last_name) AS student_name,
+                f.employee_id AS student_id,
+                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                   FROM audit_logs al
+                   JOIN administrators adm2 ON al.admin_id = adm2.admin_id
+                   WHERE al.target_table = 'faculty_document_requests' AND al.target_record_id = fdr.request_id
+                   ORDER BY al.created_at DESC LIMIT 1) AS processor,
+                fdr.purpose AS details,
+                fdr.tracking_number AS tracking_number,
+                NULL AS queue_number,
+                NULL AS raw_service_name,
+                fdr.status AS raw_status,
+                fdr.updated_at AS event_time,
+                'faculty' AS requester_type
+              FROM faculty_document_requests fdr
+              JOIN document_services s ON fdr.service_id = s.service_id
+              JOIN departments d ON s.department_id = d.department_id
+              JOIN faculty f ON fdr.faculty_id = f.faculty_id
+              WHERE s.department_id = ?
+            )
+            UNION ALL
+            (
+              SELECT
+                'submission' AS type,
+                ds.submission_id AS id,
+                CASE ds.status
+                  WHEN 'claimed'    THEN 'Received Document'
+                  WHEN 'processing' THEN 'Processing Sent Document'
+                  WHEN 'rejected'   THEN 'Rejected Sent Document'
+                  WHEN 'cancelled'  THEN 'Cancelled Sent Document'
+                  ELSE 'Sent Document'
+                END AS action,
+                d.department_abbreviation AS college_abbrev,
+                COALESCE(CONCAT(st.first_name, ' ', st.last_name), CONCAT(f.first_name, ' ', f.last_name)) AS student_name,
+                COALESCE(st.student_number, f.employee_id) AS student_id,
+                (SELECT CONCAT(adm2.first_name, ' ', adm2.last_name)
+                   FROM audit_logs al
+                   JOIN administrators adm2 ON al.admin_id = adm2.admin_id
+                   WHERE al.target_table = 'document_submissions' AND al.target_record_id = ds.submission_id
+                   ORDER BY al.created_at DESC LIMIT 1) AS processor,
+                ds.purpose AS details,
+                ds.tracking_number AS tracking_number,
+                NULL AS queue_number,
+                NULL AS raw_service_name,
+                ds.status AS raw_status,
+                ds.updated_at AS event_time,
+                ds.submitter_type AS requester_type
+              FROM document_submissions ds
+              JOIN departments d ON ds.department_id = d.department_id
+              LEFT JOIN students st ON ds.student_id = st.student_id
+              LEFT JOIN faculty f ON ds.faculty_id = f.faculty_id
+              WHERE ds.department_id = ?
+            )
+          ) AS combined
+          WHERE 1=1 ${dateClause} ${requestTypeClause} ${requestStatusClause}
+          ORDER BY event_time DESC, type, requester_type, id DESC
+          LIMIT 200
+        `;
+
+        const unionParams = [deptId, deptId, deptId, deptId, deptId];
+        if (dateParam) unionParams.push(dateParam);
+        if (requestTypeParam) unionParams.push(requestTypeParam);
+        if (requestStatusParam) unionParams.push(requestStatusParam);
+        const [rows] = await pool.query(unionSql, unionParams);
+
+        // "Admin Action" rows -- things admins do to the system itself (post an
+        // announcement, edit an FAQ, pause a queue slot, scan a QR code, edit
+        // service/settings config), sourced from the existing audit_logs table
+        // rather than a UNION branch (it needs different raw columns -- JSON
+        // old/new value blobs -- to feed formatAuditTransaction, not the fixed
+        // per-status CASE shape the 5 branches above share). Deliberately
+        // excludes 'users' (account edits, per product decision -- that feature
+        // may be retired) and the 3 document-ish tables (already surfaced above
+        // via their own correlated audit_logs subqueries -- including them here
+        // too would show every document status change twice).
+        const auditTypeClause = (filterType === "all" || filterType === "admin_action") ? "" : "AND 1=0";
+        let auditStatusClause = "";
+        let auditStatusParam = null;
+        if (filterStatus !== "all") {
+          if (AUDIT_STATUS_TO_ACTION[filterStatus]) {
+            auditStatusClause = "AND al.action = ?";
+            auditStatusParam = AUDIT_STATUS_TO_ACTION[filterStatus];
+          } else {
+            auditStatusClause = "AND 1=0";
+          }
+        }
+
+        const auditSql = `
+          SELECT al.log_id AS id, al.action AS audit_action, al.target_table, al.target_record_id,
+                 al.old_values, al.new_values, al.created_at AS event_time,
+                 CONCAT(adm.first_name, ' ', adm.last_name) AS processor,
+                 d.department_abbreviation AS college_abbrev
+          FROM audit_logs al
+          JOIN administrators adm ON al.admin_id = adm.admin_id
+          JOIN departments d ON adm.department_id = d.department_id
+          WHERE adm.department_id = ?
+            AND al.target_table IN (
+              'services','document_services','service_requirements','service_procedure_steps',
+              'system_settings','generated_files','announcements','faqs','queue_slots','locations'
+            )
+            ${auditDateClause} ${auditTypeClause} ${auditStatusClause}
+          ORDER BY al.created_at DESC, al.log_id DESC
+          LIMIT 200
+        `;
+        const auditParams = [deptId];
+        if (dateParam) auditParams.push(dateParam);
+        if (auditStatusParam) auditParams.push(auditStatusParam);
+        const [auditRows] = await pool.query(auditSql, auditParams);
+
+        const requestRows = rows.map((r) => {
+          // Queue rows get a student-facing ticket badge (e.g. "CCS-REG-012"),
+          // mirroring the exact format students see when they join a queue
+          // (see studentRoutes.js's queueNumberBadge derivation). Other types
+          // have no equivalent ticket number.
+          const queueNumberBadge =
+            r.type === "queue" && r.queue_number != null && r.raw_service_name
+              ? `${r.college_abbrev}-${r.raw_service_name
+                  .split(" ")[0]
+                  .substring(0, 3)
+                  .toUpperCase()}-${String(r.queue_number).padStart(3, "0")}`
+              : null;
+          return {
+            // requester_type disambiguates 'document' rows sourced from
+            // document_requests (student) vs. faculty_document_requests
+            // (faculty) -- both branches share the same type label but have
+            // independent id sequences, so type+id alone can collide (e.g.
+            // both tables having a row with id 1) and produce duplicate React
+            // keys on the frontend.
+            id: `${r.type}-${r.requester_type}-${r.id}`,
+            type: r.type,
+            action: r.action,
+            collegeAbbrev: r.college_abbrev,
+            studentName: r.student_name,
+            studentId: r.student_id,
+            requesterType: r.requester_type,
+            processor: r.processor,
+            processorRole: r.type === "appointment" ? "faculty" : (r.processor ? "admin" : null),
+            details: r.details || "No additional details provided.",
+            trackingNumber: r.tracking_number || null,
+            queueNumberBadge,
+            status: statusMap[r.raw_status] ?? r.raw_status,
+            rawEventTime: r.event_time,
+          };
+        });
+
+        const adminActionRows = auditRows.map((r) => {
+          const { action, details, status } = formatAuditTransaction(
+            r.target_table, r.audit_action, r.old_values, r.new_values,
+          );
+          return {
+            id: `admin_action-${r.id}`,
+            type: "admin_action",
+            action,
+            collegeAbbrev: r.college_abbrev,
+            studentName: null,
+            studentId: null,
+            requesterType: null,
+            processor: r.processor,
+            processorRole: "admin",
+            details: details || "No additional details provided.",
+            trackingNumber: null,
+            queueNumberBadge: null,
+            status,
+            rawEventTime: r.event_time,
+          };
+        });
+
+        // Merge, cap at 200 by recency -- filtering (above) already happened
+        // in SQL, so this cap no longer risks crowding out a low-volume
+        // type/status the way the old post-merge cap did.
+        return requestRows
+          .concat(adminActionRows)
+          .sort((a, b) =>
+            new Date(b.rawEventTime) - new Date(a.rawEventTime) ||
+            String(b.id).localeCompare(String(a.id)),
+          )
+          .slice(0, 200);
       }
+
+      // Unfiltered call feeds `stats` (always the department total) and
+      // doubles as the result set itself when no filter is active. Both
+      // calls are kicked off before either is awaited, so an active filter
+      // costs one concurrent pair of extra queries rather than a second
+      // round-trip tacked on after the first.
+      const combinedPromise = fetchTransactionRows("all", "all");
+      const filteredPromise = (type !== "all" || status !== "all")
+        ? fetchTransactionRows(type, status)
+        : combinedPromise;
+      const [combined, filteredRows] = await Promise.all([combinedPromise, filteredPromise]);
 
       // Format the display timestamp last, only on what's actually returned.
       // `date` is the raw instant (for client-side formatManilaDate/Time,
       // matching professorRoutes.js's pattern); `timestamp` is kept as a
       // pre-formatted fallback for the CSV export and any other consumer
       // still relying on the old single-string shape.
-      transactions = transactions.map((t) => ({
+      const transactions = filteredRows.map((t) => ({
         ...t,
         date: t.rawEventTime,
         rawEventTime: undefined,

@@ -12,7 +12,7 @@ import {
   broadcastNotificationsChanged,
 } from "../../components/NotificationBell";
 import api from "../../utils/api";
-import { formatManilaDateTime } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime } from "../../utils/dateTime";
 import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
 import { getPushToggleState, subscribeToPush, unsubscribeFromPush } from "../../utils/webPush";
@@ -293,9 +293,13 @@ export default function StudentNotifications() {
                     <span className="notif-item-message">{n.message}</span>
                   </span>
                   <span className="notif-item-meta">
+                    <span className="notif-item-date">
+                      <Calendar className="notif-item-time-icon" />
+                      {formatManilaDate(n.created_at)}
+                    </span>
                     <span className="notif-item-time">
                       <Clock className="notif-item-time-icon" />
-                      {formatManilaDateTime(n.created_at)}
+                      {formatManilaTime(n.created_at)}
                     </span>
                   </span>
                 </button>

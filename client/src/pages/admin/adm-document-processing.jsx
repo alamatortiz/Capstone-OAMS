@@ -182,6 +182,7 @@ export default function AdminDocumentProcessing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [documentTypeFilter, setDocumentTypeFilter] = useState("all");
   // Default to "all" since Today/This Week/This Month all hide anything
   // older — admins can narrow down once they actually want a recent slice.
   const [dateRange, setDateRange] = useState("all");
@@ -295,7 +296,10 @@ export default function AdminDocumentProcessing() {
           _kind: "submission",
           _endpoint: "document-submissions",
         }));
-      setDocuments([...requests, ...submissions]);
+      const merged = [...requests, ...submissions].sort(
+        (a, b) => new Date(b.requestDate) - new Date(a.requestDate),
+      );
+      setDocuments(merged);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error("Failed to load document requests:", err);
@@ -354,6 +358,22 @@ export default function AdminDocumentProcessing() {
   };
 
   // ── Derived values ────────────────────────────────────────────────────────
+  // Distinct request document types present in the currently loaded (per-
+  // source) document set. Derived client-side from what's already loaded --
+  // no extra fetch to the document-types catalog -- so the dropdown never
+  // offers a type with zero matching requests. Submissions are excluded:
+  // their documentType is free text (the submission's title) with no
+  // controlled vocabulary, so they can never usefully populate this list.
+  const documentTypeOptions = useMemo(() => {
+    const types = [...new Set(
+      documents
+        .filter((d) => d._kind === "request")
+        .map((d) => d.documentType)
+        .filter(Boolean),
+    )].sort();
+    return [{ value: "all", label: "All" }, ...types.map((t) => ({ value: t, label: t }))];
+  }, [documents]);
+
   // Search applied first so tab counts reflect the current search context.
   const searchFiltered = documents.filter((doc) => {
     const q = searchQuery.toLowerCase();
@@ -379,10 +399,22 @@ export default function AdminDocumentProcessing() {
       ? dateFiltered
       : dateFiltered.filter((doc) => doc._kind === typeFilter);
 
+  // Explicitly gated on _kind === "request" (not left as an incidental side
+  // effect of submissions' free-text title rarely matching a real catalog
+  // type name) so there's no edge-case risk of a submission accidentally
+  // matching, and the intent reads clearly -- mirrors the typeFilter check
+  // above (doc._kind === typeFilter).
+  const docTypeFiltered =
+    documentTypeFilter === "all"
+      ? baseFiltered
+      : baseFiltered.filter(
+          (doc) => doc._kind === "request" && doc.documentType === documentTypeFilter,
+        );
+
   const filteredDocuments =
     activeTab === "all"
-      ? baseFiltered
-      : baseFiltered.filter((doc) => doc.status === activeTab);
+      ? docTypeFiltered
+      : docTypeFiltered.filter((doc) => doc.status === activeTab);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleViewDetails = (doc) => {
@@ -1082,6 +1114,7 @@ export default function AdminDocumentProcessing() {
                 setSource(s.id);
                 setActiveTab("all");
                 setSearchQuery("");
+                setDocumentTypeFilter("all");
               }}
             >
               {s.label}
@@ -1100,7 +1133,7 @@ export default function AdminDocumentProcessing() {
             </div>
           </div>
           <div className="filters-grid">
-            <div className="filter-group">
+            <div className="filter-group filter-group--search">
               <label className="filter-label" htmlFor="adp-search">
                 Search
               </label>
@@ -1127,6 +1160,15 @@ export default function AdminDocumentProcessing() {
             />
 
             <FilterSelect
+              id="adp-document-type-filter"
+              label="Document Type"
+              value={documentTypeFilter}
+              onChange={(e) => setDocumentTypeFilter(e.target.value)}
+              options={documentTypeOptions}
+              chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+            />
+
+            <FilterSelect
               id="adp-date-range-filter"
               label="Date Range"
               value={dateRange}
@@ -1142,8 +1184,8 @@ export default function AdminDocumentProcessing() {
           {TABS.map((tab) => {
             const count =
               tab === "all"
-                ? baseFiltered.length
-                : baseFiltered.filter((d) => d.status === tab).length;
+                ? docTypeFiltered.length
+                : docTypeFiltered.filter((d) => d.status === tab).length;
             return (
               <button
                 key={tab}

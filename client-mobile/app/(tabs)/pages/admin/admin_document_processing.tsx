@@ -272,7 +272,10 @@ export default function AdminDocumentProcessingScreen() {
         ...d,
         source: 'submission' as RequestSource,
       }));
-      setDocuments([...studentDocs, ...facultyDocs, ...submissionDocs]);
+      const merged = [...studentDocs, ...facultyDocs, ...submissionDocs].sort(
+        (a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime(),
+      );
+      setDocuments(merged);
     } catch (err) {
       console.error('Failed to load document requests:', err);
       setError('Failed to load document requests.');

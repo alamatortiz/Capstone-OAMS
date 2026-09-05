@@ -391,8 +391,9 @@ body {
 
 .stud-notifications-container .filters-grid {
   display: grid;
-  grid-template-columns: minmax(200px, 260px);
+  grid-template-columns: 1fr;
   gap: 1rem;
+  flex: 1;
 }
 
 .stud-notifications-container .filter-group {
@@ -523,14 +524,14 @@ body {
 .stud-notifications-container .notif-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 1.25rem;
+  gap: 1.4rem;
   align-items: start;
   width: 100%;
   text-align: left;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1.09375rem;
-  padding: 1.25rem 1.5625rem;
+  padding: 1.5rem 1.85rem;
   cursor: pointer;
   font-family: inherit;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -662,10 +663,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.625rem;
+  gap: 0.5rem;
   text-align: left;
 }
 
+.stud-notifications-container .notif-item-date,
 .stud-notifications-container .notif-item-time {
   display: flex;
   align-items: center;

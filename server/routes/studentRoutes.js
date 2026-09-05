@@ -1310,7 +1310,7 @@ router.get(
          WHERE qs.slot_date = ?
            AND qs.status IN ('open', 'paused', 'full')
            AND (s.department_id = ? OR s.is_cross_college = TRUE)
-         ORDER BY department_abbreviation, s.service_name`,
+         ORDER BY qs.created_at DESC`,
         [manilaToday, studentDeptId],
       );
 
@@ -1431,7 +1431,7 @@ router.get(
          LEFT JOIN locations l ON s.location_id = l.location_id
          WHERE q.student_id = ?
            AND q.status IN ('waiting', 'serving')
-         ORDER BY q.created_at ASC`,
+         ORDER BY q.created_at DESC`,
         [studentId],
       );
 
@@ -2345,7 +2345,10 @@ router.get(
         if (dept) dept.faculty.push(fac);
       }
 
-      const result = [...deptMap.values()].filter((d) => d.faculty.length > 0);
+      // Every department is included, even with zero faculty -- lets a
+      // college filter elsewhere (e.g. stud-appointments.jsx) list every
+      // college in the DB instead of silently hiding ones with no faculty.
+      const result = [...deptMap.values()];
 
       res.json({ departments: result });
     } catch (error) {
@@ -2496,7 +2499,7 @@ router.get(
       const [rows] = await pool.query(
         `SELECT * FROM (${unionSql}) AS combined
          ${whereClause}
-         ORDER BY event_time DESC
+         ORDER BY event_time DESC, type, id DESC
          LIMIT ? OFFSET ?`,
         [
           studentId,
