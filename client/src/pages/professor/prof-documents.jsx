@@ -223,8 +223,12 @@ export default function ProfessorDocumentRequest() {
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSubmitRequest = async () => {
     if (submitting) return;
-    if (!formData.type || !formData.purpose) {
-      toast.error("Please fill in all required fields.");
+    if (!formData.type) {
+      toast.error("Please select a document type.");
+      return;
+    }
+    if (!formData.purpose) {
+      toast.error("Please enter a purpose.");
       return;
     }
     const selectedService = documentTypes.find((d) => d.name === formData.type);
@@ -252,8 +256,16 @@ export default function ProfessorDocumentRequest() {
 
   const handleSubmitSendDocument = async () => {
     if (sendSubmitting) return;
-    if (!sendFormData.title.trim() || !sendFormData.purpose.trim()) {
-      toast.error("Please fill in all required fields.");
+    if (!sendFormData.title.trim() && !sendFormData.purpose.trim()) {
+      toast.error("Please fill in the title and purpose.");
+      return;
+    }
+    if (!sendFormData.title.trim()) {
+      toast.error("Please fill in the title.");
+      return;
+    }
+    if (!sendFormData.purpose.trim()) {
+      toast.error("Please fill in the purpose.");
       return;
     }
 

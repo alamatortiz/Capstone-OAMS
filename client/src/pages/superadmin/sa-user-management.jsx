@@ -162,7 +162,9 @@ export default function SuperadminUserManagement() {
   const closeModal = () => { setShowModal(false); setEditingUser(null); setForm(BLANK_FORM); };
 
   const handleSave = async () => {
-    if (!form.name || !form.email || !form.college) return toast.error("Please fill in all required fields");
+    if (!form.name)   return toast.error("Please enter a name");
+    if (!form.email)  return toast.error("Please enter an email");
+    if (!form.college) return toast.error("Please select a college");
     if (!form.email.endsWith("@pnc.edu.ph"))        return toast.error("Email must use @pnc.edu.ph domain");
     if (form.role === "student" && !form.studentId)  return toast.error("Student ID is required for students");
     if (form.role !== "student" && !form.employeeId) return toast.error("Employee ID is required for professors and admins");

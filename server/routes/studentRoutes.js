@@ -2157,7 +2157,7 @@ router.get(
 );
 
 // DELETE /api/student/appointments/:appointmentId
-// Cancels a pending appointment. Only the owning student may cancel.
+// Cancels a pending or approved appointment. Only the owning student may cancel.
 router.delete(
   "/appointments/:appointmentId",
   authenticateToken,
@@ -2176,9 +2176,11 @@ router.delete(
 
       const [[appt]] = await conn.query(
         `SELECT a.appointment_id, a.student_id, a.status, a.faculty_id, a.department_id,
-                a.appointment_date, a.appointment_time, s.first_name, s.last_name
+                a.appointment_date, a.appointment_time, s.first_name, s.last_name,
+                sv.service_name
          FROM appointments a
          JOIN students s ON a.student_id = s.student_id
+         LEFT JOIN appointment_services sv ON a.service_id = sv.service_id
          WHERE a.appointment_id = ? FOR UPDATE`,
         [appointmentId],
       );
@@ -2223,9 +2225,12 @@ router.delete(
         appointmentId,
         status: "cancelled",
       });
+      const cancelServicePart = appt.service_name
+        ? ` ${appt.service_name}`
+        : "";
       createNotification(
-        slot.faculty_id,
-        `${bookedByStudent.first_name} ${bookedByStudent.last_name} booked${bookedServicePart} appointment with you on ${appointmentDate} at ${formatTime12h(appointmentTime)}.`,
+        appt.faculty_id,
+        `${appt.first_name} ${appt.last_name} cancelled their${cancelServicePart} appointment on ${getManilaDateString(appt.appointment_date)} at ${formatTime12h(appt.appointment_time)}.`,
         "appointment",
       );
 

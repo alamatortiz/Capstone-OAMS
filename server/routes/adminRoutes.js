@@ -748,6 +748,87 @@ router.patch(
   },
 );
 
+// PATCH /api/admin/queue-hosting/:slotId/reopen
+// Genuine same-slot reopen for a queue whose hours ran out (queueExpirySweeper.js
+// flips it to 'expired') -- unlike "Host Again" (which just clones the slot's
+// config into a brand-new slot_id, abandoning any students still attached),
+// this resumes the EXACT same slot_id so its existing waiting/serving `queues`
+// rows stay intact, and the slot becomes joinable by new students again.
+// Only valid from 'expired' -- a completed/closed slot has already settled
+// (its remaining students were force-cancelled or served out) and isn't a
+// candidate for this same-slot resume.
+router.patch(
+  "/queue-hosting/:slotId/reopen",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const slotId = parseInt(req.params.slotId, 10);
+    const adminId = req.user.userId;
+    const { endTime, maxCapacity, noShowTimeoutMinutes, serviceTimeMinutes } = req.body ?? {};
+
+    if (!endTime) {
+      return res.status(400).json({ error: "A new end time is required to reopen this queue" });
+    }
+    const normalizedEndTime = endTime.length === 5 ? `${endTime}:00` : endTime;
+    const nowTime = getManilaTimeString();
+    if (normalizedEndTime <= nowTime) {
+      return res.status(400).json({ error: "The new end time must be later than the current time" });
+    }
+    if (maxCapacity !== undefined && (isNaN(maxCapacity) || Number(maxCapacity) < 1)) {
+      return res.status(400).json({ error: "Max capacity must be a positive number" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const deptId = await getAdminDepartmentId(adminId);
+      const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
+      if (!slot) return;
+      if (slot.status !== "expired") {
+        await conn.rollback();
+        return res
+          .status(409)
+          .json({ error: "Only an expired queue can be reopened this way" });
+      }
+
+      const setClauses = ["status = 'open'", "end_time = ?", "close_reason = NULL"];
+      const values = [normalizedEndTime];
+      if (maxCapacity !== undefined) {
+        setClauses.push("max_capacity = ?");
+        values.push(Number(maxCapacity));
+      }
+      if (noShowTimeoutMinutes !== undefined) {
+        setClauses.push("no_show_timeout_minutes = ?");
+        values.push(Number(noShowTimeoutMinutes));
+      }
+      if (serviceTimeMinutes !== undefined) {
+        setClauses.push("service_time_minutes = ?");
+        values.push(Number(serviceTimeMinutes));
+      }
+      values.push(slotId);
+
+      await conn.query(
+        `UPDATE queue_slots SET ${setClauses.join(", ")} WHERE slot_id = ? AND status = 'expired'`,
+        values,
+      );
+
+      await conn.commit();
+
+      await logAudit(adminId, "UPDATE", "queue_slots", slotId, { status: "expired" }, { status: "open", endTime: normalizedEndTime });
+
+      emitToSlot(slotId, "queue:slot-status", { slotId, status: "open" });
+      emitToDept(deptId, "queue:slot-status", { slotId, status: "open" });
+      res.json({ message: "Queue reopened", slotId, status: "open", endTime: normalizedEndTime });
+    } catch (error) {
+      await conn.rollback();
+      sendServerError(res, error, "Reopen queue error:");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
 // PATCH /api/admin/queue-hosting/:slotId/close
 router.patch(
   "/queue-hosting/:slotId/close",

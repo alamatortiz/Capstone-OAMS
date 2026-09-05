@@ -246,6 +246,58 @@ export default function AdminQueueHosting() {
     }
   };
 
+  // ── "Reopen Queue" modal state (expired slots only) ───────────────────────
+  // Unlike "Host Again" (openModalWithConfig, above) this resumes the SAME
+  // slot -- see PATCH /queue-hosting/:slotId/reopen -- so existing waiting/
+  // serving students stay attached, instead of being abandoned in favor of a
+  // brand-new empty slot.
+  const [reopenTarget, setReopenTarget] = useState(null); // queue object or null
+  const [reopenEndTime, setReopenEndTime] = useState("");
+  const [reopenCapacity, setReopenCapacity] = useState("");
+  const [reopenSubmitting, setReopenSubmitting] = useState(false);
+  useLockBodyScroll(!!reopenTarget);
+
+  const openReopenModal = (queue) => {
+    setReopenTarget(queue);
+    setReopenEndTime(addMinutesClampedToDay(getManilaTimeString(), 120));
+    setReopenCapacity(String(queue.maxCapacity));
+  };
+  const closeReopenModal = () => {
+    setReopenTarget(null);
+    setReopenEndTime("");
+    setReopenCapacity("");
+  };
+
+  const handleReopenSubmit = async () => {
+    if (!reopenEndTime) {
+      toast.error("Please choose a new end time");
+      return;
+    }
+    if (reopenEndTime <= getManilaTimeString()) {
+      toast.error("The new end time must be later than the current time");
+      return;
+    }
+    const capacityNum = parseInt(reopenCapacity, 10);
+    if (!capacityNum || capacityNum <= 0) {
+      toast.error("Please enter a valid maximum queue capacity");
+      return;
+    }
+    setReopenSubmitting(true);
+    try {
+      await api.patch(`/admin/queue-hosting/${reopenTarget.id}/reopen`, {
+        endTime: `${reopenEndTime}:00`,
+        maxCapacity: capacityNum,
+      });
+      toast.success("Queue reopened successfully!");
+      closeReopenModal();
+      await fetchQueues();
+    } catch (error) {
+      toast.error(error?.response?.data?.error ?? "Failed to reopen queue");
+    } finally {
+      setReopenSubmitting(false);
+    }
+  };
+
   // ── Derived values ─────────────────────────────────────────────────────────
   // Unique service types currently hosted, regardless of how many queue lines
   // of that same type are open/paused/closed today — always computed from the
@@ -454,6 +506,76 @@ export default function AdminQueueHosting() {
                     disabled={submitting}
                   >
                     {submitting ? "Opening..." : "Open Queue Line"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reopen Queue Modal (expired slots -- same slot_id, not a new one) */}
+          {reopenTarget && (
+            <div className="aqh-modal-overlay">
+              <div className="aqh-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="aqh-modal-header">
+                  <h2 className="aqh-modal-title">Reopen Queue</h2>
+                  <button
+                    className="aqh-modal-close-btn"
+                    onClick={closeReopenModal}
+                    aria-label="Close"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="aqh-modal-body">
+                  <div className="aqh-modal-hero">
+                    <p className="aqh-modal-hero-label">Reopen Queue</p>
+                    <p className="aqh-modal-hero-title">{reopenTarget.queueType}</p>
+                    <p className="aqh-modal-hero-purpose">
+                      Students still waiting in this queue stay exactly where
+                      they are. Set a new end time to reopen it to new joins
+                      too.
+                    </p>
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">New End Time *</label>
+                    <div className="aqh-time-input-wrap">
+                      <input
+                        type="time"
+                        className="aqh-form-input"
+                        value={reopenEndTime}
+                        onChange={(e) => setReopenEndTime(e.target.value)}
+                      />
+                      <ClockIcon />
+                    </div>
+                  </div>
+
+                  <div className="aqh-form-group">
+                    <label className="aqh-form-label">
+                      Maximum Queue Capacity *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="aqh-form-input"
+                      placeholder="e.g., 100"
+                      value={reopenCapacity}
+                      onChange={(e) => setReopenCapacity(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="aqh-modal-footer">
+                  <button className="aqh-btn-cancel" onClick={closeReopenModal}>
+                    Cancel
+                  </button>
+                  <button
+                    className="aqh-btn-submit"
+                    onClick={handleReopenSubmit}
+                    disabled={reopenSubmitting}
+                  >
+                    {reopenSubmitting ? "Reopening..." : "Reopen Queue"}
                   </button>
                 </div>
               </div>
@@ -861,6 +983,15 @@ export default function AdminQueueHosting() {
                           </span>
                         )}
                         <div className="aqh-queue-card-actions">
+                          {queue.status === "expired" && (
+                            <button
+                              className="aqh-action-btn aqh-action-btn--repeat"
+                              onClick={(e) => { e.stopPropagation(); openReopenModal(queue); }}
+                            >
+                              <RepeatIcon />
+                              <span>Reopen Queue</span>
+                            </button>
+                          )}
                           <button
                             className="aqh-action-btn aqh-action-close"
                             onClick={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}

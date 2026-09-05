@@ -12,6 +12,8 @@ const ESCALATION_DAYS = 7;
 // who needs to act, from the moment it's sent. So this is a single
 // escalation phase: submissions stuck in pending/processing for 7+ days get
 // escalated once to the department's admins. Notifies, does not auto-reject.
+// `needed_by` is never checked here either -- informational only, never a
+// trigger for an automatic status change (see documentPickupSweeper.js).
 async function escalateStaleSubmissions() {
   try {
     const [stale] = await pool.query(

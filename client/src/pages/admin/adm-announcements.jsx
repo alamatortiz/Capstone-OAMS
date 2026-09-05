@@ -385,8 +385,16 @@ export default function AdminAnnouncements() {
   const closeEdit = () => { setEditingAnnouncement(null); setEditForm(EMPTY_FORM); setEditFiles([]); };
 
   const saveEdit = async () => {
-    if (!editForm.title.trim() || !editForm.content.trim()) {
-      showToast("Please fill in all required fields", "error");
+    if (!editForm.title.trim() && !editForm.content.trim()) {
+      showToast("Please fill in the title and content", "error");
+      return;
+    }
+    if (!editForm.title.trim()) {
+      showToast("Please fill in the title", "error");
+      return;
+    }
+    if (!editForm.content.trim()) {
+      showToast("Please fill in the content", "error");
       return;
     }
     try {
@@ -423,8 +431,16 @@ export default function AdminAnnouncements() {
   const closeCreate = () => { setIsCreating(false); setCreateForm(EMPTY_CREATE_FORM); setCreateFiles([]); };
 
   const saveCreate = async () => {
-    if (!createForm.title.trim() || !createForm.content.trim()) {
-      showToast("Please fill in all required fields", "error");
+    if (!createForm.title.trim() && !createForm.content.trim()) {
+      showToast("Please fill in the title and content", "error");
+      return;
+    }
+    if (!createForm.title.trim()) {
+      showToast("Please fill in the title", "error");
+      return;
+    }
+    if (!createForm.content.trim()) {
+      showToast("Please fill in the content", "error");
       return;
     }
     try {

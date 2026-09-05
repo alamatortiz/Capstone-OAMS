@@ -99,6 +99,11 @@ const CANCEL_CONFIG = {
 // Returns a plain result object rather than writing to `res` directly,
 // since the two routes use different outer response-JSON keys (`error` vs
 // `message`) that are each an established, intentional per-role convention.
+// This is the ONLY path that ever cancels a document request/submission
+// besides an explicit admin status PATCH -- deliberately owner-initiated
+// only, with no `needed_by`/date check of any kind. Do not add one: a
+// request must never be auto-cancelled just because its needed-by date
+// arrived or passed -- that's informational for the requester/admin only.
 async function cancelOwnDocumentRequest(conn, { role, ownerId, requestId }) {
   const cfg = CANCEL_CONFIG[role];
   await conn.beginTransaction();

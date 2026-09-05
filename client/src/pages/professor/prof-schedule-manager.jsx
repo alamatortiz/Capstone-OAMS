@@ -332,8 +332,20 @@ export default function ProfessorScheduleManager() {
   // Validation only -- on success, opens the confirmation modal instead of
   // saving directly. The actual save happens in handleConfirmSave.
   const handleValidateAndOpenConfirm = () => {
-    if (addDays.length === 0 || !addStart || !addEnd || !addLocation.trim()) {
-      toast.error("Please select at least one day, times, and location.");
+    if (addDays.length === 0) {
+      toast.error("Please select at least one day.");
+      return;
+    }
+    if (!addStart) {
+      toast.error("Please select a start time.");
+      return;
+    }
+    if (!addEnd) {
+      toast.error("Please select an end time.");
+      return;
+    }
+    if (!addLocation.trim()) {
+      toast.error("Please enter a location.");
       return;
     }
     if (addEnd <= addStart) { toast.error("End time must be after start time."); return; }

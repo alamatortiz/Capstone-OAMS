@@ -48,8 +48,16 @@ export default function AdminFaqs() {
   const closeCreate = () => setIsCreating(false);
 
   const saveCreate = async () => {
-    if (!createForm.question.trim() || !createForm.answer.trim()) {
+    if (!createForm.question.trim() && !createForm.answer.trim()) {
       toast.error("Question and answer are required");
+      return;
+    }
+    if (!createForm.question.trim()) {
+      toast.error("Question is required");
+      return;
+    }
+    if (!createForm.answer.trim()) {
+      toast.error("Answer is required");
       return;
     }
     setIsSaving(true);
@@ -72,8 +80,16 @@ export default function AdminFaqs() {
   const closeEdit = () => setEditingFaq(null);
 
   const saveEdit = async () => {
-    if (!editForm.question.trim() || !editForm.answer.trim()) {
+    if (!editForm.question.trim() && !editForm.answer.trim()) {
       toast.error("Question and answer are required");
+      return;
+    }
+    if (!editForm.question.trim()) {
+      toast.error("Question is required");
+      return;
+    }
+    if (!editForm.answer.trim()) {
+      toast.error("Answer is required");
       return;
     }
     setIsSaving(true);

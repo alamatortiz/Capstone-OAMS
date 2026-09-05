@@ -26,6 +26,7 @@ const RegisterFaculty = React.lazy(
   () => import("./pages/RegisterFaculty.jsx"),
 );
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
+import ErrorPage from "./components/ErrorPage.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/stud-dashboard.jsx";
 import QueuePage from "./pages/student/stud-queue.jsx";
@@ -426,6 +427,9 @@ createRoot(document.getElementById("root")).render(
                 }
               />
             </Route>
+
+            {/* ─── Catch-all: unmatched routes ───────────────────────────────── */}
+            <Route path="*" element={<ErrorPage code={404} />} />
           </Routes>
         </BrowserRouter>
       </FacultyProvider>

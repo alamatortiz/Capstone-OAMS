@@ -282,8 +282,16 @@ export default function AdminDataManagement() {
 
   const handleDocSubmit = async () => {
     const { name, description, processingTime } = docForm;
-    if (!name || !description || !processingTime) {
-      toast.error("Please fill in all required fields.");
+    if (!name) {
+      toast.error("Please enter a document type name.");
+      return;
+    }
+    if (!description) {
+      toast.error("Please enter a description.");
+      return;
+    }
+    if (!processingTime) {
+      toast.error("Please enter a processing time.");
       return;
     }
     setDocSaving(true);

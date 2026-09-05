@@ -213,8 +213,16 @@ export default function DocumentsPage() {
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleSubmitRequest = async () => {
     if (submitting) return;
-    if (!formData.type || !formData.college || !formData.purpose) {
-      toast.error("Please fill in all required fields.");
+    if (!formData.type) {
+      toast.error("Please select a document type.");
+      return;
+    }
+    if (!formData.college) {
+      toast.error("Please select a college.");
+      return;
+    }
+    if (!formData.purpose) {
+      toast.error("Please enter a purpose.");
       return;
     }
 
@@ -240,8 +248,16 @@ export default function DocumentsPage() {
 
   const handleSubmitSendDocument = async () => {
     if (sendSubmitting) return;
-    if (!sendFormData.title.trim() || !sendFormData.purpose.trim()) {
-      toast.error("Please fill in all required fields.");
+    if (!sendFormData.title.trim() && !sendFormData.purpose.trim()) {
+      toast.error("Please fill in the title and purpose.");
+      return;
+    }
+    if (!sendFormData.title.trim()) {
+      toast.error("Please fill in the title.");
+      return;
+    }
+    if (!sendFormData.purpose.trim()) {
+      toast.error("Please fill in the purpose.");
       return;
     }
 

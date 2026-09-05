@@ -56,18 +56,13 @@ export default function RegisterFaculty() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !employeeId ||
-      !collegeAbbrev ||
-      !password ||
-      !confirmPassword
-    ) {
-      toast.error("Please fill in all fields.");
-      return;
-    }
+    if (!firstName) { toast.error("Please enter your first name."); return; }
+    if (!lastName) { toast.error("Please enter your last name."); return; }
+    if (!email) { toast.error("Please enter your email."); return; }
+    if (!employeeId) { toast.error("Please enter your employee ID."); return; }
+    if (!collegeAbbrev) { toast.error("Please select your college."); return; }
+    if (!password) { toast.error("Please enter a password."); return; }
+    if (!confirmPassword) { toast.error("Please confirm your password."); return; }
     if (password.length < 8) {
       toast.error("Password must be at least 8 characters.");
       return;

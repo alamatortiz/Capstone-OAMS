@@ -58,7 +58,10 @@ async function sweepDocumentPickups() {
 // (escalated_at gates this so it doesn't refire on every subsequent daily
 // sweep the way the student/faculty reminder deliberately does). This
 // notifies, it does not auto-cancel -- cancelling someone's official
-// document with no human review felt like the wrong default.
+// document with no human review felt like the wrong default. In
+// particular, `needed_by` is never checked here or anywhere else in this
+// file -- it's informational only (drives the client's "Overdue" badge),
+// never a trigger for an automatic status change.
 async function escalateAbandonedPickups() {
   const [studentAbandoned] = await pool.query(
     `SELECT dr.request_id, dr.tracking_number, s.department_id

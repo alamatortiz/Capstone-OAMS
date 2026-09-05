@@ -6,7 +6,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "OAMS", {
       body: data.body || "",
-      icon: "/favicon.svg",
+      icon: "/favicon.png",
       data: data.data || {},
     }),
   );
