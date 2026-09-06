@@ -1180,15 +1180,15 @@ function OpenQueueModal({
               >
                 <View
                   style={{
-                    width: 18, height: 18, borderRadius: 4, borderWidth: 1.5,
-                    borderColor: hostAllServices ? (theme.primary ?? '#22c55e') : theme.tertiary,
-                    backgroundColor: hostAllServices ? (theme.primary ?? '#22c55e') : 'transparent',
+                    width: 22, height: 22, borderRadius: 5, borderWidth: 1.5,
+                    borderColor: hostAllServices ? '#3b82f6' : theme.tertiary,
+                    backgroundColor: hostAllServices ? '#3b82f6' : 'transparent',
                     alignItems: 'center', justifyContent: 'center',
                   }}
                 >
-                  {hostAllServices && <Check size={12} color="#fff" />}
+                  {hostAllServices && <Check size={14} color="#fff" />}
                 </View>
-                <Text style={[styles.formHint, { marginTop: 0, flex: 1 }]}>
+                <Text style={[styles.formHint, { marginTop: 0, flex: 1, fontSize: 10 }]}>
                   Host all services — one queue covering every service in your department
                 </Text>
               </Pressable>

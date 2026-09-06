@@ -666,7 +666,7 @@ function DocumentListItem({
     <Pressable style={[styles.listCard, completed && styles.listCardCompleted]} onPress={onPress}>
       <View style={styles.listCardHeader}>
         <View style={[styles.listIconWrap, completed && styles.listIconWrapCompleted]}>
-          <FileText size={20} color={completed ? theme.tertiary : theme.orange} />
+          <FileText size={17} color={completed ? theme.tertiary : theme.orange} />
         </View>
         <View style={styles.listTitleSection}>
           <Text style={styles.listTitle}>{doc.type}</Text>
@@ -1142,35 +1142,35 @@ function createStyles(theme: ThemePalette) {
     emptyRequestBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
 
     // List items
-    docsList: { gap: 14 },
+    docsList: { gap: 10 },
     listCard: {
       backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(249, 115, 22, 0.25)',
-      borderRadius: 18, padding: 16, gap: 12,
+      borderRadius: 18, padding: 11, gap: 10,
     },
     listCardCompleted: { opacity: 0.75, borderColor: 'rgba(107, 114, 128, 0.25)' },
-    listCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    listCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
     listIconWrap: {
-      width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+      width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
       backgroundColor: 'rgba(249, 115, 22, 0.1)', flexShrink: 0,
     },
     listIconWrapCompleted: { backgroundColor: 'rgba(107, 114, 128, 0.1)' },
     listTitleSection: { flex: 1, gap: 2 },
-    listTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
-    listCollege: { fontSize: 12, color: theme.tertiary },
-    listTracking: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
+    listTitle: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    listCollege: { fontSize: 11, color: theme.tertiary },
+    listTracking: { fontSize: 10, color: theme.tertiary, marginTop: 2 },
     listTrackingValue: { fontFamily: 'monospace', fontWeight: '700', color: theme.orange, letterSpacing: 0.3 },
 
     statusBadgePill: {
-      borderWidth: 1, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, flexShrink: 0,
+      borderWidth: 1, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0,
     },
-    statusBadgeTextPill: { fontSize: 11, fontWeight: '700' },
+    statusBadgeTextPill: { fontSize: 9.5, fontWeight: '700' },
 
-    listFieldsGrid: { gap: 10 },
+    listFieldsGrid: { gap: 8 },
     listField: { gap: 2 },
     listFieldFull: { gap: 2 },
     listFieldLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
-    listFieldValue: { fontSize: 13, fontWeight: '600', color: theme.orange },
-    listFieldValueMuted: { fontSize: 13, fontWeight: '500', color: theme.subtext, lineHeight: 18 },
+    listFieldValue: { fontSize: 12, fontWeight: '600', color: theme.orange },
+    listFieldValueMuted: { fontSize: 12, fontWeight: '500', color: theme.subtext, lineHeight: 16 },
 
     // Hero (detail view)
     heroCard: { borderRadius: 20, padding: 18, gap: 14 },

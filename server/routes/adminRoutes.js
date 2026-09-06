@@ -3055,8 +3055,25 @@ router.put(
         return res.status(404).json({ error: "Document type not found" });
       }
 
-      // What is this save actually changing? `requirements` only counts if the
-      // client sent the key (the modal holds [] transiently while it loads).
+      // What is this save actually changing? For `requirements` (present only
+      // when the client sent the key), compare *content* -- the edit modal
+      // always re-sends the loaded list, so "a list was sent" must not by itself
+      // count as an edit or it would block no-op saves and lone status flips.
+      let requirementsChanged = false;
+      if (Array.isArray(requirements)) {
+        const [existingReqs] = await conn.query(
+          `SELECT requirement_name, description, is_mandatory
+             FROM document_requirements WHERE service_id = ? ORDER BY requirement_id ASC`,
+          [serviceId],
+        );
+        const nextNorm = JSON.stringify(
+          requirements.map((r) => [r.name, r.description || null, r.isMandatory !== false]),
+        );
+        const prevNorm = JSON.stringify(
+          existingReqs.map((r) => [r.requirement_name, r.description || null, !!r.is_mandatory]),
+        );
+        requirementsChanged = nextNorm !== prevNorm;
+      }
       const nonStatusChanged =
         name !== old.service_name ||
         (description ?? "") !== (old.description ?? "") ||
@@ -3064,23 +3081,51 @@ router.put(
         effectiveRecipient !== old.recipient_type ||
         !!requiresCoding !== !!old.requires_coding ||
         !!isCrossCollege !== !!old.is_cross_college ||
-        Array.isArray(requirements);
+        requirementsChanged;
       const statusChanged = effectiveStatus !== old.status;
 
-      // A lone active -> inactive flip via the modal's status dropdown runs the
-      // same auto-decline path as the dedicated deactivate endpoint.
-      if (statusChanged && effectiveStatus === "inactive" && !nonStatusChanged) {
+      // Re-insert requirements only when they actually changed (skips a needless
+      // delete/re-insert on an unchanged list, which also preserves their ids).
+      const applyRequirements = async () => {
+        if (!Array.isArray(requirements) || !requirementsChanged) return;
+        await conn.query(`DELETE FROM document_requirements WHERE service_id = ?`, [serviceId]);
+        if (requirements.length > 0) {
+          const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
+          await conn.query(
+            `INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
+            [reqValues],
+          );
+        }
+      };
+
+      // Going inactive always goes through: retire the type first (which
+      // auto-declines every pending/processing request, student + faculty), then
+      // -- nothing left in-flight to protect -- apply any other field edits from
+      // the same save.
+      if (statusChanged && effectiveStatus === "inactive") {
         const result = await deactivateDocumentType(conn, serviceId);
+        if (nonStatusChanged) {
+          await conn.query(
+            `UPDATE document_services SET service_name = ?, description = ?, status = 'inactive',
+             processing_time = ?, is_cross_college = ?, recipient_type = ?, requires_coding = ? WHERE service_id = ?`,
+            [name, description, processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
+          );
+          await applyRequirements();
+        }
         await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
-          { status: old.status }, { status: "inactive" });
+          { name: old.service_name, status: old.status, processingTime: old.processing_time },
+          { name, status: "inactive", processingTime },
+        );
         await conn.commit();
         notifyDeactivatedRequesters(deptId, old.service_name, result);
-        return res.json({ message: "Document type set inactive" });
+        return res.json({
+          message: nonStatusChanged ? "Document type updated and set inactive" : "Document type set inactive",
+        });
       }
 
-      // Editing details (anything but a lone status flip) is blocked while
-      // in-flight requests exist -- deactivate to clear them first. A true
-      // no-op save (nothing changed) skips this check.
+      // Not going inactive. Editing details (anything but a lone status flip) is
+      // blocked while in-flight requests exist -- deactivate to clear them first.
+      // A true no-op save, or a lone inactive -> active flip, skips this check.
       if (nonStatusChanged) {
         const [[{ inflight }]] = await conn.query(
           `SELECT
@@ -3103,18 +3148,7 @@ router.put(
          is_cross_college = ?, recipient_type = ?, requires_coding = ? WHERE service_id = ?`,
         [name, description, effectiveStatus, processingTime, !!isCrossCollege, effectiveRecipient, !!requiresCoding, serviceId],
       );
-
-      // Replace requirements only when the client actually sent the list.
-      if (Array.isArray(requirements)) {
-        await conn.query(`DELETE FROM document_requirements WHERE service_id = ?`, [serviceId]);
-        if (requirements.length > 0) {
-          const reqValues = requirements.map((r) => [serviceId, r.name, r.description || null, r.isMandatory !== false]);
-          await conn.query(
-            `INSERT INTO document_requirements (service_id, requirement_name, description, is_mandatory) VALUES ?`,
-            [reqValues],
-          );
-        }
-      }
+      await applyRequirements();
 
       await logAudit(req.user.userId, "UPDATE", "document_services", serviceId,
         { name: old.service_name, status: old.status, processingTime: old.processing_time },
@@ -3397,6 +3431,23 @@ async function serviceHasLiveQueue(db, serviceId, deptId) {
 const SERVICE_LOCKED_MSG =
   "A queue for this service is still active. Close the queue before editing the service.";
 
+// Nudge everyone who should re-pull this service's details/requirements/steps
+// after an edit. The dept room covers admin hosting screens + same-dept
+// students; the per-slot rooms additionally reach students from OTHER
+// departments who joined this service's cross-college / universal queue (they
+// sit in `slot:<id>` via joinStudentSlotRooms, not this dept's room). Call
+// only when something actually changed.
+async function notifyServiceUpdated(deptId, serviceId) {
+  emitToDept(deptId, "queue:service-updated", { serviceId });
+  const [liveSlots] = await pool.query(
+    `SELECT slot_id FROM queue_slots
+       WHERE (service_id = ? OR (is_universal = TRUE AND department_id = ?))
+         AND slot_date = ? AND status IN ('open', 'paused', 'full', 'expired')`,
+    [serviceId, deptId, getManilaDateString()],
+  );
+  liveSlots.forEach((s) => emitToSlot(s.slot_id, "queue:service-updated", { serviceId }));
+}
+
 // PUT /api/admin/data-management/service-types/:id
 router.put(
   "/data-management/service-types/:id",
@@ -3419,11 +3470,15 @@ router.put(
       );
       if (!old) return res.status(404).json({ error: "Service type not found" });
 
+      // Coerce both sides before comparing -- `locationId` arrives as a string
+      // ("3") while old.location_id is a number (3), and a cleared description
+      // is "" here vs NULL in the row; a raw !== on either falsely reports a
+      // change and would wrongly trip the live-queue lock on a genuine no-op.
       const changed =
         name !== old.service_name ||
-        (description ?? null) !== (old.description ?? null) ||
+        (description || "") !== (old.description || "") ||
         !!isCrossCollege !== !!old.is_cross_college ||
-        (locationId || null) !== (old.location_id ?? null);
+        String(locationId ?? "") !== String(old.location_id ?? "");
 
       if (changed && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
         return res.status(409).json({ error: SERVICE_LOCKED_MSG });
@@ -3439,7 +3494,7 @@ router.put(
         { name: old.service_name },
         { name },
       );
-      emitToDept(deptId, "queue:service-updated", { serviceId });
+      if (changed) await notifyServiceUpdated(deptId, serviceId);
       res.json({ message: "Service type updated" });
     } catch (error) {
       sendServerError(res, error, "Service type update error:");
@@ -3559,7 +3614,8 @@ router.put(
         const prevNorm = JSON.stringify(
           existing.map((r) => [r.name, r.description || null, !!r.isMandatory]),
         );
-        if (nextNorm !== prevNorm && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
+        const reqChanged = nextNorm !== prevNorm;
+        if (reqChanged && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
           return res.status(409).json({ error: SERVICE_LOCKED_MSG });
         }
 
@@ -3574,7 +3630,7 @@ router.put(
         await logAudit(req.user.userId, "UPDATE", "service_requirements", serviceId,
           null, { requirementCount: requirements.length },
         );
-        emitToDept(deptId, "queue:service-updated", { serviceId });
+        if (reqChanged) await notifyServiceUpdated(deptId, serviceId);
       }
       res.json({ message: "Service requirements updated" });
     } catch (error) {
@@ -3651,7 +3707,8 @@ router.put(
         const prevNorm = JSON.stringify(
           existing.map((s) => [s.step_number, s.step_title, s.description || null]),
         );
-        if (nextNorm !== prevNorm && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
+        const stepsChanged = nextNorm !== prevNorm;
+        if (stepsChanged && (await serviceHasLiveQueue(pool, serviceId, deptId))) {
           return res.status(409).json({ error: SERVICE_LOCKED_MSG });
         }
 
@@ -3666,7 +3723,7 @@ router.put(
         await logAudit(req.user.userId, "UPDATE", "service_procedure_steps", serviceId,
           null, { stepCount: steps.length },
         );
-        emitToDept(deptId, "queue:service-updated", { serviceId });
+        if (stepsChanged) await notifyServiceUpdated(deptId, serviceId);
       }
       res.json({ message: "Service procedure steps updated" });
     } catch (error) {

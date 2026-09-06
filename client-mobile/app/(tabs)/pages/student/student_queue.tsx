@@ -27,6 +27,7 @@ import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
 import { useQueue } from '@/context/QueueContext';
 import api from '@/utils/api';
 import QueueConcernModal from '@/components/QueueConcernModal';
+import { UNIVERSAL_QUEUE_INFO } from '@/constants/universalQueue';
 import NotificationBell from '@/components/NotificationBell';
 import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
@@ -150,7 +151,7 @@ export default function StudentQueueScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterKind>(null);
   const [leaveTarget, setLeaveTarget] = useState<any | null>(null);
   const [concernModal, setConcernModal] = useState<
-    { slotId: number; serviceName: string; isUniversal?: boolean; universalServices?: any[] } | null
+    { slotId: number; serviceName: string; isUniversal?: boolean; universalServices?: any[] | null } | null
   >(null);
   const [concernText, setConcernText] = useState('');
   const [pickedServiceId, setPickedServiceId] = useState<number | null>(null);
@@ -206,6 +207,19 @@ export default function StudentQueueScreen() {
     }
     return null;
   };
+
+  // For a Universal Service Queue card, enrich each pickable service with its
+  // requirements/procedure (from the already-fetched catalogue) so the join
+  // modal can show them once a service is picked -- without any extra fetch.
+  // Returns null for a non-universal slot so the modal's Array.isArray() gate
+  // doesn't mistake it for a queue that needs a service pick.
+  const buildUniversalServices = (slot: any) =>
+    slot?.isUniversal
+      ? (slot.universalServices ?? []).map((u: any) => {
+          const m = findServiceMeta(u.serviceId);
+          return { ...u, requirements: m?.requirements ?? [], procedureSteps: m?.procedureSteps ?? [] };
+        })
+      : null;
 
   const openServiceDetail = (slot: any) => {
     setDetailSlot(slot);
@@ -678,7 +692,7 @@ export default function StudentQueueScreen() {
                       style={[styles.joinBtn, !canJoin && styles.joinBtnDisabled]}
                       onPress={(e) => {
                         e.stopPropagation();
-                        setConcernModal({ slotId: q.slotId, serviceName: q.serviceName, isUniversal: q.isUniversal, universalServices: q.universalServices });
+                        setConcernModal({ slotId: q.slotId, serviceName: q.serviceName, isUniversal: q.isUniversal, universalServices: buildUniversalServices(q) });
                       }}
                       disabled={!canJoin}
                     >
@@ -791,71 +805,84 @@ export default function StudentQueueScreen() {
                 </View>
               )}
 
-              {!!detailSlot?.description && (
+              {(detailSlot?.isUniversal || !!detailSlot?.description) && (
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionTitleRow}>
                     <FileText size={15} color={theme.text} />
                     <Text style={styles.detailSectionTitle}>About this Service</Text>
                   </View>
-                  <Text style={styles.detailSectionText}>{detailSlot.description}</Text>
+                  <Text style={styles.detailSectionText}>
+                    {detailSlot?.isUniversal ? UNIVERSAL_QUEUE_INFO.description : detailSlot?.description}
+                  </Text>
                 </View>
               )}
 
-              <View style={styles.detailSection}>
-                <View style={styles.detailSectionTitleRow}>
-                  <CheckCircle size={15} color={theme.text} />
-                  <Text style={styles.detailSectionTitle}>Requirements</Text>
-                </View>
-                {servicesLoading ? (
-                  <Text style={styles.detailSectionText}>Loading…</Text>
-                ) : !findServiceMeta(detailSlot?.serviceId) ? (
-                  <Text style={styles.detailSectionText}>No requirements information available.</Text>
-                ) : (findServiceMeta(detailSlot?.serviceId)?.requirements ?? []).length === 0 ? (
-                  <Text style={styles.detailSectionText}>No specific requirements listed.</Text>
-                ) : (
-                  <View style={styles.hintRequirements}>
-                    {(findServiceMeta(detailSlot?.serviceId)?.requirements ?? []).map((req: any) => (
-                      <View key={req.id ?? req.name} style={styles.hintRequirementRow}>
-                        <View style={styles.hintRequirementNameRow}>
-                          <Text style={styles.hintText}>{req.name}</Text>
-                          <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
-                            <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
-                              {req.isMandatory ? 'Required' : 'Optional'}
-                            </Text>
-                          </View>
-                        </View>
-                        {req.description && <Text style={styles.hintRequirementDesc}>{req.description}</Text>}
+              {(() => {
+                const detailReqs = detailSlot?.isUniversal
+                  ? UNIVERSAL_QUEUE_INFO.requirements
+                  : (findServiceMeta(detailSlot?.serviceId)?.requirements ?? []);
+                const detailSteps = detailSlot?.isUniversal
+                  ? UNIVERSAL_QUEUE_INFO.procedureSteps
+                  : (findServiceMeta(detailSlot?.serviceId)?.procedureSteps ?? []);
+                const loading = servicesLoading && !detailSlot?.isUniversal;
+                return (
+                  <>
+                    <View style={styles.detailSection}>
+                      <View style={styles.detailSectionTitleRow}>
+                        <CheckCircle size={15} color={theme.text} />
+                        <Text style={styles.detailSectionTitle}>Requirements</Text>
                       </View>
-                    ))}
-                  </View>
-                )}
-              </View>
+                      {loading ? (
+                        <Text style={styles.detailSectionText}>Loading…</Text>
+                      ) : detailReqs.length === 0 ? (
+                        <Text style={styles.detailSectionText}>No specific requirements listed.</Text>
+                      ) : (
+                        <View style={styles.hintRequirements}>
+                          {detailReqs.map((req: any) => (
+                            <View key={req.id ?? req.name} style={styles.hintRequirementRow}>
+                              <View style={styles.hintRequirementNameRow}>
+                                <Text style={styles.hintText}>{req.name}</Text>
+                                <View style={req.isMandatory ? styles.reqTagRequired : styles.reqTagOptional}>
+                                  <Text style={req.isMandatory ? styles.reqTagRequiredText : styles.reqTagOptionalText}>
+                                    {req.isMandatory ? 'Required' : 'Optional'}
+                                  </Text>
+                                </View>
+                              </View>
+                              {req.description && <Text style={styles.hintRequirementDesc}>{req.description}</Text>}
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
 
-              <View style={styles.detailSection}>
-                <View style={styles.detailSectionTitleRow}>
-                  <HelpCircle size={15} color={theme.text} />
-                  <Text style={styles.detailSectionTitle}>Procedure</Text>
-                </View>
-                {servicesLoading ? (
-                  <Text style={styles.detailSectionText}>Loading…</Text>
-                ) : (findServiceMeta(detailSlot?.serviceId)?.procedureSteps ?? []).length === 0 ? (
-                  <Text style={styles.detailSectionText}>No procedure information available.</Text>
-                ) : (
-                  <View style={styles.procedureList}>
-                    {(findServiceMeta(detailSlot?.serviceId)?.procedureSteps ?? []).map((step: any) => (
-                      <View key={step.id ?? step.stepNumber} style={styles.procedureStepRow}>
-                        <View style={styles.procedureStepBadge}>
-                          <Text style={styles.procedureStepBadgeText}>{step.stepNumber}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.procedureStepTitle}>{step.title}</Text>
-                          {step.description && <Text style={styles.procedureStepDesc}>{step.description}</Text>}
-                        </View>
+                    <View style={styles.detailSection}>
+                      <View style={styles.detailSectionTitleRow}>
+                        <HelpCircle size={15} color={theme.text} />
+                        <Text style={styles.detailSectionTitle}>Procedure</Text>
                       </View>
-                    ))}
-                  </View>
-                )}
-              </View>
+                      {loading ? (
+                        <Text style={styles.detailSectionText}>Loading…</Text>
+                      ) : detailSteps.length === 0 ? (
+                        <Text style={styles.detailSectionText}>No procedure information available.</Text>
+                      ) : (
+                        <View style={styles.procedureList}>
+                          {detailSteps.map((step: any) => (
+                            <View key={step.id ?? step.stepNumber} style={styles.procedureStepRow}>
+                              <View style={styles.procedureStepBadge}>
+                                <Text style={styles.procedureStepBadgeText}>{step.stepNumber}</Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.procedureStepTitle}>{step.title}</Text>
+                                {step.description && <Text style={styles.procedureStepDesc}>{step.description}</Text>}
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </>
+                );
+              })()}
             </ScrollView>
             <View style={styles.dialogActions}>
               <Pressable style={styles.btnSecondary} onPress={() => setDetailSlot(null)}>
@@ -866,7 +893,7 @@ export default function StudentQueueScreen() {
                 disabled={!!detailSlot && !getJoinState(detailSlot).canJoin}
                 onPress={() => {
                   if (!detailSlot) return;
-                  setConcernModal({ slotId: detailSlot.slotId, serviceName: detailSlot.serviceName, isUniversal: detailSlot.isUniversal, universalServices: detailSlot.universalServices });
+                  setConcernModal({ slotId: detailSlot.slotId, serviceName: detailSlot.serviceName, isUniversal: detailSlot.isUniversal, universalServices: buildUniversalServices(detailSlot) });
                   setDetailSlot(null);
                 }}
               >
@@ -885,7 +912,7 @@ export default function StudentQueueScreen() {
         serviceName={concernModal?.serviceName}
         concern={concernText}
         onChangeConcern={setConcernText}
-        universalServices={concernModal?.isUniversal ? (concernModal?.universalServices ?? []) : null}
+        universalServices={concernModal?.isUniversal ? (concernModal?.universalServices ?? null) : null}
         pickedServiceId={pickedServiceId}
         onPickService={setPickedServiceId}
         onCancel={() => {

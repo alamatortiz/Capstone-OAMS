@@ -505,12 +505,12 @@ html, body {
 .adp-doc-card-inner {
   display: flex;
   align-items: flex-start;
-  gap: 1.25rem;
-  padding: 1.5rem;
+  gap: 0.9rem;
+  padding: 1.05rem;
 }
 .adp-doc-file-icon {
-  width: 3rem;
-  height: 3rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 0.75rem;
   background: rgba(249, 115, 22, 0.1);
   display: flex;
@@ -524,8 +524,8 @@ html, body {
   background: rgba(249, 115, 22, 0.08);
 }
 .adp-doc-file-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.15rem;
+  height: 1.15rem;
   stroke: currentColor;
 }
 .adp-doc-info {
@@ -533,7 +533,7 @@ html, body {
   min-width: 0;
 }
 .adp-doc-title {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -541,7 +541,7 @@ html, body {
   transition: color 0.3s ease;
 }
 .adp-doc-college {
-  font-size: 0.9375rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
   margin: 0.25rem 0 0 0;
   transition: color 0.3s ease;
@@ -555,7 +555,7 @@ html, body {
   margin-top: 0.625rem;
 }
 .adp-doc-requester-name {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-secondary);
   transition: color 0.3s ease;
@@ -572,10 +572,10 @@ html, body {
 }
 [data-theme="light"] .adp-id-badge { color: #ea580c; }
 .adp-doc-purpose {
-  font-size: 0.9375rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
   margin: 0.625rem 0 0 0;
-  line-height: 1.45;
+  line-height: 1.4;
   transition: color 0.3s ease;
   text-align: left;
 }
@@ -610,8 +610,8 @@ html, body {
   letter-spacing: 0.3px;
 }
 .adp-status-badge svg {
-  width: 0.875rem;
-  height: 0.875rem;
+  width: 0.75rem;
+  height: 0.75rem;
   stroke: currentColor;
   flex-shrink: 0;
 }
@@ -635,14 +635,14 @@ html, body {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--text-tertiary);
   white-space: nowrap;
   transition: color 0.3s ease;
 }
 .adp-doc-date svg {
-  width: 0.875rem;
-  height: 0.875rem;
+  width: 0.75rem;
+  height: 0.75rem;
   flex-shrink: 0;
   stroke: currentColor;
 }
@@ -1043,7 +1043,7 @@ html, body {
 @media (max-width: 768px) {
   .adp-doc-card-inner {
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.9rem;
   }
   .adp-doc-action {
     width: 100%;

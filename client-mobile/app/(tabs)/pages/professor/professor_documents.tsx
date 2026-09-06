@@ -586,7 +586,7 @@ export default function ProfessorDocumentsScreen() {
                     >
                       <View style={styles.docCardHeaderRow}>
                         <View style={styles.docIconWrap}>
-                          <Ionicons name="document-text-outline" size={20} color="#f97316" />
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
@@ -696,7 +696,7 @@ export default function ProfessorDocumentsScreen() {
                     >
                       <View style={styles.docCardHeaderRow}>
                         <View style={styles.docIconWrap}>
-                          <Ionicons name="document-text-outline" size={20} color="#f97316" />
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
@@ -744,7 +744,7 @@ export default function ProfessorDocumentsScreen() {
                     >
                       <View style={styles.docCardHeaderRow}>
                         <View style={styles.docIconWrap}>
-                          <Ionicons name="document-text-outline" size={20} color="#f97316" />
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
@@ -794,7 +794,7 @@ export default function ProfessorDocumentsScreen() {
                     >
                       <View style={styles.docCardHeaderRow}>
                         <View style={styles.docIconWrap}>
-                          <Ionicons name="document-text-outline" size={20} color="#f97316" />
+                          <Ionicons name="document-text-outline" size={17} color="#f97316" />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
@@ -1323,7 +1323,7 @@ function createStyles(theme: ThemePalette) {
     pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
 
     // Request / Send buttons
-    actionButtonsCol: { gap: 10, alignItems: 'flex-start' },
+    actionButtonsCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
     requestBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1376,82 +1376,82 @@ function createStyles(theme: ThemePalette) {
     emptyText: { fontSize: 13, color: theme.tertiary, textAlign: 'center' },
 
     // Document cards
-    docList: { gap: 14 },
+    docList: { gap: 10 },
     docCard: {
       backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: 'rgba(249, 115, 22, 0.25)',
       borderRadius: 16,
-      padding: 16,
-      gap: 14,
+      padding: 11,
+      gap: 10,
     },
     docCardCompleted: { opacity: 0.85 },
-    docCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    docCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
     docIconWrap: {
-      width: 44,
-      height: 44,
+      width: 32,
+      height: 32,
       borderRadius: 12,
       backgroundColor: 'rgba(249, 115, 22, 0.1)',
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
     },
-    docTypeText: { fontSize: 15.5, fontWeight: '700', color: '#f97316' },
-    docCollegeText: { fontSize: 12.5, color: theme.tertiary, marginTop: 2 },
-    docTrackingText: { fontSize: 12.5, color: theme.tertiary, marginTop: 2 },
+    docTypeText: { fontSize: 13.5, fontWeight: '700', color: '#f97316' },
+    docCollegeText: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
+    docTrackingText: { fontSize: 11, color: theme.tertiary, marginTop: 2 },
     docTrackingValue: { fontWeight: '700', color: '#22c55e' },
     statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
       borderRadius: 10,
       borderWidth: 1,
       flexShrink: 0,
     },
-    statusBadgeText: { fontSize: 10.5, fontWeight: '700' },
+    statusBadgeText: { fontSize: 9.5, fontWeight: '700' },
 
-    docInfoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    docInfoField: { width: '46%', gap: 3 },
+    docInfoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    docInfoField: { width: '46%', gap: 2 },
     docInfoFieldFull: { width: '100%' },
-    docInfoLabel: { fontSize: 10.5, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
-    docInfoValue: { fontSize: 13.5, fontWeight: '600', color: theme.text, lineHeight: 18 },
-    docInfoDateValue: { fontSize: 13.5, fontWeight: '600', color: '#f97316', lineHeight: 18 },
+    docInfoLabel: { fontSize: 10, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    docInfoValue: { fontSize: 12, fontWeight: '600', color: theme.text, lineHeight: 16 },
+    docInfoDateValue: { fontSize: 12, fontWeight: '600', color: '#f97316', lineHeight: 16 },
 
     updateBox: {
       backgroundColor: 'rgba(16, 185, 129, 0.1)',
       borderWidth: 1,
       borderColor: 'rgba(16, 185, 129, 0.25)',
       borderRadius: 12,
-      padding: 12,
+      padding: 8,
       gap: 4,
     },
-    updateTitle: { fontSize: 12.5, fontWeight: '700', color: '#10b981' },
-    updateText: { fontSize: 13, color: theme.subtext, lineHeight: 18 },
+    updateTitle: { fontSize: 11, fontWeight: '700', color: '#10b981' },
+    updateText: { fontSize: 11, color: theme.subtext, lineHeight: 15 },
 
     cancelBtnFull: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      paddingVertical: 12,
+      paddingVertical: 11,
       borderRadius: 12,
       borderWidth: 1,
       borderColor: 'rgba(239, 68, 68, 0.35)',
     },
-    cancelBtnFullText: { fontSize: 13.5, fontWeight: '700', color: '#ef4444' },
+    cancelBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444' },
 
     viewPickupBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      paddingVertical: 12,
+      paddingVertical: 11,
       borderRadius: 12,
       backgroundColor: '#16a34a',
     },
-    viewPickupBtnText: { fontSize: 13.5, fontWeight: '700', color: '#ffffff' },
+    viewPickupBtnText: { fontSize: 12.5, fontWeight: '700', color: '#ffffff' },
 
     // Request dialog
     modalOverlay: {

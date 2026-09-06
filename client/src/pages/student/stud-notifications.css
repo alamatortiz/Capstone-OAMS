@@ -524,14 +524,14 @@ body {
 .stud-notifications-container .notif-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 1.4rem;
+  gap: 1.25rem;
   align-items: start;
   width: 100%;
   text-align: left;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1.09375rem;
-  padding: 1.5rem 1.85rem;
+  padding: 1.25rem 1.5625rem;
   cursor: pointer;
   font-family: inherit;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

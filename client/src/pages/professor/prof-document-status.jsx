@@ -707,7 +707,7 @@ export default function ProfessorDocumentStatus() {
                           >
                             <div className="dss-list-header">
                               <div className="dss-list-icon-wrap">
-                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
+                                <FileText style={{ width: "1.15rem", height: "1.15rem", color: "#f97316" }} />
                               </div>
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>
@@ -775,7 +775,7 @@ export default function ProfessorDocumentStatus() {
                           >
                             <div className="dss-list-header">
                               <div className="dss-list-icon-wrap">
-                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
+                                <FileText style={{ width: "1.15rem", height: "1.15rem", color: "#f97316" }} />
                               </div>
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>
@@ -827,7 +827,7 @@ export default function ProfessorDocumentStatus() {
                           >
                             <div className="dss-list-header">
                               <div className="dss-list-icon-wrap">
-                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
+                                <FileText style={{ width: "1.15rem", height: "1.15rem", color: "#f97316" }} />
                               </div>
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>
@@ -871,7 +871,7 @@ export default function ProfessorDocumentStatus() {
                           >
                             <div className="dss-list-header">
                               <div className="dss-list-icon-wrap">
-                                <FileText style={{ width: "1.5rem", height: "1.5rem", color: "#f97316" }} />
+                                <FileText style={{ width: "1.15rem", height: "1.15rem", color: "#f97316" }} />
                               </div>
                               <div className="dss-list-title-section">
                                 <h3>{doc.type}</h3>

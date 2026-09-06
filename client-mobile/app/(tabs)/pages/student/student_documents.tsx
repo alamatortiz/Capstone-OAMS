@@ -486,7 +486,7 @@ export default function StudentDocumentsScreen() {
       <Pressable key={doc.id} onPress={() => goToDocumentStatus(doc)} style={[styles.docCard, completed && styles.docCardCompleted]}>
         <View style={styles.docCardHeader}>
           <View style={[styles.docIconWrap, completed && styles.docIconWrapCompleted]}>
-            <FileText size={22} color={completed ? theme.tertiary : theme.orange} />
+            <FileText size={17} color={completed ? theme.tertiary : theme.orange} />
           </View>
           <View style={styles.docTitleSection}>
             <Text style={styles.docTitle}>{doc.type}</Text>
@@ -1177,7 +1177,7 @@ function createStyles(theme: ThemePalette) {
     pageSubtitle: { fontSize: 12, color: theme.subtext, marginTop: 3 },
 
     // Request / Send buttons
-    actionButtonsCol: { gap: 10, alignItems: 'flex-start' },
+    actionButtonsCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
     requestBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 14, borderRadius: 14, alignSelf: 'flex-start', paddingHorizontal: 20,
@@ -1233,59 +1233,59 @@ function createStyles(theme: ThemePalette) {
     emptyDescription: { fontSize: 12, color: theme.tertiary, textAlign: 'center', lineHeight: 18 },
 
     // Document cards
-    docsList: { gap: 12 },
+    docsList: { gap: 10 },
     docCard: {
       backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(249, 115, 22, 0.25)',
-      borderRadius: 16, padding: 14, gap: 12,
+      borderRadius: 16, padding: 11, gap: 10,
     },
     docCardCompleted: { opacity: 0.85 },
-    docCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    docCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
     docIconWrap: {
-      width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+      width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
       backgroundColor: 'rgba(249, 115, 22, 0.1)', flexShrink: 0,
     },
     docIconWrapCompleted: { backgroundColor: 'rgba(107, 114, 128, 0.1)' },
     docTitleSection: { flex: 1, gap: 2 },
-    docTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
-    docCollege: { fontSize: 12, color: theme.subtext },
-    docTracking: { fontSize: 11, color: theme.tertiary },
+    docTitle: { fontSize: 13.5, fontWeight: '700', color: theme.text },
+    docCollege: { fontSize: 11, color: theme.subtext },
+    docTracking: { fontSize: 10, color: theme.tertiary },
     docTrackingValue: { fontWeight: '700', color: theme.success },
 
     docHeaderRight: { alignItems: 'flex-end', gap: 6, flexShrink: 0 },
     trackingPill: {
-      backgroundColor: theme.orange, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12,
+      backgroundColor: theme.orange, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10,
     },
-    trackingPillText: { fontSize: 11, fontWeight: '700', color: '#ffffff', textTransform: 'uppercase' },
+    trackingPillText: { fontSize: 10, fontWeight: '700', color: '#ffffff', textTransform: 'uppercase' },
 
     statusBadge: {
-      paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, flexShrink: 0,
+      paddingVertical: 3, paddingHorizontal: 8, borderRadius: 999, borderWidth: 1, flexShrink: 0,
     },
-    statusBadgeText: { fontSize: 10, fontWeight: '700' },
+    statusBadgeText: { fontSize: 9.5, fontWeight: '700' },
 
-    docFieldsGrid: { gap: 10 },
-    docField: { gap: 3 },
-    docFieldFull: { gap: 3 },
+    docFieldsGrid: { gap: 8 },
+    docField: { gap: 2 },
+    docFieldFull: { gap: 2 },
     docFieldLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
-    docFieldValue: { fontSize: 13, fontWeight: '600', color: theme.text, lineHeight: 18 },
+    docFieldValue: { fontSize: 12, fontWeight: '600', color: theme.text, lineHeight: 16 },
 
     updateBox: {
       backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.25)',
-      borderRadius: 12, padding: 10, gap: 4,
+      borderRadius: 12, padding: 8, gap: 4,
     },
-    updateTitle: { fontSize: 12, fontWeight: '700', color: theme.success },
-    updateText: { fontSize: 12, color: theme.text, lineHeight: 17 },
+    updateTitle: { fontSize: 11, fontWeight: '700', color: theme.success },
+    updateText: { fontSize: 11, color: theme.text, lineHeight: 15 },
 
     claimBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
+      paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
     },
-    claimBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
+    claimBtnText: { fontSize: 12.5, fontWeight: '700', color: theme.primary },
 
     cancelBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
       paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
     },
-    cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    cancelBtnText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444' },
 
     // Processing times info card
     infoCard: {

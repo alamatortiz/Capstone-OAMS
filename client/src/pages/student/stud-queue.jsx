@@ -14,6 +14,7 @@ import { QueueIconNav } from "../../components/StudentSidebar";
 import { useQueue } from '../../contexts/QueueContext';
 import { useAuth } from '../../context/AuthContext';
 import { getCollegeLogo } from '../../data/collegeLogo';
+import { UNIVERSAL_QUEUE_INFO } from '../../data/universalQueue';
 import { formatCollegeLabel } from '../../utils/formatCollege';
 import api from '../../utils/api';
 
@@ -188,6 +189,18 @@ export default function QueuePage() {
   };
   const isServiceKnown = (serviceId) => !!findSvc(serviceId);
 
+  // For a Universal Service Queue card, attach each pickable service's real
+  // requirements/steps (from the already-fetched /services/by-department data)
+  // so the join popup can preview them. Non-universal card -> null (an empty
+  // array would flip the modal into "must pick a service" mode).
+  const buildUniversalServices = (slot) =>
+    slot.isUniversal
+      ? (slot.universalServices ?? []).map((u) => {
+          const m = findSvc(u.serviceId);
+          return { ...u, requirements: m?.requirements ?? [], procedureSteps: m?.procedureSteps ?? [] };
+        })
+      : null;
+
   // ── Actions ───────────────────────────────────────────────────────────────
   // Refs (not just the mirroring state below) so a fast double-click can't
   // slip past the guard before React re-renders with the disabled button --
@@ -313,7 +326,7 @@ export default function QueuePage() {
             show={concernModal !== null}
             onCancel={() => setConcernModal(null)}
             onConfirm={(notes, serviceId) => performJoin(concernModal.slotId, notes, serviceId)}
-            universalServices={concernModal?.universalServices ?? null}
+            universalServices={concernModal?.isUniversal ? (concernModal?.universalServices ?? null) : null}
             title="What's your concern?"
             message={
               concernModal?.isUniversal ? (
@@ -408,7 +421,7 @@ export default function QueuePage() {
                 </div>
                 <button
                   className="avail-services-queue-btn"
-                  onClick={() => setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName, isUniversal: selectedSlot.isUniversal, universalServices: selectedSlot.universalServices ?? null })}
+                  onClick={() => setConcernModal({ slotId: selectedSlot.slotId, serviceName: selectedSlot.serviceName, isUniversal: selectedSlot.isUniversal, universalServices: buildUniversalServices(selectedSlot) })}
                   disabled={detailJoinBtnDisabled()}
                 >
                   {joiningSlotId === selectedSlot.slotId ? (
@@ -424,7 +437,7 @@ export default function QueuePage() {
               </div>
 
               {/* About this Service */}
-              {selectedSlot.description && (
+              {(selectedSlot.isUniversal || selectedSlot.description) && (
                 <div className="avail-services-details-card">
                   <div className="avail-services-details-card-header">
                     <h3 className="avail-services-details-card-title">
@@ -433,7 +446,7 @@ export default function QueuePage() {
                   </div>
                   <div className="avail-services-details-card-content">
                     <p className="avail-services-details-card-text">
-                      {selectedSlot.description}
+                      {selectedSlot.isUniversal ? UNIVERSAL_QUEUE_INFO.description : selectedSlot.description}
                     </p>
                   </div>
                 </div>
@@ -450,7 +463,9 @@ export default function QueuePage() {
                   </div>
                   <div className="avail-services-details-card-content">
                     {(() => {
-                      const reqs = getServiceRequirements(selectedSlot.serviceId);
+                      const reqs = selectedSlot.isUniversal
+                        ? UNIVERSAL_QUEUE_INFO.requirements
+                        : getServiceRequirements(selectedSlot.serviceId);
                       if (reqs.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceId)) {
                         return (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
@@ -498,7 +513,9 @@ export default function QueuePage() {
                   </div>
                   <div className="avail-services-details-card-content">
                     {(() => {
-                      const steps = getProcedureSteps(selectedSlot.serviceId);
+                      const steps = selectedSlot.isUniversal
+                        ? UNIVERSAL_QUEUE_INFO.procedureSteps
+                        : getProcedureSteps(selectedSlot.serviceId);
                       if (steps.length === 0 && servicesLoading && !isServiceKnown(selectedSlot.serviceId)) {
                         return (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
@@ -835,7 +852,7 @@ export default function QueuePage() {
                               </div>
                               <button
                                 className={`queue-join-btn ${(isJoining || isPaused || outsideHours || atCapacity) ? 'disabled' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName, isUniversal: slot.isUniversal, universalServices: slot.universalServices ?? null }); }}
+                                onClick={(e) => { e.stopPropagation(); setConcernModal({ slotId: slot.slotId, serviceName: slot.serviceName, isUniversal: slot.isUniversal, universalServices: buildUniversalServices(slot) }); }}
                                 disabled={isJoining || isPaused || outsideHours || atCapacity}
                                 type="button"
                                 aria-label={

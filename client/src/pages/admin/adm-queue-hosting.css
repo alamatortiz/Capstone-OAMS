@@ -966,6 +966,44 @@
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
+/* Disabled while "Host all services" is ticked -- :hover still matches on a
+   disabled <select> in Chrome/FF, so override it explicitly. */
+.aqh-form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.aqh-form-select:disabled:hover {
+  border-color: var(--card-border);
+}
+
+.aqh-form-select:disabled + .aqh-select-chevron {
+  opacity: 0.4;
+}
+
+/* "Host all services" checkbox row */
+.aqh-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+}
+
+.aqh-checkbox-row input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.aqh-checkbox-row span {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
 .aqh-select-chevron {
   position: absolute;
   right: 0.875rem;
