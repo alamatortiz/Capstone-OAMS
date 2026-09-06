@@ -572,7 +572,7 @@ export default function StudentTransactionsScreen() {
                   <View key={t.id} style={[styles.txCard, { borderColor: typeMeta.border }]}>
                     <View style={styles.txHeaderRow}>
                       <View style={[styles.txIconWrap, { backgroundColor: typeMeta.color }]}>
-                        <typeMeta.icon size={18} color="#ffffff" />
+                        <typeMeta.icon size={15} color="#ffffff" />
                       </View>
                       <View style={styles.txTitleSection}>
                         <Text style={styles.txTitle}>{t.title}</Text>
@@ -933,25 +933,25 @@ function createStyles(theme: ThemePalette) {
     loadMoreBtnText: { fontSize: 13, fontWeight: '700', color: theme.primary },
 
     // Transaction list
-    txList: { gap: 12 },
+    txList: { gap: 10 },
     txCard: {
       backgroundColor: theme.card,
       borderWidth: 1,
       borderRadius: 16,
-      padding: 16,
-      gap: 8,
+      padding: 11,
+      gap: 7,
     },
-    txHeaderRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+    txHeaderRow: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
     txIconWrap: {
-      width: 42,
-      height: 42,
+      width: 33,
+      height: 33,
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
     },
     txTitleSection: { flex: 1, gap: 6 },
-    txTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    txTitle: { fontSize: 13.5, fontWeight: '700', color: theme.text },
     txBadgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     txBadge: {
       borderRadius: 6,
@@ -959,22 +959,22 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 8,
     },
     txBadgeText: {
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: '700',
       textTransform: 'capitalize',
     },
-    txCollege: { fontSize: 12, color: theme.tertiary },
-    txDetails: { fontSize: 13, color: theme.subtext, lineHeight: 18 },
+    txCollege: { fontSize: 11, color: theme.tertiary },
+    txDetails: { fontSize: 12, color: theme.subtext, lineHeight: 16 },
     txMetaRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginTop: 4,
-      paddingTop: 10,
+      paddingTop: 8,
       borderTopWidth: 1,
       borderTopColor: theme.border,
     },
-    txMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    txMetaText: { fontSize: 11, color: theme.tertiary, fontWeight: '600' },
+    txMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    txMetaText: { fontSize: 10.5, color: theme.tertiary, fontWeight: '600' },
 
     // Empty state
     emptyCard: {

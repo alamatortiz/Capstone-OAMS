@@ -886,7 +886,7 @@ export default function StudentAppointmentsScreen() {
                     >
                       <View style={styles.bookingHeaderRow}>
                         <View style={styles.bookingIconWrap}>
-                          <Calendar size={24} color={theme.purple} />
+                          <Calendar size={18} color={theme.purple} />
                         </View>
                         <View style={styles.bookingTitleSection}>
                           <Text style={styles.bookingPersonName}>{booking.person}</Text>
@@ -1461,30 +1461,30 @@ function createStyles(theme: ThemePalette) {
     slotCountBadgeText: { fontSize: 11, fontWeight: '700', color: theme.purple, textTransform: 'uppercase', letterSpacing: 0.4 },
 
     // Slot cards
-    slotsList: { gap: 12 },
+    slotsList: { gap: 10 },
     slotCard: {
       backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)',
-      borderRadius: 16, padding: 14, gap: 12,
+      borderRadius: 16, padding: 11, gap: 8,
     },
     slotCardDisabled: { opacity: 0.6, borderColor: theme.border },
     slotHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-    slotProfessorName: { fontSize: 14, fontWeight: '700', color: theme.text, flex: 1 },
+    slotProfessorName: { fontSize: 13, fontWeight: '700', color: theme.text, flex: 1 },
     collegeBadge: {
       backgroundColor: theme.collegeBadgeBg, borderWidth: 1, borderColor: theme.collegeBadgeBorder,
-      borderRadius: 6, paddingVertical: 4, paddingHorizontal: 10,
+      borderRadius: 6, paddingVertical: 3, paddingHorizontal: 10,
     },
-    collegeBadgeText: { fontSize: 11, fontWeight: '700', color: theme.collegeBadgeText },
-    slotDetails: { gap: 6 },
-    slotDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    slotDetailText: { fontSize: 12, color: theme.subtext, flex: 1 },
+    collegeBadgeText: { fontSize: 10, fontWeight: '700', color: theme.collegeBadgeText },
+    slotDetails: { gap: 5 },
+    slotDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    slotDetailText: { fontSize: 11, color: theme.subtext, flex: 1 },
 
     bookBtn: {
-      alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
+      alignItems: 'center', justifyContent: 'center', paddingVertical: 11,
       borderRadius: 12,
     },
-    bookBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+    bookBtnText: { fontSize: 12, fontWeight: '700', color: '#ffffff' },
     bookBtnDisabled: { backgroundColor: theme.border },
-    bookBtnTextDisabled: { fontSize: 13, fontWeight: '700', color: theme.tertiary },
+    bookBtnTextDisabled: { fontSize: 12, fontWeight: '700', color: theme.tertiary },
 
     // Bookings
     bookingsHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
@@ -1500,49 +1500,49 @@ function createStyles(theme: ThemePalette) {
     statusGroup: { gap: 8 },
     statusGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     statusBadge: {
-      alignItems: 'center', justifyContent: 'center', minWidth: 88,
-      paddingVertical: 5, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1,
+      alignItems: 'center', justifyContent: 'center', minWidth: 72,
+      paddingVertical: 3, paddingHorizontal: 9, borderRadius: 8, borderWidth: 1,
     },
-    statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+    statusBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
     statusGroupTitle: { fontSize: 14, fontWeight: '700', color: theme.text },
 
     bookingCard: {
       backgroundColor: theme.card, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.2)',
-      borderRadius: 16, padding: 20, gap: 14, marginBottom: 4,
+      borderRadius: 16, padding: 14, gap: 11, marginBottom: 4,
     },
     bookingHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
     bookingIconWrap: {
-      width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+      width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
       backgroundColor: 'rgba(168, 85, 247, 0.12)', flexShrink: 0,
     },
     bookingTitleSection: { flex: 1, minWidth: 0 },
-    bookingPersonName: { fontSize: 16, fontWeight: '700', color: theme.purple },
-    bookingCollegeText: { fontSize: 13, color: theme.tertiary, marginTop: 2 },
+    bookingPersonName: { fontSize: 14, fontWeight: '700', color: theme.purple },
+    bookingCollegeText: { fontSize: 11.5, color: theme.tertiary, marginTop: 2 },
     apptTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     apptTypeLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase' },
     apptTypePill: {
       backgroundColor: 'rgba(168, 85, 247, 0.12)', borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.3)',
-      borderRadius: 999, paddingVertical: 2, paddingHorizontal: 10,
+      borderRadius: 999, paddingVertical: 2, paddingHorizontal: 9,
     },
-    apptTypePillText: { fontSize: 11, fontWeight: '600', color: theme.purple },
+    apptTypePillText: { fontSize: 10, fontWeight: '600', color: theme.purple },
 
-    fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+    fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     fieldGridItem: { width: '42%', flexGrow: 1, gap: 3 },
     fieldGridItemFull: { width: '100%', gap: 3 },
-    fieldLabel: { fontSize: 11, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.5 },
-    fieldValue: { fontSize: 14, fontWeight: '600', color: theme.purple, lineHeight: 20 },
-    fieldValueFull: { fontSize: 14, fontWeight: '600', color: theme.text, lineHeight: 20 },
+    fieldLabel: { fontSize: 10, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.5 },
+    fieldValue: { fontSize: 12.5, fontWeight: '600', color: theme.purple, lineHeight: 16 },
+    fieldValueFull: { fontSize: 12.5, fontWeight: '600', color: theme.text, lineHeight: 16 },
 
     cancelBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      marginTop: 4, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
+      marginTop: 4, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)',
     },
-    cancelBtnText: { fontSize: 13, fontWeight: '600', color: '#ef4444' },
+    cancelBtnText: { fontSize: 12.5, fontWeight: '600', color: '#ef4444' },
     completeBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      marginTop: 8, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
+      marginTop: 8, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
     },
-    completeBtnText: { fontSize: 13, fontWeight: '600', color: '#22c55e' },
+    completeBtnText: { fontSize: 12.5, fontWeight: '600', color: '#22c55e' },
 
     // Nav drawer
     drawerOverlay: { flex: 1, flexDirection: 'row' },

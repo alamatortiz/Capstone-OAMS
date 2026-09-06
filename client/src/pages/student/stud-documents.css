@@ -249,9 +249,10 @@ body {
 
 .doc-action-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 0.625rem;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .doc-send-btn {
@@ -1171,6 +1172,10 @@ body {
   .doc-action-buttons {
     align-self: stretch;
     justify-content: center;
+  }
+
+  .doc-action-buttons {
+    flex-direction: column;
   }
 
   .doc-card-grid {

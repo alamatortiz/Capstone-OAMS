@@ -513,7 +513,7 @@ export default function ProfessorTransactionsScreen() {
                   <View key={txn.id} style={[styles.txnCard, { borderColor: typeMeta.border }]}>
                     <View style={styles.txnHeaderRow}>
                       <View style={[styles.txnIconWrap, { backgroundColor: typeMeta.bg, borderColor: typeMeta.border }]}>
-                        <Ionicons name={typeMeta.icon} size={18} color={typeMeta.color} />
+                        <Ionicons name={typeMeta.icon} size={15} color={typeMeta.color} />
                       </View>
                       <View style={styles.txnTitleSection}>
                         <Text style={styles.txnTitle}>{action}</Text>
@@ -845,18 +845,18 @@ function createStyles(theme: ThemePalette) {
     filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
 
     // Transaction list
-    txnList: { gap: 12 },
+    txnList: { gap: 10 },
     txnCard: {
       backgroundColor: theme.card,
       borderWidth: 1,
       borderRadius: 16,
-      padding: 16,
-      gap: 8,
+      padding: 11,
+      gap: 7,
     },
-    txnHeaderRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+    txnHeaderRow: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
     txnIconWrap: {
-      width: 42,
-      height: 42,
+      width: 33,
+      height: 33,
       borderRadius: 12,
       borderWidth: 1,
       alignItems: 'center',
@@ -864,7 +864,7 @@ function createStyles(theme: ThemePalette) {
       flexShrink: 0,
     },
     txnTitleSection: { flex: 1, gap: 6 },
-    txnTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+    txnTitle: { fontSize: 13.5, fontWeight: '700', color: theme.text },
     txnBadgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     txnBadge: {
       borderWidth: 1,
@@ -873,25 +873,25 @@ function createStyles(theme: ThemePalette) {
       paddingHorizontal: 8,
     },
     txnBadgeText: {
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: '700',
       textTransform: 'capitalize',
     },
     txnSubRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    txnSubValue: { fontSize: 12.5, fontWeight: '700', color: theme.text },
-    txnSubMuted: { fontSize: 12.5, color: theme.tertiary },
-    txnDetails: { fontSize: 13, color: theme.subtext, lineHeight: 18 },
+    txnSubValue: { fontSize: 11, fontWeight: '700', color: theme.text },
+    txnSubMuted: { fontSize: 11, color: theme.tertiary },
+    txnDetails: { fontSize: 12, color: theme.subtext, lineHeight: 16 },
     txnMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 16,
       marginTop: 4,
-      paddingTop: 10,
+      paddingTop: 8,
       borderTopWidth: 1,
       borderTopColor: theme.border,
     },
-    txnMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    txnMetaText: { fontSize: 11.5, color: theme.tertiary, fontWeight: '600' },
+    txnMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    txnMetaText: { fontSize: 10.5, color: theme.tertiary, fontWeight: '600' },
 
     // Empty state
     emptyCard: {

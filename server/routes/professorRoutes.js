@@ -1219,7 +1219,17 @@ router.patch(
       // student's originally intended start.
       const noLongerFitsIds = new Set(noLongerFits.map((b) => b.appointment_id));
       const survivors = bookings.filter((b) => !noLongerFitsIds.has(b.appointment_id));
-      if (windowMoved && survivors.length > 0) {
+      // Only re-stamp + re-notify survivors that are today or later -- a
+      // past-dated approved booking that was never marked completed already
+      // happened at the old time/room; rewriting its snapshot and pinging the
+      // student to "review the new time" is just noise.
+      const manilaToday = getManilaDateString();
+      const survivorDate = (b) =>
+        b.appointment_date instanceof Date
+          ? getManilaDateString(b.appointment_date)
+          : String(b.appointment_date).split("T")[0];
+      const activeSurvivors = survivors.filter((b) => survivorDate(b) >= manilaToday);
+      if (windowMoved && activeSurvivors.length > 0) {
         await conn.query(
           `UPDATE appointments
              SET window_start_snapshot = ?, window_end_snapshot = ?, location_snapshot = ?,
@@ -1229,7 +1239,7 @@ router.patch(
             `${effectiveStart}:00`,
             `${effectiveEnd}:00`,
             effectiveLocation ?? null,
-            survivors.map((b) => b.appointment_id),
+            activeSurvivors.map((b) => b.appointment_id),
           ],
         );
       }
@@ -1337,11 +1347,8 @@ router.patch(
       }
 
       if (windowMoved) {
-        for (const b of survivors) {
-          const dateStr =
-            b.appointment_date instanceof Date
-              ? getManilaDateString(b.appointment_date)
-              : String(b.appointment_date).split("T")[0];
+        for (const b of activeSurvivors) {
+          const dateStr = survivorDate(b);
           emitToUser(b.student_id, "appointment:status-updated", {
             appointmentId: b.appointment_id,
             reason: "slot_adjusted",
@@ -1357,7 +1364,7 @@ router.patch(
       res.json({
         message: "Availability updated",
         cancelledAppointments: noLongerFits.length,
-        adjustedAppointments: windowMoved ? survivors.length : 0,
+        adjustedAppointments: windowMoved ? activeSurvivors.length : 0,
       });
     } catch (err) {
       await conn.rollback();

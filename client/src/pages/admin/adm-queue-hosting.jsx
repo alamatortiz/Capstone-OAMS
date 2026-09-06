@@ -416,7 +416,7 @@ export default function AdminQueueHosting() {
                         No services configured for your department yet.
                       </p>
                     )}
-                    <label className="aqh-checkbox-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+                    <label className="aqh-checkbox-row">
                       <input
                         type="checkbox"
                         checked={hostAllServices}
@@ -425,7 +425,7 @@ export default function AdminQueueHosting() {
                           if (e.target.checked) setServiceId("");
                         }}
                       />
-                      <span>Host all services (one queue covering every service in your department)</span>
+                      <span>Host all services — one queue covering every service in your department</span>
                     </label>
                   </div>
 
