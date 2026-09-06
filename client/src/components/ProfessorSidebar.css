@@ -162,6 +162,25 @@
   transform: translateY(0);
 }
 
+/* Inline in the mobile header row -- see the same note in
+   StudentSidebar.css. */
+.mobile-tutorial-trigger {
+  position: relative;
+  display: flex;
+}
+
+.mobile-tutorial-trigger .tutorial-trigger-tooltip {
+  top: calc(100% + 0.5rem);
+  bottom: auto;
+  right: 0;
+  transform: translateY(-4px);
+}
+
+.mobile-tutorial-trigger:hover .tutorial-trigger-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 [data-theme="dark"] .sun-icon {
   color: #fbbf24;
 }

@@ -207,6 +207,20 @@ export default function StudentSidebar() {
 
   useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
 
+  // On mobile the nav items the tour spotlights live in the off-canvas
+  // drawer, translated out of view until opened -- starting the tour
+  // without this would spotlight elements sitting off-screen. Closing the
+  // drawer again on tour-close is a no-op on desktop (the "open" class
+  // only has a transform rule under the mobile breakpoint at all).
+  const startTour = () => {
+    setSidebarOpen(true);
+    setTourOpen(true);
+  };
+  const closeTour = () => {
+    setTourOpen(false);
+    setSidebarOpen(false);
+  };
+
   const handleLogout = () => setShowLogoutConfirm(true);
   const confirmLogout = () => {
     logout();
@@ -320,6 +334,19 @@ export default function StudentSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            {/* Unlike the desktop trigger, this one lives inline in a row
+                that spans the full viewport width, not a narrow ~250px
+                sidebar column -- plenty of room, no crowding risk. */}
+            <div className="mobile-tutorial-trigger">
+              <button
+                className="theme-toggle-btn"
+                onClick={startTour}
+                aria-label="Start a short tutorial"
+              >
+                <Lightbulb size={18} />
+              </button>
+              <span className="tutorial-trigger-tooltip">Want a short tutorial?</span>
+            </div>
             <NotificationBell
               endpointBase="student"
               viewAllPath="/student/notifications"
@@ -345,13 +372,12 @@ export default function StudentSidebar() {
       {/* Floating, not squeezed into .sidebar-logo alongside the theme
           toggle + notification bell -- that row has no room to spare on
           desktop widths, and a 4th icon there was pushing the bell out of
-          the visible row entirely. Desktop-only for the same reason the
-          tour itself is (see STUDENT_TOUR_STEPS comment): hidden below the
-          1024px breakpoint where the mobile header takes over. */}
+          the visible row entirely. Hidden below the 1024px breakpoint,
+          where the mobile-header copy above takes over instead. */}
       <div className="tutorial-trigger-wrap">
         <button
           className="tutorial-trigger-btn"
-          onClick={() => setTourOpen(true)}
+          onClick={startTour}
           aria-label="Start a short tutorial"
         >
           <Lightbulb size={18} />
@@ -365,11 +391,7 @@ export default function StudentSidebar() {
         onCancel={() => setShowLogoutConfirm(false)}
       />
 
-      <TutorialTour
-        steps={STUDENT_TOUR_STEPS}
-        isOpen={tourOpen}
-        onClose={() => setTourOpen(false)}
-      />
+      <TutorialTour steps={STUDENT_TOUR_STEPS} isOpen={tourOpen} onClose={closeTour} />
     </>
   );
 }

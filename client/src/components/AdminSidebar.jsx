@@ -197,6 +197,19 @@ export default function AdminSidebar() {
 
   useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
 
+  // On mobile the nav items the tour spotlights live in the off-canvas
+  // drawer, translated out of view until opened -- see the same note in
+  // StudentSidebar.jsx. Closing the drawer again on tour-close is a no-op
+  // on desktop.
+  const startTour = () => {
+    setSidebarOpen(true);
+    setTourOpen(true);
+  };
+  const closeTour = () => {
+    setTourOpen(false);
+    setSidebarOpen(false);
+  };
+
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
   }, [isDark]);
@@ -314,6 +327,16 @@ export default function AdminSidebar() {
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <div className="mobile-tutorial-trigger">
+              <button
+                className="theme-toggle-btn"
+                onClick={startTour}
+                aria-label="Start a short tutorial"
+              >
+                <Lightbulb size={18} />
+              </button>
+              <span className="tutorial-trigger-tooltip">Want a short tutorial?</span>
+            </div>
             <NotificationBell
               endpointBase="admin"
               viewAllPath="/admin/notifications"
@@ -342,7 +365,7 @@ export default function AdminSidebar() {
       <div className="tutorial-trigger-wrap">
         <button
           className="tutorial-trigger-btn"
-          onClick={() => setTourOpen(true)}
+          onClick={startTour}
           aria-label="Start a short tutorial"
         >
           <Lightbulb size={18} />
@@ -356,11 +379,7 @@ export default function AdminSidebar() {
         onCancel={() => setShowLogoutConfirm(false)}
       />
 
-      <TutorialTour
-        steps={ADMIN_TOUR_STEPS}
-        isOpen={tourOpen}
-        onClose={() => setTourOpen(false)}
-      />
+      <TutorialTour steps={ADMIN_TOUR_STEPS} isOpen={tourOpen} onClose={closeTour} />
     </>
   );
 }

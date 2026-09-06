@@ -165,6 +165,28 @@
   transform: translateY(0);
 }
 
+/* Inline in the mobile header row (not fixed like the desktop one) --
+   that row spans the full viewport width, so there's no crowding risk
+   like there was in the narrow .sidebar-logo column. Tooltip drops
+   downward here since the button sits at the top of the screen, not the
+   bottom. */
+.mobile-tutorial-trigger {
+  position: relative;
+  display: flex;
+}
+
+.mobile-tutorial-trigger .tutorial-trigger-tooltip {
+  top: calc(100% + 0.5rem);
+  bottom: auto;
+  right: 0;
+  transform: translateY(-4px);
+}
+
+.mobile-tutorial-trigger:hover .tutorial-trigger-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Sun icon styling - yellow in dark mode */
 [data-theme="dark"] .sun-icon {
   color: #fbbf24;
