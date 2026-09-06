@@ -20,6 +20,16 @@ api.interceptors.request.use((config) => {
 // still-logged-in session hitting the wrong endpoint, not an expired one.
 const SESSION_DEAD_MESSAGES = ["Access token required", "Invalid or expired token"];
 
+// 502/503/504 (or no response at all -- the backend/gateway never answered)
+// mean the whole system is down, not that this one request failed for its
+// own reason -- unlike every other status code, no page-level toast can
+// meaningfully explain that, so this takes over the whole screen with a
+// dedicated status page instead. A plain 500 deliberately stays out of this
+// list: that's this one action's own code throwing, which the page's
+// existing toast/retry handling already covers, and the rest of the app is
+// still perfectly usable.
+let redirectingToErrorPage = false;
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -38,7 +48,20 @@ api.interceptors.response.use(
       sessionStorage.removeItem("oams_user");
       sessionStorage.setItem("oams_session_expired", "1");
       window.location.href = "/login";
+      return Promise.reject(error);
     }
+
+    const isGatewayStatus = status === 502 || status === 503 || status === 504;
+    const isUnreachable = !error.response && !axios.isCancel(error);
+    if (
+      (isGatewayStatus || isUnreachable) &&
+      !redirectingToErrorPage &&
+      !window.location.pathname.startsWith("/error/")
+    ) {
+      redirectingToErrorPage = true;
+      window.location.href = `/error/${status || 503}`;
+    }
+
     return Promise.reject(error);
   },
 );
