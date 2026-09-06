@@ -27,6 +27,7 @@ const RegisterFaculty = React.lazy(
 );
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
+import ErrorPageRoute from "./components/ErrorPageRoute.jsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import StudentDashboard from "./pages/student/stud-dashboard.jsx";
 import QueuePage from "./pages/student/stud-queue.jsx";
@@ -427,6 +428,11 @@ createRoot(document.getElementById("root")).render(
                 }
               />
             </Route>
+
+            {/* ─── Real backend/network failures -- api.js's response
+                interceptor hard-navigates here on a 502/503/504 or an
+                unreachable backend, with the actual status in the URL. ─── */}
+            <Route path="/error/:code" element={<ErrorPageRoute />} />
 
             {/* ─── Catch-all: unmatched routes ───────────────────────────────── */}
             <Route path="*" element={<ErrorPage code={404} />} />

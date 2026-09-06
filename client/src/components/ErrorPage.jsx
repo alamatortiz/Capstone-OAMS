@@ -54,6 +54,12 @@ const ERROR_PRESETS = {
       "The system is temporarily down for maintenance or is experiencing heavy load. Please try again shortly.",
     icon: ServerCrash,
   },
+  504: {
+    title: "Gateway Timeout",
+    description:
+      "The server took too long to respond. Please try again in a moment.",
+    icon: ServerCrash,
+  },
 };
 
 export default function ErrorPage({ code = 404, title, description }) {
@@ -73,7 +79,7 @@ export default function ErrorPage({ code = 404, title, description }) {
         <img
           src={pncLogo}
           alt="University of Cabuyao"
-          className="error-page-logo"
+          className="error-page-logo error-page-logo--pnc"
         />
         <img
           src={oamsLogo}
