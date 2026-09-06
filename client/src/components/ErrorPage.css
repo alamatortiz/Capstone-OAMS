@@ -47,20 +47,32 @@
 .error-page-logos {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 2.5rem;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
   z-index: 1;
 }
 
 .error-page-logo {
-  height: 3rem;
+  height: 6.5rem;
   width: auto;
   object-fit: contain;
-  opacity: 0.8;
 }
 
+/* PN C seal keeps the same soft brand glow it has in the navbar. */
+.error-page-logo--pnc {
+  filter: drop-shadow(0 0 6px rgba(34, 197, 94, 0.18));
+}
+
+/* Crisp 1px white stroke -- same multi-layer, zero-blur technique the
+   dashboard/navbar uses. Blurred drop-shadows read as a washed-out halo
+   against this dark background, so every layer here stays at 0 blur. */
 .error-page-logo--oams {
-  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 4px #fff);
+  filter:
+    drop-shadow(0 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(-1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85));
 }
 
 .error-page-card {
@@ -189,4 +201,16 @@
   font-size: 0.75rem;
   color: #374151;
   text-align: center;
+}
+
+/* Scale the seals back down on phones so they don't crowd the card. */
+@media (max-width: 480px) {
+  .error-page-logo {
+    height: 4.5rem;
+  }
+
+  .error-page-logos {
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
 }

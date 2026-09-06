@@ -73,7 +73,7 @@ export default function ErrorPage({ code = 404, title, description }) {
         <img
           src={pncLogo}
           alt="University of Cabuyao"
-          className="error-page-logo"
+          className="error-page-logo error-page-logo--pnc"
         />
         <img
           src={oamsLogo}
