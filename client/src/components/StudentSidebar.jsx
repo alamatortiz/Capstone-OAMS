@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Megaphone as LucideMegaphone, FileText as LucideFileText } from "lucide-react";
+import {
+  Megaphone as LucideMegaphone,
+  FileText as LucideFileText,
+  Lightbulb,
+} from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
+import TutorialTour from "./TutorialTour";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
 import NotificationBell from "./NotificationBell";
@@ -103,11 +108,75 @@ const NOTIFICATION_TYPE_PATHS = {
 
 const navItems = [
   { icon: HomeIcon, label: "Home", path: "/student/dashboard" },
-  { icon: MegaphoneNavIcon, label: "Announcements", path: "/student/announcements" },
-  { icon: QueueIconNav, label: "Queue", path: "/student/queue" },
-  { icon: CalendarIconNav, label: "Appointments", path: "/student/appointments" },
-  { icon: FileTextNavIcon, label: "Documents", path: "/student/documents" },
-  { icon: HistoryIconNav, label: "Transactions", path: "/student/transactions" },
+  {
+    icon: MegaphoneNavIcon,
+    label: "Announcements",
+    path: "/student/announcements",
+    tourId: "nav-announcements",
+  },
+  { icon: QueueIconNav, label: "Queue", path: "/student/queue", tourId: "nav-queue" },
+  {
+    icon: CalendarIconNav,
+    label: "Appointments",
+    path: "/student/appointments",
+    tourId: "nav-appointments",
+  },
+  {
+    icon: FileTextNavIcon,
+    label: "Documents",
+    path: "/student/documents",
+    tourId: "nav-documents",
+  },
+  {
+    icon: HistoryIconNav,
+    label: "Transactions",
+    path: "/student/transactions",
+    tourId: "nav-transactions",
+  },
+];
+
+// Sidebar-only walkthrough (per capstone scope: student side first) --
+// spotlights each of these four nav links in place rather than actually
+// navigating through their real pages, so it works from wherever the
+// student happened to click the lightbulb and can't break on page-load
+// timing. selector-less steps (just the welcome one here) render as a
+// plain centered card with no spotlight -- see TutorialTour.jsx.
+const STUDENT_TOUR_STEPS = [
+  {
+    title: "Welcome to OAMS!",
+    description:
+      "Let's take a quick look at what you can do here, it'll only take a few seconds.",
+  },
+  {
+    selector: '[data-tour="nav-announcements"]',
+    title: "Stay Informed",
+    description:
+      "Catch announcements from your department, and check the FAQs there for quick answers to common questions.",
+  },
+  {
+    selector: '[data-tour="nav-queue"]',
+    title: "Join a Queue",
+    description:
+      "Line up for a service, like document requests or general inquiries, without waiting in person. Track your position in real-time.",
+  },
+  {
+    selector: '[data-tour="nav-appointments"]',
+    title: "Book Appointments",
+    description:
+      "Schedule a consultation with a professor or staff member at a time that works for you.",
+  },
+  {
+    selector: '[data-tour="nav-documents"]',
+    title: "Request Documents",
+    description:
+      "Request certificates, transcripts, and other official documents right from here.",
+  },
+  {
+    selector: '[data-tour="nav-transactions"]',
+    title: "Track Everything",
+    description:
+      "See the full history and status of every queue, appointment, and document request you've made.",
+  },
 ];
 
 export default function StudentSidebar() {
@@ -130,6 +199,7 @@ export default function StudentSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
   useEffect(() => {
     applyTheme(isDark ? "dark" : "light");
@@ -210,6 +280,7 @@ export default function StudentSidebar() {
                   onClick={() => setSidebarOpen(false)}
                   className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
+                  {...(item.tourId ? { "data-tour": item.tourId } : {})}
                 >
                   <item.icon className="nav-icon-medium" />
                   <span className={`nav-label ${item.smallLabel ? "nav-label-sm" : ""}`}>
@@ -271,10 +342,33 @@ export default function StudentSidebar() {
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
+      {/* Floating, not squeezed into .sidebar-logo alongside the theme
+          toggle + notification bell -- that row has no room to spare on
+          desktop widths, and a 4th icon there was pushing the bell out of
+          the visible row entirely. Desktop-only for the same reason the
+          tour itself is (see STUDENT_TOUR_STEPS comment): hidden below the
+          1024px breakpoint where the mobile header takes over. */}
+      <div className="tutorial-trigger-wrap">
+        <button
+          className="tutorial-trigger-btn"
+          onClick={() => setTourOpen(true)}
+          aria-label="Start a short tutorial"
+        >
+          <Lightbulb size={18} />
+        </button>
+        <span className="tutorial-trigger-tooltip">Want a short tutorial?</span>
+      </div>
+
       <LogoutConfirmModal
         show={showLogoutConfirm}
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <TutorialTour
+        steps={STUDENT_TOUR_STEPS}
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
       />
     </>
   );

@@ -1,11 +1,16 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { FileText as LucideFileText, Megaphone as LucideMegaphone } from "lucide-react";
+import {
+  FileText as LucideFileText,
+  Megaphone as LucideMegaphone,
+  Lightbulb,
+} from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
 import QueueReasonModal from "./QueueReasonModal";
+import TutorialTour from "./TutorialTour";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import api from "../utils/api";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
@@ -98,10 +103,70 @@ const NOTIFICATION_TYPE_PATHS = {
 
 const navItems = [
   { icon: HomeIcon, label: "Dashboard", path: "/professor/dashboard" },
-  { icon: MegaphoneNavIcon, label: "Announcements", path: "/professor/announcements" },
-  { icon: CalendarIconNav, label: "Appointments", path: "/professor/appointments" },
-  { icon: FileTextNavIcon, label: "Documents", path: "/professor/document-request" },
-  { icon: HistoryIconNav, label: "Transactions", path: "/professor/transactions" },
+  {
+    icon: MegaphoneNavIcon,
+    label: "Announcements",
+    path: "/professor/announcements",
+    tourId: "nav-announcements",
+  },
+  {
+    icon: CalendarIconNav,
+    label: "Appointments",
+    path: "/professor/appointments",
+    tourId: "nav-appointments",
+  },
+  {
+    icon: FileTextNavIcon,
+    label: "Documents",
+    path: "/professor/document-request",
+    tourId: "nav-documents",
+  },
+  {
+    icon: HistoryIconNav,
+    label: "Transactions",
+    path: "/professor/transactions",
+    tourId: "nav-transactions",
+  },
+];
+
+// Sidebar-only walkthrough, same approach as the student one. No FAQ
+// mention here -- professor FAQ was deliberately removed repo-wide by a
+// teammate, unlike student/admin which still have it on their
+// Announcements page.
+const PROFESSOR_TOUR_STEPS = [
+  {
+    title: "Welcome to OAMS!",
+    description:
+      "Let's take a quick look at what you can do here, it'll only take a few seconds.",
+  },
+  {
+    selector: '[data-tour="availability-toggle"]',
+    title: "Set Your Availability",
+    description:
+      "Toggle this off when you're unavailable for appointments -- students won't be able to book you while it's off.",
+  },
+  {
+    selector: '[data-tour="nav-announcements"]',
+    title: "Stay Informed",
+    description: "Catch announcements from your department here.",
+  },
+  {
+    selector: '[data-tour="nav-appointments"]',
+    title: "Manage Appointments",
+    description:
+      "Review and respond to appointment requests from students who want to consult with you.",
+  },
+  {
+    selector: '[data-tour="nav-documents"]',
+    title: "Request Documents",
+    description: "Request documents for yourself, just like a student would.",
+  },
+  {
+    selector: '[data-tour="nav-transactions"]',
+    title: "Track Everything",
+    description:
+      "See the full history and status of every appointment and document request tied to you.",
+  },
 ];
 
 export default function ProfessorSidebar() {
@@ -126,6 +191,7 @@ export default function ProfessorSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
   useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
 
@@ -257,7 +323,7 @@ export default function ProfessorSidebar() {
             </div>
           </div>
 
-          <div className="sidebar-availability">
+          <div className="sidebar-availability" data-tour="availability-toggle">
             <span className="sidebar-availability-label">
               {profStatus === "available" ? "Available" : "Unavailable"}
             </span>
@@ -283,6 +349,7 @@ export default function ProfessorSidebar() {
                   onClick={() => setSidebarOpen(false)}
                   className={`nav-item${location.pathname === item.path ? " active" : ""}`}
                   title={item.label}
+                  {...(item.tourId ? { "data-tour": item.tourId } : {})}
                 >
                   <item.icon className="nav-icon-medium" />
                   <span className="nav-label">{item.label}</span>
@@ -342,10 +409,29 @@ export default function ProfessorSidebar() {
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
+      {/* Floating, not squeezed into .sidebar-logo -- see the same note in
+          StudentSidebar.jsx. Desktop-only. */}
+      <div className="tutorial-trigger-wrap">
+        <button
+          className="tutorial-trigger-btn"
+          onClick={() => setTourOpen(true)}
+          aria-label="Start a short tutorial"
+        >
+          <Lightbulb size={18} />
+        </button>
+        <span className="tutorial-trigger-tooltip">Want a short tutorial?</span>
+      </div>
+
       <LogoutConfirmModal
         show={showLogoutConfirm}
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <TutorialTour
+        steps={PROFESSOR_TOUR_STEPS}
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
       />
 
       <QueueReasonModal

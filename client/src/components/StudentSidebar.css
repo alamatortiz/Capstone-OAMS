@@ -99,6 +99,72 @@
   transition: all 0.3s ease;
 }
 
+.tutorial-trigger-wrap {
+  /* Bottom-right, not top-right -- the Toaster (sonner) also renders at
+     top-right, so any toast (e.g. "Welcome back") would render on top of
+     and hide a button placed there. */
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 500;
+  display: flex;
+}
+
+@media (max-width: 1024px) {
+  .tutorial-trigger-wrap {
+    display: none;
+  }
+}
+
+.tutorial-trigger-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  width: 2.5rem;
+  height: 2.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.tutorial-trigger-btn:hover {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.4);
+  background-color: rgba(245, 158, 11, 0.12);
+}
+
+.tutorial-trigger-tooltip {
+  /* Above the button, not below -- it's now bottom-anchored, so "below"
+     would run off the bottom of the viewport. */
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  right: 0;
+  transform: translateY(4px);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10;
+}
+
+.tutorial-trigger-wrap:hover .tutorial-trigger-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Sun icon styling - yellow in dark mode */
 [data-theme="dark"] .sun-icon {
   color: #fbbf24;

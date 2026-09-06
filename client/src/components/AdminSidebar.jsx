@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Megaphone as LucideMegaphone, FileText as LucideFileText } from "lucide-react";
+import {
+  Megaphone as LucideMegaphone,
+  FileText as LucideFileText,
+  Lightbulb,
+} from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
+import TutorialTour from "./TutorialTour";
 import { applyTheme, getSavedTheme } from "../utils/theme";
 import useEdgeSwipeOpen from "../hooks/useEdgeSwipeOpen";
 import NotificationBell from "./NotificationBell";
@@ -101,11 +106,71 @@ const NOTIFICATION_TYPE_PATHS = {
 
 const navItems = [
   { icon: HomeIcon, label: "Home", path: "/admin/dashboard" },
-  { icon: MegaphoneNavIcon, label: "Announcements", path: "/admin/announcements" },
-  { icon: QueueIconNav, label: "Queue", path: "/admin/queue" },
-  { icon: CalendarIconNav, label: "Appointments", path: "/admin/appointments" },
-  { icon: FileTextNavIcon, label: "Documents", path: "/admin/document-processing" },
-  { icon: HistoryIconNav, label: "Transactions", path: "/admin/transactions" },
+  {
+    icon: MegaphoneNavIcon,
+    label: "Announcements",
+    path: "/admin/announcements",
+    tourId: "nav-announcements",
+  },
+  { icon: QueueIconNav, label: "Queue", path: "/admin/queue", tourId: "nav-queue" },
+  {
+    icon: CalendarIconNav,
+    label: "Appointments",
+    path: "/admin/appointments",
+    tourId: "nav-appointments",
+  },
+  {
+    icon: FileTextNavIcon,
+    label: "Documents",
+    path: "/admin/document-processing",
+    tourId: "nav-documents",
+  },
+  {
+    icon: HistoryIconNav,
+    label: "Transactions",
+    path: "/admin/transactions",
+    tourId: "nav-transactions",
+  },
+];
+
+// Sidebar-only walkthrough, same approach as the student one -- spotlights
+// each nav link in place rather than actually navigating through its page.
+const ADMIN_TOUR_STEPS = [
+  {
+    title: "Welcome to OAMS!",
+    description:
+      "Let's take a quick look at what you can do here, it'll only take a few seconds.",
+  },
+  {
+    selector: '[data-tour="nav-announcements"]',
+    title: "Post Announcements",
+    description:
+      "Publish department-wide announcements, and manage the FAQs students see on their own Announcements page.",
+  },
+  {
+    selector: '[data-tour="nav-queue"]',
+    title: "Host Queues",
+    description:
+      "Open queue lines for your department's services, and manage students waiting in real-time.",
+  },
+  {
+    selector: '[data-tour="nav-appointments"]',
+    title: "Manage Appointments",
+    description:
+      "Review, approve, and track appointment requests between students and faculty.",
+  },
+  {
+    selector: '[data-tour="nav-documents"]',
+    title: "Process Documents",
+    description:
+      "Handle incoming document requests, generate files, and track their status through to release.",
+  },
+  {
+    selector: '[data-tour="nav-transactions"]',
+    title: "Track Everything",
+    description:
+      "See the full history of every queue, appointment, and document transaction in your department.",
+  },
 ];
 
 export default function AdminSidebar() {
@@ -128,6 +193,7 @@ export default function AdminSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getSavedTheme() === "dark");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
   useEdgeSwipeOpen(() => setSidebarOpen(true), !sidebarOpen);
 
@@ -208,6 +274,7 @@ export default function AdminSidebar() {
                   onClick={() => setSidebarOpen(false)}
                   className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
                   title={item.label}
+                  {...(item.tourId ? { "data-tour": item.tourId } : {})}
                 >
                   <item.icon className="nav-icon-medium" />
                   <span className={`nav-label ${item.smallLabel ? "nav-label-sm" : ""}`}>
@@ -269,10 +336,30 @@ export default function AdminSidebar() {
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
+      {/* Floating, not squeezed into .sidebar-logo -- see the same note in
+          StudentSidebar.jsx (that row has no room to spare and a 4th icon
+          there pushed the notification bell out of view). Desktop-only. */}
+      <div className="tutorial-trigger-wrap">
+        <button
+          className="tutorial-trigger-btn"
+          onClick={() => setTourOpen(true)}
+          aria-label="Start a short tutorial"
+        >
+          <Lightbulb size={18} />
+        </button>
+        <span className="tutorial-trigger-tooltip">Want a short tutorial?</span>
+      </div>
+
       <LogoutConfirmModal
         show={showLogoutConfirm}
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <TutorialTour
+        steps={ADMIN_TOUR_STEPS}
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
       />
     </>
   );
