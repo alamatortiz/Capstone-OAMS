@@ -1155,6 +1155,27 @@
   font-size: 0.8rem;
 }
 
+/* Native "Choose Files" button -- pin to a light chip with near-black text so
+   it stays readable regardless of the OS color-scheme (see the same rule in
+   adm-document-processing.css for the why). */
+.ann-file-input::file-selector-button,
+.ann-file-input::-webkit-file-upload-button {
+  margin-right: 0.6rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: #e5e7eb;
+  color: #111827;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ann-file-input::file-selector-button:hover,
+.ann-file-input::-webkit-file-upload-button:hover {
+  background: #d1d5db;
+}
+
 .ann-attachment-filename {
   display: inline-flex;
   align-items: center;

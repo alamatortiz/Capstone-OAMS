@@ -11,9 +11,9 @@ import { formatManilaDate, formatManilaTime, getManilaTomorrowDateString } from 
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
-import { getDocStatusHubMeta } from "../../utils/documentStatus";
+import { getDocStatusHubMeta, normalizeDocStatus } from "../../utils/documentStatus";
 
-import { ChevronLeft, XCircle, FileText, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, XCircle, FileText, CheckCircle2, Calendar, Clock } from "lucide-react";
 
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
 // advisory here for the running-total UI, the server stays authoritative.
@@ -32,7 +32,7 @@ const formatBytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
  * @property {string} college
  * @property {string} requestDate
  * @property {string} purpose
- * @property {'pending' | 'processing' | 'ready' | 'released' | 'claimed' | 'rejected' | 'cancelled'} status
+ * @property {'pending' | 'processing' | 'ready' | 'claimed' | 'rejected' | 'cancelled'} status
  * @property {string} trackingNumber
  * @property {string} [notes]
  * @property {string} [estimatedCompletion]
@@ -91,6 +91,8 @@ export default function DocumentsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
+  const [claimTarget, setClaimTarget] = useState(null);
+  const [claimingId, setClaimingId] = useState(null);
   const [servicesByDepartmentId, setServicesByDepartmentId] = useState({});
   const [collegesFromDB, setCollegesFromDB] = useState([]);
   const [formOptionsLoading, setFormOptionsLoading] = useState(false);
@@ -302,6 +304,25 @@ export default function DocumentsPage() {
       );
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  // Owner self-claim (Ready -> Claimed). doc.id is prefixed ("req-12"/"sub-7")
+  // and the /claim route parses that prefix, so pass it through unchanged.
+  const handleClaimRequest = async (docId) => {
+    setClaimingId(docId);
+    try {
+      await api.patch(`/student/documents/${docId}/claim`);
+      setClaimTarget(null);
+      await fetchDocuments();
+      toast.success("Document marked as claimed.");
+    } catch (err) {
+      console.error("Failed to mark document as claimed:", err);
+      toast.error(
+        err?.response?.data?.error ?? "Failed to mark the document as claimed",
+      );
+    } finally {
+      setClaimingId(null);
     }
   };
 
@@ -656,6 +677,25 @@ export default function DocumentsPage() {
             confirmDisabled={!!cancellingId}
           />
 
+          {/* Mark as Claimed Confirm Dialog */}
+          <ActionConfirmModal
+            show={claimTarget !== null}
+            variant="success"
+            onCancel={() => setClaimTarget(null)}
+            onConfirm={() => handleClaimRequest(claimTarget.id)}
+            title="Mark Document as Claimed?"
+            message={
+              <>
+                Mark <strong>{claimTarget?.type}</strong> as claimed? Only do
+                this once you've received your document.
+              </>
+            }
+            icon={<CheckCircle2 width={22} height={22} />}
+            cancelText="Not Yet"
+            confirmText={claimingId === claimTarget?.id ? "Marking…" : "Mark as Claimed"}
+            confirmDisabled={!!claimingId}
+          />
+
         </>
       }
     >
@@ -670,8 +710,8 @@ export default function DocumentsPage() {
             }
             icon={<FileText />}
             iconClassName="doc-title-icon"
-            title="Document Requests"
-            subtitle="Request documents and track their status."
+            title="Document Requests and Submissions"
+            subtitle="Request and submit documents as well as track their status."
             headerClassName="doc-header"
             breadcrumbClassName="page-breadcrumb"
             titleSectionClassName="doc-title-section"
@@ -690,7 +730,7 @@ export default function DocumentsPage() {
               className="doc-send-btn"
               onClick={() => setSendDialogOpen(true)}
             >
-              <PlusIcon /> Send a Document
+              <PlusIcon /> Send Document
             </button>
           </div>
 
@@ -753,12 +793,12 @@ export default function DocumentsPage() {
                             <p className="doc-card-college">{doc.college}</p>
                           </div>
                           <div className="doc-card-header-right">
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
 
@@ -804,18 +844,29 @@ export default function DocumentsPage() {
                           </div>
                         )}
 
-                        {(doc.status === "ready" || doc.status === "released") && (
-                          <button
-                            className="doc-card-view-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate("/student/document-status", {
-                                state: { from: "documents", docId: doc.id },
-                              });
-                            }}
-                          >
-                            <DownloadIcon /> View Pickup Details
-                          </button>
+                        {normalizeDocStatus(doc.status) === "ready" && (
+                          <div className="doc-card-actions-row">
+                            <button
+                              className="doc-card-view-button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate("/student/document-status", {
+                                  state: { from: "documents", docId: doc.id },
+                                });
+                              }}
+                            >
+                              <DownloadIcon /> View Pickup Details
+                            </button>
+                            <button
+                              className="doc-claim-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setClaimTarget(doc);
+                              }}
+                            >
+                              <CheckCircle2 /> Mark Document as Claimed
+                            </button>
+                          </div>
                         )}
 
                         {(doc.status === "pending" ||
@@ -871,28 +922,28 @@ export default function DocumentsPage() {
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
                             <p className="doc-card-college">{doc.college}</p>
-                            {doc.claimedDate && (
-                              <>
-                                <p className="doc-card-claimed-date">
-                                  {formatManilaDate(doc.claimedDate, {
-                                    month: "long",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  })}
-                                </p>
-                                <p className="doc-card-claimed-time">
-                                  {formatManilaTime(doc.claimedDate)}
-                                </p>
-                              </>
-                            )}
+                            <div className="doc-card-meta">
+                              <span className="doc-card-meta-date">
+                                <Calendar />
+                                {formatManilaDate(doc.updatedAt || doc.requestDate, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </span>
+                              <span className="doc-card-meta-time">
+                                <Clock />
+                                {formatManilaTime(doc.updatedAt || doc.requestDate)}
+                              </span>
+                            </div>
                           </div>
                           <div className="doc-card-header-right">
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
                       </div>
@@ -935,22 +986,29 @@ export default function DocumentsPage() {
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
-                            <p className="doc-card-college">
-                              {doc.college} •{" "}
-                              {formatManilaDate(doc.requestDate, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </p>
+                            <p className="doc-card-college">{doc.college}</p>
+                            <div className="doc-card-meta">
+                              <span className="doc-card-meta-date">
+                                <Calendar />
+                                {formatManilaDate(doc.updatedAt || doc.requestDate, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </span>
+                              <span className="doc-card-meta-time">
+                                <Clock />
+                                {formatManilaTime(doc.updatedAt || doc.requestDate)}
+                              </span>
+                            </div>
                           </div>
                           <div className="doc-card-header-right">
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
                       </div>
@@ -993,22 +1051,29 @@ export default function DocumentsPage() {
                           </div>
                           <div className="doc-card-title-section">
                             <h3>{doc.type}</h3>
-                            <p className="doc-card-college">
-                              {doc.college} •{" "}
-                              {formatManilaDate(doc.requestDate, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </p>
+                            <p className="doc-card-college">{doc.college}</p>
+                            <div className="doc-card-meta">
+                              <span className="doc-card-meta-date">
+                                <Calendar />
+                                {formatManilaDate(doc.updatedAt || doc.requestDate, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </span>
+                              <span className="doc-card-meta-time">
+                                <Clock />
+                                {formatManilaTime(doc.updatedAt || doc.requestDate)}
+                              </span>
+                            </div>
                           </div>
                           <div className="doc-card-header-right">
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
                       </div>

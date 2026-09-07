@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, Download, FileText, Home as HomeIcon,
+  AlertCircle, Calendar, CheckCircle, ChevronDown, ChevronLeft, Clock, Download, FileText, Home as HomeIcon,
   Megaphone, Plus, Users, X, XCircle, ClipboardList,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -29,7 +29,7 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { connectSocket } from '@/utils/socket';
-import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
+import { DocStatus, getHubStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
 import { toLocalYMD } from '@/utils/date';
 
 // Mirrors the server's limits (server/middleware/upload.js) -- purely
@@ -119,8 +119,8 @@ interface DocumentRequest {
   notes?: string;
   estimatedCompletion?: string;
   neededBy?: string;
-  releasedDate?: string;
   claimedDate?: string;
+  updatedAt?: string;
   studentFiles?: DocumentAttachment[];
   adminFiles?: DocumentAttachment[];
 }
@@ -151,6 +151,11 @@ const formatDateLong = (dateString?: string) => {
 const formatDateShort = (dateString?: string) => {
   if (!dateString) return '—';
   return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatTimeShort = (dateString?: string) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 interface NavItem {
@@ -201,9 +206,11 @@ export default function StudentDocumentsScreen() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ type: '', college: '', copies: '1', purpose: '', neededBy: '' });
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
+  const [claimTarget, setClaimTarget] = useState<DocumentRequest | null>(null);
   const [showNeededByPicker, setShowNeededByPicker] = useState(false);
   const tomorrowDate = (() => {
     const d = new Date();
@@ -451,6 +458,25 @@ export default function StudentDocumentsScreen() {
     }
   };
 
+  // Owner self-claim (Ready -> Claimed). target.id is prefixed ("req-12"/"sub-7")
+  // and the /claim route parses that prefix, so pass it through unchanged.
+  const doClaimRequest = async () => {
+    const target = claimTarget;
+    if (!target) return;
+    setClaimingId(target.id);
+    try {
+      await api.patch(`/student/documents/${target.id}/claim`);
+      setClaimTarget(null);
+      await fetchDocuments();
+      Alert.alert('Claimed', 'Document marked as claimed.');
+    } catch (err: any) {
+      console.error('Failed to mark document as claimed:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to mark the document as claimed');
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   const selectedCollegeId = collegesFromDB.find((c) => c.name === formData.college)?.id;
   const availableTypes = selectedCollegeId != null ? servicesByDepartmentId[selectedCollegeId] ?? [] : [];
   const hasServicesForCollege = availableTypes.length > 0;
@@ -490,20 +516,26 @@ export default function StudentDocumentsScreen() {
           </View>
           <View style={styles.docTitleSection}>
             <Text style={styles.docTitle}>{doc.type}</Text>
-            <Text style={styles.docCollege}>
-              {doc.college}
-              {completed && doc.status !== 'claimed' ? ` • ${formatDateShort(doc.requestDate)}` : ''}
-            </Text>
-            {doc.status === 'claimed' && doc.claimedDate && (
-              <Text style={styles.docCollege}>{formatDateLong(doc.claimedDate)}</Text>
+            <Text style={styles.docCollege}>{doc.college}</Text>
+            {completed && (
+              <View style={styles.docCardMeta}>
+                <View style={styles.docCardMetaRow}>
+                  <Calendar size={13} color={theme.tertiary} />
+                  <Text style={styles.docCardMetaText}>{formatDateShort(doc.updatedAt || doc.requestDate)}</Text>
+                </View>
+                <View style={styles.docCardMetaRow}>
+                  <Clock size={13} color={theme.tertiary} />
+                  <Text style={styles.docCardMetaText}>{formatTimeShort(doc.updatedAt || doc.requestDate)}</Text>
+                </View>
+              </View>
             )}
           </View>
           <View style={styles.docHeaderRight}>
-            <View style={styles.trackingPill}>
-              <Text style={styles.trackingPillText}>{doc.trackingNumber}</Text>
-            </View>
             <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
               <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+            </View>
+            <View style={styles.trackingPill}>
+              <Text style={styles.trackingPillText}>{doc.trackingNumber}</Text>
             </View>
           </View>
         </View>
@@ -540,11 +572,21 @@ export default function StudentDocumentsScreen() {
               </View>
             )}
 
-            {(doc.status === 'ready' || doc.status === 'released') && (
-              <Pressable style={styles.claimBtn} onPress={(e: any) => { e.stopPropagation?.(); goToDocumentStatus(doc); }}>
-                <Download size={16} color={theme.primary} />
-                <Text style={styles.claimBtnText}>View Pickup Details</Text>
-              </Pressable>
+            {normalizeDocStatus(doc.status) === 'ready' && (
+              <View style={styles.docActionsRow}>
+                <Pressable style={[styles.claimBtn, styles.docActionsRowItem]} onPress={(e: any) => { e.stopPropagation?.(); goToDocumentStatus(doc); }}>
+                  <Download size={16} color={theme.primary} />
+                  <Text style={styles.claimBtnText}>View Pickup Details</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.claimBtn, styles.docActionsRowItem]}
+                  onPress={(e: any) => { e.stopPropagation?.(); setClaimTarget(doc); }}
+                  disabled={claimingId === doc.id}
+                >
+                  <CheckCircle size={16} color={theme.primary} />
+                  <Text style={styles.claimBtnText}>{claimingId === doc.id ? 'Marking…' : 'Mark Document as Claimed'}</Text>
+                </Pressable>
+              </View>
             )}
 
             {(doc.status === 'pending' || doc.status === 'processing') && (
@@ -609,8 +651,8 @@ export default function StudentDocumentsScreen() {
               <FileText size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
-              <Text style={styles.pageTitle}>Document Requests</Text>
-              <Text style={styles.pageSubtitle}>Request documents and track their status.</Text>
+              <Text style={styles.pageTitle}>Document Requests and Submissions</Text>
+              <Text style={styles.pageSubtitle}>Request and submit documents as well as track their status.</Text>
             </View>
           </View>
 
@@ -625,7 +667,7 @@ export default function StudentDocumentsScreen() {
             <Pressable onPress={openSendDialog}>
               <LinearGradient colors={['#f97316', '#ea580c']} style={styles.sendBtn}>
                 <Plus size={18} color="#ffffff" />
-                <Text style={styles.sendBtnText}>Send a Document</Text>
+                <Text style={styles.sendBtnText}>Send Document</Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -1058,6 +1100,35 @@ export default function StudentDocumentsScreen() {
         </View>
       </Modal>
 
+      {/* Mark as Claimed Confirm Modal */}
+      <Modal visible={claimTarget !== null} animationType="fade" transparent onRequestClose={() => setClaimTarget(null)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={[styles.logoutIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
+              <CheckCircle size={26} color="#22c55e" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Mark Document as Claimed?</Text>
+            <Text style={styles.logoutModalDescription}>
+              Mark {claimTarget?.type} as claimed? Only do this once you&apos;ve received your document.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setClaimTarget(null)}>
+                <Text style={styles.logoutCancelBtnText}>Not Yet</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.logoutConfirmBtn, { backgroundColor: '#22c55e' }]}
+                onPress={doClaimRequest}
+                disabled={claimingId === claimTarget?.id}
+              >
+                <Text style={styles.logoutConfirmBtnText}>
+                  {claimingId === claimTarget?.id ? 'Marking…' : 'Mark as Claimed'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Confirm Logout Modal */}
       <Modal visible={logoutModalVisible} animationType="fade" transparent onRequestClose={() => setLogoutModalVisible(false)}>
         <View style={styles.logoutOverlay}>
@@ -1251,6 +1322,11 @@ function createStyles(theme: ThemePalette) {
     docTracking: { fontSize: 10, color: theme.tertiary },
     docTrackingValue: { fontWeight: '700', color: theme.success },
 
+    // Terminal cards: left-aligned date + time stamp (transaction-card style).
+    docCardMeta: { alignItems: 'flex-start', gap: 4, marginTop: 4 },
+    docCardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    docCardMetaText: { fontSize: 11, color: theme.tertiary },
+
     docHeaderRight: { alignItems: 'flex-end', gap: 6, flexShrink: 0 },
     trackingPill: {
       backgroundColor: theme.orange, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10,
@@ -1280,6 +1356,10 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)',
     },
     claimBtnText: { fontSize: 12.5, fontWeight: '700', color: theme.primary },
+
+    // Ready card: "View Pickup Details" + "Mark Document as Claimed" side by side.
+    docActionsRow: { flexDirection: 'row', gap: 8 },
+    docActionsRowItem: { flex: 1, minWidth: 0 },
 
     cancelBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

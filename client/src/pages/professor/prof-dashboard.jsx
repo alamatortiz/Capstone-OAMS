@@ -81,7 +81,8 @@ const ClipboardListIcon = () => (
 // text reads the same way on both dashboards ("No Show" not "NO_SHOW").
 function formatActivityStatus(status, type) {
   if (status === "no_show") return "No Show";
-  if (type === "document" && status === "generated") return "Ready";
+  // Defensive: pre-collapse doc rows may still say "generated"/"released".
+  if (type === "document" && (status === "generated" || status === "released")) return "Ready";
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -229,7 +230,7 @@ export default function ProfessorDashboard() {
       title: "Documents",
       value: loading ? "—" : String(s?.documents?.total ?? 0),
       // Same conditional-list-building pattern as stud-dashboard.jsx's own
-      // Documents card description, over s.documents.{pendingOnly,processing,ready,released}.
+      // Documents card description, over s.documents.{pendingOnly,processing,ready}.
       description: (() => {
         if (loading) return "Loading...";
         const parts = [];
@@ -237,7 +238,6 @@ export default function ProfessorDashboard() {
         if (docs.pendingOnly > 0) parts.push(`${docs.pendingOnly} pending`);
         if (docs.processing > 0) parts.push(`${docs.processing} processing`);
         if (docs.ready > 0) parts.push(`${docs.ready} ready`);
-        if (docs.released > 0) parts.push(`${docs.released} released`);
         return parts.length ? parts.join(", ") : "No pending documents";
       })(),
       icon: FileText,
@@ -293,8 +293,8 @@ export default function ProfessorDashboard() {
       badge: `${s?.pendingAppointments ?? 0} Active`,
     },
     {
-      label: "Document Requests",
-      description: "Request documents and track their status.",
+      label: "Document Requests and Submissions",
+      description: "Request and submit documents as well as track their status.",
       icon: FileText,
       path: "/professor/document-request",
       gradientIndex: 4,

@@ -28,7 +28,7 @@ import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
-import { DocStatus, getDetailStatusMeta } from '@/utils/documentStatus';
+import { DocStatus, getDetailStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
 import { formatManilaDate } from '@/utils/date';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -218,8 +218,9 @@ export default function ProfessorDocumentsStatusScreen() {
   );
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showClaimDialog, setShowClaimDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const { user, logout, token } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
@@ -363,19 +364,23 @@ export default function ProfessorDocumentsStatusScreen() {
     }
   };
 
-  const confirmReceipt = async () => {
-    if (!selectedDoc || confirmingReceipt) return;
-    setConfirmingReceipt(true);
+  // Owner self-claim (Ready -> Claimed), mirroring how a student marks an
+  // appointment as done. selectedDoc.id is already prefixed ("req-12"/"sub-7")
+  // and the /claim route parses that prefix, so pass it through unchanged.
+  const claimDocument = async () => {
+    if (!selectedDoc || claiming) return;
+    setClaiming(true);
     try {
-      await api.patch(`/professor/documents/${selectedDoc.id}/confirm-receipt`);
+      await api.patch(`/professor/documents/${selectedDoc.id}/claim`);
       setDocuments((prev) =>
         prev.map((d) => (d.id === selectedDoc.id ? { ...d, status: 'claimed' } : d)),
       );
+      setShowClaimDialog(false);
     } catch (err: any) {
-      console.error('Confirm receipt error:', err);
-      Alert.alert('Error', err?.response?.data?.message ?? 'Could not confirm receipt.');
+      console.error('Claim document error:', err);
+      Alert.alert('Error', err?.response?.data?.message ?? err?.response?.data?.error ?? 'Could not mark the document as claimed.');
     } finally {
-      setConfirmingReceipt(false);
+      setClaiming(false);
     }
   };
 
@@ -415,11 +420,11 @@ export default function ProfessorDocumentsStatusScreen() {
               isDarkMode={isDarkMode}
               styles={styles}
               doc={selectedDoc}
-              backLabel={detailOpenedFromExternal ? 'Document Requests' : 'All Requests'}
+              backLabel={detailOpenedFromExternal ? 'Document Requests and Submissions' : 'All Requests'}
               onBack={backFromDetail}
               onCancel={() => setShowCancelDialog(true)}
-              onConfirmReceipt={confirmReceipt}
-              confirmingReceipt={confirmingReceipt}
+              onClaim={() => setShowClaimDialog(true)}
+              claiming={claiming}
               requirements={selectedDocRequirements}
               reqLoading={loading && !selectedDoc}
             />
@@ -433,7 +438,7 @@ export default function ProfessorDocumentsStatusScreen() {
               >
                 <Ionicons name="chevron-back" size={18} color={theme.subtext} />
                 <Text style={styles.breadcrumbText}>
-                  {breadcrumbFromRequestPage ? 'Document Requests' : 'Home'}
+                  {breadcrumbFromRequestPage ? 'Document Requests and Submissions' : 'Home'}
                 </Text>
               </Pressable>
 
@@ -655,6 +660,34 @@ export default function ProfessorDocumentsStatusScreen() {
         </View>
       </Modal>
 
+      {/* Mark as Claimed Confirm Modal */}
+      <Modal visible={showClaimDialog} animationType="fade" transparent onRequestClose={() => setShowClaimDialog(false)}>
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={[styles.logoutIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
+              <Ionicons name="checkmark-circle-outline" size={26} color="#22c55e" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Mark Document as Claimed?</Text>
+            <Text style={styles.logoutModalDescription}>
+              Mark {selectedDoc?.type} as claimed? Only do this once you&apos;ve received your document.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable style={styles.logoutCancelBtn} onPress={() => setShowClaimDialog(false)}>
+                <Text style={styles.logoutCancelBtnText}>Not Yet</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.logoutConfirmBtn, { backgroundColor: '#22c55e' }]}
+                onPress={claimDocument}
+                disabled={claiming}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
+                <Text style={styles.logoutConfirmBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Confirm Logout Modal */}
       <Modal visible={logoutModalVisible} animationType="fade" transparent onRequestClose={() => setLogoutModalVisible(false)}>
         <View style={styles.logoutOverlay}>
@@ -758,8 +791,8 @@ function DocumentDetail({
   backLabel,
   onBack,
   onCancel,
-  onConfirmReceipt,
-  confirmingReceipt,
+  onClaim,
+  claiming,
   requirements,
   reqLoading,
   isDarkMode,
@@ -770,28 +803,33 @@ function DocumentDetail({
   backLabel: string;
   onBack: () => void;
   onCancel: () => void;
-  onConfirmReceipt: () => void;
-  confirmingReceipt: boolean;
+  onClaim: () => void;
+  claiming: boolean;
   requirements: DocumentRequirement[];
   reqLoading: boolean;
   isDarkMode: boolean;
 }) {
   const meta = getDetailStatusMeta(doc.status, isDarkMode);
   const canCancel = doc.status === 'pending' || doc.status === 'processing';
+  const canClaim = normalizeDocStatus(doc.status) === 'ready';
   const { token } = useAuth();
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
-  // Mirrors student_document_status.tsx's viewSubmissionFile() -- download to
-  // cache then hand off to the OS share sheet, since RN has no direct "open file".
-  const viewSubmissionFile = async (file: DocumentAttachment) => {
+  // Download to cache then hand off to the OS share sheet, since RN has no
+  // direct "open file". Endpoint depends on whether this is a submission or a request.
+  const viewDocFile = async (file: DocumentAttachment) => {
     if (downloadingFileId) return;
     setDownloadingFileId(file.id);
     try {
-      const submissionId = doc.id.replace(/^sub-/, '');
+      const isSub = doc.kind === 'submission';
+      const rawId = doc.id.replace(/^(sub|req)-/, '');
       const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const uri = `${FileSystem.cacheDirectory}submission-${submissionId}-${file.id}-${safeName}`;
+      const uri = `${FileSystem.cacheDirectory}${isSub ? 'submission' : 'request'}-${rawId}-${file.id}-${safeName}`;
+      const endpoint = isSub
+        ? `/professor/document-submissions/${rawId}/files/${file.id}`
+        : `/professor/documents/${rawId}/files/${file.id}`;
       const result = await FileSystem.downloadAsync(
-        `${api.defaults.baseURL}/professor/document-submissions/${submissionId}/files/${file.id}`,
+        `${api.defaults.baseURL}${endpoint}`,
         uri,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -852,7 +890,7 @@ function DocumentDetail({
       </LinearGradient>
 
       {/* Ready alert */}
-      {doc.status === 'generated' && (
+      {canClaim && (
         <View style={styles.readyBanner}>
           <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
           <Text style={styles.readyBannerText}>
@@ -861,18 +899,9 @@ function DocumentDetail({
         </View>
       )}
 
-      {/* Released alert */}
-      {doc.status === 'released' && (
-        <View style={styles.readyBanner}>
-          <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
-          <Text style={styles.readyBannerText}>
-            Your document has been released to the designated location — visit to complete pickup.
-          </Text>
-        </View>
-      )}
-
-      {/* Digital Pickup Code -- shown once an admin used "Generate Document" instead of a physical hand-off */}
-      {doc.isDigitalDelivery && doc.deliveryCode && (doc.status === 'released' || doc.status === 'claimed') && (
+      {/* Digital Pickup Code -- shown once an admin generated a QR code for this
+          Ready request. Claiming is done from the "Mark as Claimed" card below. */}
+      {doc.isDigitalDelivery && doc.deliveryCode && (canClaim || doc.status === 'claimed') && (
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardTitleRow}>
@@ -885,19 +914,11 @@ function DocumentDetail({
               <QRCode value={doc.deliveryCode} size={160} />
             </View>
             <Text style={styles.deliveryCodeText}>{doc.deliveryCode}</Text>
-            {doc.status === 'released' ? (
-              <Pressable
-                style={[styles.confirmReceiptBtn, confirmingReceipt && { opacity: 0.6 }]}
-                onPress={onConfirmReceipt}
-                disabled={confirmingReceipt}
-              >
-                <Text style={styles.confirmReceiptBtnText}>
-                  {confirmingReceipt ? 'Confirming…' : 'Confirm Received'}
-                </Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.claimedNote}>Receipt confirmed — kept here as a record.</Text>
-            )}
+            <Text style={styles.claimedNote}>
+              {doc.status === 'claimed'
+                ? 'Kept here for verification purposes.'
+                : 'Show this code to the office when you collect your document.'}
+            </Text>
           </View>
         </View>
       )}
@@ -924,12 +945,6 @@ function DocumentDetail({
             {doc.neededBy ? formatDate(doc.neededBy) : 'No date requested for the document to be claimable.'}
           </Text>
         </View>
-        {doc.status === 'released' && doc.releasedDate && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date Released</Text>
-            <Text style={styles.detailValue}>{formatDate(doc.releasedDate)}</Text>
-          </View>
-        )}
         {doc.status === 'claimed' && doc.claimedDate && (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date and Time Claimed</Text>
@@ -1005,7 +1020,7 @@ function DocumentDetail({
           {doc.facultyFiles && doc.facultyFiles.length > 0 ? (
             <View style={{ gap: 8, marginTop: 6, marginBottom: 10 }}>
               {doc.facultyFiles.map((f) => (
-                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewSubmissionFile(f)} disabled={!!downloadingFileId}>
+                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewDocFile(f)} disabled={!!downloadingFileId}>
                   <Ionicons name="document-text-outline" size={14} color={theme.orange} />
                   <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
                 </Pressable>
@@ -1018,7 +1033,7 @@ function DocumentDetail({
           {doc.adminFiles && doc.adminFiles.length > 0 ? (
             <View style={{ gap: 8, marginTop: 6 }}>
               {doc.adminFiles.map((f) => (
-                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewSubmissionFile(f)} disabled={!!downloadingFileId}>
+                <Pressable key={f.id} style={styles.attachChip} onPress={() => viewDocFile(f)} disabled={!!downloadingFileId}>
                   <Ionicons name="document-text-outline" size={14} color={theme.orange} />
                   <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
                 </Pressable>
@@ -1027,6 +1042,26 @@ function DocumentDetail({
           ) : (
             <Text style={[styles.reqSubtext, { marginTop: 4 }]}>Nothing returned yet.</Text>
           )}
+        </View>
+      )}
+
+      {/* Soft-copy files the office attached to a document request */}
+      {doc.kind !== 'submission' && doc.adminFiles && doc.adminFiles.length > 0 && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="document-text-outline" size={18} color={theme.orange} />
+              <Text style={styles.cardTitleText}>Files from the Office</Text>
+            </View>
+          </View>
+          <View style={{ gap: 8, marginTop: 6 }}>
+            {doc.adminFiles.map((f) => (
+              <Pressable key={f.id} style={styles.attachChip} onPress={() => viewDocFile(f)} disabled={!!downloadingFileId}>
+                <Ionicons name="document-text-outline" size={14} color={theme.orange} />
+                <Text style={styles.attachChipText} numberOfLines={1}>{f.filename}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       )}
 
@@ -1071,6 +1106,30 @@ function DocumentDetail({
           </Text>
           <Pressable style={styles.cancelBtn} onPress={onCancel}>
             <Text style={styles.cancelBtnText}>Cancel Request</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Mark as Claimed (only while Ready) -- the document counterpart to
+          marking an appointment as done. */}
+      {canClaim && (
+        <View style={[styles.card, styles.claimCard]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#22c55e" />
+              <Text style={[styles.cardTitleText, { color: '#22c55e' }]}>Mark as Claimed</Text>
+            </View>
+          </View>
+          <Text style={styles.cancelDescription}>
+            Once you&apos;ve collected this document, mark it as claimed here so its status stays up to date.
+          </Text>
+          <Pressable
+            style={[styles.claimActionBtn, claiming && { opacity: 0.5 }]}
+            onPress={onClaim}
+            disabled={claiming}
+          >
+            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+            <Text style={styles.claimActionBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>
           </Pressable>
         </View>
       )}
@@ -1291,15 +1350,20 @@ function createStyles(theme: ThemePalette) {
     },
     cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
 
-    // Digital Pickup Code card (QR + text code, "Confirm Received" button)
+    // Mark as Claimed card (green accent, mirrors the cancel card)
+    // Matches student_appointment_status.tsx's completeCard / completeBtn.
+    claimCard: { borderColor: 'rgba(34, 197, 94, 0.25)', backgroundColor: 'rgba(34, 197, 94, 0.04)' },
+    claimActionBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      paddingVertical: 12, borderRadius: 12,
+      borderWidth: 1.5, borderColor: 'rgba(34, 197, 94, 0.35)', backgroundColor: 'rgba(34, 197, 94, 0.05)',
+    },
+    claimActionBtnText: { fontSize: 13, fontWeight: '700', color: '#22c55e' },
+
+    // Digital Pickup Code card (QR + text code)
     qrWrap: { alignItems: 'center', paddingVertical: 8, gap: 12 },
     qrBox: { padding: 12, backgroundColor: '#ffffff', borderRadius: 12 },
     deliveryCodeText: { fontSize: 15, fontWeight: '700', color: theme.text, fontFamily: 'monospace', letterSpacing: 1 },
-    confirmReceiptBtn: {
-      alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, backgroundColor: '#059669', width: '100%', marginTop: 4,
-    },
-    confirmReceiptBtnText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
     claimedNote: { fontSize: 12, color: theme.subtext, textAlign: 'center', marginTop: 4 },
 
     // Nav drawer

@@ -139,12 +139,7 @@ const EMPTY_STATE_META = {
   ready: {
     Icon: CheckCircleIcon,
     title: "No Documents Ready",
-    desc: "There are no documents ready for release.",
-  },
-  released: {
-    Icon: CheckCircleIcon,
-    title: "No Released Documents",
-    desc: "There are no records of released documents.",
+    desc: "There are no documents ready to be claimed.",
   },
   claimed: {
     Icon: CheckCircleIcon,
@@ -227,14 +222,11 @@ export default function AdminDocumentProcessing() {
   const removeReturnFile = (id) =>
     setReturnFiles((prev) => prev.filter((f) => f.id !== id));
 
-  // Fetches one document-submission file's bytes on demand and opens/
-  // downloads it -- mirrors adm-announcements.jsx's openAttachment().
-  const openSubmissionFile = async (submissionId, file) => {
+  // Fetches one document file's bytes on demand and opens/downloads it --
+  // mirrors adm-announcements.jsx's openAttachment().
+  const openDocFileBlob = async (path, file) => {
     try {
-      const res = await api.get(
-        `/admin/document-submissions/${submissionId}/files/${file.id}`,
-        { responseType: "blob" },
-      );
+      const res = await api.get(path, { responseType: "blob" });
       const url = URL.createObjectURL(res.data);
       if (
         file.mimeType?.startsWith("image/") ||
@@ -252,6 +244,16 @@ export default function AdminDocumentProcessing() {
       toast.error("Failed to load file");
     }
   };
+
+  const openSubmissionFile = (submissionId, file) =>
+    openDocFileBlob(
+      `/admin/document-submissions/${submissionId}/files/${file.id}`,
+      file,
+    );
+
+  // Request soft-copy files: endpoint depends on requester source.
+  const openRequestFile = (requestId, file, endpoint) =>
+    openDocFileBlob(`/admin/${endpoint}/${requestId}/files/${file.id}`, file);
 
   // ── Status-change confirmation ───────────────────────────────────────────
   const [confirmStatus, setConfirmStatus] = useState(null); // target status or null
@@ -439,13 +441,13 @@ export default function AdminDocumentProcessing() {
     const notesToSend = notesOverride !== undefined ? notesOverride : processingNotes;
     // Re-sending the document's own current status is how "Attach Files"
     // works without also changing the status -- same endpoint doubles as
-    // both actions, mirroring PUT /admin/announcements/:id.
-    const isFileOnlyUpdate =
-      isSubmission && newStatus === selectedDocument.status;
+    // both actions, mirroring PUT /admin/announcements/:id. Both requests and
+    // submissions support file attach now.
+    const isFileOnlyUpdate = newStatus === selectedDocument.status;
     // GET /admin/document-submissions prefixes ids ("sub-42") so this list
     // stays merge-safe alongside other sources elsewhere (e.g. the admin
     // dashboard widget) -- but the PATCH route itself expects the raw
-    // numeric submission_id, so the prefix must be stripped here.
+    // numeric id, so the prefix must be stripped here. Request ids are raw.
     const rawId = isSubmission
       ? selectedDocument.id.replace(/^sub-/, "")
       : selectedDocument.id;
@@ -455,6 +457,17 @@ export default function AdminDocumentProcessing() {
         body.append("status", newStatus);
         body.append("notes", notesToSend);
         returnFiles.forEach((f) => body.append("returnFiles", f.file));
+        await api.patch(
+          `/admin/${selectedDocument._endpoint}/${rawId}/status`,
+          body,
+        );
+      } else if (returnFiles.length > 0) {
+        // Request + soft-copy files: multipart, field name "attachmentFiles".
+        const body = new FormData();
+        body.append("status", newStatus);
+        body.append("notes", notesToSend);
+        if (needsCode) body.append("officialCode", officialCode);
+        returnFiles.forEach((f) => body.append("attachmentFiles", f.file));
         await api.patch(
           `/admin/${selectedDocument._endpoint}/${rawId}/status`,
           body,
@@ -487,16 +500,16 @@ export default function AdminDocumentProcessing() {
     }
   };
 
-  // "Generate Document" prototype -- an alternative to Mark as Released,
-  // only ever offered for requests (never submissions) at "ready". Its own
-  // endpoint, not handleUpdateStatus's PATCH .../status, since it takes no
-  // body and does more than a plain status change server-side (attaches a
-  // QR/text code, flags the request as a digital delivery).
+  // "Generate Document" prototype -- layers a QR/text pickup code onto an
+  // already-Ready request (never submissions). Its own endpoint, not
+  // handleUpdateStatus's PATCH .../status, since it takes no body and does
+  // more than a plain status change server-side (attaches a QR/text code,
+  // flags the request as a digital delivery). Status stays "ready".
   const handleGenerateDocument = async () => {
     if (!selectedDocument) return;
     try {
       await api.patch(`/admin/${selectedDocument._endpoint}/${selectedDocument.id}/generate`);
-      toast.success("Document generated and sent digitally");
+      toast.success("Digital pickup code generated");
       setShowDetailsModal(false);
       setSelectedDocument(null);
       await fetchDocuments();
@@ -567,17 +580,16 @@ export default function AdminDocumentProcessing() {
         variant: "success",
       },
       generate: {
-        title: "Generate Document?",
+        title: "Generate Pickup Code?",
         message: (
           <>
-            Skip the physical hand-off and generate a QR + text code for the{" "}
+            Generate a QR + text pickup code for the{" "}
             <strong>{selectedDocument.documentType}</strong> request for{" "}
-            <strong>{selectedDocument.requesterName}</strong>? They'll confirm
-            receipt themselves from their own Documents page -- this is a
-            testing prototype, not the normal release process.
+            <strong>{selectedDocument.requesterName}</strong>? It stays Ready and
+            the requester shows the code when they collect it.
           </>
         ),
-        confirmText: "Generate Document",
+        confirmText: "Generate Code",
         icon: <CheckCircleIcon />,
         variant: "success",
       },
@@ -585,44 +597,50 @@ export default function AdminDocumentProcessing() {
         title: "Mark as Ready?",
         message: (
           <>
-            Mark the <strong>{selectedDocument.documentType}</strong> request
-            for <strong>{selectedDocument.requesterName}</strong> as ready for
-            pickup?
+            Mark{" "}
+            {selectedDocument._kind === "submission" ? (
+              <>
+                the <strong>{selectedDocument.documentType}</strong> submission
+                from <strong>{selectedDocument.requesterName}</strong>
+              </>
+            ) : (
+              <>
+                the <strong>{selectedDocument.documentType}</strong> request for{" "}
+                <strong>{selectedDocument.requesterName}</strong>
+              </>
+            )}{" "}
+            as ready for the requester to claim?
           </>
         ),
         confirmText: "Mark as Ready",
         icon: <CheckCircleIcon />,
         variant: "success",
       },
-      claimed:
-        selectedDocument._kind === "submission"
-          ? {
-              title: "Mark as Received?",
-              message: (
-                <>
-                  Confirm that <strong>{selectedDocument.documentType}</strong>{" "}
-                  from <strong>{selectedDocument.requesterName}</strong> has
-                  been received and processed by the office?
-                </>
-              ),
-              confirmText: "Mark as Received",
-              icon: <CheckCircleIcon />,
-              variant: "success",
-            }
-          : {
-              title: "Mark as Claimed?",
-              message: (
-                <>
-                  Confirm that the{" "}
-                  <strong>{selectedDocument.documentType}</strong> request for{" "}
-                  <strong>{selectedDocument.requesterName}</strong> has been
-                  handed to the correct recipient, per office procedure?
-                </>
-              ),
-              confirmText: "Mark as Claimed",
-              icon: <CheckCircleIcon />,
-              variant: "success",
-            },
+      claimed: {
+        title: "Mark as Claimed?",
+        message: (
+          <>
+            Confirm that{" "}
+            {selectedDocument._kind === "submission" ? (
+              <>
+                the <strong>{selectedDocument.documentType}</strong> submission
+                from <strong>{selectedDocument.requesterName}</strong> is
+                complete
+              </>
+            ) : (
+              <>
+                the <strong>{selectedDocument.documentType}</strong> request for{" "}
+                <strong>{selectedDocument.requesterName}</strong> has been handed
+                to the correct recipient
+              </>
+            )}
+            , per office procedure?
+          </>
+        ),
+        confirmText: "Mark as Claimed",
+        icon: <CheckCircleIcon />,
+        variant: "success",
+      },
     }[confirmStatus];
 
   const getStatusMeta = (status) => {
@@ -640,15 +658,11 @@ export default function AdminDocumentProcessing() {
           Icon: ClockIcon,
         };
       case "ready":
+      case "generated":
+      case "released":
         return {
           label: "Ready",
           cls: "adp-badge-ready",
-          Icon: CheckCircleIcon,
-        };
-      case "released":
-        return {
-          label: "Released",
-          cls: "adp-badge-released",
           Icon: CheckCircleIcon,
         };
       case "claimed":
@@ -674,17 +688,13 @@ export default function AdminDocumentProcessing() {
     }
   };
 
-  // One fixed status list for the merged (requests + submissions) view.
-  // Submissions never populate 'ready'/'released' -- nothing is physically
-  // generated or picked up in that direction, claimed is reached directly
-  // from processing -- but that's just an empty tab for them, not a reason
-  // to hide the tab from the merged list.
+  // One fixed status list for the merged (requests + submissions) view --
+  // both now share the Pending -> Processing -> Ready -> Claimed lifeline.
   const TABS = [
     "all",
     "pending",
     "processing",
     "ready",
-    "released",
     "claimed",
     "rejected",
     "cancelled",
@@ -791,14 +801,6 @@ export default function AdminDocumentProcessing() {
                         {formatManilaDate(selectedDocument.requestDate)}
                       </p>
                     </div>
-                    {selectedDocument.releasedDate && (
-                      <div className="adp-modal-field">
-                        <label className="adp-modal-label">Released Date</label>
-                        <p className="adp-modal-value">
-                          {formatManilaDate(selectedDocument.releasedDate)}
-                        </p>
-                      </div>
-                    )}
                     {selectedDocument.claimedDate && (
                       <div className="adp-modal-field">
                         <label className="adp-modal-label">Claimed Date</label>
@@ -825,111 +827,139 @@ export default function AdminDocumentProcessing() {
                     )}
                   </div>
 
-                  {selectedDocument._kind === "submission" && (
-                    <div className="adp-modal-notes-wrap">
-                      <label className="adp-modal-label">
-                        Files from Student
-                      </label>
-                      {selectedDocument.studentFiles?.length > 0 ? (
-                        <div className="adp-attach-list">
-                          {selectedDocument.studentFiles.map((f) => (
-                            <button
-                              key={f.id}
-                              type="button"
-                              className="adp-attach-chip"
-                              onClick={() =>
-                                openSubmissionFile(
-                                  selectedDocument.id.replace(/^sub-/, ""),
-                                  f,
-                                )
-                              }
-                            >
-                              <FileText /> {f.filename}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="adp-modal-value">No files attached.</p>
-                      )}
+                  {(() => {
+                    const isSub = selectedDocument._kind === "submission";
+                    const openAttachedFile = (f) =>
+                      isSub
+                        ? openSubmissionFile(
+                            selectedDocument.id.replace(/^sub-/, ""),
+                            f,
+                          )
+                        : openRequestFile(
+                            selectedDocument.id,
+                            f,
+                            selectedDocument._endpoint,
+                          );
+                    // Files can be attached once processing has started (never
+                    // while Pending) -- matches the server-side guard.
+                    const canAttach =
+                      selectedDocument.status === "processing" ||
+                      selectedDocument.status === "ready";
+                    // Submissions always show this block (it also holds the
+                    // student's own uploads); requests only when there's
+                    // something to show or do.
+                    if (
+                      !isSub &&
+                      !canAttach &&
+                      !(selectedDocument.adminFiles?.length > 0)
+                    ) {
+                      return null;
+                    }
+                    return (
+                      <div className="adp-modal-notes-wrap">
+                        {isSub && (
+                          <>
+                            <label className="adp-modal-label">
+                              Files from Student
+                            </label>
+                            {selectedDocument.studentFiles?.length > 0 ? (
+                              <div className="adp-attach-list">
+                                {selectedDocument.studentFiles.map((f) => (
+                                  <button
+                                    key={f.id}
+                                    type="button"
+                                    className="adp-attach-chip"
+                                    onClick={() => openAttachedFile(f)}
+                                  >
+                                    <FileText /> {f.filename}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="adp-modal-value">
+                                No files attached.
+                              </p>
+                            )}
+                          </>
+                        )}
 
-                      <label
-                        className="adp-modal-label"
-                        style={{ marginTop: "0.75rem" }}
-                      >
-                        Return Files{" "}
-                        <span className="adp-attach-budget">
-                          ({returnFiles.length}/{MAX_FILES} files,{" "}
-                          {formatBytes(
-                            returnFiles.reduce(
-                              (sum, f) => sum + f.file.size,
-                              0,
-                            ),
-                          )}
-                          /{formatBytes(MAX_TOTAL_BYTES)})
-                        </span>
-                      </label>
-                      {selectedDocument.adminFiles?.length > 0 && (
-                        <div className="adp-attach-list">
-                          {selectedDocument.adminFiles.map((f) => (
-                            <button
-                              key={f.id}
-                              type="button"
-                              className="adp-attach-chip"
-                              onClick={() =>
-                                openSubmissionFile(
-                                  selectedDocument.id.replace(/^sub-/, ""),
-                                  f,
-                                )
-                              }
-                            >
-                              <FileText /> {f.filename}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {returnFiles.length > 0 && (
-                        <div className="adp-attach-list">
-                          {returnFiles.map((f) => (
-                            <div
-                              key={f.id}
-                              className="adp-attach-chip adp-attach-chip--queued"
-                            >
-                              <span className="adp-attach-filename">
-                                <FileText /> {f.file.name}
-                              </span>
+                        <label
+                          className="adp-modal-label"
+                          style={isSub ? { marginTop: "0.75rem" } : undefined}
+                        >
+                          {isSub ? "Return Files" : "Attached Files (Soft Copy)"}{" "}
+                          <span className="adp-attach-budget">
+                            ({returnFiles.length}/{MAX_FILES} files,{" "}
+                            {formatBytes(
+                              returnFiles.reduce(
+                                (sum, f) => sum + f.file.size,
+                                0,
+                              ),
+                            )}
+                            /{formatBytes(MAX_TOTAL_BYTES)})
+                          </span>
+                        </label>
+                        {selectedDocument.adminFiles?.length > 0 && (
+                          <div className="adp-attach-list">
+                            {selectedDocument.adminFiles.map((f) => (
                               <button
+                                key={f.id}
                                 type="button"
-                                className="adp-attach-remove"
-                                aria-label={`Remove ${f.file.name}`}
-                                onClick={() => removeReturnFile(f.id)}
+                                className="adp-attach-chip"
+                                onClick={() => openAttachedFile(f)}
                               >
-                                <CloseIcon />
+                                <FileText /> {f.filename}
                               </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {(selectedDocument.status === "pending" ||
-                        selectedDocument.status === "processing") && (
-                        <>
-                          <input
-                            type="file"
-                            multiple
-                            accept={ATTACHMENT_ACCEPT}
-                            className="adp-attach-input"
-                            disabled={returnFiles.length >= MAX_FILES}
-                            onChange={(e) => {
-                              addReturnFiles(e.target.files);
-                              e.target.value = "";
-                            }}
-                          />
+                            ))}
+                          </div>
+                        )}
+                        {returnFiles.length > 0 && (
+                          <div className="adp-attach-list">
+                            {returnFiles.map((f) => (
+                              <div
+                                key={f.id}
+                                className="adp-attach-chip adp-attach-chip--queued"
+                              >
+                                <span className="adp-attach-filename">
+                                  <FileText /> {f.file.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="adp-attach-remove"
+                                  aria-label={`Remove ${f.file.name}`}
+                                  onClick={() => removeReturnFile(f.id)}
+                                >
+                                  <CloseIcon />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {canAttach ? (
+                          <>
+                            <input
+                              type="file"
+                              multiple
+                              accept={ATTACHMENT_ACCEPT}
+                              className="adp-attach-input"
+                              disabled={returnFiles.length >= MAX_FILES}
+                              onChange={(e) => {
+                                addReturnFiles(e.target.files);
+                                e.target.value = "";
+                              }}
+                            />
+                            <p className="adp-attach-hint">
+                              Each file up to {formatBytes(MAX_FILE_BYTES)}.
+                            </p>
+                          </>
+                        ) : (
                           <p className="adp-attach-hint">
-                            Each file up to {formatBytes(MAX_FILE_BYTES)}.
+                            Start processing this document to attach files.
                           </p>
-                        </>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {selectedDocument.status === "processing" &&
                     selectedDocument.requiresCoding && (
@@ -975,30 +1005,12 @@ export default function AdminDocumentProcessing() {
                         Start Processing
                       </button>
                     )}
-                    {selectedDocument.status === "processing" &&
-                      selectedDocument._kind === "submission" && (
-                        <button
-                          className="adp-modal-btn adp-modal-btn--success"
-                          onClick={() => setConfirmStatus("claimed")}
-                        >
-                          Mark as Received
-                        </button>
-                      )}
-                    {selectedDocument.status === "processing" &&
-                      selectedDocument._kind !== "submission" && (
-                        <button
-                          className="adp-modal-btn adp-modal-btn--success"
-                          onClick={handleMarkReadyClick}
-                        >
-                          Mark as Ready
-                        </button>
-                      )}
-                    {selectedDocument.status === "ready" && (
+                    {selectedDocument.status === "processing" && (
                       <button
-                        className="adp-modal-btn adp-modal-btn--primary"
-                        onClick={() => handleUpdateStatus("released")}
+                        className="adp-modal-btn adp-modal-btn--success"
+                        onClick={handleMarkReadyClick}
                       >
-                        Mark as Released
+                        Mark as Ready
                       </button>
                     )}
                     {selectedDocument.status === "ready" &&
@@ -1007,10 +1019,10 @@ export default function AdminDocumentProcessing() {
                           className="adp-modal-btn adp-modal-btn--outline"
                           onClick={() => setConfirmStatus("generate")}
                         >
-                          Generate Document
+                          Generate Pickup Code
                         </button>
                       )}
-                    {selectedDocument.status === "released" && (
+                    {selectedDocument.status === "ready" && (
                       <button
                         className="adp-modal-btn adp-modal-btn--primary"
                         onClick={() => setConfirmStatus("claimed")}
@@ -1027,17 +1039,16 @@ export default function AdminDocumentProcessing() {
                         Reject Request
                       </button>
                     )}
-                    {selectedDocument._kind === "submission" &&
-                      (selectedDocument.status === "pending" ||
-                        selectedDocument.status === "processing") && (
-                        <button
-                          className="adp-modal-btn adp-modal-btn--outline"
-                          onClick={handleAttachReturnFiles}
-                          disabled={returnFiles.length === 0}
-                        >
-                          Attach Files
-                        </button>
-                      )}
+                    {(selectedDocument.status === "processing" ||
+                      selectedDocument.status === "ready") && (
+                      <button
+                        className="adp-modal-btn adp-modal-btn--outline"
+                        onClick={handleAttachReturnFiles}
+                        disabled={returnFiles.length === 0}
+                      >
+                        Attach Files
+                      </button>
+                    )}
                     <button
                       className="adp-modal-btn adp-modal-btn--outline"
                       onClick={handleCloseModal}

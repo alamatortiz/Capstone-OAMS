@@ -202,12 +202,6 @@
   border: 1px solid rgba(34, 197, 94, 0.35);
 }
 
-.dss-badge-released {
-  background: rgba(34, 197, 94, 0.18);
-  color: var(--primary-color);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-}
-
 .dss-badge-claimed {
   background: rgba(34, 197, 94, 0.18);
   color: var(--primary-color);
@@ -237,11 +231,6 @@
   border-color: rgba(37, 99, 235, 0.25);
 }
 [data-theme="light"] .dss-badge-ready {
-  background: rgba(5, 150, 105, 0.1);
-  color: #065f46;
-  border-color: rgba(5, 150, 105, 0.25);
-}
-[data-theme="light"] .dss-badge-released {
   background: rgba(5, 150, 105, 0.1);
   color: #065f46;
   border-color: rgba(5, 150, 105, 0.25);
@@ -699,26 +688,72 @@
   border-color: rgba(239, 68, 68, 0.5);
 }
 
-.dss-confirm-receipt-btn {
-  background: #22c55e;
-  border: 1px solid #22c55e;
-  color: white;
-  padding: 0.5rem 1.25rem;
+/* ─── Mark as Claimed card + button — matches the appointment
+   "Mark as Completed" card (.apst-card.apst-complete-card in
+   stud-appointment-status.css) exactly. ──────────────────────────────────── */
+.dss-claim-card {
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+[data-theme="light"] .dss-claim-card {
+  background-color: rgba(34, 197, 94, 0.03);
+}
+
+.dss-claim-card .dss-card-header {
+  border-bottom-color: rgba(34, 197, 94, 0.15);
+}
+
+.dss-claim-title,
+.dss-claim-card .dss-card-title svg {
+  color: #22c55e;
+}
+
+.dss-claim-desc {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.dss-claim-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
   border-radius: 0.75rem;
+  color: #86efac;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.dss-confirm-receipt-btn:hover {
-  background-color: #16a34a;
-  border-color: #16a34a;
+.dss-claim-btn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #4ade80;
 }
 
-.dss-confirm-receipt-btn:disabled {
-  opacity: 0.6;
+.dss-claim-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+[data-theme="light"] .dss-claim-btn {
+  background: rgba(21, 128, 61, 0.08);
+  border-color: rgba(21, 128, 61, 0.25);
+  color: #166534;
+}
+
+[data-theme="light"] .dss-claim-btn:hover:not(:disabled) {
+  background: rgba(21, 128, 61, 0.15);
+  border-color: rgba(21, 128, 61, 0.4);
+  color: #14532d;
 }
 
 /* ─── Attachments (Send a Document) ─────────────────────────────────────── */

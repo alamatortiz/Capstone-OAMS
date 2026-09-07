@@ -354,8 +354,12 @@ body {
   transition: all 0.3s ease;
 }
 
-.announcement-general .announcement-icon {
-  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+/* Faculty "general" announcements render blue (matching the student
+   "reminder" category accent) rather than gray. Scoped to
+   .prof-announcements-page so the bare .announcement-general rule in
+   stud-announcements.css (bundled globally) still governs student pages. */
+.prof-announcements-page .announcement-general .announcement-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
 .announcement-pinned .announcement-icon {
@@ -594,8 +598,8 @@ body {
   height: 1.4rem;
 }
 
-.ann-detail-header-icon.announcement-general {
-  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+.prof-ann-detail .ann-detail-header-icon.announcement-general {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
 .ann-detail-header-icon.announcement-pinned {

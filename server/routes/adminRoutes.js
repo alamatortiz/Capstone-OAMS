@@ -9,7 +9,7 @@ const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/authMiddleware");
-const { upload, UPLOAD_DIR, MAX_FILES, documentSubmissionUpload } = require("../middleware/upload");
+const { upload, UPLOAD_DIR, MAX_FILES, documentSubmissionUpload, documentRequestUpload } = require("../middleware/upload");
 const {
   getAttachmentsMap,
   getAttachments,
@@ -24,6 +24,13 @@ const {
   deleteFiles: deleteSubmissionFiles,
   serveAdminDocumentSubmissionFile,
 } = require("../utils/documentSubmissionAttachments");
+const {
+  getFilesMap: getRequestFilesMap,
+  insertFiles: insertRequestFiles,
+  deleteFiles: deleteRequestFiles,
+  getExistingBudget: getRequestFilesBudget,
+  serveAdminRequestFile,
+} = require("../utils/documentRequestAttachments");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
 const { getManilaDateString, getManilaTimeString, formatRelativeTime, formatTime12h: formatTime } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
@@ -1467,8 +1474,10 @@ router.get(
         pending: "pending",
         rejected: "rejected",
         processing: "processing",
-        generated: "generated",
-        released: "released",
+        ready: "ready",
+        // Defensive aliases for any row that predates the lifeline collapse.
+        generated: "ready",
+        released: "ready",
         claimed: "claimed",
       };
       // Reverse index of statusMap (e.g. { pending: ["waiting","pending"], ... })
@@ -1592,8 +1601,9 @@ router.get(
                 dr.request_id AS id,
                 CASE dr.status
                   WHEN 'claimed'    THEN 'Claimed Document Request'
-                  WHEN 'released'   THEN 'Released Document Request'
-                  WHEN 'generated'  THEN 'Generated Document'
+                  WHEN 'ready'      THEN 'Ready Document Request'
+                  WHEN 'released'   THEN 'Ready Document Request'
+                  WHEN 'generated'  THEN 'Ready Document Request'
                   WHEN 'processing' THEN 'Processing Document Request'
                   WHEN 'cancelled'  THEN 'Cancelled Document Request'
                   ELSE 'Pending Document Request'
@@ -1626,8 +1636,9 @@ router.get(
                 fdr.request_id AS id,
                 CASE fdr.status
                   WHEN 'claimed'    THEN 'Claimed Document Request'
-                  WHEN 'released'   THEN 'Released Document Request'
-                  WHEN 'generated'  THEN 'Generated Document'
+                  WHEN 'ready'      THEN 'Ready Document Request'
+                  WHEN 'released'   THEN 'Ready Document Request'
+                  WHEN 'generated'  THEN 'Ready Document Request'
                   WHEN 'processing' THEN 'Processing Document Request'
                   WHEN 'cancelled'  THEN 'Cancelled Document Request'
                   ELSE 'Pending Document Request'
@@ -1659,7 +1670,8 @@ router.get(
                 'submission' AS type,
                 ds.submission_id AS id,
                 CASE ds.status
-                  WHEN 'claimed'    THEN 'Received Document'
+                  WHEN 'claimed'    THEN 'Completed Document Submission'
+                  WHEN 'ready'      THEN 'Ready Document Submission'
                   WHEN 'processing' THEN 'Processing Sent Document'
                   WHEN 'rejected'   THEN 'Rejected Sent Document'
                   WHEN 'cancelled'  THEN 'Cancelled Sent Document'
@@ -1977,6 +1989,11 @@ router.get(
         [deptId],
       );
 
+      const adminFilesMap = await getRequestFilesMap(
+        rows.map((r) => r.request_id),
+        { faculty: false },
+      );
+
       const documents = rows.map((r) => ({
         id: String(r.request_id),
         trackingNumber: r.tracking_number,
@@ -2001,6 +2018,7 @@ router.get(
         officialCode: r.official_code || null,
         isDigitalDelivery: !!r.is_digital_delivery,
         deliveryCode: r.delivery_code || null,
+        adminFiles: adminFilesMap[r.request_id] || [],
       }));
 
       res.json({ documents });
@@ -2053,6 +2071,11 @@ router.get(
         [deptId],
       );
 
+      const adminFilesMap = await getRequestFilesMap(
+        rows.map((r) => r.request_id),
+        { faculty: true },
+      );
+
       const documents = rows.map((r) => ({
         id: String(r.request_id),
         trackingNumber: r.tracking_number,
@@ -2075,6 +2098,7 @@ router.get(
         officialCode: r.official_code || null,
         isDigitalDelivery: !!r.is_digital_delivery,
         deliveryCode: r.delivery_code || null,
+        adminFiles: adminFilesMap[r.request_id] || [],
       }));
 
       res.json({ documents });
@@ -2134,69 +2158,78 @@ async function upsertDeliveryCode(isFaculty, requestId, trackingNumber) {
 }
 
 // PATCH /api/admin/faculty-document-processing/:requestId/status
-// Body: { status, notes }
+// Body: { status, notes, officialCode } as JSON, OR multipart/form-data with
+// the same fields plus attachmentFiles[] (soft-copy files the office attaches
+// to the request). Re-sending the current status with files = "attach only".
 // Validates the request belongs to the admin's department before updating.
 router.patch(
   "/faculty-document-processing/:requestId/status",
   authenticateToken,
   authorizeRoles("admin"),
+  documentRequestUpload.upload.array("attachmentFiles", MAX_FILES),
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
     const { status, notes, officialCode } = req.body;
     const adminId = req.user.userId;
 
     if (!DB_STATUS_MAP[status]) {
+      deleteRequestFiles(req.files);
       return res.status(400).json({ error: "Invalid status" });
     }
     const dbStatus = DB_STATUS_MAP[status];
 
+    let conn;
     try {
       const deptId = await getAdminDepartmentId(adminId);
       if (!deptId) {
+        deleteRequestFiles(req.files);
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
 
-      const [[request]] = await pool.query(
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      const [[request]] = await conn.query(
         `SELECT fdr.request_id, fdr.status, fdr.faculty_id, fdr.tracking_number, s.department_id, s.requires_coding, s.service_name
          FROM faculty_document_requests fdr
          JOIN document_services s ON fdr.service_id = s.service_id
-         WHERE fdr.request_id = ?`,
+         WHERE fdr.request_id = ? FOR UPDATE`,
         [requestId],
       );
 
-      if (!request) {
-        return res.status(404).json({ error: "Document request not found" });
-      }
+      const fail = async (code, error) => {
+        await conn.rollback();
+        deleteRequestFiles(req.files);
+        return res.status(code).json({ error });
+      };
+
+      if (!request) return fail(404, "Document request not found");
       if (request.department_id !== deptId) {
-        return res.status(403).json({ error: "You can only update documents for your own department" });
+        return fail(403, "You can only update documents for your own department");
       }
-
-      // Once a request reaches a terminal state, nothing should move it
-      // again -- most importantly 'cancelled', since that's set by the
-      // faculty member themselves and an admin resuming it behind their
-      // back would be surprising. (claimed/rejected are also final.)
+      // Terminal states (claimed/rejected/cancelled) accept nothing further.
       if (["claimed", "rejected", "cancelled"].includes(request.status)) {
-        return res.status(409).json({
-          error: "This request is already finalized and can no longer be updated",
-        });
+        return fail(409, "This request is already finalized and can no longer be updated");
       }
-
       const requiredPrior = REQUIRED_PRIOR_STATUS[dbStatus];
       if (requiredPrior && request.status !== requiredPrior) {
-        return res.status(409).json({
-          error: `Document must be ${requiredPrior} before it can be marked ${dbStatus}`,
-        });
+        return fail(409, `Document must be ${requiredPrior} before it can be marked ${dbStatus}`);
       }
-
-      const needsCode = dbStatus === "generated" && request.requires_coding;
+      const needsCode = dbStatus === "ready" && request.requires_coding;
       const trimmedCode = typeof officialCode === "string" ? officialCode.trim() : "";
       if (needsCode && !trimmedCode) {
-        return res.status(400).json({ error: "This document type requires an official code before it can be marked ready" });
+        return fail(400, "This document type requires an official code before it can be marked ready");
+      }
+      if (req.files?.length && !["processing", "ready"].includes(request.status)) {
+        return fail(400, "Files can only be attached while the request is processing or ready");
+      }
+      if (req.files?.length) {
+        const budget = await getRequestFilesBudget(requestId, { faculty: true });
+        const budgetError = validateBudget(req.files, budget.count, budget.bytes);
+        if (budgetError) return fail(400, budgetError);
       }
 
-      const timestampClause =
-        dbStatus === "released" ? ", released_at = NOW()" :
-        dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
       const codeClause = needsCode ? ", official_code = ?" : "";
 
@@ -2205,10 +2238,16 @@ router.patch(
       if (needsCode) values.push(trimmedCode);
       values.push(requestId);
 
-      await pool.query(
+      await conn.query(
         `UPDATE faculty_document_requests SET status = ?${notesClause}${codeClause}${timestampClause} WHERE request_id = ?`,
         values,
       );
+
+      if (req.files?.length) {
+        await insertRequestFiles(requestId, { faculty: true }, req.files, adminId, conn);
+      }
+
+      await conn.commit();
 
       await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: dbStatus });
 
@@ -2225,17 +2264,20 @@ router.patch(
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
+      if (conn) { try { await conn.rollback(); } catch { /* already rolled back */ } }
+      deleteRequestFiles(req.files);
       sendServerError(res, error, "Faculty document status update error:");
+    } finally {
+      if (conn) conn.release();
     }
   },
 );
 
 // PATCH /api/admin/faculty-document-processing/:requestId/generate
-// "Generate Document" prototype -- an alternative to the normal Ready ->
-// Released -> Claimed hand-off. Only valid from "ready" (DB: 'generated');
-// attaches a QR/text code and jumps straight to "released" flagged as a
-// digital delivery, so the faculty member can self-claim it from their own
-// Documents page instead of an admin manually marking it claimed.
+// "Generate Document" prototype -- layers a QR/text pickup code onto an
+// already-Ready request and flags it as a digital delivery, so the faculty
+// member can show the code at the office. Status stays 'ready'; the requester
+// self-claims it (Ready -> Claimed) from their own Documents page.
 router.patch(
   "/faculty-document-processing/:requestId/generate",
   authenticateToken,
@@ -2264,27 +2306,27 @@ router.patch(
       if (request.department_id !== deptId) {
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
-      if (request.status !== "generated") {
+      if (request.status !== "ready") {
         return res.status(409).json({ error: "Document must be Ready before it can be digitally generated" });
       }
 
       const deliveryCode = await upsertDeliveryCode(true, requestId, request.tracking_number);
 
       await pool.query(
-        `UPDATE faculty_document_requests SET status = 'released', is_digital_delivery = TRUE, released_at = NOW() WHERE request_id = ?`,
+        `UPDATE faculty_document_requests SET is_digital_delivery = TRUE WHERE request_id = ?`,
         [requestId],
       );
 
-      await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: "released", is_digital_delivery: true });
+      await logAudit(adminId, "UPDATE", "faculty_document_requests", requestId, { status: request.status }, { status: "ready", is_digital_delivery: true });
 
-      emitToUser(request.faculty_id, "document:status-updated", { requestId, status: "released" });
+      emitToUser(request.faculty_id, "document:status-updated", { requestId, status: "ready" });
       createNotification(
         request.faculty_id,
         `Your ${request.service_name} request (${request.tracking_number}) is ready -- check your Documents page for your pickup code.`,
         "document",
       );
 
-      res.json({ message: "Document generated and released digitally", requestId, deliveryCode });
+      res.json({ message: "Digital pickup code generated", requestId, deliveryCode });
     } catch (error) {
       sendServerError(res, error, "Faculty document generate error:");
     }
@@ -2292,69 +2334,78 @@ router.patch(
 );
 
 // PATCH /api/admin/document-processing/:requestId/status
-// Body: { status, notes }
+// Body: { status, notes, officialCode } as JSON, OR multipart/form-data with
+// the same fields plus attachmentFiles[] (soft-copy files the office attaches
+// to the request). Re-sending the current status with files = "attach only".
 // Validates the request belongs to the admin's department before updating.
 router.patch(
   "/document-processing/:requestId/status",
   authenticateToken,
   authorizeRoles("admin"),
+  documentRequestUpload.upload.array("attachmentFiles", MAX_FILES),
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
     const { status, notes, officialCode } = req.body;
     const adminId = req.user.userId;
 
     if (!DB_STATUS_MAP[status]) {
+      deleteRequestFiles(req.files);
       return res.status(400).json({ error: "Invalid status" });
     }
     const dbStatus = DB_STATUS_MAP[status];
 
+    let conn;
     try {
       const deptId = await getAdminDepartmentId(adminId);
       if (!deptId) {
+        deleteRequestFiles(req.files);
         return res.status(403).json({ error: "Admin has no department assigned" });
       }
 
-      const [[request]] = await pool.query(
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      const [[request]] = await conn.query(
         `SELECT dr.request_id, dr.student_id, dr.status, dr.tracking_number, s.department_id, s.requires_coding, s.service_name
          FROM document_requests dr
          JOIN document_services s ON dr.service_id = s.service_id
-         WHERE dr.request_id = ?`,
+         WHERE dr.request_id = ? FOR UPDATE`,
         [requestId],
       );
 
-      if (!request) {
-        return res.status(404).json({ error: "Document request not found" });
-      }
+      const fail = async (code, error) => {
+        await conn.rollback();
+        deleteRequestFiles(req.files);
+        return res.status(code).json({ error });
+      };
+
+      if (!request) return fail(404, "Document request not found");
       if (request.department_id !== deptId) {
-        return res.status(403).json({ error: "You can only update documents for your own department" });
+        return fail(403, "You can only update documents for your own department");
       }
-
-      // Once a request reaches a terminal state, nothing should move it
-      // again -- most importantly 'cancelled', since that's set by the
-      // student themselves and an admin resuming it behind their back would
-      // be surprising. (claimed/rejected are also final.)
+      // Terminal states (claimed/rejected/cancelled) accept nothing further.
       if (["claimed", "rejected", "cancelled"].includes(request.status)) {
-        return res.status(409).json({
-          error: "This request is already finalized and can no longer be updated",
-        });
+        return fail(409, "This request is already finalized and can no longer be updated");
       }
-
       const requiredPrior = REQUIRED_PRIOR_STATUS[dbStatus];
       if (requiredPrior && request.status !== requiredPrior) {
-        return res.status(409).json({
-          error: `Document must be ${requiredPrior} before it can be marked ${dbStatus}`,
-        });
+        return fail(409, `Document must be ${requiredPrior} before it can be marked ${dbStatus}`);
       }
-
-      const needsCode = dbStatus === "generated" && request.requires_coding;
+      const needsCode = dbStatus === "ready" && request.requires_coding;
       const trimmedCode = typeof officialCode === "string" ? officialCode.trim() : "";
       if (needsCode && !trimmedCode) {
-        return res.status(400).json({ error: "This document type requires an official code before it can be marked ready" });
+        return fail(400, "This document type requires an official code before it can be marked ready");
+      }
+      if (req.files?.length && !["processing", "ready"].includes(request.status)) {
+        return fail(400, "Files can only be attached while the request is processing or ready");
+      }
+      if (req.files?.length) {
+        const budget = await getRequestFilesBudget(requestId, { faculty: false });
+        const budgetError = validateBudget(req.files, budget.count, budget.bytes);
+        if (budgetError) return fail(400, budgetError);
       }
 
-      const timestampClause =
-        dbStatus === "released" ? ", released_at = NOW()" :
-        dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
+      const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
       const codeClause = needsCode ? ", official_code = ?" : "";
 
@@ -2363,10 +2414,16 @@ router.patch(
       if (needsCode) values.push(trimmedCode);
       values.push(requestId);
 
-      await pool.query(
+      await conn.query(
         `UPDATE document_requests SET status = ?${notesClause}${codeClause}${timestampClause} WHERE request_id = ?`,
         values,
       );
+
+      if (req.files?.length) {
+        await insertRequestFiles(requestId, { faculty: false }, req.files, adminId, conn);
+      }
+
+      await conn.commit();
 
       await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: dbStatus });
 
@@ -2383,17 +2440,20 @@ router.patch(
 
       res.json({ message: "Document status updated", requestId, status });
     } catch (error) {
+      if (conn) { try { await conn.rollback(); } catch { /* already rolled back */ } }
+      deleteRequestFiles(req.files);
       sendServerError(res, error, "Document status update error:");
+    } finally {
+      if (conn) conn.release();
     }
   },
 );
 
 // PATCH /api/admin/document-processing/:requestId/generate
 // "Generate Document" prototype -- see the faculty-document-processing
-// equivalent above for the full explanation. Only valid from "ready" (DB:
-// 'generated'); attaches a QR/text code and jumps straight to "released"
-// flagged as a digital delivery, so the student can self-claim it from their
-// own Documents page instead of an admin manually marking it claimed.
+// equivalent above. Layers a QR/text pickup code onto an already-Ready
+// request and flags it as a digital delivery; status stays 'ready' and the
+// student self-claims it (Ready -> Claimed) from their own Documents page.
 router.patch(
   "/document-processing/:requestId/generate",
   authenticateToken,
@@ -2422,27 +2482,27 @@ router.patch(
       if (request.department_id !== deptId) {
         return res.status(403).json({ error: "You can only update documents for your own department" });
       }
-      if (request.status !== "generated") {
+      if (request.status !== "ready") {
         return res.status(409).json({ error: "Document must be Ready before it can be digitally generated" });
       }
 
       const deliveryCode = await upsertDeliveryCode(false, requestId, request.tracking_number);
 
       await pool.query(
-        `UPDATE document_requests SET status = 'released', is_digital_delivery = TRUE, released_at = NOW() WHERE request_id = ?`,
+        `UPDATE document_requests SET is_digital_delivery = TRUE WHERE request_id = ?`,
         [requestId],
       );
 
-      await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: "released", is_digital_delivery: true });
+      await logAudit(adminId, "UPDATE", "document_requests", requestId, { status: request.status }, { status: "ready", is_digital_delivery: true });
 
-      emitToUser(request.student_id, "document:status-updated", { requestId, status: "released" });
+      emitToUser(request.student_id, "document:status-updated", { requestId, status: "ready" });
       createNotification(
         request.student_id,
         `Your ${request.service_name} request (${request.tracking_number}) is ready -- check your Documents page for your pickup code.`,
         "document",
       );
 
-      res.json({ message: "Document generated and released digitally", requestId, deliveryCode });
+      res.json({ message: "Digital pickup code generated", requestId, deliveryCode });
     } catch (error) {
       sendServerError(res, error, "Document generate error:");
     }
@@ -2536,11 +2596,11 @@ router.get(
 
 // PATCH /api/admin/document-submissions/:submissionId/status
 // Body (multipart/form-data or JSON): { status, notes, returnFiles[] }
-// Same terminal-state gate as document-processing's PATCH, using the
-// submission's own smaller status vocabulary (no 'generated'/'released' --
-// claimed is reached directly from processing). This one endpoint doubles
-// as "attach return files without changing status" -- the admin UI can
-// re-send the current status alongside new returnFiles, exactly like
+// Same lifeline as document-processing now: Pending -> Processing -> Ready
+// -> Claimed (+ Rejected, Cancelled). 'ready' = the office has processed the
+// submission; the submitter then self-marks it Claimed. This one endpoint
+// doubles as "attach return files without changing status" -- the admin UI
+// can re-send the current status alongside new returnFiles, exactly like
 // PUT /admin/announcements/:id doubles as "edit text" / "add files." The
 // upload.array middleware safely no-ops on a plain-JSON request body.
 router.patch(
@@ -2599,6 +2659,17 @@ router.patch(
         deleteSubmissionFiles(req.files);
         return res.status(409).json({
           error: `Document must be ${requiredPrior} before it can be marked ${dbStatus}`,
+        });
+      }
+
+      // Return files can only be attached once the office has started
+      // processing (or the submission is Ready) -- never while it's still
+      // Pending. The UI hides the picker before Processing; this is the
+      // server-side backstop against a re-sent 'pending' status smuggling files in.
+      if (req.files?.length && !["processing", "ready"].includes(submission.status)) {
+        deleteSubmissionFiles(req.files);
+        return res.status(400).json({
+          error: "Files can only be attached once the submission is being processed",
         });
       }
 
@@ -2682,6 +2753,53 @@ router.get(
       await serveAdminDocumentSubmissionFile(res, { submissionId, fileId, adminDeptId });
     } catch (error) {
       sendServerError(res, error, "Get document submission file error:");
+    }
+  },
+);
+
+// GET /api/admin/document-processing/:requestId/files/:fileId
+// Streams one soft-copy file the office attached to a student document request.
+router.get(
+  "/document-processing/:requestId/files/:fileId",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const requestId = parseInt(req.params.requestId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!requestId || !fileId) {
+      return res.status(400).json({ error: "Invalid request or file id" });
+    }
+    try {
+      const adminDeptId = await getAdminDepartmentId(req.user.userId);
+      if (!adminDeptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      await serveAdminRequestFile(res, { requestId, fileId, faculty: false, adminDeptId });
+    } catch (error) {
+      sendServerError(res, error, "Get document request file error:");
+    }
+  },
+);
+
+// GET /api/admin/faculty-document-processing/:requestId/files/:fileId
+router.get(
+  "/faculty-document-processing/:requestId/files/:fileId",
+  authenticateToken,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const requestId = parseInt(req.params.requestId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!requestId || !fileId) {
+      return res.status(400).json({ error: "Invalid request or file id" });
+    }
+    try {
+      const adminDeptId = await getAdminDepartmentId(req.user.userId);
+      if (!adminDeptId) {
+        return res.status(403).json({ error: "Admin has no department assigned" });
+      }
+      await serveAdminRequestFile(res, { requestId, fileId, faculty: true, adminDeptId });
+    } catch (error) {
+      sendServerError(res, error, "Get faculty document request file error:");
     }
   },
 );

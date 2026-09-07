@@ -2,50 +2,55 @@
 // Both tables are driven by the same admin endpoints - keeping the maps here
 // stops the two copies from silently drifting apart.
 
-// API/admin-facing status word -> DB ENUM value. Used to validate PATCH .../status bodies.
+// API/admin-facing status word -> DB ENUM value. Used to validate PATCH .../status
+// bodies. The lifeline is Pending -> Processing -> Ready -> Claimed (+ Rejected,
+// Cancelled) -- the old 'generated'/'released' pair was collapsed into 'ready'.
 const DB_STATUS_MAP = {
   pending: "pending",
   processing: "processing",
-  ready: "generated",
-  released: "released",
+  ready: "ready",
   claimed: "claimed",
   rejected: "rejected",
 };
 
 // DB ENUM value -> API/admin-facing status word. Used by GET list endpoints.
+// 'generated'/'released' are kept as defensive aliases -> 'ready' so any row
+// that predates the collapse (an un-migrated volume) still renders as "Ready"
+// instead of falling through raw. They can never be *set* -- DB_STATUS_MAP drops them.
 const STATUS_LABEL_MAP = {
   pending: "pending",
   processing: "processing",
+  ready: "ready",
   generated: "ready",
-  released: "released",
+  released: "ready",
   claimed: "claimed",
   rejected: "rejected",
   cancelled: "cancelled",
 };
 
 // Statuses a scanned document is still considered authentic/issuable under.
-const VALID_SCAN_STATUSES = ["generated", "released", "claimed"];
+const VALID_SCAN_STATUSES = ["ready", "claimed"];
 
 // A target status that can only be reached from one specific prior status.
 const REQUIRED_PRIOR_STATUS = {
-  claimed: "released",
+  claimed: "ready",
 };
 
-// document_submissions' own, smaller status vocabulary (student -> office
-// "Send a Document"). No 'generated'/'released' -- nothing is physically
-// generated or picked up in this direction, so claimed is reached directly
-// from processing. STATUS_LABEL_MAP above needs no submission-specific
-// counterpart -- it already has identity entries for pending/processing/
-// claimed/rejected/cancelled, the full submission vocabulary.
+// document_submissions now share the same lifeline as document_requests:
+// Pending -> Processing -> Ready -> Claimed. 'ready' = the office has processed
+// the submission (and attached any return files); the submitter then self-marks
+// it Claimed. STATUS_LABEL_MAP above already covers this vocabulary.
 const SUBMISSION_DB_STATUS_MAP = {
   pending: "pending",
   processing: "processing",
+  ready: "ready",
   claimed: "claimed",
   rejected: "rejected",
 };
 
 const SUBMISSION_REQUIRED_PRIOR_STATUS = {
-  claimed: "processing",
+  ready: "processing",
+  claimed: "ready",
 };
 
 // Table/owner-column pair for each requester role. Kept as an internal,
@@ -133,6 +138,111 @@ async function cancelOwnDocumentRequest(conn, { role, ownerId, requestId }) {
   return { ok: true, departmentId: request.department_id };
 }
 
+// Table/owner-column pair for the owner-initiated "mark my document as claimed"
+// flow -- the document counterpart to a student marking an appointment as done
+// (see the /appointments/:id/complete route). Same four requester roles as
+// CANCEL_CONFIG. `owner_id`/`label` are aliased so selfClaimDocument below can
+// stay table-agnostic. Never build these by splicing caller input into SQL.
+const CLAIM_CONFIG = {
+  student: {
+    selectSql: `SELECT dr.student_id AS owner_id, dr.status, dr.tracking_number,
+                       s.department_id, s.service_name AS label
+                FROM document_requests dr
+                JOIN document_services s ON dr.service_id = s.service_id
+                WHERE dr.request_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE document_requests SET status = 'claimed', claimed_at = NOW()
+                WHERE request_id = ? AND status = 'ready'`,
+  },
+  faculty: {
+    selectSql: `SELECT fdr.faculty_id AS owner_id, fdr.status, fdr.tracking_number,
+                       s.department_id, s.service_name AS label
+                FROM faculty_document_requests fdr
+                JOIN document_services s ON fdr.service_id = s.service_id
+                WHERE fdr.request_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE faculty_document_requests SET status = 'claimed', claimed_at = NOW()
+                WHERE request_id = ? AND status = 'ready'`,
+  },
+  submission: {
+    selectSql: `SELECT student_id AS owner_id, status, tracking_number,
+                       department_id, title AS label
+                FROM document_submissions
+                WHERE submission_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE document_submissions SET status = 'claimed', claimed_at = NOW()
+                WHERE submission_id = ? AND status = 'ready'`,
+  },
+  facultySubmission: {
+    selectSql: `SELECT faculty_id AS owner_id, status, tracking_number,
+                       department_id, title AS label
+                FROM document_submissions
+                WHERE submission_id = ?
+                FOR UPDATE`,
+    updateSql: `UPDATE document_submissions SET status = 'claimed', claimed_at = NOW()
+                WHERE submission_id = ? AND status = 'ready'`,
+  },
+};
+
+// Owner-initiated Ready -> Claimed. Runs the lock/ownership/status checks and
+// the UPDATE inside the caller's own connection; this function owns the
+// transaction (beginTransaction/commit/rollback). Returns a plain result
+// object -- callers map `.ok`/`.status`/`.message` onto their own response
+// convention and use `.departmentId`/`.ownerId` for socket emits. Only
+// succeeds from 'ready'; 'claimed' is treated as an idempotent success.
+async function selfClaimDocument(conn, { role, ownerId, requestId }) {
+  const cfg = CLAIM_CONFIG[role];
+  if (!cfg) return { ok: false, status: 400, message: "Unknown document type" };
+
+  await conn.beginTransaction();
+
+  const [[row]] = await conn.query(cfg.selectSql, [requestId]);
+
+  if (!row) {
+    await conn.rollback();
+    return { ok: false, status: 404, message: "Document not found" };
+  }
+  if (row.owner_id !== ownerId) {
+    await conn.rollback();
+    return { ok: false, status: 403, message: "You can only claim your own documents" };
+  }
+  if (row.status === "claimed") {
+    await conn.rollback();
+    return {
+      ok: true,
+      already: true,
+      departmentId: row.department_id,
+      ownerId: row.owner_id,
+      trackingNumber: row.tracking_number,
+      label: row.label,
+    };
+  }
+  if (row.status !== "ready") {
+    await conn.rollback();
+    return {
+      ok: false,
+      status: 409,
+      message: "This document isn't ready to be claimed yet",
+    };
+  }
+
+  const [result] = await conn.query(cfg.updateSql, [requestId]);
+  if (result.affectedRows === 0) {
+    // Lost a race with another claim/status change between the lock and the UPDATE.
+    await conn.rollback();
+    return { ok: false, status: 409, message: "This document isn't ready to be claimed yet" };
+  }
+  await conn.commit();
+
+  return {
+    ok: true,
+    departmentId: row.department_id,
+    ownerId: row.owner_id,
+    trackingNumber: row.tracking_number,
+    label: row.label,
+  };
+}
+
 // Builds the frozen catalogue copy stored on document_requests.service_snapshot
 // / faculty_document_requests.service_snapshot at submit time. `db` is any
 // query executor (pool or an in-flight transaction connection). Returns a plain
@@ -174,5 +284,6 @@ module.exports = {
   SUBMISSION_DB_STATUS_MAP,
   SUBMISSION_REQUIRED_PRIOR_STATUS,
   cancelOwnDocumentRequest,
+  selfClaimDocument,
   buildDocumentServiceSnapshot,
 };

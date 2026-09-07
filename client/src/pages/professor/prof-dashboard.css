@@ -885,11 +885,11 @@ body {
 }
 
 /* Document-only Recent Activity badges, namespaced separately from
-   appt-status-badge--* above so document statuses (processing/generated/
+   appt-status-badge--* above so document statuses (processing/ready/
    claimed/etc.) don't collide with appointment statuses that happen to
    share some of the same words but different color meanings. Colors for
-   pending/processing/generated/released/claimed/rejected copied verbatim
-   from stud-dashboard.css's own .activity-status-doc-* set; cancelled has
+   pending/processing/ready/claimed/rejected copied verbatim from
+   stud-dashboard.css's own .activity-status-doc-* set; cancelled has
    no student-side precedent (faculty_document_requests-only status), so
    its color is sourced from prof-documents.css's .doc-badge-cancelled --
    the module's own authoritative palette for this exact status. */
@@ -903,12 +903,7 @@ body {
   color: #60a5fa;
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
-.professor-dashboard .activity-status-doc-generated {
-  background: rgba(34, 197, 94, 0.18);
-  color: var(--primary-color);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-}
-.professor-dashboard .activity-status-doc-released {
+.professor-dashboard .activity-status-doc-ready {
   background: rgba(34, 197, 94, 0.18);
   color: var(--primary-color);
   border: 1px solid rgba(34, 197, 94, 0.35);
@@ -939,12 +934,7 @@ body {
   color: #1d4ed8;
   border-color: rgba(37, 99, 235, 0.25);
 }
-[data-theme="light"] .professor-dashboard .activity-status-doc-generated {
-  background: rgba(5, 150, 105, 0.1);
-  color: #065f46;
-  border-color: rgba(5, 150, 105, 0.25);
-}
-[data-theme="light"] .professor-dashboard .activity-status-doc-released {
+[data-theme="light"] .professor-dashboard .activity-status-doc-ready {
   background: rgba(5, 150, 105, 0.1);
   color: #065f46;
   border-color: rgba(5, 150, 105, 0.25);

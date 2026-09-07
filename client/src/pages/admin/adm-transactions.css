@@ -872,13 +872,8 @@
   text-transform: uppercase;
 }
 
-.admin-transaction-badge-generated {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: var(--success);
-  border: 0.5px solid rgba(16, 185, 129, 0.3);
-  text-transform: uppercase;
-}
-
+.admin-transaction-badge-ready,
+.admin-transaction-badge-generated,
 .admin-transaction-badge-released {
   background-color: rgba(16, 185, 129, 0.15);
   color: var(--success);

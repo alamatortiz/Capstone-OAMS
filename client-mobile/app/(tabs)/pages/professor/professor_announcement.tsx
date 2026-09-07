@@ -76,14 +76,16 @@ function OamsLogo({
 }
 
 // Faculty announcements have no real category -- pinned status is the only
-// visual dimension left to vary the card icon by.
+// visual dimension left to vary the card icon by. Non-pinned faculty
+// announcements render blue (matching the student "reminder" accent) rather
+// than gray.
 const PINNED_STYLE = {
   icon: 'megaphone-outline' as IoniconName,
   gradient: ['#22c55e', '#16a34a'] as const,
 };
 const DEFAULT_CARD_STYLE = {
   icon: 'megaphone-outline' as IoniconName,
-  gradient: ['#94a3b8', '#64748b'] as const,
+  gradient: ['#3b82f6', '#2563eb'] as const,
 };
 
 interface AnnouncementAttachment {

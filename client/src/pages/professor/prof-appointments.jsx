@@ -139,12 +139,14 @@ function AppointmentCard({
           <Calendar style={{ width: "1.5rem", height: "1.5rem" }} />
         </div>
         <div className="appt-card-title-section">
-          <h3 className="appt-card-name">{appointment.studentName}</h3>
-          {appointment.studentId && (
-            <span className="appt-card-student-id-badge">
-              {appointment.studentId}
-            </span>
-          )}
+          <div className="appt-card-name-row">
+            <h3 className="appt-card-name">{appointment.studentName}</h3>
+            {appointment.studentId && (
+              <span className="appt-card-student-id-badge">
+                {appointment.studentId}
+              </span>
+            )}
+          </div>
           {appointment.course && (
             <p className="appt-card-sub">{appointment.course}</p>
           )}

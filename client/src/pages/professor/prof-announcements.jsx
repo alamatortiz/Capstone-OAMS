@@ -220,7 +220,7 @@ export default function ProfessorAnnouncementsPage() {
               className="ann-detail-overlay"
               onClick={() => setViewingAnnouncement(null)}
             >
-              <div className="ann-detail-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="ann-detail-modal prof-ann-detail" onClick={(e) => e.stopPropagation()}>
                 <div className="ann-detail-header">
                   <div className={`ann-detail-header-icon ${getCardClass(viewingAnnouncement)}`}>
                     <MegaphoneIcon />
@@ -280,7 +280,7 @@ export default function ProfessorAnnouncementsPage() {
         </>
       }
     >
-        <div className="announcements-page">
+        <div className="announcements-page prof-announcements-page">
           {/* Header */}
           <PageHeader
             breadcrumb={

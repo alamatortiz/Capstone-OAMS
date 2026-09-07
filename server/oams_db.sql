@@ -470,9 +470,12 @@ CREATE TABLE document_requests (
     -- 'cancelled' = student voluntarily withdrew the request while it was
     -- still pending/processing. Kept as a status (not a DELETE) so it stays
     -- visible in transaction history, same as queues/appointments.
-    status                  ENUM('pending','processing','generated','released','claimed','rejected','cancelled') DEFAULT 'pending',
+    status                  ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
     estimated_completion    DATE         NULL,
     needed_by               DATE         NULL,
+    -- Legacy column: the old Ready -> Released -> Claimed flow was collapsed to
+    -- Ready -> Claimed. No longer written or read; kept only so existing rows
+    -- and mock seeds don't error. Safe to drop in a later migration.
     released_at             TIMESTAMP    NULL,
     claimed_at              TIMESTAMP    NULL,
     notes                   TEXT         NULL,
@@ -486,10 +489,10 @@ CREATE TABLE document_requests (
     -- finished request shows. Editing a type is blocked while any request for
     -- it is still pending/processing, so this stays accurate up to that point.
     service_snapshot        JSON         NULL,
-    -- TRUE when admin used "Generate Document" (QR/text-code prototype) instead
-    -- of the normal physical Mark as Released -> Mark as Claimed flow -- lets
-    -- the requester's own "Confirm Received" self-claim the request, and gates
-    -- the QR/code display on the requester's document status page.
+    -- TRUE when admin used "Generate Document" (QR/text-code prototype) on a
+    -- Ready request -- attaches a pickup code the requester can show the office.
+    -- Only gates the QR/code display on the requester's document status page now;
+    -- self-claim (Ready -> Claimed) is available regardless of this flag.
     is_digital_delivery     BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Auto-touched on any change to this row (status, notes, etc). Lets the
@@ -564,10 +567,11 @@ CREATE TABLE document_submissions (
     department_id   INT          NOT NULL,
     title           VARCHAR(255) NOT NULL, -- student-authored; stands in for "document type" everywhere in the UI
     purpose         VARCHAR(255) NOT NULL,
-    -- Deliberately smaller than document_requests.status: no 'generated'/
-    -- 'released' -- nothing is physically generated or picked up in this
-    -- direction, so claimed is reached directly from processing.
-    status          ENUM('pending','processing','claimed','rejected','cancelled') DEFAULT 'pending',
+    -- Same lifeline as document_requests now: Pending -> Processing -> Ready
+    -- -> Claimed (+ Rejected, Cancelled). 'ready' = admin has processed the
+    -- submission (and attached any return files); the submitter then self-marks
+    -- it Claimed once they've collected it.
+    status          ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
     needed_by       DATE         NULL,
     notes           TEXT         NULL, -- admin processing/rejection notes, mirrors document_requests.notes
     claimed_at      TIMESTAMP    NULL,
@@ -745,9 +749,10 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     -- 'cancelled' = faculty voluntarily withdrew the request while it was
     -- still pending/processing. Kept as a status (not a DELETE) so it stays
     -- visible in transaction history, same as queues/appointments.
-    status               ENUM('pending','processing','generated','released','claimed','rejected','cancelled') DEFAULT 'pending',
+    status               ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
     estimated_completion DATE         NULL,
     needed_by            DATE         NULL,
+    -- Legacy column (see document_requests.released_at) -- no longer written/read.
     released_at          TIMESTAMP    NULL,
     claimed_at           TIMESTAMP    NULL,
     notes                TEXT         NULL,
@@ -795,6 +800,32 @@ ALTER TABLE generated_files
 -- request_id/faculty_request_id is set" is enforced app-side only now, by
 -- whichever code path inserts generated_files (only ever sets one or the
 -- other already, in practice) -- no DB-level backstop for this one case.
+
+-- ─────────────────────────────────────────────────────────────
+-- 15b. DOCUMENT REQUEST FILES (admin -> requester: soft-copy files the office
+--      attaches to a document REQUEST, e.g. when the requested document can be
+--      provided digitally instead of a hard copy. Mirrors document_submission_files'
+--      'admin_return' channel, but for the document_requests / faculty_document_requests
+--      direction. One direction only (office -> requester), so no `direction` enum.
+--      Exactly one of request_id / faculty_request_id is set -- enforced app-side
+--      (same as generated_files above; no CHECK for TiDB compatibility).
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE document_request_files (
+    file_id            INT          AUTO_INCREMENT PRIMARY KEY,
+    request_id         INT          NULL,
+    faculty_request_id INT          NULL,
+    filename           VARCHAR(255) NOT NULL, -- original display name
+    file_path          VARCHAR(255) NOT NULL, -- server-generated UUID name on disk
+    mime_type          VARCHAR(100) NOT NULL,
+    file_size          INT          NOT NULL,
+    uploaded_by        INT          NOT NULL, -- users.user_id -- the admin who attached it
+    uploaded_at        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id)         REFERENCES document_requests(request_id)         ON DELETE CASCADE,
+    FOREIGN KEY (faculty_request_id) REFERENCES faculty_document_requests(request_id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by)        REFERENCES users(user_id),
+    INDEX idx_document_request_files_request (request_id),
+    INDEX idx_document_request_files_faculty (faculty_request_id)
+);
 
 -- ─────────────────────────────────────────────────────────────
 -- 16. SECTIONS & SUBMISSIONS (schema only -- no routes/controllers/UI yet)

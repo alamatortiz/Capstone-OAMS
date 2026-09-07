@@ -24,8 +24,8 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import NotificationBell from '@/components/NotificationBell';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
-import { DocStatus, getHubStatusMeta } from '@/utils/documentStatus';
-import { toLocalYMD, formatManilaDate } from '@/utils/date';
+import { DocStatus, getHubStatusMeta, normalizeDocStatus } from '@/utils/documentStatus';
+import { toLocalYMD, formatManilaDate, formatManilaTime } from '@/utils/date';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -113,6 +113,7 @@ interface DocumentRequest {
   purpose: string;
   copies?: number;
   requestDate: string;
+  updatedAt?: string;
   status: DocStatus;
   trackingNumber: string;
   notes?: string;
@@ -188,6 +189,8 @@ export default function ProfessorDocumentsScreen() {
   const [showNeededByPicker, setShowNeededByPicker] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [claimTarget, setClaimTarget] = useState<DocumentRequest | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // ── "Send a Document" state ────────────────────────────────────────────
@@ -296,6 +299,7 @@ export default function ProfessorDocumentsScreen() {
           purpose: r.purpose,
           copies: r.copies,
           requestDate: r.created_at,
+          updatedAt: r.updated_at || undefined,
           status: r.status,
           trackingNumber: r.tracking_number,
           notes: r.notes || undefined,
@@ -458,6 +462,22 @@ export default function ProfessorDocumentsScreen() {
     }
   };
 
+  const confirmClaimRequest = async () => {
+    if (!claimTarget) return;
+    setClaimingId(claimTarget.id);
+    try {
+      await api.patch(`/professor/documents/${claimTarget.id}/claim`);
+      setClaimTarget(null);
+      await fetchRequests();
+      Toast.show({ type: 'success', text1: 'Document marked as claimed.' });
+    } catch (err: any) {
+      console.error('Claim document request error:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Failed to mark the document as claimed.');
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   const activeRequests = requests.filter(
     (r) => r.status !== 'claimed' && r.status !== 'rejected' && r.status !== 'cancelled',
   );
@@ -512,8 +532,8 @@ export default function ProfessorDocumentsScreen() {
               <Ionicons name="document-text-outline" size={22} color="#ffffff" />
             </LinearGradient>
             <View style={styles.titleTextWrap}>
-              <Text style={styles.pageTitle}>Document Requests</Text>
-              <Text style={styles.pageSubtitle}>Request documents and track their status.</Text>
+              <Text style={styles.pageTitle}>Document Requests and Submissions</Text>
+              <Text style={styles.pageSubtitle}>Request and submit documents as well as track their status.</Text>
             </View>
           </View>
 
@@ -526,7 +546,7 @@ export default function ProfessorDocumentsScreen() {
             <Pressable style={styles.requestBtn} onPress={openSendDialog}>
               <LinearGradient colors={['#f97316', '#ea580c']} style={StyleSheet.absoluteFill} />
               <Ionicons name="add-outline" size={16} color="#ffffff" />
-              <Text style={styles.requestBtnText}>Send a Document</Text>
+              <Text style={styles.requestBtnText}>Send Document</Text>
             </Pressable>
           </View>
 
@@ -591,13 +611,13 @@ export default function ProfessorDocumentsScreen() {
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
                           <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Ionicons name={meta.icon} size={12} color={meta.color} />
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
                           <Text style={styles.docTrackingText}>
                             Tracking: <Text style={styles.docTrackingValue}>{req.trackingNumber}</Text>
                           </Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-                          <Ionicons name={meta.icon} size={12} color={meta.color} />
-                          <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
                         </View>
                       </View>
 
@@ -631,20 +651,35 @@ export default function ProfessorDocumentsScreen() {
                         </View>
                       )}
 
-                      {(req.status === 'generated' || req.status === 'released') && (
-                        <Pressable
-                          style={styles.viewPickupBtn}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            router.push({
-                              pathname: '/pages/professor/professor_documents_status',
-                              params: { docId: req.id, from: 'document-request' },
-                            });
-                          }}
-                        >
-                          <Ionicons name="download-outline" size={16} color="#ffffff" />
-                          <Text style={styles.viewPickupBtnText}>View Pickup Details</Text>
-                        </Pressable>
+                      {normalizeDocStatus(req.status) === 'ready' && (
+                        <View style={styles.docActionsRow}>
+                          <Pressable
+                            style={[styles.claimBtnFull, styles.docActionsRowItem]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              router.push({
+                                pathname: '/pages/professor/professor_documents_status',
+                                params: { docId: req.id, from: 'document-request' },
+                              });
+                            }}
+                          >
+                            <Ionicons name="download-outline" size={16} color="#22c55e" />
+                            <Text style={styles.claimBtnFullText}>View Pickup Details</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.claimBtnFull, styles.docActionsRowItem]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setClaimTarget(req);
+                            }}
+                            disabled={claimingId === req.id}
+                          >
+                            <Ionicons name="checkmark-circle-outline" size={16} color="#22c55e" />
+                            <Text style={styles.claimBtnFullText}>
+                              {claimingId === req.id ? 'Marking…' : 'Mark Document as Claimed'}
+                            </Text>
+                          </Pressable>
+                        </View>
                       )}
 
                       {(req.status === 'pending' || req.status === 'processing') && (
@@ -701,10 +736,22 @@ export default function ProfessorDocumentsScreen() {
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
                           <Text style={styles.docCollegeText}>{req.college}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
                           <Text style={styles.docTrackingText}>{req.trackingNumber}</Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-                          <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          <View style={styles.docCardMeta}>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>
+                                {formatManilaDate(req.updatedAt || req.requestDate, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            </View>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>{formatManilaTime(req.updatedAt || req.requestDate)}</Text>
+                            </View>
+                          </View>
                         </View>
                       </View>
                     </Pressable>
@@ -749,12 +796,22 @@ export default function ProfessorDocumentsScreen() {
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
                           <Text style={styles.docCollegeText}>{req.college}</Text>
-                          <Text style={styles.docTrackingText}>
-                            {formatDate(req.requestDate)} · {req.trackingNumber}
-                          </Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-                          <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
+                          <Text style={styles.docTrackingText}>{req.trackingNumber}</Text>
+                          <View style={styles.docCardMeta}>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>
+                                {formatManilaDate(req.updatedAt || req.requestDate, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            </View>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>{formatManilaTime(req.updatedAt || req.requestDate)}</Text>
+                            </View>
+                          </View>
                         </View>
                       </View>
                     </Pressable>
@@ -799,12 +856,22 @@ export default function ProfessorDocumentsScreen() {
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={styles.docTypeText}>{req.type}</Text>
                           <Text style={styles.docCollegeText}>{req.college}</Text>
-                          <Text style={styles.docTrackingText}>
-                            {formatDate(req.requestDate)} · {req.trackingNumber}
-                          </Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-                          <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          <View style={[styles.statusBadge, styles.docHeaderBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                          </View>
+                          <Text style={styles.docTrackingText}>{req.trackingNumber}</Text>
+                          <View style={styles.docCardMeta}>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="calendar-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>
+                                {formatManilaDate(req.updatedAt || req.requestDate, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Text>
+                            </View>
+                            <View style={styles.docCardMetaRow}>
+                              <Ionicons name="time-outline" size={13} color={theme.tertiary} />
+                              <Text style={styles.docCardMetaText}>{formatManilaTime(req.updatedAt || req.requestDate)}</Text>
+                            </View>
+                          </View>
                         </View>
                       </View>
                     </Pressable>
@@ -1101,6 +1168,35 @@ export default function ProfessorDocumentsScreen() {
                 disabled={!!cancellingId}
               >
                 <Text style={styles.confirmBtnText}>{cancellingId ? 'Cancelling…' : 'Cancel Request'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mark as Claimed Confirm Modal */}
+      <Modal visible={!!claimTarget} animationType="fade" transparent onRequestClose={() => setClaimTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModalCard}>
+            <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+              <Ionicons name="checkmark-circle-outline" size={26} color="#22c55e" />
+            </View>
+            <Text style={styles.confirmTitle}>Mark Document as Claimed?</Text>
+            <Text style={styles.confirmDescription}>
+              Mark{' '}
+              <Text style={{ fontWeight: '700', color: theme.text }}>{claimTarget?.type}</Text> as claimed?
+              Only do this once you&apos;ve received your document.
+            </Text>
+            <View style={styles.confirmActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setClaimTarget(null)}>
+                <Text style={styles.cancelBtnText}>Not Yet</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmActionBtn, { backgroundColor: '#22c55e' }]}
+                onPress={confirmClaimRequest}
+                disabled={!!claimingId}
+              >
+                <Text style={styles.confirmBtnText}>{claimingId ? 'Marking…' : 'Mark as Claimed'}</Text>
               </Pressable>
             </View>
           </View>
@@ -1411,6 +1507,24 @@ function createStyles(theme: ThemePalette) {
       flexShrink: 0,
     },
     statusBadgeText: { fontSize: 9.5, fontWeight: '700' },
+    docHeaderBadge: { alignSelf: 'flex-start', marginTop: 4 },
+    docCardMeta: { alignItems: 'flex-start', gap: 4, marginTop: 6 },
+    docCardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    docCardMetaText: { fontSize: 11, color: theme.tertiary },
+    docActionsRow: { flexDirection: 'row', gap: 8 },
+    docActionsRowItem: { flex: 1, minWidth: 0 },
+    claimBtnFull: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 11,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.35)',
+      backgroundColor: 'rgba(34, 197, 94, 0.05)',
+    },
+    claimBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#22c55e' },
 
     docInfoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     docInfoField: { width: '46%', gap: 2 },
@@ -1441,17 +1555,6 @@ function createStyles(theme: ThemePalette) {
       borderColor: 'rgba(239, 68, 68, 0.35)',
     },
     cancelBtnFullText: { fontSize: 12.5, fontWeight: '700', color: '#ef4444' },
-
-    viewPickupBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingVertical: 11,
-      borderRadius: 12,
-      backgroundColor: '#16a34a',
-    },
-    viewPickupBtnText: { fontSize: 12.5, fontWeight: '700', color: '#ffffff' },
 
     // Request dialog
     modalOverlay: {

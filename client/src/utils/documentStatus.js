@@ -1,15 +1,16 @@
-// The faculty document-requests endpoint returns the raw DB enum value
-// "generated" where the student/admin endpoints already normalize it to
-// "ready". This is the one place that alias is resolved on the frontend.
+// The document lifeline is Pending -> Processing -> Ready -> Claimed (+ Rejected,
+// Cancelled). The old DB values "generated" (shown as "Ready") and "released"
+// were collapsed into "ready" -- both are folded here as defensive aliases so a
+// row that predates the collapse (an un-migrated backend) still renders cleanly.
 export function normalizeDocStatus(status) {
-  return status === "generated" ? "ready" : status;
+  if (status === "generated" || status === "released") return "ready";
+  return status;
 }
 
 const HUB_LABELS = {
   pending: "pending",
   processing: "processing",
   ready: "ready",
-  released: "released",
   claimed: "claimed",
   rejected: "rejected",
   cancelled: "cancelled",
@@ -19,7 +20,6 @@ const HUB_CLASSES = {
   pending: "doc-badge-pending",
   processing: "doc-badge-processing",
   ready: "doc-badge-ready",
-  released: "doc-badge-released",
   claimed: "doc-badge-claimed",
   rejected: "doc-badge-rejected",
   cancelled: "doc-badge-cancelled",
@@ -29,7 +29,6 @@ const DETAIL_LABELS = {
   pending: "Pending",
   processing: "Processing",
   ready: "Ready",
-  released: "Released",
   claimed: "Claimed",
   rejected: "Rejected",
   cancelled: "Cancelled",
@@ -39,7 +38,6 @@ const DETAIL_CLASSES = {
   pending: "dss-badge-pending",
   processing: "dss-badge-processing",
   ready: "dss-badge-ready",
-  released: "dss-badge-released",
   claimed: "dss-badge-claimed",
   rejected: "dss-badge-rejected",
   cancelled: "dss-badge-cancelled",

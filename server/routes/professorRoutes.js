@@ -21,6 +21,7 @@ const { emitToUser, emitToDept } = require("../sockets");
 const { isValidTransition } = require("../utils/appointmentStatus");
 const {
   cancelOwnDocumentRequest,
+  selfClaimDocument,
   buildDocumentServiceSnapshot,
 } = require("../utils/documentStatus");
 const { sendServerError } = require("../utils/errorResponse");
@@ -38,6 +39,10 @@ const {
   deleteFiles,
   serveFacultyDocumentSubmissionFile,
 } = require("../utils/documentSubmissionAttachments");
+const {
+  getFilesMap: getRequestFilesMap,
+  serveRequestFile,
+} = require("../utils/documentRequestAttachments");
 
 const WEEKDAY_NAMES = [
   "Sunday",
@@ -107,8 +112,7 @@ router.get(
         `SELECT
            SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_only,
            SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count,
-           SUM(CASE WHEN status = 'generated'  THEN 1 ELSE 0 END) AS ready_count,
-           SUM(CASE WHEN status = 'released'   THEN 1 ELSE 0 END) AS released_count
+           SUM(CASE WHEN status = 'ready'      THEN 1 ELSE 0 END) AS ready_count
          FROM faculty_document_requests
          WHERE faculty_id = ?`,
         [facultyId],
@@ -116,7 +120,6 @@ router.get(
       const docPendingOnly = Number(docRow.pending_only || 0);
       const docProcessing = Number(docRow.processing_count || 0);
       const docReady = Number(docRow.ready_count || 0);
-      const docReleased = Number(docRow.released_count || 0);
       const docCount = docPendingOnly + docProcessing;
 
       // 4. Completed, all-time -- appointments completed + the faculty
@@ -208,11 +211,10 @@ router.get(
           studentRequests: studentRow.student_count || 0,
           documentsToReview: docCount,
           documents: {
-            total: docCount + docReady + docReleased,
+            total: docCount + docReady,
             pendingOnly: docPendingOnly,
             processing: docProcessing,
             ready: docReady,
-            released: docReleased,
           },
           completed: completedRow.total_completed || 0,
         },
@@ -372,8 +374,7 @@ function buildDocumentActivityTitle(row) {
   const map = {
     pending: `Document request submitted: ${row.request_type}`,
     processing: `Document request being processed: ${row.request_type}`,
-    generated: `Document ready for pickup: ${row.request_type}`,
-    released: `Document released: ${row.request_type}`,
+    ready: `Document ready for pickup: ${row.request_type}`,
     claimed: `Document claimed: ${row.request_type}`,
     rejected: `Document request rejected: ${row.request_type}`,
     cancelled: `You cancelled the document request: ${row.request_type}`,
@@ -413,7 +414,7 @@ router.get(
         sql += " AND a.status = ?";
         params.push(status);
       }
-      sql += " ORDER BY a.appointment_date DESC, a.appointment_time ASC";
+      sql += " ORDER BY a.appointment_date DESC, a.appointment_time DESC";
       const [rows] = await pool.query(sql, params);
       res.json(
         rows.map((r) => ({
@@ -740,6 +741,7 @@ router.get(
 const TXN_STATUS_BUCKET = {
   completed: "completed",
   claimed: "completed",
+  ready: "ongoing",
   pending: "ongoing",
   approved: "ongoing",
   processing: "ongoing",
@@ -1545,6 +1547,7 @@ router.get(
                fdr.claimed_at,
                fdr.notes,
                fdr.created_at,
+               fdr.updated_at,
                fdr.is_digital_delivery,
                fdr.service_snapshot,
                gf.qr_code AS delivery_code,
@@ -1571,6 +1574,7 @@ router.get(
                dsub.claimed_at,
                dsub.notes,
                dsub.created_at,
+               dsub.updated_at,
                NULL AS is_digital_delivery,
                NULL AS service_snapshot,
                NULL AS delivery_code,
@@ -1587,9 +1591,13 @@ router.get(
       const submissionIds = rows
         .filter((r) => r.kind === "submission")
         .map((r) => r.request_id);
-      const [facultyFilesMap, adminFilesMap] = await Promise.all([
+      const requestIds = rows
+        .filter((r) => r.kind === "request")
+        .map((r) => r.request_id);
+      const [facultyFilesMap, adminFilesMap, requestFilesMap] = await Promise.all([
         getFilesMap(submissionIds, "student_upload"),
         getFilesMap(submissionIds, "admin_return"),
+        getRequestFilesMap(requestIds, { faculty: true }),
       ]);
 
       const documents = rows.map((r) => {
@@ -1601,6 +1609,9 @@ router.get(
         if (r.kind === "submission") {
           doc.faculty_files = facultyFilesMap[rawId] || [];
           doc.admin_files = adminFilesMap[rawId] || [];
+        } else {
+          // Soft-copy files the office attached to this request.
+          doc.admin_files = requestFilesMap[rawId] || [];
         }
         return doc;
       });
@@ -1797,50 +1808,68 @@ router.delete(
   },
 );
 
-// PATCH /api/professor/documents/:requestId/confirm-receipt
-// Self-service counterpart to admin's "Generate Document" prototype (see
-// adminRoutes.js) -- mirrors studentRoutes.js's own confirm-receipt route.
-// Only succeeds for the faculty member's own request, only when it's
-// currently 'released' AND was digitally delivered, and only moves it to
-// 'claimed'.
+// PATCH /api/professor/documents/:docId/claim
+// Owner-initiated Ready -> Claimed, mirroring studentRoutes.js's /claim route
+// and the appointment self-complete flow. `:docId` is prefixed ("req-12"/
+// "sub-7"). Only succeeds for the faculty member's own request/submission and
+// only from the 'ready' state; 'claimed' is an idempotent success.
 router.patch(
-  "/documents/:requestId/confirm-receipt",
+  "/documents/:docId/claim",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const match = /^(req|sub)-(\d+)$/.exec(req.params.docId);
+    if (!match) {
+      return res.status(400).json({ message: "Invalid document id" });
+    }
+    const role = match[1] === "sub" ? "facultySubmission" : "faculty";
+    const requestId = parseInt(match[2], 10);
+
+    const conn = await pool.getConnection();
+    try {
+      const result = await selfClaimDocument(conn, { role, ownerId: facultyId, requestId });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.message });
+      }
+
+      emitToUser(facultyId, "document:status-updated", { requestId, status: "claimed" });
+      emitToDept(result.departmentId, "document:status-updated", { requestId, status: "claimed" });
+      if (!result.already) {
+        createNotification(
+          facultyId,
+          `You claimed your ${result.label} document (${result.trackingNumber}).`,
+          "document",
+        );
+      }
+
+      res.json({ message: "Document claimed", requestId: req.params.docId, status: "claimed" });
+    } catch (err) {
+      try { await conn.rollback(); } catch { /* already rolled back */ }
+      sendServerError(res, err, "Claim document error:");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// GET /api/professor/documents/:requestId/files/:fileId
+// Streams one soft-copy file the office attached to the faculty member's own request.
+router.get(
+  "/documents/:requestId/files/:fileId",
   authenticateToken,
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
     const requestId = parseInt(req.params.requestId, 10);
-
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!requestId || !fileId) {
+      return res.status(400).json({ message: "Invalid request or file id" });
+    }
     try {
-      const [[request]] = await pool.query(
-        `SELECT fdr.request_id, fdr.status, fdr.is_digital_delivery, fdr.tracking_number, s.department_id, s.service_name
-         FROM faculty_document_requests fdr
-         JOIN document_services s ON fdr.service_id = s.service_id
-         WHERE fdr.request_id = ? AND fdr.faculty_id = ?`,
-        [requestId, facultyId],
-      );
-      if (!request) {
-        return res.status(404).json({ message: "Document request not found" });
-      }
-      if (request.status !== "released" || !request.is_digital_delivery) {
-        return res.status(409).json({ message: "This document isn't ready to be confirmed as received" });
-      }
-
-      await pool.query(
-        `UPDATE faculty_document_requests SET status = 'claimed', claimed_at = NOW() WHERE request_id = ?`,
-        [requestId],
-      );
-
-      emitToDept(request.department_id, "document:status-updated", { requestId, status: "claimed" });
-      createNotification(
-        facultyId,
-        `You confirmed receipt of your ${request.service_name} request (${request.tracking_number}).`,
-        "document",
-      );
-
-      res.json({ message: "Receipt confirmed", requestId, status: "claimed" });
+      await serveRequestFile(res, { requestId, fileId, faculty: true, requesterId: facultyId });
     } catch (err) {
-      sendServerError(res, err, "Confirm document receipt error:");
+      sendServerError(res, err, "Get document request file error:");
     }
   },
 );

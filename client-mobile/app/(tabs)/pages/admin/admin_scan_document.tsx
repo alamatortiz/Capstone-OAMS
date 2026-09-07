@@ -91,7 +91,7 @@ function OamsLogo({
 // GET /admin/scan-document/verify/:code, GET /admin/scan-document/recent and
 // PATCH /admin/document-processing/:id/status) ───
 type DocStatus = 'VALID' | 'EXPIRED';
-type DocumentStatus = 'generated' | 'released' | 'claimed' | string;
+type DocumentStatus = 'ready' | 'generated' | 'released' | 'claimed' | string;
 
 interface ScannedDocument {
   requestId?: number;
@@ -111,8 +111,10 @@ interface ScannedDocument {
 }
 
 const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+  ready: 'Ready for Pickup',
+  // Defensive aliases for rows that predate the lifeline collapse.
   generated: 'Ready for Pickup',
-  released: 'Released — awaiting claim',
+  released: 'Ready for Pickup',
   claimed: 'Claimed',
 };
 
@@ -645,7 +647,7 @@ export default function AdminScanDocumentScreen() {
               </ScrollView>
 
               <View style={styles.docModalActions}>
-                {scannedDocument.documentStatus === 'released' && (
+                {['ready', 'generated', 'released'].includes(scannedDocument.documentStatus) && (
                   <Pressable style={styles.claimBtn} onPress={handleMarkClaimed} disabled={claiming}>
                     <CheckCircle size={15} color="#10b981" />
                     <Text style={styles.claimBtnText}>{claiming ? 'Marking…' : 'Mark as Claimed'}</Text>

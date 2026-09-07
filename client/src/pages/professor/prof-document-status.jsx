@@ -17,7 +17,7 @@ import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
-import { getDocStatusDetailMeta } from "../../utils/documentStatus";
+import { getDocStatusDetailMeta, normalizeDocStatus } from "../../utils/documentStatus";
 import { QRCodeSVG } from "qrcode.react";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
@@ -48,14 +48,11 @@ const formatDateShort = (dateStr) => {
   });
 };
 
-// Fetches one document-submission file's bytes on demand and opens/downloads
-// it -- mirrors stud-document-status.jsx's openSubmissionFile().
-async function openSubmissionFile(submissionId, file) {
+// Fetches one file's bytes on demand and opens/downloads it -- mirrors
+// stud-document-status.jsx.
+async function openFileBlob(path, file) {
   try {
-    const res = await api.get(
-      `/professor/document-submissions/${submissionId}/files/${file.id}`,
-      { responseType: "blob" },
-    );
+    const res = await api.get(path, { responseType: "blob" });
     const url = URL.createObjectURL(res.data);
     if (file.mimeType?.startsWith("image/") || file.mimeType === "application/pdf") {
       window.open(url, "_blank");
@@ -71,11 +68,19 @@ async function openSubmissionFile(submissionId, file) {
   }
 }
 
+const openSubmissionFile = (submissionId, file) =>
+  openFileBlob(`/professor/document-submissions/${submissionId}/files/${file.id}`, file);
+
+const openRequestFile = (requestId, file) =>
+  openFileBlob(`/professor/documents/${requestId}/files/${file.id}`, file);
+
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, confirmingReceipt, backLabel = "All Documents", requirements, reqLoading }) {
+function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, backLabel = "All Documents", requirements, reqLoading }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showClaimDialog, setShowClaimDialog] = useState(false);
   const statusMeta = getDocStatusDetailMeta(doc.status);
   const canCancel = doc.status === "pending" || doc.status === "processing";
+  const canClaim = normalizeDocStatus(doc.status) === "ready";
 
   return (
     <div className="dss-status-container">
@@ -117,7 +122,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
       </div>
 
       {/* Ready alert */}
-      {doc.status === "generated" && (
+      {normalizeDocStatus(doc.status) === "ready" && (
         <div
           style={{
             background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
@@ -137,35 +142,10 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
         </div>
       )}
 
-      {/* Released alert */}
-      {doc.status === "released" && (
-        <div
-          style={{
-            background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-            borderRadius: "1rem",
-            padding: "1rem 1.5rem",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            fontWeight: 700,
-            fontSize: "1rem",
-            boxShadow: "0 8px 24px rgba(34,197,94,0.3)",
-          }}
-        >
-          <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document has been released to the designated location — visit to complete pickup.
-        </div>
-      )}
-
-      {/* Digital delivery: QR + text code, prototype for testing --
-          replaces the in-person "Mark as Claimed" step with the faculty
-          member confirming receipt themselves. Kept visible (not just while
-          "released") even after being claimed -- it doubles as a
-          verification/audit record either side can point back to if the
-          claimed status itself is ever in question. Only the action button
-          goes away once there's nothing left to confirm. */}
-      {doc.isDigitalDelivery && (doc.status === "released" || doc.status === "claimed") && (
+      {/* Digital delivery: QR + text code. Shown once the document is Ready (or
+          after it's Claimed, as a verification/audit record). Claiming is done
+          from the "Mark as Claimed" card in the sidebar now. */}
+      {doc.isDigitalDelivery && (normalizeDocStatus(doc.status) === "ready" || doc.status === "claimed") && (
         <div className="dss-card">
           <div className="dss-card-header">
             <h3 className="dss-card-title">
@@ -179,23 +159,13 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
           >
             <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: 0, textAlign: "center" }}>
               {doc.status === "claimed"
-                ? "Receipt already confirmed. Kept here for verification purposes."
-                : "Show this QR code (or read out the text code) to the office, then confirm below once you've received your document. (Testing prototype — not the normal pickup process.)"}
+                ? "Kept here for verification purposes."
+                : "Show this QR code (or read out the text code) to the office when you collect your document."}
             </p>
             <QRCodeSVG value={doc.deliveryCode} size={160} />
             <p style={{ fontWeight: 700, fontSize: "1rem", letterSpacing: "0.03em", margin: 0 }}>
               {doc.deliveryCode}
             </p>
-            {doc.status === "released" && (
-              <button
-                type="button"
-                className="dss-confirm-receipt-btn"
-                disabled={confirmingReceipt}
-                onClick={() => onConfirmReceipt(doc.id)}
-              >
-                {confirmingReceipt ? "Confirming…" : "Confirm Received"}
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -228,12 +198,6 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
                     : "No date requested for the document to be claimable."}
                 </span>
               </div>
-              {doc.status === "released" && doc.releasedDate && (
-                <div className="dss-detail-row">
-                  <span className="dss-detail-label">Date Released</span>
-                  <span className="dss-detail-value">{formatDate(doc.releasedDate)}</span>
-                </div>
-              )}
               {doc.status === "claimed" && doc.claimedDate && (
                 <div className="dss-detail-row">
                   <span className="dss-detail-label">Date and Time Claimed</span>
@@ -352,6 +316,32 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
             </div>
           )}
 
+          {/* Soft-copy files the office attached to a document request */}
+          {doc.kind !== "submission" && doc.adminFiles?.length > 0 && (
+            <div className="dss-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title">
+                  <FileText style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Files from the Office
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                <div className="dss-attach-list">
+                  {doc.adminFiles.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className="dss-attach-chip"
+                      onClick={() => openRequestFile(doc.id.replace(/^req-/, ""), f)}
+                    >
+                      <FileText /> {f.filename}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Rejection reason -- emphasized callout, not the plain Notes
               card below (which stays as-is for every other status). */}
           {doc.status === "rejected" && doc.notes && (
@@ -416,6 +406,33 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
               </div>
             </div>
           )}
+
+          {/* Mark as Claimed card (only while Ready) -- the document counterpart
+              to marking an appointment as done. */}
+          {canClaim && (
+            <div className="dss-card dss-claim-card">
+              <div className="dss-card-header">
+                <h3 className="dss-card-title dss-claim-title">
+                  <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem" }} />
+                  Mark as Claimed
+                </h3>
+              </div>
+              <div className="dss-card-content">
+                <p className="dss-claim-desc">
+                  Once you've collected this document, mark it as claimed here so
+                  its status stays up to date.
+                </p>
+                <button
+                  className="dss-claim-btn"
+                  onClick={() => setShowClaimDialog(true)}
+                  disabled={claiming}
+                >
+                  <CheckCircle2 style={{ width: "1rem", height: "1rem" }} />
+                  {claiming ? "Marking…" : "Mark as Claimed"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -436,6 +453,25 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onConfirmReceipt, c
         cancelText="Keep Request"
         confirmText={cancelling ? "Cancelling…" : "Cancel Request"}
         confirmDisabled={cancelling}
+      />
+
+      {/* Mark as Claimed Confirm Dialog */}
+      <ActionConfirmModal
+        show={showClaimDialog}
+        variant="success"
+        onCancel={() => setShowClaimDialog(false)}
+        onConfirm={() => { setShowClaimDialog(false); onClaim(doc.id); }}
+        title="Mark Document as Claimed?"
+        message={
+          <>
+            Mark <strong>{doc.type}</strong> as claimed? Only do this once
+            you've received your document.
+          </>
+        }
+        icon={<CheckCircle2 width={22} height={22} />}
+        cancelText="Not Yet"
+        confirmText={claiming ? "Marking…" : "Mark as Claimed"}
+        confirmDisabled={claiming}
       />
     </div>
   );
@@ -460,7 +496,7 @@ export default function ProfessorDocumentStatus() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
-  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const selectedDoc = selectedDocId
     ? (documents.find((d) => d.id === selectedDocId) ?? null)
     : null;
@@ -495,8 +531,8 @@ export default function ProfessorDocumentStatus() {
           notes: r.notes || undefined,
           estimatedCompletion: r.estimated_completion || undefined,
           neededBy: r.needed_by || undefined,
-          releasedDate: r.released_at || undefined,
           claimedDate: r.claimed_at || undefined,
+          updatedAt: r.updated_at || undefined,
           isDigitalDelivery: !!r.is_digital_delivery,
           deliveryCode: r.delivery_code || undefined,
           serviceSnapshot: r.service_snapshot ?? null,
@@ -561,23 +597,21 @@ export default function ProfessorDocumentStatus() {
     }
   };
 
-  // "Generate Document" prototype -- self-service counterpart to admin's
-  // Generate Document action. doc.id is prefixed ("req-12") from GET
-  // /documents; confirm-receipt only ever applies to requests, so the
-  // prefix is stripped here rather than teaching the route to parse it.
-  const handleConfirmReceipt = async (docId) => {
-    const rawId = docId.replace(/^req-/, "");
-    setConfirmingReceipt(true);
+  // Owner self-claim (Ready -> Claimed), mirroring how a student marks an
+  // appointment as done. doc.id is already prefixed ("req-12"/"sub-7") from
+  // GET /documents and the /claim route parses that prefix, so pass it through.
+  const handleClaim = async (docId) => {
+    setClaiming(true);
     try {
-      await api.patch(`/professor/documents/${rawId}/confirm-receipt`);
+      await api.patch(`/professor/documents/${docId}/claim`);
       setDocuments((prev) =>
         prev.map((d) => (d.id === docId ? { ...d, status: "claimed" } : d)),
       );
-      toast.success("Receipt confirmed — thanks!");
+      toast.success("Document marked as claimed.");
     } catch (err) {
-      toast.error(err?.response?.data?.message ?? "Failed to confirm receipt.");
+      toast.error(err?.response?.data?.message ?? "Failed to mark the document as claimed.");
     } finally {
-      setConfirmingReceipt(false);
+      setClaiming(false);
     }
   };
 
@@ -597,7 +631,7 @@ export default function ProfessorDocumentStatus() {
         {selectedDoc ? (
           <DocumentDetail
             doc={selectedDoc}
-            backLabel={detailOpenedFromExternal ? "Document Requests" : "All Documents"}
+            backLabel={detailOpenedFromExternal ? "Document Requests and Submissions" : "All Documents"}
             onBack={() =>
               detailOpenedFromExternal
                 ? navigate("/professor/document-request")
@@ -605,8 +639,8 @@ export default function ProfessorDocumentStatus() {
             }
             onCancel={handleCancel}
             cancelling={cancelling}
-            onConfirmReceipt={handleConfirmReceipt}
-            confirmingReceipt={confirmingReceipt}
+            onClaim={handleClaim}
+            claiming={claiming}
             requirements={selectedDocRequirements}
             reqLoading={loading && !selectedDoc}
           />
@@ -625,8 +659,8 @@ export default function ProfessorDocumentStatus() {
               }
               icon={<FileText style={{ width: "1.75rem", height: "1.75rem" }} />}
               iconClassName="dss-title-icon"
-              title="My Document Requests"
-              subtitle="Track all of your document requests."
+              title="My Document Requests and Submissions"
+              subtitle="Track all of your document requests and submissions."
               headerClassName="dss-header"
               breadcrumbClassName="page-breadcrumb"
               titleSectionClassName="dss-title-section"

@@ -578,7 +578,7 @@ INSERT INTO appointments (student_id, faculty_id, department_id, appointment_dat
 -- must stay 'REQ-00001' exactly, referenced by the retro-UPDATE and
 -- generated_files INSERT further below.
 INSERT INTO document_requests (tracking_number, student_id, service_id, request_type, purpose, status) VALUES
-('REQ-00001', 104, 2, 'Transcript of Records', 'For job application', 'released');
+('REQ-00001', 104, 2, 'Transcript of Records', 'For job application', 'ready');
 
 -- Document submission (student -> office "Send a Document"). Admin + student
 -- only. department_id is student 104's own (1001, CCS).
@@ -603,14 +603,14 @@ INSERT INTO announcements (title, content, type, is_pinned, audience, department
 INSERT INTO audit_logs (admin_id, action, target_table, target_record_id, old_values, new_values) VALUES
 (103, 'CREATE', 'announcements', LAST_INSERT_ID(), NULL, JSON_OBJECT('title', 'Queue System Downtime Advisory'));
 
-INSERT INTO document_requests (tracking_number, student_id, service_id, request_type, purpose, copies, status, official_code, released_at, claimed_at) VALUES
-    ('REQ-00002', 105, 1, 'Good Moral Certificate',    'Job application', 1, 'generated', 'CCS-2026-00201', NULL, NULL),
-    ('REQ-00003', 108, 3, 'Certificate of Enrollment', 'Scholarship',     1, 'claimed',   'CCS-2026-00202', NOW() - INTERVAL 5 HOUR, NOW() - INTERVAL 4 HOUR);
+INSERT INTO document_requests (tracking_number, student_id, service_id, request_type, purpose, copies, status, official_code, claimed_at) VALUES
+    ('REQ-00002', 105, 1, 'Good Moral Certificate',    'Job application', 1, 'ready',   'CCS-2026-00201', NULL),
+    ('REQ-00003', 108, 3, 'Certificate of Enrollment', 'Scholarship',     1, 'claimed', 'CCS-2026-00202', NOW() - INTERVAL 4 HOUR);
 
-INSERT INTO faculty_document_requests (tracking_number, faculty_id, service_id, request_type, purpose, copies, status, official_code, released_at, claimed_at) VALUES
-    ('FDR-00002', 107, 5, 'Certificate of Employment', 'Visa application', 1, 'released', 'CCS-2026-00301', NOW() - INTERVAL 2 HOUR, NULL);
+INSERT INTO faculty_document_requests (tracking_number, faculty_id, service_id, request_type, purpose, copies, status, official_code, claimed_at) VALUES
+    ('FDR-00002', 107, 5, 'Certificate of Employment', 'Visa application', 1, 'ready', 'CCS-2026-00301', NULL);
  
--- Retro-assign an official_code to the pre-existing released request
+-- Retro-assign an official_code to the pre-existing ready request
 -- (REQ-00001, student 104) so it has something to encode into a QR.
 UPDATE document_requests
 SET official_code = 'CCS-2026-00101'
@@ -641,7 +641,7 @@ FROM faculty_document_requests WHERE tracking_number = 'FDR-00002';
 -- ─────────────────────────────────────────────────────────────
 -- QR tracking logs -- scans recorded so far
 -- (QR-REQ-00002 is intentionally left unscanned to test a
---  first-time scan against a "generated" but not-yet-released request)
+--  first-time scan against a "ready" but not-yet-claimed request)
 -- ─────────────────────────────────────────────────────────────
  
 INSERT INTO qr_tracking_logs (file_id, scanned_by, scan_location, scan_time)

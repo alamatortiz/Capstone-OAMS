@@ -109,15 +109,18 @@ export default function ProfessorTransactionsPage() {
       no_show: "txn-badge txn-badge-noshow",
       pending: "txn-badge txn-badge-pending",
       processing: "txn-badge txn-badge-processing",
-      generated: "txn-badge txn-badge-generated",
-      released: "txn-badge txn-badge-released",
+      ready: "txn-badge txn-badge-ready",
+      // Defensive aliases for rows that predate the lifeline collapse.
+      generated: "txn-badge txn-badge-ready",
+      released: "txn-badge txn-badge-ready",
       claimed: "txn-badge txn-badge-claimed",
     }[status] ?? "txn-badge");
 
   const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
   const statusLabel = (status) => {
-    if (status === "generated") return "Ready for Pickup";
+    if (status === "ready" || status === "generated" || status === "released")
+      return "Ready for Pickup";
     if (status === "no_show") return "No Show";
     return capitalize(status);
   };
@@ -339,8 +342,7 @@ export default function ProfessorTransactionsPage() {
                   { value: "pending", label: "Pending" },
                   { value: "approved", label: "Approved" },
                   { value: "processing", label: "Processing" },
-                  { value: "generated", label: "Ready for Pickup" },
-                  { value: "released", label: "Released" },
+                  { value: "ready", label: "Ready for Pickup" },
                   { value: "claimed", label: "Claimed" },
                   { value: "completed", label: "Completed" },
                   { value: "rejected", label: "Rejected" },

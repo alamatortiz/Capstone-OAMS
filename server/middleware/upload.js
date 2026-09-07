@@ -60,11 +60,14 @@ function createUploadMiddleware(subdir) {
 
 const announcementUpload = createUploadMiddleware("announcements");
 const documentSubmissionUpload = createUploadMiddleware("document-submissions");
+// Soft-copy files the office attaches to a document REQUEST (office -> requester).
+const documentRequestUpload = createUploadMiddleware("document-requests");
 
 module.exports = {
   upload: announcementUpload.upload,
   UPLOAD_DIR: announcementUpload.UPLOAD_DIR,
   documentSubmissionUpload,
+  documentRequestUpload,
   MIME_EXT,
   MAX_FILES,
   MAX_FILE_BYTES,

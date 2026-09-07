@@ -16,8 +16,10 @@ import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { toast } from "sonner";
 
 const DOCUMENT_STATUS_LABELS = {
+  ready: "Ready for Pickup",
+  // Defensive aliases for rows that predate the lifeline collapse.
   generated: "Ready for Pickup",
-  released: "Released — awaiting claim",
+  released: "Ready for Pickup",
   claimed: "Claimed",
 };
 
@@ -373,7 +375,7 @@ export default function AdminScanDocument() {
 
                 {/* Modal Actions */}
                 <div className="asd-modal-actions">
-                  {verifiedDoc.documentStatus === "released" && (
+                  {["ready", "generated", "released"].includes(verifiedDoc.documentStatus) && (
                     <button
                       className="asd-btn-claim"
                       onClick={handleMarkClaimed}

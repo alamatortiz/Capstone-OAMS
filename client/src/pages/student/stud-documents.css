@@ -565,6 +565,27 @@ body {
   font-size: 0.8rem;
 }
 
+/* Native "Choose Files" button -- pin to a light chip with near-black text so
+   it stays readable regardless of the OS color-scheme (see the same rule in
+   adm-document-processing.css for the why). */
+.doc-attach-input::file-selector-button,
+.doc-attach-input::-webkit-file-upload-button {
+  margin-right: 0.6rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: #e5e7eb;
+  color: #111827;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.doc-attach-input::file-selector-button:hover,
+.doc-attach-input::-webkit-file-upload-button:hover {
+  background: #d1d5db;
+}
+
 .doc-attach-budget {
   font-size: 0.72rem;
   color: var(--text-tertiary);
@@ -761,12 +782,6 @@ body {
   border-color: rgba(34, 197, 94, 0.35);
 }
 
-.doc-badge-released {
-  background-color: rgba(34, 197, 94, 0.18);
-  color: var(--primary-color);
-  border-color: rgba(34, 197, 94, 0.35);
-}
-
 .doc-badge-claimed {
   background-color: rgba(34, 197, 94, 0.18);
   color: var(--primary-color);
@@ -799,12 +814,6 @@ body {
 }
 
 [data-theme="light"] .doc-badge-ready {
-  background-color: rgba(5, 150, 105, 0.1);
-  color: #065f46;
-  border-color: rgba(5, 150, 105, 0.25);
-}
-
-[data-theme="light"] .doc-badge-released {
   background-color: rgba(5, 150, 105, 0.1);
   color: #065f46;
   border-color: rgba(5, 150, 105, 0.25);
@@ -904,14 +913,6 @@ body {
   transition: color 0.3s ease;
 }
 
-.doc-card-claimed-date,
-.doc-card-claimed-time {
-  font-size: 0.8125rem;
-  color: var(--text-tertiary);
-  margin: 0.25rem 0 0 0;
-  transition: color 0.3s ease;
-}
-
 .doc-card-header-right {
   display: flex;
   flex-direction: column;
@@ -931,6 +932,36 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.3px;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Terminal cards (claimed/rejected/cancelled): a left-aligned date + time
+   stamp under the college line, styled like the Transactions cards'
+   .transaction-date / .transaction-time. */
+.doc-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  margin-top: 0.4rem;
+}
+
+.doc-card-meta-date,
+.doc-card-meta-time {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.doc-card-meta-date svg,
+.doc-card-meta-time svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  stroke: currentColor;
   flex-shrink: 0;
 }
 
@@ -1044,7 +1075,8 @@ body {
   flex-shrink: 0;
 }
 
-.doc-card-view-button {
+.doc-card-view-button,
+.doc-claim-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1063,26 +1095,50 @@ body {
   margin-top: 0.75rem;
 }
 
-.doc-card-view-button:hover {
+.doc-card-view-button:hover,
+.doc-claim-btn:hover {
   background-color: rgba(34, 197, 94, 0.1);
   border-color: rgba(34, 197, 94, 0.65);
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(34, 197, 94, 0.2);
 }
 
-.doc-card-view-button:active {
+.doc-card-view-button:active,
+.doc-claim-btn:active {
   transform: translateY(0);
   box-shadow: none;
 }
 
-.doc-card-view-button svg {
+.doc-card-view-button svg,
+.doc-claim-btn svg {
   width: 1.3rem;
   height: 1.3rem;
   flex-shrink: 0;
 }
 
-[data-theme="light"] .doc-card-view-button {
+[data-theme="light"] .doc-card-view-button,
+[data-theme="light"] .doc-claim-btn {
   color: #065f46;
+}
+
+/* Ready card: "View Pickup Details" + "Mark Document as Claimed" side by side. */
+.doc-card-actions-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.doc-card-actions-row .doc-card-view-button,
+.doc-card-actions-row .doc-claim-btn {
+  flex: 1;
+  margin-top: 0;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .doc-card-actions-row {
+    flex-direction: column;
+  }
 }
 
 /* ===== EMPTY STATE ===== */

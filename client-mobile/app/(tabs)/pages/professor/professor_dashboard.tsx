@@ -139,7 +139,8 @@ const STATUS_META: Record<string, { bg: string; border: string; color: string }>
 // text reads the same way on both dashboards ("No Show" not "no_show").
 function formatActivityStatus(status: string, type: string) {
   if (status === 'no_show') return 'No Show';
-  if (type === 'document' && status === 'generated') return 'Ready';
+  // Defensive: pre-collapse doc rows may still say "generated"/"released".
+  if (type === 'document' && (status === 'generated' || status === 'released')) return 'Ready';
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -359,7 +360,6 @@ export default function ProfessorDashboardScreen() {
         if (docs.pendingOnly > 0) parts.push(`${docs.pendingOnly} pending`);
         if (docs.processing > 0) parts.push(`${docs.processing} processing`);
         if (docs.ready > 0) parts.push(`${docs.ready} ready`);
-        if (docs.released > 0) parts.push(`${docs.released} released`);
         return parts.length ? parts.join(', ') : 'No pending documents';
       })();
 
@@ -445,7 +445,7 @@ export default function ProfessorDashboardScreen() {
     { key: 'announcements', title: 'Announcements', description: 'Stay updated with the latest notices from your department.', icon: Megaphone, badge: `${pinnedAnnouncements.length} Pinned`, gradient: ['#22c55e', '#16a34a'] },
     { key: 'schedule-manager', title: 'Schedule Manager', description: 'Set your weekly recurring availability by day. It repeats every week until you edit or remove it.', icon: Calendar, gradient: ['#a855f7', '#9333ea'] },
     { key: 'appointments', title: 'Appointments', description: 'Review and manage student appointment requests.', icon: Calendar, badge: `${s?.pendingAppointments ?? 0} Active`, gradient: ['#a855f7', '#9333ea'] },
-    { key: 'document-request', title: 'Document Requests', description: 'Request documents and track their status.', icon: FileText, badge: `${s?.documentsToReview ?? 0} Pending`, gradient: ['#f97316', '#ea580c'] },
+    { key: 'document-request', title: 'Document Requests and Submissions', description: 'Request and submit documents as well as track their status.', icon: FileText, badge: `${s?.documentsToReview ?? 0} Pending`, gradient: ['#f97316', '#ea580c'] },
     { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: ClipboardList, gradient: ['#22c55e', '#16a34a'] },
   ];
 

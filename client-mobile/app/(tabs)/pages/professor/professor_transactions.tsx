@@ -92,6 +92,9 @@ type TxnStatus =
   | 'pending'
   | 'approved'
   | 'processing'
+  | 'ready'
+  // 'generated'/'released' are defensive aliases for rows that predate the
+  // lifeline collapse.
   | 'generated'
   | 'released'
   | 'claimed'
@@ -141,8 +144,9 @@ const STATUS_META: Record<TxnStatus, { label: string; bg: string; border: string
   no_show: { label: 'No Show', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', color: '#f87171' },
   pending: { label: 'Pending', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b' },
   processing: { label: 'Processing', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6' },
+  ready: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   generated: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
-  released: { label: 'Released', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#34d399' },
+  released: { label: 'Ready for Pickup', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
   claimed: { label: 'Claimed', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981' },
 };
 
@@ -162,8 +166,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
   { value: 'processing', label: 'Processing' },
-  { value: 'generated', label: 'Ready for Pickup' },
-  { value: 'released', label: 'Released' },
+  { value: 'ready', label: 'Ready for Pickup' },
   { value: 'claimed', label: 'Claimed' },
   { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },

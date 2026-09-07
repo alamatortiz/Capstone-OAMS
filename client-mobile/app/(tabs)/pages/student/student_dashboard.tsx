@@ -166,6 +166,7 @@ const STATUS_COLOR_MAP: Record<string, { bg: string; color: string }> = {
   processing: { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
   completed: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
   claimed: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
+  ready: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
   released: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
   generated: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' },
   cancelled: { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' },
@@ -455,7 +456,6 @@ export default function StudentDashboardScreen() {
         if (docs.pendingOnly > 0) parts.push(`${docs.pendingOnly} pending`);
         if (docs.processing > 0) parts.push(`${docs.processing} processing`);
         if (docs.ready > 0) parts.push(`${docs.ready} ready`);
-        if (docs.released > 0) parts.push(`${docs.released} released`);
         return parts.length ? parts.join(', ') : 'No pending documents';
       })(),
       icon: FileText, tint: 'orange',
@@ -476,7 +476,7 @@ export default function StudentDashboardScreen() {
     { key: 'professor-schedules', title: 'Professor Schedules', description: 'Check professor consultation hours and availability across all departments.', icon: GraduationCap, badge: `${dashStats?.stats?.totalFacultyCount ?? 0} Faculty`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
     { key: 'queues', title: 'Queues', description: 'Join queues and track your position in real-time.', icon: Users, badge: `${activeQueueCount} Participating Queues`, badgeTint: 'blue', gradient: ['#3b82f6', '#6366f1'] },
     { key: 'appointments', title: 'Appointments', description: 'Schedule appointments with professors and view available slots.', icon: Calendar, badge: `${dashStats?.stats?.appointments?.active ?? 0} Active Bookings`, badgeTint: 'violet', gradient: ['#a855f7', '#9333ea'] },
-    { key: 'document-requests', title: 'Document Requests', description: 'Request documents and track their status.', icon: FileText, badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`, badgeTint: 'orange', gradient: ['#f97316', '#ea580c'] },
+    { key: 'document-requests', title: 'Document Requests and Submissions', description: 'Request and submit documents as well as track their status.', icon: FileText, badge: `${dashStats?.stats?.documents?.total ?? 0} Active Requests`, badgeTint: 'orange', gradient: ['#f97316', '#ea580c'] },
     { key: 'transactions', title: 'Transactions', description: 'View all your activities and transactions.', icon: ClipboardList, badgeTint: 'green', gradient: ['#22c55e', '#16a34a'] },
   ];
 

@@ -8,12 +8,12 @@ const STALE_HOURS = 24;
 const ESCALATION_DAYS = 7;
 
 // Finds every document request (student-side and faculty-side) that's been
-// sitting in 'generated' (ready for pickup) for longer than STALE_HOURS and
+// sitting in 'ready' (ready for pickup) for longer than STALE_HOURS and
 // reminds the requester. Neither table has a dedicated "became ready"
 // timestamp, so this reuses `updated_at` (already ON UPDATE CURRENT_TIMESTAMP
 // on both tables) as a "time since last status change" proxy instead of
 // adding a tracking column -- the accepted trade-off is a request stuck in
-// 'generated' gets reminded roughly once per sweep (~daily) until claimed,
+// 'ready' gets reminded roughly once per sweep (~daily) until claimed,
 // which reads as an intentional daily nag rather than a bug.
 async function sweepDocumentPickups() {
   try {
@@ -21,14 +21,14 @@ async function sweepDocumentPickups() {
       `SELECT dr.request_id, dr.student_id AS user_id, dr.tracking_number, s.service_name
        FROM document_requests dr
        JOIN document_services s ON dr.service_id = s.service_id
-       WHERE dr.status = 'generated' AND dr.updated_at <= (NOW() - INTERVAL ? HOUR)`,
+       WHERE dr.status = 'ready' AND dr.updated_at <= (NOW() - INTERVAL ? HOUR)`,
       [STALE_HOURS],
     );
     const [facultyStale] = await pool.query(
       `SELECT fdr.request_id, fdr.faculty_id AS user_id, fdr.tracking_number, s.service_name
        FROM faculty_document_requests fdr
        JOIN document_services s ON fdr.service_id = s.service_id
-       WHERE fdr.status = 'generated' AND fdr.updated_at <= (NOW() - INTERVAL ? HOUR)`,
+       WHERE fdr.status = 'ready' AND fdr.updated_at <= (NOW() - INTERVAL ? HOUR)`,
       [STALE_HOURS],
     );
 
@@ -67,7 +67,7 @@ async function escalateAbandonedPickups() {
     `SELECT dr.request_id, dr.tracking_number, s.department_id
      FROM document_requests dr
      JOIN students s ON dr.student_id = s.student_id
-     WHERE dr.status = 'generated'
+     WHERE dr.status = 'ready'
        AND dr.escalated_at IS NULL
        AND dr.updated_at <= (NOW() - INTERVAL ? DAY)`,
     [ESCALATION_DAYS],
@@ -76,7 +76,7 @@ async function escalateAbandonedPickups() {
     `SELECT fdr.request_id, fdr.tracking_number, f.department_id
      FROM faculty_document_requests fdr
      JOIN faculty f ON fdr.faculty_id = f.faculty_id
-     WHERE fdr.status = 'generated'
+     WHERE fdr.status = 'ready'
        AND fdr.escalated_at IS NULL
        AND fdr.updated_at <= (NOW() - INTERVAL ? DAY)`,
     [ESCALATION_DAYS],

@@ -17,6 +17,7 @@ const { getQueueDisplayInfo } = require("../utils/queueDisplay");
 const {
   STATUS_LABEL_MAP,
   cancelOwnDocumentRequest,
+  selfClaimDocument,
   buildDocumentServiceSnapshot,
 } = require("../utils/documentStatus");
 // const { createNotification } = require("../utils/notifications");
@@ -40,6 +41,10 @@ const {
   deleteFiles,
   serveStudentDocumentSubmissionFile,
 } = require("../utils/documentSubmissionAttachments");
+const {
+  getFilesMap: getRequestFilesMap,
+  serveRequestFile,
+} = require("../utils/documentRequestAttachments");
 
 // Logs the real error server-side (unchanged from before) but only ever
 // sends a generic, safe message to the client under the `error` key --
@@ -127,20 +132,20 @@ router.get(
         `SELECT
            SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_only_count,
            SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count,
-           SUM(CASE WHEN status = 'generated'  THEN 1 ELSE 0 END) AS ready_count,
-           SUM(CASE WHEN status = 'released'   THEN 1 ELSE 0 END) AS released_count
+           SUM(CASE WHEN status = 'ready'      THEN 1 ELSE 0 END) AS ready_count
          FROM document_requests
          WHERE student_id = ?`,
         [studentId],
       );
 
-      // document_submissions has no 'generated'/'released' states (nothing is
-      // physically produced/picked up in that direction), so only
-      // pending/processing counts fold into the combined documents stat below.
+      // document_submissions now share the Pending -> Processing -> Ready ->
+      // Claimed lifeline, so pending/processing/ready all fold into the
+      // combined documents stat below.
       const [[subRow]] = await pool.query(
         `SELECT
            SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_only_count,
-           SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count
+           SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count,
+           SUM(CASE WHEN status = 'ready'      THEN 1 ELSE 0 END) AS ready_count
          FROM document_submissions
          WHERE student_id = ?`,
         [studentId],
@@ -275,16 +280,16 @@ router.get(
             const processing =
               Number(docRow.processing_count || 0) +
               Number(subRow.processing_count || 0);
-            const ready = Number(docRow.ready_count || 0);
-            const released = Number(docRow.released_count || 0);
-            const total = pendingOnly + processing + ready + released;
+            const ready =
+              Number(docRow.ready_count || 0) +
+              Number(subRow.ready_count || 0);
+            const total = pendingOnly + processing + ready;
             return {
               total,
               pending: total,
               pendingOnly,
               processing,
               ready,
-              released,
             };
           })(),
           completed: completedRow.total_completed || 0,
@@ -376,8 +381,7 @@ function buildDocumentActivityTitle(row) {
   const map = {
     pending: `Document request submitted: ${row.request_type}`,
     processing: `Document request being processed: ${row.request_type}`,
-    generated: `Document ready for pickup: ${row.request_type}`,
-    released: `Document released: ${row.request_type}`,
+    ready: `Document ready for pickup: ${row.request_type}`,
     claimed: `Document claimed: ${row.request_type}`,
     rejected: `Document request rejected: ${row.request_type}`,
     cancelled: `You cancelled the document request: ${row.request_type}`,
@@ -391,7 +395,8 @@ function buildSubmissionActivityTitle(row) {
   const map = {
     pending: `Document sent: ${row.request_type}`,
     processing: `Sent document being processed: ${row.request_type}`,
-    claimed: `Sent document received by the office: ${row.request_type}`,
+    ready: `Sent document processed and ready: ${row.request_type}`,
+    claimed: `Sent document completed: ${row.request_type}`,
     rejected: `Sent document rejected: ${row.request_type}`,
     cancelled: `You cancelled the sent document: ${row.request_type}`,
   };
@@ -622,6 +627,7 @@ router.get(
                dr.claimed_at,
                dr.notes,
                dr.created_at,
+               dr.updated_at,
                dr.is_digital_delivery,
                dr.service_snapshot,
                gf.qr_code AS delivery_code,
@@ -648,6 +654,7 @@ router.get(
                ds.claimed_at,
                ds.notes,
                ds.created_at,
+               ds.updated_at,
                NULL AS is_digital_delivery,
                NULL AS service_snapshot,
                NULL AS delivery_code,
@@ -664,9 +671,13 @@ router.get(
       const submissionIds = rows
         .filter((d) => d.kind === "submission")
         .map((d) => d.id);
-      const [studentFilesMap, adminFilesMap] = await Promise.all([
+      const requestIds = rows
+        .filter((d) => d.kind === "request")
+        .map((d) => d.id);
+      const [studentFilesMap, adminFilesMap, requestFilesMap] = await Promise.all([
         getFilesMap(submissionIds, "student_upload"),
         getFilesMap(submissionIds, "admin_return"),
+        getRequestFilesMap(requestIds, { faculty: false }),
       ]);
 
       const documents = rows.map((d) => {
@@ -676,6 +687,7 @@ router.get(
           type: d.title,
           college: d.college,
           requestDate: d.created_at,
+          updatedAt: d.updated_at,
           purpose: d.purpose,
           copies: d.copies,
           status: STATUS_LABEL_MAP[d.status] ?? d.status,
@@ -696,6 +708,9 @@ router.get(
         if (d.kind === "submission") {
           doc.studentFiles = studentFilesMap[d.id] || [];
           doc.adminFiles = adminFilesMap[d.id] || [];
+        } else {
+          // Soft-copy files the office attached to this request.
+          doc.adminFiles = requestFilesMap[d.id] || [];
         }
         return doc;
       });
@@ -1223,50 +1238,69 @@ router.delete(
   },
 );
 
-// PATCH /api/student/documents/:requestId/confirm-receipt
-// Self-service counterpart to admin's "Generate Document" prototype (see
-// adminRoutes.js) -- only succeeds for the student's own request, only when
-// it's currently 'released' AND was digitally delivered, and only moves it
-// to 'claimed'. Nothing else (physically-released documents still require
-// admin to mark them claimed in person).
+// PATCH /api/student/documents/:docId/claim
+// Owner-initiated Ready -> Claimed, the document counterpart to a student
+// marking an appointment as done. `:docId` is prefixed ("req-12"/"sub-7") the
+// same way GET /documents and DELETE /documents/:docId are. Only succeeds for
+// the student's own request/submission and only from the 'ready' state;
+// 'claimed' is treated as an idempotent success.
 router.patch(
-  "/documents/:requestId/confirm-receipt",
+  "/documents/:docId/claim",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const match = /^(req|sub)-(\d+)$/.exec(req.params.docId);
+    if (!match) {
+      return res.status(400).json({ error: "Invalid document id" });
+    }
+    const role = match[1] === "sub" ? "submission" : "student";
+    const requestId = parseInt(match[2], 10);
+
+    const conn = await pool.getConnection();
+    try {
+      const result = await selfClaimDocument(conn, { role, ownerId: studentId, requestId });
+      if (!result.ok) {
+        return res.status(result.status).json({ error: result.message });
+      }
+
+      emitToUser(studentId, "document:status-updated", { requestId, status: "claimed" });
+      emitToDept(result.departmentId, "document:status-updated", { requestId, status: "claimed" });
+      if (!result.already) {
+        createNotification(
+          studentId,
+          `You claimed your ${result.label} document (${result.trackingNumber}).`,
+          "document",
+        );
+      }
+
+      res.json({ message: "Document claimed", requestId: req.params.docId, status: "claimed" });
+    } catch (error) {
+      try { await conn.rollback(); } catch { /* already rolled back */ }
+      sendServerError(res, error, "Claim document error");
+    } finally {
+      conn.release();
+    }
+  },
+);
+
+// GET /api/student/documents/:requestId/files/:fileId
+// Streams one soft-copy file the office attached to the student's own request.
+router.get(
+  "/documents/:requestId/files/:fileId",
   authenticateToken,
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
     const requestId = parseInt(req.params.requestId, 10);
-
+    const fileId = parseInt(req.params.fileId, 10);
+    if (!requestId || !fileId) {
+      return res.status(400).json({ error: "Invalid request or file id" });
+    }
     try {
-      const [[request]] = await pool.query(
-        `SELECT dr.request_id, dr.status, dr.is_digital_delivery, dr.tracking_number, s.department_id, s.service_name
-         FROM document_requests dr
-         JOIN document_services s ON dr.service_id = s.service_id
-         WHERE dr.request_id = ? AND dr.student_id = ?`,
-        [requestId, studentId],
-      );
-      if (!request) {
-        return res.status(404).json({ error: "Document request not found" });
-      }
-      if (request.status !== "released" || !request.is_digital_delivery) {
-        return res.status(409).json({ error: "This document isn't ready to be confirmed as received" });
-      }
-
-      await pool.query(
-        `UPDATE document_requests SET status = 'claimed', claimed_at = NOW() WHERE request_id = ?`,
-        [requestId],
-      );
-
-      emitToDept(request.department_id, "document:status-updated", { requestId, status: "claimed" });
-      createNotification(
-        studentId,
-        `You confirmed receipt of your ${request.service_name} request (${request.tracking_number}).`,
-        "document",
-      );
-
-      res.json({ message: "Receipt confirmed", requestId, status: "claimed" });
+      await serveRequestFile(res, { requestId, fileId, faculty: false, requesterId: studentId });
     } catch (error) {
-      sendServerError(res, error, "Confirm document receipt error");
+      sendServerError(res, error, "Get document request file error");
     }
   },
 );
@@ -2636,6 +2670,8 @@ router.get(
       approved: "ongoing",
       rejected: "cancelled",
       processing: "ongoing",
+      ready: "ongoing",
+      // Defensive aliases for rows that predate the lifeline collapse.
       generated: "ongoing",
       released: "ongoing",
       claimed: "completed",
