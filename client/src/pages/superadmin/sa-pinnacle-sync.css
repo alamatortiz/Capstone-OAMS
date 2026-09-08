@@ -588,6 +588,69 @@
   margin: 0;
 }
 
+/* ── Per-department settings row (Satisfaction Survey) ───────── */
+.aps-dept-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.aps-dept-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--secondary, #1a3a1f);
+  border: 1px solid var(--card-border, #1e3a23);
+  border-radius: 0.65rem;
+  padding: 0.85rem 1rem;
+}
+
+.aps-dept-row-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 150px;
+  flex-shrink: 0;
+}
+
+.aps-dept-abbrev {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary-color, #22c55e);
+  background: rgba(34, 197, 94, 0.15);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  flex-shrink: 0;
+}
+
+.aps-dept-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0fdf4);
+}
+
+.aps-dept-row .aps-input {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.aps-dept-save-btn {
+  flex-shrink: 0;
+  padding: 0.65rem 1.1rem;
+}
+
+@media (max-width: 600px) {
+  .aps-dept-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .aps-dept-save-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* ── Light mode overrides ─────────────────────────────────── */
 [data-theme="light"] .aps-stat-card,
 [data-theme="light"] .aps-panel,
@@ -603,7 +666,8 @@
 }
 
 [data-theme="light"] .aps-toggle-card,
-[data-theme="light"] .aps-how-it-works {
+[data-theme="light"] .aps-how-it-works,
+[data-theme="light"] .aps-dept-row {
   background: #f1f5f9;
   border-color: #e2e8f0;
 }
@@ -613,7 +677,8 @@
 [data-theme="light"] .aps-label,
 [data-theme="light"] .aps-toggle-title,
 [data-theme="light"] .aps-how-title,
-[data-theme="light"] .aps-empty-title {
+[data-theme="light"] .aps-empty-title,
+[data-theme="light"] .aps-dept-name {
   color: #1e293b;
 }
 

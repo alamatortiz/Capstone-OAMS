@@ -21,7 +21,6 @@ import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
-import SatisfactionSurveyCard from "../../components/SatisfactionSurveyCard";
 import api from "../../utils/api";
 import "./stud-queue-status.css";
 
@@ -305,9 +304,11 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             </div>
           </div>
 
-          {queue.status === "completed" && (
-            <SatisfactionSurveyCard endpointBase="student" />
-          )}
+          {/* Satisfaction survey card intentionally not shown here yet --
+              feature is built and configurable (see superadmin's Satisfaction
+              Survey settings) but held back from end users pending school
+              approval. Re-add `<SatisfactionSurveyCard endpointBase="student" />`
+              gated on queue.status === "completed" once approved. */}
 
           {/* Wait time card */}
           <div className="qss-card">

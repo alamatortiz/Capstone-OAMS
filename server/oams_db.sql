@@ -19,7 +19,8 @@ CREATE TABLE departments (
     department_name     VARCHAR(100) NOT NULL,
     department_abbreviation VARCHAR(20) NOT NULL,  -- tightened from VARCHAR(100)
     office_location     VARCHAR(100),
-    office_hours        TEXT         NULL
+    office_hours        TEXT         NULL,
+    satisfaction_survey_url VARCHAR(500) NULL  -- external survey link, set per-department by superadmin
 );
 
 -- ─────────────────────────────────────────────────────────────

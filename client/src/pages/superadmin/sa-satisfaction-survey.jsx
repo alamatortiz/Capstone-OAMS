@@ -12,8 +12,10 @@ import api from "../../utils/api";
 
 export default function SuperadminSatisfactionSurvey() {
   const { user: authUser } = useAuth();
-  const [surveyUrl, setSurveyUrl] = useState("");
-  const [saving, setSaving] = useState(false);
+  // Keyed by departmentId -- each college has its own external survey link.
+  const [urlsByDept, setUrlsByDept] = useState({});
+  const [departments, setDepartments] = useState([]);
+  const [savingId, setSavingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
 
@@ -21,18 +23,26 @@ export default function SuperadminSatisfactionSurvey() {
     if (!authUser) return;
     api
       .get("/admin/settings/satisfaction-survey")
-      .then((res) => setSurveyUrl(res.data?.surveyUrl || ""))
+      .then((res) => {
+        const depts = res.data?.departments ?? [];
+        setDepartments(depts);
+        setUrlsByDept(
+          Object.fromEntries(depts.map((d) => [d.departmentId, d.surveyUrl || ""])),
+        );
+      })
       .catch((err) => console.error("Failed to load satisfaction survey config:", err))
       .finally(() => setLoading(false));
   }, [authUser]);
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSave = async (departmentId) => {
+    setSavingId(departmentId);
     try {
-      const res = await api.put("/admin/settings/satisfaction-survey", {
-        surveyUrl: surveyUrl.trim(),
-      });
-      setSurveyUrl(res.data.surveyUrl || "");
+      const surveyUrl = (urlsByDept[departmentId] ?? "").trim();
+      const res = await api.put(
+        `/admin/settings/satisfaction-survey/${departmentId}`,
+        { surveyUrl },
+      );
+      setUrlsByDept((prev) => ({ ...prev, [departmentId]: res.data.surveyUrl || "" }));
       setMessage({ type: "success", text: "Saved." });
     } catch (err) {
       setMessage({
@@ -40,7 +50,7 @@ export default function SuperadminSatisfactionSurvey() {
         text: err?.response?.data?.error ?? "Failed to save.",
       });
     } finally {
-      setSaving(false);
+      setSavingId(null);
       setTimeout(() => setMessage(null), 3000);
     }
   };
@@ -66,8 +76,8 @@ export default function SuperadminSatisfactionSurvey() {
               <div>
                 <h1 className="aps-page-title">Satisfaction Survey</h1>
                 <p className="aps-page-subtitle">
-                  Link students to an external satisfaction survey after a
-                  completed service
+                  Link students to each department's own external
+                  satisfaction survey after a completed service
                 </p>
               </div>
             </div>
@@ -83,40 +93,50 @@ export default function SuperadminSatisfactionSurvey() {
 
         <div className="aps-panel">
           <div className="aps-panel-header">
-            <h2 className="aps-panel-title">Survey Link</h2>
+            <h2 className="aps-panel-title">Survey Links by Department</h2>
             <p className="aps-panel-subtitle">
-              One shared link shown to every student after a queue is
-              completed or a document is claimed. OAMS doesn't host or store
-              responses — this only points them to your external survey.
+              Each college has its own link shown after a queue is completed
+              or a document is claimed in that department. OAMS doesn't host
+              or store responses — this only points students to the external
+              survey. Leave a field blank to hide the prompt for that
+              department.
             </p>
           </div>
 
-          <div className="aps-form-group">
-            <label className="aps-label">Survey URL</label>
-            <input
-              type="text"
-              className="aps-input"
-              value={surveyUrl}
-              onChange={(e) => setSurveyUrl(e.target.value)}
-              placeholder="https://forms.example.com/your-survey"
-              disabled={loading}
-            />
-            <p className="aps-hint">
-              Shown as a "Take the Survey" button plus a QR code students can
-              scan with another device. Leave blank to hide the prompt
-              everywhere.
-            </p>
-          </div>
-
-          <div className="aps-panel-actions">
-            <button
-              className="aps-btn-primary"
-              onClick={handleSave}
-              disabled={saving || loading}
-            >
-              <Star size={16} />
-              {saving ? "Saving..." : "Save"}
-            </button>
+          <div className="aps-dept-list">
+            {loading && (
+              <p className="aps-hint">Loading departments…</p>
+            )}
+            {!loading && departments.length === 0 && (
+              <p className="aps-hint">No departments found.</p>
+            )}
+            {departments.map((dept) => (
+              <div className="aps-dept-row" key={dept.departmentId}>
+                <div className="aps-dept-row-label">
+                  <span className="aps-dept-abbrev">{dept.departmentAbbreviation}</span>
+                  <span className="aps-dept-name">{dept.departmentName}</span>
+                </div>
+                <input
+                  type="text"
+                  className="aps-input"
+                  value={urlsByDept[dept.departmentId] ?? ""}
+                  onChange={(e) =>
+                    setUrlsByDept((prev) => ({
+                      ...prev,
+                      [dept.departmentId]: e.target.value,
+                    }))
+                  }
+                  placeholder="https://forms.example.com/your-survey"
+                />
+                <button
+                  className="aps-btn-primary aps-dept-save-btn"
+                  onClick={() => handleSave(dept.departmentId)}
+                  disabled={savingId === dept.departmentId}
+                >
+                  {savingId === dept.departmentId ? "Saving..." : "Save"}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>

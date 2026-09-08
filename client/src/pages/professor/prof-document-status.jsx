@@ -19,7 +19,6 @@ import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../
 import { connectSocket } from "../../utils/socket";
 import { getDocStatusDetailMeta, normalizeDocStatus } from "../../utils/documentStatus";
 import { QRCodeSVG } from "qrcode.react";
-import SatisfactionSurveyCard from "../../components/SatisfactionSurveyCard";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 
@@ -171,9 +170,11 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
         </div>
       )}
 
-      {doc.status === "claimed" && (
-        <SatisfactionSurveyCard endpointBase="professor" />
-      )}
+      {/* Satisfaction survey card intentionally not shown here yet --
+          feature is built and configurable (see superadmin's Satisfaction
+          Survey settings) but held back from end users pending school
+          approval. Re-add `<SatisfactionSurveyCard endpointBase="professor" />`
+          gated on doc.status === "claimed" once approved. */}
 
       {/* Detail Grid */}
       <div className="dss-detail-grid">

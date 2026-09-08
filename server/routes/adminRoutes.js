@@ -5116,38 +5116,55 @@ router.post(
 
 // ─────────────────────────────────────────────────────────────
 // SATISFACTION SURVEY
-// One shared, system-wide link to an EXTERNAL survey (OAMS never builds or
-// stores responses) -- reuses system_settings the same way Pinnacle Sync's
-// config does above. Readable by any admin/superadmin here; student.js and
-// professor.js each expose their own read-only copy of the GET so those
-// roles can fetch it without needing admin-level auth.
+// Each department has its OWN external survey link (OAMS never builds or
+// stores responses) -- stored directly on departments.satisfaction_survey_url,
+// the same shape as that table's existing office_location column.
+// Superadmin-only to configure. student.js and professor.js each expose
+// their own read-only mirror, scoped to the caller's own department, so
+// those roles can fetch just their department's link without admin auth.
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/settings/satisfaction-survey
+// Lists every department's configured (or blank) survey link, for the
+// superadmin settings page to render and edit one row per college.
 router.get(
   "/settings/satisfaction-survey",
   authenticateToken,
-  authorizeRoles("admin", "superadmin"),
+  authorizeRoles("superadmin"),
   async (req, res) => {
     try {
-      const [[row]] = await pool.query(
-        `SELECT setting_value FROM system_settings WHERE setting_key = 'satisfaction_survey_url'`,
+      const [rows] = await pool.query(
+        `SELECT department_id, department_name, department_abbreviation, satisfaction_survey_url
+         FROM departments
+         ORDER BY department_name`,
       );
-      res.json({ surveyUrl: row?.setting_value || "" });
+      res.json({
+        departments: rows.map((d) => ({
+          departmentId: d.department_id,
+          departmentName: d.department_name,
+          departmentAbbreviation: d.department_abbreviation,
+          surveyUrl: d.satisfaction_survey_url || "",
+        })),
+      });
     } catch (error) {
       sendServerError(res, error, "Satisfaction survey config get error:");
     }
   },
 );
 
-// PUT /api/admin/settings/satisfaction-survey
+// PUT /api/admin/settings/satisfaction-survey/:departmentId
 router.put(
-  "/settings/satisfaction-survey",
+  "/settings/satisfaction-survey/:departmentId",
   authenticateToken,
   authorizeRoles("superadmin"),
   async (req, res) => {
+    const departmentId = Number(req.params.departmentId);
     const surveyUrl = (req.body?.surveyUrl ?? "").trim();
     const adminId = req.user.userId;
+
+    if (!Number.isInteger(departmentId)) {
+      return res.status(400).json({ error: "Invalid department." });
+    }
 
     if (surveyUrl) {
       try {
@@ -5158,16 +5175,17 @@ router.put(
     }
 
     try {
-      await pool.query(
-        `INSERT INTO system_settings (setting_key, setting_value)
-         VALUES ('satisfaction_survey_url', ?)
-         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
-        [surveyUrl],
+      const [result] = await pool.query(
+        `UPDATE departments SET satisfaction_survey_url = ? WHERE department_id = ?`,
+        [surveyUrl || null, departmentId],
       );
-      await logAudit(adminId, "UPDATE", "system_settings", null, null, {
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Department not found." });
+      }
+      await logAudit(adminId, "UPDATE", "departments", departmentId, null, {
         satisfactionSurveyUrl: surveyUrl,
       });
-      res.json({ message: "Satisfaction survey link saved.", surveyUrl });
+      res.json({ message: "Satisfaction survey link saved.", departmentId, surveyUrl });
     } catch (error) {
       sendServerError(res, error, "Satisfaction survey config save error:");
     }

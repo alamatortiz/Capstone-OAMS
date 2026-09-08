@@ -2264,7 +2264,8 @@ router.get(
 );
 
 // GET /api/professor/settings/satisfaction-survey
-// Read-only mirror of the admin/superadmin-managed system_settings key --
+// Read-only mirror scoped to the faculty member's own department -- each
+// department has its own external survey link (departments.satisfaction_survey_url);
 // see adminRoutes.js's own copy for where this gets written.
 router.get(
   "/settings/satisfaction-survey",
@@ -2273,9 +2274,13 @@ router.get(
   async (req, res) => {
     try {
       const [[row]] = await pool.query(
-        `SELECT setting_value FROM system_settings WHERE setting_key = 'satisfaction_survey_url'`,
+        `SELECT d.satisfaction_survey_url
+         FROM faculty f
+         JOIN departments d ON f.department_id = d.department_id
+         WHERE f.faculty_id = ?`,
+        [req.user.userId],
       );
-      res.json({ surveyUrl: row?.setting_value || "" });
+      res.json({ surveyUrl: row?.satisfaction_survey_url || "" });
     } catch (error) {
       sendServerError(res, error, "Satisfaction survey config get error:");
     }
