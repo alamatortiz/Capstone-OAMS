@@ -374,8 +374,12 @@ router.get(
 );
 
 // GET /api/admin/queue-hosting
-// All of today's queue_slots for the admin's department, with live
-// waiting counts. Frontend buckets these into active/paused/closed.
+// Today's queue_slots for the admin's department, plus yesterday's so a
+// closed/expired line from the previous day is still there to "Host Again"
+// or "Reopen" right after the calendar rolls over -- see slot_date's own
+// comment for why status alone can't scope this. Frontend buckets these
+// into active/paused/closed, and only counts isToday rows in its summary
+// stats so yesterday's carryover doesn't inflate "today's" numbers.
 router.get(
   "/queue-hosting",
   authenticateToken,
@@ -389,9 +393,13 @@ router.get(
           .json({ error: "Admin has no department assigned" });
       }
 
+      const today = getManilaDateString();
+      const yesterday = getManilaDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+
       const [slots] = await pool.query(
         `SELECT
            qs.slot_id,
+           qs.slot_date,
            qs.service_id,
            qs.is_universal,
            qs.max_capacity,
@@ -438,9 +446,9 @@ router.get(
          LEFT JOIN locations l ON s.location_id = l.location_id
          JOIN departments d ON qs.department_id = d.department_id
          WHERE qs.department_id = ?
-           AND qs.slot_date = ?
+           AND qs.slot_date IN (?, ?)
          ORDER BY qs.created_at DESC`,
-        [deptId, getManilaDateString()],
+        [deptId, today, yesterday],
       );
 
       const formatted = slots.map((q) => {
@@ -474,6 +482,8 @@ router.get(
           servicedPercent,
           status: q.status, // 'open' | 'paused' | 'full' | 'expired' | 'completed' | 'closed'
           createdAt: q.created_at,
+          slotDate: q.slot_date,
+          isToday: getManilaDateString(q.slot_date) === today,
           // The slot's actual service location, not the department's generic
           // office address -- falls back to the department address only for
           // universal-queue slots, which have no single service_id to
@@ -882,8 +892,13 @@ router.patch(
         }
       }
 
-      const setClauses = ["status = 'open'", "end_time = ?", "close_reason = NULL"];
-      const values = [normalizedEndTime];
+      // Bump slot_date to today when reopening a slot carried over from a
+      // previous day -- every student-facing query (join, available slots,
+      // etc.) scopes strictly on slot_date = today, so without this a
+      // reopened stale-dated slot would show as "open" to the admin here
+      // but be invisible and unjoinable for students.
+      const setClauses = ["status = 'open'", "end_time = ?", "close_reason = NULL", "slot_date = ?"];
+      const values = [normalizedEndTime, getManilaDateString()];
       if (maxCapacity !== undefined) {
         setClauses.push("max_capacity = ?");
         values.push(Number(maxCapacity));

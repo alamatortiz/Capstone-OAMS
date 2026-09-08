@@ -342,6 +342,15 @@ export default function AdminQueueHosting() {
   ];
   const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "all" || typeFilter !== "all";
 
+  // Summary stats reflect today only -- a closed/expired line carried over
+  // from yesterday (kept in the list below so it can still be Hosted Again
+  // or Reopened) shouldn't inflate what's meant to be today's snapshot.
+  const todayActiveCount = activeQueues.filter((q) => q.isToday).length;
+  const todayPausedCount = pausedQueues.filter((q) => q.isToday).length;
+  const todayStillServingCount = stillServingQueues.filter((q) => q.isToday).length;
+  const todayCompletedCount = completedQueues.filter((q) => q.isToday).length;
+  const todayClosedCount = closedQueues.filter((q) => q.isToday).length;
+
   return (
     <AdminPageShell
       outerClassName="aqh-dashboard-with-sidebar"
@@ -657,7 +666,7 @@ export default function AdminQueueHosting() {
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Active Queues</p>
                 <p className="aqh-summary-value aqh-value-active">
-                  {loading ? "—" : activeQueues.length}
+                  {loading ? "—" : todayActiveCount}
                 </p>
               </div>
             </div>
@@ -668,7 +677,7 @@ export default function AdminQueueHosting() {
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Paused Queues</p>
                 <p className="aqh-summary-value aqh-value-paused">
-                  {loading ? "—" : pausedQueues.length}
+                  {loading ? "—" : todayPausedCount}
                 </p>
               </div>
             </div>
@@ -679,7 +688,7 @@ export default function AdminQueueHosting() {
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Still Serving</p>
                 <p className="aqh-summary-value aqh-value-still-serving">
-                  {loading ? "—" : stillServingQueues.length}
+                  {loading ? "—" : todayStillServingCount}
                 </p>
               </div>
             </div>
@@ -690,7 +699,7 @@ export default function AdminQueueHosting() {
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Completed Queues</p>
                 <p className="aqh-summary-value aqh-value-completed">
-                  {loading ? "—" : completedQueues.length}
+                  {loading ? "—" : todayCompletedCount}
                 </p>
               </div>
             </div>
@@ -701,7 +710,7 @@ export default function AdminQueueHosting() {
               <div className="aqh-summary-content">
                 <p className="aqh-summary-label">Manually Closed</p>
                 <p className="aqh-summary-value aqh-value-closed">
-                  {loading ? "—" : closedQueues.length}
+                  {loading ? "—" : todayClosedCount}
                 </p>
               </div>
             </div>
@@ -1018,7 +1027,7 @@ export default function AdminQueueHosting() {
                         </div>
                       </div>
                     </div>
-                    <div className="aqh-queue-stats-row aqh-stats-row-3">
+                    <div className="aqh-queue-stats-row aqh-stats-row-4">
                       <div className="aqh-queue-stat">
                         <p className="aqh-queue-stat-label">Waiting / Max</p>
                         <p className="aqh-queue-stat-value">
@@ -1032,7 +1041,22 @@ export default function AdminQueueHosting() {
                         </p>
                       </div>
                       <div className="aqh-queue-stat">
-                        <p className="aqh-queue-stat-label">Served Today</p>
+                        <p className="aqh-queue-stat-label">Opened At</p>
+                        <p className="aqh-queue-stat-value aqh-stat-value-sm">
+                          <span className="aqh-stat-datetime">
+                            <span>
+                              {formatManilaDate(queue.createdAt, {
+                                year: "numeric",
+                                month: "numeric",
+                                day: "numeric",
+                              })}
+                            </span>
+                            <span>{formatManilaTime(queue.createdAt)}</span>
+                          </span>
+                        </p>
+                      </div>
+                      <div className="aqh-queue-stat">
+                        <p className="aqh-queue-stat-label">Served</p>
                         <p className="aqh-queue-stat-value aqh-stat-value-sm">
                           {queue.servedCount}
                         </p>
@@ -1085,7 +1109,13 @@ export default function AdminQueueHosting() {
                       </div>
                     </div>
                     <p className="aqh-closed-meta">
-                      Served {queue.servedCount} student(s), capacity{" "}
+                      Opened{" "}
+                      {formatManilaDate(queue.createdAt, {
+                        year: "numeric",
+                        month: "numeric",
+                        day: "numeric",
+                      })}
+                      {" · "}Served {queue.servedCount} student(s), capacity{" "}
                       {queue.maxCapacity}
                     </p>
                   </div>
@@ -1135,7 +1165,13 @@ export default function AdminQueueHosting() {
                       </div>
                     </div>
                     <p className="aqh-closed-meta">
-                      Served {queue.servedCount} student(s), capacity{" "}
+                      Opened{" "}
+                      {formatManilaDate(queue.createdAt, {
+                        year: "numeric",
+                        month: "numeric",
+                        day: "numeric",
+                      })}
+                      {" · "}Served {queue.servedCount} student(s), capacity{" "}
                       {queue.maxCapacity}
                     </p>
                   </div>
@@ -1148,7 +1184,7 @@ export default function AdminQueueHosting() {
               <ClockIcon />
               <h3>No Queue Lines Yet</h3>
               <p>
-                No queue lines yet today for {user.departmentAbbrev}. Open one
+                No recent queue lines for {user.departmentAbbrev}. Open one
                 to start serving students.
               </p>
             </div>

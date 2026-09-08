@@ -271,8 +271,12 @@ export default function AdminQueue() {
   // Today's open/paused queue lines, plus 'full'/'expired' lines — those are
   // closed to new joins but still have unserved students by construction
   // (they settle into 'completed' once the last one is served/left/voided).
-  const activeQueueDetails = queueDetails.filter((q) =>
-    ["open", "paused", "full", "expired"].includes(q.status),
+  // GET /admin/queue-hosting now also includes yesterday's carryover lines
+  // (so Queue Hosting can still offer Host Again/Reopen on them) -- excluded
+  // here with isToday since this page's system stats are meant to be a
+  // right-now snapshot, not blended across two days.
+  const activeQueueDetails = queueDetails.filter(
+    (q) => q.isToday && ["open", "paused", "full", "expired"].includes(q.status),
   );
 
   const serviceTypes = [...new Set(activeQueueDetails.map((q) => q.queueType))].sort();
