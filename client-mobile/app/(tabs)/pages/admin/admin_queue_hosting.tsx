@@ -204,6 +204,36 @@ export default function AdminQueueHostingScreen() {
   const [services, setServices] = useState<{ service_id: string; service_name: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
+  // Genuine same-slot reopen for an 'expired' queue (hours ran out) --
+  // distinct from "Host Again", which clones the config into a brand-new
+  // slot and abandons any students still attached to the old one. Only
+  // needs a new end time; the server (adminRoutes.js PATCH .../reopen)
+  // handles the rest.
+  const [reopenTarget, setReopenTarget] = useState<any | null>(null);
+  const [reopenEndTime, setReopenEndTime] = useState('');
+  const [reopenSubmitting, setReopenSubmitting] = useState(false);
+
+  const openReopenModal = (queue: any) => {
+    setReopenTarget(queue);
+    setReopenEndTime(addMinutesClampedToDay(getManilaTimeString(), 240));
+  };
+
+  const confirmReopen = async () => {
+    if (!reopenTarget || !reopenEndTime.trim() || reopenSubmitting) return;
+    setReopenSubmitting(true);
+    try {
+      const normalizedEndTime = reopenEndTime.length === 5 ? `${reopenEndTime}:00` : reopenEndTime;
+      await api.patch(`/admin/queue-hosting/${reopenTarget.id}/reopen`, { endTime: normalizedEndTime });
+      Toast.show({ type: 'success', text1: 'Queue reopened' });
+      setReopenTarget(null);
+      await fetchQueues();
+    } catch (err: any) {
+      Toast.show({ type: 'error', text1: err?.response?.data?.error ?? 'Failed to reopen queue' });
+    } finally {
+      setReopenSubmitting(false);
+    }
+  };
+
   const fetchServices = useCallback(async () => {
     try {
       const res = await api.get('/admin/queue-hosting/services');
@@ -771,6 +801,15 @@ export default function AdminQueueHostingScreen() {
                       </View>
 
                       <View style={styles.queueActionsRow}>
+                        {queue.status === 'expired' && (
+                          <Pressable
+                            style={[styles.queueActionBtn, styles.queueActionBtnSuccess]}
+                            onPress={(e) => { e.stopPropagation(); openReopenModal(queue); }}
+                          >
+                            <Play size={14} color="#3b82f6" />
+                            <Text style={[styles.queueActionBtnText, { color: '#3b82f6' }]}>Reopen</Text>
+                          </Pressable>
+                        )}
                         <Pressable
                           style={[styles.queueActionBtn, styles.queueActionBtnDanger, { flex: 1 }]}
                           onPress={(e) => { e.stopPropagation(); handleCloseQueue(queue.id); }}
@@ -956,6 +995,48 @@ export default function AdminQueueHostingScreen() {
         hostAllServices={hostAllServices}
         onToggleHostAll={(v) => { setHostAllServices(v); if (v) setServiceId(''); }}
       />
+
+      {/* Reopen an expired queue in-place -- distinct from "Host Again"
+          (a new slot); this resumes the exact same slot_id so any students
+          still waiting/being served stay attached. */}
+      <Modal visible={!!reopenTarget} animationType="fade" transparent onRequestClose={() => setReopenTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModalCard}>
+            <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+              <Play size={26} color="#3b82f6" />
+            </View>
+            <Text style={styles.confirmTitle}>Reopen Queue?</Text>
+            <Text style={styles.confirmDescription}>
+              {reopenTarget ? `Resume "${reopenTarget.queueType}" for ${reopenTarget.department} — students still waiting or being served stay in line.` : ''}
+            </Text>
+            <View style={{ width: '100%', marginBottom: 16 }}>
+              <Text style={styles.formLabel}>New End Time *</Text>
+              <View style={styles.searchWrapper}>
+                <Clock size={14} color={theme.tertiary} style={styles.searchIcon} />
+                <TextInput
+                  style={[styles.textInput, { paddingLeft: 36 }]}
+                  placeholder="17:00"
+                  placeholderTextColor={theme.tertiary}
+                  value={reopenEndTime}
+                  onChangeText={setReopenEndTime}
+                />
+              </View>
+            </View>
+            <View style={styles.confirmActionsRow}>
+              <Pressable style={styles.cancelBtn} onPress={() => setReopenTarget(null)} disabled={reopenSubmitting}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmBtn, { backgroundColor: '#3b82f6' }, (reopenSubmitting || !reopenEndTime.trim()) && styles.formSubmitBtnDisabled]}
+                onPress={confirmReopen}
+                disabled={reopenSubmitting || !reopenEndTime.trim()}
+              >
+                <Text style={styles.confirmBtnText}>{reopenSubmitting ? 'Reopening…' : 'Reopen Queue'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Shared select modal: status/type filters only -- the service picker
           renders inside OpenQueueModal itself (see serviceSelectOpen above)

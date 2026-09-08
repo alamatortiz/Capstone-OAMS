@@ -1065,8 +1065,22 @@ function DocumentDetail({
         </View>
       )}
 
+      {/* Rejection reason -- replaces the plain Notes card when rejected,
+          mirroring prof-document-status.jsx's rejection callout (the reason
+          is stored in the same `notes` field, reused per
+          admin_document_processing.tsx's reject flow). */}
+      {doc.status === 'rejected' && doc.notes && (
+        <View style={styles.rejectNotice}>
+          <Ionicons name="close-circle-outline" size={20} color="#ef4444" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rejectNoticeTitle}>This request was rejected.</Text>
+            <Text style={styles.rejectNoticeReason}>Reason: {doc.notes}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Notes */}
-      {doc.notes && (
+      {doc.status !== 'rejected' && doc.notes && (
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardTitleRow}>
@@ -1337,6 +1351,20 @@ function createStyles(theme: ThemePalette) {
       borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background,
     },
     attachChipText: { flex: 1, fontSize: 12.5, color: theme.text },
+
+    // Rejection reason callout -- mirrors web's rejection notice
+    rejectNotice: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.35)',
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    rejectNoticeTitle: { fontSize: 13.5, fontWeight: '700', color: '#ef4444' },
+    rejectNoticeReason: { fontSize: 12.5, color: theme.text, marginTop: 4, lineHeight: 18 },
 
     trackingBig: { fontSize: 22, fontWeight: '800', color: theme.orange, fontFamily: 'monospace', letterSpacing: 1 },
     trackingCaption: { fontSize: 11, color: theme.tertiary, marginTop: 4 },

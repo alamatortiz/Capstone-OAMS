@@ -78,6 +78,14 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       if (prev.status === "serving" && q.status === "waiting") {
         Toast.show({ type: "info", text1: `Your call for ${q.serviceName} was reverted`, text2: "The queue was paused. You're still in line." });
       }
+      // A completed entry stays in the active list for a short grace period
+      // (see GET /student/queues/active) instead of disappearing right away
+      // -- so this transition has to be caught here in-place, not only via
+      // the "vanished from the list" detection below, which a still-present
+      // completed entry will never trigger.
+      if (prev.status === "serving" && q.status === "completed") {
+        Toast.show({ type: "success", text1: `You've been served for ${q.serviceName}. Thank you!` });
+      }
       if (prev.slotStatus !== "paused" && q.slotStatus === "paused") {
         Toast.show({
           type: "info",

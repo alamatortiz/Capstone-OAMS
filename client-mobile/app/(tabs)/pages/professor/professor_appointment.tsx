@@ -23,6 +23,7 @@ import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import { formatManilaDate, formatManilaTime } from '@/utils/date';
 import NotificationBell from '@/components/NotificationBell';
+import QueueReasonModal from '@/components/QueueReasonModal';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 
 const pncLogo = require('@/assets/Pnc-Logo.png');
@@ -223,6 +224,13 @@ export default function ProfessorAppointmentScreen() {
   const [rangeModalOpen, setRangeModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: ActionType; apt: Appointment } | null>(null);
   const [confirmSaving, setConfirmSaving] = useState(false);
+  // Reject is split out from the generic ConfirmActionModal above -- the
+  // server now hard-requires a non-blank reason to reject an appointment
+  // (professorRoutes.js), so it needs its own reason-collecting modal
+  // instead of a bare confirm.
+  const [rejectTarget, setRejectTarget] = useState<Appointment | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const router = useRouter();
   const { user, logout, token } = useAuth();
 
@@ -332,7 +340,14 @@ export default function ProfessorAppointmentScreen() {
   const visibleAppointments =
     activeTab === 'all' ? rangeFiltered : rangeFiltered.filter((a) => a.status === activeTab);
 
-  const requestAction = (type: ActionType, apt: Appointment) => setConfirmAction({ type, apt });
+  const requestAction = (type: ActionType, apt: Appointment) => {
+    if (type === 'reject') {
+      setRejectReason('');
+      setRejectTarget(apt);
+      return;
+    }
+    setConfirmAction({ type, apt });
+  };
 
   const runConfirmAction = async () => {
     if (!confirmAction) return;
@@ -342,12 +357,32 @@ export default function ProfessorAppointmentScreen() {
     try {
       await api.patch(`/professor/appointments/${apt.id}/status`, { status });
       await fetchAppointments();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update appointment status error:', err);
-      Alert.alert('Error', 'Could not update the appointment.');
+      // Surfaces the server's actual reason (e.g. "appointment window
+      // hasn't opened yet") instead of a generic message -- professorRoutes.js
+      // rejects approve/complete outside the scheduled window with a
+      // specific 409 message that was previously discarded here.
+      Alert.alert('Error', err?.response?.data?.error ?? 'Could not update the appointment.');
     } finally {
       setConfirmSaving(false);
       setConfirmAction(null);
+    }
+  };
+
+  const confirmReject = async (reason: string) => {
+    if (!rejectTarget || !reason.trim() || rejectSubmitting) return;
+    setRejectSubmitting(true);
+    try {
+      await api.patch(`/professor/appointments/${rejectTarget.id}/status`, { status: 'rejected', reason: reason.trim() });
+      await fetchAppointments();
+      setRejectTarget(null);
+      setRejectReason('');
+    } catch (err: any) {
+      console.error('Reject appointment error:', err);
+      Alert.alert('Error', err?.response?.data?.error ?? 'Could not reject the appointment.');
+    } finally {
+      setRejectSubmitting(false);
     }
   };
 
@@ -641,6 +676,21 @@ export default function ProfessorAppointmentScreen() {
         onCancel={() => setConfirmAction(null)}
         onConfirm={runConfirmAction}
         styles={styles}
+      />
+
+      <QueueReasonModal
+        visible={!!rejectTarget}
+        title="Reject Appointment?"
+        message={`Reject the appointment request from ${rejectTarget?.studentName ?? 'this student'}? They'll see this reason. This action cannot be undone.`}
+        confirmText={rejectSubmitting ? 'Rejecting…' : 'Reject'}
+        confirmColor="#dc2626"
+        reason={rejectReason}
+        onChangeReason={setRejectReason}
+        onCancel={() => { setRejectTarget(null); setRejectReason(''); }}
+        onConfirm={() => confirmReject(rejectReason)}
+        theme={theme}
+        styles={styles}
+        submitting={rejectSubmitting}
       />
 
       <LogoutModal
@@ -1189,6 +1239,31 @@ function createStyles(theme: ThemePalette) {
       paddingVertical: 12,
       borderRadius: 12,
     },
+    // Reject reason modal (QueueReasonModal) -- confirmBtn is its own name,
+    // distinct from confirmActionBtn above (this file's generic
+    // ConfirmActionModal), since QueueReasonModal is a shared component with
+    // its own fixed prop-name contract.
+    confirmBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
     logoutConfirmBtn: {
       flex: 1,
       flexDirection: 'row',

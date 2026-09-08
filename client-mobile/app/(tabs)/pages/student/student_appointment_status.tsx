@@ -125,6 +125,7 @@ interface Appointment {
   status: BookingStatus;
   createdAt: string;
   appointmentType?: string;
+  rejectionReason?: string;
 }
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -270,6 +271,7 @@ export default function StudentAppointmentStatusScreen() {
           status: a.status,
           createdAt: a.createdAt,
           appointmentType: a.appointmentType ?? undefined,
+          rejectionReason: a.rejectionReason ?? undefined,
         })),
       );
       setError(null);
@@ -688,6 +690,15 @@ export default function StudentAppointmentStatusScreen() {
                             </View>
                           ) : null}
                         </View>
+                        {appt.status === 'rejected' && appt.rejectionReason && (
+                          <View style={styles.rejectNotice}>
+                            <XCircle size={20} color="#ef4444" />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.rejectNoticeTitle}>This appointment request was rejected.</Text>
+                              <Text style={styles.rejectNoticeReason}>Reason: {appt.rejectionReason}</Text>
+                            </View>
+                          </View>
+                        )}
                       </Pressable>
                     );
                   })}
@@ -1005,6 +1016,21 @@ function createStyles(theme: ThemePalette) {
     listItemFieldLabel: { fontSize: 10, fontWeight: '700', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
     listItemFieldValue: { fontSize: 13, fontWeight: '600', color: theme.purple, lineHeight: 18 },
     listItemFieldValueMuted: { fontSize: 13, fontWeight: '500', color: theme.text, lineHeight: 18 },
+
+    // Rejection reason callout -- mirrors web's .apst-reject-notice
+    rejectNotice: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(239, 68, 68, 0.35)',
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    rejectNoticeTitle: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
+    rejectNoticeReason: { fontSize: 12.5, color: theme.text, marginTop: 4, lineHeight: 18 },
 
     // Detail info card
     infoCard: {

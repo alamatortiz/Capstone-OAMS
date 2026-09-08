@@ -42,6 +42,7 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import NotificationBell from '@/components/NotificationBell';
+import QueueReasonModal from '@/components/QueueReasonModal';
 import { ADMIN_NOTIFICATION_PATHS, ADMIN_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
 import { getHubStatusMeta, normalizeDocStatus, type DocStatus } from '@/utils/documentStatus';
 
@@ -1130,32 +1131,52 @@ export default function AdminDocumentProcessingScreen() {
         )}
       </Modal>
 
-      {/* Status-change confirmation */}
-      <Modal visible={!!confirmStatus} animationType="fade" transparent onRequestClose={() => setConfirmStatus(null)}>
-        <View style={styles.modalOverlay}>
-          {activeConfirmMeta && (
-            <View style={styles.confirmModalCard}>
-              <View style={[styles.confirmIconCircle, { backgroundColor: `${activeConfirmMeta.color}26` }]}>
-                <activeConfirmMeta.icon size={26} color={activeConfirmMeta.color} />
+      {/* Status-change confirmation -- reject gets a required-reason modal
+          (matching web's adm-document-processing.jsx), reusing the same
+          `processingNotes` field already sent as `notes` for every status
+          change on this screen, not a separate reason field. */}
+      {confirmStatus === 'rejected' ? (
+        <QueueReasonModal
+          visible={!!confirmStatus}
+          title={activeConfirmMeta?.title ?? 'Reject Request?'}
+          message={activeConfirmMeta?.description ?? 'Reject this request? This action cannot be undone.'}
+          confirmText={updating ? 'Updating…' : 'Reject Request'}
+          confirmColor="#ef4444"
+          reason={processingNotes}
+          onChangeReason={setProcessingNotes}
+          onCancel={() => setConfirmStatus(null)}
+          onConfirm={runConfirmStatusChange}
+          theme={theme}
+          styles={styles}
+          submitting={updating}
+        />
+      ) : (
+        <Modal visible={!!confirmStatus} animationType="fade" transparent onRequestClose={() => setConfirmStatus(null)}>
+          <View style={styles.modalOverlay}>
+            {activeConfirmMeta && (
+              <View style={styles.confirmModalCard}>
+                <View style={[styles.confirmIconCircle, { backgroundColor: `${activeConfirmMeta.color}26` }]}>
+                  <activeConfirmMeta.icon size={26} color={activeConfirmMeta.color} />
+                </View>
+                <Text style={styles.confirmTitle}>{activeConfirmMeta.title}</Text>
+                <Text style={styles.confirmDescription}>{activeConfirmMeta.description}</Text>
+                <View style={styles.confirmActionsRow}>
+                  <Pressable style={styles.cancelBtn} onPress={() => setConfirmStatus(null)}>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.confirmBtn, { backgroundColor: activeConfirmMeta.color }, updating && { opacity: 0.6 }]}
+                    onPress={runConfirmStatusChange}
+                    disabled={updating}
+                  >
+                    <Text style={styles.confirmBtnText}>{updating ? 'Updating…' : activeConfirmMeta.confirmLabel}</Text>
+                  </Pressable>
+                </View>
               </View>
-              <Text style={styles.confirmTitle}>{activeConfirmMeta.title}</Text>
-              <Text style={styles.confirmDescription}>{activeConfirmMeta.description}</Text>
-              <View style={styles.confirmActionsRow}>
-                <Pressable style={styles.cancelBtn} onPress={() => setConfirmStatus(null)}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.confirmBtn, { backgroundColor: activeConfirmMeta.color }, updating && { opacity: 0.6 }]}
-                  onPress={runConfirmStatusChange}
-                  disabled={updating}
-                >
-                  <Text style={styles.confirmBtnText}>{updating ? 'Updating…' : activeConfirmMeta.confirmLabel}</Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-        </View>
-      </Modal>
+            )}
+          </View>
+        </Modal>
+      )}
 
       <LogoutModal
         visible={logoutModalVisible}
@@ -1711,6 +1732,21 @@ function createStyles(theme: ThemePalette) {
       borderRadius: 12,
     },
     confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    // Reject-reason modal (QueueReasonModal)
+    reasonInput: {
+      width: '100%',
+      minHeight: 64,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: theme.text,
+      backgroundColor: theme.background,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    formSubmitBtnDisabled: { opacity: 0.6 },
     logoutConfirmBtn: {
       flex: 1,
       flexDirection: 'row',

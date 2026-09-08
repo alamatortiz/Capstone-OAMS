@@ -119,6 +119,7 @@ interface QueueRecord {
   endTime: string;
   notes: string;
   arrivedAt?: string | null;
+  completedAt?: string | null;
 }
 
 interface ServiceRequirement {
@@ -393,7 +394,11 @@ export default function StudentQueueStatusScreen() {
                           <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Your Position</Text>
                             <Text style={styles.statValuePrimary}>
-                              {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
+                              {queue.status === 'completed'
+                                ? 'Completed'
+                                : queue.status === 'serving'
+                                  ? (queue.arrivedAt ? 'Being Served' : 'Called')
+                                  : queue.position}
                             </Text>
                           </View>
                           <View style={styles.statBox}>
@@ -401,8 +406,8 @@ export default function StudentQueueStatusScreen() {
                             <Text style={styles.statValue}>{queue.totalWaiting}</Text>
                           </View>
                           <View style={styles.statBox}>
-                            <Text style={styles.statLabel}>Est. Wait Time</Text>
-                            <Text style={styles.statValueSm}>{queue.estimatedWait}</Text>
+                            <Text style={styles.statLabel}>{queue.status === 'completed' ? 'Completed At' : 'Est. Wait Time'}</Text>
+                            <Text style={styles.statValueSm}>{queue.status === 'completed' ? (queue.completedAt || 'Done') : queue.estimatedWait}</Text>
                           </View>
                           <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Joined At</Text>
@@ -777,22 +782,28 @@ function QueueDetail({
 
         <View style={styles.positionCenter}>
           <Text style={styles.positionLabel}>
-            {queue.status === 'serving' ? 'Status' : 'Number in Line'}
+            {queue.status === 'serving' || queue.status === 'completed' ? 'Status' : 'Number in Line'}
           </Text>
           <Text style={styles.positionNumber}>
-            {queue.status === 'serving' ? (queue.arrivedAt ? 'Being Served' : 'Called') : queue.position}
+            {queue.status === 'completed'
+              ? 'Completed'
+              : queue.status === 'serving'
+                ? (queue.arrivedAt ? 'Being Served' : 'Called')
+                : queue.position}
           </Text>
-          {queue.status !== 'serving' && (
+          {queue.status !== 'serving' && queue.status !== 'completed' && (
             <Text style={styles.positionTotal}>of {queue.totalWaiting} waiting</Text>
           )}
           <Text style={styles.positionMessage}>
-            {queue.status === 'serving'
-              ? queue.arrivedAt
-                ? "You're being served now!"
-                : "You've been called — please proceed!"
-              : queue.position === 1
-                ? "You're next!"
-                : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`}
+            {queue.status === 'completed'
+              ? "You've been served. Thank you!"
+              : queue.status === 'serving'
+                ? queue.arrivedAt
+                  ? "You're being served now!"
+                  : "You've been called — please proceed!"
+                : queue.position === 1
+                  ? "You're next!"
+                  : `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`}
           </Text>
         </View>
 
@@ -806,7 +817,7 @@ function QueueDetail({
           <View style={styles.cardTitleRow}>
             <Clock size={18} color={theme.blue} />
             <Text style={styles.cardTitleText}>
-              {queue.status === 'serving' ? 'Next Steps' : 'Estimated Wait'}
+              {queue.status === 'completed' ? 'Service Completed' : queue.status === 'serving' ? 'Next Steps' : 'Estimated Wait'}
             </Text>
           </View>
         </View>
@@ -814,7 +825,7 @@ function QueueDetail({
           <View style={styles.waitTimeIcon}>
             <Clock size={26} color={theme.blue} />
           </View>
-          <Text style={styles.waitTimeValue}>{queue.estimatedWait}</Text>
+          <Text style={styles.waitTimeValue}>{queue.status === 'completed' ? (queue.completedAt || 'Done') : queue.estimatedWait}</Text>
           <Text style={styles.waitTimeJoined}>Joined at {queue.joinedAt}</Text>
         </View>
       </View>
