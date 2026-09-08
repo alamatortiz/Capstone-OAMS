@@ -19,6 +19,7 @@ import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../
 import { connectSocket } from "../../utils/socket";
 import { getDocStatusDetailMeta, normalizeDocStatus } from "../../utils/documentStatus";
 import { QRCodeSVG } from "qrcode.react";
+import SatisfactionSurveyCard from "../../components/SatisfactionSurveyCard";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 
@@ -168,6 +169,10 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
             </p>
           </div>
         </div>
+      )}
+
+      {doc.status === "claimed" && (
+        <SatisfactionSurveyCard endpointBase="professor" />
       )}
 
       {/* Detail Grid */}

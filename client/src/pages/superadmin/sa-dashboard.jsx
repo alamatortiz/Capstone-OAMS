@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Star } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import SuperadminPageShell from "../../components/SuperadminPageShell";
 // Reuses the admin dashboard's own stylesheet directly -- same
@@ -57,6 +58,13 @@ const superadminTools = [
     title: "Pinnacle Sync",
     description: "Data synchronization",
     path: "/superadmin/pinnacle-sync",
+  },
+  {
+    icon: Star,
+    iconColor: "bg-purple-500",
+    title: "Satisfaction Survey",
+    description: "Link students to an external satisfaction survey",
+    path: "/superadmin/satisfaction-survey",
   },
 ];
 

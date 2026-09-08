@@ -87,6 +87,9 @@ const SuperadminUserManagement = React.lazy(
 const SuperadminPinnacleSync = React.lazy(
   () => import("./pages/superadmin/sa-pinnacle-sync.jsx"),
 );
+const SuperadminSatisfactionSurvey = React.lazy(
+  () => import("./pages/superadmin/sa-satisfaction-survey.jsx"),
+);
 
 import AppointmentsPage from "./pages/student/stud-appointments.jsx";
 import DocumentsPage from "./pages/student/stud-documents.jsx";
@@ -424,6 +427,14 @@ createRoot(document.getElementById("root")).render(
                 element={
                   <Suspense fallback={<LoadingFallback />}>
                     <SuperadminPinnacleSync />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/superadmin/satisfaction-survey"
+                element={
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperadminSatisfactionSurvey />
                   </Suspense>
                 }
               />

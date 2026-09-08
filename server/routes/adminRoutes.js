@@ -404,6 +404,7 @@ router.get(
            d.department_name,
            d.department_abbreviation,
            d.office_location,
+           l.location_name,
            (
              SELECT COUNT(*) FROM queues q
              WHERE q.slot_id = qs.slot_id AND q.status = 'waiting'
@@ -434,6 +435,7 @@ router.get(
            qs.service_time_minutes AS avg_service_minutes
          FROM queue_slots qs
          LEFT JOIN services s ON qs.service_id = s.service_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
          JOIN departments d ON qs.department_id = d.department_id
          WHERE qs.department_id = ?
            AND qs.slot_date = ?
@@ -472,7 +474,11 @@ router.get(
           servicedPercent,
           status: q.status, // 'open' | 'paused' | 'full' | 'expired' | 'completed' | 'closed'
           createdAt: q.created_at,
-          location: q.office_location || null,
+          // The slot's actual service location, not the department's generic
+          // office address -- falls back to the department address only for
+          // universal-queue slots, which have no single service_id to
+          // resolve a specific location from (matches studentRoutes.js).
+          location: q.location_name || q.office_location || null,
           currentlyServingStudentNumber:
             q.currently_serving_student_number || null,
           currentlyServingArrivedAt: q.currently_serving_arrived_at || null,
@@ -5104,6 +5110,66 @@ router.post(
       res.json({ message: "Sync completed successfully.", syncedAt: inserted.synced_at });
     } catch (error) {
       sendServerError(res, error, "Pinnacle trigger error:");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────
+// SATISFACTION SURVEY
+// One shared, system-wide link to an EXTERNAL survey (OAMS never builds or
+// stores responses) -- reuses system_settings the same way Pinnacle Sync's
+// config does above. Readable by any admin/superadmin here; student.js and
+// professor.js each expose their own read-only copy of the GET so those
+// roles can fetch it without needing admin-level auth.
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/settings/satisfaction-survey
+router.get(
+  "/settings/satisfaction-survey",
+  authenticateToken,
+  authorizeRoles("admin", "superadmin"),
+  async (req, res) => {
+    try {
+      const [[row]] = await pool.query(
+        `SELECT setting_value FROM system_settings WHERE setting_key = 'satisfaction_survey_url'`,
+      );
+      res.json({ surveyUrl: row?.setting_value || "" });
+    } catch (error) {
+      sendServerError(res, error, "Satisfaction survey config get error:");
+    }
+  },
+);
+
+// PUT /api/admin/settings/satisfaction-survey
+router.put(
+  "/settings/satisfaction-survey",
+  authenticateToken,
+  authorizeRoles("superadmin"),
+  async (req, res) => {
+    const surveyUrl = (req.body?.surveyUrl ?? "").trim();
+    const adminId = req.user.userId;
+
+    if (surveyUrl) {
+      try {
+        new URL(surveyUrl);
+      } catch {
+        return res.status(400).json({ error: "Please enter a valid URL." });
+      }
+    }
+
+    try {
+      await pool.query(
+        `INSERT INTO system_settings (setting_key, setting_value)
+         VALUES ('satisfaction_survey_url', ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+        [surveyUrl],
+      );
+      await logAudit(adminId, "UPDATE", "system_settings", null, null, {
+        satisfactionSurveyUrl: surveyUrl,
+      });
+      res.json({ message: "Satisfaction survey link saved.", surveyUrl });
+    } catch (error) {
+      sendServerError(res, error, "Satisfaction survey config save error:");
     }
   },
 );

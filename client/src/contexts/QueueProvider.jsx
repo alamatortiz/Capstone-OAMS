@@ -90,6 +90,14 @@ export function QueueProvider({ children }) {
           `Your call for ${q.serviceName} was reverted because the queue was paused. You're still in line.`,
         );
       }
+      // A completed entry stays in the active list for a short grace period
+      // (see GET /student/queues/active) so the satisfaction-survey prompt
+      // has somewhere to show -- so this transition is caught here in-place,
+      // rather than only via the "vanished from the list" detection below,
+      // which a still-present completed entry will never trigger.
+      if (prev.status === "serving" && q.status === "completed") {
+        toast.success(`You've been served for ${q.serviceName}. Thank you!`);
+      }
       if (prev.slotStatus !== "paused" && q.slotStatus === "paused") {
         toast.warning(
           q.slotPauseReason

@@ -20,6 +20,7 @@ import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
 import { getDocStatusDetailMeta, normalizeDocStatus } from "../../utils/documentStatus";
 import { QRCodeSVG } from "qrcode.react";
+import SatisfactionSurveyCard from "../../components/SatisfactionSurveyCard";
 import "./stud-document-status.css";
 
 const CheckCircleIcon = () => (
@@ -169,6 +170,10 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
             </p>
           </div>
         </div>
+      )}
+
+      {doc.status === "claimed" && (
+        <SatisfactionSurveyCard endpointBase="student" />
       )}
 
       {/* Detail Grid */}

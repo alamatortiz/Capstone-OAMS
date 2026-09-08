@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Star } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import LogoutConfirmModal from "./LogoutConfirmModal";
@@ -85,6 +86,7 @@ const navItems = [
   { icon: HomeIcon, label: "Home", path: "/superadmin/dashboard" },
   { icon: UsersIconNav, label: "User Management", path: "/superadmin/user-management" },
   { icon: SyncIconNav, label: "Pinnacle Sync", path: "/superadmin/pinnacle-sync" },
+  { icon: Star, label: "Satisfaction Survey", path: "/superadmin/satisfaction-survey" },
 ];
 
 export default function SuperadminSidebar() {

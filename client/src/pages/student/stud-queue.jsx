@@ -664,9 +664,11 @@ export default function QueuePage() {
                                 <div className="qp-stat">
                                   <p className="qp-stat-label">Your Position</p>
                                   <p className="qp-stat-value">
-                                    {queue.status === 'serving'
-                                      ? (queue.arrivedAt ? 'Being Served' : 'Called')
-                                      : queue.position}
+                                    {queue.status === 'completed'
+                                      ? 'Completed'
+                                      : queue.status === 'serving'
+                                        ? (queue.arrivedAt ? 'Being Served' : 'Called')
+                                        : queue.position}
                                   </p>
                                 </div>
                                 <div className="qp-stat">
@@ -678,8 +680,12 @@ export default function QueuePage() {
                                     queue.status === 'serving' ? ' qp-stat--serving' : ''
                                   }`}
                                 >
-                                  <p className="qp-stat-label">Est. Wait Time</p>
-                                  <p className="qp-stat-value-sm">{queue.estimatedWait}</p>
+                                  <p className="qp-stat-label">
+                                    {queue.status === 'completed' ? 'Completed At' : 'Est. Wait Time'}
+                                  </p>
+                                  <p className="qp-stat-value-sm">
+                                    {queue.status === 'completed' ? (queue.completedAt || '—') : queue.estimatedWait}
+                                  </p>
                                 </div>
                                 <div className="qp-stat">
                                   <p className="qp-stat-label">Joined At</p>
@@ -694,24 +700,26 @@ export default function QueuePage() {
                                 servicedTotal={queue.totalInQueue ?? 0}
                                 servicedPercent={queue.servicedPercent ?? 0}
                               />
-                              <button
-                                className="queue-leave-btn"
-                                onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status, arrivedAt: queue.arrivedAt }); }}
-                                disabled={leavingQueueId === queue.queueId}
-                                title="Leave this queue"
-                                type="button"
-                                aria-label={`Leave queue for ${queue.serviceName}`}
-                              >
-                                {leavingQueueId === queue.queueId ? (
-                                  <Loader2 className="icon" style={{ animation: 'spin 1s linear infinite' }} />
-                                ) : (
-                                  <XCircle className="icon" />
-                                )}
-                                <span className="leave-text">
-                                  {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
-                                </span>
-                              </button>
-                              {queue.voidTimeoutMinutes != null && !(queue.status === 'serving' && queue.arrivedAt) && (
+                              {queue.status !== 'completed' && (
+                                <button
+                                  className="queue-leave-btn"
+                                  onClick={(e) => { e.stopPropagation(); setLeaveConfirmQueue({ queueId: queue.queueId, serviceName: queue.serviceName, status: queue.status, arrivedAt: queue.arrivedAt }); }}
+                                  disabled={leavingQueueId === queue.queueId}
+                                  title="Leave this queue"
+                                  type="button"
+                                  aria-label={`Leave queue for ${queue.serviceName}`}
+                                >
+                                  {leavingQueueId === queue.queueId ? (
+                                    <Loader2 className="icon" style={{ animation: 'spin 1s linear infinite' }} />
+                                  ) : (
+                                    <XCircle className="icon" />
+                                  )}
+                                  <span className="leave-text">
+                                    {leavingQueueId === queue.queueId ? 'Leaving…' : 'Leave Queue'}
+                                  </span>
+                                </button>
+                              )}
+                              {queue.status !== 'completed' && queue.voidTimeoutMinutes != null && !(queue.status === 'serving' && queue.arrivedAt) && (
                                 <div className="qp-void-warning">
                                   <AlertCircle className="qp-void-warning-icon" />
                                   <span>

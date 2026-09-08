@@ -414,7 +414,7 @@ router.get(
         sql += " AND a.status = ?";
         params.push(status);
       }
-      sql += " ORDER BY a.appointment_date DESC, a.appointment_time DESC";
+      sql += " ORDER BY a.created_at DESC";
       const [rows] = await pool.query(sql, params);
       res.json(
         rows.map((r) => ({
@@ -2259,6 +2259,25 @@ router.get(
       });
     } catch (error) {
       sendServerError(res, error, "Announcement attachment fetch error");
+    }
+  },
+);
+
+// GET /api/professor/settings/satisfaction-survey
+// Read-only mirror of the admin/superadmin-managed system_settings key --
+// see adminRoutes.js's own copy for where this gets written.
+router.get(
+  "/settings/satisfaction-survey",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    try {
+      const [[row]] = await pool.query(
+        `SELECT setting_value FROM system_settings WHERE setting_key = 'satisfaction_survey_url'`,
+      );
+      res.json({ surveyUrl: row?.setting_value || "" });
+    } catch (error) {
+      sendServerError(res, error, "Satisfaction survey config get error:");
     }
   },
 );

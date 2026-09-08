@@ -1492,7 +1492,10 @@ router.get(
 );
 
 // GET /api/student/queues/active
-// Returns all waiting/serving queue entries for the logged-in student.
+// Returns all waiting/serving queue entries for the logged-in student, plus
+// any entry completed within the last 30 minutes (a short grace window so
+// the completed-state UI, including the satisfaction-survey prompt, has
+// somewhere to actually be seen before it drops off this list for good).
 router.get(
   "/queues/active",
   authenticateToken,
@@ -1511,6 +1514,7 @@ router.get(
            q.notes,
            q.created_at AS joined_at,
            q.arrived_at,
+           q.completed_at,
            qs.start_time,
            qs.end_time,
            qs.max_capacity,
@@ -1560,7 +1564,10 @@ router.get(
          JOIN departments d ON s.department_id = d.department_id
          LEFT JOIN locations l ON s.location_id = l.location_id
          WHERE q.student_id = ?
-           AND q.status IN ('waiting', 'serving')
+           AND (
+             q.status IN ('waiting', 'serving')
+             OR (q.status = 'completed' AND q.completed_at >= NOW() - INTERVAL 30 MINUTE)
+           )
          ORDER BY q.created_at DESC`,
         [studentId],
       );
@@ -1602,6 +1609,13 @@ router.get(
           departmentAbbrev: deptAbbrev,
           status: row.status,
           arrivedAt: row.arrived_at,
+          completedAt: row.completed_at
+            ? new Date(row.completed_at).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Manila",
+              })
+            : null,
           notes: row.notes ?? null,
           description: row.service_description || null,
           location: row.service_location || null,
@@ -2305,7 +2319,7 @@ router.get(
          LEFT JOIN faculty_availability fda ON a.availability_id = fda.availability_id
          LEFT JOIN appointment_services s ON a.service_id = s.service_id
          WHERE a.student_id = ?
-         ORDER BY a.appointment_date DESC, COALESCE(a.window_start_snapshot, fda.start_time) DESC`,
+         ORDER BY a.created_at DESC`,
         [studentId],
       );
 
@@ -3714,6 +3728,25 @@ router.delete(
       res.json({ message: "Unsubscribed" });
     } catch (error) {
       sendServerError(res, error, "Remove push subscription error");
+    }
+  },
+);
+
+// GET /api/student/settings/satisfaction-survey
+// Read-only mirror of the admin/superadmin-managed system_settings key --
+// see adminRoutes.js's own copy for where this gets written.
+router.get(
+  "/settings/satisfaction-survey",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      const [[row]] = await pool.query(
+        `SELECT setting_value FROM system_settings WHERE setting_key = 'satisfaction_survey_url'`,
+      );
+      res.json({ surveyUrl: row?.setting_value || "" });
+    } catch (error) {
+      sendServerError(res, error, "Satisfaction survey config get error:");
     }
   },
 );
