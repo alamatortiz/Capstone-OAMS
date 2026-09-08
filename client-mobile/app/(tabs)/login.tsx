@@ -24,6 +24,29 @@ const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
 
+// Unset in the original combined build (local dev, and any eas.json profile
+// that doesn't set it) -- every role redirects normally there, same as
+// before the split. Set only in the 3 role-specific eas.json build profiles
+// (see metro.config.js), where each variant's bundle genuinely doesn't
+// contain the other roles' route files any more -- routing there would 404
+// instead of failing cleanly, so those roles must be rejected before ever
+// attempting the redirect.
+const APP_VARIANT = process.env.EXPO_PUBLIC_APP_VARIANT as
+  | 'student'
+  | 'faculty'
+  | 'admin'
+  | undefined;
+const VARIANT_ALLOWED_ROUTE_ROLES: Record<string, ReadonlyArray<string>> = {
+  student: ['student'],
+  faculty: ['professor'],
+  admin: ['admin', 'superadmin'],
+};
+const VARIANT_LABELS: Record<string, string> = {
+  student: 'Student',
+  faculty: 'Faculty',
+  admin: 'Admin',
+};
+
 function OamsLogo({
   style,
   outline,
@@ -71,7 +94,7 @@ export default function LoginScreen() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
 
   const theme = isDarkMode ? darkPalette : lightPalette;
   const styles = createStyles(theme);
@@ -94,6 +117,22 @@ export default function LoginScreen() {
     try {
       const authedUser = await login(email, password);
       const routeRole = getRouteRole(authedUser.role);
+
+      const allowedRoles = APP_VARIANT ? VARIANT_ALLOWED_ROUTE_ROLES[APP_VARIANT] : null;
+      if (allowedRoles && !allowedRoles.includes(routeRole)) {
+        // This build's bundle genuinely doesn't contain that role's screens
+        // (see metro.config.js) -- log the just-created session back out
+        // immediately rather than leaving a valid token stored on a device
+        // with no UI able to use it, and before router.replace below tries
+        // to navigate to a route that no longer exists in this variant.
+        logout();
+        Alert.alert(
+          'Wrong app',
+          `This app is for ${VARIANT_LABELS[APP_VARIANT!]} accounts only. Please install the correct OAMS app for your role.`,
+        );
+        return;
+      }
+
       switch (routeRole) {
         case 'student':
           router.replace('/pages/student/student_dashboard');

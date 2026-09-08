@@ -23,6 +23,63 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951550159266:android:2159c7eaccc05fba5d6afb",
+        "android_client_info": {
+          "package_name": "com.pnc.oams.admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeqDcIUWN3GlBhtAhFCy56x55m9Mk6h8w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951550159266:android:73ca4142d8943b315d6afb",
+        "android_client_info": {
+          "package_name": "com.pnc.oams.faculty"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeqDcIUWN3GlBhtAhFCy56x55m9Mk6h8w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951550159266:android:e1b09ea7c1dde2535d6afb",
+        "android_client_info": {
+          "package_name": "com.pnc.oams.student"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeqDcIUWN3GlBhtAhFCy56x55m9Mk6h8w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

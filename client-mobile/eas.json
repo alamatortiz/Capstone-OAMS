@@ -14,6 +14,18 @@
         "buildType": "apk"
       }
     },
+    "preview-student": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "student", "EXPO_PUBLIC_APP_VARIANT": "student" }
+    },
+    "preview-faculty": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "faculty", "EXPO_PUBLIC_APP_VARIANT": "faculty" }
+    },
+    "preview-admin": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "admin", "EXPO_PUBLIC_APP_VARIANT": "admin" }
+    },
     "production": {
       "autoIncrement": true
     }
