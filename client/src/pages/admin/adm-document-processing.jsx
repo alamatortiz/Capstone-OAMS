@@ -298,8 +298,14 @@ export default function AdminDocumentProcessing() {
           _kind: "submission",
           _endpoint: "document-submissions",
         }));
+      // Sort on the raw full timestamp (requestDate is day-only, so a same-day
+      // request and submission would otherwise tie and keep concat order --
+      // all requests above all submissions). `?? requestDate` keeps this
+      // working against a server that predates the requestedAtRaw field.
       const merged = [...requests, ...submissions].sort(
-        (a, b) => new Date(b.requestDate) - new Date(a.requestDate),
+        (a, b) =>
+          new Date(b.requestedAtRaw ?? b.requestDate) -
+          new Date(a.requestedAtRaw ?? a.requestDate),
       );
       setDocuments(merged);
     } catch (err) {

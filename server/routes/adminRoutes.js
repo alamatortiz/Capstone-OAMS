@@ -2030,6 +2030,9 @@ router.get(
         requestDate: r.created_at instanceof Date
           ? getManilaDateString(r.created_at)
           : String(r.created_at).split("T")[0],
+        // Raw full timestamp for precise cross-type ordering on the client
+        // (requestDate is day-only). Mirrors the admin appointments endpoint.
+        requestedAtRaw: r.created_at,
         status: STATUS_LABEL_MAP[r.status] ?? r.status,
         notes: r.notes || "",
         neededBy: r.needed_by || null,
@@ -2110,6 +2113,9 @@ router.get(
         requestDate: r.created_at instanceof Date
           ? getManilaDateString(r.created_at)
           : String(r.created_at).split("T")[0],
+        // Raw full timestamp for precise cross-type ordering on the client
+        // (requestDate is day-only). Mirrors the admin appointments endpoint.
+        requestedAtRaw: r.created_at,
         status: STATUS_LABEL_MAP[r.status] ?? r.status,
         notes: r.notes || "",
         neededBy: r.needed_by || null,
@@ -2597,6 +2603,9 @@ router.get(
           requestDate: r.created_at instanceof Date
             ? getManilaDateString(r.created_at)
             : String(r.created_at).split("T")[0],
+          // Raw full timestamp for precise cross-type ordering on the client
+          // (requestDate is day-only). Mirrors the admin appointments endpoint.
+          requestedAtRaw: r.created_at,
           status: STATUS_LABEL_MAP[r.status] ?? r.status,
           notes: r.notes || "",
           neededBy: r.needed_by || null,

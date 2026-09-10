@@ -10,6 +10,7 @@ import AdminPageShell from "../../components/AdminPageShell";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { formatManilaDate, formatManilaTime, getManilaTimeString, addMinutesClampedToDay, formatTimeString } from "../../utils/dateTime";
+import { getCollegeLogo } from "../../data/collegeLogo";
 
 // ── Icons ──────────────────────────────────────────────────────
 // Plus-in-circle — matches adm-queue's .aq-host-link-btn-icon-box glyph so the
@@ -74,16 +75,6 @@ const RepeatIcon = () => (
     <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
   </svg>
 );
-
-// ── College logo resolver ────────────────────────────────────────────────
-// Resolves a college's logo image from /src/assets/{CODE}.png, falling
-// back to the CCS logo if the specific college image is missing/404s.
-const ccsLogoFallback = new URL("../../assets/CCS.png", import.meta.url).href;
-const getCollegeLogo = (code) =>
-  new URL(
-    `../../assets/${(code || "CCS").toString().toUpperCase()}.png`,
-    import.meta.url,
-  ).href;
 
 export default function AdminQueueHosting() {
   const navigate = useNavigate();
@@ -810,11 +801,6 @@ export default function AdminQueueHosting() {
                           )}
                           alt={`${queue.department || user.departmentAbbrev} logo`}
                           className="aqh-queue-card-logo"
-                          onError={(e) => {
-                            if (e.currentTarget.src !== ccsLogoFallback) {
-                              e.currentTarget.src = ccsLogoFallback;
-                            }
-                          }}
                         />
                         <div className="aqh-queue-card-title-block">
                           <h3 className="aqh-queue-card-title">
@@ -909,11 +895,6 @@ export default function AdminQueueHosting() {
                           )}
                           alt={`${queue.department || user.departmentAbbrev} logo`}
                           className="aqh-queue-card-logo"
-                          onError={(e) => {
-                            if (e.currentTarget.src !== ccsLogoFallback) {
-                              e.currentTarget.src = ccsLogoFallback;
-                            }
-                          }}
                         />
                         <div className="aqh-queue-card-title-block">
                           <h3 className="aqh-queue-card-title">
@@ -983,11 +964,6 @@ export default function AdminQueueHosting() {
                           )}
                           alt={`${queue.department || user.departmentAbbrev} logo`}
                           className="aqh-queue-card-logo"
-                          onError={(e) => {
-                            if (e.currentTarget.src !== ccsLogoFallback) {
-                              e.currentTarget.src = ccsLogoFallback;
-                            }
-                          }}
                         />
                         <div className="aqh-queue-card-title-block">
                           <h3 className="aqh-queue-card-title">
@@ -1078,11 +1054,6 @@ export default function AdminQueueHosting() {
                           )}
                           alt={`${queue.department || user.departmentAbbrev} logo`}
                           className="aqh-queue-card-logo"
-                          onError={(e) => {
-                            if (e.currentTarget.src !== ccsLogoFallback) {
-                              e.currentTarget.src = ccsLogoFallback;
-                            }
-                          }}
                         />
                         <div className="aqh-queue-card-title-block">
                           <h3 className="aqh-queue-card-title">
@@ -1134,11 +1105,6 @@ export default function AdminQueueHosting() {
                           )}
                           alt={`${queue.department || user.departmentAbbrev} logo`}
                           className="aqh-queue-card-logo"
-                          onError={(e) => {
-                            if (e.currentTarget.src !== ccsLogoFallback) {
-                              e.currentTarget.src = ccsLogoFallback;
-                            }
-                          }}
                         />
                         <div className="aqh-queue-card-title-block">
                           <h3 className="aqh-queue-card-title">

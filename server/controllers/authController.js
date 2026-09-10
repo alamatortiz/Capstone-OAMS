@@ -197,6 +197,32 @@ const login = async (req, res) => {
       [user.user_id, hashToken(token), ipAddress, userAgent, decoded.exp],
     );
 
+    // Faculty presence broadcast: a professor now has a live session, so the
+    // session-gated availability seen by admin/students flips from "offline"
+    // to their stored toggle state. Mirrors the logout handler's "offline"
+    // broadcast so those screens refetch immediately instead of waiting for
+    // their 15-45s poll. Best-effort -- a hiccup here must not break login.
+    if (user.role === "faculty") {
+      try {
+        const [[fac]] = await pool.query(
+          "SELECT department_id, availability_status, unavailable_reason FROM faculty WHERE faculty_id = ?",
+          [user.user_id],
+        );
+        if (fac?.department_id) {
+          emitToDept(fac.department_id, "faculty:availability-status-changed", {
+            facultyId: Number(user.user_id),
+            availabilityStatus: fac.availability_status,
+            unavailableReason:
+              fac.availability_status === "unavailable"
+                ? fac.unavailable_reason
+                : null,
+          });
+        }
+      } catch (emitErr) {
+        console.error("Login presence broadcast error:", emitErr.message);
+      }
+    }
+
     const profile = await fetchUserProfile(user.user_id, user.role);
 
     res.json({ message: "Login successful", token, user: profile });

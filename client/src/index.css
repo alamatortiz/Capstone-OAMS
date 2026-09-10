@@ -30,6 +30,18 @@
   }
 }
 
+/* Native controls (<select> option popups, date pickers, scrollbars) follow
+   `color-scheme`, not our `data-theme` attribute. applyTheme() (utils/theme.js)
+   always pins <html data-theme> to a concrete "dark"/"light", so mirror it
+   here -- otherwise dark mode on a light OS renders option lists light-on-light.
+   Higher specificity than the bare `:root` rule above, so order-independent. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;

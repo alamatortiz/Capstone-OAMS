@@ -323,11 +323,21 @@ export default function AppointmentsPage() {
         const id = String(fac.facultyId);
         if (seen.has(id)) continue;
         seen.add(id);
-        result.push({ id, name: fac.name });
+        result.push({
+          id,
+          name: fac.name,
+          availabilityStatus: fac.availabilityStatus,
+          unavailableReason: fac.unavailableReason,
+        });
       }
     }
     return result.sort((a, b) => a.name.localeCompare(b.name));
   }, [collegeOptions, selectedCollege]);
+
+  const selectedProfessor = useMemo(
+    () => availableProfessors.find((p) => p.id === selectedProfessorId) ?? null,
+    [availableProfessors, selectedProfessorId],
+  );
 
   const calendarDays = useMemo(() => {
     if (!selectedProfessorId) return [];
@@ -677,7 +687,20 @@ export default function AppointmentsPage() {
               ) : slotsError ? (
                 <div className="appt-empty-state appt-empty-state--card"><CalendarIcon /><h3>Could not load slots</h3><p>{slotsError}</p><button className="book-btn" style={{ marginTop: "0.5rem" }} onClick={fetchSlots}>Retry</button></div>
               ) : availableSlots.length === 0 ? (
-                <div className="appt-empty-state appt-empty-state--card"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results." : "No professors have published their consultation hours yet."}</p></div>
+                selectedProfessor?.availabilityStatus === "unavailable" ? (
+                  <div className="appt-empty-state appt-empty-state--card">
+                    <CalendarIcon />
+                    <h3>{selectedProfessor.name} is Unavailable</h3>
+                    <p>
+                      This professor isn&apos;t accepting consultations right now.
+                      {selectedProfessor.unavailableReason
+                        ? ` Reason: ${selectedProfessor.unavailableReason}`
+                        : ""}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="appt-empty-state appt-empty-state--card"><CalendarIcon /><h3>No Available Slots</h3><p>{selectedDate || selectedProfessorId ? "Try adjusting your filters to see more results." : "No professors have published their consultation hours yet."}</p></div>
+                )
               ) : selectedDate ? (
                 <div className="week-section">
                   <div className="week-section-header">
