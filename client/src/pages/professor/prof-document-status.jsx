@@ -10,6 +10,9 @@ import {
   MessageSquare,
 } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import FilePreviewModal from "../../components/FilePreviewModal";
+import AttachmentChip from "../../components/AttachmentChip";
+import useFilePreview from "../../hooks/useFilePreview";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { getCollegeLogo } from "../../data/collegeLogo";
@@ -19,6 +22,7 @@ import { formatManilaDate, formatManilaTime, formatManilaDateTime } from "../../
 import { connectSocket } from "../../utils/socket";
 import { getDocStatusDetailMeta, normalizeDocStatus } from "../../utils/documentStatus";
 import { QRCodeSVG } from "qrcode.react";
+import SatisfactionSurveyCard from "../../components/SatisfactionSurveyCard";
 import "./prof-dashboard.css";
 import "./prof-document-status.css";
 
@@ -48,36 +52,18 @@ const formatDateShort = (dateStr) => {
   });
 };
 
-// Fetches one file's bytes on demand and opens/downloads it -- mirrors
-// stud-document-status.jsx.
-async function openFileBlob(path, file) {
-  try {
-    const res = await api.get(path, { responseType: "blob" });
-    const url = URL.createObjectURL(res.data);
-    if (file.mimeType?.startsWith("image/") || file.mimeType === "application/pdf") {
-      window.open(url, "_blank");
-    } else {
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.filename;
-      link.click();
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch {
-    toast.error("Failed to load file");
-  }
-}
-
-const openSubmissionFile = (submissionId, file) =>
-  openFileBlob(`/professor/document-submissions/${submissionId}/files/${file.id}`, file);
-
-const openRequestFile = (requestId, file) =>
-  openFileBlob(`/professor/documents/${requestId}/files/${file.id}`, file);
-
 // ─── Detail View ──────────────────────────────────────────────────────────────
 function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, backLabel = "All Documents", requirements, reqLoading }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showClaimDialog, setShowClaimDialog] = useState(false);
+  const { preview, openFile, closePreview, downloadPreview } = useFilePreview();
+  // image/PDF preview in a modal, else download -- see useFilePreview.
+  const openSubmissionFile = (submissionId, file) =>
+    openFile(`/professor/document-submissions/${submissionId}/files/${file.id}`,
+      { mimeType: file.mimeType, filename: file.filename });
+  const openRequestFile = (requestId, file) =>
+    openFile(`/professor/documents/${requestId}/files/${file.id}`,
+      { mimeType: file.mimeType, filename: file.filename });
   const statusMeta = getDocStatusDetailMeta(doc.status);
   const canCancel = doc.status === "pending" || doc.status === "processing";
   const canClaim = normalizeDocStatus(doc.status) === "ready";
@@ -138,7 +124,8 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
           }}
         >
           <CheckCircle2 style={{ width: "1.5rem", height: "1.5rem", flexShrink: 0 }} />
-          Your document is ready for pickup — please proceed to the designated location
+          Your document is ready for pickup — please proceed to the designated location.
+          {doc.claimBy && ` Please collect it by ${formatDate(doc.claimBy)}.`}
         </div>
       )}
 
@@ -170,11 +157,11 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
         </div>
       )}
 
-      {/* Satisfaction survey card intentionally not shown here yet --
-          feature is built and configurable (see superadmin's Satisfaction
-          Survey settings) but held back from end users pending school
-          approval. Re-add `<SatisfactionSurveyCard endpointBase="professor" />`
-          gated on doc.status === "claimed" once approved. */}
+      {/* After-service survey -- shown once the document is claimed. Renders
+          nothing if this department has no survey link configured. */}
+      {doc.status === "claimed" && (
+        <SatisfactionSurveyCard endpointBase="professor" />
+      )}
 
       {/* Detail Grid */}
       <div className="dss-detail-grid">
@@ -204,6 +191,12 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
                     : "No date requested for the document to be claimable."}
                 </span>
               </div>
+              {doc.claimBy && (
+                <div className="dss-detail-row">
+                  <span className="dss-detail-label">Claim By</span>
+                  <span className="dss-detail-value">{formatDate(doc.claimBy)}</span>
+                </div>
+              )}
               {doc.status === "claimed" && doc.claimedDate && (
                 <div className="dss-detail-row">
                   <span className="dss-detail-label">Date and Time Claimed</span>
@@ -283,14 +276,15 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
                 {doc.facultyFiles?.length > 0 ? (
                   <div className="dss-attach-list">
                     {doc.facultyFiles.map((f) => (
-                      <button
+                      <AttachmentChip
                         key={f.id}
-                        type="button"
                         className="dss-attach-chip"
-                        onClick={() => openSubmissionFile(doc.id.replace(/^sub-/, ""), f)}
-                      >
-                        <FileText /> {f.filename}
-                      </button>
+                        path={`/professor/document-submissions/${doc.id.replace(/^sub-/, "")}/files/${f.id}`}
+                        mimeType={f.mimeType}
+                        filename={f.filename}
+                        icon={<FileText />}
+                        onOpen={() => openSubmissionFile(doc.id.replace(/^sub-/, ""), f)}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -303,14 +297,15 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
                 {doc.adminFiles?.length > 0 ? (
                   <div className="dss-attach-list">
                     {doc.adminFiles.map((f) => (
-                      <button
+                      <AttachmentChip
                         key={f.id}
-                        type="button"
                         className="dss-attach-chip"
-                        onClick={() => openSubmissionFile(doc.id.replace(/^sub-/, ""), f)}
-                      >
-                        <FileText /> {f.filename}
-                      </button>
+                        path={`/professor/document-submissions/${doc.id.replace(/^sub-/, "")}/files/${f.id}`}
+                        mimeType={f.mimeType}
+                        filename={f.filename}
+                        icon={<FileText />}
+                        onOpen={() => openSubmissionFile(doc.id.replace(/^sub-/, ""), f)}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -334,14 +329,15 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
               <div className="dss-card-content">
                 <div className="dss-attach-list">
                   {doc.adminFiles.map((f) => (
-                    <button
+                    <AttachmentChip
                       key={f.id}
-                      type="button"
                       className="dss-attach-chip"
-                      onClick={() => openRequestFile(doc.id.replace(/^req-/, ""), f)}
-                    >
-                      <FileText /> {f.filename}
-                    </button>
+                      path={`/professor/documents/${doc.id.replace(/^req-/, "")}/files/${f.id}`}
+                      mimeType={f.mimeType}
+                      filename={f.filename}
+                      icon={<FileText />}
+                      onOpen={() => openRequestFile(doc.id.replace(/^req-/, ""), f)}
+                    />
                   ))}
                 </div>
               </div>
@@ -479,6 +475,14 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
         confirmText={claiming ? "Marking…" : "Mark as Claimed"}
         confirmDisabled={claiming}
       />
+      <FilePreviewModal
+        open={!!preview}
+        onClose={closePreview}
+        blobUrl={preview?.blobUrl}
+        mimeType={preview?.mimeType}
+        filename={preview?.filename}
+        onDownload={downloadPreview}
+      />
     </div>
   );
 }
@@ -537,6 +541,7 @@ export default function ProfessorDocumentStatus() {
           notes: r.notes || undefined,
           estimatedCompletion: r.estimated_completion || undefined,
           neededBy: r.needed_by || undefined,
+          claimBy: r.claim_by || undefined,
           claimedDate: r.claimed_at || undefined,
           updatedAt: r.updated_at || undefined,
           isDigitalDelivery: !!r.is_digital_delivery,

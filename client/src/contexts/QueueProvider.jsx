@@ -98,6 +98,20 @@ export function QueueProvider({ children }) {
       if (prev.status === "serving" && q.status === "completed") {
         toast.success(`You've been served for ${q.serviceName}. Thank you!`);
       }
+      // "You're almost up" -- fires once, only on the crossing into the top 3
+      // (the >3 -> <=3 guard stops it re-firing every poll). The server sends
+      // the real push; this is just the in-app nudge while the tab is open.
+      if (
+        q.status === "waiting" &&
+        typeof prev.position === "number" &&
+        typeof q.position === "number" &&
+        prev.position > 3 &&
+        q.position <= 3
+      ) {
+        toast.message(
+          `You're almost up — you're #${q.position} in line for ${q.serviceName}.`,
+        );
+      }
       if (prev.slotStatus !== "paused" && q.slotStatus === "paused") {
         toast.warning(
           q.slotPauseReason

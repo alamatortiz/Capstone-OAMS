@@ -45,6 +45,7 @@ const {
   SUBMISSION_REQUIRED_PRIOR_STATUS,
 } = require("../utils/documentStatus");
 const { createNotification, createNotificationsBatch } = require("../utils/notifications");
+const { notifyAlmostUp } = require("../utils/queuePositionNudge");
 const { getFacultyAvailabilityToday } = require("../utils/facultyAvailability");
 const { sendServerError } = require("../utils/errorResponse");
 
@@ -1101,6 +1102,13 @@ router.patch(
         "queue",
       );
 
+      // The line just advanced -- nudge whoever's now #2/#3. Best-effort.
+      try {
+        await notifyAlmostUp(slotId);
+      } catch (nudgeErr) {
+        console.error("[call-next] almost-up nudge failed:", nudgeErr.message);
+      }
+
       res.json({ message: "Next student called", queueId: next.queue_id });
     } catch (error) {
       await conn.rollback();
@@ -1991,6 +1999,7 @@ router.get(
            dr.notes,
            dr.created_at,
            dr.needed_by,
+           dr.claim_by,
            dr.released_at,
            dr.claimed_at,
            dr.official_code,
@@ -2036,6 +2045,7 @@ router.get(
         status: STATUS_LABEL_MAP[r.status] ?? r.status,
         notes: r.notes || "",
         neededBy: r.needed_by || null,
+        claimBy: r.claim_by || null,
         releasedDate: r.released_at || null,
         claimedDate: r.claimed_at || null,
         requiresCoding: !!r.requires_coding,
@@ -2076,6 +2086,7 @@ router.get(
            fdr.notes,
            fdr.created_at,
            fdr.needed_by,
+           fdr.claim_by,
            fdr.released_at,
            fdr.claimed_at,
            fdr.official_code,
@@ -2119,6 +2130,7 @@ router.get(
         status: STATUS_LABEL_MAP[r.status] ?? r.status,
         notes: r.notes || "",
         neededBy: r.needed_by || null,
+        claimBy: r.claim_by || null,
         releasedDate: r.released_at || null,
         claimedDate: r.claimed_at || null,
         requiresCoding: !!r.requires_coding,
@@ -2196,7 +2208,7 @@ router.patch(
   documentRequestUpload.upload.array("attachmentFiles", MAX_FILES),
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
-    const { status, notes, officialCode } = req.body;
+    const { status, notes, officialCode, claimBy } = req.body;
     const adminId = req.user.userId;
 
     if (!DB_STATUS_MAP[status]) {
@@ -2259,14 +2271,19 @@ router.patch(
       const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
       const codeClause = needsCode ? ", official_code = ?" : "";
+      // Optional office-set claim-by date, only settable on the ready transition.
+      const setClaimBy =
+        dbStatus === "ready" && claimBy != null && String(claimBy).trim() !== "";
+      const claimByClause = setClaimBy ? ", claim_by = ?" : "";
 
       const values = [dbStatus];
       if (notes !== undefined) values.push(notes);
       if (needsCode) values.push(trimmedCode);
+      if (setClaimBy) values.push(claimBy);
       values.push(requestId);
 
       await conn.query(
-        `UPDATE faculty_document_requests SET status = ?${notesClause}${codeClause}${timestampClause} WHERE request_id = ?`,
+        `UPDATE faculty_document_requests SET status = ?${notesClause}${codeClause}${claimByClause}${timestampClause} WHERE request_id = ?`,
         values,
       );
 
@@ -2372,7 +2389,7 @@ router.patch(
   documentRequestUpload.upload.array("attachmentFiles", MAX_FILES),
   async (req, res) => {
     const requestId = parseInt(req.params.requestId, 10);
-    const { status, notes, officialCode } = req.body;
+    const { status, notes, officialCode, claimBy } = req.body;
     const adminId = req.user.userId;
 
     if (!DB_STATUS_MAP[status]) {
@@ -2435,14 +2452,19 @@ router.patch(
       const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
       const codeClause = needsCode ? ", official_code = ?" : "";
+      // Optional office-set claim-by date, only settable on the ready transition.
+      const setClaimBy =
+        dbStatus === "ready" && claimBy != null && String(claimBy).trim() !== "";
+      const claimByClause = setClaimBy ? ", claim_by = ?" : "";
 
       const values = [dbStatus];
       if (notes !== undefined) values.push(notes);
       if (needsCode) values.push(trimmedCode);
+      if (setClaimBy) values.push(claimBy);
       values.push(requestId);
 
       await conn.query(
-        `UPDATE document_requests SET status = ?${notesClause}${codeClause}${timestampClause} WHERE request_id = ?`,
+        `UPDATE document_requests SET status = ?${notesClause}${codeClause}${claimByClause}${timestampClause} WHERE request_id = ?`,
         values,
       );
 
@@ -2563,6 +2585,7 @@ router.get(
            ds.notes,
            ds.created_at,
            ds.needed_by,
+           ds.claim_by,
            ds.claimed_at,
            ds.submitter_type,
            COALESCE(st.first_name, f.first_name) AS first_name,
@@ -2609,6 +2632,7 @@ router.get(
           status: STATUS_LABEL_MAP[r.status] ?? r.status,
           notes: r.notes || "",
           neededBy: r.needed_by || null,
+          claimBy: r.claim_by || null,
           claimedDate: r.claimed_at || null,
           requiresCoding: false,
           officialCode: null,
@@ -2640,7 +2664,7 @@ router.patch(
   documentSubmissionUpload.upload.array("returnFiles", MAX_FILES),
   async (req, res) => {
     const submissionId = parseInt(req.params.submissionId, 10);
-    const { status, notes } = req.body;
+    const { status, notes, claimBy } = req.body;
     const adminId = req.user.userId;
 
     if (!submissionId) {
@@ -2718,9 +2742,13 @@ router.patch(
 
       const timestampClause = dbStatus === "claimed" ? ", claimed_at = NOW()" : "";
       const notesClause = notes !== undefined ? ", notes = ?" : "";
+      const setClaimBy =
+        dbStatus === "ready" && claimBy != null && String(claimBy).trim() !== "";
+      const claimByClause = setClaimBy ? ", claim_by = ?" : "";
 
       const values = [dbStatus];
       if (notes !== undefined) values.push(notes);
+      if (setClaimBy) values.push(claimBy);
       values.push(submissionId);
 
       const conn = await pool.getConnection();
@@ -2728,7 +2756,7 @@ router.patch(
         await conn.beginTransaction();
 
         await conn.query(
-          `UPDATE document_submissions SET status = ?${notesClause}${timestampClause} WHERE submission_id = ?`,
+          `UPDATE document_submissions SET status = ?${notesClause}${claimByClause}${timestampClause} WHERE submission_id = ?`,
           values,
         );
 

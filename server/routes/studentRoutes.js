@@ -14,6 +14,7 @@ const {
 } = require("../utils/dateTime");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
+const { notifyAlmostUp } = require("../utils/queuePositionNudge");
 const {
   STATUS_LABEL_MAP,
   cancelOwnDocumentRequest,
@@ -623,6 +624,7 @@ router.get(
                dr.status,
                dr.estimated_completion,
                dr.needed_by,
+               dr.claim_by,
                dr.released_at,
                dr.claimed_at,
                dr.notes,
@@ -650,6 +652,7 @@ router.get(
                ds.status,
                NULL AS estimated_completion,
                ds.needed_by,
+               ds.claim_by,
                NULL AS released_at,
                ds.claimed_at,
                ds.notes,
@@ -695,6 +698,7 @@ router.get(
           notes: d.notes || undefined,
           estimatedCompletion: d.estimated_completion || undefined,
           neededBy: d.needed_by || undefined,
+          claimBy: d.claim_by || undefined,
           releasedDate: d.released_at || undefined,
           claimedDate: d.claimed_at || undefined,
           isDigitalDelivery: !!d.is_digital_delivery,
@@ -889,7 +893,7 @@ router.post(
       const [[newDoc]] = await pool.query(
         `SELECT
            dr.request_id, dr.tracking_number, dr.request_type, dr.purpose, dr.copies,
-           dr.status, dr.estimated_completion, dr.needed_by, dr.notes, dr.created_at,
+           dr.status, dr.estimated_completion, dr.needed_by, dr.claim_by, dr.notes, dr.created_at,
            d.department_name AS college, s.department_id
          FROM document_requests dr
          JOIN document_services s ON dr.service_id = s.service_id
@@ -921,6 +925,7 @@ router.post(
           notes: newDoc.notes || undefined,
           estimatedCompletion: newDoc.estimated_completion || undefined,
           neededBy: newDoc.needed_by || undefined,
+          claimBy: newDoc.claim_by || undefined,
         },
       });
     } catch (error) {
@@ -1028,7 +1033,7 @@ router.post(
 
         const [[newSub]] = await pool.query(
           `SELECT ds.submission_id, ds.tracking_number, ds.title, ds.purpose, ds.status,
-                  ds.needed_by, ds.notes, ds.created_at, d.department_name AS college
+                  ds.needed_by, ds.claim_by, ds.notes, ds.created_at, d.department_name AS college
            FROM document_submissions ds
            JOIN departments d ON ds.department_id = d.department_id
            WHERE ds.submission_id = ?`,
@@ -1063,6 +1068,7 @@ router.post(
             trackingNumber: newSub.tracking_number,
             notes: newSub.notes || undefined,
             neededBy: newSub.needed_by || undefined,
+            claimBy: newSub.claim_by || undefined,
             studentFiles,
             adminFiles: [],
           },
@@ -2163,6 +2169,13 @@ router.post(
         };
         emitToSlot(entry.slot_id, "queue:slot-status", settledPayload);
         emitToDept(deptRow?.department_id, "queue:slot-status", settledPayload);
+      }
+
+      // Someone ahead just left -- nudge whoever's now #2/#3. Best-effort.
+      try {
+        await notifyAlmostUp(entry.slot_id);
+      } catch (nudgeErr) {
+        console.error("[leave queue] almost-up nudge failed:", nudgeErr.message);
       }
 
       res.json({ message: "Successfully left the queue", queueId });

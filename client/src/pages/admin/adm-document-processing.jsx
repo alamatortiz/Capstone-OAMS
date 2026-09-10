@@ -10,6 +10,9 @@ import ActionConfirmModal from "../../components/ActionConfirmModal";
 import QueueReasonModal from "../../components/QueueReasonModal";
 import FilterSelect from "../../components/FilterSelect";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import useFilePreview from "../../hooks/useFilePreview";
+import FilePreviewModal from "../../components/FilePreviewModal";
+import AttachmentChip from "../../components/AttachmentChip";
 import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 
 const DOCUMENT_LIVE_EVENTS = [
@@ -17,7 +20,7 @@ const DOCUMENT_LIVE_EVENTS = [
   "document:status-updated",
   "document:cancelled",
 ];
-import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { formatManilaDate, getManilaDateString, getManilaTomorrowDateString } from "../../utils/dateTime";
 import { COLLEGES } from "../../data/colleges";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -184,8 +187,12 @@ export default function AdminDocumentProcessing() {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   useLockBodyScroll(showDetailsModal);
+  const { preview, openFile, closePreview, downloadPreview } = useFilePreview();
   const [processingNotes, setProcessingNotes] = useState("");
   const [officialCode, setOfficialCode] = useState("");
+  // Optional office-set "claim by" date, only editable while a doc is being
+  // marked Ready (status === "processing" in the modal).
+  const [claimBy, setClaimBy] = useState("");
 
   // ── Return-file attachments (submission source only) ────────────────────
   const [returnFiles, setReturnFiles] = useState([]); // { id, file }[] queued to send back to the student
@@ -222,28 +229,9 @@ export default function AdminDocumentProcessing() {
   const removeReturnFile = (id) =>
     setReturnFiles((prev) => prev.filter((f) => f.id !== id));
 
-  // Fetches one document file's bytes on demand and opens/downloads it --
-  // mirrors adm-announcements.jsx's openAttachment().
-  const openDocFileBlob = async (path, file) => {
-    try {
-      const res = await api.get(path, { responseType: "blob" });
-      const url = URL.createObjectURL(res.data);
-      if (
-        file.mimeType?.startsWith("image/") ||
-        file.mimeType === "application/pdf"
-      ) {
-        window.open(url, "_blank");
-      } else {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = file.filename;
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      toast.error("Failed to load file");
-    }
-  };
+  // image/PDF preview in a modal, else download -- see useFilePreview.
+  const openDocFileBlob = (path, file) =>
+    openFile(path, { mimeType: file.mimeType, filename: file.filename });
 
   const openSubmissionFile = (submissionId, file) =>
     openDocFileBlob(
@@ -429,6 +417,7 @@ export default function AdminDocumentProcessing() {
     setSelectedDocument(doc);
     setProcessingNotes(doc.notes || "");
     setOfficialCode(doc.officialCode || "");
+    setClaimBy(doc.claimBy || "");
     setReturnFiles([]);
     setShowDetailsModal(true);
   };
@@ -444,6 +433,7 @@ export default function AdminDocumentProcessing() {
     if (!selectedDocument) return;
     const isSubmission = selectedDocument._kind === "submission";
     const needsCode = newStatus === "ready" && selectedDocument.requiresCoding;
+    const sendClaimBy = newStatus === "ready" && !!claimBy;
     const notesToSend = notesOverride !== undefined ? notesOverride : processingNotes;
     // Re-sending the document's own current status is how "Attach Files"
     // works without also changing the status -- same endpoint doubles as
@@ -462,6 +452,7 @@ export default function AdminDocumentProcessing() {
         const body = new FormData();
         body.append("status", newStatus);
         body.append("notes", notesToSend);
+        if (sendClaimBy) body.append("claimBy", claimBy);
         returnFiles.forEach((f) => body.append("returnFiles", f.file));
         await api.patch(
           `/admin/${selectedDocument._endpoint}/${rawId}/status`,
@@ -473,6 +464,7 @@ export default function AdminDocumentProcessing() {
         body.append("status", newStatus);
         body.append("notes", notesToSend);
         if (needsCode) body.append("officialCode", officialCode);
+        if (sendClaimBy) body.append("claimBy", claimBy);
         returnFiles.forEach((f) => body.append("attachmentFiles", f.file));
         await api.patch(
           `/admin/${selectedDocument._endpoint}/${rawId}/status`,
@@ -485,6 +477,7 @@ export default function AdminDocumentProcessing() {
             status: newStatus,
             notes: notesToSend,
             ...(needsCode ? { officialCode } : {}),
+            ...(sendClaimBy ? { claimBy } : {}),
           },
         );
       }
@@ -497,6 +490,7 @@ export default function AdminDocumentProcessing() {
       setSelectedDocument(null);
       setProcessingNotes("");
       setOfficialCode("");
+      setClaimBy("");
       setReturnFiles([]);
       await fetchDocuments();
     } catch (err) {
@@ -534,6 +528,7 @@ export default function AdminDocumentProcessing() {
     setSelectedDocument(null);
     setProcessingNotes("");
     setOfficialCode("");
+    setClaimBy("");
     setReturnFiles([]);
   };
 
@@ -846,6 +841,10 @@ export default function AdminDocumentProcessing() {
                             f,
                             selectedDocument._endpoint,
                           );
+                    const attachedFilePath = (f) =>
+                      isSub
+                        ? `/admin/document-submissions/${selectedDocument.id.replace(/^sub-/, "")}/files/${f.id}`
+                        : `/admin/${selectedDocument._endpoint}/${selectedDocument.id}/files/${f.id}`;
                     // Files can be attached once processing has started (never
                     // while Pending) -- matches the server-side guard.
                     const canAttach =
@@ -871,14 +870,15 @@ export default function AdminDocumentProcessing() {
                             {selectedDocument.studentFiles?.length > 0 ? (
                               <div className="adp-attach-list">
                                 {selectedDocument.studentFiles.map((f) => (
-                                  <button
+                                  <AttachmentChip
                                     key={f.id}
-                                    type="button"
                                     className="adp-attach-chip"
-                                    onClick={() => openAttachedFile(f)}
-                                  >
-                                    <FileText /> {f.filename}
-                                  </button>
+                                    path={attachedFilePath(f)}
+                                    mimeType={f.mimeType}
+                                    filename={f.filename}
+                                    icon={<FileText />}
+                                    onOpen={() => openAttachedFile(f)}
+                                  />
                                 ))}
                               </div>
                             ) : (
@@ -908,14 +908,15 @@ export default function AdminDocumentProcessing() {
                         {selectedDocument.adminFiles?.length > 0 && (
                           <div className="adp-attach-list">
                             {selectedDocument.adminFiles.map((f) => (
-                              <button
+                              <AttachmentChip
                                 key={f.id}
-                                type="button"
                                 className="adp-attach-chip"
-                                onClick={() => openAttachedFile(f)}
-                              >
-                                <FileText /> {f.filename}
-                              </button>
+                                path={attachedFilePath(f)}
+                                mimeType={f.mimeType}
+                                filename={f.filename}
+                                icon={<FileText />}
+                                onOpen={() => openAttachedFile(f)}
+                              />
                             ))}
                           </div>
                         )}
@@ -987,6 +988,27 @@ export default function AdminDocumentProcessing() {
                         />
                       </div>
                     )}
+
+                  {selectedDocument.status === "processing" && (
+                    <div className="adp-modal-notes-wrap">
+                      <label className="adp-modal-label" htmlFor="adp-claim-by">
+                        Claim By{" "}
+                        <span
+                          style={{ color: "var(--text-tertiary)", fontWeight: 400 }}
+                        >
+                          (optional)
+                        </span>
+                      </label>
+                      <input
+                        id="adp-claim-by"
+                        type="date"
+                        className="adp-modal-textarea"
+                        min={getManilaTomorrowDateString()}
+                        value={claimBy}
+                        onChange={(e) => setClaimBy(e.target.value)}
+                      />
+                    </div>
+                  )}
 
                   <div className="adp-modal-notes-wrap">
                     <label className="adp-modal-label" htmlFor="adp-notes">
@@ -1080,6 +1102,15 @@ export default function AdminDocumentProcessing() {
             }
             confirmDisabled={confirmSaving}
             variant={DOC_CONFIRM_META?.variant ?? "danger"}
+          />
+
+          <FilePreviewModal
+            open={!!preview}
+            onClose={closePreview}
+            blobUrl={preview?.blobUrl}
+            mimeType={preview?.mimeType}
+            filename={preview?.filename}
+            onDownload={downloadPreview}
           />
 
           <QueueReasonModal
@@ -1244,6 +1275,10 @@ export default function AdminDocumentProcessing() {
                 doc.neededBy &&
                 !doneStatuses.includes(doc.status) &&
                 doc.neededBy < getManilaDateString();
+              const isClaimOverdue =
+                doc.claimBy &&
+                doc.status === "ready" &&
+                doc.claimBy < getManilaDateString();
               const cardTitle =
                 doc._kind === "submission"
                   ? `Document Submission: ${doc.documentType}`
@@ -1268,7 +1303,7 @@ export default function AdminDocumentProcessing() {
                         </span>
                       </div>
                       <p className="adp-doc-purpose">{doc.purpose}</p>
-                      {(doc.neededBy || doc.processedBy) && (
+                      {(doc.neededBy || doc.claimBy || doc.processedBy) && (
                         <div className="adp-doc-tags-row">
                           {doc.neededBy && (
                             <span
@@ -1278,6 +1313,14 @@ export default function AdminDocumentProcessing() {
                               {formatManilaDate(doc.neededBy)}
                               {deadlineLabel(doc.neededBy) &&
                                 ` (${deadlineLabel(doc.neededBy)})`}
+                            </span>
+                          )}
+                          {doc.claimBy && (
+                            <span
+                              className={`adp-status-badge ${isClaimOverdue ? "adp-badge-rejected" : "adp-badge-pending"}`}
+                            >
+                              {isClaimOverdue ? "Claim overdue — " : "Claim by: "}
+                              {formatManilaDate(doc.claimBy)}
                             </span>
                           )}
                           {doc.processedBy && (

@@ -9,6 +9,9 @@ import { formatManilaDateTime } from "../../utils/dateTime";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
 import useLockBodyScroll from "../../hooks/useLockBodyScroll";
+import useFilePreview from "../../hooks/useFilePreview";
+import FilePreviewModal from "../../components/FilePreviewModal";
+import AttachmentChip from "../../components/AttachmentChip";
 
 import "./stud-announcements.css";
 
@@ -113,30 +116,16 @@ export default function AnnouncementsPage() {
   const [selectedFilter, setSelectedFilter] = useState("pinned");
   const [viewingAnnouncement, setViewingAnnouncement] = useState(null);
   useLockBodyScroll(!!viewingAnnouncement);
+  const { preview, openFile, closePreview, downloadPreview } = useFilePreview();
 
   // Fetches one attachment's bytes on demand (authenticated, so a plain
-  // <img src> won't work -- the JWT only ever goes out via axios'
-  // Authorization header) and opens/downloads it.
-  const openAttachment = async (announcementId, attachment) => {
-    try {
-      const res = await api.get(
-        `/student/announcements/${announcementId}/attachments/${attachment.id}`,
-        { responseType: "blob" },
-      );
-      const url = URL.createObjectURL(res.data);
-      if (attachment.mimeType?.startsWith("image/") || attachment.mimeType === "application/pdf") {
-        window.open(url, "_blank");
-      } else {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = attachment.filename;
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      toast.error("Could not load attachment.");
-    }
-  };
+  // <img src> won't work) -- image/PDF preview in a modal, else download.
+  const openAttachment = (announcementId, attachment) =>
+    openFile(
+      `/student/announcements/${announcementId}/attachments/${attachment.id}`,
+      { mimeType: attachment.mimeType, filename: attachment.filename },
+      () => toast.error("Could not load attachment."),
+    );
 
   // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
   // `announcements` holds whatever page(s) have been loaded for the CURRENT
@@ -325,14 +314,15 @@ export default function AnnouncementsPage() {
                 {viewingAnnouncement.attachments?.length > 0 && (
                   <div className="ann-detail-attachment">
                     {viewingAnnouncement.attachments.map((att) => (
-                      <button
+                      <AttachmentChip
                         key={att.id}
-                        type="button"
                         className="ann-detail-attachment-btn"
-                        onClick={() => openAttachment(viewingAnnouncement.id, att)}
-                      >
-                        <FileIcon /> {att.filename}
-                      </button>
+                        path={`/student/announcements/${viewingAnnouncement.id}/attachments/${att.id}`}
+                        mimeType={att.mimeType}
+                        filename={att.filename}
+                        icon={<FileIcon />}
+                        onOpen={() => openAttachment(viewingAnnouncement.id, att)}
+                      />
                     ))}
                   </div>
                 )}
@@ -353,6 +343,14 @@ export default function AnnouncementsPage() {
               </div>
             </div>
           )}
+          <FilePreviewModal
+            open={!!preview}
+            onClose={closePreview}
+            blobUrl={preview?.blobUrl}
+            mimeType={preview?.mimeType}
+            filename={preview?.filename}
+            onDownload={downloadPreview}
+          />
         </>
       }
     >

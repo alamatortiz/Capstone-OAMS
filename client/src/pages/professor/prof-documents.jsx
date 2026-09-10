@@ -176,6 +176,7 @@ export default function ProfessorDocumentRequest() {
           notes: r.notes || undefined,
           estimatedCompletion: r.estimated_completion || undefined,
           neededBy: r.needed_by || undefined,
+          claimBy: r.claim_by || undefined,
           claimedDate: r.claimed_at || undefined,
           updatedAt: r.updated_at || undefined,
           facultyFiles: r.faculty_files || [],

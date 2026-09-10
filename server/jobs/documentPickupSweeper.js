@@ -46,9 +46,58 @@ async function sweepDocumentPickups() {
       );
     }
 
+    await notifyOverdueClaims();
     await escalateAbandonedPickups();
   } catch (error) {
     console.error("[documentPickupSweeper] Sweep failed:", error);
+  }
+}
+
+// A Ready document can carry an optional office-set `claim_by` date (set by
+// an admin on the mark-ready transition -- distinct from the requester's own
+// `needed_by` wish-date). Once that date passes, nudge the requester once
+// (overdue_notified_at gates it, like escalated_at above) and move on -- the
+// admin list flags it visually, and the 7-day escalateAbandonedPickups still
+// handles the "unclaimed far too long" case regardless of claim_by. Covers
+// all three document tables (the daily reminder above only covers the two
+// request tables; a submission can be Ready and overdue too).
+async function notifyOverdueClaims() {
+  const sources = [
+    { table: "document_requests", idCol: "request_id", userSel: "student_id" },
+    { table: "faculty_document_requests", idCol: "request_id", userSel: "faculty_id" },
+    { table: "document_submissions", idCol: "submission_id", userSel: "COALESCE(student_id, faculty_id)" },
+  ];
+
+  let notified = 0;
+  for (const src of sources) {
+    const [rows] = await pool.query(
+      `SELECT ${src.idCol} AS id, ${src.userSel} AS user_id, tracking_number
+       FROM ${src.table}
+       WHERE status = 'ready'
+         AND claim_by IS NOT NULL
+         AND claim_by < CURDATE()
+         AND overdue_notified_at IS NULL`,
+    );
+    for (const row of rows) {
+      const [cas] = await pool.query(
+        `UPDATE ${src.table} SET overdue_notified_at = NOW(), updated_at = updated_at
+         WHERE ${src.idCol} = ? AND overdue_notified_at IS NULL`,
+        [row.id],
+      );
+      if (cas.affectedRows === 0) continue; // another tick claimed it
+      createNotification(
+        row.user_id,
+        `Your document (${row.tracking_number}) has passed its claim-by date. Please collect it as soon as possible.`,
+        "document",
+      );
+      notified += 1;
+    }
+  }
+
+  if (notified > 0) {
+    console.log(
+      `[documentPickupSweeper] Notified ${notified} overdue claim${notified === 1 ? "" : "s"}`,
+    );
   }
 }
 

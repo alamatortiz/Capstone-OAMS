@@ -41,6 +41,16 @@ const CloseIcon = () => (
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+// Quick-add shortcuts for the "Appointment Types" tag field. Each is just an
+// ordinary tag string -- the professor can still type anything custom.
+const PRESET_APPT_TYPES = [
+  "Consultation",
+  "Advising",
+  "Thesis/Capstone",
+  "Make-up Class",
+  "Grade Consultation",
+];
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmt12(t) {
   if (!t) return "";
@@ -307,11 +317,15 @@ export default function ProfessorScheduleManager() {
     setAddEnd((prevEnd) => (prevEnd && prevEnd > newStart ? prevEnd : ""));
   };
 
-  const commitApptTag = () => {
-    const val = addApptInput.trim();
+  // `explicit` is a preset string when clicked from PRESET_APPT_TYPES; when
+  // wired to onBlur/onKeyDown it's a React event, so `typeof !== "string"`
+  // falls back to the free-text input (unchanged behaviour there).
+  const commitApptTag = (explicit) => {
+    const fromPreset = typeof explicit === "string";
+    const val = (fromPreset ? explicit : addApptInput).trim();
     if (!val || addApptTypes.includes(val) || addApptTypes.length >= 10) return;
     setAddApptTypes((prev) => [...prev, val]);
-    setAddApptInput("");
+    if (!fromPreset) setAddApptInput("");
   };
 
   const removeApptTag = (tag) => setAddApptTypes((prev) => prev.filter((t) => t !== tag));
@@ -794,6 +808,22 @@ export default function ProfessorScheduleManager() {
               </div>
               <div className="sa-form-group">
                 <label>Appointment Types <span style={{ fontWeight: 400, color: "var(--text-tertiary)", fontSize: "0.78rem" }}>(optional · press Enter to add)</span></label>
+                <div className="sa-preset-row">
+                  {PRESET_APPT_TYPES.map((preset) => {
+                    const added = addApptTypes.includes(preset);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={`sa-preset-chip${added ? " is-added" : ""}`}
+                        onClick={() => commitApptTag(preset)}
+                        disabled={added || addApptTypes.length >= 10 || modalLocked}
+                      >
+                        {added ? "✓ " : "+ "}{preset}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className={`sa-tag-input-box${addApptTypes.length > 0 ? " has-tags" : ""}`}>
                   {addApptTypes.map((tag) => (
                     <span key={tag} className="sa-tag-chip">

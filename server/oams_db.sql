@@ -311,6 +311,11 @@ CREATE TABLE queues (
     -- clock (queueNoShowSweeper.js) so a long service session isn't mistaken
     -- for an absence -- see PATCH /queue-hosting/:slotId/mark-arrived.
     arrived_at      TIMESTAMP    NULL,
+    -- One-shot: set the first time this entry reaches position #2 or #3 in
+    -- its slot (advanced by call-next or someone ahead leaving), so the
+    -- "you're almost up" reminder fires at most once -- see the post-commit
+    -- block in PATCH /queue-hosting/:slotId/call-next.
+    position_reminder_sent_at TIMESTAMP NULL DEFAULT NULL,
     completed_at    TIMESTAMP    NULL,
     cancelled_at    TIMESTAMP    NULL,
     notes           TEXT,
@@ -426,6 +431,11 @@ CREATE TABLE appointments (
     -- notifications on the same row (one to the student pre-appointment,
     -- one to faculty while still awaiting approval).
     pending_nudge_sent_at TIMESTAMP  NULL DEFAULT NULL,
+    -- Set by appointmentReminderSweeper.js's imminent pass once the T-10min
+    -- "your appointment starts soon" reminder has gone out (to BOTH the
+    -- student and the professor). Separate from reminder_sent_at, which is
+    -- the 24h-out reminder -- one row can get both.
+    imminent_reminder_sent_at TIMESTAMP NULL DEFAULT NULL,
     -- Computed from this row's own columns; NULL whenever status is
     -- cancelled/rejected, so any number of cancelled/rejected rows can share
     -- the same student/faculty/date/time -- only a genuinely ACTIVE duplicate
@@ -474,6 +484,11 @@ CREATE TABLE document_requests (
     status                  ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
     estimated_completion    DATE         NULL,
     needed_by               DATE         NULL,
+    -- Optional office-set "collect it by" date, set by an admin when marking
+    -- the request Ready. Distinct from needed_by (the requester's own
+    -- wish-date). Past this date the requester is nudged once (overdue_notified_at)
+    -- and the admin list flags it -- see documentPickupSweeper.js notifyOverdueClaims.
+    claim_by                DATE         NULL,
     -- Legacy column: the old Ready -> Released -> Claimed flow was collapsed to
     -- Ready -> Claimed. No longer written or read; kept only so existing rows
     -- and mock seeds don't error. Safe to drop in a later migration.
@@ -505,6 +520,10 @@ CREATE TABLE document_requests (
     -- same request on every subsequent daily sweep (the student's own daily
     -- reminder is separate and intentionally keeps repeating; see updated_at).
     escalated_at            TIMESTAMP    NULL DEFAULT NULL,
+    -- Set by documentPickupSweeper.js's notifyOverdueClaims once the requester
+    -- has been nudged that this Ready request passed its claim_by date --
+    -- one-shot, so the daily sweep doesn't re-nudge.
+    overdue_notified_at     TIMESTAMP    NULL DEFAULT NULL,
     FOREIGN KEY (student_id) REFERENCES students(student_id),
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_document_requests_tracking (tracking_number)
@@ -574,6 +593,8 @@ CREATE TABLE document_submissions (
     -- it Claimed once they've collected it.
     status          ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
     needed_by       DATE         NULL,
+    -- Optional office-set "collect it by" date -- see document_requests.claim_by.
+    claim_by        DATE         NULL,
     notes           TEXT         NULL, -- admin processing/rejection notes, mirrors document_requests.notes
     claimed_at      TIMESTAMP    NULL,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -583,6 +604,8 @@ CREATE TABLE document_submissions (
     -- prevents re-escalating the same submission on every subsequent daily
     -- sweep, mirroring document_requests.escalated_at.
     escalated_at    TIMESTAMP    NULL DEFAULT NULL,
+    -- One-shot claim_by-overdue nudge dedupe -- see document_requests.overdue_notified_at.
+    overdue_notified_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (student_id)    REFERENCES students(student_id),
     FOREIGN KEY (faculty_id)    REFERENCES faculty(faculty_id),
     FOREIGN KEY (department_id) REFERENCES departments(department_id),
@@ -753,6 +776,8 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     status               ENUM('pending','processing','ready','claimed','rejected','cancelled') DEFAULT 'pending',
     estimated_completion DATE         NULL,
     needed_by            DATE         NULL,
+    -- Optional office-set "collect it by" date -- see document_requests.claim_by.
+    claim_by             DATE         NULL,
     -- Legacy column (see document_requests.released_at) -- no longer written/read.
     released_at          TIMESTAMP    NULL,
     claimed_at           TIMESTAMP    NULL,
@@ -772,6 +797,8 @@ CREATE TABLE IF NOT EXISTS faculty_document_requests (
     -- request has sat unclaimed for 7+ days -- see document_requests.escalated_at
     -- for the full reasoning (identical pattern, mirrored here).
     escalated_at         TIMESTAMP    NULL DEFAULT NULL,
+    -- One-shot claim_by-overdue nudge dedupe -- see document_requests.overdue_notified_at.
+    overdue_notified_at  TIMESTAMP    NULL DEFAULT NULL,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES document_services(service_id),
     INDEX idx_faculty_doc_requests_faculty (faculty_id)

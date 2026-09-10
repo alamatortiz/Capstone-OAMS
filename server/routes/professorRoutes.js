@@ -1543,6 +1543,7 @@ router.get(
                fdr.status,
                fdr.estimated_completion,
                fdr.needed_by,
+               fdr.claim_by,
                fdr.released_at,
                fdr.claimed_at,
                fdr.notes,
@@ -1570,6 +1571,7 @@ router.get(
                dsub.status,
                NULL AS estimated_completion,
                dsub.needed_by,
+               dsub.claim_by,
                NULL AS released_at,
                dsub.claimed_at,
                dsub.notes,
@@ -1976,7 +1978,7 @@ router.post(
 
         const [[newSub]] = await pool.query(
           `SELECT ds.submission_id, ds.tracking_number, ds.title, ds.purpose, ds.status,
-                  ds.needed_by, ds.notes, ds.created_at, d.department_name AS college
+                  ds.needed_by, ds.claim_by, ds.notes, ds.created_at, d.department_name AS college
            FROM document_submissions ds
            JOIN departments d ON ds.department_id = d.department_id
            WHERE ds.submission_id = ?`,
@@ -2011,6 +2013,7 @@ router.post(
             trackingNumber: newSub.tracking_number,
             notes: newSub.notes || undefined,
             neededBy: newSub.needed_by || undefined,
+            claimBy: newSub.claim_by || undefined,
             facultyFiles,
             adminFiles: [],
           },

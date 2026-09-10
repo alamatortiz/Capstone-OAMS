@@ -20,6 +20,7 @@ import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
+import SatisfactionSurveyCard from "../../components/SatisfactionSurveyCard";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 import "./stud-queue-status.css";
@@ -304,11 +305,13 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             </div>
           </div>
 
-          {/* Satisfaction survey card intentionally not shown here yet --
-              feature is built and configurable (see superadmin's Satisfaction
-              Survey settings) but held back from end users pending school
-              approval. Re-add `<SatisfactionSurveyCard endpointBase="student" />`
-              gated on queue.status === "completed" once approved. */}
+          {/* After-service survey -- shown once the queue is completed (it
+              stays in the active list for a 30-min grace window, see
+              GET /student/queues/active). Renders nothing if this department
+              has no survey link configured. */}
+          {queue.status === "completed" && (
+            <SatisfactionSurveyCard endpointBase="student" />
+          )}
 
           {/* Wait time card */}
           <div className="qss-card">

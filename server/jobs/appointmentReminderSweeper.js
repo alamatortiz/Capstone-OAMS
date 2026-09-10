@@ -6,6 +6,10 @@ const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
 const REMINDER_LEAD_HOURS = 24;
 const COMPLETE_GRACE_HOURS = 3;
 const PENDING_NUDGE_HOURS = 48;
+// The T-10min "starts soon" reminder runs on its own faster tick -- 15 min is
+// too coarse for a 10-min lead. Mirrors queueNoShowSweeper's short interval.
+const IMMINENT_INTERVAL_MS = 60 * 1000;
+const IMMINENT_LEAD_MINUTES = 10;
 
 // `appointment_date`/`appointment_time` are plain calendar-date/wall-clock
 // values (no timezone conversion needed, unlike TIMESTAMP columns) -- this
@@ -74,6 +78,54 @@ async function sweepAppointmentReminders() {
     await sweepExpiredPending();
   } catch (error) {
     console.error("[appointmentReminderSweeper] Sweep failed:", error);
+  }
+}
+
+// T-10min "your appointment is starting soon" reminder. Fires for BOTH
+// 'pending' and 'approved' -- some professors approve at the time rather than
+// in advance, so for a pending request this doubles as a nudge to act -- and
+// notifies BOTH the student and the professor. Separate from the 24h pass:
+// its own dedupe column (imminent_reminder_sent_at) and its own faster tick.
+// Anchored to the appointment's START time; the BETWEEN window closes at the
+// start, so it can't re-fire once the start passes, and it never overlaps
+// sweepExpiredPending (which fires on the window END).
+async function sweepImminentAppointmentReminders() {
+  try {
+    const [due] = await pool.query(
+      `SELECT appointment_id, student_id, faculty_id, appointment_date, appointment_time, location_snapshot
+       FROM appointments
+       WHERE status IN ('pending', 'approved')
+         AND imminent_reminder_sent_at IS NULL
+         AND TIMESTAMP(appointment_date, appointment_time)
+             BETWEEN CONVERT_TZ(NOW(), '+00:00', '+08:00')
+                 AND (CONVERT_TZ(NOW(), '+00:00', '+08:00') + INTERVAL ? MINUTE)`,
+      [IMMINENT_LEAD_MINUTES],
+    );
+
+    let sentCount = 0;
+    for (const row of due) {
+      const [result] = await pool.query(
+        `UPDATE appointments SET imminent_reminder_sent_at = NOW() WHERE appointment_id = ? AND imminent_reminder_sent_at IS NULL`,
+        [row.appointment_id],
+      );
+      if (result.affectedRows === 0) continue; // another tick claimed it
+
+      const dateStr = formatDate(row.appointment_date);
+      const timeStr = formatTime(row.appointment_time);
+      const locationPart = row.location_snapshot ? ` at ${row.location_snapshot}` : "";
+      const msg = `Reminder: an appointment is starting soon — ${dateStr} at ${timeStr}${locationPart}.`;
+      createNotification(row.student_id, msg, "appointment");
+      createNotification(row.faculty_id, msg, "appointment");
+      sentCount += 1;
+    }
+
+    if (sentCount > 0) {
+      console.log(
+        `[appointmentReminderSweeper] Sent ${sentCount} T-${IMMINENT_LEAD_MINUTES}min reminder${sentCount === 1 ? "" : "s"}`,
+      );
+    }
+  } catch (error) {
+    console.error("[appointmentReminderSweeper] Imminent sweep failed:", error);
   }
 }
 
@@ -208,7 +260,12 @@ async function sweepExpiredPending() {
 }
 
 function startAppointmentReminderSweeper() {
+  setInterval(sweepImminentAppointmentReminders, IMMINENT_INTERVAL_MS);
   return setInterval(sweepAppointmentReminders, SWEEP_INTERVAL_MS);
 }
 
-module.exports = { startAppointmentReminderSweeper, sweepAppointmentReminders };
+module.exports = {
+  startAppointmentReminderSweeper,
+  sweepAppointmentReminders,
+  sweepImminentAppointmentReminders,
+};

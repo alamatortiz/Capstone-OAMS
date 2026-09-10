@@ -7,6 +7,9 @@ import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
+import FilePreviewModal from "../../components/FilePreviewModal";
+import AttachmentChip from "../../components/AttachmentChip";
+import useFilePreview from "../../hooks/useFilePreview";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaDateTime, formatManilaTime } from "../../utils/dateTime";
 
@@ -176,34 +179,22 @@ export default function AdminAnnouncements() {
   const [editFiles, setEditFiles] = useState([]); // { id, file }[] queued to add to editingAnnouncement.attachments
 
   const [toasts, setToasts] = useState([]);
+  const { preview, openFile, closePreview, downloadPreview } = useFilePreview();
   const showToast = (message, kind = "success") => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, kind }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
   };
 
-  // Fetches one attachment's bytes on demand and opens/downloads it -- used
-  // by both the View modal and the Edit modal's existing-attachments list.
-  const openAttachment = async (announcementId, attachment) => {
-    try {
-      const res = await api.get(
-        `/admin/announcements/${announcementId}/attachments/${attachment.id}`,
-        { responseType: "blob" },
-      );
-      const url = URL.createObjectURL(res.data);
-      if (attachment.mimeType?.startsWith("image/") || attachment.mimeType === "application/pdf") {
-        window.open(url, "_blank");
-      } else {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = attachment.filename;
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      showToast("Failed to load attachment", "error");
-    }
-  };
+  // Fetches one attachment's bytes on demand -- image/PDF preview in a modal,
+  // else download. Used by both the View modal and the Edit modal's
+  // existing-attachments list (one shared preview covers both).
+  const openAttachment = (announcementId, attachment) =>
+    openFile(
+      `/admin/announcements/${announcementId}/attachments/${attachment.id}`,
+      { mimeType: attachment.mimeType, filename: attachment.filename },
+      () => showToast("Failed to load attachment", "error"),
+    );
 
   const removeExistingAttachment = async (announcementId, attachmentId) => {
     try {
@@ -478,6 +469,14 @@ export default function AdminAnnouncements() {
       mainClassName="admin-dashboard-main"
       overlay={
         <>
+          <FilePreviewModal
+            open={!!preview}
+            onClose={closePreview}
+            blobUrl={preview?.blobUrl}
+            mimeType={preview?.mimeType}
+            filename={preview?.filename}
+            onDownload={downloadPreview}
+          />
           {/* Toasts */}
           <div className="ann-toast-stack">
             {toasts.map((t) => (
@@ -552,14 +551,15 @@ export default function AdminAnnouncements() {
                       <p className="ann-view-label">Attachments ({viewingAnnouncement.attachments.length})</p>
                       <div className="ann-attachment-list">
                         {viewingAnnouncement.attachments.map((att) => (
-                          <button
+                          <AttachmentChip
                             key={att.id}
-                            type="button"
                             className="ann-btn-secondary"
-                            onClick={() => openAttachment(viewingAnnouncement.id, att)}
-                          >
-                            <FileIcon /> {att.filename}
-                          </button>
+                            path={`/admin/announcements/${viewingAnnouncement.id}/attachments/${att.id}`}
+                            mimeType={att.mimeType}
+                            filename={att.filename}
+                            icon={<FileIcon />}
+                            onOpen={() => openAttachment(viewingAnnouncement.id, att)}
+                          />
                         ))}
                       </div>
                     </div>
@@ -623,13 +623,14 @@ export default function AdminAnnouncements() {
                     <div className="ann-attachment-list">
                       {editExistingAttachments.map((att) => (
                         <div key={att.id} className="ann-attachment-chip">
-                          <button
-                            type="button"
+                          <AttachmentChip
                             className="ann-attachment-filename"
-                            onClick={() => openAttachment(editingAnnouncement.id, att)}
-                          >
-                            <FileIcon /> {att.filename}
-                          </button>
+                            path={`/admin/announcements/${editingAnnouncement.id}/attachments/${att.id}`}
+                            mimeType={att.mimeType}
+                            filename={att.filename}
+                            icon={<FileIcon />}
+                            onOpen={() => openAttachment(editingAnnouncement.id, att)}
+                          />
                           <button
                             type="button"
                             className="ann-attachment-remove"

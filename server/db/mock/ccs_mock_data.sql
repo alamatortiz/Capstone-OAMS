@@ -97,14 +97,19 @@ INSERT INTO locations (location_id, department_id, location_name) VALUES
 
 -- ─────────────────────────────────────────────────────────────
 -- SECTION 1 · USERS (parent table)
--- Insert order: admin → faculty → students (respects no cross-deps)
+-- Insert order: superadmin → admin → faculty → students (respects no cross-deps)
 -- ─────────────────────────────────────────────────────────────
 
--- 1a. Administrator (1)
+-- 1a. Superadmin (1) -- system-wide, not tied to any department.
+--     login: superadmin.oams@pnc.edu.ph / password123
+INSERT INTO users (user_id, password, role, status) VALUES
+(100, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'superadmin', 'active');
+
+-- 1b. Administrator (1)
 INSERT INTO users (user_id, password, role, status) VALUES
 (103, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'admin', 'active');
 
--- 1b. Faculty (5): all named
+-- 1c. Faculty (5): all named
 INSERT INTO users (user_id, password, role, status) VALUES
 (102, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active'),
 (106, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active'),
@@ -112,7 +117,7 @@ INSERT INTO users (user_id, password, role, status) VALUES
 (110, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active'),
 (111, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'faculty', 'active');
 
--- 1c. Students (100): 5 named + 95 generated
+-- 1d. Students (100): 5 named + 95 generated
 INSERT INTO users (user_id, password, role, status) VALUES
 -- Named students
 (101, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active'),
@@ -216,6 +221,13 @@ INSERT INTO users (user_id, password, role, status) VALUES
 (292, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active'),
 (293, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active'),
 (294, '$2b$10$GMNxFjm2.l.Z/FF5bycqt.0M4NhO729ylMoq5h9zM9bSQtxq0R3bK', 'student', 'active');
+
+
+-- ─────────────────────────────────────────────────────────────
+-- SECTION 1e · SUPERADMIN (child profile)
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO superadmins (superadmin_id, employee_id, first_name, last_name, email) VALUES
+(100, 'SA-2026-001', 'Super', 'Admin', 'superadmin.oams@pnc.edu.ph');
 
 
 -- ─────────────────────────────────────────────────────────────
