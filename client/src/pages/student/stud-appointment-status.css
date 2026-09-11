@@ -877,3 +877,93 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+/* ─── Shared comment card ─────────────────────────────────────────────────── */
+/* Edit sits right next to the "Comment" title (not pushed to the card's far
+   edge the way .apst-card-header's default space-between does for other
+   cards' title+badge pairs). */
+.apst-comment-header {
+  justify-content: flex-start;
+  gap: 0.6rem;
+}
+
+.apst-comment-edit-link {
+  background: none;
+  border: none;
+  color: #a855f7;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+[data-theme="light"] .apst-comment-edit-link { color: #9333ea; }
+
+.apst-comment-text { white-space: pre-wrap; }
+
+/* Deliberately much smaller/quieter than .apst-comment-text above (which
+   inherits .apst-detail-value's larger size) so the message itself is what
+   catches the eye, not the "last updated" byline. */
+.apst-comment-meta {
+  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--text-tertiary);
+  opacity: 0.85;
+}
+
+.apst-comment-empty {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.apst-comment-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.apst-comment-textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: var(--input-background, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+}
+
+.apst-comment-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.apst-comment-cancel-btn,
+.apst-comment-save-btn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.apst-comment-cancel-btn {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.apst-comment-save-btn {
+  background: linear-gradient(135deg, #a855f7, #9333ea);
+  color: #fff;
+  border-color: transparent;
+}
+
+.apst-comment-save-btn:disabled,
+.apst-comment-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

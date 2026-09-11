@@ -535,7 +535,13 @@ html, body {
   border-radius: 0.875rem;
   padding: 0.9rem;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  /* Meta column is a fixed width, not `auto` -- an `auto` track sizes to its
+     widest child's max-content width, so adding the (wider) certificate
+     button below the date/time would have widened this column and stolen
+     space from the middle column, visibly shifting the title/badges left.
+     Fixed width + the button wrapping onto its own lines (see .txn-cert-btn)
+     keeps this column's width constant whether or not that button renders. */
+  grid-template-columns: auto 1fr 7.5rem;
   gap: 0.75rem;
   align-items: start;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -827,12 +833,18 @@ html, body {
   .txn-item-meta {
     grid-column: 1 / -1;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     align-self: auto;
     padding-top: 0.75rem;
     border-top: 1px solid var(--card-border);
     margin-top: 0.25rem;
+  }
+
+  .txn-cert-btn {
+    max-width: none;
+    white-space: nowrap;
   }
 
   .txn-item-date,
@@ -848,4 +860,48 @@ html, body {
 
 @media (max-width: 380px) {
   .transactions-stats-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Per-row "generate official document" button (appointment rows only) ──
+   Sits under the date/time in .txn-item-meta. Sized to fit within that
+   column's fixed width (see .txn-item's grid-template-columns) so it never
+   grows the column and shifts the title/badges -- text wraps onto 2 lines
+   instead of forcing the button (and its column) wider. */
+.txn-cert-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  max-width: 7.5rem;
+  margin-top: 0.15rem;
+  padding: 0.4rem 0.3rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.txn-cert-btn svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+}
+
+.txn-cert-btn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.txn-cert-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

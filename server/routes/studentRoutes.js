@@ -2317,6 +2317,9 @@ router.get(
            a.status,
            a.notes,
            a.rejection_reason,
+           a.shared_comment,
+           a.comment_updated_by,
+           a.comment_updated_at,
            a.created_at,
            f.faculty_id,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
@@ -2325,6 +2328,7 @@ router.get(
            COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
            COALESCE(a.window_end_snapshot,   fda.end_time)   AS window_end,
            COALESCE(a.location_snapshot,     fda.location)   AS location,
+           COALESCE(a.slot_note_snapshot,    fda.slot_note)  AS slot_note,
            s.service_name
          FROM appointments a
          JOIN faculty      f ON a.faculty_id    = f.faculty_id
@@ -2350,15 +2354,85 @@ router.get(
         windowStart: row.window_start ? formatTime12h(row.window_start) : null,
         windowEnd: row.window_end ? formatTime12h(row.window_end) : null,
         location: row.location ?? "TBA",
+        slotNote: row.slot_note ?? null,
         purpose: row.notes ?? "",
         status: row.status,
         rejectionReason: row.rejection_reason ?? null,
+        sharedComment: row.shared_comment ?? null,
+        commentUpdatedBy: row.comment_updated_by ?? null,
+        commentUpdatedAt: row.comment_updated_at ?? null,
         createdAt: row.created_at ? getManilaDateString(row.created_at) : null,
       }));
 
       res.json({ appointments: formatted });
     } catch (error) {
       sendServerError(res, error, "Fetch appointments error");
+    }
+  },
+);
+
+// PATCH /api/student/appointments/:appointmentId/comment
+// Writes/overwrites the one shared comment field on an appointment -- read
+// and editable by both the student and the professor (see the mirrored
+// PATCH /professor/appointments/:id/comment). Only while the appointment is
+// still pending/approved -- a terminal appointment (completed/rejected/
+// cancelled) is a closed record, same guard used elsewhere for terminal-state
+// edits.
+router.patch(
+  "/appointments/:appointmentId/comment",
+  authenticateToken,
+  authorizeRoles("student"),
+  async (req, res) => {
+    const studentId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    const { comment } = req.body;
+
+    if (!appointmentId || isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+    if (typeof comment !== "string") {
+      return res.status(400).json({ error: "comment must be a string" });
+    }
+    const trimmed = comment.trim().slice(0, 2000);
+
+    try {
+      const [[appt]] = await pool.query(
+        `SELECT appointment_id, student_id, faculty_id, status, appointment_date
+         FROM appointments WHERE appointment_id = ?`,
+        [appointmentId],
+      );
+      if (!appt || appt.student_id !== studentId) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (!["pending", "approved"].includes(appt.status)) {
+        return res.status(409).json({
+          error: "Comments can no longer be edited on this appointment",
+        });
+      }
+
+      await pool.query(
+        `UPDATE appointments
+         SET shared_comment = ?, comment_updated_by = 'student', comment_updated_at = NOW()
+         WHERE appointment_id = ?`,
+        [trimmed || null, appointmentId],
+      );
+
+      emitToUser(appt.faculty_id, "appointment:comment-updated", {
+        appointmentId,
+      });
+      createNotification(
+        appt.faculty_id,
+        `The student left a comment on the appointment for ${getManilaDateString(appt.appointment_date)}.`,
+        "appointment",
+      );
+
+      res.json({
+        message: "Comment saved",
+        sharedComment: trimmed || null,
+        commentUpdatedBy: "student",
+      });
+    } catch (error) {
+      sendServerError(res, error, "PATCH /appointments/:id/comment error");
     }
   },
 );
@@ -2938,7 +3012,7 @@ router.get(
       let tmplQuery = `
         SELECT
           fa.availability_id, fa.faculty_id, fa.day_of_week,
-          fa.start_time, fa.end_time, fa.location, fa.max_students,
+          fa.start_time, fa.end_time, fa.location, fa.slot_note, fa.max_students,
           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
           f.specialization, f.availability_status,
           d.department_abbreviation AS college,
@@ -3046,6 +3120,7 @@ router.get(
             windowStart: String(t.start_time).slice(0, 5),
             windowEnd: String(t.end_time).slice(0, 5),
             location: t.location ?? "TBA",
+            slotNote: t.slot_note ?? null,
             maxStudents: t.max_students,
             totalBooked,
             spotsLeft,
@@ -3105,7 +3180,7 @@ router.post(
 
       // Lock the recurring template row to prevent race conditions
       const [[slot]] = await conn.query(
-        `SELECT availability_id, faculty_id, day_of_week, start_time, end_time, location, max_students
+        `SELECT availability_id, faculty_id, day_of_week, start_time, end_time, location, slot_note, max_students
          FROM faculty_availability
          WHERE availability_id = ?
          FOR UPDATE`,
@@ -3237,9 +3312,9 @@ router.post(
       const [result] = await conn.query(
         `INSERT INTO appointments
            (student_id, faculty_id, department_id, service_id, availability_id,
-            location_snapshot, window_start_snapshot, window_end_snapshot,
+            location_snapshot, slot_note_snapshot, window_start_snapshot, window_end_snapshot,
             appointment_date, appointment_time, status, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
         [
           studentId,
           slot.faculty_id,
@@ -3247,6 +3322,7 @@ router.post(
           chosenServiceId,
           availabilityId,
           slot.location,
+          slot.slot_note,
           slot.start_time,
           slot.end_time,
           appointmentDate,
@@ -3318,7 +3394,7 @@ router.post(
           `SELECT
              a.appointment_id, a.appointment_date, a.status, a.notes,
              a.window_start_snapshot AS window_start, a.window_end_snapshot AS window_end,
-             a.location_snapshot AS location,
+             a.location_snapshot AS location, a.slot_note_snapshot AS slot_note,
              CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
              f.specialization AS faculty_role,
              d.department_name AS college
@@ -3349,6 +3425,7 @@ router.post(
               windowStart: formatTime12h(newRow.window_start),
               windowEnd: formatTime12h(newRow.window_end),
               location: newRow.location ?? "TBA",
+              slotNote: newRow.slot_note ?? null,
               purpose: newRow.notes ?? "",
               status: newRow.status,
             }

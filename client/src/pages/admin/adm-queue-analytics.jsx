@@ -10,6 +10,8 @@ import api from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import { getManilaDateString } from "../../utils/dateTime";
+import ExportMenu from "../../components/ExportMenu";
+import { exportTransactionsPdf } from "../../utils/exportPdf";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const BarChartIcon = () => (
@@ -53,13 +55,6 @@ const ClockIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-const DownloadIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 const ChevronDownIcon = ({ className = "" }) => (
@@ -142,16 +137,26 @@ export default function AdminQueueAnalytics() {
     if (/^[=+\-@]/.test(str)) str = `'${str}`;
     return `"${str.replace(/"/g, '""')}"`;
   };
-  const handleExport = () => {
-    const header = ["Service", "Students Served", "Overtime Queues", "No-Shows", "Avg Wait (min)"];
-    const rows = byService.map((r) => [
-      r.service,
-      r.studentsServed,
-      r.overtimeQueues,
-      r.noShows,
-      r.avgWaitMinutes,
-    ]);
-    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+  const exportHeader = ["Service", "Students Served", "Overtime Queues", "No-Shows", "Avg Wait (min)"];
+  const exportRows = byService.map((r) => [
+    r.service,
+    r.studentsServed,
+    r.overtimeQueues,
+    r.noShows,
+    r.avgWaitMinutes,
+  ]);
+  const summaryRows = [
+    ["Accomplished Queues", totals.accomplishedQueues],
+    ["Overtime Queues", totals.overtimeQueues],
+    ["Students Served", totals.studentsServed],
+    ["No-Shows", totals.noShows],
+    ["Peak Hour", totals.peakHour],
+  ];
+
+  const handleExportCsv = () => {
+    const csv = [...summaryRows, [], exportHeader, ...exportRows]
+      .map((row) => row.map(csvEscape).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -159,6 +164,18 @@ export default function AdminQueueAnalytics() {
     link.download = `queue-analytics-${range}-${getManilaDateString()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    toast.success("Export complete");
+  };
+
+  const handleExportPdf = () => {
+    exportTransactionsPdf({
+      title: "Queue Analytics Report",
+      subtitle: `${user.college} (${user.departmentAbbrev}) — ${rangeLabel} — Generated ${getManilaDateString()}`,
+      columns: exportHeader,
+      rows: exportRows,
+      filename: `queue-analytics-${range}-${getManilaDateString()}.pdf`,
+      summary: summaryRows.map(([label, value]) => ({ label, value })),
+    });
     toast.success("Export complete");
   };
 
@@ -247,14 +264,12 @@ export default function AdminQueueAnalytics() {
                 {user.college} ({user.departmentAbbrev})
               </p>
             </div>
-            <button
-              className="aqa-export-btn"
-              onClick={handleExport}
+            <ExportMenu
+              triggerClassName="aqa-export-btn"
               disabled={byService.length === 0}
-            >
-              <DownloadIcon />
-              Export Report
-            </button>
+              onExportCsv={handleExportCsv}
+              onExportPdf={handleExportPdf}
+            />
           </div>
           <div className="aqa-filters-grid">
             <FilterSelect

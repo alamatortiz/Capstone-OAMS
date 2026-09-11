@@ -348,6 +348,7 @@ html, body {
 
 /* ── Individual appointment card ─────────────────────────── */
 .appt-card {
+  position: relative;
   background: var(--card);
   border: 1px solid rgba(168, 85, 247, 0.2);
   border-radius: 1rem;
@@ -408,6 +409,17 @@ html, body {
   text-align: left;
 }
 
+/* Date/Time sits directly under the name/course, tightly stacked (no gap) --
+   moved out of the header row's flex layout entirely so its position is
+   never affected by the header-actions column's height. */
+.appt-card-datetime-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.35rem;
+}
+
 .appt-card-name {
   font-size: 0.95rem;
   font-weight: 700;
@@ -451,32 +463,18 @@ html, body {
   transition: color 0.3s ease;
 }
 
-/* Appointment type pill — mirrors the student card's .apt-list-appt-type-*, sized larger */
-.appt-card-appt-type {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.appt-card-appt-type-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-}
-
+/* Appointment type pill — sits inline in the name row now (next to the
+   student-id badge) rather than its own labeled row below the header. */
 .appt-card-appt-type-value {
   display: inline-block;
-  padding: 0.3rem 0.85rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   background: rgba(168, 85, 247, 0.12);
   color: #a855f7;
   border: 1px solid rgba(168, 85, 247, 0.3);
+  white-space: nowrap;
 }
 
 [data-theme="light"] .appt-card-appt-type-value {
@@ -534,12 +532,15 @@ html, body {
 [data-theme="light"] .appt-status-badge--rejected  { background: rgba(220,38,38,0.08);  color: #991b1b; border-color: rgba(220,38,38,0.2); }
 [data-theme="light"] .appt-status-badge--cancelled { background: rgba(107,114,128,0.08);color: #374151; border-color: rgba(107,114,128,0.2); }
 
-/* ── Info grid (2-col, like dss-list-card-grid) ──────────── */
+/* Location/Note stack -- lives inside .appt-card-title-section now, right
+   under Date/Time. A plain vertical stack (not a real grid) since every
+   field here is full-width (.appt-info-field--full); kept as .appt-info-grid
+   for the shared .appt-info-field/label/value styling underneath it. */
 .appt-info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem 0.7rem;
-  margin-bottom: 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
 }
 
 .appt-info-field {
@@ -582,21 +583,9 @@ html, body {
   transition: color 0.3s ease;
 }
 
-/* ── Footer row ──────────────────────────────────────────── */
-.appt-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid rgba(168, 85, 247, 0.1);
-  flex-wrap: wrap;
-}
-
-[data-theme="light"] .appt-footer { border-top-color: rgba(147, 51, 234, 0.1); }
-
-/* Requested-at timestamp — vertical icon+text stack, mirrors prof-transactions .txn-item-meta */
+/* Requested-at timestamp -- now lives in the header's right column (see
+   .appt-card-header-actions) instead of a dedicated footer row. */
 .appt-requested-meta {
-  margin-left: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -628,52 +617,99 @@ html, body {
   flex-shrink: 0;
 }
 
-/* ── Action buttons ──────────────────────────────────────── */
-.appt-btn {
+/* ── Header actions (Requested-at + Comment) ─────────────────────────────
+   A normal flex child of .appt-card-header-row -- Purpose and the action
+   buttons moved to the left column (see .appt-info-grid/.appt-header-btn-row
+   below, now nested in .appt-card-title-section), so this right column is
+   lightweight: just Requested-at and Comment. Fixed (not max-) width --
+   Comment needs a real, predictable width to stretch into (see
+   .appt-comment-field's width: 100% below); an auto/shrink-to-fit column has
+   no stable width for a child to be "100%" of. */
+.appt-card-header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  width: 12.5rem;
+}
+
+/* Sits at the bottom of the left column (.appt-card-title-section), after
+   Location/Purpose -- left-aligned like everything else over there, not
+   right-aligned the way it was when it lived in the right column. */
+.appt-header-btn-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.appt-btn-sm {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.45rem 0.9rem;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
   border: none;
-  border-radius: 0.5rem;
-  font-size: 0.8rem;
+  border-radius: 0.4rem;
+  font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
   transition: opacity 0.2s ease, transform 0.1s ease;
 }
 
-.appt-btn:hover  { opacity: 0.88; }
-.appt-btn:active { transform: scale(0.97); }
+.appt-btn-sm:hover  { opacity: 0.88; }
+.appt-btn-sm:active { transform: scale(0.97); }
 
 /* Disabled state must override the base cursor:pointer/hover rules above --
-   otherwise a disabled button (e.g. "Mark Complete" on a future-dated
+   otherwise a disabled button (e.g. "Complete" on a future-dated
    appointment) is visually identical to an active one and clicking it just
    silently does nothing with no feedback. pointer-events stays enabled
    (not "none") so the title="..." tooltip explaining why still shows on hover. */
-.appt-btn:disabled {
+.appt-btn-sm:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.appt-btn:disabled:hover {
+.appt-btn-sm:disabled:hover {
   opacity: 0.45;
 }
 
-.appt-btn .appt-icon-sm,
-.appt-btn svg {
-  width: 0.95rem;
-  height: 0.95rem;
+.appt-btn-sm svg {
+  width: 0.8rem;
+  height: 0.8rem;
   flex-shrink: 0;
 }
 
-.appt-btn-approve  { background: #16a34a; color: #fff; }
-.appt-btn-reject   { background: #dc2626; color: #fff; }
-.appt-btn-complete { background: #2563eb; color: #fff; }
-.appt-btn-cancel {
+.appt-btn-sm-approve  { background: #16a34a; color: #fff; }
+.appt-btn-sm-reject   { background: #dc2626; color: #fff; }
+.appt-btn-sm-complete { background: #2563eb; color: #fff; }
+.appt-btn-sm-cancel {
   background: transparent;
   color: var(--text-primary);
   border: 1px solid var(--card-border);
+}
+
+/* Date/Time pill styling -- used inside .appt-card-datetime-row, right
+   under the name/course (Location moved to its own labeled field below,
+   same pattern as Note/Purpose/Comment). */
+.appt-quick-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #a855f7;
+  transition: color 0.3s ease;
+}
+
+[data-theme="light"] .appt-quick-meta-item { color: #9333ea; }
+
+.appt-quick-meta-item svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+  stroke: currentColor;
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
@@ -683,17 +719,6 @@ html, body {
 
 @media (max-width: 640px) {
   .appt-page-content { padding: 1rem; gap: 1rem; }
-}
-
-@media (max-width: 768px) {
-  .appt-info-grid { grid-template-columns: 1fr 1fr; }
-
-  .appt-requested-meta {
-    width: 100%;
-    margin-left: 0;
-    margin-top: 0.25rem;
-    align-items: flex-start;
-  }
 }
 
 @media (max-width: 480px) {
@@ -712,8 +737,140 @@ html, body {
   }
 
   .appt-card-name { font-size: 0.9rem; }
+
+  .appt-card-header-actions { max-width: 6.5rem; }
+
+  .appt-requested-label,
+  .appt-requested-date,
+  .appt-requested-time { font-size: 0.62rem; }
+
+  .appt-header-btn-row { flex-wrap: wrap; }
+
+  .appt-btn-sm { padding: 0.25rem 0.4rem; font-size: 0.62rem; }
 }
 
-@media (max-width: 380px) {
-  .appt-info-grid { grid-template-columns: 1fr; }
+
+/* ─── Shared comment field ─────────────────────────────────────────────────── */
+/* Lives inside .appt-card-header-actions now (below the action buttons),
+   not the main body -- width: 100% stretches it to that column's fixed
+   width despite the parent's align-items: flex-end (which otherwise
+   shrink-wraps every child to its own content). */
+.appt-comment-field {
+  width: 100%;
+  margin-top: 0.15rem;
+  text-align: right;
+}
+
+/* Edit sits right next to the "Comment" label, and the pair is pushed to
+   the column's right edge (flex-end) so it lines up with Requested/Purpose/
+   the buttons above it instead of starting at this box's own left edge,
+   which would otherwise land in the middle of the card. */
+.appt-comment-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+/* Matches .appt-info-field label exactly (Location/Purpose's label style)
+   -- this bare <label> has no styling of its own otherwise, since it isn't
+   a descendant of .appt-info-field. */
+.appt-comment-field-header label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.appt-comment-edit-link {
+  background: none;
+  border: none;
+  color: #a855f7;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+[data-theme="light"] .appt-comment-edit-link { color: #9333ea; }
+
+.appt-comment-empty {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* Matches .appt-info-field p's size/weight/color exactly (Location/Purpose's
+   style) for consistency -- set explicitly rather than inheriting it, since
+   this element isn't a descendant of .appt-info-field. */
+.appt-comment-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #a855f7;
+  margin: 0;
+  line-height: 1.3;
+}
+
+[data-theme="light"] .appt-comment-text { color: #9333ea; }
+
+.appt-comment-meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.68rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text-tertiary);
+  opacity: 0.85;
+}
+
+.appt-comment-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.appt-comment-textarea {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: var(--input-background, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.appt-comment-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.appt-comment-cancel-btn,
+.appt-comment-save-btn {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.appt-comment-cancel-btn {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.appt-comment-save-btn {
+  background: linear-gradient(135deg, #a855f7, #9333ea);
+  color: #fff;
+  border-color: transparent;
+}
+
+.appt-comment-save-btn:disabled,
+.appt-comment-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

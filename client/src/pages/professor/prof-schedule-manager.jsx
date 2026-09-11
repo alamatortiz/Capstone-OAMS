@@ -51,6 +51,26 @@ const PRESET_APPT_TYPES = [
   "Grade Consultation",
 ];
 
+// Renders a slot note as plain text, but turns a bare URL (e.g. a pasted
+// Google Meet link) into a clickable link -- the field itself is just free
+// text, no markdown/rich-text support.
+const URL_RE = /^(https?:\/\/\S+)$/i;
+function SlotNoteLine({ note, className }) {
+  if (!note) return null;
+  const isLink = URL_RE.test(note.trim());
+  return (
+    <p className={className}>
+      {isLink ? (
+        <a href={note.trim()} target="_blank" rel="noopener noreferrer">
+          {note.trim()}
+        </a>
+      ) : (
+        note
+      )}
+    </p>
+  );
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmt12(t) {
   if (!t) return "";
@@ -229,6 +249,7 @@ export default function ProfessorScheduleManager() {
   const [endCustom, setEndCustom] = useState(false); // End Time picked via "Custom time…" (free time input)
   const [addLocation, setAddLocation] = useState("");
   const [showOtherLocation, setShowOtherLocation] = useState(false);
+  const [addSlotNote, setAddSlotNote] = useState(""); // optional, e.g. a Google Meet link
   const [addMaxStudents, setAddMaxStudents] = useState("");
   const [editingCurrentMaxBooked, setEditingCurrentMaxBooked] = useState(0); // students already booked (future dates) for the slot being edited
   const [addApptTypes, setAddApptTypes] = useState([]);   // string[]
@@ -281,6 +302,7 @@ export default function ProfessorScheduleManager() {
     setEndCustom(false);
     setAddLocation("");
     setShowOtherLocation(false);
+    setAddSlotNote("");
     setAddMaxStudents("");
     setAddApptTypes([]);
     setAddApptInput("");
@@ -297,6 +319,7 @@ export default function ProfessorScheduleManager() {
     setEndCustom(false);
     setAddLocation(slot.location ?? "");
     setShowOtherLocation(!!slot.location && !locations.some((loc) => loc.name === slot.location));
+    setAddSlotNote(slot.slot_note ?? "");
     setAddMaxStudents(slot.max_students != null ? String(slot.max_students) : "");
     setAddApptTypes((slot.appointmentTypes ?? []).map((t) => t.name));
     setAddApptInput("");
@@ -406,6 +429,7 @@ export default function ProfessorScheduleManager() {
           start_time: addStart,
           end_time: addEnd,
           location: addLocation.trim(),
+          slotNote: addSlotNote.trim(),
           max_students: maxStu,
           appointmentTypes: addApptTypes,
         });
@@ -421,6 +445,7 @@ export default function ProfessorScheduleManager() {
               start_time: addStart,
               end_time: addEnd,
               location: addLocation.trim(),
+              slotNote: addSlotNote.trim(),
               max_students: maxStu,
               appointmentTypes: addApptTypes,
             })
@@ -574,6 +599,7 @@ export default function ProfessorScheduleManager() {
                                   <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
                                 </div>
                                 <span className="sa-slot-count">{s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}</span>
+                                <SlotNoteLine note={s.slot_note} className="sa-slot-note" />
                               </div>
                               <div className="sa-slot-actions">
                                 <button className="sa-edit-btn" onClick={() => openEditSlot(s, selectedDay)} title="Edit slot" aria-label="Edit slot">
@@ -652,6 +678,7 @@ export default function ProfessorScheduleManager() {
                               <span className="sa-mini-slot-count">
                                 {s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}
                               </span>
+                              <SlotNoteLine note={s.slot_note} className="sa-mini-slot-note" />
                             </div>
                           ))}
                         </div>
@@ -787,6 +814,19 @@ export default function ProfessorScheduleManager() {
                     disabled={modalLocked}
                   />
                 )}
+              </div>
+              <div className="sa-form-group">
+                <label>Note <span style={{ fontWeight: 400, color: "var(--text-tertiary)", fontSize: "0.78rem" }}>(optional)</span></label>
+                <input
+                  className="sa-input"
+                  type="text"
+                  placeholder="e.g. a Google Meet link, room change, or reminder for students"
+                  value={addSlotNote}
+                  maxLength={500}
+                  onChange={(e) => setAddSlotNote(e.target.value)}
+                  disabled={modalLocked}
+                />
+                <p className="sa-field-hint">Shown to students on this slot. Doesn't send a notification.</p>
               </div>
               <div className="sa-form-group">
                 <label>Max Students *</label>

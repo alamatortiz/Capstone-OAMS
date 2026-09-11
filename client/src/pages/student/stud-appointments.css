@@ -589,6 +589,9 @@ body {
 .slot-detail .appointment-icon { width: 1.1rem; height: 1.1rem; color: #a855f7; flex-shrink: 0; background: none; border: none; border-radius: 0; }
 .slot-detail .appointment-icon:hover { background: none; border-color: transparent; }
 
+.slot-note-line { font-size: 0.82rem; color: var(--text-tertiary); word-break: break-word; transition: color 0.3s ease; }
+.slot-note-line a { color: #a855f7; text-decoration: underline; }
+
 .book-btn {
   background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
   color: white;

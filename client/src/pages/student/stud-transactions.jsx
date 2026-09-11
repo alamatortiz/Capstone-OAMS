@@ -216,7 +216,11 @@ export default function TransactionsPage() {
   // formats share this one fetch so a future column change only has to be
   // made once. ──────────────────────────────────────────────────────────
   const header = ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
-  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const csvEscape = (value) => {
+    const str = String(value ?? "");
+    const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
 
   const fetchExportRows = async () => {
     const res = await api.get("/student/transactions", {
@@ -233,11 +237,18 @@ export default function TransactionsPage() {
     ]);
   };
 
+  const summaryRows = [
+    ["Total", txStats.total],
+    ["Completed", txStats.completed],
+    ["Ongoing", txStats.ongoing],
+    ["This Month", txStats.thisMonth],
+  ];
+
   const handleExportCsv = async () => {
     setIsExporting(true);
     try {
       const rows = await fetchExportRows();
-      const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+      const csv = [...summaryRows, [], header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -263,6 +274,7 @@ export default function TransactionsPage() {
         columns: header,
         rows,
         filename: `transactions-${getManilaDateString()}.pdf`,
+        summary: summaryRows.map(([label, value]) => ({ label, value })),
       });
     } catch (err) {
       console.error("Failed to export transactions:", err);

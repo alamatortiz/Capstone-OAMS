@@ -368,6 +368,10 @@ CREATE TABLE faculty_availability (
     start_time       TIME NOT NULL,
     end_time         TIME NOT NULL,
     location         VARCHAR(150),
+    -- Optional free-text note a professor can attach to this slot (e.g. a
+    -- Google Meet link, a room change, a reminder). Purely informational --
+    -- never fires a notification, unlike everything else on this row.
+    slot_note        VARCHAR(500) NULL,
     max_students     INT NULL,    -- NULL = indefinite (no cap on bookings)
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
@@ -395,6 +399,7 @@ CREATE TABLE appointments (
     service_id          INT          NULL,   -- FK to appointment_services (the chosen appointment type)
     availability_id     INT          NULL,   -- FK to faculty_availability; the recurring template this was booked against
     location_snapshot     VARCHAR(150) NULL, -- location captured at booking time, immune to the template being edited/deleted later
+    slot_note_snapshot    VARCHAR(500) NULL, -- faculty_availability.slot_note captured at booking time (same reason)
     window_start_snapshot TIME         NULL, -- consultation window captured at booking time (same reason)
     window_end_snapshot   TIME         NULL,
     appointment_date    DATE         NOT NULL,
@@ -413,6 +418,14 @@ CREATE TABLE appointments (
     -- this column has no such dual-purpose precedent).
     rejection_reason    TEXT         NULL,
     notes               TEXT,
+    -- One shared, overwritable comment either the student or the professor
+    -- can read/edit (e.g. a quick back-and-forth note) -- distinct from
+    -- `notes` above (student's one-time booking purpose) and from
+    -- `rejection_reason`. comment_updated_by/_at drive a "last updated by
+    -- ..." UI line since a single shared field has no author otherwise.
+    shared_comment       TEXT         NULL,
+    comment_updated_by   ENUM('student','faculty') NULL,
+    comment_updated_at   TIMESTAMP    NULL DEFAULT NULL,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     -- Auto-touched on any change to this row. Lets the transactions feeds
     -- sort by "most recently modified" -- appointments otherwise have no

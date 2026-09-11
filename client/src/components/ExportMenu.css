@@ -31,7 +31,7 @@
   z-index: 20;
   min-width: 11rem;
   background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--card-border, #e5e7eb);
   border-radius: 0.6rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: 0.35rem;
@@ -52,5 +52,5 @@
 }
 
 .export-menu-item:hover {
-  background: var(--hover-bg, #f3f4f6);
+  background: rgba(34, 197, 94, 0.12);
 }

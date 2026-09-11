@@ -388,10 +388,28 @@ export default function AdminTransaction() {
   const exportRows = filteredTransactions.map((t) => [
     t.type, t.action, t.details, t.status, t.collegeAbbrev, t.studentName, t.studentId, t.processor, t.trackingNumber, t.timestamp,
   ]);
-  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  // Prefixes a leading =/+/-/@ with a straight quote so a formula-looking
+  // cell (e.g. a details string starting with "=") can't execute as one when
+  // the CSV is opened in Excel/Sheets -- matches the guard already used in
+  // adm-queue-analytics.jsx's own csvEscape, just missing here until now.
+  const csvEscape = (value) => {
+    const str = String(value ?? "");
+    const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+
+  const summaryRows = [
+    ["Total Transactions", stats.total],
+    ["Queue", stats.queue],
+    ["Appointments", stats.appointments],
+    ["Documents", stats.documents],
+    ["Admin Actions", stats.adminActions],
+  ];
 
   const handleExportCsv = () => {
-    const csv = [exportHeader, ...exportRows].map((row) => row.map(csvEscape).join(",")).join("\n");
+    const csv = [...summaryRows, [], exportHeader, ...exportRows]
+      .map((row) => row.map(csvEscape).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -408,8 +426,14 @@ export default function AdminTransaction() {
       columns: exportHeader,
       rows: exportRows,
       filename: `transactions-${getManilaDateString()}.pdf`,
+      summary: summaryRows.map(([label, value]) => ({ label, value })),
     });
   };
+
+  // Official single-record certificate generation lives on the professor's
+  // own Transactions page (prof-transactions.jsx) instead -- it's the
+  // faculty member's own appointment, and the button didn't fit this page's
+  // per-row layout (see prof-transactions.jsx for the working version).
 
   return (
     <AdminPageShell

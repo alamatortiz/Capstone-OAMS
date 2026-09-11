@@ -108,6 +108,85 @@ const CONFIRM_META = {
   }),
 };
 
+const NOTE_URL_RE = /^(https?:\/\/\S+)$/i;
+
+// One shared, overwritable comment either party can read/edit -- see the
+// mirrored card in stud-appointment-status.jsx. Only editable while the
+// appointment is still pending/approved (server-enforced too).
+function CommentBlock({ appointment, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(appointment.sharedComment ?? "");
+  const [saving, setSaving] = useState(false);
+  const canEdit =
+    appointment.status === "pending" || appointment.status === "approved";
+
+  const startEdit = () => {
+    setDraft(appointment.sharedComment ?? "");
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/professor/appointments/${appointment.id}/comment`, {
+        comment: draft,
+      });
+      toast.success("Comment saved.");
+      setEditing(false);
+      onSaved?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to save comment.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="appt-comment-field">
+      <div className="appt-comment-field-header">
+        <label>Comment</label>
+        {canEdit && !editing && (
+          <button type="button" className="appt-comment-edit-link" onClick={startEdit}>
+            {appointment.sharedComment ? "Edit" : "Add a comment"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="appt-comment-edit">
+          <textarea
+            className="appt-comment-textarea"
+            value={draft}
+            maxLength={2000}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Leave a note for the student…"
+            disabled={saving}
+          />
+          <div className="appt-comment-edit-actions">
+            <button type="button" className="appt-comment-cancel-btn" onClick={() => setEditing(false)} disabled={saving}>
+              Cancel
+            </button>
+            <button type="button" className="appt-comment-save-btn" onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : appointment.sharedComment ? (
+        <>
+          <p className="appt-comment-text">{appointment.sharedComment}</p>
+          {appointment.commentUpdatedAt && (
+            <p className="appt-comment-meta">
+              Last updated by {appointment.commentUpdatedBy === "student" ? "the student" : "you"} on{" "}
+              {formatManilaDate(appointment.commentUpdatedAt, { month: "short", day: "numeric", year: "numeric" })}
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="appt-comment-empty">No comment yet.</p>
+      )}
+    </div>
+  );
+}
+
 // ── AppointmentCard ────────────────────────────────────────────────────────────
 function AppointmentCard({
   appointment,
@@ -115,6 +194,7 @@ function AppointmentCard({
   onReject,
   onComplete,
   onCancel,
+  onCommentSaved,
 }) {
   const dateStr = (() => {
     try {
@@ -133,7 +213,12 @@ function AppointmentCard({
 
   return (
     <div className="appt-card">
-      {/* Header: icon + student name/purpose + badge */}
+      {/* Header: icon + name/type/status, then Date/Time, Location, Purpose,
+          and the action buttons all stacked on the left -- Purpose and the
+          buttons sit at the BOTTOM of that stack deliberately, so a
+          professor's eye crosses the purpose before reaching Approve/Reject
+          instead of the buttons being one of the first things seen. The
+          right column stays lightweight: just Requested-at and Comment. */}
       <div className="appt-card-header-row">
         <div className="appt-card-icon-wrap">
           <Calendar style={{ width: "1.5rem", height: "1.5rem" }} />
@@ -146,111 +231,119 @@ function AppointmentCard({
                 {appointment.studentId}
               </span>
             )}
+            {appointment.appointmentType && (
+              <span className="appt-card-appt-type-value">
+                {appointment.appointmentType}
+              </span>
+            )}
+            <span
+              className={`appt-status-badge appt-status-badge--${appointment.status}`}
+            >
+              {statusLabel}
+            </span>
           </div>
           {appointment.course && (
             <p className="appt-card-sub">{appointment.course}</p>
           )}
-        </div>
-        <span
-          className={`appt-status-badge appt-status-badge--${appointment.status}`}
-        >
-          {statusLabel}
-        </span>
-      </div>
-
-      {appointment.appointmentType && (
-        <div className="appt-card-appt-type">
-          <span className="appt-card-appt-type-label">Type:</span>
-          <span className="appt-card-appt-type-value">
-            {appointment.appointmentType}
-          </span>
-        </div>
-      )}
-
-      {/* Info grid */}
-      <div className="appt-info-grid">
-        <div className="appt-info-field">
-          <label>Date</label>
-          <p>{dateStr}</p>
-        </div>
-        <div className="appt-info-field">
-          <label>Time</label>
-          <p>{appointment.time}</p>
-        </div>
-        <div className="appt-info-field appt-info-field--full">
-          <label>Location</label>
-          <p>{appointment.location}</p>
-        </div>
-        {appointment.purpose && (
-          <div className="appt-info-field appt-info-field--full">
-            <label>Purpose</label>
-            <p className="appt-notes-text">{appointment.purpose}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="appt-footer">
-        {appointment.status === "pending" && (
-          <>
-            <button
-              className="appt-btn appt-btn-approve"
-              onClick={() => onApprove(appointment.id)}
-            >
-              <CheckCircle2Icon /> Approve
-            </button>
-            <button
-              className="appt-btn appt-btn-reject"
-              onClick={() => onReject(appointment.id)}
-            >
-              <XCircleIcon /> Reject
-            </button>
-          </>
-        )}
-        {appointment.status === "approved" && (
-          <>
-            <button
-              className="appt-btn appt-btn-complete"
-              onClick={() => onComplete(appointment.id)}
-              disabled={isFutureDate}
-              title={
-                isFutureDate
-                  ? "This appointment hasn't happened yet"
-                  : undefined
-              }
-            >
-              <CheckCircle2Icon /> Mark Complete
-            </button>
-            <button
-              className="appt-btn appt-btn-cancel"
-              onClick={() => onCancel(appointment.id)}
-            >
-              Cancel
-            </button>
-          </>
-        )}
-        <div className="appt-requested-meta">
-          <span className="appt-requested-label">Requested</span>
-          {appointment.requestedAtRaw ? (
-            <>
-              <span className="appt-requested-date">
-                <Calendar />
-                {formatManilaDate(appointment.requestedAtRaw, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-              <span className="appt-requested-time">
-                <Clock />
-                {formatManilaTime(appointment.requestedAtRaw)}
-              </span>
-            </>
-          ) : (
-            <span className="appt-requested-date">
-              {appointment.requestedAt}
+          <div className="appt-card-datetime-row">
+            <span className="appt-quick-meta-item">
+              <Calendar /> {dateStr}
             </span>
+            <span className="appt-quick-meta-item">
+              <Clock /> {appointment.time}
+            </span>
+          </div>
+          {/* Location, Purpose (and Note, when present), then the action
+              buttons at the very bottom of the left column. */}
+          <div className="appt-info-grid">
+            <div className="appt-info-field appt-info-field--full">
+              <label>Location</label>
+              <p>{appointment.location}</p>
+            </div>
+            {appointment.slotNote && (
+              <div className="appt-info-field appt-info-field--full">
+                <label>Note</label>
+                <p className="appt-notes-text">
+                  {NOTE_URL_RE.test(appointment.slotNote.trim()) ? (
+                    <a href={appointment.slotNote.trim()} target="_blank" rel="noopener noreferrer">
+                      {appointment.slotNote.trim()}
+                    </a>
+                  ) : (
+                    appointment.slotNote
+                  )}
+                </p>
+              </div>
+            )}
+            {appointment.purpose && (
+              <div className="appt-info-field appt-info-field--full">
+                <label>Purpose</label>
+                <p>{appointment.purpose}</p>
+              </div>
+            )}
+          </div>
+          {appointment.status === "pending" && (
+            <div className="appt-header-btn-row">
+              <button
+                className="appt-btn-sm appt-btn-sm-approve"
+                onClick={() => onApprove(appointment.id)}
+                title="Approve"
+              >
+                <CheckCircle2Icon /> Approve
+              </button>
+              <button
+                className="appt-btn-sm appt-btn-sm-reject"
+                onClick={() => onReject(appointment.id)}
+                title="Reject"
+              >
+                <XCircleIcon /> Reject
+              </button>
+            </div>
           )}
+          {appointment.status === "approved" && (
+            <div className="appt-header-btn-row">
+              <button
+                className="appt-btn-sm appt-btn-sm-complete"
+                onClick={() => onComplete(appointment.id)}
+                disabled={isFutureDate}
+                title={isFutureDate ? "This appointment hasn't happened yet" : "Mark Complete"}
+              >
+                <CheckCircle2Icon /> Complete
+              </button>
+              <button
+                className="appt-btn-sm appt-btn-sm-cancel"
+                onClick={() => onCancel(appointment.id)}
+                title="Cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="appt-card-header-actions">
+          <div className="appt-requested-meta">
+            <span className="appt-requested-label">Requested</span>
+            {appointment.requestedAtRaw ? (
+              <>
+                <span className="appt-requested-date">
+                  <Calendar />
+                  {formatManilaDate(appointment.requestedAtRaw, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+                <span className="appt-requested-time">
+                  <Clock />
+                  {formatManilaTime(appointment.requestedAtRaw)}
+                </span>
+              </>
+            ) : (
+              <span className="appt-requested-date">{appointment.requestedAt}</span>
+            )}
+          </div>
+          {/* Comment -- font/weight untouched from before, only its position
+              moved: this right column now only carries Requested-at + Comment. */}
+          <CommentBlock appointment={appointment} onSaved={onCommentSaved} />
         </div>
       </div>
     </div>
@@ -582,6 +675,7 @@ export default function ProfessorAppointmentsPage() {
                 onReject={handleReject}
                 onComplete={handleComplete}
                 onCancel={handleCancel}
+                onCommentSaved={fetchAppointments}
               />
             ))
           )}

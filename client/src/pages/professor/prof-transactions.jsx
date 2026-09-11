@@ -11,6 +11,7 @@ import "./prof-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
+import { exportAppointmentCertificate } from "../../utils/exportCertificate";
 import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
 
@@ -204,20 +205,37 @@ export default function ProfessorTransactionsPage() {
 
   // Exports exactly what's currently on screen (the server-filtered list
   // already held in state) — no new backend endpoint needed.
-  const exportHeader = ["Type", "Title", "Details", "Status", "Student/Tracking", "Date", "Time"];
+  const exportHeader = ["Type", "Title", "Details", "Status", "Student Name", "Student ID", "Tracking #", "Date", "Time"];
   const exportRows = filtered.map((t) => [
     typeLabel(t.type),
     t.title,
     t.details,
     statusLabel(t.status),
-    t.type === "document" || t.type === "submission" ? t.trackingNumber : `${t.studentName ?? ""} (${t.studentId ?? ""})`,
+    t.studentName ?? "",
+    t.studentId ?? "",
+    (t.type === "document" || t.type === "submission") ? (t.trackingNumber ?? "") : "",
     t.dateLabel,
     t.timeLabel,
   ]);
-  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  // Prefixes a leading =/+/-/@ so a cell can't execute as a formula when the
+  // CSV is opened in Excel/Sheets (matches the guard in adm-transactions.jsx).
+  const csvEscape = (value) => {
+    const str = String(value ?? "");
+    const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+
+  const summaryRows = [
+    ["Total", txStats.total],
+    ["Completed", txStats.completed],
+    ["Ongoing", txStats.ongoing],
+    ["This Month", txStats.thisMonth],
+  ];
 
   const handleExportCsv = () => {
-    const csv = [exportHeader, ...exportRows].map((row) => row.map(csvEscape).join(",")).join("\n");
+    const csv = [...summaryRows, [], exportHeader, ...exportRows]
+      .map((row) => row.map(csvEscape).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -234,7 +252,22 @@ export default function ProfessorTransactionsPage() {
       columns: exportHeader,
       rows: exportRows,
       filename: `transactions-${getManilaDateString()}.pdf`,
+      summary: summaryRows.map(([label, value]) => ({ label, value })),
     });
+  };
+
+  // ── Official single-record certificate (one appointment at a time) ────────
+  const [generatingCertId, setGeneratingCertId] = useState(null);
+  const handleGenerateCertificate = async (txn) => {
+    setGeneratingCertId(txn.id);
+    try {
+      const { data } = await api.get(`/professor/appointments/${txn.id}/certificate-data`);
+      await exportAppointmentCertificate(data);
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to generate the official document.");
+    } finally {
+      setGeneratingCertId(null);
+    }
   };
 
   return (
@@ -417,6 +450,18 @@ export default function ProfessorTransactionsPage() {
                       <ClockIcon />
                       {txn.timeLabel}
                     </div>
+                    {txn.type === "appointment" && (
+                      <button
+                        type="button"
+                        className="txn-cert-btn"
+                        onClick={() => handleGenerateCertificate(txn)}
+                        disabled={generatingCertId === txn.id}
+                        title="Generate a formal one-page PDF of this appointment for school submission purposes"
+                      >
+                        <FileText />
+                        {generatingCertId === txn.id ? "Generating…" : "Official Document"}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

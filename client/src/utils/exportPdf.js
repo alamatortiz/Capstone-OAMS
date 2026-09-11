@@ -7,7 +7,11 @@ import autoTable from "jspdf-autotable";
 // plain arrays -- each page already builds these same shapes for its own
 // CSV export, so the caller just passes the identical data through here too
 // instead of maintaining a second, parallel column list.
-export function exportTransactionsPdf({ title, subtitle, columns, rows, filename }) {
+// `summary` is an optional [{ label, value }] array -- when passed, it's
+// rendered as a compact "label: value" strip between the subtitle and the
+// main table (e.g. the on-screen stat cards' totals), so a report isn't just
+// a raw row dump. Omit it and this behaves exactly as before.
+export function exportTransactionsPdf({ title, subtitle, columns, rows, filename, summary }) {
   const doc = new jsPDF({ orientation: "landscape" });
 
   doc.setFontSize(16);
@@ -19,8 +23,18 @@ export function exportTransactionsPdf({ title, subtitle, columns, rows, filename
   doc.text(title, 14, 22);
   if (subtitle) doc.text(subtitle, 14, 28);
 
+  let tableStartY = subtitle ? 33 : 27;
+  if (summary && summary.length > 0) {
+    const summaryY = tableStartY + 4;
+    doc.setFontSize(9);
+    doc.setTextColor(40);
+    const summaryLine = summary.map((s) => `${s.label}: ${s.value}`).join("     ");
+    doc.text(summaryLine, 14, summaryY);
+    tableStartY = summaryY + 6;
+  }
+
   autoTable(doc, {
-    startY: subtitle ? 33 : 27,
+    startY: tableStartY,
     head: [columns],
     body: rows,
     styles: { fontSize: 8, cellPadding: 2.5, overflow: "linebreak" },

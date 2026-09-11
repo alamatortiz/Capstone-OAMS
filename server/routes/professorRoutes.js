@@ -399,11 +399,13 @@ router.get(
         SELECT
           a.appointment_id, a.appointment_date, a.appointment_time,
           a.status, a.notes, a.created_at,
+          a.shared_comment, a.comment_updated_by, a.comment_updated_at,
           s.first_name, s.last_name, s.student_number, s.course,
           svc.service_name AS appointment_type,
           COALESCE(a.window_start_snapshot, fda.start_time) AS window_start,
           COALESCE(a.window_end_snapshot,   fda.end_time)   AS window_end,
-          COALESCE(a.location_snapshot,     fda.location)   AS location
+          COALESCE(a.location_snapshot,     fda.location)   AS location,
+          COALESCE(a.slot_note_snapshot,    fda.slot_note)  AS slot_note
         FROM appointments a
         JOIN students s ON a.student_id = s.student_id
         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
@@ -433,7 +435,11 @@ router.get(
               ? `${formatTime(r.window_start)} – ${formatTime(r.window_end)}`
               : formatTime(r.appointment_time),
           location: r.location ?? "TBA",
+          slotNote: r.slot_note ?? null,
           status: r.status,
+          sharedComment: r.shared_comment ?? null,
+          commentUpdatedBy: r.comment_updated_by ?? null,
+          commentUpdatedAt: r.comment_updated_at ?? null,
           requestedAt: new Date(r.created_at).toLocaleString("en-US", {
             timeZone: "Asia/Manila",
             year: "numeric",
@@ -606,6 +612,67 @@ router.patch(
   },
 );
 
+// PATCH /api/professor/appointments/:id/comment
+// Writes/overwrites the one shared comment field on an appointment -- read
+// and editable by both the professor and the student (see the mirrored
+// PATCH /student/appointments/:appointmentId/comment). Only while the
+// appointment is still pending/approved, same guard as the student side.
+router.patch(
+  "/appointments/:id/comment",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const { id } = req.params;
+    const { comment } = req.body;
+
+    if (typeof comment !== "string") {
+      return res.status(400).json({ error: "comment must be a string" });
+    }
+    const trimmed = comment.trim().slice(0, 2000);
+
+    try {
+      const [[appt]] = await pool.query(
+        `SELECT appointment_id, student_id, faculty_id, status, appointment_date
+         FROM appointments WHERE appointment_id = ? AND faculty_id = ?`,
+        [id, facultyId],
+      );
+      if (!appt) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      if (!["pending", "approved"].includes(appt.status)) {
+        return res.status(409).json({
+          error: "Comments can no longer be edited on this appointment",
+        });
+      }
+
+      await pool.query(
+        `UPDATE appointments
+         SET shared_comment = ?, comment_updated_by = 'faculty', comment_updated_at = NOW()
+         WHERE appointment_id = ?`,
+        [trimmed || null, id],
+      );
+
+      emitToUser(appt.student_id, "appointment:comment-updated", {
+        appointmentId: Number(id),
+      });
+      createNotification(
+        appt.student_id,
+        `The professor left a comment on your appointment for ${getManilaDateString(appt.appointment_date)}.`,
+        "appointment",
+      );
+
+      res.json({
+        message: "Comment saved",
+        sharedComment: trimmed || null,
+        commentUpdatedBy: "faculty",
+      });
+    } catch (err) {
+      sendServerError(res, err, "PATCH /appointments/:id/comment error:");
+    }
+  },
+);
+
 // ─────────────────────────────────────────────────────────────
 // DOCUMENT REQUESTS (student requests in faculty's department)
 // ─────────────────────────────────────────────────────────────
@@ -724,6 +791,75 @@ router.get(
       res.json(rows);
     } catch (err) {
       sendServerError(res, err, "GET /transactions error:");
+    }
+  },
+);
+
+// GET /api/professor/appointments/:appointmentId/certificate-data
+// Same shape as admin's GET /admin/appointments/:appointmentId/certificate-data
+// (see client/src/utils/exportCertificate.js) -- lives here too so a faculty
+// member can generate the same official one-page PDF for their own
+// appointment directly from their own Transactions page. Scoped to
+// a.faculty_id = this professor, not department-wide like the admin version.
+router.get(
+  "/appointments/:appointmentId/certificate-data",
+  authenticateToken,
+  authorizeRoles("faculty"),
+  async (req, res) => {
+    const facultyId = req.user.userId;
+    const appointmentId = parseInt(req.params.appointmentId, 10);
+    if (!appointmentId || Number.isNaN(appointmentId)) {
+      return res.status(400).json({ error: "Invalid appointmentId" });
+    }
+    try {
+      const [[row]] = await pool.query(
+        `SELECT
+           a.appointment_id, a.appointment_date, a.appointment_time, a.status, a.notes,
+           COALESCE(a.window_start_snapshot, fa.start_time) AS window_start,
+           COALESCE(a.window_end_snapshot,   fa.end_time)   AS window_end,
+           COALESCE(a.location_snapshot,     fa.location)   AS location,
+           st.first_name AS student_first_name, st.last_name AS student_last_name,
+           st.student_number, st.course, st.year_level,
+           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
+           f.specialization AS faculty_role,
+           svc.service_name,
+           d.department_name, d.department_abbreviation
+         FROM appointments a
+         JOIN students st ON a.student_id = st.student_id
+         JOIN faculty f ON a.faculty_id = f.faculty_id
+         JOIN departments d ON a.department_id = d.department_id
+         LEFT JOIN faculty_availability fa ON a.availability_id = fa.availability_id
+         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
+         WHERE a.appointment_id = ? AND a.faculty_id = ?`,
+        [appointmentId, facultyId],
+      );
+      if (!row) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      res.json({
+        appointmentId: row.appointment_id,
+        studentName: `${row.student_first_name} ${row.student_last_name}`,
+        studentNumber: row.student_number,
+        course: row.course ?? null,
+        yearLevel: row.year_level ?? null,
+        facultyName: row.faculty_name,
+        facultyRole: row.faculty_role ?? "Faculty",
+        serviceName: row.service_name ?? "Consultation",
+        date:
+          row.appointment_date instanceof Date
+            ? getManilaDateString(row.appointment_date)
+            : String(row.appointment_date).split("T")[0],
+        windowStart: row.window_start ? String(row.window_start).slice(0, 5) : null,
+        windowEnd: row.window_end ? String(row.window_end).slice(0, 5) : null,
+        location: row.location ?? "TBA",
+        purpose: row.notes ?? "",
+        status: row.status,
+        departmentName: row.department_name,
+        departmentAbbrev: row.department_abbreviation,
+      });
+    } catch (error) {
+      sendServerError(res, error, "Appointment certificate-data fetch error:");
     }
   },
 );
@@ -953,7 +1089,7 @@ router.get(
 );
 
 // POST /api/professor/availability
-// Body: { day_of_week, start_time, end_time, location, max_students, appointmentTypes? }
+// Body: { day_of_week, start_time, end_time, location, slotNote?, max_students, appointmentTypes? }
 router.post(
   "/availability",
   authenticateToken,
@@ -965,6 +1101,7 @@ router.post(
       start_time,
       end_time,
       location,
+      slotNote,
       max_students,
       appointmentTypes,
     } = req.body;
@@ -1032,14 +1169,19 @@ router.post(
           message: `This time overlaps an existing slot on ${day_of_week} (${String(overlap.start_time).slice(0, 5)}–${String(overlap.end_time).slice(0, 5)})`,
         });
       }
+      const noteVal =
+        typeof slotNote === "string" && slotNote.trim()
+          ? slotNote.trim().slice(0, 500)
+          : null;
       const [result] = await conn.query(
-        "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, max_students) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO faculty_availability (faculty_id, day_of_week, start_time, end_time, location, slot_note, max_students) VALUES (?,?,?,?,?,?,?)",
         [
           facultyId,
           day_of_week,
           start_time,
           end_time,
           location ?? null,
+          noteVal,
           maxStu,
         ],
       );
@@ -1087,7 +1229,7 @@ router.post(
 );
 
 // PATCH /api/professor/availability/:id
-// Body: { day_of_week?, start_time?, end_time?, location?, max_students?, appointmentTypes? }
+// Body: { day_of_week?, start_time?, end_time?, location?, slotNote?, max_students?, appointmentTypes? }
 router.patch(
   "/availability/:id",
   authenticateToken,
@@ -1100,9 +1242,17 @@ router.patch(
       start_time,
       end_time,
       location,
+      slotNote,
       max_students,
       appointmentTypes,
     } = req.body;
+    // Matches `location`'s own COALESCE-based partial-update convention below
+    // (a `null`/omitted value leaves the existing value untouched via
+    // COALESCE, same limitation location already has).
+    const noteVal =
+      typeof slotNote === "string" && slotNote.trim()
+        ? slotNote.trim().slice(0, 500)
+        : null;
 
     if (day_of_week !== undefined && !VALID_DAYS.includes(day_of_week)) {
       return res.status(400).json({ message: "Invalid day_of_week" });
@@ -1139,7 +1289,7 @@ router.patch(
       );
 
       const [[current]] = await conn.query(
-        "SELECT day_of_week, start_time, end_time, location FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
+        "SELECT day_of_week, start_time, end_time, location, slot_note FROM faculty_availability WHERE availability_id = ? AND faculty_id = ?",
         [id, facultyId],
       );
       if (!current) {
@@ -1155,12 +1305,16 @@ router.patch(
         start_time ?? String(current.start_time).slice(0, 5);
       const effectiveEnd = end_time ?? String(current.end_time).slice(0, 5);
       const effectiveLocation = location ?? current.location;
+      const effectiveNote = noteVal ?? current.slot_note;
       // Did the student-visible window/room actually move? Used below to decide
       // whether to re-sync surviving bookings' snapshots + re-notify.
       const windowMoved =
         effectiveStart !== String(current.start_time).slice(0, 5) ||
         effectiveEnd !== String(current.end_time).slice(0, 5) ||
         (effectiveLocation ?? "") !== (current.location ?? "");
+      // Note-only edits should still refresh already-booked students' cards
+      // (silently, no notification) even when nothing else moved.
+      const noteChanged = (effectiveNote ?? "") !== (current.slot_note ?? "");
       if (effectiveEnd <= effectiveStart) {
         await conn.rollback();
         return res
@@ -1245,6 +1399,14 @@ router.patch(
           ],
         );
       }
+      // The note is purely informational (no reminder reset, no notification)
+      // so it re-syncs independently of windowMoved.
+      if (noteChanged && activeSurvivors.length > 0) {
+        await conn.query(
+          `UPDATE appointments SET slot_note_snapshot = ? WHERE appointment_id IN (?)`,
+          [effectiveNote ?? null, activeSurvivors.map((b) => b.appointment_id)],
+        );
+      }
 
       // Never let max_students drop below the number of students already
       // booked into a future date for this template -- otherwise a student
@@ -1280,6 +1442,7 @@ router.patch(
              start_time = COALESCE(?, start_time),
              end_time = COALESCE(?, end_time),
              location = COALESCE(?, location),
+             slot_note = COALESCE(?, slot_note),
              max_students = COALESCE(?, max_students)
          WHERE availability_id = ? AND faculty_id = ?`,
         [
@@ -1287,6 +1450,7 @@ router.patch(
           start_time ?? null,
           end_time ?? null,
           location ?? null,
+          noteVal,
           maxStu ?? null,
           id,
           facultyId,

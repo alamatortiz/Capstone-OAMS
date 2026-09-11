@@ -50,8 +50,84 @@ const formatDateShort = (dateStr) => {
   });
 };
 
+// A single, shared, overwritable comment either party can read/edit -- see
+// the mirrored card in prof-appointments.jsx. Only editable while the
+// appointment is still pending/approved (same guard the server enforces).
+function CommentCard({ appt, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(appt.sharedComment ?? "");
+  const [saving, setSaving] = useState(false);
+  const canEdit = appt.status === "pending" || appt.status === "approved";
+
+  const startEdit = () => {
+    setDraft(appt.sharedComment ?? "");
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/student/appointments/${appt.id}/comment`, { comment: draft });
+      toast.success("Comment saved.");
+      setEditing(false);
+      onSaved?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.error ?? "Failed to save comment.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="apst-card">
+      <div className="apst-card-header apst-comment-header">
+        <h3 className="apst-card-title">Comment</h3>
+        {canEdit && !editing && (
+          <button type="button" className="apst-comment-edit-link" onClick={startEdit}>
+            {appt.sharedComment ? "Edit" : "Add a comment"}
+          </button>
+        )}
+      </div>
+      <div className="apst-card-content">
+        {editing ? (
+          <div className="apst-comment-edit">
+            <textarea
+              className="apst-comment-textarea"
+              value={draft}
+              maxLength={2000}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Leave a note for the professor…"
+              disabled={saving}
+            />
+            <div className="apst-comment-edit-actions">
+              <button type="button" className="apst-comment-cancel-btn" onClick={() => setEditing(false)} disabled={saving}>
+                Cancel
+              </button>
+              <button type="button" className="apst-comment-save-btn" onClick={save} disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        ) : appt.sharedComment ? (
+          <>
+            <p className="apst-detail-value apst-comment-text">{appt.sharedComment}</p>
+            {appt.commentUpdatedAt && (
+              <p className="apst-comment-meta">
+                Last updated by {appt.commentUpdatedBy === "faculty" ? "the professor" : "you"} on{" "}
+                {formatDateShort(appt.commentUpdatedAt)}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="apst-comment-empty">No comment yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, backLabel = "My Appointments" }) {
+function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, onCommentSaved, backLabel = "My Appointments" }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const { label: statusLabel, cls: statusCls } = getStatusMeta(appt.status);
@@ -132,6 +208,18 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                 <p className="apst-detail-label">Location</p>
                 <p className="apst-detail-value">{appt.location}</p>
               </div>
+              {appt.slotNote && (
+                <div className="apst-detail-row">
+                  <p className="apst-detail-label">Note</p>
+                  <p className="apst-detail-value">
+                    {/^https?:\/\/\S+$/i.test(appt.slotNote.trim()) ? (
+                      <a href={appt.slotNote.trim()} target="_blank" rel="noopener noreferrer">{appt.slotNote.trim()}</a>
+                    ) : (
+                      appt.slotNote
+                    )}
+                  </p>
+                </div>
+              )}
               {appt.purpose && (
                 <div className="apst-detail-row">
                   <p className="apst-detail-label">Purpose</p>
@@ -169,6 +257,8 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
               </div>
             )}
           </div>
+
+          <CommentCard appt={appt} onSaved={onCommentSaved} />
 
           {canCancel && (
             <div className="apst-card apst-cancel-card">
@@ -410,6 +500,7 @@ export default function AppointmentStatusPage() {
             cancelling={cancelling}
             onComplete={handleComplete}
             completing={completing}
+            onCommentSaved={fetchAppointments}
           />
         ) : (
           <div className="apst-status-container">

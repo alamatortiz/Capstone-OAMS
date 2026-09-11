@@ -82,6 +82,24 @@ const Loader2Icon = () => (
   </svg>
 );
 
+// Renders a professor's optional per-slot note as plain text, turning a bare
+// URL (e.g. a pasted Google Meet link) into a clickable link.
+const NOTE_URL_RE = /^(https?:\/\/\S+)$/i;
+function NoteLine({ note }) {
+  const trimmed = note?.trim();
+  if (!trimmed) return null;
+  const isLink = NOTE_URL_RE.test(trimmed);
+  return (
+    <div className="slot-note-line">
+      {isLink ? (
+        <a href={trimmed} target="_blank" rel="noopener noreferrer">{trimmed}</a>
+      ) : (
+        trimmed
+      )}
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppointmentsPage() {
   const { user, token } = useAuth();
@@ -464,6 +482,7 @@ export default function AppointmentsPage() {
                   <div className="slot-detail"><Clock style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{formatTime(slot.windowStart)} – {formatTime(slot.windowEnd)}</span></div>
                   <div className="slot-detail"><MapPin style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.location}</span></div>
                   <div className="slot-detail"><Users style={{ width: "1rem", height: "1rem", color: "#a855f7", flexShrink: 0 }} /><span>{slot.spotsLeft != null ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "spot" : "spots"} left` : "Unlimited"} {slot.maxStudents != null ? `(max ${slot.maxStudents})` : ""}</span></div>
+                  {slot.slotNote && <NoteLine note={slot.slotNote} />}
                 </div>
                 {isPast ? (
                   <button className="book-btn book-btn--disabled" disabled>No Longer Available</button>
@@ -506,6 +525,7 @@ export default function AppointmentsPage() {
                       <div className="summary-item"><ClockIcon /><span>{formatTime(selectedSlot.windowStart)} – {formatTime(selectedSlot.windowEnd)}</span></div>
                       <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
                     </div>
+                    {selectedSlot.slotNote && <NoteLine note={selectedSlot.slotNote} />}
                   </div>
                   {selectedSlot.appointmentTypes?.length > 0 && (
                     <div className="form-group">
