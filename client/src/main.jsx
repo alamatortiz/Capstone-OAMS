@@ -25,6 +25,9 @@ const RegisterStudent = React.lazy(
 const RegisterFaculty = React.lazy(
   () => import("./pages/RegisterFaculty.jsx"),
 );
+const PrivacyPolicy = React.lazy(
+  () => import("./pages/legal/PrivacyPolicy.jsx"),
+);
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
 import ErrorPageRoute from "./components/ErrorPageRoute.jsx";
@@ -172,6 +175,14 @@ createRoot(document.getElementById("root")).render(
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <RegisterFaculty />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/privacy-policy"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <PrivacyPolicy />
                 </Suspense>
               }
             />

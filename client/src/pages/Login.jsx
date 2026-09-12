@@ -116,7 +116,10 @@ export default function Login({ registerAudience }) {
         )}
       </button>
 
-      <div className="login-wrapper">
+      {/* <main> landmark -- a real Lighthouse accessibility audit flagged
+          its absence (landmark-one-main); <main> is a block element like
+          <div>, so this is purely semantic, no layout/CSS impact. */}
+      <main className="login-wrapper">
         {/* ── Left: Branding ── */}
         <div className="login-branding">
           <div className="login-logos">
@@ -226,11 +229,13 @@ export default function Login({ registerAudience }) {
           )}
         </div>
         {/* /login-card */}
-      </div>
+      </main>
       {/* /login-wrapper */}
 
       <p className="login-footer-copy">
         © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights reserved.
+        {" · "}
+        <Link to="/privacy-policy" className="login-footer-link">Privacy Policy</Link>
       </p>
 
       {redirecting && <LoadingOverlay label="Signing you in..." />}

@@ -226,7 +226,12 @@ body.dark-mode .login-card-desc {
 }
 
 body.dark-mode .login-card-hint {
-  color: #4b5563;
+  /* Was #4b5563 -- a dark gray that's darker than the light-mode default
+     (#9ca3af), so against this page's dark background it gave only a
+     2.42:1 contrast ratio (WCAG AA requires 4.5:1; caught via a real
+     Lighthouse accessibility audit, not eyeballed). Matches
+     .login-card-desc's dark-mode color instead, which passes at 7.14:1. */
+  color: #94a3b8;
 }
 
 /* ── Form ── */
@@ -367,6 +372,19 @@ body.dark-mode .login-input::placeholder {
 
 body.dark-mode .login-footer-copy {
   color: #374151;
+}
+
+.login-footer-link {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.login-footer-link:hover {
+  color: #16a34a;
+}
+
+body.dark-mode .login-footer-link:hover {
+  color: #86efac;
 }
 
 /* ── Show/Hide password toggle button ── */

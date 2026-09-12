@@ -1,0 +1,173 @@
+/* ================================================
+   OAMS — legal.css (Privacy Policy / Terms)
+   Light mode default, dark green accent -- same token
+   convention as Login.css since this page lives alongside it,
+   outside any authenticated dashboard shell.
+   ================================================ */
+
+.legal-root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #ffffff;
+  transition: background 0.3s;
+  position: relative;
+  /* #root in index.css sets text-align: center (leftover Vite boilerplate) --
+     every other page in the app overrides it defensively; this page needs
+     the same, since a legal document reads badly centered. */
+  text-align: left;
+}
+
+:root[data-theme="dark"] .legal-root,
+body.dark-mode .legal-root {
+  background: #0a0f0a;
+  background-image:
+    radial-gradient(ellipse 70% 50% at 20% 10%, rgba(34, 197, 94, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 90%, rgba(34, 197, 94, 0.06) 0%, transparent 60%);
+}
+
+.legal-theme-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 300;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+:root[data-theme="dark"] .legal-theme-btn,
+body.dark-mode .legal-theme-btn {
+  background: rgba(17, 22, 18, 0.85);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.legal-theme-icon {
+  width: 18px;
+  height: 18px;
+  color: #16a34a;
+}
+
+:root[data-theme="dark"] .legal-theme-icon,
+body.dark-mode .legal-theme-icon {
+  color: #86efac;
+}
+
+.legal-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 72px 24px 64px;
+}
+
+.legal-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #16a34a;
+  text-decoration: none;
+  margin-bottom: 24px;
+}
+
+.legal-back-link:hover { text-decoration: underline; }
+
+:root[data-theme="dark"] .legal-back-link,
+body.dark-mode .legal-back-link {
+  color: #86efac;
+}
+
+.legal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+.legal-logo {
+  height: 44px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.legal-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 0;
+  color: #111827;
+  transition: color 0.3s;
+}
+
+:root[data-theme="dark"] .legal-title,
+body.dark-mode .legal-title {
+  color: #f0fdf4;
+}
+
+.legal-updated {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+:root[data-theme="dark"] .legal-updated,
+body.dark-mode .legal-updated {
+  color: #94a3b8;
+}
+
+.legal-body {
+  color: #1f2937;
+  line-height: 1.7;
+  font-size: 0.95rem;
+  transition: color 0.3s;
+}
+
+:root[data-theme="dark"] .legal-body,
+body.dark-mode .legal-body {
+  color: #cbd5e1;
+}
+
+.legal-body h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 32px 0 12px;
+  color: #111827;
+  transition: color 0.3s;
+}
+
+:root[data-theme="dark"] .legal-body h2,
+body.dark-mode .legal-body h2 {
+  color: #f0fdf4;
+}
+
+.legal-body p {
+  margin: 0 0 14px;
+}
+
+.legal-body ul {
+  margin: 0 0 14px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legal-body strong {
+  color: #16a34a;
+}
+
+:root[data-theme="dark"] .legal-body strong,
+body.dark-mode .legal-body strong {
+  color: #86efac;
+}
+
+@media (max-width: 640px) {
+  .legal-page { padding: 64px 16px 48px; }
+  .legal-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
