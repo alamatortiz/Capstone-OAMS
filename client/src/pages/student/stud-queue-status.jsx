@@ -20,7 +20,6 @@ import useLockBodyScroll from "../../hooks/useLockBodyScroll";
 import { toast } from "sonner";
 import StudentPageShell from "../../components/StudentPageShell";
 import QueueProgressBars from "../../components/QueueProgressBars";
-import SatisfactionSurveyCard from "../../components/SatisfactionSurveyCard";
 import PageHeader from "../../components/PageHeader";
 import api from "../../utils/api";
 import "./stud-queue-status.css";
@@ -259,19 +258,15 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
               <div className="queue-placement-center">
                 <div className="queue-position-display">
                   <div className="queue-position-label">
-                    {queue.status === "serving" || queue.status === "completed"
-                      ? "Status"
-                      : "Number in Line"}
+                    {queue.status === "serving" ? "Status" : "Number in Line"}
                   </div>
                   <div>
                     <div className="queue-position-number">
-                      {queue.status === "completed"
-                        ? "Completed"
-                        : queue.status === "serving"
-                          ? (queue.arrivedAt ? "Being Served" : "Called")
-                          : queue.position}
+                      {queue.status === "serving"
+                        ? (queue.arrivedAt ? "Being Served" : "Called")
+                        : queue.position}
                     </div>
-                    {queue.status !== "serving" && queue.status !== "completed" && (
+                    {queue.status !== "serving" && (
                       <div className="queue-position-total">
                         of {queue.totalWaiting} waiting
                       </div>
@@ -281,13 +276,11 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
                     className="queue-position-message"
                     style={{ marginTop: "0.75rem" }}
                   >
-                    {queue.status === "completed"
-                      ? "You've been served. Thank you!"
-                      : queue.status === "serving"
-                        ? (queue.arrivedAt ? "You're being served now!" : "You've been called — please proceed!")
-                        : queue.position === 1
-                          ? "You're next!"
-                          : `${peopleAhead} ${peopleAhead === 1 ? "person" : "people"} ahead of you`}
+                    {queue.status === "serving"
+                      ? (queue.arrivedAt ? "You're being served now!" : "You've been called — please proceed!")
+                      : queue.position === 1
+                        ? "You're next!"
+                        : `${peopleAhead} ${peopleAhead === 1 ? "person" : "people"} ahead of you`}
                   </div>
                 </div>
 
@@ -305,33 +298,19 @@ function QueueDetail({ queue, onBack, onCancel, onSaveNotes, cancelling, backLab
             </div>
           </div>
 
-          {/* After-service survey -- shown once the queue is completed (it
-              stays in the active list for a 30-min grace window, see
-              GET /student/queues/active). Renders nothing if this department
-              has no survey link configured. */}
-          {queue.status === "completed" && (
-            <SatisfactionSurveyCard endpointBase="student" />
-          )}
-
           {/* Wait time card */}
           <div className="qss-card">
             <div className="qss-card-header">
               <h3 className="qss-card-title">
                 <Clock style={{ width: "1.25rem", height: "1.25rem" }} />
-                {queue.status === "completed"
-                  ? "Service Completed"
-                  : queue.status === "serving"
-                    ? "Next Steps"
-                    : "Estimated Wait"}
+                {queue.status === "serving" ? "Next Steps" : "Estimated Wait"}
               </h3>
             </div>
             <div className="qss-card-content">
               <div className="queue-wait-time-display">
                 <div className="queue-wait-time-left">
                   <div className="queue-wait-time-value">
-                    {queue.status === "completed"
-                      ? (queue.completedAt || "Done")
-                      : queue.estimatedWait}
+                    {queue.estimatedWait}
                   </div>
                   <div className="queue-wait-time-joined">
                     Joined at {queue.joinedAt}
@@ -808,11 +787,9 @@ export default function QueueStatusPage() {
                                 <div className="qsl-stat">
                                   <p className="qsl-stat-label">Your Position</p>
                                   <p className="qsl-stat-value">
-                                    {queue.status === "completed"
-                                      ? "Completed"
-                                      : queue.status === "serving"
-                                        ? (queue.arrivedAt ? "Being Served" : "Called")
-                                        : queue.position}
+                                    {queue.status === "serving"
+                                      ? (queue.arrivedAt ? "Being Served" : "Called")
+                                      : queue.position}
                                   </p>
                                 </div>
                                 <div className="qsl-stat">
@@ -824,12 +801,8 @@ export default function QueueStatusPage() {
                                     queue.status === "serving" ? " qsl-stat--serving" : ""
                                   }`}
                                 >
-                                  <p className="qsl-stat-label">
-                                    {queue.status === "completed" ? "Completed At" : "Est. Wait Time"}
-                                  </p>
-                                  <p className="qsl-stat-value-sm">
-                                    {queue.status === "completed" ? (queue.completedAt || "—") : queue.estimatedWait}
-                                  </p>
+                                  <p className="qsl-stat-label">Est. Wait Time</p>
+                                  <p className="qsl-stat-value-sm">{queue.estimatedWait}</p>
                                 </div>
                                 <div className="qsl-stat">
                                   <p className="qsl-stat-label">Joined At</p>

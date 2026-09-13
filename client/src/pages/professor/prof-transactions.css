@@ -334,12 +334,14 @@ html, body {
   .transactions-page .filters-grid {
     gap: 1.5rem;
   }
+
+  .transactions-page .filters-date-section {
+    margin-top: 1.5rem;
+  }
 }
 
 .transactions-page .filters-date-section {
   margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--card-border);
 }
 
 .transactions-page .filter-group {

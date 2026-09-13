@@ -11,7 +11,11 @@ import autoTable from "jspdf-autotable";
 // rendered as a compact "label: value" strip between the subtitle and the
 // main table (e.g. the on-screen stat cards' totals), so a report isn't just
 // a raw row dump. Omit it and this behaves exactly as before.
-export function exportTransactionsPdf({ title, subtitle, columns, rows, filename, summary }) {
+// `secondTable` is an optional { heading, columns, rows } -- when passed, a
+// second labeled table is appended below the first (e.g. Queue Analytics'
+// per-service averages alongside its main per-queue list). Omit it for the
+// original single-table behavior every other caller still uses.
+export function exportTransactionsPdf({ title, subtitle, columns, rows, filename, summary, secondTable }) {
   const doc = new jsPDF({ orientation: "landscape" });
 
   doc.setFontSize(16);
@@ -42,6 +46,22 @@ export function exportTransactionsPdf({ title, subtitle, columns, rows, filename
     alternateRowStyles: { fillColor: [245, 250, 247] },
     margin: { left: 14, right: 14 },
   });
+
+  if (secondTable && secondTable.rows?.length > 0) {
+    const headingY = doc.lastAutoTable.finalY + 8;
+    doc.setFontSize(10);
+    doc.setTextColor(40);
+    doc.text(secondTable.heading, 14, headingY);
+    autoTable(doc, {
+      startY: headingY + 3,
+      head: [secondTable.columns],
+      body: secondTable.rows,
+      styles: { fontSize: 8, cellPadding: 2.5, overflow: "linebreak" },
+      headStyles: { fillColor: [34, 197, 94], textColor: 255 },
+      alternateRowStyles: { fillColor: [245, 250, 247] },
+      margin: { left: 14, right: 14 },
+    });
+  }
 
   const pageCount = doc.internal.getNumberOfPages();
   const generatedAt = new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" });

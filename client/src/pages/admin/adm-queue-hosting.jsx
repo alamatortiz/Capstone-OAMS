@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, StopCircle, PauseCircle } from "lucide-react";
 import "./adm-queue-hosting.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -331,8 +331,6 @@ export default function AdminQueueHosting() {
     ...completedQueues,
     ...closedQueues,
   ];
-  const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "all" || typeFilter !== "all";
-
   // Summary stats reflect today only -- a closed/expired line carried over
   // from yesterday (kept in the list below so it can still be Hosted Again
   // or Reopened) shouldn't inflate what's meant to be today's snapshot.
@@ -356,8 +354,18 @@ export default function AdminQueueHosting() {
                 ? queues.find((q) => q.id === reasonModal.id)?.currentlyServingStudentNumber
                   ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
                   : "Students in this queue will see this reason while it's paused."
-                : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
+                : (() => {
+                    const q = queues.find((q) => q.id === reasonModal?.id);
+                    return !q?.currentlyServingStudentNumber && q?.currentCount === 0
+                      ? q?.servedCount > 0
+                        ? "This queue has no one left waiting and already served students — stopping it will mark it complete."
+                        : "This queue hasn't served any students yet — it will be marked closed."
+                      : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone.";
+                  })()
             }
+            icon={reasonModal?.mode === "pause" ? <PauseCircle width={22} height={22} /> : <StopCircle width={22} height={22} />}
+            variant={reasonModal?.mode === "pause" ? "warning" : "danger"}
+            accentTheme="blue"
             confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
             submitting={reasonSubmitting}
             onConfirm={handleReasonConfirm}
@@ -1161,18 +1169,6 @@ export default function AdminQueueHosting() {
               <ClockIcon />
               <h3>No Matches</h3>
               <p>No queue lines match your search or filters.</p>
-              {hasActiveFilters && (
-                <button
-                  className="aqh-clear-filters-btn"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setStatusFilter("all");
-                    setTypeFilter("all");
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
             </div>
           )}
         </div>

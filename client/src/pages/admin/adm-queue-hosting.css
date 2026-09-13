@@ -472,25 +472,6 @@
   padding-left: 2.5rem;
 }
 
-.aqh-clear-filters-btn {
-  margin-top: 0.75rem;
-  padding: 0.5rem 1.25rem;
-  background: transparent;
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  border-radius: 0.625rem;
-  color: #3b82f6;
-  font-size: 0.85rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.aqh-clear-filters-btn:hover {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.6);
-}
-
 /* ===== Queue Cards ===== */
 .aqh-queue-list {
   display: flex;
@@ -581,8 +562,8 @@
 }
 
 /* Status badge — adm-queue's .status-badge colour mapping + all-caps, at this
-   screen's smaller size. active=green, paused=amber, full/expired=orange,
-   completed/closed=red. */
+   screen's smaller size. active/completed=green, paused=amber, full/expired=
+   orange, closed=red. */
 .aqh-status-badge {
   padding: 0.375rem 0.75rem;
   border-radius: 0.5rem;
@@ -619,9 +600,9 @@
 }
 
 .aqh-status-completed {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 0.5px solid rgba(239, 68, 68, 0.4);
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  border: 0.5px solid rgba(34, 197, 94, 0.4);
 }
 
 /* Secondary "currently serving" pill — kept semantic (positive = green,

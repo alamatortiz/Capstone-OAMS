@@ -26,6 +26,18 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   text-align: center;
   animation: qcm-slide-up 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Only this middle section scrolls -- the header above and the Cancel/Join
+   actions below stay put, so the buttons never overlap the content the way
+   a sticky-footer-inside-a-scrolling-modal would. */
+.qcm-scroll-content {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Universal Service Queue join: the picker + its requirements/steps preview
@@ -268,10 +280,7 @@
   display: flex;
   gap: 0.75rem;
   margin-top: 1rem;
-  position: sticky;
-  bottom: 0;
-  background: var(--card-bg, #111612);
-  padding-top: 0.5rem;
+  flex-shrink: 0;
 }
 
 .qcm-cancel {
@@ -326,7 +335,6 @@
 /* ── Responsive (mirrors ActionConfirmModal) ── */
 .qcm-modal {
   max-height: calc(100dvh - 2rem);
-  overflow-y: auto;
 }
 
 @media (max-width: 480px) {

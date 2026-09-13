@@ -405,6 +405,10 @@
   .admin-transaction-container .filters-grid {
     gap: 1.5rem;
   }
+
+  .admin-transaction-container .filters-date-section {
+    margin-top: 1.5rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -415,8 +419,6 @@
 
 .admin-transaction-container .filters-date-section {
   margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--card-border);
 }
 
 .admin-transaction-container .filter-group {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, Users } from "lucide-react";
+import { ChevronLeft, Users, StopCircle, PauseCircle, UserX } from "lucide-react";
 import "./adm-queue.css";
 import { toast } from "sonner";
 import api from "../../utils/api";
@@ -12,7 +12,7 @@ import QueueProgressBars from "../../components/QueueProgressBars";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
 import { getCollegeLogo } from "../../data/collegeLogo";
-import { formatTimeString, getManilaDateString } from "../../utils/dateTime";
+import { formatTimeString } from "../../utils/dateTime";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -156,8 +156,8 @@ export default function AdminQueue() {
   // ── Queue entries (individual students waiting) for the monitored queue ──
   const [queueEntries, setQueueEntries] = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
-  const [entriesPage, setEntriesPage] = useState(0);
-  const ENTRIES_PER_PAGE = 5;
+  const [visibleEntryCount, setVisibleEntryCount] = useState(3);
+  const ENTRIES_PAGE_SIZE = 3;
 
   // Lets other pages (e.g. Queue Hosting Management) jump straight into this
   // queue's monitor view instead of requiring the in-page Monitor button.
@@ -168,7 +168,7 @@ export default function AdminQueue() {
     const { monitorQueueId: id, from } = location.state || {};
     if (id) {
       setMonitoringQueueId(id);
-      setEntriesPage(0);
+      setVisibleEntryCount(3);
       setMonitorCameFrom(from === "hosting" ? "hosting" : null);
       navigate(location.pathname, { replace: true, state: {} });
     }
@@ -215,53 +215,29 @@ export default function AdminQueue() {
     handleReasonConfirm: handleReasonConfirmBase,
   } = useAdminQueueHosting({ onLiveUpdate: fetchQueueEntries });
 
-  const totalEntryPages = Math.max(1, Math.ceil(queueEntries.length / ENTRIES_PER_PAGE));
-  // Keeps the stored page in sync with the live entry count, not just its
-  // displayed value -- if a live update shrinks the list while an admin is
-  // on a later page, the stored index is corrected immediately rather than
-  // only being clamped for display (which could otherwise let a stale
-  // "Next" click land on a page number that no longer make sense).
-  useEffect(() => {
-    setEntriesPage((p) => Math.min(p, Math.max(0, totalEntryPages - 1)));
-  }, [totalEntryPages]);
-  const currentEntriesPage = Math.min(entriesPage, totalEntryPages - 1);
-  const entriesStartIndex = currentEntriesPage * ENTRIES_PER_PAGE;
-  const paginatedEntries = queueEntries.slice(entriesStartIndex, entriesStartIndex + ENTRIES_PER_PAGE);
-
   const getEntryStatusLabel = (entry) => {
     if (entry.status === "no_show") return "No-Show";
     if (entry.status === "serving") return entry.arrivedAt ? "Being Served" : "Called";
     return entry.status;
   };
 
-  // Prefixes a leading =/+/-/@ with a single quote so spreadsheet apps
-  // (Excel, Sheets) treat the cell as literal text instead of a formula --
-  // user-entered fields like names have no format restriction at registration.
-  const csvEscape = (value) => {
-    let str = String(value ?? "");
-    if (/^[=+\-@]/.test(str)) str = `'${str}`;
-    return `"${str.replace(/"/g, '""')}"`;
-  };
-  const handleExportQueueData = () => {
-    const header = ["Queue Number", "Student Name", "Student ID", "Status", "Concern", "Joined At"];
-    const rows = queueEntries.map((entry) => [
-      entry.queueNumber,
-      entry.studentName,
-      entry.studentId,
-      getEntryStatusLabel(entry),
-      entry.concern,
-      entry.joinedAt,
-    ]);
-    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `queue-${monitoringQueue.id}-${getManilaDateString()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Export complete");
-  };
+  // Displayed entries: cancelled/no-show are just clutter here (still
+  // recorded in the DB, just not shown), and the rest are grouped so
+  // whoever's about to be called/being served always leads, then everyone
+  // still waiting (in ticket order), then everyone already served at the
+  // bottom -- recomputed from live data on every refetch, so a just-served
+  // student drops down and the next one rises to the top automatically.
+  const STATUS_GROUP_ORDER = { serving: 0, waiting: 1, completed: 2 };
+  const displayableEntries = queueEntries
+    .filter((entry) => entry.status !== "cancelled" && entry.status !== "no_show")
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => {
+      const groupDiff = STATUS_GROUP_ORDER[a.entry.status] - STATUS_GROUP_ORDER[b.entry.status];
+      return groupDiff !== 0 ? groupDiff : a.index - b.index;
+    })
+    .map(({ entry }) => entry);
+  const visibleEntries = displayableEntries.slice(0, visibleEntryCount);
+  const hasMoreEntries = displayableEntries.length > visibleEntryCount;
 
   // Re-derive the monitored queue from live data on every refresh, so the
   // monitor view always reflects the latest call-next/serve/pause actions
@@ -422,8 +398,15 @@ export default function AdminQueue() {
                   ? monitoringQueue?.currentlyServingStudentNumber
                     ? "Students in this queue will see this reason while it's paused. A student is currently being served — pausing will return them to waiting instead of leaving their call in progress."
                     : "Students in this queue will see this reason while it's paused."
-                  : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
+                  : !monitoringQueue?.currentlyServingStudentNumber && monitoringQueue?.currentCount === 0
+                    ? monitoringQueue?.servedCount > 0
+                      ? "This queue has no one left waiting and already served students — stopping it will mark it complete."
+                      : "This queue hasn't served any students yet — it will be marked closed."
+                    : "All students still waiting or being served will be removed from this queue and will see this reason. This cannot be undone."
               }
+              icon={reasonModal?.mode === "pause" ? <PauseCircle width={22} height={22} /> : <StopCircle width={22} height={22} />}
+              variant={reasonModal?.mode === "pause" ? "warning" : "danger"}
+              accentTheme="blue"
               confirmText={reasonModal?.mode === "pause" ? "Pause" : "Stop Queue"}
               submitting={reasonSubmitting}
               onConfirm={handleReasonConfirm}
@@ -434,6 +417,8 @@ export default function AdminQueue() {
               show={skipReasonModal}
               title="Skip Student"
               message="This voids the currently-served student's ticket as a no-show. They'll see this reason. This cannot be undone."
+              icon={<UserX width={22} height={22} />}
+              accentTheme="blue"
               confirmText="Skip Student"
               submitting={skipSubmitting}
               onConfirm={handleSkipConfirm}
@@ -543,7 +528,9 @@ export default function AdminQueue() {
                   <div className="queue-overview-item">
                     <span className="queue-overview-label">Location</span>
                     <span className="queue-overview-value">
-                      {monitoringQueue.location || "Not specified"}
+                      {monitoringQueue.isUniversal
+                        ? "Varies by service"
+                        : monitoringQueue.location || "Not specified"}
                     </span>
                   </div>
                   <div className="queue-overview-item">
@@ -577,7 +564,7 @@ export default function AdminQueue() {
             </div>
 
             {/* Queue Actions */}
-            <div className="queue-detail-card">
+            <div className="queue-detail-card queue-compact-card">
               <div className="queue-detail-header">
                 <h3>
                   <SlidersIcon />
@@ -628,22 +615,21 @@ export default function AdminQueue() {
                 <button
                   className="queue-action-btn queue-action-btn--danger"
                   onClick={() => handleStopQueue(monitoringQueue.id)}
+                  disabled={["closed", "completed"].includes(monitoringQueue.status)}
+                  title={
+                    ["closed", "completed"].includes(monitoringQueue.status)
+                      ? "This queue is already closed"
+                      : undefined
+                  }
                 >
                   <CloseIcon />
                   Stop Queue
-                </button>
-                <button
-                  className="queue-action-btn queue-action-btn--neutral"
-                  onClick={handleExportQueueData}
-                >
-                  <TrendingUpIcon />
-                  Export Data
                 </button>
               </div>
             </div>
 
             {/* Currently Serving */}
-            <div className="queue-detail-card">
+            <div className="queue-detail-card queue-compact-card">
               <div className="queue-detail-header">
                 <h3>
                   <ClockIcon />
@@ -651,47 +637,45 @@ export default function AdminQueue() {
                 </h3>
               </div>
               <div className="queue-detail-content">
-                <p className="queue-serving-name">
-                  {monitoringQueue.currentlyServingStudentNumber ||
-                    "No student is currently being served"}
-                </p>
-                <p className="queue-serving-label">
-                  {monitoringQueue.queueType}
-                  {monitoringQueue.currentlyServingStudentNumber && (
-                    <>
-                      {" • "}
-                      {monitoringQueue.currentlyServingArrivedAt ? "Being Served" : "Called — awaiting arrival"}
-                    </>
+                {monitoringQueue.currentlyServingStudentNumber ? (
+                  <p className="queue-serving-name">
+                    {monitoringQueue.currentlyServingStudentName || "Student"}
+                    <span className="queue-serving-id-badge">
+                      {monitoringQueue.currentlyServingStudentNumber}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="queue-serving-name queue-serving-name--empty">
+                    No student is currently being served
+                  </p>
+                )}
+                <div className="queue-serving-actions">
+                  {monitoringQueue.currentlyServingStudentNumber && !monitoringQueue.currentlyServingArrivedAt && (
+                    <button
+                      className="queue-action-btn queue-action-btn--primary"
+                      onClick={() => handleMarkArrived(monitoringQueue.id)}
+                    >
+                      <AlertCircleIcon />
+                      Mark Arrived
+                    </button>
                   )}
-                </p>
-                {monitoringQueue.currentlyServingStudentNumber && !monitoringQueue.currentlyServingArrivedAt && (
                   <button
-                    className="queue-action-btn queue-action-btn--primary"
-                    style={{ width: "100%", marginTop: "0.75rem" }}
-                    onClick={() => handleMarkArrived(monitoringQueue.id)}
+                    className="queue-action-btn queue-action-btn--success"
+                    onClick={() => handleMarkAsServed(monitoringQueue.id)}
+                    disabled={!monitoringQueue.currentlyServingStudentNumber}
                   >
                     <AlertCircleIcon />
-                    Mark Arrived
+                    Mark as Served
                   </button>
-                )}
-                <button
-                  className="queue-action-btn queue-action-btn--success"
-                  style={{ width: "100%", marginTop: "0.75rem" }}
-                  onClick={() => handleMarkAsServed(monitoringQueue.id)}
-                  disabled={!monitoringQueue.currentlyServingStudentNumber}
-                >
-                  <AlertCircleIcon />
-                  Mark as Served
-                </button>
-                <button
-                  className="queue-action-btn queue-action-btn--danger"
-                  style={{ width: "100%", marginTop: "0.5rem" }}
-                  onClick={() => setSkipReasonModal(true)}
-                  disabled={!monitoringQueue.currentlyServingStudentNumber}
-                >
-                  <CloseIcon />
-                  Skip / No-Show
-                </button>
+                  <button
+                    className="queue-action-btn queue-action-btn--danger"
+                    onClick={() => setSkipReasonModal(true)}
+                    disabled={!monitoringQueue.currentlyServingStudentNumber}
+                  >
+                    <CloseIcon />
+                    Skip / No-Show
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -701,7 +685,7 @@ export default function AdminQueue() {
                 <h3>
                   <UsersIcon />
                   Queue Entries
-                  <span className="queue-entries-count-badge">{queueEntries.length}</span>
+                  <span className="queue-entries-count-badge">{displayableEntries.length}</span>
                 </h3>
               </div>
               <div className="queue-entries-list">
@@ -709,17 +693,21 @@ export default function AdminQueue() {
                   <p className="queue-entries-empty">Loading entries…</p>
                 ) : queueEntries.length === 0 ? (
                   <p className="queue-entries-empty">No students in queue.</p>
+                ) : displayableEntries.length === 0 ? (
+                  <p className="queue-entries-empty">No active students in queue.</p>
                 ) : (
-                  paginatedEntries.map((entry, index) => (
+                  visibleEntries.map((entry, index) => (
                     <div
                       key={entry.queueNumber}
                       className={`queue-entry-item ${entry.status === "serving" ? "is-serving" : ""}`}
                     >
                       <div className="queue-entry-top">
-                        <div className="queue-entry-number">{entriesStartIndex + index + 1}</div>
+                        <div className="queue-entry-number">{index + 1}</div>
                         <div className="queue-entry-info">
-                          <h4 className="queue-entry-name">{entry.studentName}</h4>
-                          <p className="queue-entry-id">ID: {entry.studentId}</p>
+                          <h4 className="queue-entry-name">
+                            {entry.studentName}
+                            <span className="queue-entry-id-badge">{entry.studentId}</span>
+                          </h4>
                         </div>
                         <div className="queue-entry-badges">
                           <span className={`queue-entry-status queue-entry-status--${entry.status}`}>
@@ -732,6 +720,7 @@ export default function AdminQueue() {
                         {monitoringQueue?.isUniversal && entry.service && (
                           <p className="queue-entry-concern">
                             <strong>Service:</strong> {entry.service}
+                            {entry.location && ` — ${entry.location}`}
                           </p>
                         )}
                         <p className="queue-entry-concern">
@@ -746,28 +735,13 @@ export default function AdminQueue() {
                   ))
                 )}
               </div>
-              {!loadingEntries && queueEntries.length > ENTRIES_PER_PAGE && (
-                <div className="queue-entries-pagination">
+              {!loadingEntries && hasMoreEntries && (
+                <div className="queue-entries-load-more">
                   <button
-                    className="queue-entries-page-btn"
-                    onClick={() => setEntriesPage((p) => Math.max(0, p - 1))}
-                    disabled={currentEntriesPage === 0}
-                    aria-label="Previous batch"
+                    className="queue-entries-load-more-btn"
+                    onClick={() => setVisibleEntryCount((n) => n + ENTRIES_PAGE_SIZE)}
                   >
-                    <ChevronLeft />
-                  </button>
-                  <span className="queue-entries-page-label">
-                    {entriesStartIndex + 1}–{Math.min(queueEntries.length, entriesStartIndex + ENTRIES_PER_PAGE)} of {queueEntries.length}
-                  </span>
-                  <button
-                    className="queue-entries-page-btn"
-                    onClick={() => setEntriesPage((p) => Math.min(totalEntryPages - 1, p + 1))}
-                    disabled={currentEntriesPage >= totalEntryPages - 1}
-                    aria-label="Next batch"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    Load 3 More
                   </button>
                 </div>
               )}
@@ -933,7 +907,7 @@ export default function AdminQueue() {
                       className="btn-monitor"
                       onClick={() => {
                         setMonitoringQueueId(detail.id);
-                        setEntriesPage(0);
+                        setVisibleEntryCount(3);
                         setMonitorCameFrom(null);
                       }}
                     >

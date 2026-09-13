@@ -240,7 +240,7 @@ export default function TransactionsPage() {
       },
     });
     return (res.data.transactions ?? []).map((t) => [
-      t.type, t.title, t.details, t.status, t.college, t.date, t.time,
+      getTypeLabel(t.type), t.title, t.details, t.status, t.college, t.date, t.time,
     ]);
   };
 
@@ -382,6 +382,23 @@ export default function TransactionsPage() {
     }
   };
 
+  // Shared by the row badge and the CSV/PDF export's Type column, so both
+  // show a friendly label instead of the raw "document"/"submission" string.
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case "queue":
+        return "Queue";
+      case "appointment":
+        return "Appointment";
+      case "document":
+        return "Document Request";
+      case "submission":
+        return "Document Submission";
+      default:
+        return type ? type.charAt(0).toUpperCase() + type.slice(1) : "Unknown";
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "completed":
@@ -482,7 +499,6 @@ export default function TransactionsPage() {
                   { value: "queue", label: "Queue" },
                   { value: "appointment", label: "Appointment" },
                   { value: "document", label: "Document" },
-                  { value: "submission", label: "Sent Document" },
                 ]}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
@@ -534,8 +550,13 @@ export default function TransactionsPage() {
                 <p>You have no transaction records yet.</p>
               </div>
             ) : (
-              transactions.map((transaction) => (
-                <div key={transaction.id} className={`transaction-item transaction-type-${transaction.type}`}>
+              transactions.map((transaction) => {
+                // Submission rows reuse document's row-accent styling --
+                // .transaction-type-submission was never given its own CSS,
+                // so submission rows silently got no hover/gradient accent.
+                const rowTypeClass = transaction.type === "submission" ? "document" : transaction.type;
+                return (
+                <div key={transaction.id} className={`transaction-item transaction-type-${rowTypeClass}`}>
                   <div className="transaction-icon">
                     <span
                       className={`icon-wrapper ${getTypeColor(transaction.type)}`}
@@ -551,7 +572,7 @@ export default function TransactionsPage() {
                         <span
                           className={`tx-badge ${getTypeColor(transaction.type)}`}
                         >
-                          {transaction.type}
+                          {getTypeLabel(transaction.type)}
                         </span>
                         <span
                           className={`tx-badge ${getStatusColor(
@@ -581,7 +602,8 @@ export default function TransactionsPage() {
                     </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 

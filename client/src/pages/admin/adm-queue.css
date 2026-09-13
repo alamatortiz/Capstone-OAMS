@@ -526,11 +526,11 @@ body {
   position: absolute;
   inset: 0;
 
-  /* Sync refresh icon + hover tint with the app primary green */
+  /* Refresh icon + hover tint use blue, matching this screen's accent */
   background: linear-gradient(
     135deg,
-    var(--primary-dark) 0%,
-    var(--success) 100%
+    #2563eb 0%,
+    #3b82f6 100%
   );
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -548,8 +548,8 @@ body {
 }
 
 .btn-refresh-queue:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
+  border-color: var(--blue);
+  color: var(--blue);
 }
 
 .btn-refresh-queue svg {
@@ -869,13 +869,35 @@ body {
   flex-shrink: 0;
 }
 
-/* Queue Overview reads as the section's lead heading — a step larger. */
+/* Queue Overview reads as the section's lead heading — a step larger, but
+   kept compact (smaller than before) so the card doesn't run too tall. */
+.queue-overview-card {
+  padding: 1.125rem;
+}
+.queue-overview-card .queue-detail-header {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+}
 .queue-overview-card .queue-detail-header h3 {
-  font-size: 1.25rem;
+  font-size: 1.05rem;
 }
 .queue-overview-card .queue-detail-header svg {
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.queue-overview-card .status-badge {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.75rem;
+}
+
+/* Queue Actions + Currently Serving — shrunk to match the Queue Overview
+   card's smaller footprint (Queue Entries keeps the base card size). */
+.queue-compact-card {
+  padding: 1.125rem;
+}
+.queue-compact-card .queue-detail-header {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
 }
 
 /* Count pill in the "Queue Entries" heading (flex child of .queue-detail-header h3). */
@@ -883,12 +905,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.5rem;
-  padding: 0.1rem 0.5rem;
+  min-width: 1.75rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
   background: rgba(59, 130, 246, 0.15);
   color: #3b82f6;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -944,53 +966,30 @@ body {
   opacity: 0.8;
 }
 
-.queue-entries-pagination {
+.queue-entries-load-more {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 1rem;
   margin-top: 1.25rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--card-border);
 }
 
-.queue-entries-page-btn {
-  width: 2.25rem;
-  height: 2.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.queue-entries-load-more-btn {
+  padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
   border: 1px solid var(--card-border);
   background: transparent;
   color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  flex-shrink: 0;
 }
 
-.queue-entries-page-btn:hover:not(:disabled) {
+.queue-entries-load-more-btn:hover {
   border-color: var(--blue);
   background: rgba(59, 130, 246, 0.1);
   color: var(--blue);
-}
-
-.queue-entries-page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.queue-entries-page-btn svg {
-  width: 1rem;
-  height: 1rem;
-  stroke: currentColor;
-}
-
-.queue-entries-page-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  white-space: nowrap;
 }
 
 .queue-entry-item {
@@ -1035,16 +1034,12 @@ body {
 }
 
 .queue-entry-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-weight: 700;
   font-size: 0.95rem;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
-  text-align: left;
-}
-
-.queue-entry-id {
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
   margin: 0;
   text-align: left;
 }
@@ -1149,7 +1144,7 @@ body {
 
 @media (min-width: 900px) {
   .queue-actions-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -1228,29 +1223,49 @@ body {
   color: #ef4444;
 }
 
-.queue-action-btn.queue-action-btn--neutral {
-  border-color: var(--card-border);
-  color: var(--text-secondary, var(--text-primary));
-}
-.queue-action-btn.queue-action-btn--neutral:hover {
-  background: rgba(100, 116, 139, 0.12);
-  border-color: #64748b;
-  color: var(--text-primary);
-}
-
 .queue-serving-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
-  text-align: left;
+  text-align: center;
 }
 
-.queue-serving-label {
-  font-size: 0.8rem;
+.queue-serving-name--empty {
   color: var(--text-tertiary);
-  margin: 0.25rem 0 0 0;
-  text-align: left;
+  font-weight: 500;
+}
+
+.queue-serving-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.queue-serving-actions .queue-action-btn {
+  flex: 1 1 auto;
+}
+
+/* Shared blue "ID" pill for a student's name — Currently Serving and Queue
+   Entries both use it, mirroring adm-appointment.css's purple id-badge. */
+.queue-serving-id-badge,
+.queue-entry-id-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--blue);
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .status-badge {
@@ -1284,7 +1299,12 @@ body {
   border: 1px solid rgba(249, 115, 22, 0.4);
 }
 
-.status-badge--completed,
+.status-badge--completed {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
 .status-badge--closed,
 .status-badge--cancelled {
   background: rgba(239, 68, 68, 0.2);

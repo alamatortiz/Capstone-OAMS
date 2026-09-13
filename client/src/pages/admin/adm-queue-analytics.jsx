@@ -5,11 +5,12 @@ import "./adm-queue-analytics.css";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
+import FilterDateRange from "../../components/FilterDateRange";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import { useLiveRefetch } from "../../hooks/useLiveRefetch";
-import { getManilaDateString } from "../../utils/dateTime";
+import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
 import ExportMenu from "../../components/ExportMenu";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
 
@@ -63,11 +64,6 @@ const ChevronDownIcon = ({ className = "" }) => (
   </svg>
 );
 
-const RANGE_OPTIONS = [
-  { value: "today", label: "Today" },
-  { value: "all", label: "All Time" },
-];
-
 // A queue metric moves whenever a student is called / served / no-showed or a
 // slot's lifecycle changes; useLiveRefetch also reconciles on socket reconnect.
 const ANALYTICS_LIVE_EVENTS = [
@@ -89,7 +85,9 @@ export default function AdminQueueAnalytics() {
       }
     : { name: "Admin", college: "", departmentAbbrev: "CCS" };
 
-  const [range, setRange] = useState("today");
+  const today = getManilaDateString();
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [serviceType, setServiceType] = useState("All Services");
   const [serviceTypes, setServiceTypes] = useState(["All Services"]);
   const [totals, setTotals] = useState({
@@ -99,37 +97,66 @@ export default function AdminQueueAnalytics() {
     noShows: 0,
     peakHour: "N/A",
   });
-  const [byService, setByService] = useState([]);
+  const [queues, setQueues] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Starts true so the first load shows a loading state; later refreshes
   // (filter change / socket / reconnect) update silently.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      setError(null);
-      const res = await api.get("/admin/queue-analytics/summary", {
-        params: { range, service: serviceType },
-      });
-      setTotals(res.data.totals);
-      setByService(res.data.byService ?? []);
-      if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
-    } catch (err) {
-      console.error("Queue analytics summary fetch error:", err);
-      setError("Could not load queue analytics.");
-    } finally {
-      setLoading(false);
-    }
-  }, [range, serviceType]);
+  // Queue Analytics defaults to today (unlike Adm-Transactions' blank/all-
+  // time default) -- an unset date input just falls back to today here.
+  const effectiveStart = startDate || today;
+  const effectiveEnd = endDate || today;
 
-  // Initial + filter-driven fetch (fetchSummary changes identity with range /
-  // serviceType), plus live socket updates + reconnect reconciliation.
+  const fetchSummary = useCallback(
+    async (pageToFetch = 1, { append = false } = {}) => {
+      try {
+        if (!append) setError(null);
+        const res = await api.get("/admin/queue-analytics/summary", {
+          params: {
+            startDate: effectiveStart,
+            endDate: effectiveEnd,
+            service: serviceType,
+            page: pageToFetch,
+            limit: 10,
+          },
+        });
+        setTotals(res.data.totals);
+        setQueues((prev) => (append ? [...prev, ...(res.data.queues ?? [])] : (res.data.queues ?? [])));
+        setPage(res.data.page ?? pageToFetch);
+        setHasMore(!!res.data.hasMore);
+        if (res.data.serviceTypes) setServiceTypes(res.data.serviceTypes);
+      } catch (err) {
+        console.error("Queue analytics summary fetch error:", err);
+        setError("Could not load queue analytics.");
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [effectiveStart, effectiveEnd, serviceType],
+  );
+
+  // Initial + filter-driven fetch (fetchSummary changes identity with the
+  // date range / serviceType), plus live socket updates + reconnect
+  // reconciliation -- both always reset back to page 1.
   useEffect(() => {
-    if (authUser) fetchSummary();
+    if (authUser) fetchSummary(1);
   }, [authUser, fetchSummary]);
-  useLiveRefetch(ANALYTICS_LIVE_EVENTS, fetchSummary);
+  useLiveRefetch(ANALYTICS_LIVE_EVENTS, () => fetchSummary(1));
 
-  const rangeLabel = range === "today" ? "Today" : "All time";
+  const handleLoadMore = () => {
+    setLoadingMore(true);
+    fetchSummary(page + 1, { append: true });
+  };
+
+  const rangeLabel =
+    effectiveStart === today && effectiveEnd === today
+      ? "Today"
+      : `${formatManilaDate(effectiveStart)} – ${formatManilaDate(effectiveEnd)}`;
 
   // Prefixes a leading =/+/-/@ so spreadsheet apps treat the cell as text.
   const csvEscape = (value) => {
@@ -137,14 +164,34 @@ export default function AdminQueueAnalytics() {
     if (/^[=+\-@]/.test(str)) str = `'${str}`;
     return `"${str.replace(/"/g, '""')}"`;
   };
-  const exportHeader = ["Service", "Students Served", "Overtime Queues", "No-Shows", "Avg Wait (min)"];
-  const exportRows = byService.map((r) => [
-    r.service,
-    r.studentsServed,
-    r.overtimeQueues,
-    r.noShows,
-    r.avgWaitMinutes,
-  ]);
+  const buildExportRow = (q) => [
+    q.label,
+    formatManilaDate(q.slotDate),
+    `${q.startTime} – ${q.endTime}`,
+    q.status === "completed" ? "Completed" : "Closed",
+    q.studentsServed,
+    q.noShows,
+    q.overtime ? "Yes" : "No",
+    q.avgWaitMinutes,
+  ];
+  const exportHeader = ["Queue", "Date", "Time Window", "Status", "Students Served", "No-Shows", "Overtime?", "Avg Wait (min)"];
+  // Export reflects the whole filtered range, not just whatever pages
+  // "Load More" has pulled onto the screen so far -- pages through the same
+  // endpoint (capped at 50/request server-side) until nothing's left.
+  const fetchAllQueuesForExport = async () => {
+    let all = [];
+    let fetchPage = 1;
+    let more = true;
+    while (more) {
+      const res = await api.get("/admin/queue-analytics/summary", {
+        params: { startDate: effectiveStart, endDate: effectiveEnd, service: serviceType, page: fetchPage, limit: 50 },
+      });
+      all = all.concat(res.data.queues ?? []);
+      more = !!res.data.hasMore;
+      fetchPage += 1;
+    }
+    return all;
+  };
   const summaryRows = [
     ["Accomplished Queues", totals.accomplishedQueues],
     ["Overtime Queues", totals.overtimeQueues],
@@ -152,31 +199,47 @@ export default function AdminQueueAnalytics() {
     ["No-Shows", totals.noShows],
     ["Peak Hour", totals.peakHour],
   ];
+  const exportFilenameBase = `queue-analytics-${effectiveStart}-to-${effectiveEnd}`;
 
-  const handleExportCsv = () => {
-    const csv = [...summaryRows, [], exportHeader, ...exportRows]
-      .map((row) => row.map(csvEscape).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `queue-analytics-${range}-${getManilaDateString()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Export complete");
+  const handleExportCsv = async () => {
+    try {
+      const allQueues = await fetchAllQueuesForExport();
+      const csv = [
+        ...summaryRows, [],
+        exportHeader, ...allQueues.map(buildExportRow),
+      ]
+        .map((row) => row.map(csvEscape).join(","))
+        .join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${exportFilenameBase}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export complete");
+    } catch (err) {
+      console.error("Queue analytics CSV export error:", err);
+      toast.error("Could not export analytics");
+    }
   };
 
-  const handleExportPdf = () => {
-    exportTransactionsPdf({
-      title: "Queue Analytics Report",
-      subtitle: `${user.college} (${user.departmentAbbrev}) — ${rangeLabel} — Generated ${getManilaDateString()}`,
-      columns: exportHeader,
-      rows: exportRows,
-      filename: `queue-analytics-${range}-${getManilaDateString()}.pdf`,
-      summary: summaryRows.map(([label, value]) => ({ label, value })),
-    });
-    toast.success("Export complete");
+  const handleExportPdf = async () => {
+    try {
+      const allQueues = await fetchAllQueuesForExport();
+      exportTransactionsPdf({
+        title: "Queue Analytics Report",
+        subtitle: `${user.college} (${user.departmentAbbrev}) — ${rangeLabel} — Generated ${getManilaDateString()}`,
+        columns: exportHeader,
+        rows: allQueues.map(buildExportRow),
+        filename: `${exportFilenameBase}.pdf`,
+        summary: summaryRows.map(([label, value]) => ({ label, value })),
+      });
+      toast.success("Export complete");
+    } catch (err) {
+      console.error("Queue analytics PDF export error:", err);
+      toast.error("Could not export analytics");
+    }
   };
 
   const statCards = [
@@ -266,19 +329,20 @@ export default function AdminQueueAnalytics() {
             </div>
             <ExportMenu
               triggerClassName="aqa-export-btn"
-              disabled={byService.length === 0}
+              disabled={queues.length === 0}
               onExportCsv={handleExportCsv}
               onExportPdf={handleExportPdf}
             />
           </div>
           <div className="aqa-filters-grid">
-            <FilterSelect
-              id="aqa-filter-range"
-              label="Time Range"
-              value={range}
-              onChange={(e) => setRange(e.target.value)}
-              options={RANGE_OPTIONS}
-              chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+            <FilterDateRange
+              id="aqa-filter-date-range"
+              label="Date Range"
+              startValue={startDate}
+              endValue={endDate}
+              onStartChange={(e) => setStartDate(e.target.value)}
+              onEndChange={(e) => setEndDate(e.target.value)}
+              onClear={() => { setStartDate(""); setEndDate(""); }}
             />
             <FilterSelect
               id="aqa-filter-service"
@@ -289,17 +353,13 @@ export default function AdminQueueAnalytics() {
               chevronIcon={<ChevronDownIcon className="filter-chevron" />}
             />
           </div>
+          {(startDate || endDate) && (
+            <p className="aqa-range-label">{rangeLabel}</p>
+          )}
         </div>
 
-        {/* Per-service breakdown */}
+        {/* Per-queue-instance breakdown */}
         <div className="aqa-svc-list">
-          <div className="aqa-svc-list-head">
-            <h3 className="aqa-svc-list-title">Service Breakdown</h3>
-            <p className="aqa-svc-list-sub">
-              Per-service queue metrics — {rangeLabel.toLowerCase()}.
-            </p>
-          </div>
-
           {loading ? (
             <div className="aqa-empty-state">
               <BarChartIcon />
@@ -311,46 +371,65 @@ export default function AdminQueueAnalytics() {
               <h3>Could not load analytics</h3>
               <p>{error}</p>
             </div>
-          ) : byService.length === 0 ? (
+          ) : queues.length === 0 ? (
             <div className="aqa-empty-state">
               <BarChartIcon />
-              <h3>No services yet</h3>
-              <p>Your department has no queue services configured.</p>
+              <h3>No queues hosted in this range</h3>
+              <p>No queue lines finished or were closed in the selected date range.</p>
             </div>
           ) : (
-            byService.map((row) => (
-              <div key={row.service} className="aqa-svc-card">
-                <div className="aqa-svc-card-head">
-                  <span className="aqa-svc-name">{row.service}</span>
+            <>
+              {queues.map((row) => (
+                <div key={row.slotId} className="aqa-svc-card">
+                  <div className="aqa-svc-card-head">
+                    <span className="aqa-svc-name">
+                      {row.label} Queue for {formatManilaDate(row.slotDate)}: {row.startTime} – {row.endTime}
+                    </span>
+                    <span className={`aqa-queue-status-badge aqa-queue-status--${row.status}`}>
+                      {row.status === "completed" ? "Completed" : "Closed"}
+                    </span>
+                  </div>
+                  <div className="aqa-svc-metrics">
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">Students Served</span>
+                      <span className="aqa-svc-metric-value aqa-val-blue">
+                        {row.studentsServed}
+                      </span>
+                    </div>
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">No-Shows</span>
+                      <span className="aqa-svc-metric-value aqa-val-red">
+                        {row.noShows}
+                      </span>
+                    </div>
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">Overtime</span>
+                      <span className={`aqa-svc-metric-value ${row.overtime ? "aqa-val-amber" : "aqa-val-blue"}`}>
+                        {row.overtime ? "Yes" : "No"}
+                      </span>
+                    </div>
+                    <div className="aqa-svc-metric">
+                      <span className="aqa-svc-metric-label">Avg Wait</span>
+                      <span className="aqa-svc-metric-value">
+                        {row.avgWaitMinutes > 0 ? `${row.avgWaitMinutes} min` : "—"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="aqa-svc-metrics">
-                  <div className="aqa-svc-metric">
-                    <span className="aqa-svc-metric-label">Students Served</span>
-                    <span className="aqa-svc-metric-value aqa-val-blue">
-                      {row.studentsServed}
-                    </span>
-                  </div>
-                  <div className="aqa-svc-metric">
-                    <span className="aqa-svc-metric-label">Overtime Queues</span>
-                    <span className="aqa-svc-metric-value aqa-val-amber">
-                      {row.overtimeQueues}
-                    </span>
-                  </div>
-                  <div className="aqa-svc-metric">
-                    <span className="aqa-svc-metric-label">No-Shows</span>
-                    <span className="aqa-svc-metric-value aqa-val-red">
-                      {row.noShows}
-                    </span>
-                  </div>
-                  <div className="aqa-svc-metric">
-                    <span className="aqa-svc-metric-label">Avg Wait</span>
-                    <span className="aqa-svc-metric-value">
-                      {row.avgWaitMinutes > 0 ? `${row.avgWaitMinutes} min` : "—"}
-                    </span>
-                  </div>
+              ))}
+              {hasMore && (
+                <div className="aqa-load-more">
+                  <button
+                    type="button"
+                    className="aqa-load-more-btn"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? "Loading…" : "Load More"}
+                  </button>
                 </div>
-              </div>
-            ))
+              )}
+            </>
           )}
         </div>
       </div>

@@ -15,6 +15,7 @@ import { exportTransactionsPdf } from "../../utils/exportPdf";
 import { exportAppointmentCertificate } from "../../utils/exportCertificate";
 import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
+import { PROFESSOR_STATUSES_BY_TYPE, getStatusOptionsForType } from "../../data/transactionStatusOptions";
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 const CalendarSmIcon = () => (
@@ -73,6 +74,23 @@ const AlertCircleIcon = () => (
 
 // ── Transactions data ─────────────────────────────────────────────────────────
 
+const TYPE_OPTIONS = [
+  { value: "all", label: "All Types" },
+  { value: "appointment", label: "Appointment" },
+  { value: "document", label: "Document" },
+];
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "processing", label: "Processing" },
+  { value: "ready", label: "Ready for Pickup" },
+  { value: "claimed", label: "Claimed" },
+  { value: "completed", label: "Completed" },
+  { value: "rejected", label: "Rejected" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
 export default function ProfessorTransactionsPage() {
   const { user: authUser, token } = useAuth();
 
@@ -102,7 +120,7 @@ export default function ProfessorTransactionsPage() {
     }[type] ?? "txn-badge");
 
   const typeLabel = (type) =>
-    ({ appointment: "Appointment", document: "Document", submission: "Document Submission" }[type] ?? type);
+    ({ appointment: "Appointment", document: "Document Request", submission: "Document Submission" }[type] ?? type);
 
   const statusBadgeClass = (status) =>
     ({
@@ -366,13 +384,15 @@ export default function ProfessorTransactionsPage() {
                 id="txn-type-select"
                 label="Type"
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                options={[
-                  { value: "all", label: "All Types" },
-                  { value: "appointment", label: "Appointment" },
-                  { value: "document", label: "Document" },
-                  { value: "submission", label: "Document Submission" },
-                ]}
+                onChange={(e) => {
+                  const nextType = e.target.value;
+                  setFilterType(nextType);
+                  const allowedStatuses = PROFESSOR_STATUSES_BY_TYPE[nextType];
+                  if (allowedStatuses && filterStatus !== "all" && !allowedStatuses.includes(filterStatus)) {
+                    setFilterStatus("all");
+                  }
+                }}
+                options={TYPE_OPTIONS}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
 
@@ -381,17 +401,7 @@ export default function ProfessorTransactionsPage() {
                 label="Status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                options={[
-                  { value: "all", label: "All Statuses" },
-                  { value: "pending", label: "Pending" },
-                  { value: "approved", label: "Approved" },
-                  { value: "processing", label: "Processing" },
-                  { value: "ready", label: "Ready for Pickup" },
-                  { value: "claimed", label: "Claimed" },
-                  { value: "completed", label: "Completed" },
-                  { value: "rejected", label: "Rejected" },
-                  { value: "cancelled", label: "Cancelled" },
-                ]}
+                options={getStatusOptionsForType(STATUS_OPTIONS, PROFESSOR_STATUSES_BY_TYPE, filterType)}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
             </div>

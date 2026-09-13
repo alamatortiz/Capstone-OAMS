@@ -20,6 +20,7 @@ import FilterDateRange from "../../components/FilterDateRange";
 import Pagination from "../../components/Pagination";
 import ExportMenu from "../../components/ExportMenu";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
+import { ADMIN_STATUSES_BY_TYPE, getStatusOptionsForType } from "../../data/transactionStatusOptions";
 
 // ── Icons (all unchanged from admin_dashboard) ──────────────────────────────
 const SearchIcon = () => (
@@ -162,7 +163,6 @@ const TYPE_OPTIONS = [
   { value: "queue", label: "Queue" },
   { value: "appointment", label: "Appointment" },
   { value: "document", label: "Document" },
-  { value: "submission", label: "Sent Document" },
   { value: "admin_action", label: "Admin Action" },
 ];
 const STATUS_OPTIONS = [
@@ -282,29 +282,36 @@ export default function AdminTransaction() {
   const pagedTransactions = filteredTransactions.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // ── Badge Helpers ─────────────────────────────────────────────────────────
-  const getTypeBadge = (type) => {
-    const typeConfig = {
-      queue: { color: "admin-transaction-badge-queue", label: "Queue" },
-      appointment: {
-        color: "admin-transaction-badge-appointment",
-        label: "Appointment",
-      },
-      document: {
-        color: "admin-transaction-badge-document",
-        label: "Document",
-      },
-      submission: {
-        color: "admin-transaction-badge-document",
-        label: "Sent Document",
-      },
-      admin_action: {
-        color: "admin-transaction-badge-admin-action",
-        label: "Admin Action",
-      },
-    };
-    const config = typeConfig[type] || {
+  const TYPE_BADGE_CONFIG = {
+    queue: { color: "admin-transaction-badge-queue", label: "Queue" },
+    appointment: {
+      color: "admin-transaction-badge-appointment",
+      label: "Appointment",
+    },
+    document: {
       color: "admin-transaction-badge-document",
-      label: type ? type.charAt(0).toUpperCase() + type.slice(1) : "Unknown",
+      label: "Document Request",
+    },
+    submission: {
+      color: "admin-transaction-badge-document",
+      label: "Document Submission",
+    },
+    admin_action: {
+      color: "admin-transaction-badge-admin-action",
+      label: "Admin Action",
+    },
+  };
+  // Shared by the on-screen badge below and the CSV/PDF export's Type
+  // column, so both show the same friendly label instead of the export
+  // showing a raw "document"/"submission" string.
+  const getTypeLabel = (type) =>
+    TYPE_BADGE_CONFIG[type]?.label ??
+    (type ? type.charAt(0).toUpperCase() + type.slice(1) : "Unknown");
+
+  const getTypeBadge = (type) => {
+    const config = TYPE_BADGE_CONFIG[type] || {
+      color: "admin-transaction-badge-document",
+      label: getTypeLabel(type),
     };
     return (
       <span className={`admin-transaction-badge ${config.color}`}>
@@ -382,7 +389,7 @@ export default function AdminTransaction() {
   // filters, mirroring the professor transactions page's export) ───────────
   const exportHeader = ["Type", "Action", "Details", "Status", "College", "Student Name", "Student ID", "Processor", "Tracking #", "Timestamp"];
   const exportRows = filteredTransactions.map((t) => [
-    t.type, t.action, t.details, t.status, t.collegeAbbrev, t.studentName, t.studentId, t.processor, t.trackingNumber, t.timestamp,
+    getTypeLabel(t.type), t.action, t.details, t.status, t.collegeAbbrev, t.studentName, t.studentId, t.processor, t.trackingNumber, t.timestamp,
   ]);
   // Prefixes a leading =/+/-/@ with a straight quote so a formula-looking
   // cell (e.g. a details string starting with "=") can't execute as one when
@@ -549,7 +556,15 @@ export default function AdminTransaction() {
                 id="tx-filter-type"
                 label="Type"
                 value={filterType}
-                onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  const nextType = e.target.value;
+                  setFilterType(nextType);
+                  const allowedStatuses = ADMIN_STATUSES_BY_TYPE[nextType];
+                  if (allowedStatuses && filterStatus !== "all" && !allowedStatuses.includes(filterStatus)) {
+                    setFilterStatus("all");
+                  }
+                  setPage(1);
+                }}
                 options={TYPE_OPTIONS}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
@@ -559,7 +574,7 @@ export default function AdminTransaction() {
                 label="Status"
                 value={filterStatus}
                 onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-                options={STATUS_OPTIONS}
+                options={getStatusOptionsForType(STATUS_OPTIONS, ADMIN_STATUSES_BY_TYPE, filterType)}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
               />
             </div>

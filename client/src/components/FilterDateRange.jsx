@@ -35,7 +35,7 @@ export default function FilterDateRange({
           type="date"
           className="filter-date-input"
           value={startValue || ""}
-          max={getManilaDateString()}
+          max={endValue || getManilaDateString()}
           onChange={onStartChange}
           disabled={disabled}
           aria-label={`${label} start`}
@@ -46,7 +46,7 @@ export default function FilterDateRange({
           type="date"
           className="filter-date-input"
           value={endValue || ""}
-          min={getManilaDateString()}
+          min={startValue || undefined}
           onChange={onEndChange}
           disabled={disabled}
           aria-label={`${label} end`}

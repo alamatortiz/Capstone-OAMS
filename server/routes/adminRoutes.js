@@ -396,6 +396,9 @@ router.get(
 
       const today = getManilaDateString();
       const yesterday = getManilaDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+      // 3-day window (today + 2 back) so a Friday-hosted queue stays visible
+      // through the weekend and into Monday, rather than vanishing Saturday.
+      const twoDaysAgo = getManilaDateString(new Date(Date.now() - 48 * 60 * 60 * 1000));
 
       const [slots] = await pool.query(
         `SELECT
@@ -435,6 +438,14 @@ router.get(
              LIMIT 1
            ) AS currently_serving_student_number,
            (
+             SELECT CONCAT(st3c.first_name, ' ', st3c.last_name)
+             FROM queues q3c
+             JOIN students st3c ON q3c.student_id = st3c.student_id
+             WHERE q3c.slot_id = qs.slot_id AND q3c.status = 'serving'
+             ORDER BY q3c.called_at DESC
+             LIMIT 1
+           ) AS currently_serving_student_name,
+           (
              SELECT q3b.arrived_at
              FROM queues q3b
              WHERE q3b.slot_id = qs.slot_id AND q3b.status = 'serving'
@@ -447,9 +458,9 @@ router.get(
          LEFT JOIN locations l ON s.location_id = l.location_id
          JOIN departments d ON qs.department_id = d.department_id
          WHERE qs.department_id = ?
-           AND qs.slot_date IN (?, ?)
+           AND qs.slot_date IN (?, ?, ?)
          ORDER BY qs.created_at DESC`,
-        [deptId, today, yesterday],
+        [deptId, today, yesterday, twoDaysAgo],
       );
 
       const formatted = slots.map((q) => {
@@ -492,6 +503,7 @@ router.get(
           location: q.location_name || q.office_location || null,
           currentlyServingStudentNumber:
             q.currently_serving_student_number || null,
+          currentlyServingStudentName: q.currently_serving_student_name || null,
           currentlyServingArrivedAt: q.currently_serving_arrived_at || null,
           avgServiceMinutes:
             q.avg_service_minutes != null ? Number(q.avg_service_minutes) : null,
@@ -954,6 +966,10 @@ router.patch(
       const deptId = await getAdminDepartmentId(adminId);
       const slot = await getOwnedSlotOrRespond(conn, res, { slotId, deptId });
       if (!slot) return;
+      if (["closed", "completed"].includes(slot.status)) {
+        await conn.rollback();
+        return res.status(409).json({ error: "This queue is already closed" });
+      }
 
       // Every student still waiting or being served has their entry force-
       // cancelled with the admin's reason — otherwise these rows would be
@@ -964,6 +980,20 @@ router.patch(
          WHERE slot_id = ? AND status IN ('waiting', 'serving')`,
         [slotId],
       );
+
+      const [[servedRow]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM queues WHERE slot_id = ? AND status = 'completed'`,
+        [slotId],
+      );
+
+      // Completed only when nobody's currently waiting AND real service
+      // already happened -- a queue that never served anyone stays Closed
+      // even if closed early, matching the "zero activity isn't an
+      // accomplishment" rule already used elsewhere (the Accomplished-Queues
+      // analytics count, the sweeper's zero-activity path). Closed covers
+      // every other admin-close: someone still waiting (force-cancelled
+      // below), or nobody ever served at all.
+      const newStatus = affected.length === 0 && servedRow.n > 0 ? "completed" : "closed";
 
       for (const entry of affected) {
         await conn.query(
@@ -978,16 +1008,16 @@ router.patch(
       }
 
       await conn.query(
-        `UPDATE queue_slots SET status = 'closed', close_reason = ? WHERE slot_id = ?`,
-        [reason, slotId],
+        `UPDATE queue_slots SET status = ?, close_reason = ? WHERE slot_id = ?`,
+        [newStatus, reason, slotId],
       );
 
       await conn.commit();
 
-      await logAudit(adminId, "UPDATE", "queue_slots", slotId, { status: slot.status }, { status: "closed", reason, cancelledCount: affected.length });
+      await logAudit(adminId, "UPDATE", "queue_slots", slotId, { status: slot.status }, { status: newStatus, reason, cancelledCount: affected.length });
 
-      emitToSlot(slotId, "queue:slot-status", { slotId, status: "closed", reason });
-      emitToDept(deptId, "queue:slot-status", { slotId, status: "closed", reason });
+      emitToSlot(slotId, "queue:slot-status", { slotId, status: newStatus, reason });
+      emitToDept(deptId, "queue:slot-status", { slotId, status: newStatus, reason });
       for (const entry of affected) {
         const stoppedPayload = { slotId, queueId: entry.queue_id, studentId: entry.student_id, reason };
         emitToUser(entry.student_id, "queue:queue-stopped", stoppedPayload);
@@ -995,9 +1025,9 @@ router.patch(
       }
 
       res.json({
-        message: "Queue closed",
+        message: newStatus === "completed" ? "Queue marked complete" : "Queue closed",
         slotId,
-        status: "closed",
+        status: newStatus,
         reason,
         cancelledCount: affected.length,
       });
@@ -1551,7 +1581,13 @@ router.get(
         let requestTypeClause = "";
         let requestTypeParam = null;
         if (filterType !== "all") {
-          if (REQUEST_TYPES.includes(filterType)) {
+          if (filterType === "document") {
+            // Document requests and document submissions share one lifecycle
+            // (identical status ENUM, same icons/badges everywhere else) --
+            // the "Document" filter option covers both raw types.
+            requestTypeClause = "AND type IN (?)";
+            requestTypeParam = ["document", "submission"];
+          } else if (REQUEST_TYPES.includes(filterType)) {
             requestTypeClause = "AND type = ?";
             requestTypeParam = filterType;
           } else {
@@ -2045,11 +2081,13 @@ router.get(
            q.created_at,
            q.arrived_at,
            COALESCE(q.service_label_snapshot, s.service_name) AS service_label,
+           l.location_name AS service_location,
            CONCAT(st.first_name, ' ', st.last_name) AS student_name,
            st.student_number
          FROM queues q
          JOIN students st ON q.student_id = st.student_id
          LEFT JOIN services s ON q.service_id = s.service_id
+         LEFT JOIN locations l ON s.location_id = l.location_id
          WHERE q.slot_id = ?
          ORDER BY q.queue_number ASC`,
         [slotId],
@@ -2060,6 +2098,7 @@ router.get(
         studentName: r.student_name,
         studentId: r.student_number,
         service: r.service_label || null,
+        location: r.service_location || null,
         concern: r.notes || "No concern specified",
         joinedAt: formatTime(getManilaTimeString(r.created_at)),
         status: r.status,
@@ -4707,18 +4746,21 @@ router.delete(
 // QUEUE ANALYTICS
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/admin/queue-analytics/summary?range=today|all&service=All+Services|<name>
+// GET /api/admin/queue-analytics/summary?startDate=&endDate=&service=All+Services|<name>&page=&limit=
 // Lean, real-metric summary for the reworked (web) Queue Analytics screen:
 // accomplished queues, overtime queues, students served, no-shows, peak hour,
-// plus a per-service breakdown. Scoped to the admin's own department.
+// a per-service averages rollup, and a per-hosted-queue-instance list.
+// Scoped to the admin's own department. Defaults to today when neither date
+// is supplied.
 //
-// "Overtime" = a queue slot whose posted window ended while it still had
-// students to serve -- derived, no schema column: it's either sitting
-// 'expired' right now with people still in line, OR at least one of its entries
-// was completed/cancelled after the slot's posted end_time (service ran past
-// hours). `close_reason = 'Queue hours ended'` (set by queueExpirySweeper.js,
-// never cleared by queueSlotSettlement.js) is a secondary signal available to
-// tighten this later.
+// "Overtime" = a *completed* queue slot where at least one of its entries was
+// completed/cancelled after the slot's posted end_time (it ran past hours
+// before finally finishing) -- a strict subset of "Accomplished Queues", not
+// a separately-counted bucket. A still-`expired` slot that's currently
+// running late but hasn't finished yet doesn't count here (this is a
+// historical report); `close_reason = 'Queue hours ended'` (set by
+// queueExpirySweeper.js) is a secondary signal available if that live-in-
+// progress case ever needs its own indicator elsewhere.
 router.get(
   "/queue-analytics/summary",
   authenticateToken,
@@ -4732,19 +4774,24 @@ router.get(
           .json({ error: "Admin has no department assigned" });
       }
 
-      const range = req.query.range === "all" ? "all" : "today";
+      const today = getManilaDateString();
+      const startDate = req.query.startDate || today;
+      const endDate = req.query.endDate || today;
       const service =
         req.query.service && req.query.service !== "All Services"
           ? req.query.service
           : null;
+      const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+      const offset = (page - 1) * limit;
 
-      // Manila-midnight-as-a-UTC-instant, same pattern as the /transactions
-      // endpoint. NULL selects "all time" via the `? IS NULL OR …` guards below.
-      const slotDateParam = range === "today" ? getManilaDateString() : null;
-      const entryDateParam =
-        range === "today"
-          ? new Date(`${getManilaDateString()}T00:00:00+08:00`)
-          : null;
+      // `queues` timestamp columns (completed_at/called_at/created_at) are
+      // real UTC instants, so they need the Manila-midnight-anchored bounds
+      // -- same two-sided pattern as GET /transactions. A single-sided lower
+      // bound (the old today-vs-all-time toggle's shortcut) would silently
+      // include everything from startDate through today for a real range.
+      const startUTC = manilaDayStartUTC(startDate);
+      const endExclusiveUTC = manilaDayEndExclusiveUTC(endDate);
 
       const fmtHour = (h) => {
         const suffix = h >= 12 ? "PM" : "AM";
@@ -4752,12 +4799,12 @@ router.get(
         return `${h12}:00 ${suffix}`;
       };
 
-      // The overtime predicate, reused for the total and the per-service counts.
+      // `qs.slot_date` is a plain DATE column already in Manila-calendar
+      // terms (not a UTC timestamp) -- a simple string BETWEEN is correct
+      // here, no UTC conversion needed (that's only for the `queues` entry
+      // timestamps above).
       const OVERTIME_PREDICATE = `(
-        (qs.status = 'expired' AND EXISTS (
-          SELECT 1 FROM queues q WHERE q.slot_id = qs.slot_id
-            AND q.status IN ('waiting','serving')))
-        OR EXISTS (
+        qs.status = 'completed' AND EXISTS (
           SELECT 1 FROM queues q WHERE q.slot_id = qs.slot_id
             AND COALESCE(q.completed_at, q.cancelled_at) >
                 CONVERT_TZ(CONCAT(qs.slot_date, ' ', qs.end_time), '+08:00', '+00:00'))
@@ -4769,31 +4816,36 @@ router.get(
         [overtimeRows],
         [peakRows],
         [serviceRows],
+        [queueRows],
       ] = await Promise.all([
-        // Accomplished queues -- queue_slots that ran to a clean finish.
+        // Accomplished queues -- completed slots with at least one actually-
+        // served student (excludes a slot nobody ever joined, or where every
+        // joiner cancelled, from counting as a "job well done").
         pool.query(
           `SELECT COUNT(*) AS n
            FROM queue_slots qs
            LEFT JOIN services s ON qs.service_id = s.service_id
            WHERE qs.department_id = ?
              AND qs.status = 'completed'
-             AND (? IS NULL OR qs.slot_date = ?)
-             AND (? IS NULL OR (CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END) = ?)`,
-          [deptId, slotDateParam, slotDateParam, service, service],
+             AND qs.slot_date BETWEEN ? AND ?
+             AND (? IS NULL OR (CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END) = ?)
+             AND EXISTS (SELECT 1 FROM queues q WHERE q.slot_id = qs.slot_id AND q.status = 'completed')`,
+          [deptId, startDate, endDate, service, service],
         ),
-        // Per-service served / no-shows / avg wait. Each metric requires the
-        // timestamp that proves the entry actually ran its course
-        // (completed_at / called_at), so a malformed row -- e.g. status
-        // 'completed' with a null completed_at -- can't inflate the counts.
+        // Per-service served / no-shows / avg wait ("Service Averages").
+        // Each metric requires the timestamp that proves the entry actually
+        // ran its course (completed_at / called_at), so a malformed row --
+        // e.g. status 'completed' with a null completed_at -- can't inflate
+        // the counts.
         pool.query(
           `SELECT s.service_id, s.service_name,
              COALESCE(SUM(q.status = 'completed' AND q.completed_at IS NOT NULL
-               AND (? IS NULL OR q.completed_at >= ?)), 0) AS students_served,
+               AND q.completed_at >= ? AND q.completed_at < ?), 0) AS students_served,
              COALESCE(SUM(q.status = 'no_show' AND q.called_at IS NOT NULL
-               AND (? IS NULL OR q.called_at >= ?)), 0) AS no_shows,
+               AND q.called_at >= ? AND q.called_at < ?), 0) AS no_shows,
              AVG(CASE WHEN q.status = 'completed' AND q.completed_at IS NOT NULL
                AND q.called_at IS NOT NULL
-               AND (? IS NULL OR q.completed_at >= ?)
+               AND q.completed_at >= ? AND q.completed_at < ?
                THEN TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at) END) AS avg_wait_minutes
            FROM services s
            LEFT JOIN queues q ON q.service_id = s.service_id
@@ -4802,9 +4854,9 @@ router.get(
            GROUP BY s.service_id, s.service_name
            ORDER BY students_served DESC, s.service_name`,
           [
-            entryDateParam, entryDateParam,
-            entryDateParam, entryDateParam,
-            entryDateParam, entryDateParam,
+            startUTC, endExclusiveUTC,
+            startUTC, endExclusiveUTC,
+            startUTC, endExclusiveUTC,
             deptId, service, service,
           ],
         ),
@@ -4816,11 +4868,11 @@ router.get(
            FROM queue_slots qs
            LEFT JOIN services s ON qs.service_id = s.service_id
            WHERE qs.department_id = ?
-             AND (? IS NULL OR qs.slot_date = ?)
+             AND qs.slot_date BETWEEN ? AND ?
              AND (? IS NULL OR (CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END) = ?)
              AND ${OVERTIME_PREDICATE}
            GROUP BY qs.service_id`,
-          [deptId, slotDateParam, slotDateParam, service, service],
+          [deptId, startDate, endDate, service, service],
         ),
         // Peak hour -- busiest Manila clock-hour by queue join time, over
         // entries that actually reached a service window (`called_at` set:
@@ -4833,17 +4885,46 @@ router.get(
            JOIN services s ON q.service_id = s.service_id
            WHERE s.department_id = ?
              AND q.called_at IS NOT NULL
-             AND (? IS NULL OR q.created_at >= ?)
+             AND q.created_at >= ? AND q.created_at < ?
              AND (? IS NULL OR s.service_name = ?)
            GROUP BY hr
            ORDER BY cnt DESC
            LIMIT 1`,
-          [deptId, entryDateParam, entryDateParam, service, service],
+          [deptId, startUTC, endExclusiveUTC, service, service],
         ),
         // Service-type dropdown options.
         pool.query(
           `SELECT service_name FROM services WHERE department_id = ? ORDER BY service_name`,
           [deptId],
+        ),
+        // Per-hosted-queue-instance list -- every queue_slot that reached a
+        // terminal state (completed *or* closed, so a force-closed queue
+        // doesn't vanish from analytics) in the picked range. Fetches one
+        // extra row past `limit` to know whether "Load More" should show,
+        // without a separate COUNT query.
+        pool.query(
+          `SELECT qs.slot_id, qs.slot_date, qs.start_time, qs.end_time, qs.is_universal, qs.status,
+                  CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END AS label,
+                  COALESCE(SUM(q.status = 'completed'), 0) AS students_served,
+                  COALESCE(SUM(q.status = 'no_show'), 0) AS no_shows,
+                  AVG(CASE WHEN q.status = 'completed' AND q.called_at IS NOT NULL
+                      THEN TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at) END) AS avg_wait_minutes,
+                  EXISTS (
+                    SELECT 1 FROM queues q2 WHERE q2.slot_id = qs.slot_id
+                      AND COALESCE(q2.completed_at, q2.cancelled_at) >
+                          CONVERT_TZ(CONCAT(qs.slot_date, ' ', qs.end_time), '+08:00', '+00:00')
+                  ) AS is_overtime
+           FROM queue_slots qs
+           LEFT JOIN services s ON qs.service_id = s.service_id
+           LEFT JOIN queues q ON q.slot_id = qs.slot_id
+           WHERE qs.department_id = ?
+             AND qs.status IN ('completed', 'closed')
+             AND qs.slot_date BETWEEN ? AND ?
+             AND (? IS NULL OR (CASE WHEN qs.is_universal THEN 'Universal Service Queue' ELSE s.service_name END) = ?)
+           GROUP BY qs.slot_id
+           ORDER BY qs.slot_date DESC, qs.start_time DESC
+           LIMIT ? OFFSET ?`,
+          [deptId, startDate, endDate, service, service, limit + 1, offset],
         ),
       ]);
 
@@ -4856,6 +4937,22 @@ router.get(
         studentsServed: Number(r.students_served) || 0,
         noShows: Number(r.no_shows) || 0,
         overtimeQueues: overtimeByService.get(r.service_id) || 0,
+        avgWaitMinutes:
+          r.avg_wait_minutes != null ? Math.round(Number(r.avg_wait_minutes)) : 0,
+      }));
+
+      const hasMore = queueRows.length > limit;
+      const queues = queueRows.slice(0, limit).map((r) => ({
+        slotId: r.slot_id,
+        label: r.label,
+        slotDate: r.slot_date,
+        startTime: String(r.start_time).slice(0, 5),
+        endTime: String(r.end_time).slice(0, 5),
+        isUniversal: !!r.is_universal,
+        status: r.status,
+        studentsServed: Number(r.students_served) || 0,
+        noShows: Number(r.no_shows) || 0,
+        overtime: !!r.is_overtime,
         avgWaitMinutes:
           r.avg_wait_minutes != null ? Math.round(Number(r.avg_wait_minutes)) : 0,
       }));
@@ -4874,268 +4971,17 @@ router.get(
       };
 
       res.json({
-        range,
+        startDate,
+        endDate,
         serviceTypes: ["All Services", ...serviceRows.map((s) => s.service_name)],
         totals,
         byService,
+        queues,
+        page,
+        hasMore,
       });
     } catch (error) {
       sendServerError(res, error, "Queue analytics summary error:");
-    }
-  },
-);
-
-// GET /api/admin/queue-analytics?period=Today|This Week|This Month|This Semester&service=All+Services|<name>
-router.get(
-  "/queue-analytics",
-  authenticateToken,
-  authorizeRoles("admin"),
-  async (req, res) => {
-    try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      if (!deptId) {
-        return res
-          .status(403)
-          .json({ error: "Admin has no department assigned" });
-      }
-      const { period = "Today", service = "All Services" } = req.query;
-
-      // Compute date threshold, anchored to Manila midnight (a real UTC
-      // instant) rather than the server process's own local time -- mirrors
-      // the /transactions endpoint above (~line 865). Do not use raw local
-      // `Date` getters (getFullYear/getMonth/getDate) here; they depend on
-      // the server process's own timezone, not Manila's.
-      const manilaMidnightUTC = new Date(`${getManilaDateString()}T00:00:00+08:00`);
-      const [manilaYear, manilaMonth, manilaDay] = getManilaDateString()
-        .split("-")
-        .map(Number);
-      let dateThreshold;
-      if (period === "Today") {
-        dateThreshold = manilaMidnightUTC;
-      } else if (period === "This Week") {
-        // Weekday of Manila's "today", derived from a local-Date seed built
-        // from the Manila Y/M/D so it never depends on server process TZ.
-        const dayOfWeek = new Date(manilaYear, manilaMonth - 1, manilaDay).getDay();
-        dateThreshold = new Date(
-          manilaMidnightUTC.getTime() - dayOfWeek * 24 * 60 * 60 * 1000,
-        );
-      } else if (period === "This Month") {
-        dateThreshold = new Date(
-          `${manilaYear}-${String(manilaMonth).padStart(2, "0")}-01T00:00:00+08:00`,
-        );
-      } else {
-        // This Semester: 6 months back from the 1st of the current Manila month
-        let semYear = manilaYear;
-        let semMonth = manilaMonth - 6;
-        if (semMonth <= 0) {
-          semMonth += 12;
-          semYear -= 1;
-        }
-        dateThreshold = new Date(
-          `${semYear}-${String(semMonth).padStart(2, "0")}-01T00:00:00+08:00`,
-        );
-      }
-
-      // Service type filter
-      const serviceFilter = service !== "All Services" ? service : null;
-
-      // Main performance query: per-service stats for completed queues
-      const [rows] = await pool.query(
-        `SELECT s.service_id, s.service_name, d.department_abbreviation AS college,
-           COUNT(q.queue_id) AS students_served,
-           AVG(TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at)) AS avg_wait_minutes
-         FROM queues q
-         JOIN services s ON q.service_id = s.service_id
-         JOIN departments d ON s.department_id = d.department_id
-         WHERE q.status = 'completed'
-           AND s.department_id = ?
-           AND q.created_at >= ?
-           ${serviceFilter ? "AND s.service_name = ?" : ""}
-         GROUP BY s.service_id, s.service_name, d.department_abbreviation`,
-        serviceFilter ? [deptId, dateThreshold, serviceFilter] : [deptId, dateThreshold],
-      );
-
-      // q.created_at is stored/returned as a UTC instant; HOUR() alone would
-      // bucket by UTC hour, not Manila hour, so shift it first. Shared by the
-      // per-service peak-hour loop below and the department-wide trends
-      // queries further down.
-      const fmtHour = (h) => {
-        const suffix = h >= 12 ? "PM" : "AM";
-        const h12 = h % 12 || 12;
-        return `${h12}:00 ${suffix}`;
-      };
-
-      // Peak hour per service
-      const peakMap = {};
-      for (const row of rows) {
-        const [peakRows] = await pool.query(
-          `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr, COUNT(*) AS cnt
-           FROM queues q
-           WHERE q.service_id = ? AND q.created_at >= ?
-           GROUP BY hr
-           ORDER BY cnt DESC
-           LIMIT 1`,
-          [row.service_id, dateThreshold],
-        );
-        if (peakRows.length > 0) {
-          const hr = peakRows[0].hr;
-          peakMap[row.service_id] = `${fmtHour(hr)} - ${fmtHour(hr + 1)}`;
-        } else {
-          peakMap[row.service_id] = "N/A";
-        }
-      }
-
-      // Build performance array
-      const performance = rows.map((r) => {
-        const avgWait = r.avg_wait_minutes != null ? parseFloat(r.avg_wait_minutes) : 0;
-        const satisfaction = Math.min(100, Math.max(60, Math.round(100 - avgWait * 1.5)));
-        let status;
-        if (avgWait < 15) status = "excellent";
-        else if (avgWait < 20) status = "good";
-        else status = "needs improvement";
-        return {
-          service: r.service_name,
-          college: r.college,
-          status,
-          studentsServed: r.students_served,
-          avgWait: avgWait > 0 ? `${Math.round(avgWait)} min` : "N/A",
-          peakHours: peakMap[r.service_id] || "N/A",
-          satisfaction,
-        };
-      });
-
-      // Derive insights from performance data
-      const sorted = [...performance].sort((a, b) => b.satisfaction - a.satisfaction);
-      const positiveInsights = sorted
-        .filter((p) => p.satisfaction >= 80)
-        .slice(0, 3)
-        .map((p) => ({
-          title: `${p.status === "excellent" ? "Excellent" : "Good"} Performance: ${p.service}`,
-          desc: `${p.college} ${p.service} has a ${p.satisfaction}% satisfaction rate with an average wait of ${p.avgWait}.`,
-        }));
-      const improvementAreas = sorted
-        .filter((p) => p.status === "needs improvement" || parseFloat(p.avgWait) > 18)
-        .slice(0, 3)
-        .map((p) => ({
-          title: `Long Wait Times: ${p.service}`,
-          desc: `${p.college} ${p.service} averages ${p.avgWait} wait time. Consider adding more service windows during peak hours (${p.peakHours}).`,
-        }));
-
-      // Service type list for dropdown
-      const [serviceRows] = await pool.query(
-        `SELECT service_name FROM services WHERE department_id = ? ORDER BY service_name`,
-        [deptId],
-      );
-      const serviceTypes = ["All Services", ...serviceRows.map((s) => s.service_name)];
-
-      // ── Trends tab: department-wide (not per-service) stats, plus a
-      // period-over-period comparison against the immediately-preceding
-      // window of equal length (e.g. "This Week" compares to last week). ──
-      const now = new Date();
-      const periodLengthMs = now.getTime() - dateThreshold.getTime();
-      const previousPeriodEnd = dateThreshold;
-      const previousPeriodStart = new Date(dateThreshold.getTime() - periodLengthMs);
-
-      const serviceFilterClause = serviceFilter ? "AND s.service_name = ?" : "";
-
-      // Peak Activity Time: busiest hour department-wide, any queue-join
-      // regardless of status (mirrors the per-service peak-hour query above,
-      // just without the per-service GROUP BY/loop).
-      const [peakActivityRows] = await pool.query(
-        `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr, COUNT(*) AS cnt
-         FROM queues q
-         JOIN services s ON q.service_id = s.service_id
-         WHERE s.department_id = ? AND q.created_at >= ? ${serviceFilterClause}
-         GROUP BY hr
-         ORDER BY cnt DESC
-         LIMIT 1`,
-        serviceFilter ? [deptId, dateThreshold, serviceFilter] : [deptId, dateThreshold],
-      );
-      const peakActivityTime = peakActivityRows.length > 0
-        ? `${fmtHour(peakActivityRows[0].hr)} - ${fmtHour(peakActivityRows[0].hr + 1)}`
-        : "N/A";
-
-      // Best Service Time: hour with the lowest avg wait among completed
-      // tickets (the "shortest average wait times" hour of the day).
-      const [bestServiceRows] = await pool.query(
-        `SELECT HOUR(CONVERT_TZ(q.created_at, '+00:00', '+08:00')) AS hr,
-                AVG(TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at)) AS avg_wait_minutes
-         FROM queues q
-         JOIN services s ON q.service_id = s.service_id
-         WHERE q.status = 'completed' AND s.department_id = ? AND q.created_at >= ? ${serviceFilterClause}
-         GROUP BY hr
-         ORDER BY avg_wait_minutes ASC
-         LIMIT 1`,
-        serviceFilter ? [deptId, dateThreshold, serviceFilter] : [deptId, dateThreshold],
-      );
-      const bestServiceTime = bestServiceRows.length > 0
-        ? `${fmtHour(bestServiceRows[0].hr)} - ${fmtHour(bestServiceRows[0].hr + 1)}`
-        : "N/A";
-
-      // Department-wide current vs. previous period aggregates, for the
-      // "Weekly Comparison" style cards.
-      const fetchPeriodAgg = async (start, end) => {
-        const [[agg]] = await pool.query(
-          `SELECT COUNT(q.queue_id) AS students_served,
-                  AVG(TIMESTAMPDIFF(MINUTE, q.created_at, q.called_at)) AS avg_wait_minutes
-           FROM queues q
-           JOIN services s ON q.service_id = s.service_id
-           WHERE q.status = 'completed' AND s.department_id = ?
-             AND q.created_at >= ? AND q.created_at < ?
-             ${serviceFilterClause}`,
-          serviceFilter ? [deptId, start, end, serviceFilter] : [deptId, start, end],
-        );
-        const avgWait = agg.avg_wait_minutes != null ? parseFloat(agg.avg_wait_minutes) : 0;
-        return {
-          studentsServed: agg.students_served || 0,
-          avgWaitMinutes: avgWait,
-          satisfaction: Math.min(100, Math.max(60, Math.round(100 - avgWait * 1.5))),
-        };
-      };
-      const [currentAgg, previousAgg] = await Promise.all([
-        fetchPeriodAgg(dateThreshold, now),
-        fetchPeriodAgg(previousPeriodStart, previousPeriodEnd),
-      ]);
-
-      // No prior-period data to compare against -- show "New" (a real
-      // current value with nothing to size it against) or "N/A" (nothing to
-      // show either way), rather than a division-by-zero/Infinity percentage,
-      // or (for satisfaction specifically) a misleading comparison against
-      // the synthetic formula's zero-wait/100%-satisfaction default.
-      const pctChange = (curr, prev, hasBaseline = prev !== 0) => {
-        if (!hasBaseline) return curr ? "New" : "N/A";
-        const pct = Math.round(((curr - prev) / prev) * 100);
-        return `${pct >= 0 ? "+" : ""}${pct}%`;
-      };
-
-      const trends = {
-        peakActivityTime,
-        bestServiceTime,
-        weeklyComparison: [
-          {
-            label: "Students Served",
-            value: String(currentAgg.studentsServed),
-            change: pctChange(currentAgg.studentsServed, previousAgg.studentsServed),
-            color: "#22c55e",
-          },
-          {
-            label: "Avg Wait Time",
-            value: currentAgg.avgWaitMinutes > 0 ? `${Math.round(currentAgg.avgWaitMinutes)} min` : "N/A",
-            change: pctChange(currentAgg.avgWaitMinutes, previousAgg.avgWaitMinutes, previousAgg.studentsServed > 0),
-            color: "#3b82f6",
-          },
-          {
-            label: "Satisfaction Rate",
-            value: `${currentAgg.satisfaction}%`,
-            change: pctChange(currentAgg.satisfaction, previousAgg.satisfaction, previousAgg.studentsServed > 0),
-            color: "#22c55e",
-          },
-        ],
-      };
-
-      res.json({ performance, positiveInsights, improvementAreas, serviceTypes, trends });
-    } catch (error) {
-      sendServerError(res, error, "Queue analytics error:");
     }
   },
 );

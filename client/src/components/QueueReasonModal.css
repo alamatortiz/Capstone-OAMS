@@ -21,3 +21,12 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.qrm-textarea--blue {
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.qrm-textarea--blue:focus {
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}

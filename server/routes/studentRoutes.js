@@ -1500,10 +1500,9 @@ router.get(
 );
 
 // GET /api/student/queues/active
-// Returns all waiting/serving queue entries for the logged-in student, plus
-// any entry completed within the last 30 minutes (a short grace window so
-// the completed-state UI, including the satisfaction-survey prompt, has
-// somewhere to actually be seen before it drops off this list for good).
+// Returns all waiting/serving queue entries for the logged-in student. A
+// completed entry drops off this list immediately (rather than lingering
+// for a grace window) so the student can rejoin the same slot right away.
 router.get(
   "/queues/active",
   authenticateToken,
@@ -1572,10 +1571,7 @@ router.get(
          JOIN departments d ON s.department_id = d.department_id
          LEFT JOIN locations l ON s.location_id = l.location_id
          WHERE q.student_id = ?
-           AND (
-             q.status IN ('waiting', 'serving')
-             OR (q.status = 'completed' AND q.completed_at >= NOW() - INTERVAL 30 MINUTE)
-           )
+           AND q.status IN ('waiting', 'serving')
          ORDER BY q.created_at DESC`,
         [studentId],
       );
@@ -2804,7 +2800,12 @@ router.get(
     try {
       const filterClauses = [];
       const filterParams = [];
-      if (
+      if (type === "document") {
+        // Document requests and document submissions share one lifecycle --
+        // the "Document" filter option covers both raw types.
+        filterClauses.push("type IN (?)");
+        filterParams.push(["document", "submission"]);
+      } else if (
         type &&
         ["queue", "appointment", "document", "submission"].includes(type)
       ) {

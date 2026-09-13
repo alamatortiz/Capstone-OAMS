@@ -779,7 +779,10 @@ router.get(
       // page before. No studentName/studentId here (unlike the appointment
       // branch above) -- this is the faculty member's own submission, there's
       // no other party to name, same as the document-request branch above it.
-      if (filterType === "all" || filterType === "submission") {
+      // Guarded on "document" (not a separate "submission" filter value) --
+      // document requests and submissions share one lifecycle and are
+      // filtered together under the single "Document" option.
+      if (filterType === "all" || filterType === "document") {
         let sql = `
           SELECT
             sub.submission_id AS id, 'submission' AS type,

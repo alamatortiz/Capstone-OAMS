@@ -63,6 +63,11 @@
   color: #a855f7;
 }
 
+.acm-icon--warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
 .acm-title {
   font-size: 1.125rem;
   font-weight: 700;
@@ -108,6 +113,12 @@
 .acm-cancel--primary:hover:not(:disabled) {
   background: rgba(168, 85, 247, 0.06);
   border-color: rgba(168, 85, 247, 0.3);
+}
+
+.acm-cancel--hover-blue:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: var(--blue, #3b82f6);
 }
 
 .acm-cancel:disabled {
@@ -161,6 +172,14 @@
 
 .acm-confirm--primary:hover:not(:disabled) {
   background: #9333ea;
+}
+
+.acm-confirm--warning {
+  background: #f59e0b;
+}
+
+.acm-confirm--warning:hover:not(:disabled) {
+  background: #d97706;
 }
 
 .acm-confirm:disabled {

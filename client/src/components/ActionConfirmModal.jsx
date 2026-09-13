@@ -14,6 +14,7 @@ export default function ActionConfirmModal({
   confirmDisabled = false,
   variant = "danger",
   centered = false,
+  accentTheme,
 }) {
   useLockBodyScroll(show);
 
@@ -31,7 +32,7 @@ export default function ActionConfirmModal({
         <div className={`acm-message${centered ? " acm-message--centered" : ""}`}>{message}</div>
         <div className="acm-actions">
           <button
-            className={`acm-cancel acm-cancel--${variant}`}
+            className={`acm-cancel acm-cancel--${variant}${accentTheme === "blue" ? " acm-cancel--hover-blue" : ""}`}
             onClick={onCancel}
             disabled={confirmDisabled}
           >

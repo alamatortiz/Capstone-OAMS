@@ -452,12 +452,14 @@ body {
   .transactions-container .filters-grid {
     gap: 1.5rem;
   }
+
+  .transactions-container .filters-date-section {
+    margin-top: 1.5rem;
+  }
 }
 
 .transactions-container .filters-date-section {
   margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--card-border);
 }
 
 .tx-export-btn {
