@@ -8,8 +8,8 @@ import { useLiveRefetch } from "./useLiveRefetch";
 // (queue lifecycle management) -- both fetch the same GET /admin/queue-hosting
 // data and drive the same pause/resume/close actions against it. Centralizing
 // the fetch, live-update socket wiring, and pause/resume/close flow here
-// keeps them from drifting the way they previously did (e.g. queue:notes-
-// updated was only wired up in one of the two pages).
+// keeps the two pages from drifting out of sync (e.g. one page missing a
+// socket event the other has wired up).
 const QUEUE_HOSTING_EVENTS = [
   "queue:slot-opened",
   "queue:slot-status",

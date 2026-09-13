@@ -215,7 +215,7 @@ body {
   stroke: currentColor;
 }
 
-/* Header icon (self-contained, was previously leaking box shape from stud-queue.css) */
+/* Self-contained so it doesn't inherit box shape from stud-queue.css */
 .tx-title-icon {
   width: 3.5rem;
   height: 3.5rem;
@@ -415,10 +415,10 @@ body {
   text-align: center;
 }
 
-/* Grid placement lives on the ExportMenu wrapper now, not the button itself
-   -- the button is no longer a direct child of .filters-header's grid once
-   wrapped in the CSV/PDF dropdown, so grid-column/justify-self on the
-   button alone would be silently ignored by the browser. */
+/* Grid placement lives on the ExportMenu wrapper, not the button itself --
+   the button isn't a direct child of .filters-header's grid once wrapped in
+   the CSV/PDF dropdown, so grid-column/justify-self on the button alone
+   would be silently ignored by the browser. */
 .transactions-container .export-menu {
   grid-column: 3;
   justify-self: end;
@@ -863,7 +863,31 @@ body {
 .transaction-badges {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.txn-tracking-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(249, 115, 22, 0.12);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  font-family: "Inter", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .txn-tracking-pill {
+  background: rgba(234, 88, 12, 0.08);
+  color: #9a3412;
+  border-color: rgba(234, 88, 12, 0.2);
 }
 
 .tx-badge {
@@ -1006,9 +1030,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .transactions-container {
     padding: 0.75rem;
     gap: 0.75rem;

@@ -127,11 +127,10 @@ export default function AnnouncementsPage() {
       () => toast.error("Could not load attachment."),
     );
 
-  // ── Live data state (replaces the old static ANNOUNCEMENTS_DATA array) ────
   // `announcements` holds whatever page(s) have been loaded for the CURRENT
-  // tab only -- filtering/pagination now happens server-side (see
+  // tab only -- filtering/pagination happens server-side (see
   // fetchAnnouncements), so there's no separate "all announcements ever
-  // fetched" cache to filter client-side anymore.
+  // fetched" cache to filter client-side.
   const [announcements, setAnnouncements] = useState([]);
   const [annLoading, setAnnLoading] = useState(true);
   const [annError, setAnnError] = useState(null);

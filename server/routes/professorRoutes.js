@@ -354,7 +354,7 @@ function buildActivityTitle(row) {
     // cancelled_by distinguishes a student's own cancellation from one this
     // faculty member triggered themselves, or an automatic cancellation
     // caused by editing/deleting the schedule slot the appointment was in --
-    // without this, all three used to render as "cancelled by {student}".
+    // without it, all three would render as "cancelled by {student}".
     if (row.cancelled_by === "system")
       return `Appointment with ${row.student_name} auto-cancelled — schedule changed`;
     if (row.cancelled_by === "system_expired")
@@ -896,10 +896,9 @@ router.get(
 // appointments + own document requests -- mirrors studentRoutes.js's
 // STATUS_MAP/STATUS_GROUPS "this month" pattern so the stat cards never
 // reflect whatever search/type/status filter happens to be active client-side.
-// Shipped as a separate, additive endpoint (rather than folding stats into
-// GET /transactions above) specifically so that endpoint's existing bare-array
-// response shape never changes -- client-mobile's professor transactions
-// screen depends on that shape and isn't otherwise being touched in this pass.
+// Kept as a separate endpoint (rather than folding stats into GET
+// /transactions above) so that endpoint's bare-array response shape never
+// changes -- client-mobile's professor transactions screen depends on it.
 const TXN_STATUS_BUCKET = {
   completed: "completed",
   claimed: "completed",

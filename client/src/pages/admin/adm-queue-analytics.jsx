@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import api from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import { useLiveRefetch } from "../../hooks/useLiveRefetch";
-import { getManilaDateString, formatManilaDate } from "../../utils/dateTime";
+import { getManilaDateString, formatManilaDate, formatTimeString } from "../../utils/dateTime";
 import ExportMenu from "../../components/ExportMenu";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
 
@@ -167,7 +167,7 @@ export default function AdminQueueAnalytics() {
   const buildExportRow = (q) => [
     q.label,
     formatManilaDate(q.slotDate),
-    `${q.startTime} – ${q.endTime}`,
+    `${formatTimeString(q.startTime)} – ${formatTimeString(q.endTime)}`,
     q.status === "completed" ? "Completed" : "Closed",
     q.studentsServed,
     q.noShows,
@@ -383,7 +383,7 @@ export default function AdminQueueAnalytics() {
                 <div key={row.slotId} className="aqa-svc-card">
                   <div className="aqa-svc-card-head">
                     <span className="aqa-svc-name">
-                      {row.label} Queue for {formatManilaDate(row.slotDate)}: {row.startTime} – {row.endTime}
+                      {row.isUniversal ? row.label : `${row.label} Queue`} for {formatManilaDate(row.slotDate)}: {formatTimeString(row.startTime)} – {formatTimeString(row.endTime)}
                     </span>
                     <span className={`aqa-queue-status-badge aqa-queue-status--${row.status}`}>
                       {row.status === "completed" ? "Completed" : "Closed"}

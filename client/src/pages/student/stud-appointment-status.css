@@ -1,5 +1,5 @@
 /* ===== Appointment Status Page — Purple-themed Overrides ===== */
-/* Fully self-contained — no longer depends on other pages' CSS. */
+/* Fully self-contained — does not depend on other pages' CSS. */
 
 /* ===== DARK MODE (DEFAULT) ===== */
 :root,
@@ -879,9 +879,9 @@
 }
 
 /* ─── Comments card — read-only, blue hue (mirrors the cancel card's red /
-   complete card's green pattern). The student can no longer edit this field
-   at all (see prof-appointments.jsx's CommentBlock for the professor's own,
-   still-editable copy), so there is no edit affordance here anymore. ────── */
+   complete card's green pattern). The student cannot edit this field (see
+   prof-appointments.jsx's CommentBlock for the professor's own, editable
+   copy), so there is no edit affordance here. ─────────────────────────── */
 .apst-comment-card {
   border: 1px solid rgba(59, 130, 246, 0.2);
   background-color: rgba(59, 130, 246, 0.05);

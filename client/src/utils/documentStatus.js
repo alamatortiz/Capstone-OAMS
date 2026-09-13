@@ -1,7 +1,6 @@
 // The document lifeline is Pending -> Processing -> Ready -> Claimed (+ Rejected,
-// Cancelled). The old DB values "generated" (shown as "Ready") and "released"
-// were collapsed into "ready" -- both are folded here as defensive aliases so a
-// row that predates the collapse (an un-migrated backend) still renders cleanly.
+// Cancelled). "generated" and "released" are legacy DB values, folded here as
+// aliases for "ready" so a row from an un-migrated backend still renders cleanly.
 export function normalizeDocStatus(status) {
   if (status === "generated" || status === "released") return "ready";
   return status;

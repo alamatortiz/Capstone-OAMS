@@ -118,7 +118,7 @@ const TransactionsIcon = () => <LucideClipboardList className="icon" />;
 const formatActivityStatus = (status, type) => {
   if (!status) return "";
   if (status === "no_show") return "No Show";
-  // Defensive: pre-collapse doc rows may still say "generated"/"released".
+  // Defensive: legacy doc rows may still say "generated"/"released".
   if (type === "document" && (status === "generated" || status === "released")) return "Ready";
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
@@ -299,8 +299,8 @@ export default function StudentDashboard() {
   // ── Derived values ────────────────────────────────────────────────────────
   // The "Active Queue" preview reads exclusively from QueueContext (the same
   // source stud-queue-status.jsx uses) instead of also considering
-  // dashStats.activeQueue -- the two used to be refreshed by different,
-  // non-identical socket event sets and could show contradictory
+  // dashStats.activeQueue, since the two are refreshed by different,
+  // non-identical socket event sets and could otherwise show contradictory
   // position/status for the same queue. dashStats is still used below for
   // the other stat tiles (appointments/documents/completed) that have no
   // QueueContext equivalent. Field names are normalized (serviceName ->

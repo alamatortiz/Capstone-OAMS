@@ -574,6 +574,11 @@ export default function TransactionsPage() {
                         >
                           {getTypeLabel(transaction.type)}
                         </span>
+                        {transaction.trackingNumber && (
+                          <span className="txn-tracking-pill">
+                            {transaction.trackingNumber}
+                          </span>
+                        )}
                         <span
                           className={`tx-badge ${getStatusColor(
                             transaction.status,
@@ -584,7 +589,11 @@ export default function TransactionsPage() {
                       </div>
                     </div>
                     <p className="transaction-college">{transaction.college}</p>
-                    <p className="transaction-details">{transaction.details}</p>
+                    {transaction.type === "queue" && transaction.adminReason && (
+                      <p className="transaction-details">
+                        Reason: {transaction.adminReason}
+                      </p>
+                    )}
                   </div>
 
                   <div className="transaction-meta">

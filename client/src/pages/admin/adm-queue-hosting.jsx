@@ -319,7 +319,7 @@ export default function AdminQueueHosting() {
     (q) => q.status === "full" || q.status === "expired",
   );
   const completedQueues = filteredQueues.filter((q) => q.status === "completed");
-  // 'closed' now means exclusively "an admin manually stopped this queue".
+  // 'closed' means exclusively "an admin manually stopped this queue".
   const closedQueues = filteredQueues.filter((q) => q.status === "closed");
   // The flat card list, ordered by status priority. These five groups are
   // exhaustive of every possible queue_slots.status value, so gate the list

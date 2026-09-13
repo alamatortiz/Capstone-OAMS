@@ -81,7 +81,7 @@ const ClipboardListIcon = () => (
 // text reads the same way on both dashboards ("No Show" not "NO_SHOW").
 function formatActivityStatus(status, type) {
   if (status === "no_show") return "No Show";
-  // Defensive: pre-collapse doc rows may still say "generated"/"released".
+  // Defensive: legacy doc rows may still say "generated"/"released".
   if (type === "document" && (status === "generated" || status === "released")) return "Ready";
   return status.charAt(0).toUpperCase() + status.slice(1);
 }

@@ -281,8 +281,8 @@ router.get(
           pendingProcessing: docRow.processing_doc_count || 0,
           completedToday: completedRow.completed_today_count || 0,
           facultyAvailable: facultyAvailableCount,
-          // Kept for the mobile admin dashboard, which still renders an
-          // Announcements stat card + list. The web dashboard no longer uses it.
+          // Kept for the mobile admin dashboard, which renders an
+          // Announcements stat card + list; the web dashboard doesn't use it.
           announcements: annRow.announcement_count || 0,
         },
         pendingDocuments: pendingDocuments.map((d) => ({
@@ -1530,8 +1530,8 @@ router.get(
       // Map raw per-table statuses -> the badge vocabulary the UI uses.
       // Document statuses stay granular (matching /professor/transactions'
       // vocabulary) instead of collapsing pending/processing/generated/
-      // released into "approved" — that used to render an untouched
-      // "pending" request with a green "Approved" badge.
+      // released into "approved" — collapsing them would render an
+      // untouched "pending" request with a green "Approved" badge.
       // Deliberately NOT the same shape as student's statusMap in
       // studentRoutes.js's GET /transactions (which collapses everything
       // into 3 generic badge states) -- this one needs the granular labels
@@ -1573,8 +1573,8 @@ router.get(
       // Runs the 5-branch request UNION plus the admin_action audit query
       // for one (type, status) filter combination, each capped to its own
       // 200 most-recent rows. Filtering happens in SQL, before that cap, so
-      // a low-volume type/status can no longer be crowded out of a shared
-      // top-200 window by busier ones. Called once unfiltered (for stats and
+      // a low-volume type/status is never crowded out of a shared top-200
+      // window by busier ones. Called once unfiltered (for stats and
       // the default view) and, only when a filter is actually active, a
       // second time with the real filter values.
       async function fetchTransactionRows(filterType, filterStatus) {
@@ -1635,6 +1635,9 @@ router.get(
                 CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
                 q.queue_number AS queue_number,
                 COALESCE(q.service_label_snapshot, s.service_name) AS raw_service_name,
+                qs.is_universal AS is_universal,
+                q.admin_reason AS admin_reason_raw,
+                CAST(NULL AS CHAR(100) CHARACTER SET utf8mb4) AS request_type,
                 q.status AS raw_status,
                 q.updated_at AS event_time,
                 'student' AS requester_type
@@ -1667,6 +1670,9 @@ router.get(
                 CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS tracking_number,
                 NULL AS queue_number,
                 svc.service_name AS raw_service_name,
+                FALSE AS is_universal,
+                CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
+                CAST(NULL AS CHAR(100) CHARACTER SET utf8mb4) AS request_type,
                 a.status AS raw_status,
                 a.updated_at AS event_time,
                 'student' AS requester_type
@@ -1703,6 +1709,9 @@ router.get(
                 dr.tracking_number AS tracking_number,
                 NULL AS queue_number,
                 NULL AS raw_service_name,
+                FALSE AS is_universal,
+                CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
+                dr.request_type AS request_type,
                 dr.status AS raw_status,
                 dr.updated_at AS event_time,
                 'student' AS requester_type
@@ -1738,6 +1747,9 @@ router.get(
                 fdr.tracking_number AS tracking_number,
                 NULL AS queue_number,
                 NULL AS raw_service_name,
+                FALSE AS is_universal,
+                CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
+                fdr.request_type AS request_type,
                 fdr.status AS raw_status,
                 fdr.updated_at AS event_time,
                 'faculty' AS requester_type
@@ -1772,6 +1784,9 @@ router.get(
                 ds.tracking_number AS tracking_number,
                 NULL AS queue_number,
                 NULL AS raw_service_name,
+                FALSE AS is_universal,
+                CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS admin_reason_raw,
+                ds.title AS request_type,
                 ds.status AS raw_status,
                 ds.updated_at AS event_time,
                 ds.submitter_type AS requester_type
@@ -1799,10 +1814,10 @@ router.get(
         // rather than a UNION branch (it needs different raw columns -- JSON
         // old/new value blobs -- to feed formatAuditTransaction, not the fixed
         // per-status CASE shape the 5 branches above share). Deliberately
-        // excludes 'users' (account edits, per product decision -- that feature
-        // may be retired) and the 3 document-ish tables (already surfaced above
-        // via their own correlated audit_logs subqueries -- including them here
-        // too would show every document status change twice).
+        // excludes 'users' (account edits) and the 3 document-ish tables
+        // (already surfaced above via their own correlated audit_logs
+        // subqueries -- including them here too would show every document
+        // status change twice).
         const auditTypeClause = (filterType === "all" || filterType === "admin_action") ? "" : "AND 1=0";
         let auditStatusClause = "";
         let auditStatusParam = null;
@@ -1872,7 +1887,10 @@ router.get(
             details: r.details || "No additional details provided.",
             trackingNumber: r.tracking_number || null,
             queueNumberBadge,
-            serviceName: r.type === "appointment" ? (r.raw_service_name ?? null) : null,
+            serviceName: (r.type === "appointment" || r.type === "queue") ? (r.raw_service_name ?? null) : null,
+            isUniversal: r.type === "queue" ? !!r.is_universal : false,
+            adminReason: r.type === "queue" ? (r.admin_reason_raw || null) : null,
+            requestType: r.request_type || null,
             status: statusMap[r.raw_status] ?? r.raw_status,
             rawEventTime: r.event_time,
           };
@@ -1892,7 +1910,7 @@ router.get(
             requesterType: null,
             processor: r.processor,
             processorRole: "admin",
-            details: details || "No additional details provided.",
+            details: details || null,
             trackingNumber: null,
             queueNumberBadge: null,
             status,
@@ -1901,8 +1919,8 @@ router.get(
         });
 
         // Merge, cap at 200 by recency -- filtering (above) already happened
-        // in SQL, so this cap no longer risks crowding out a low-volume
-        // type/status the way the old post-merge cap did.
+        // in SQL, so this cap doesn't risk crowding out a low-volume
+        // type/status.
         return requestRows
           .concat(adminActionRows)
           .sort((a, b) =>
@@ -4788,8 +4806,8 @@ router.get(
       // `queues` timestamp columns (completed_at/called_at/created_at) are
       // real UTC instants, so they need the Manila-midnight-anchored bounds
       // -- same two-sided pattern as GET /transactions. A single-sided lower
-      // bound (the old today-vs-all-time toggle's shortcut) would silently
-      // include everything from startDate through today for a real range.
+      // bound would silently include everything from startDate through
+      // today instead of stopping at a real range's endDate.
       const startUTC = manilaDayStartUTC(startDate);
       const endExclusiveUTC = manilaDayEndExclusiveUTC(endDate);
 

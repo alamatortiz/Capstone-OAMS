@@ -135,8 +135,8 @@ app.use((err, req, res, next) => {
 
 // Catch-all: anything not already handled above (malformed JSON from
 // express.json(), or an uncaught synchronous exception in a route handler)
-// previously fell through to Express's default handler, which renders a
-// full HTML stack trace -- including real server file paths -- instead of
+// would otherwise fall through to Express's default handler, which renders
+// a full HTML stack trace -- including real server file paths -- instead of
 // a clean JSON error. This must stay the LAST middleware registered.
 app.use((err, req, res, next) => {
   if (err.type === "entity.parse.failed") {

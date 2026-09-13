@@ -130,9 +130,8 @@ const navItems = [
 ];
 
 // Sidebar-only walkthrough, same approach as the student one. No FAQ
-// mention here -- professor FAQ was deliberately removed repo-wide by a
-// teammate, unlike student/admin which still have it on their
-// Announcements page.
+// mention here -- professor FAQ is intentionally absent repo-wide, unlike
+// student/admin which still have it on their Announcements page.
 const PROFESSOR_TOUR_STEPS = [
   {
     title: "Welcome to OAMS!",

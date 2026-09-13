@@ -1,11 +1,5 @@
-/* Base theme tokens + semantic status/type color tokens -- this file
-   previously only defined the semantic subset and relied on whichever
-   other admin page's CSS happened to load first in Vite's global bundle
-   to supply --card-bg/--dark-bg/--text-primary/etc., which silently
-   broke (transparent cards, no page background) when this page was the
-   first admin page loaded in a session. Full block below matches the
-   canonical values in adm-appointment.css/adm-dashboard.css/etc. so this
-   page is self-contained regardless of navigation history. */
+/* Full token block (not just semantic tokens) so this page renders correctly
+   regardless of which other admin page loaded first in the session. */
 :root,
 [data-theme="dark"] {
   --primary-color: #22c55e;

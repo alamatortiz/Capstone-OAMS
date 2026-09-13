@@ -175,7 +175,7 @@ export default function AdminDocumentProcessing() {
   const [source, setSource] = useState("student");
   const [documents, setDocuments] = useState([]);
   // Starts true (not false) so the very first load still shows a loading
-  // state -- fetchDocuments itself no longer re-arms this on later calls.
+  // state -- fetchDocuments does not re-arm this on later calls.
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
@@ -438,7 +438,7 @@ export default function AdminDocumentProcessing() {
     // Re-sending the document's own current status is how "Attach Files"
     // works without also changing the status -- same endpoint doubles as
     // both actions, mirroring PUT /admin/announcements/:id. Both requests and
-    // submissions support file attach now.
+    // submissions support file attach.
     const isFileOnlyUpdate = newStatus === selectedDocument.status;
     // GET /admin/document-submissions prefixes ids ("sub-42") so this list
     // stays merge-safe alongside other sources elsewhere (e.g. the admin
@@ -690,7 +690,7 @@ export default function AdminDocumentProcessing() {
   };
 
   // One fixed status list for the merged (requests + submissions) view --
-  // both now share the Pending -> Processing -> Ready -> Claimed lifeline.
+  // both share the Pending -> Processing -> Ready -> Claimed lifeline.
   const TABS = [
     "all",
     "pending",

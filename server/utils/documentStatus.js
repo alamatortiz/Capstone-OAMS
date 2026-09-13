@@ -4,7 +4,7 @@
 
 // API/admin-facing status word -> DB ENUM value. Used to validate PATCH .../status
 // bodies. The lifeline is Pending -> Processing -> Ready -> Claimed (+ Rejected,
-// Cancelled) -- the old 'generated'/'released' pair was collapsed into 'ready'.
+// Cancelled).
 const DB_STATUS_MAP = {
   pending: "pending",
   processing: "processing",

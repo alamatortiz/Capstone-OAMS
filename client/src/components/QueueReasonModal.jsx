@@ -4,14 +4,14 @@ import "./ActionConfirmModal.css";
 import "./QueueReasonModal.css";
 import useLockBodyScroll from "../hooks/useLockBodyScroll";
 
-// Prompts for a free-text reason/comment. Originally built for the admin's
-// required pause/stop-queue reason (students see it in a paused banner /
-// "queue stopped" toast + transaction history, so it must not be empty by
-// default), and now also reused for the professor's optional appointment
-// comment editor (prof-appointments.jsx) -- `required`/`icon`/`variant`/
-// `initialValue` all default to that original required-reason behavior, so
-// none of this component's other call sites (admin queue pause/stop,
-// professor-unavailable toggle, admin document rejection) need any changes.
+// Prompts for a free-text reason/comment. Used for the admin's required
+// pause/stop-queue reason (students see it in a paused banner / "queue
+// stopped" toast + transaction history, so it must not be empty by default)
+// as well as the professor's optional appointment comment editor
+// (prof-appointments.jsx) -- `required`/`icon`/`variant`/`initialValue` all
+// default to the required-reason behavior, so the other call sites (admin
+// queue pause/stop, professor-unavailable toggle, admin document rejection)
+// don't need to pass anything extra.
 export default function QueueReasonModal({
   show,
   onConfirm,

@@ -243,10 +243,10 @@ export default function AdminDashboard() {
     if (authUser) fetchStats();
   }, [authUser, fetchStats]);
 
-  // ── Live updates: every stat tile + the Faculty Availability preview should
-  // track its source in real time. Previously only queue events were wired, so
-  // faculty toggles / appointment / document changes sat stale until the 45s
-  // poll. useLiveRefetch also refetches on socket reconnect.
+  // ── Live updates: every stat tile + the Faculty Availability preview
+  // tracks its source in real time (queue events, faculty toggles,
+  // appointment/document changes). useLiveRefetch also refetches on socket
+  // reconnect.
   useLiveRefetch(DASHBOARD_LIVE_EVENTS, fetchStats);
 
   // ── Fallback poll: covers a silently-dropped/blocked WebSocket connection,

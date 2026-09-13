@@ -1,12 +1,9 @@
 import "./QueueProgressBars.css";
 
 /**
- * Consolidates the "Occupied Slots / Serviced People" dual progress bar previously duplicated
- * (with a genuine cross-file border/margin/fill-color inconsistency) across the dashboard,
+ * Shared "Occupied Slots / Serviced People" dual progress bar, used across the dashboard,
  * queue, queue-status, and queue-tracking pages. The occupancy fill is intentionally blue
- * everywhere now — previously only the dashboard's own instance had this via a scoped
- * override, while queue/queue-status fell back to a green default and queue-tracking hardcoded
- * blue independently. Unifying on blue was a deliberate choice, not a preserved default.
+ * everywhere for visual consistency.
  */
 export default function QueueProgressBars({
   occupancyCurrent = 0,

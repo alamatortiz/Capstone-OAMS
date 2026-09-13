@@ -610,7 +610,8 @@ body {
 .student-dashboard .action-main {
   display: flex;
   gap: 0.625rem;
-  align-items: flex-start;
+  align-items: stretch;
+  flex: 1;
 }
 
 .student-dashboard .action-icon {
@@ -626,6 +627,7 @@ body {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .student-dashboard .action-badge-right {
@@ -640,6 +642,7 @@ body {
   flex: 1;
   z-index: 1;
   align-items: flex-start;
+  justify-content: space-between;
   text-align: left;
 }
 
@@ -1880,9 +1883,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .student-dashboard {
     padding: 0.75rem;
     gap: 1rem;

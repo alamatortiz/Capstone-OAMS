@@ -29,9 +29,8 @@ const pool = mysql.createPool({
   // / formatManilaDate* (client) and getManilaDateString / getManilaTimeString
   // (server). DO NOT change this to "+08:00" unless the db container is also
   // given TZ: Asia/Manila in docker-compose.yml -- doing one without the
-  // other silently shifts every TIMESTAMP column by ~8 hours (this has
-  // happened before; if you're about to "fix" this, check docker-compose.yml
-  // first, not just this comment).
+  // other silently shifts every TIMESTAMP column by ~8 hours. If you're about
+  // to "fix" this, check docker-compose.yml first, not just this comment.
   timezone: "Z",
 });
 

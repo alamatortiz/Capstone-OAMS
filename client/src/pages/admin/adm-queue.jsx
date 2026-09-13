@@ -247,7 +247,7 @@ export default function AdminQueue() {
   // Today's open/paused queue lines, plus 'full'/'expired' lines — those are
   // closed to new joins but still have unserved students by construction
   // (they settle into 'completed' once the last one is served/left/voided).
-  // GET /admin/queue-hosting now also includes yesterday's carryover lines
+  // GET /admin/queue-hosting also includes yesterday's carryover lines
   // (so Queue Hosting can still offer Host Again/Reopen on them) -- excluded
   // here with isToday since this page's system stats are meant to be a
   // right-now snapshot, not blended across two days.

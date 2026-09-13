@@ -662,7 +662,7 @@ body {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 
-/* Service name — now the row's primary heading (plain text) */
+/* Service name — the row's primary heading (plain text) */
 .queue-detail-service {
   margin: 0;
   font-size: 1.05rem;
@@ -674,7 +674,7 @@ body {
   border-radius: 0;
 }
 
-/* Department — now a blue badge (the look the service name used to have) */
+/* Department badge — blue, matching the service name's badge style */
 .queue-detail-abbrev {
   background: rgba(59, 130, 246, 0.15);
   color: #3b82f6;

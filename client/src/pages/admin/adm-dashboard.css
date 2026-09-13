@@ -710,7 +710,7 @@ body {
   gap: 1rem;
 }
 
-.quick-action-card {
+.admin-dashboard .quick-action-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1rem;
@@ -720,7 +720,7 @@ body {
   display: flex;
   flex-direction: row;
   gap: 0.75rem;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .quick-action-text {
@@ -736,7 +736,7 @@ body {
   margin-top: 0;
 }
 
-.quick-action-card:hover {
+.admin-dashboard .quick-action-card:hover {
   box-shadow: 0 8px 16px rgba(34, 197, 94, 0.15);
   transform: translateY(-2px);
   border-color: rgba(34, 197, 94, 0.3);
@@ -1219,9 +1219,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .admin-dashboard {
     padding: 0.75rem;
   }

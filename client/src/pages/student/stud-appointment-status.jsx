@@ -53,9 +53,9 @@ const formatDateShort = (dateStr) => {
 
 // Read-only display of the shared appointment comment -- the professor is
 // the only party who can write it (see prof-appointments.jsx's CommentBlock,
-// which still edits the same field via /professor/appointments/:id/comment).
-// The student's own write path to this field has been removed entirely, not
-// just hidden here, so this is genuinely view-only rather than cosmetically so.
+// which edits the same field via /professor/appointments/:id/comment). The
+// student has no write path to this field at all, not just a hidden one, so
+// this is genuinely view-only rather than cosmetically so.
 function CommentCard({ appt }) {
   return (
     <div className="apst-card apst-comment-card">

@@ -1,6 +1,7 @@
 const pool = require("../db");
 const { createNotification } = require("../utils/notifications");
 const { emitToUser, emitToDept } = require("../sockets");
+const { formatTime12h: formatTime } = require("../utils/dateTime");
 
 const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
 const REMINDER_LEAD_HOURS = 24;
@@ -13,15 +14,12 @@ const IMMINENT_LEAD_MINUTES = 10;
 
 // `appointment_date`/`appointment_time` are plain calendar-date/wall-clock
 // values (no timezone conversion needed, unlike TIMESTAMP columns) -- this
-// just normalizes whichever JS shape mysql2 hands back (Date object for
-// DATE, string for TIME) into "YYYY-MM-DD" / "HH:MM" for the message.
+// normalizes whichever JS shape mysql2 hands back (Date object for DATE,
+// string for TIME) into "YYYY-MM-DD" for the message; formatTime (imported
+// above) handles the 12-hour time part.
 function formatDate(value) {
   return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
 }
-function formatTime(value) {
-  return String(value).slice(0, 5);
-}
-
 function buildReminderMessage({ appointment_date, appointment_time, location_snapshot }) {
   const dateStr = formatDate(appointment_date);
   const timeStr = formatTime(appointment_time);

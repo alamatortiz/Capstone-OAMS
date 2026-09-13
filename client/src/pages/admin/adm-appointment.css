@@ -969,7 +969,7 @@ body {
   flex-shrink: 0;
 }
 
-/* Error-state "Retry" button (formerly shared the card's view-details class). */
+/* Error-state "Retry" button. */
 .admin-appointment-retry-btn {
   margin-top: 1rem;
   padding: 0.5rem 1rem;
@@ -1023,9 +1023,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .admin-appointment-container {
     padding: 0.75rem;
   }

@@ -642,12 +642,12 @@ html, body {
 
 /* ── Header actions (Requested-at + Comment) ─────────────────────────────
    A normal flex child of .appt-card-header-row -- Purpose and the action
-   buttons moved to the left column (see .appt-info-grid/.appt-header-btn-row
-   below, now nested in .appt-card-title-section), so this right column is
-   lightweight: just Requested-at now that Comments has its own section in
-   the left column below the action buttons. Shrink-to-fit width (no more
-   fixed 12.5rem) since there's no longer a 100%-width child needing a
-   stable column width to stretch into. */
+   buttons live in the left column (see .appt-info-grid/.appt-header-btn-row
+   below, nested in .appt-card-title-section), so this right column is
+   lightweight: just Requested-at, since Comments has its own section in
+   the left column below the action buttons. Shrink-to-fit width since
+   there's no 100%-width child needing a stable column width to stretch
+   into. */
 .appt-card-header-actions {
   display: flex;
   flex-direction: column;

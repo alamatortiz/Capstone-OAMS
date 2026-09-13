@@ -21,9 +21,9 @@ const SWEEP_INTERVAL_MS = 30 * 1000;
 // can race on the same slot (e.g. this sweeper reads unserved=1 for a slot
 // the instant the no-show sweeper is, in the same moment, voiding that
 // slot's last entry). Without a shared row lock, the two can interleave so
-// neither one settles the slot to 'completed' -- reproducing the exact
-// "stuck at expired forever" bug this fix exists to close, just in a
-// narrower window. Locking the same queue_slots row (as settleSlotAfter
+// neither one settles the slot to 'completed' -- the same "stuck at expired
+// forever" failure mode, just in a narrower window. Locking the same
+// queue_slots row (as settleSlotAfter
 // EntryChange/getOwnedSlotOrRespond already do everywhere else) serializes
 // the two: whichever commits first, the other re-reads fresh state before
 // acting.

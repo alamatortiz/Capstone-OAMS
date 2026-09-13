@@ -49,11 +49,10 @@ const {
   serveRequestFile,
 } = require("../utils/documentRequestAttachments");
 
-// Logs the real error server-side (unchanged from before) but only ever
-// sends a generic, safe message to the client under the `error` key --
-// every student-facing catch block reads `err.response.data.error`, so
-// raw internal error text (e.g. SQL details) previously shipped to the
-// browser via a `dev_error` field that nothing actually read.
+// Logs the real error server-side but only ever sends a generic, safe
+// message to the client under the `error` key -- every student-facing
+// catch block reads `err.response.data.error`, so raw internal error text
+// (e.g. SQL details) must never reach the browser.
 function sendServerError(res, error, label) {
   console.error(`${label}:`, error);
   res.status(500).json({ error: "Something went wrong. Please try again." });
@@ -2373,12 +2372,10 @@ router.get(
   },
 );
 
-// The student-side PATCH /appointments/:appointmentId/comment route that
-// used to live here has been removed intentionally -- the shared appointment
-// comment is now professor-authored only (see PATCH
+// The shared appointment comment is professor-authored only (see PATCH
 // /professor/appointments/:id/comment in professorRoutes.js). Students view
-// it read-only on stud-appointment-status.jsx; there is no remaining write
-// path for them to this field, by design.
+// it read-only on stud-appointment-status.jsx; there is no write path for
+// them to this field, by design.
 
 // DELETE /api/student/appointments/:appointmentId
 // Cancels a pending or approved appointment. Only the owning student may cancel.
@@ -2744,7 +2741,9 @@ router.get(
           IF(q.admin_reason IS NOT NULL, 'Queue Stopped', CONCAT('Queue for ', COALESCE(q.service_label_snapshot, s.service_name))) AS title,
           d.department_name AS college,
           q.status AS raw_status,
-          COALESCE(q.admin_reason, q.notes) AS details,
+          q.notes AS details,
+          CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS trackingNumber,
+          q.admin_reason AS adminReason,
           q.updated_at AS event_time
         FROM queues q
         JOIN services s ON q.service_id = s.service_id
@@ -2760,6 +2759,8 @@ router.get(
           d.department_name AS college,
           a.status AS raw_status,
           a.notes AS details,
+          CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS trackingNumber,
+          CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
           a.updated_at AS event_time
         FROM appointments a
         JOIN faculty f ON a.faculty_id = f.faculty_id
@@ -2775,6 +2776,8 @@ router.get(
           d.department_name AS college,
           dr.status AS raw_status,
           dr.purpose AS details,
+          dr.tracking_number AS trackingNumber,
+          CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
           dr.updated_at AS event_time
         FROM document_requests dr
         JOIN document_services s ON dr.service_id = s.service_id
@@ -2790,6 +2793,8 @@ router.get(
           d.department_name AS college,
           ds.status AS raw_status,
           ds.purpose AS details,
+          ds.tracking_number AS trackingNumber,
+          CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
           ds.updated_at AS event_time
         FROM document_submissions ds
         JOIN departments d ON ds.department_id = d.department_id
@@ -2882,6 +2887,8 @@ router.get(
           }),
           status: STATUS_MAP[row.raw_status] ?? "ongoing",
           details: row.details || "No additional details provided.",
+          trackingNumber: row.trackingNumber || null,
+          adminReason: row.adminReason || null,
         };
       });
 

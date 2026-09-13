@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 const DOCUMENT_STATUS_LABELS = {
   ready: "Ready for Pickup",
-  // Defensive aliases for rows that predate the lifeline collapse.
+  // Aliases so legacy status values still map to "Ready for Pickup".
   generated: "Ready for Pickup",
   released: "Ready for Pickup",
   claimed: "Claimed",

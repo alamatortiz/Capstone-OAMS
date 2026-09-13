@@ -812,9 +812,9 @@ body {
 }
 
 /* Base pill geometry for document-type Recent Activity badges only --
-   duplicated from .appt-status-badge above (not reused directly) so this
-   class name no longer implies "appointment" for an item type that isn't
-   one. Byte-for-byte copy of the box geometry; colors still come from the
+   duplicated from .appt-status-badge above (not reused directly) since this
+   class name shouldn't imply "appointment" for an item type that isn't one.
+   Byte-for-byte copy of the box geometry; colors still come from the
    activity-status-doc-* modifier classes below. */
 .professor-dashboard .activity-status-badge {
   display: inline-flex;
@@ -1036,7 +1036,8 @@ body {
 .professor-dashboard .action-main {
   display: flex;
   gap: 0.625rem;
-  align-items: flex-start;
+  align-items: stretch;
+  flex: 1;
 }
 
 .professor-dashboard .action-icon {
@@ -1052,6 +1053,7 @@ body {
     transform 0.25s ease,
     box-shadow 0.25s ease;
   z-index: 1;
+  align-self: flex-start;
 }
 
 .professor-dashboard .action-icon svg {
@@ -1094,6 +1096,7 @@ body {
   flex: 1;
   z-index: 1;
   align-items: flex-start;
+  justify-content: space-between;
 }
 
 .professor-dashboard .action-badge {
@@ -1725,9 +1728,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .professor-dashboard {
     padding: 0.75rem;
   }

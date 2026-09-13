@@ -481,12 +481,10 @@ body {
 [data-theme="light"] .tabs-navigation .ab-tab.active::after { background: #9333ea; }
 
 /* ===== Slots Container ===== */
-/* No longer a card of its own -- it used to wrap both week sections in one
-   shared bordered box, which blurred "This Week" and "Next Week" together.
-   Now it's just a plain vertical layout; each .week-section below supplies
-   its own full card chrome (background/border/radius) directly, so the two
-   weeks read as clearly separate cards spanning the same width this
-   container used to occupy. The empty/loading/error state (.appt-empty-state)
+/* Not a card of its own -- a plain vertical layout; each .week-section below
+   supplies its own full card chrome (background/border/radius) directly, so
+   "This Week" and "Next Week" read as clearly separate cards rather than
+   being blurred into one shared bordered box. The empty/loading/error state (.appt-empty-state)
    still renders as a direct child here and supplies its own padding. */
 .slots-container { display: flex; flex-direction: column; gap: 2rem; }
 
@@ -670,10 +668,8 @@ body {
   transition: all 0.3s ease;
 }
 
-/* Individual booking cards now render via the shared AppointmentListItem
-   component (client/src/components/AppointmentListItem.css) instead of the
-   bespoke .booking-card/.booking-detail/.purpose-box/.cancel-btn markup that
-   used to live here. */
+/* Individual booking cards render via the shared AppointmentListItem
+   component (client/src/components/AppointmentListItem.css). */
 
 /* ===== Dialog ===== */
 .dialog-overlay {
@@ -881,9 +877,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .appointment-content { padding: 0.75rem; gap: 1rem; }
   .appt-empty-state { padding: 2rem 1rem; }
 }

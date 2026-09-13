@@ -132,7 +132,7 @@ export default function ProfessorTransactionsPage() {
       pending: "txn-badge txn-badge-pending",
       processing: "txn-badge txn-badge-processing",
       ready: "txn-badge txn-badge-ready",
-      // Defensive aliases for rows that predate the lifeline collapse.
+      // Aliases so legacy status values still map to the "ready" badge.
       generated: "txn-badge txn-badge-ready",
       released: "txn-badge txn-badge-ready",
       claimed: "txn-badge txn-badge-claimed",
@@ -199,9 +199,9 @@ export default function ProfessorTransactionsPage() {
 
   useEffect(() => { fetchStats(); }, []);
 
-  // ── Live updates: previously fetch-once-per-filter-change only, so
-  // activity elsewhere (e.g. a document status change) wouldn't show up
-  // here until the professor tweaked a filter or reloaded.
+  // ── Live updates: refetches on socket events so activity elsewhere
+  // (e.g. a document status change) shows up without the professor
+  // needing to tweak a filter or reload.
   useEffect(() => {
     if (!authUser || !token) return;
     const socket = connectSocket(token);
@@ -450,38 +450,20 @@ export default function ProfessorTransactionsPage() {
                       <span className="txn-item-title">{txn.title}</span>
                       <div className="txn-item-badges">
                         <span className={typeBadgeClass(txn.type)}>{typeLabel(txn.type)}</span>
+                        {txn.trackingNumber && (
+                          <span className="txn-tracking-pill">{txn.trackingNumber}</span>
+                        )}
                         <span className={statusBadgeClass(txn.status)}>{statusLabel(txn.status)}</span>
                       </div>
                     </div>
-                    {txn.type === "document" || txn.type === "submission" ? (
-                      txn.trackingNumber && (
-                        <div className="txn-item-student">
-                          <span className="txn-tracking-pill">{txn.trackingNumber}</span>
-                        </div>
-                      )
-                    ) : (
-                      txn.studentName && (
-                        <div className="txn-item-student">
-                          <span className="txn-item-student-name">{txn.studentName}</span>
-                          {txn.studentId && (
-                            <span className="txn-student-id-badge">{txn.studentId}</span>
-                          )}
-                        </div>
-                      )
+                    {txn.studentName && (
+                      <div className="txn-item-student">
+                        <span className="txn-item-student-name">{txn.studentName}</span>
+                        {txn.studentId && (
+                          <span className="txn-student-id-badge">{txn.studentId}</span>
+                        )}
+                      </div>
                     )}
-                    {(txn.type === "document" || txn.type === "submission") && txn.details && (
-                      <p className="txn-item-details">{txn.details}</p>
-                    )}
-                  </div>
-                  <div className="txn-item-meta">
-                    <div className="txn-item-date">
-                      <CalendarSmIcon />
-                      {txn.dateLabel}
-                    </div>
-                    <div className="txn-item-time">
-                      <ClockIcon />
-                      {txn.timeLabel}
-                    </div>
                     {txn.type === "appointment" && (
                       <button
                         type="button"
@@ -494,6 +476,16 @@ export default function ProfessorTransactionsPage() {
                         {generatingCertId === txn.id ? "Generating…" : "Official Document"}
                       </button>
                     )}
+                  </div>
+                  <div className="txn-item-meta">
+                    <div className="txn-item-date">
+                      <CalendarSmIcon />
+                      {txn.dateLabel}
+                    </div>
+                    <div className="txn-item-time">
+                      <ClockIcon />
+                      {txn.timeLabel}
+                    </div>
                   </div>
                 </div>
               ))

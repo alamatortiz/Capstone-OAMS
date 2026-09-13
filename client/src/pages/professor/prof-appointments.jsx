@@ -109,13 +109,12 @@ const CONFIRM_META = {
   }),
 };
 
-// One shared, overwritable comment either party can read/edit -- see the
-// read-only mirror in stud-appointment-status.jsx (the student's own write
-// path to this field has been removed there; this professor-side route is
-// now the only writer). Only editable while the appointment is still
-// pending/approved (server-enforced too). Editing happens in a popup instead
-// of inline, so this renders as its own dedicated section rather than a
-// small inline field.
+// One shared, overwritable comment either party can read -- see the
+// read-only mirror in stud-appointment-status.jsx; this professor-side
+// route is the field's only writer. Only editable while the appointment is
+// still pending/approved (server-enforced too). Editing happens in a popup
+// instead of inline, so this renders as its own dedicated section rather
+// than a small inline field.
 function CommentBlock({ appointment, onSaved }) {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);

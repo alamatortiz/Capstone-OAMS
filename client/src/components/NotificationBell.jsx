@@ -32,10 +32,9 @@ export const NOTIFICATION_EVENTS = [
 ];
 
 // Live updates are pushed over WebSocket; this is only a safety-net poll in
-// case a socket event is missed or the connection drops silently. Mirrors
-// QueueProvider's identical fallback (this component previously had none,
-// so a blocked/dropped WebSocket meant the bell would never update again
-// without a manual reload).
+// case a socket event is missed or the connection drops silently, so a
+// blocked/dropped WebSocket doesn't mean the bell stops updating until a
+// manual reload. Mirrors QueueProvider's identical fallback.
 const FALLBACK_POLL_INTERVAL_MS = 45000;
 
 // Matches the browser tab's base <title> in index.html -- kept as a separate
@@ -45,9 +44,10 @@ const FALLBACK_POLL_INTERVAL_MS = 45000;
 const APP_TITLE = "OAMS";
 
 // The bell and the full Notifications page each keep their own independent
-// `notifications` state, so marking read/all-read in one previously left the
-// other stale until the next socket event or poll. This same-tab event lets
-// either side tell all the others to refetch immediately after a mutation.
+// `notifications` state, so marking read/all-read in one would otherwise
+// leave the other stale until the next socket event or poll. This same-tab
+// event lets either side tell all the others to refetch immediately after
+// a mutation.
 export const NOTIFICATIONS_SYNC_EVENT = "oams:notifications-sync";
 export const broadcastNotificationsChanged = () =>
   window.dispatchEvent(new Event(NOTIFICATIONS_SYNC_EVENT));

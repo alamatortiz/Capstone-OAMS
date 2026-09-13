@@ -148,20 +148,31 @@
 }
 
 .tutorial-tour-btn--primary {
-  background: var(--primary-color, #22c55e);
-  color: #08120a;
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: var(--primary-color, #22c55e);
 }
 
 .tutorial-tour-btn--primary:hover {
-  opacity: 0.85;
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.7);
+}
+
+[data-theme="light"] .tutorial-tour-btn--primary {
+  color: #065f46;
 }
 
 .tutorial-tour-btn--outline {
   background: transparent;
-  border-color: var(--card-border, rgba(148, 163, 184, 0.3));
-  color: var(--text-primary, #f0fdf4);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: var(--primary-color, #22c55e);
 }
 
 .tutorial-tour-btn--outline:hover {
   background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.65);
+}
+
+[data-theme="light"] .tutorial-tour-btn--outline {
+  color: #065f46;
 }

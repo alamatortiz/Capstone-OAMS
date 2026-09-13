@@ -183,7 +183,7 @@
   gap: 1rem;
 }
 
-/* The "Open Queue Line" CTA now sits on its own row below the header. */
+/* The "Open Queue Line" CTA sits on its own row below the header. */
 .aqh-actions-row {
   display: flex;
 }
@@ -1135,9 +1135,8 @@
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .aqh-page-container {
     padding: 0.75rem;
   }

@@ -139,7 +139,7 @@
 }
 
 .tutorial-trigger-tooltip {
-  /* Above the button, not below -- it's now bottom-anchored, so "below"
+  /* Above the button, not below -- the button is bottom-anchored, so "below"
      would run off the bottom of the viewport. */
   position: absolute;
   bottom: calc(100% + 0.5rem);

@@ -6,10 +6,9 @@ const pool = require("../db");
 // mechanism, so this is its own utility rather than a shared one.
 //
 // web-push throws synchronously at require-time if any VAPID var is missing
-// -- that used to crash the ENTIRE server on boot (a misconfigured/missing
-// env var on one unrelated feature took down the whole API). Guard it and
-// degrade to a no-op instead: web push just won't send, everything else
-// keeps working.
+// -- unguarded, a misconfigured/missing env var on this one feature would
+// crash the entire server on boot. Guard it and degrade to a no-op instead:
+// web push just won't send, everything else keeps working.
 const vapidConfigured =
   !!process.env.VAPID_SUBJECT && !!process.env.VAPID_PUBLIC_KEY && !!process.env.VAPID_PRIVATE_KEY;
 
@@ -50,8 +49,6 @@ async function sendWebPush(userId, title, body, data = {}) {
       } catch (err) {
         if (err.statusCode === 404 || err.statusCode === 410) {
           // Subscription expired or was revoked by the browser -- prune it.
-          // (pushNotifications.js left this as a future TODO for Expo
-          // tokens; doing it properly here from day one.)
           await pool
             .query(`DELETE FROM web_push_subscriptions WHERE subscription_id = ?`, [row.subscription_id])
             .catch(() => {});

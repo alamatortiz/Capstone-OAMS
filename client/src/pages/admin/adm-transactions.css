@@ -1,11 +1,5 @@
-/* Base theme tokens + semantic status/type color tokens -- this file
-   previously only defined the semantic subset and relied on whichever
-   other admin page's CSS happened to load first in Vite's global bundle
-   to supply --card-bg/--dark-bg/--text-primary/etc., which silently
-   broke (transparent cards, no page background) when this page was the
-   first admin page loaded in a session. Full block below matches the
-   canonical values in adm-appointment.css/adm-dashboard.css/etc. so this
-   page is self-contained regardless of navigation history. */
+/* Full token block (not just semantic tokens) so this page renders correctly
+   regardless of which other admin page loaded first in the session. */
 :root,
 [data-theme="dark"] {
   --primary-color: #22c55e;
@@ -614,10 +608,10 @@
   flex-shrink: 0;
 }
 
-/* Grid placement lives on the ExportMenu wrapper now, not the button itself
-   -- the button is no longer a direct child of .filters-header's grid once
-   wrapped in the CSV/PDF dropdown, so grid-column/justify-self on the
-   button alone would be silently ignored by the browser. */
+/* Grid placement lives on the ExportMenu wrapper, not the button itself --
+   the button isn't a direct child of .filters-header's grid once wrapped in
+   the CSV/PDF dropdown, so grid-column/justify-self on the button alone
+   would be silently ignored by the browser. */
 .admin-transaction-container .export-menu {
   grid-column: 3;
   justify-self: end;
@@ -809,9 +803,8 @@
 }
 
 /* Wraps the title + reference/tracking number so they read as one
-   identifying line, taking the same flex slot .admin-transaction-item-title
-   used to occupy directly (pushes .admin-transaction-item-badges to the
-   right edge of the header row). */
+   identifying line, and pushes .admin-transaction-item-badges to the
+   right edge of the header row. */
 .admin-transaction-item-title-group {
   display: flex;
   align-items: baseline;
@@ -832,10 +825,10 @@
 }
 
 /* Inside .admin-transaction-item-title-group specifically, the title must
-   NOT grow to fill the group's box (that's what pushed the ref badge all
-   the way to the group's far edge instead of sitting right after the
-   text) -- shrink only, size to content, let the group's own flex:1
-   handle claiming space from the header row. */
+   NOT grow to fill the group's box -- growing pushes the ref badge all the
+   way to the group's far edge instead of sitting right after the text --
+   shrink only, size to content, let the group's own flex:1 handle claiming
+   space from the header row. */
 .admin-transaction-item-title-group .admin-transaction-item-title {
   flex: 0 1 auto;
 }
@@ -917,7 +910,7 @@
 
 /* Document-only status classes -- kept as separate selectors since JSX
    assigns them specifically for document rows; colors intentionally match
-   the shared pending/rejected badges above now that all "pending"/"rejected"
+   the shared pending/rejected badges above, since all "pending"/"rejected"
    statuses use one consistent color app-wide. */
 .admin-transaction-badge-doc-pending {
   background-color: rgba(245, 158, 11, 0.15);
@@ -1065,6 +1058,14 @@
   line-height: 1.4;
 }
 
+.admin-transaction-item-service-type {
+  font-size: 0.8rem;
+  color: var(--text-secondary, var(--text-primary));
+  margin: 0;
+  transition: color 0.3s ease;
+  line-height: 1.4;
+}
+
 .admin-transaction-item-processor {
   font-size: 0.8rem;
   color: var(--text-tertiary);
@@ -1183,9 +1184,8 @@
 }
 
 @media (max-width: 640px) {
-  /* Was 1rem, which re-inflated the 0.75rem set by the 768px block above --
-     this rule is later in the file, so it won the cascade and padding grew
-     as the screen got smaller. */
+  /* This rule is later in the file than the 768px block above, so it wins
+     the cascade -- keep it explicit or padding grows as the screen shrinks. */
   .admin-transaction-container {
     padding: 0.75rem;
   }

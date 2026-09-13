@@ -155,8 +155,7 @@ const ChevronDownIcon = ({ className = "" }) => (
   </svg>
 );
 
-// Transactions now come live from GET /api/admin/transactions, scoped
-// server-side to the logged-in admin's own department. No static data.
+// Scoped server-side to the logged-in admin's own department.
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All Types" },
@@ -337,7 +336,7 @@ export default function AdminTransaction() {
       },
       processing: { color: "admin-transaction-badge-processing", label: "Processing" },
       ready: { color: "admin-transaction-badge-ready", label: "Ready" },
-      // Defensive aliases for rows that predate the lifeline collapse.
+      // Aliases so legacy status values still map to the "Ready" badge.
       generated: { color: "admin-transaction-badge-ready", label: "Ready" },
       released: { color: "admin-transaction-badge-ready", label: "Ready" },
       claimed: { color: "admin-transaction-badge-claimed", label: "Claimed" },
@@ -393,8 +392,8 @@ export default function AdminTransaction() {
   ]);
   // Prefixes a leading =/+/-/@ with a straight quote so a formula-looking
   // cell (e.g. a details string starting with "=") can't execute as one when
-  // the CSV is opened in Excel/Sheets -- matches the guard already used in
-  // adm-queue-analytics.jsx's own csvEscape, just missing here until now.
+  // the CSV is opened in Excel/Sheets -- matches the guard used in
+  // adm-queue-analytics.jsx's own csvEscape.
   const csvEscape = (value) => {
     const str = String(value ?? "");
     const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
@@ -440,9 +439,9 @@ export default function AdminTransaction() {
   };
 
   // Official single-record certificate generation lives on the professor's
-  // own Transactions page (prof-transactions.jsx) instead -- it's the
-  // faculty member's own appointment, and the button didn't fit this page's
-  // per-row layout (see prof-transactions.jsx for the working version).
+  // own Transactions page (prof-transactions.jsx) since it's the faculty
+  // member's own appointment and the button doesn't fit this page's
+  // per-row layout.
 
   return (
     <AdminPageShell
@@ -654,6 +653,14 @@ export default function AdminTransaction() {
                           </div>
                         </div>
 
+                        <p className="admin-transaction-item-processor">
+                          {transaction.processorRole === "admin"
+                            ? `Processed by: ${/^admin\b/i.test(transaction.processor || "") ? transaction.processor : `Admin ${transaction.processor}`}`
+                            : transaction.processorRole === "faculty"
+                              ? `Processed by: ${/^faculty\b/i.test(transaction.processor || "") ? transaction.processor : `Faculty ${transaction.processor}`}`
+                              : "Processed by: Not yet processed"}
+                        </p>
+
                         <div className="admin-transaction-item-grid">
                           <div className="admin-transaction-item-college">
                             {KNOWN_COLLEGES.includes(transaction.collegeAbbrev) && (
@@ -682,21 +689,31 @@ export default function AdminTransaction() {
                           )}
                         </div>
 
-                        {/* Promoted up from the bottom of the card -- who
-                            handled this is "who's involved" info, grouped
-                            with the student/college row above rather than
-                            left as trailing small print. */}
-                        <p className="admin-transaction-item-processor">
-                          {transaction.processorRole === "admin"
-                            ? `Processed by: Admin ${transaction.processor}`
-                            : transaction.processorRole === "faculty"
-                              ? `Processed by: Faculty ${transaction.processor}`
-                              : "Processed by: Not yet processed"}
-                        </p>
+                        {transaction.type === "queue" && (
+                          <p className="admin-transaction-item-service-type">
+                            Service Type: {transaction.isUniversal
+                              ? (transaction.serviceName && transaction.serviceName !== "Universal Service Queue"
+                                  ? `Universal Service Queue – ${transaction.serviceName}`
+                                  : "Universal Service Queue")
+                              : transaction.serviceName}
+                          </p>
+                        )}
+                        {(transaction.type === "document" || transaction.type === "submission") && transaction.requestType && (
+                          <p className="admin-transaction-item-service-type">
+                            Document Type: {transaction.requestType}
+                          </p>
+                        )}
 
-                        <p className="admin-transaction-item-details">
-                          {transaction.details}
-                        </p>
+                        {transaction.type === "queue" && transaction.adminReason && (
+                          <p className="admin-transaction-item-details">
+                            Reason: {transaction.adminReason}
+                          </p>
+                        )}
+                        {transaction.type === "admin_action" && transaction.details && (
+                          <p className="admin-transaction-item-details">
+                            {transaction.details}
+                          </p>
+                        )}
                       </div>
 
                       <div className="admin-transaction-item-meta">
