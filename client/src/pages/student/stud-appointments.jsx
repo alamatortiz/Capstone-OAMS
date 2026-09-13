@@ -14,7 +14,7 @@ import CalendarGrid from "../../components/CalendarGrid";
 import { useAuth } from "../../context/AuthContext";
 import { formatCollegeLabel } from "../../utils/formatCollege";
 import { connectSocket } from "../../utils/socket";
-import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, GraduationCap as LucideGraduationCap } from "lucide-react";
+import { ChevronDown, ChevronLeft, CalendarDays, ClipboardList, Calendar, Clock, MapPin, Users, XCircle, CheckCircle2, StickyNote, GraduationCap as LucideGraduationCap } from "lucide-react";
 
 // ─── Content Icons ────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -46,26 +46,9 @@ const MapPinIcon = () => (
   </svg>
 );
 
-const UsersIcon = () => (
-  <svg className="appointment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-    <circle cx="9" cy="7" r="4"></circle>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-  </svg>
-);
-
 const ChevronRightIcon = () => (
   <svg className="appointment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="9 18 15 12 9 6"></polyline>
-  </svg>
-);
-
-const XCircleIcon = () => (
-  <svg className="appointment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="15" y1="9" x2="9" y2="15"></line>
-    <line x1="9" y1="9" x2="15" y2="15"></line>
   </svg>
 );
 
@@ -85,17 +68,30 @@ const Loader2Icon = () => (
 // Renders a professor's optional per-slot note as plain text, turning a bare
 // URL (e.g. a pasted Google Meet link) into a clickable link.
 const NOTE_URL_RE = /^(https?:\/\/\S+)$/i;
-function NoteLine({ note }) {
+// `boxed` gives the note its own tinted callout (used on the slot-selection
+// cards); the booking-confirmation dialog's .slot-summary is already its own
+// tinted box, so it renders the bare line instead to avoid a box-in-a-box.
+function NoteLine({ note, boxed = true }) {
   const trimmed = note?.trim();
   if (!trimmed) return null;
   const isLink = NOTE_URL_RE.test(trimmed);
-  return (
+  const line = (
     <div className="slot-note-line">
       {isLink ? (
         <a href={trimmed} target="_blank" rel="noopener noreferrer">{trimmed}</a>
       ) : (
         trimmed
       )}
+    </div>
+  );
+  if (!boxed) return line;
+  return (
+    <div className="slot-note-box">
+      <div className="slot-note-header">
+        <StickyNote style={{ width: "0.9rem", height: "0.9rem" }} />
+        <span>Notes</span>
+      </div>
+      {line}
     </div>
   );
 }
@@ -117,6 +113,8 @@ export default function AppointmentsPage() {
   const [completingId, setCompletingId] = useState(null);
   const [completeConfirmId, setCompleteConfirmId] = useState(null);
   const [selectedApptType, setSelectedApptType] = useState("");
+  const [yearProgram, setYearProgram] = useState("");
+  const [courseCode, setCourseCode] = useState("");
   const [collegeOptions, setCollegeOptions] = useState([]);
 
   const [selectedDate, setSelectedDate] = useState("");
@@ -162,7 +160,7 @@ export default function AppointmentsPage() {
     try {
       const { data } = await api.get("/student/appointments/available-slots");
       setSlots(data.slots ?? []);
-    } catch (err) {
+    } catch {
       // Only take over the whole tab with a blocking error on the true first
       // load -- a background poll/socket refresh failing shouldn't wipe out
       // an already-good, visible list.
@@ -179,7 +177,7 @@ export default function AppointmentsPage() {
     try {
       const { data } = await api.get("/student/appointments");
       setMyBookings(data.appointments ?? []);
-    } catch (err) {
+    } catch {
       if (myBookingsRef.current.length === 0) {
         setBookingsError("Could not load your bookings. Please try again.");
       } else {
@@ -245,19 +243,46 @@ export default function AppointmentsPage() {
     };
   }, [fetchMyBookings, token]);
 
+  // ── Live updates: refetch "My Bookings" when a professor leaves/edits a
+  // shared comment, so the Comments box on an AppointmentListItem updates
+  // without navigating away and back ─────────────────────────────────────
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = connectSocket(token);
+    if (!socket) return;
+
+    const handleCommentUpdate = (payload) => {
+      toast.message("Your professor left a new comment on an appointment.", {
+        id: `appt-comment-${payload?.appointmentId}`,
+      });
+      fetchMyBookings();
+    };
+
+    socket.on("appointment:comment-updated", handleCommentUpdate);
+
+    return () => {
+      socket.off("appointment:comment-updated", handleCommentUpdate);
+    };
+  }, [fetchMyBookings, token]);
+
   // Fallback poll: a student browsing a professor from another college is
   // in their own department's socket room, not the professor's, so
   // appointment:slot-updated/removed events for that professor never reach
-  // them -- this keeps spotsLeft/removed slots from drifting stale.
+  // them -- this keeps spotsLeft/removed slots from drifting stale. Also
+  // refreshes My Bookings for the same reason (comment/status updates from a
+  // cross-department professor's dept-room broadcast never reach this
+  // student's socket either).
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       fetchSlots();
+      fetchMyBookings();
       const nowStr = getManilaDateString();
       setTodayAnchor((prev) => (prev === nowStr ? prev : nowStr));
     }, 15000);
     return () => clearInterval(interval);
-  }, [fetchSlots]);
+  }, [fetchSlots, fetchMyBookings]);
 
   const availableSlots = useMemo(() => slots.filter((slot) => {
     const matchesDate = !selectedDate || slot.date === selectedDate;
@@ -381,12 +406,17 @@ export default function AppointmentsPage() {
     setShowBookDialog(false);
     setSelectedApptType("");
     setPurpose("");
+    setYearProgram("");
+    setCourseCode("");
   };
 
   const handleBookSlot = async () => {
     if (!selectedSlot || submitting) return;
     if (selectedSlot.appointmentTypes?.length > 0 && !selectedApptType) {
       toast.error("Please select an appointment type."); return;
+    }
+    if (!yearProgram.trim() || !courseCode.trim()) {
+      toast.error("Please provide your year level and program, and course code."); return;
     }
     setSubmitting(true);
     try {
@@ -395,9 +425,11 @@ export default function AppointmentsPage() {
         appointmentDate: selectedSlot.date,
         appointmentType: selectedApptType || null,
         purpose: purpose.trim(),
+        yearProgram: yearProgram.trim(),
+        courseCode: courseCode.trim(),
       });
       toast.success("Appointment booked successfully!");
-      setPurpose(""); setSelectedApptType(""); setSelectedSlot(null); setShowBookDialog(false);
+      setPurpose(""); setSelectedApptType(""); setYearProgram(""); setCourseCode(""); setSelectedSlot(null); setShowBookDialog(false);
       await Promise.all([fetchSlots(), fetchMyBookings()]);
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to book appointment. The slot may no longer be available.");
@@ -493,7 +525,7 @@ export default function AppointmentsPage() {
                 ) : isAlreadyBooked ? (
                   <button className="book-btn book-btn--disabled" disabled>Already Booked</button>
                 ) : (
-                  <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setPurpose(""); setShowBookDialog(true); }}>Book this Slot</button>
+                  <button className="book-btn" onClick={() => { setSelectedSlot(slot); setSelectedApptType(""); setPurpose(""); setYearProgram(""); setCourseCode(""); setShowBookDialog(true); }}>Book this Slot</button>
                 )}
               </div>
             );
@@ -525,7 +557,15 @@ export default function AppointmentsPage() {
                       <div className="summary-item"><ClockIcon /><span>{formatTime(selectedSlot.windowStart)} – {formatTime(selectedSlot.windowEnd)}</span></div>
                       <div className="summary-item"><MapPinIcon /><span>{selectedSlot.location}</span></div>
                     </div>
-                    {selectedSlot.slotNote && <NoteLine note={selectedSlot.slotNote} />}
+                  </div>
+                  {selectedSlot.slotNote && <NoteLine note={selectedSlot.slotNote} />}
+                  <div className="form-group">
+                    <label htmlFor="yearProgram">Year Level and Program *</label>
+                    <input id="yearProgram" type="text" placeholder="e.g., 1 CS-A, 1 IT-A" value={yearProgram} onChange={(e) => setYearProgram(e.target.value)} className="textarea" />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="courseCode">Course Code *</label>
+                    <input id="courseCode" type="text" placeholder="e.g., CS 101" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} className="textarea" />
                   </div>
                   {selectedSlot.appointmentTypes?.length > 0 && (
                     <div className="form-group">

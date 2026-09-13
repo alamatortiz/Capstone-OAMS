@@ -44,6 +44,31 @@ function formatTime12h(timeStr) {
   return `${h % 12 || 12}:${m} ${suffix}`;
 }
 
+const DATE_STR_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Converts a plain "YYYY-MM-DD" string (as sent by an <input type="date">
+// or a mobile date picker) into the UTC instant for Manila midnight on that
+// date -- the same `${dateStr}T00:00:00+08:00` anchor already used elsewhere
+// in this codebase for "today" boundaries, just accepting an arbitrary
+// caller-supplied date instead of only today's. Returns null for anything
+// malformed or not a real calendar date, so a filter endpoint can treat an
+// invalid value the same as "not provided" instead of letting an Invalid
+// Date reach a SQL parameter.
+function manilaDayStartUTC(dateStr) {
+  if (typeof dateStr !== "string" || !DATE_STR_RE.test(dateStr)) return null;
+  const d = new Date(`${dateStr}T00:00:00+08:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// The exclusive upper bound for the same date -- Manila midnight at the
+// start of the NEXT day, so a range check like `event_time < this` correctly
+// includes every instant during dateStr's Manila-local day regardless of
+// exact time, without the off-by-a-few-hours risk of a literal "23:59:59".
+function manilaDayEndExclusiveUTC(dateStr) {
+  const start = manilaDayStartUTC(dateStr);
+  return start ? new Date(start.getTime() + 24 * 60 * 60 * 1000) : null;
+}
+
 // Expects a real Date object -- callers pass `new Date(someTimestamp)`.
 function formatRelativeTime(date) {
   const now = new Date();
@@ -63,4 +88,6 @@ module.exports = {
   isSameManilaDay,
   formatTime12h,
   formatRelativeTime,
+  manilaDayStartUTC,
+  manilaDayEndExclusiveUTC,
 };

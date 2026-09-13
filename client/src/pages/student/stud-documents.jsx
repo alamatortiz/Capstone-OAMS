@@ -793,12 +793,12 @@ export default function DocumentsPage() {
                             <p className="doc-card-college">{doc.college}</p>
                           </div>
                           <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
 
@@ -839,7 +839,7 @@ export default function DocumentsPage() {
 
                         {doc.notes && (
                           <div className="doc-card-update">
-                            <p className="doc-update-title">Update</p>
+                            <p className="doc-update-title">Processing Notes</p>
                             <p className="doc-update-text">{doc.notes}</p>
                           </div>
                         )}
@@ -938,12 +938,12 @@ export default function DocumentsPage() {
                             </div>
                           </div>
                           <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
                       </div>
@@ -1003,12 +1003,12 @@ export default function DocumentsPage() {
                             </div>
                           </div>
                           <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
                       </div>
@@ -1068,12 +1068,12 @@ export default function DocumentsPage() {
                             </div>
                           </div>
                           <div className="doc-card-header-right">
+                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                             <span
                               className={`doc-badge ${getDocStatusHubMeta(doc.status).cls}`}
                             >
                               {getDocStatusHubMeta(doc.status).label}
                             </span>
-                            <span className="doc-tracking-pill">{doc.trackingNumber}</span>
                           </div>
                         </div>
                       </div>

@@ -640,6 +640,7 @@ body {
   color: var(--text-secondary);
   line-height: 1.6;
   transition: color 0.3s ease;
+  text-align: justify;
 }
 
 /* ===== Service Hours ===== */

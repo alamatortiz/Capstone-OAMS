@@ -87,6 +87,8 @@ interface Appointment {
   studentName: string;
   studentId: string;
   course: string | null;
+  bookingYearProgram: string | null;
+  courseCode: string | null;
   appointmentType: string | null;
   date: string;
   time: string;
@@ -589,6 +591,18 @@ export default function ProfessorAppointmentScreen() {
                         <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
                           <Text style={styles.apptInfoLabel}>Purpose</Text>
                           <Text style={styles.apptNotesText}>{apt.purpose}</Text>
+                        </View>
+                      )}
+                      {apt.bookingYearProgram && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={styles.apptInfoLabel}>Year & Program</Text>
+                          <Text style={styles.apptInfoValue}>{apt.bookingYearProgram}</Text>
+                        </View>
+                      )}
+                      {apt.courseCode && (
+                        <View style={[styles.apptInfoField, styles.apptInfoFieldFull]}>
+                          <Text style={styles.apptInfoLabel}>Course Code</Text>
+                          <Text style={styles.apptInfoValue}>{apt.courseCode}</Text>
                         </View>
                       )}
                     </View>

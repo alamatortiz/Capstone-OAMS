@@ -351,7 +351,7 @@ body.dark-mode .about-section {
   color: #6b7280;
   font-size: 1.05rem;
   line-height: 1.75;
-  text-align: center;
+  text-align: justify;
   transition: color 0.3s;
 }
 

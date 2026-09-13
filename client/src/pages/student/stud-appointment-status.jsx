@@ -11,6 +11,7 @@ import {
   LayoutList,
   Clock,
   CheckCircle2,
+  MessageSquare,
 } from "lucide-react";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
 import { toast } from "sonner";
@@ -50,65 +51,22 @@ const formatDateShort = (dateStr) => {
   });
 };
 
-// A single, shared, overwritable comment either party can read/edit -- see
-// the mirrored card in prof-appointments.jsx. Only editable while the
-// appointment is still pending/approved (same guard the server enforces).
-function CommentCard({ appt, onSaved }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(appt.sharedComment ?? "");
-  const [saving, setSaving] = useState(false);
-  const canEdit = appt.status === "pending" || appt.status === "approved";
-
-  const startEdit = () => {
-    setDraft(appt.sharedComment ?? "");
-    setEditing(true);
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await api.patch(`/student/appointments/${appt.id}/comment`, { comment: draft });
-      toast.success("Comment saved.");
-      setEditing(false);
-      onSaved?.();
-    } catch (err) {
-      toast.error(err?.response?.data?.error ?? "Failed to save comment.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
+// Read-only display of the shared appointment comment -- the professor is
+// the only party who can write it (see prof-appointments.jsx's CommentBlock,
+// which still edits the same field via /professor/appointments/:id/comment).
+// The student's own write path to this field has been removed entirely, not
+// just hidden here, so this is genuinely view-only rather than cosmetically so.
+function CommentCard({ appt }) {
   return (
-    <div className="apst-card">
-      <div className="apst-card-header apst-comment-header">
-        <h3 className="apst-card-title">Comment</h3>
-        {canEdit && !editing && (
-          <button type="button" className="apst-comment-edit-link" onClick={startEdit}>
-            {appt.sharedComment ? "Edit" : "Add a comment"}
-          </button>
-        )}
+    <div className="apst-card apst-comment-card">
+      <div className="apst-card-header">
+        <h3 className="apst-card-title apst-comment-title">
+          <MessageSquare style={{ width: "1.25rem", height: "1.25rem", color: "#3b82f6" }} />
+          Comments
+        </h3>
       </div>
       <div className="apst-card-content">
-        {editing ? (
-          <div className="apst-comment-edit">
-            <textarea
-              className="apst-comment-textarea"
-              value={draft}
-              maxLength={2000}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Leave a note for the professor…"
-              disabled={saving}
-            />
-            <div className="apst-comment-edit-actions">
-              <button type="button" className="apst-comment-cancel-btn" onClick={() => setEditing(false)} disabled={saving}>
-                Cancel
-              </button>
-              <button type="button" className="apst-comment-save-btn" onClick={save} disabled={saving}>
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </div>
-          </div>
-        ) : appt.sharedComment ? (
+        {appt.sharedComment ? (
           <>
             <p className="apst-detail-value apst-comment-text">{appt.sharedComment}</p>
             {appt.commentUpdatedAt && (
@@ -127,7 +85,7 @@ function CommentCard({ appt, onSaved }) {
 }
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
-function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, onCommentSaved, backLabel = "My Appointments" }) {
+function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, completing, backLabel = "My Appointments" }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const { label: statusLabel, cls: statusCls } = getStatusMeta(appt.status);
@@ -258,7 +216,7 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
             )}
           </div>
 
-          <CommentCard appt={appt} onSaved={onCommentSaved} />
+          <CommentCard appt={appt} />
 
           {canCancel && (
             <div className="apst-card apst-cancel-card">
@@ -375,7 +333,7 @@ export default function AppointmentStatusPage() {
     try {
       const { data } = await api.get("/student/appointments");
       setAppointments(data.appointments ?? []);
-    } catch (err) {
+    } catch {
       // Only take over the whole view with a blocking error on the true
       // first load. A background refresh (poll/socket) failing shouldn't
       // wipe out an already-good, visible list -- just note it quietly.
@@ -409,8 +367,21 @@ export default function AppointmentStatusPage() {
 
     socket.on("appointment:status-updated", handleStatusUpdate);
 
+    // A professor's comment is otherwise only picked up by the 30s fallback
+    // poll below -- this makes it show up immediately for a student who
+    // already has this page open.
+    const handleCommentUpdate = (payload) => {
+      toast.message("Your professor left a new comment on an appointment.", {
+        id: `appt-comment-${payload?.appointmentId}`,
+      });
+      fetchAppointments();
+    };
+
+    socket.on("appointment:comment-updated", handleCommentUpdate);
+
     return () => {
       socket.off("appointment:status-updated", handleStatusUpdate);
+      socket.off("appointment:comment-updated", handleCommentUpdate);
     };
   }, [fetchAppointments, token]);
 
@@ -500,7 +471,6 @@ export default function AppointmentStatusPage() {
             cancelling={cancelling}
             onComplete={handleComplete}
             completing={completing}
-            onCommentSaved={fetchAppointments}
           />
         ) : (
           <div className="apst-status-container">

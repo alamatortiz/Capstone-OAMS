@@ -235,9 +235,9 @@
 }
 
 .apst-badge-cancelled {
-  background: rgba(107, 114, 128, 0.15);
-  color: #d1d5db;
-  border: 1px solid rgba(107, 114, 128, 0.35);
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 /* Light mode */
@@ -266,9 +266,9 @@
 }
 
 [data-theme="light"] .apst-badge-cancelled {
-  background: rgba(107, 114, 128, 0.08);
-  color: #374151;
-  border-color: rgba(107, 114, 128, 0.2);
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
 }
 
 /* ─── Cancel Button ──────────────────────────────────────────────────────── */
@@ -878,25 +878,27 @@
   to   { transform: rotate(360deg); }
 }
 
-/* ─── Shared comment card ─────────────────────────────────────────────────── */
-/* Edit sits right next to the "Comment" title (not pushed to the card's far
-   edge the way .apst-card-header's default space-between does for other
-   cards' title+badge pairs). */
-.apst-comment-header {
-  justify-content: flex-start;
-  gap: 0.6rem;
+/* ─── Comments card — read-only, blue hue (mirrors the cancel card's red /
+   complete card's green pattern). The student can no longer edit this field
+   at all (see prof-appointments.jsx's CommentBlock for the professor's own,
+   still-editable copy), so there is no edit affordance here anymore. ────── */
+.apst-comment-card {
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  background-color: rgba(59, 130, 246, 0.05);
 }
 
-.apst-comment-edit-link {
-  background: none;
-  border: none;
-  color: #a855f7;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
+[data-theme="light"] .apst-comment-card {
+  background-color: rgba(59, 130, 246, 0.03);
 }
-[data-theme="light"] .apst-comment-edit-link { color: #9333ea; }
+
+.apst-comment-card .apst-card-header {
+  border-bottom-color: rgba(59, 130, 246, 0.15);
+}
+
+.apst-comment-title,
+.apst-comment-card .apst-card-title svg {
+  color: #3b82f6;
+}
 
 .apst-comment-text { white-space: pre-wrap; }
 
@@ -915,55 +917,4 @@
   font-size: 0.9rem;
   color: var(--text-tertiary);
   font-style: italic;
-}
-
-.apst-comment-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.apst-comment-textarea {
-  width: 100%;
-  min-height: 90px;
-  resize: vertical;
-  border-radius: 0.6rem;
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  background: var(--input-background, transparent);
-  color: var(--text-primary);
-  font: inherit;
-  padding: 0.6rem 0.75rem;
-}
-
-.apst-comment-edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-.apst-comment-cancel-btn,
-.apst-comment-save-btn {
-  padding: 0.45rem 0.9rem;
-  border-radius: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-}
-
-.apst-comment-cancel-btn {
-  background: transparent;
-  color: var(--text-primary);
-}
-
-.apst-comment-save-btn {
-  background: linear-gradient(135deg, #a855f7, #9333ea);
-  color: #fff;
-  border-color: transparent;
-}
-
-.apst-comment-save-btn:disabled,
-.apst-comment-cancel-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }

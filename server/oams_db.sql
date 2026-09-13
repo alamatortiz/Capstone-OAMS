@@ -418,6 +418,12 @@ CREATE TABLE appointments (
     -- this column has no such dual-purpose precedent).
     rejection_reason    TEXT         NULL,
     notes               TEXT,
+    -- Booking-time context the student types in themselves (not pulled from
+    -- students.year_level/course, which may be stale or unset) so the
+    -- professor knows which class/year the consultation concerns. Free-text
+    -- shorthand (e.g. "1 CS-A"), not split into separate year/program columns.
+    booking_year_program VARCHAR(150) NULL,
+    course_code          VARCHAR(50)  NULL,
     -- One shared, overwritable comment either the student or the professor
     -- can read/edit (e.g. a quick back-and-forth note) -- distinct from
     -- `notes` above (student's one-time booking purpose) and from

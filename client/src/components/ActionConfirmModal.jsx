@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import "./ActionConfirmModal.css";
 import useLockBodyScroll from "../hooks/useLockBodyScroll";
 
@@ -18,7 +19,11 @@ export default function ActionConfirmModal({
 
   if (!show) return null;
 
-  return (
+  // Portaled to document.body -- otherwise this fixed-position overlay would
+  // be confined to (and jump around with) any ancestor card that applies a
+  // transform on hover, since a transform creates a new containing block for
+  // position:fixed descendants.
+  return createPortal(
     <div className="acm-overlay">
       <div className="acm-modal">
         {icon && <div className={`acm-icon acm-icon--${variant}`}>{icon}</div>}
@@ -41,6 +46,7 @@ export default function ActionConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

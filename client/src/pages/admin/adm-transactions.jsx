@@ -16,6 +16,7 @@ import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 import AdminPageShell from "../../components/AdminPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
+import FilterDateRange from "../../components/FilterDateRange";
 import Pagination from "../../components/Pagination";
 import ExportMenu from "../../components/ExportMenu";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
@@ -185,13 +186,6 @@ const STATUS_OPTIONS = [
 // of these, instead of silently falling back to the CAS logo.
 const KNOWN_COLLEGES = ["CCS", "CBAA", "COE", "COED", "CAS", "CHAS"];
 
-const DATE_OPTIONS = [
-  { value: "today", label: "Today" },
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
-  { value: "all", label: "All Time" },
-];
-
 const TRANSACTION_LIVE_EVENTS = [
   "queue:called",
   "queue:served",
@@ -213,7 +207,8 @@ export default function AdminTransaction() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [dateRange, setDateRange] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
@@ -236,7 +231,8 @@ export default function AdminTransaction() {
         params: {
           type: filterType,
           status: filterStatus,
-          range: dateRange,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
         },
       });
       setTransactions(res.data.transactions ?? []);
@@ -248,7 +244,7 @@ export default function AdminTransaction() {
       setError("Could not load transaction data.");
       toast.error("Could not load transaction data");
     }
-  }, [filterType, filterStatus, dateRange]);
+  }, [filterType, filterStatus, startDate, endDate]);
 
   useEffect(() => {
     const init = async () => {
@@ -398,7 +394,13 @@ export default function AdminTransaction() {
     return `"${safe.replace(/"/g, '""')}"`;
   };
 
+  const dateRangeLabel =
+    startDate || endDate
+      ? `${startDate || "…"} to ${endDate || "…"}`
+      : "All Time";
+
   const summaryRows = [
+    ["Date Range", dateRangeLabel],
     ["Total Transactions", stats.total],
     ["Queue", stats.queue],
     ["Appointments", stats.appointments],
@@ -422,7 +424,7 @@ export default function AdminTransaction() {
   const handleExportPdf = () => {
     exportTransactionsPdf({
       title: "Department Transaction Report",
-      subtitle: `${authUser?.departmentName ?? "Department"} — Generated ${getManilaDateString()}`,
+      subtitle: `${authUser?.departmentName ?? "Department"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
       columns: exportHeader,
       rows: exportRows,
       filename: `transactions-${getManilaDateString()}.pdf`,
@@ -544,15 +546,6 @@ export default function AdminTransaction() {
             </div>
             <div className="filters-grid">
               <FilterSelect
-                id="tx-filter-date-range"
-                label="Date Range"
-                value={dateRange}
-                onChange={(e) => { setDateRange(e.target.value); setPage(1); }}
-                options={DATE_OPTIONS}
-                chevronIcon={<ChevronDownIcon className="filter-chevron" />}
-              />
-
-              <FilterSelect
                 id="tx-filter-type"
                 label="Type"
                 value={filterType}
@@ -568,6 +561,17 @@ export default function AdminTransaction() {
                 onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                 options={STATUS_OPTIONS}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+            </div>
+            <div className="filters-date-section">
+              <FilterDateRange
+                id="tx-filter-date-range"
+                label="Date Range"
+                startValue={startDate}
+                endValue={endDate}
+                onStartChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                onEndChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                onClear={() => { setStartDate(""); setEndDate(""); setPage(1); }}
               />
             </div>
           </div>

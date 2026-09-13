@@ -401,6 +401,8 @@ export default function StudentAppointmentsScreen() {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [selectedApptType, setSelectedApptType] = useState('');
   const [purpose, setPurpose] = useState('');
+  const [yearProgram, setYearProgram] = useState('');
+  const [courseCode, setCourseCode] = useState('');
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null);
@@ -499,13 +501,19 @@ export default function StudentAppointmentsScreen() {
   };
 
   const openBookDialog = (slot: Slot) => {
-    setSelectedSlot(slot); setSelectedApptType(''); setPurpose(''); setShowBookDialog(true);
+    setSelectedSlot(slot); setSelectedApptType(''); setPurpose('');
+    setYearProgram(''); setCourseCode('');
+    setShowBookDialog(true);
   };
 
   const handleBookSlot = async () => {
     if (!selectedSlot || submitting) return;
     if (selectedSlot.appointmentTypes && selectedSlot.appointmentTypes.length > 0 && !selectedApptType) {
       Alert.alert('Missing information', 'Please select an appointment type.');
+      return;
+    }
+    if (!yearProgram.trim() || !courseCode.trim()) {
+      Alert.alert('Missing information', 'Please provide your year level and program, and course code.');
       return;
     }
     setSubmitting(true);
@@ -515,8 +523,11 @@ export default function StudentAppointmentsScreen() {
         appointmentDate: selectedSlot.date,
         appointmentType: selectedApptType || null,
         purpose: purpose.trim(),
+        yearProgram: yearProgram.trim(),
+        courseCode: courseCode.trim(),
       });
       setShowBookDialog(false); setSelectedSlot(null); setSelectedApptType(''); setPurpose('');
+      setYearProgram(''); setCourseCode('');
       Alert.alert('Success', 'Appointment booked successfully!');
       await Promise.all([fetchSlots(), fetchMyBookings()]);
     } catch (err: any) {
@@ -1025,6 +1036,28 @@ export default function StudentAppointmentsScreen() {
                         <Text style={styles.slotDetailText}>{selectedSlot.location}</Text>
                       </View>
                     </View>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Year Level and Program *</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g., 1 CS-A, 1 IT-A"
+                      placeholderTextColor={theme.tertiary}
+                      value={yearProgram}
+                      onChangeText={setYearProgram}
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Course Code *</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g., CS 101"
+                      placeholderTextColor={theme.tertiary}
+                      value={courseCode}
+                      onChangeText={setCourseCode}
+                    />
                   </View>
 
                   {selectedSlot.appointmentTypes && selectedSlot.appointmentTypes.length > 0 && (
@@ -1615,6 +1648,10 @@ function createStyles(theme: ThemePalette) {
     textarea: {
       backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 12,
       padding: 12, color: theme.text, fontSize: 13, minHeight: 80, textAlignVertical: 'top',
+    },
+    textInput: {
+      backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 12,
+      padding: 12, color: theme.text, fontSize: 13,
     },
     dialogActions: {
       flexDirection: 'row', gap: 10, justifyContent: 'flex-end',

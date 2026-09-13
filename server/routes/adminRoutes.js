@@ -32,7 +32,7 @@ const {
   serveAdminRequestFile,
 } = require("../utils/documentRequestAttachments");
 const { emitToSlot, emitToDept, emitToUser } = require("../sockets");
-const { getManilaDateString, getManilaTimeString, formatRelativeTime, formatTime12h: formatTime } = require("../utils/dateTime");
+const { getManilaDateString, getManilaTimeString, formatRelativeTime, formatTime12h: formatTime, manilaDayStartUTC, manilaDayEndExclusiveUTC } = require("../utils/dateTime");
 const { voidQueueEntry, emitVoidEvents } = require("../jobs/queueNoShowSweeper");
 const notificationsController = require("../controllers/notificationsController");
 const { settleSlotAfterEntryChange, getOwnedSlotOrRespond } = require("../utils/queueSlotSettlement");
@@ -1370,7 +1370,13 @@ router.get(
           d.department_name,
           d.department_abbreviation,
           COALESCE(a.location_snapshot, fda.location) AS location,
-          svc.service_name
+          svc.service_name,
+          a.booking_year_program,
+          a.course_code,
+          a.shared_comment,
+          a.comment_updated_by,
+          a.comment_updated_at,
+          COALESCE(a.slot_note_snapshot, fda.slot_note) AS slot_note
         FROM appointments a
         JOIN students     s   ON a.student_id   = s.student_id
         JOIN faculty       f   ON a.faculty_id    = f.faculty_id
@@ -1402,6 +1408,12 @@ router.get(
           facultyEmail: r.faculty_email,
           serviceName: r.service_name ?? null,
           purpose: r.notes || "No purpose specified",
+          bookingYearProgram: r.booking_year_program ?? null,
+          courseCode: r.course_code ?? null,
+          slotNote: r.slot_note ?? null,
+          sharedComment: r.shared_comment ?? null,
+          commentUpdatedBy: r.comment_updated_by ?? null,
+          commentUpdatedAt: r.comment_updated_at ?? null,
           date: dateStr,
           time: formatTime(r.appointment_time),
           status: r.status,
@@ -1439,10 +1451,11 @@ router.get(
 
 // GET /api/admin/transactions
 // Query params (all optional):
-//   type   = "all" | "queue" | "appointment" | "document" | "submission"
-//   status = "all" | <status string from the relevant table>
-//   range  = "today" | "week" | "month" | "all"   (default "all")
-//   search = free text matched against student name/id, processor, details
+//   type      = "all" | "queue" | "appointment" | "document" | "submission"
+//   status    = "all" | <status string from the relevant table>
+//   startDate = "YYYY-MM-DD" -- inclusive, Manila-local
+//   endDate   = "YYYY-MM-DD" -- inclusive, Manila-local
+//   search    = free text matched against student name/id, processor, details
 router.get(
   "/transactions",
   authenticateToken,
@@ -1456,29 +1469,33 @@ router.get(
           .json({ error: "Admin has no department assigned" });
       }
 
-      const { type = "all", status = "all", range = "all" } = req.query;
+      const { type = "all", status = "all", startDate, endDate } = req.query;
 
-      // Date-range boundary applied identically to all three branches below.
-      // event_time is a real UTC instant, so "today"/"week"/"month" must be
-      // anchored to Manila midnight, not the DB server's (UTC) CURDATE().
-      const manilaMidnightUTC = new Date(`${getManilaDateString()}T00:00:00+08:00`);
+      // Date-range boundary applied identically to all three branches below
+      // (via fetchTransactionRows, called twice -- see its two call sites
+      // further down -- so this also correctly scopes the stat-card counts
+      // to the same range, not just the displayed list). event_time is a
+      // real UTC instant, so the picked dates must be anchored to Manila
+      // midnight, not the DB server's (UTC) CURDATE(). An invalid/malformed
+      // date string degrades to null (treated as "not provided"), never a
+      // thrown error.
+      const startUTC = manilaDayStartUTC(startDate);
+      const endExclusiveUTC = manilaDayEndExclusiveUTC(endDate);
       let dateClause = "";
-      let dateParam = null;
-      if (range === "today") {
-        dateClause = "AND event_time >= ?";
-        dateParam = manilaMidnightUTC;
-      } else if (range === "week") {
-        dateClause = "AND event_time >= ?";
-        dateParam = new Date(manilaMidnightUTC.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else if (range === "month") {
-        dateClause = "AND event_time >= ?";
-        dateParam = new Date(manilaMidnightUTC.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const dateParams = [];
+      if (startUTC) {
+        dateClause += "AND event_time >= ?";
+        dateParams.push(startUTC);
+      }
+      if (endExclusiveUTC) {
+        dateClause += " AND event_time < ?";
+        dateParams.push(endExclusiveUTC);
       }
 
       // Same boundary, but against al.created_at -- the audit-log query below
       // is a flat SELECT, not a derived table, so the "event_time" alias used
       // by dateClause above isn't a valid column reference in its WHERE clause.
-      const auditDateClause = dateClause ? "AND al.created_at >= ?" : "";
+      const auditDateClause = dateClause.replace(/event_time/g, "al.created_at");
 
       // Map raw per-table statuses -> the badge vocabulary the UI uses.
       // Document statuses stay granular (matching /professor/transactions'
@@ -1735,7 +1752,7 @@ router.get(
         `;
 
         const unionParams = [deptId, deptId, deptId, deptId, deptId];
-        if (dateParam) unionParams.push(dateParam);
+        unionParams.push(...dateParams);
         if (requestTypeParam) unionParams.push(requestTypeParam);
         if (requestStatusParam) unionParams.push(requestStatusParam);
         const [rows] = await pool.query(unionSql, unionParams);
@@ -1780,7 +1797,7 @@ router.get(
           LIMIT 200
         `;
         const auditParams = [deptId];
-        if (dateParam) auditParams.push(dateParam);
+        auditParams.push(...dateParams);
         if (auditStatusParam) auditParams.push(auditStatusParam);
         const [auditRows] = await pool.query(auditSql, auditParams);
 
@@ -1939,6 +1956,7 @@ router.get(
       const [[row]] = await pool.query(
         `SELECT
            a.appointment_id, a.appointment_date, a.appointment_time, a.status, a.notes,
+           a.booking_year_program, a.course_code,
            COALESCE(a.window_start_snapshot, fa.start_time) AS window_start,
            COALESCE(a.window_end_snapshot,   fa.end_time)   AS window_end,
            COALESCE(a.location_snapshot,     fa.location)   AS location,
@@ -1978,6 +1996,8 @@ router.get(
         windowEnd: row.window_end ? String(row.window_end).slice(0, 5) : null,
         location: row.location ?? "TBA",
         purpose: row.notes ?? "",
+        bookingYearProgram: row.booking_year_program ?? null,
+        courseCode: row.course_code ?? null,
         status: row.status,
         departmentName: row.department_name,
         departmentAbbrev: row.department_abbreviation,

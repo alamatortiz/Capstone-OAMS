@@ -30,8 +30,8 @@
   right: 0;
   z-index: 20;
   min-width: 11rem;
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--card-border, #e5e7eb);
+  background: var(--card-bg, #111612);
+  border: 1px solid var(--card-border, #1e3a23);
   border-radius: 0.6rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: 0.35rem;
@@ -46,7 +46,7 @@
   border-radius: 0.4rem;
   border: none;
   background: transparent;
-  color: var(--text-primary, #1f2937);
+  color: var(--text-primary, #f0fdf4);
   font-size: 0.85rem;
   cursor: pointer;
 }

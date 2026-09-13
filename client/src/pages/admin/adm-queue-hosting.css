@@ -1060,6 +1060,13 @@
   pointer-events: none;
 }
 
+/* The browser draws its own clock/picker icon in this same corner for
+   type="time" inputs -- without suppressing it, it renders stacked directly
+   under the custom SVG above, showing as two overlapping clock icons. */
+.aqh-time-input-wrap input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+}
+
 .aqh-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

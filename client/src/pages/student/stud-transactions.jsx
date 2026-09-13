@@ -5,6 +5,7 @@ import {
   CalendarIconNav,
 } from "../../components/StudentSidebar";
 import FilterSelect from "../../components/FilterSelect";
+import FilterDateRange from "../../components/FilterDateRange";
 import PageHeader from "../../components/PageHeader";
 import Pagination from "../../components/Pagination";
 import ExportMenu from "../../components/ExportMenu";
@@ -97,6 +98,8 @@ export default function TransactionsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [transactions, setTransactions] = useState([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState(null);
@@ -181,6 +184,8 @@ export default function TransactionsPage() {
             search: debouncedSearch || undefined,
             type: filterType !== "all" ? filterType : undefined,
             status: filterStatus !== "all" ? filterStatus : undefined,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
             limit: PAGE_SIZE,
             page,
           },
@@ -202,7 +207,7 @@ export default function TransactionsPage() {
         if (requestId === requestIdRef.current) setTxLoading(false);
       }
     },
-    [debouncedSearch, filterType, filterStatus, page],
+    [debouncedSearch, filterType, filterStatus, startDate, endDate, page],
   );
 
   // ── Export (CSV/PDF of everything matching the current filters, not just
@@ -228,6 +233,8 @@ export default function TransactionsPage() {
         search: debouncedSearch || undefined,
         type: filterType !== "all" ? filterType : undefined,
         status: filterStatus !== "all" ? filterStatus : undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
         limit: 100,
         page: 1,
       },
@@ -237,7 +244,13 @@ export default function TransactionsPage() {
     ]);
   };
 
+  const dateRangeLabel =
+    startDate || endDate
+      ? `${startDate || "…"} to ${endDate || "…"}`
+      : "All Time";
+
   const summaryRows = [
+    ["Date Range", dateRangeLabel],
     ["Total", txStats.total],
     ["Completed", txStats.completed],
     ["Ongoing", txStats.ongoing],
@@ -270,7 +283,7 @@ export default function TransactionsPage() {
       const rows = await fetchExportRows();
       exportTransactionsPdf({
         title: "Transaction History",
-        subtitle: `${user?.name ?? "Student"} — Generated ${getManilaDateString()}`,
+        subtitle: `${user?.name ?? "Student"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
         columns: header,
         rows,
         filename: `transactions-${getManilaDateString()}.pdf`,
@@ -486,6 +499,17 @@ export default function TransactionsPage() {
                   { value: "cancelled", label: "Cancelled" },
                 ]}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+            </div>
+            <div className="filters-date-section">
+              <FilterDateRange
+                id="tx-filter-date-range"
+                label="Date Range"
+                startValue={startDate}
+                endValue={endDate}
+                onStartChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                onEndChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                onClear={() => { setStartDate(""); setEndDate(""); setPage(1); }}
               />
             </div>
           </div>

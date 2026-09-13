@@ -463,12 +463,29 @@ html, body {
   transition: color 0.3s ease;
 }
 
+.appt-card-location-sub {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin: 0.15rem 0 0;
+  transition: color 0.3s ease;
+}
+
+.appt-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  margin: 0.6rem 0 0;
+  transition: color 0.3s ease;
+}
+
 /* Appointment type pill — sits inline in the name row now (next to the
    student-id badge) rather than its own labeled row below the header. */
 .appt-card-appt-type-value {
   display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
   font-size: 0.68rem;
   font-weight: 700;
   background: rgba(168, 85, 247, 0.12);
@@ -484,14 +501,15 @@ html, body {
 }
 
 /* ── Status badge ────────────────────────────────────────── */
+/* Sized to match .appt-card-student-id-badge right next to it, rather than
+   standing out as the largest badge on the row. */
 .appt-status-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 4.5rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 0.625rem;
-  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -521,21 +539,21 @@ html, body {
   border: 1px solid rgba(239, 68, 68, 0.35);
 }
 .appt-status-badge--cancelled {
-  background: rgba(107, 114, 128, 0.15);
-  color: #d1d5db;
-  border: 1px solid rgba(107, 114, 128, 0.35);
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 [data-theme="light"] .appt-status-badge--pending   { background: rgba(217,119,6,0.1);   color: #92400e; border-color: rgba(217,119,6,0.3); }
 [data-theme="light"] .appt-status-badge--approved  { background: rgba(5,150,105,0.1);   color: #065f46; border-color: rgba(5,150,105,0.25); }
 [data-theme="light"] .appt-status-badge--completed { background: rgba(5,150,105,0.1);    color: #065f46; border-color: rgba(5,150,105,0.25); }
 [data-theme="light"] .appt-status-badge--rejected  { background: rgba(220,38,38,0.08);  color: #991b1b; border-color: rgba(220,38,38,0.2); }
-[data-theme="light"] .appt-status-badge--cancelled { background: rgba(107,114,128,0.08);color: #374151; border-color: rgba(107,114,128,0.2); }
+[data-theme="light"] .appt-status-badge--cancelled { background: rgba(220,38,38,0.08);  color: #991b1b; border-color: rgba(220,38,38,0.2); }
 
-/* Location/Note stack -- lives inside .appt-card-title-section now, right
-   under Date/Time. A plain vertical stack (not a real grid) since every
-   field here is full-width (.appt-info-field--full); kept as .appt-info-grid
-   for the shared .appt-info-field/label/value styling underneath it. */
+/* Year & Program / Course Code row, then Purpose -- lives inside
+   .appt-card-title-section, below the Date/Time section. A plain vertical
+   stack (not a real grid); kept as .appt-info-grid for the shared
+   .appt-info-field/label/value styling underneath it. */
 .appt-info-grid {
   display: flex;
   flex-direction: column;
@@ -552,6 +570,20 @@ html, body {
 
 .appt-info-field--full {
   grid-column: 1 / -1;
+}
+
+/* Year & Program / Course Code sit side by side -- the parent is flex, not a
+   real grid, so .appt-info-field--full's grid-column is a no-op here; this
+   is the real side-by-side wrapper. */
+.appt-info-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.appt-info-row .appt-info-field {
+  flex: 1;
+  min-width: 8rem;
 }
 
 .appt-info-field label {
@@ -573,15 +605,6 @@ html, body {
 }
 
 [data-theme="light"] .appt-info-field p { color: #9333ea; }
-
-.appt-notes-text {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.4;
-  transition: color 0.3s ease;
-}
 
 /* Requested-at timestamp -- now lives in the header's right column (see
    .appt-card-header-actions) instead of a dedicated footer row. */
@@ -621,45 +644,51 @@ html, body {
    A normal flex child of .appt-card-header-row -- Purpose and the action
    buttons moved to the left column (see .appt-info-grid/.appt-header-btn-row
    below, now nested in .appt-card-title-section), so this right column is
-   lightweight: just Requested-at and Comment. Fixed (not max-) width --
-   Comment needs a real, predictable width to stretch into (see
-   .appt-comment-field's width: 100% below); an auto/shrink-to-fit column has
-   no stable width for a child to be "100%" of. */
+   lightweight: just Requested-at now that Comments has its own section in
+   the left column below the action buttons. Shrink-to-fit width (no more
+   fixed 12.5rem) since there's no longer a 100%-width child needing a
+   stable column width to stretch into. */
 .appt-card-header-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: center;
   gap: 0.4rem;
   flex-shrink: 0;
-  width: 12.5rem;
 }
 
 /* Sits at the bottom of the left column (.appt-card-title-section), after
    Location/Purpose -- left-aligned like everything else over there, not
-   right-aligned the way it was when it lived in the right column. */
+   right-aligned the way it was when it lived in the right column. Bordered
+   off from the info above it, the same way .appt-comment-section is
+   bordered off from the buttons below. */
 .appt-header-btn-row {
   display: flex;
   gap: 0.35rem;
-  margin-top: 0.5rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--card-border);
 }
 
 .appt-btn-sm {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.55rem;
-  border: none;
-  border-radius: 0.4rem;
-  font-size: 0.7rem;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 1;
+  padding: 0.65rem 1rem;
+  background: transparent;
+  border: 1px solid transparent; /* each variant below sets its real color */
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
-  transition: opacity 0.2s ease, transform 0.1s ease;
+  transition: all 0.25s ease;
 }
 
-.appt-btn-sm:hover  { opacity: 0.88; }
-.appt-btn-sm:active { transform: scale(0.97); }
+.appt-btn-sm:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
 
 /* Disabled state must override the base cursor:pointer/hover rules above --
    otherwise a disabled button (e.g. "Complete" on a future-dated
@@ -671,24 +700,45 @@ html, body {
   cursor: not-allowed;
 }
 
-.appt-btn-sm:disabled:hover {
-  opacity: 0.45;
-}
-
 .appt-btn-sm svg {
-  width: 0.8rem;
-  height: 0.8rem;
+  width: 1.1rem;
+  height: 1.1rem;
   flex-shrink: 0;
 }
 
-.appt-btn-sm-approve  { background: #16a34a; color: #fff; }
-.appt-btn-sm-reject   { background: #dc2626; color: #fff; }
-.appt-btn-sm-complete { background: #2563eb; color: #fff; }
-.appt-btn-sm-cancel {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--card-border);
+/* Outlined "hollow" style matching .doc-card-view-button/.doc-claim-btn
+   (stud-documents.css) -- transparent fill, colored border/text, hover tints
+   the background and lifts slightly. Each button's color matches its own
+   confirmation popup (approve/complete -> ActionConfirmModal variant
+   "success"; reject -> QueueReasonModal's danger default; cancel ->
+   ActionConfirmModal's danger default) -- green for actions that move an
+   appointment forward, red for ones that stop it. The :not(:disabled) guards
+   keep a disabled button (e.g. Complete on a future-dated appointment) from
+   showing a hover tint that implies it's clickable. */
+.appt-btn-sm-approve, .appt-btn-sm-complete {
+  color: #16a34a;
+  border-color: rgba(34, 197, 94, 0.35);
 }
+.appt-btn-sm-approve:hover:not(:disabled), .appt-btn-sm-complete:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.65);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.2);
+}
+
+.appt-btn-sm-reject, .appt-btn-sm-cancel {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.appt-btn-sm-reject:hover:not(:disabled), .appt-btn-sm-cancel:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.65);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="light"] .appt-btn-sm-approve, [data-theme="light"] .appt-btn-sm-complete { color: #065f46; }
+[data-theme="light"] .appt-btn-sm-reject, [data-theme="light"] .appt-btn-sm-cancel { color: #991b1b; }
 
 /* Date/Time pill styling -- used inside .appt-card-datetime-row, right
    under the name/course (Location moved to its own labeled field below,
@@ -746,41 +796,40 @@ html, body {
 
   .appt-header-btn-row { flex-wrap: wrap; }
 
-  .appt-btn-sm { padding: 0.25rem 0.4rem; font-size: 0.62rem; }
+  .appt-btn-sm { padding: 0.5rem 0.75rem; font-size: 0.78rem; }
+  .appt-btn-sm svg { width: 0.95rem; height: 0.95rem; }
 }
 
 
-/* ─── Shared comment field ─────────────────────────────────────────────────── */
-/* Lives inside .appt-card-header-actions now (below the action buttons),
-   not the main body -- width: 100% stretches it to that column's fixed
-   width despite the parent's align-items: flex-end (which otherwise
-   shrink-wraps every child to its own content). */
-.appt-comment-field {
-  width: 100%;
-  margin-top: 0.15rem;
-  text-align: right;
+/* ─── Comments section ────────────────────────────────────────────────────── */
+/* Its own dedicated section at the bottom of the left column, below the
+   action buttons -- editing now happens in a popup (see CommentBlock's
+   QueueReasonModal usage) instead of inline, so this is display-only plus a
+   button that opens that popup. */
+.appt-comment-section {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--card-border);
 }
 
-/* Edit sits right next to the "Comment" label, and the pair is pushed to
-   the column's right edge (flex-end) so it lines up with Requested/Purpose/
-   the buttons above it instead of starting at this box's own left edge,
-   which would otherwise land in the middle of the card. */
-.appt-comment-field-header {
+.appt-comment-section-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 0.6rem;
+  margin-bottom: 0.4rem;
 }
 
-/* Matches .appt-info-field label exactly (Location/Purpose's label style)
-   -- this bare <label> has no styling of its own otherwise, since it isn't
-   a descendant of .appt-info-field. */
-.appt-comment-field-header label {
-  font-size: 0.7rem;
+.appt-comment-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
   color: var(--text-tertiary);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin: 0;
 }
 
 .appt-comment-edit-link {
@@ -791,6 +840,7 @@ html, body {
   font-weight: 600;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
 }
 [data-theme="light"] .appt-comment-edit-link { color: #9333ea; }
 
@@ -801,18 +851,14 @@ html, body {
   margin: 0;
 }
 
-/* Matches .appt-info-field p's size/weight/color exactly (Location/Purpose's
-   style) for consistency -- set explicitly rather than inheriting it, since
-   this element isn't a descendant of .appt-info-field. */
 .appt-comment-text {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #a855f7;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.4;
+  text-align: justify;
 }
-
-[data-theme="light"] .appt-comment-text { color: #9333ea; }
 
 .appt-comment-meta {
   margin: 0.3rem 0 0;
@@ -821,56 +867,4 @@ html, body {
   font-style: italic;
   color: var(--text-tertiary);
   opacity: 0.85;
-}
-
-.appt-comment-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.appt-comment-textarea {
-  width: 100%;
-  min-height: 52px;
-  resize: vertical;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  background: var(--input-background, transparent);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 0.82rem;
-  padding: 0.5rem 0.65rem;
-}
-
-.appt-comment-edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.4rem;
-}
-
-.appt-comment-cancel-btn,
-.appt-comment-save-btn {
-  padding: 0.35rem 0.75rem;
-  border-radius: 0.4rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-}
-
-.appt-comment-cancel-btn {
-  background: transparent;
-  color: var(--text-primary);
-}
-
-.appt-comment-save-btn {
-  background: linear-gradient(135deg, #a855f7, #9333ea);
-  color: #fff;
-  border-color: transparent;
-}
-
-.appt-comment-save-btn:disabled,
-.appt-comment-cancel-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }

@@ -135,6 +135,7 @@
   line-height: 1.6;
   margin: 0 0 0.625rem 0;
   white-space: pre-wrap;
+  text-align: justify;
 }
 
 /* Added-on timestamp — vertical icon+text stack, mirrors adm-appointment's

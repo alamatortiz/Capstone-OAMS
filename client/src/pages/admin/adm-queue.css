@@ -1123,7 +1123,7 @@ body {
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.4;
-  text-align: left;
+  text-align: justify;
 }
 
 .queue-entry-time {

@@ -11,6 +11,8 @@ const {
   getManilaTimeString,
   formatTime12h,
   formatRelativeTime,
+  manilaDayStartUTC,
+  manilaDayEndExclusiveUTC,
 } = require("../utils/dateTime");
 const { settleSlotAfterEntryChange } = require("../utils/queueSlotSettlement");
 const { getQueueDisplayInfo } = require("../utils/queueDisplay");
@@ -2317,6 +2319,8 @@ router.get(
            a.status,
            a.notes,
            a.rejection_reason,
+           a.booking_year_program,
+           a.course_code,
            a.shared_comment,
            a.comment_updated_by,
            a.comment_updated_at,
@@ -2358,6 +2362,8 @@ router.get(
         purpose: row.notes ?? "",
         status: row.status,
         rejectionReason: row.rejection_reason ?? null,
+        bookingYearProgram: row.booking_year_program ?? null,
+        courseCode: row.course_code ?? null,
         sharedComment: row.shared_comment ?? null,
         commentUpdatedBy: row.comment_updated_by ?? null,
         commentUpdatedAt: row.comment_updated_at ?? null,
@@ -2371,71 +2377,12 @@ router.get(
   },
 );
 
-// PATCH /api/student/appointments/:appointmentId/comment
-// Writes/overwrites the one shared comment field on an appointment -- read
-// and editable by both the student and the professor (see the mirrored
-// PATCH /professor/appointments/:id/comment). Only while the appointment is
-// still pending/approved -- a terminal appointment (completed/rejected/
-// cancelled) is a closed record, same guard used elsewhere for terminal-state
-// edits.
-router.patch(
-  "/appointments/:appointmentId/comment",
-  authenticateToken,
-  authorizeRoles("student"),
-  async (req, res) => {
-    const studentId = req.user.userId;
-    const appointmentId = parseInt(req.params.appointmentId, 10);
-    const { comment } = req.body;
-
-    if (!appointmentId || isNaN(appointmentId)) {
-      return res.status(400).json({ error: "Invalid appointmentId" });
-    }
-    if (typeof comment !== "string") {
-      return res.status(400).json({ error: "comment must be a string" });
-    }
-    const trimmed = comment.trim().slice(0, 2000);
-
-    try {
-      const [[appt]] = await pool.query(
-        `SELECT appointment_id, student_id, faculty_id, status, appointment_date
-         FROM appointments WHERE appointment_id = ?`,
-        [appointmentId],
-      );
-      if (!appt || appt.student_id !== studentId) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-      if (!["pending", "approved"].includes(appt.status)) {
-        return res.status(409).json({
-          error: "Comments can no longer be edited on this appointment",
-        });
-      }
-
-      await pool.query(
-        `UPDATE appointments
-         SET shared_comment = ?, comment_updated_by = 'student', comment_updated_at = NOW()
-         WHERE appointment_id = ?`,
-        [trimmed || null, appointmentId],
-      );
-
-      emitToUser(appt.faculty_id, "appointment:comment-updated", {
-        appointmentId,
-      });
-      createNotification(
-        appt.faculty_id,
-        `The student left a comment on the appointment for ${getManilaDateString(appt.appointment_date)}.`,
-        "appointment",
-      );
-
-      res.json({
-        message: "Comment saved",
-        sharedComment: trimmed || null,
-        commentUpdatedBy: "student",
-      });
-    } catch (error) {
-      sendServerError(res, error, "PATCH /appointments/:id/comment error");
-    }
-  },
-);
+// The student-side PATCH /appointments/:appointmentId/comment route that
+// used to live here has been removed intentionally -- the shared appointment
+// comment is now professor-authored only (see PATCH
+// /professor/appointments/:id/comment in professorRoutes.js). Students view
+// it read-only on stud-appointment-status.jsx; there is no remaining write
+// path for them to this field, by design.
 
 // DELETE /api/student/appointments/:appointmentId
 // Cancels a pending or approved appointment. Only the owning student may cancel.
@@ -2782,7 +2729,7 @@ router.get(
       STATUS_GROUPS[mapped].push(raw);
     }
 
-    const { search, type, status } = req.query;
+    const { search, type, status, startDate, endDate } = req.query;
     const limit = Math.min(
       Math.max(parseInt(req.query.limit, 10) || 20, 1),
       100,
@@ -2873,6 +2820,19 @@ router.get(
         filterClauses.push("(title LIKE ? OR details LIKE ?)");
         const likeTerm = `%${trimmedSearch}%`;
         filterParams.push(likeTerm, likeTerm);
+      }
+      // Date range narrows the returned list only -- the stats query below
+      // stays intentionally full-history regardless of any filter, same as
+      // it already ignores type/status/search.
+      const startUTC = manilaDayStartUTC(startDate);
+      const endExclusiveUTC = manilaDayEndExclusiveUTC(endDate);
+      if (startUTC) {
+        filterClauses.push("event_time >= ?");
+        filterParams.push(startUTC);
+      }
+      if (endExclusiveUTC) {
+        filterClauses.push("event_time < ?");
+        filterParams.push(endExclusiveUTC);
       }
       const whereClause = filterClauses.length
         ? `WHERE ${filterClauses.join(" AND ")}`
@@ -3144,7 +3104,7 @@ router.get(
 );
 
 // POST /api/student/appointments/book-slot
-// Body: { availabilityId, appointmentDate, purpose, appointmentType? }
+// Body: { availabilityId, appointmentDate, purpose, appointmentType?, yearProgram, courseCode }
 // availabilityId identifies the recurring weekly template (faculty_availability);
 // appointmentDate is the specific projected date the student is booking into,
 // since one template now spans many possible calendar dates.
@@ -3155,8 +3115,14 @@ router.post(
   authorizeRoles("student"),
   async (req, res) => {
     const studentId = req.user.userId;
-    const { availabilityId, appointmentDate, purpose, appointmentType } =
-      req.body;
+    const {
+      availabilityId,
+      appointmentDate,
+      purpose,
+      appointmentType,
+      yearProgram,
+      courseCode,
+    } = req.body;
 
     if (!availabilityId || !appointmentDate) {
       return res.status(400).json({
@@ -3172,6 +3138,21 @@ router.post(
       return res
         .status(400)
         .json({ error: "Purpose must be 255 characters or fewer" });
+    }
+    if (!yearProgram?.trim() || !courseCode?.trim()) {
+      return res.status(400).json({
+        error: "Year Level and Program, and Course Code, are required",
+      });
+    }
+    if (yearProgram.trim().length > 150) {
+      return res.status(400).json({
+        error: "Year Level and Program must be 150 characters or fewer",
+      });
+    }
+    if (courseCode.trim().length > 50) {
+      return res
+        .status(400)
+        .json({ error: "Course Code must be 50 characters or fewer" });
     }
 
     const conn = await pool.getConnection();
@@ -3313,8 +3294,9 @@ router.post(
         `INSERT INTO appointments
            (student_id, faculty_id, department_id, service_id, availability_id,
             location_snapshot, slot_note_snapshot, window_start_snapshot, window_end_snapshot,
-            appointment_date, appointment_time, status, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
+            appointment_date, appointment_time, status, notes,
+            booking_year_program, course_code, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())`,
         [
           studentId,
           slot.faculty_id,
@@ -3328,6 +3310,8 @@ router.post(
           appointmentDate,
           appointmentTime,
           purpose?.trim() || null,
+          yearProgram.trim(),
+          courseCode.trim(),
         ],
       );
       const appointmentId = result.insertId;

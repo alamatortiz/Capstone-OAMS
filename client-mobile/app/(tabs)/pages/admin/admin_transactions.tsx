@@ -30,6 +30,8 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
@@ -163,8 +165,7 @@ const DEFAULT_STATUS_META = { label: 'Unknown', bg: 'rgba(107, 114, 128, 0.15)',
 
 type TypeFilter = 'all' | TxType;
 type StatusFilter = 'all' | TxStatus;
-type DateFilter = 'today' | 'week' | 'month' | 'all';
-type SelectField = 'type' | 'status' | 'date' | null;
+type SelectField = 'type' | 'status' | null;
 
 const TYPE_OPTIONS = [
   { value: 'all', label: 'All Types' },
@@ -187,13 +188,6 @@ const STATUS_OPTIONS = [
   { value: 'viewed', label: 'Viewed' },
 ];
 
-const DATE_OPTIONS = [
-  { value: 'today', label: 'Today' },
-  { value: 'week', label: 'This Week' },
-  { value: 'month', label: 'This Month' },
-  { value: 'all', label: 'All Time' },
-];
-
 const PAGE_SIZE = 20;
 
 export default function AdminTransactionsScreen() {
@@ -204,7 +198,10 @@ export default function AdminTransactionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
-  const [dateRange, setDateRange] = useState<DateFilter>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [page, setPage] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -230,7 +227,12 @@ export default function AdminTransactionsScreen() {
     setError(null);
     try {
       const { data } = await api.get('/admin/transactions', {
-        params: { type: filterType, status: filterStatus, range: dateRange },
+        params: {
+          type: filterType,
+          status: filterStatus,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        },
       });
       if (requestId !== requestIdRef.current) return;
       setTransactions(
@@ -256,7 +258,7 @@ export default function AdminTransactionsScreen() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [filterType, filterStatus, dateRange]);
+  }, [filterType, filterStatus, startDate, endDate]);
 
   useEffect(() => {
     fetchTransactions();
@@ -371,7 +373,13 @@ export default function AdminTransactionsScreen() {
     try {
       const { header, rows } = buildExportRows();
       const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
-      await exportRowsAsPdf({ title: 'Transaction Log', subtitle: adminDepartmentAbbrev, columns: header, rows, filename: fileName });
+      await exportRowsAsPdf({
+        title: 'Transaction Log',
+        subtitle: `${adminDepartmentAbbrev} — ${dateRangeLabel}`,
+        columns: header,
+        rows,
+        filename: fileName,
+      });
     } catch (err) {
       console.error('Export transactions error:', err);
       Alert.alert('Error', 'Could not export transactions.');
@@ -382,7 +390,7 @@ export default function AdminTransactionsScreen() {
 
   useEffect(() => {
     setPage(0);
-  }, [searchQuery, filterType, filterStatus, dateRange]);
+  }, [searchQuery, filterType, filterStatus, startDate, endDate]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
@@ -404,20 +412,16 @@ export default function AdminTransactionsScreen() {
     { key: 'adminActions', label: 'Admin Actions', icon: Settings },
   ];
 
-  const selectOptions =
-    selectField === 'type' ? TYPE_OPTIONS : selectField === 'status' ? STATUS_OPTIONS : DATE_OPTIONS;
-  const selectTitle =
-    selectField === 'type' ? 'Select Type' : selectField === 'status' ? 'Select Status' : 'Select Date Range';
-  const selectCurrentValue =
-    selectField === 'type' ? filterType : selectField === 'status' ? filterStatus : dateRange;
+  const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
+  const selectTitle = selectField === 'type' ? 'Select Type' : 'Select Status';
+  const selectCurrentValue = selectField === 'type' ? filterType : filterStatus;
   const typeLabel = TYPE_OPTIONS.find((o) => o.value === filterType)?.label ?? 'All Types';
   const statusLabel = STATUS_OPTIONS.find((o) => o.value === filterStatus)?.label ?? 'All Status';
-  const dateLabel = DATE_OPTIONS.find((o) => o.value === dateRange)?.label ?? 'All Time';
+  const dateRangeLabel = startDate || endDate ? `${startDate || '…'} to ${endDate || '…'}` : 'All Time';
 
   const chooseOption = (value: string) => {
     if (selectField === 'type') setFilterType(value as TypeFilter);
     else if (selectField === 'status') setFilterStatus(value as StatusFilter);
-    else if (selectField === 'date') setDateRange(value as DateFilter);
     setSelectField(null);
   };
 
@@ -532,10 +536,54 @@ export default function AdminTransactionsScreen() {
               </Pressable>
             </View>
 
-            <Pressable style={styles.filterSelect} onPress={() => setSelectField('date')}>
-              <Text style={styles.filterSelectText} numberOfLines={1}>{dateLabel}</Text>
-              <ChevronDown size={16} color={theme.primary} />
-            </Pressable>
+            <View style={styles.dateSection}>
+              <Text style={styles.filterLabel}>Date Range</Text>
+              <View style={styles.filterRow}>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowStartPicker(true)}>
+                  <Text style={startDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {startDate || 'From'}
+                  </Text>
+                  <Calendar size={16} color={theme.primary} />
+                </Pressable>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowEndPicker(true)}>
+                  <Text style={endDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {endDate || 'To'}
+                  </Text>
+                  <Calendar size={16} color={theme.primary} />
+                </Pressable>
+                {(startDate || endDate) && (
+                  <Pressable
+                    style={styles.dateClearBtn}
+                    onPress={() => { setStartDate(''); setEndDate(''); }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={16} color={theme.tertiary} />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+            {showStartPicker && (
+              <DateTimePicker
+                value={startDate ? new Date(startDate) : new Date()}
+                mode="date"
+                maximumDate={fromLocalYMD(getManilaDateString())}
+                onChange={(event, selectedDate) => {
+                  setShowStartPicker(false);
+                  if (event.type === 'set' && selectedDate) setStartDate(toLocalYMD(selectedDate));
+                }}
+              />
+            )}
+            {showEndPicker && (
+              <DateTimePicker
+                value={endDate ? new Date(endDate) : new Date()}
+                mode="date"
+                minimumDate={fromLocalYMD(getManilaDateString())}
+                onChange={(event, selectedDate) => {
+                  setShowEndPicker(false);
+                  if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));
+                }}
+              />
+            )}
           </View>
 
           {/* Transaction List */}
@@ -940,6 +988,13 @@ function createStyles(theme: ThemePalette) {
       fontSize: 13,
     },
     filterRow: { flexDirection: 'row', gap: 10 },
+    filterLabel: { fontSize: 12, fontWeight: '700', color: theme.text, marginBottom: 6 },
+    dateSection: {
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 14,
+      paddingTop: 14,
+    },
     filterSelect: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -953,6 +1008,16 @@ function createStyles(theme: ThemePalette) {
     },
     filterSelectHalf: { flex: 1 },
     filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+    filterSelectPlaceholder: { fontSize: 13, color: theme.tertiary, flex: 1, marginRight: 8 },
+    dateClearBtn: {
+      width: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+    },
 
     // Transaction list
     txList: { gap: 10 },

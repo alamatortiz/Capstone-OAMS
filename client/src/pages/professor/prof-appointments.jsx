@@ -25,6 +25,7 @@ import {
   LayoutList,
   Loader2,
   CalendarClock,
+  MessageSquare,
 } from "lucide-react";
 
 // ── Appointment-specific icons ─────────────────────────────────────────────────
@@ -108,31 +109,27 @@ const CONFIRM_META = {
   }),
 };
 
-const NOTE_URL_RE = /^(https?:\/\/\S+)$/i;
-
 // One shared, overwritable comment either party can read/edit -- see the
-// mirrored card in stud-appointment-status.jsx. Only editable while the
-// appointment is still pending/approved (server-enforced too).
+// read-only mirror in stud-appointment-status.jsx (the student's own write
+// path to this field has been removed there; this professor-side route is
+// now the only writer). Only editable while the appointment is still
+// pending/approved (server-enforced too). Editing happens in a popup instead
+// of inline, so this renders as its own dedicated section rather than a
+// small inline field.
 function CommentBlock({ appointment, onSaved }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(appointment.sharedComment ?? "");
+  const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const canEdit =
     appointment.status === "pending" || appointment.status === "approved";
 
-  const startEdit = () => {
-    setDraft(appointment.sharedComment ?? "");
-    setEditing(true);
-  };
-
-  const save = async () => {
+  const save = async (draft) => {
     setSaving(true);
     try {
       await api.patch(`/professor/appointments/${appointment.id}/comment`, {
         comment: draft,
       });
       toast.success("Comment saved.");
-      setEditing(false);
+      setShowModal(false);
       onSaved?.();
     } catch (err) {
       toast.error(err?.response?.data?.error ?? "Failed to save comment.");
@@ -142,35 +139,19 @@ function CommentBlock({ appointment, onSaved }) {
   };
 
   return (
-    <div className="appt-comment-field">
-      <div className="appt-comment-field-header">
-        <label>Comment</label>
-        {canEdit && !editing && (
-          <button type="button" className="appt-comment-edit-link" onClick={startEdit}>
-            {appointment.sharedComment ? "Edit" : "Add a comment"}
+    <div className="appt-comment-section">
+      <div className="appt-comment-section-header">
+        <h4 className="appt-comment-section-title">
+          <MessageSquare style={{ width: "1.1rem", height: "1.1rem" }} />
+          Comments
+        </h4>
+        {canEdit && (
+          <button type="button" className="appt-comment-edit-link" onClick={() => setShowModal(true)}>
+            {appointment.sharedComment ? "Edit Comment" : "Add Comment"}
           </button>
         )}
       </div>
-      {editing ? (
-        <div className="appt-comment-edit">
-          <textarea
-            className="appt-comment-textarea"
-            value={draft}
-            maxLength={2000}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Leave a note for the student…"
-            disabled={saving}
-          />
-          <div className="appt-comment-edit-actions">
-            <button type="button" className="appt-comment-cancel-btn" onClick={() => setEditing(false)} disabled={saving}>
-              Cancel
-            </button>
-            <button type="button" className="appt-comment-save-btn" onClick={save} disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
-      ) : appointment.sharedComment ? (
+      {appointment.sharedComment ? (
         <>
           <p className="appt-comment-text">{appointment.sharedComment}</p>
           {appointment.commentUpdatedAt && (
@@ -183,6 +164,20 @@ function CommentBlock({ appointment, onSaved }) {
       ) : (
         <p className="appt-comment-empty">No comment yet.</p>
       )}
+      <QueueReasonModal
+        show={showModal}
+        onCancel={() => setShowModal(false)}
+        onConfirm={save}
+        title="Edit Comment"
+        message={<>Leave a note for <strong>{appointment.studentName}</strong> about this appointment.</>}
+        confirmText={saving ? "Saving…" : "Save Comment"}
+        submitting={saving}
+        icon={<MessageSquare style={{ width: 22, height: 22 }} />}
+        variant="neutral"
+        required={false}
+        initialValue={appointment.sharedComment ?? ""}
+        placeholder="Leave a note for the student…"
+      />
     </div>
   );
 }
@@ -214,11 +209,12 @@ function AppointmentCard({
   return (
     <div className="appt-card">
       {/* Header: icon + name/type/status, then Date/Time, Location, Purpose,
-          and the action buttons all stacked on the left -- Purpose and the
-          buttons sit at the BOTTOM of that stack deliberately, so a
-          professor's eye crosses the purpose before reaching Approve/Reject
-          instead of the buttons being one of the first things seen. The
-          right column stays lightweight: just Requested-at and Comment. */}
+          the action buttons, and finally Comments, all stacked on the left --
+          Purpose and the buttons sit near the BOTTOM of that stack
+          deliberately, so a professor's eye crosses the purpose before
+          reaching Approve/Reject instead of the buttons being one of the
+          first things seen; Comments comes last as its own section below the
+          actions. The right column stays lightweight: just Requested-at. */}
       <div className="appt-card-header-row">
         <div className="appt-card-icon-wrap">
           <Calendar style={{ width: "1.5rem", height: "1.5rem" }} />
@@ -245,6 +241,8 @@ function AppointmentCard({
           {appointment.course && (
             <p className="appt-card-sub">{appointment.course}</p>
           )}
+          <p className="appt-card-location-sub">{appointment.location}</p>
+          <p className="appt-section-title">Appointment Date and Time</p>
           <div className="appt-card-datetime-row">
             <span className="appt-quick-meta-item">
               <Calendar /> {dateStr}
@@ -253,25 +251,23 @@ function AppointmentCard({
               <Clock /> {appointment.time}
             </span>
           </div>
-          {/* Location, Purpose (and Note, when present), then the action
+          {/* Year & Program / Course Code, then Purpose, then the action
               buttons at the very bottom of the left column. */}
           <div className="appt-info-grid">
-            <div className="appt-info-field appt-info-field--full">
-              <label>Location</label>
-              <p>{appointment.location}</p>
-            </div>
-            {appointment.slotNote && (
-              <div className="appt-info-field appt-info-field--full">
-                <label>Note</label>
-                <p className="appt-notes-text">
-                  {NOTE_URL_RE.test(appointment.slotNote.trim()) ? (
-                    <a href={appointment.slotNote.trim()} target="_blank" rel="noopener noreferrer">
-                      {appointment.slotNote.trim()}
-                    </a>
-                  ) : (
-                    appointment.slotNote
-                  )}
-                </p>
+            {(appointment.bookingYearProgram || appointment.courseCode) && (
+              <div className="appt-info-row">
+                {appointment.bookingYearProgram && (
+                  <div className="appt-info-field">
+                    <label>Year &amp; Program</label>
+                    <p>{appointment.bookingYearProgram}</p>
+                  </div>
+                )}
+                {appointment.courseCode && (
+                  <div className="appt-info-field">
+                    <label>Course Code</label>
+                    <p>{appointment.courseCode}</p>
+                  </div>
+                )}
               </div>
             )}
             {appointment.purpose && (
@@ -318,6 +314,7 @@ function AppointmentCard({
               </button>
             </div>
           )}
+          <CommentBlock appointment={appointment} onSaved={onCommentSaved} />
         </div>
         <div className="appt-card-header-actions">
           <div className="appt-requested-meta">
@@ -341,9 +338,6 @@ function AppointmentCard({
               <span className="appt-requested-date">{appointment.requestedAt}</span>
             )}
           </div>
-          {/* Comment -- font/weight untouched from before, only its position
-              moved: this right column now only carries Requested-at + Comment. */}
-          <CommentBlock appointment={appointment} onSaved={onCommentSaved} />
         </div>
       </div>
     </div>
@@ -373,7 +367,7 @@ export default function ProfessorAppointmentsPage() {
     try {
       const res = await api.get("/professor/appointments");
       setAppointments(res.data);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load appointments.");
     } finally {
       setLoading(false);
@@ -392,7 +386,7 @@ export default function ProfessorAppointmentsPage() {
     const socket = connectSocket(token);
     if (!socket) return;
 
-    const events = ["appointment:slot-updated", "appointment:status-updated"];
+    const events = ["appointment:slot-updated", "appointment:status-updated", "appointment:comment-updated"];
     events.forEach((event) => socket.on(event, fetchAppointments));
 
     return () => {
@@ -524,6 +518,7 @@ export default function ProfessorAppointmentsPage() {
             }
             confirmText={rejectSaving ? "Please wait…" : "Reject"}
             submitting={rejectSaving}
+            icon={<XCircle style={{ width: 22, height: 22 }} />}
           />
         </>
       }

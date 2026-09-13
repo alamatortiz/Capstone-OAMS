@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
@@ -197,6 +199,10 @@ export default function ProfessorTransactionsScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,6 +239,8 @@ export default function ProfessorTransactionsScreen() {
       if (debouncedSearch) params.search = debouncedSearch;
       if (filterType !== 'all') params.filterType = filterType;
       if (filterStatus !== 'all') params.filterStatus = filterStatus;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
       const { data } = await api.get('/professor/transactions', { params });
       if (requestId !== requestIdRef.current) return;
       setTransactions(
@@ -253,7 +261,7 @@ export default function ProfessorTransactionsScreen() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [debouncedSearch, filterType, filterStatus]);
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
 
   // Stats come from the professor's FULL unfiltered history, computed
   // server-side, so the stat cards never reflect whatever search/type/status
@@ -339,7 +347,7 @@ export default function ProfessorTransactionsScreen() {
     try {
       const { header, rows } = buildExportRows();
       const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
-      await exportRowsAsPdf({ title: 'Transaction History', columns: header, rows, filename: fileName });
+      await exportRowsAsPdf({ title: 'Transaction History', subtitle: dateRangeLabel, columns: header, rows, filename: fileName });
     } catch (err) {
       console.error('Export transactions error:', err);
       Toast.show({ type: 'error', text1: 'Could not export transactions.' });
@@ -362,6 +370,8 @@ export default function ProfessorTransactionsScreen() {
 
   // Server already applies search/type/status filtering.
   const filtered = transactions;
+
+  const dateRangeLabel = startDate || endDate ? `${startDate || '…'} to ${endDate || '…'}` : 'All Time';
 
   const selectOptions = selectField === 'type' ? TYPE_OPTIONS : STATUS_OPTIONS;
   const selectTitle = selectField === 'type' ? 'Filter by Type' : 'Filter by Status';
@@ -498,6 +508,55 @@ export default function ProfessorTransactionsScreen() {
                 <Text style={styles.filterSelectText} numberOfLines={1}>{statusLabel}</Text>
                 <Ionicons name="chevron-down" size={16} color={theme.primary} />
               </Pressable>
+            </View>
+
+            <View style={[styles.filterField, styles.dateSection]}>
+              <Text style={styles.filterLabel}>Date Range</Text>
+              <View style={styles.filterRow}>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowStartPicker(true)}>
+                  <Text style={startDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {startDate || 'From'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={16} color={theme.primary} />
+                </Pressable>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowEndPicker(true)}>
+                  <Text style={endDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {endDate || 'To'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={16} color={theme.primary} />
+                </Pressable>
+                {(startDate || endDate) && (
+                  <Pressable
+                    style={styles.dateClearBtn}
+                    onPress={() => { setStartDate(''); setEndDate(''); }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={16} color={theme.tertiary} />
+                  </Pressable>
+                )}
+              </View>
+              {showStartPicker && (
+                <DateTimePicker
+                  value={startDate ? new Date(startDate) : new Date()}
+                  mode="date"
+                  maximumDate={fromLocalYMD(getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowStartPicker(false);
+                    if (event.type === 'set' && selectedDate) setStartDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDate ? new Date(endDate) : new Date()}
+                  mode="date"
+                  minimumDate={fromLocalYMD(getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowEndPicker(false);
+                    if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
             </View>
           </View>
 
@@ -846,6 +905,24 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: theme.background,
     },
     filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+    filterSelectPlaceholder: { fontSize: 13, color: theme.tertiary, flex: 1, marginRight: 8 },
+    filterRow: { flexDirection: 'row', gap: 10 },
+    filterSelectHalf: { flex: 1 },
+    dateClearBtn: {
+      width: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+    },
+    dateSection: {
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 4,
+      paddingTop: 14,
+    },
 
     // Transaction list
     txnList: { gap: 10 },

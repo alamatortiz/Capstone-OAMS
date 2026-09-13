@@ -336,19 +336,60 @@ html, body {
 [data-theme="light"] .sa-slot-time { color: #9333ea; }
 
 .sa-slot-count {
-  font-size: 0.8rem;
+  margin-top: 0.15rem;
+  font-size: 0.875rem;
+  font-weight: 500;
   color: var(--text-tertiary);
   transition: color 0.3s ease;
+  text-align: justify;
 }
 
 .sa-slot-note {
-  margin: 0.35rem 0 0;
+  margin: 0;
   font-size: 0.8rem;
   color: var(--text-secondary);
   word-break: break-word;
+  text-align: justify;
 }
 .sa-slot-note a { color: #a855f7; text-decoration: underline; }
 [data-theme="light"] .sa-slot-note a { color: #9333ea; }
+
+.sa-note-block {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sa-note-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #a855f7;
+}
+
+.sa-note-icon {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+}
+
+.sa-note-block--compact {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  gap: 0.15rem;
+}
+.sa-note-block--compact .sa-note-header {
+  font-size: 0.65rem;
+}
+.sa-note-block--compact .sa-note-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
 
 .sa-slot-actions {
   display: flex;
@@ -526,7 +567,9 @@ html, body {
 
 .sa-mini-slot-count {
   align-self: flex-start;
+  margin-top: 0.1rem;
   font-size: 0.8rem;
+  font-weight: 500;
   color: var(--text-tertiary);
   text-align: left;
   transition: color 0.3s ease;
@@ -534,7 +577,7 @@ html, body {
 
 .sa-mini-slot-note {
   align-self: flex-start;
-  margin: 0.15rem 0 0;
+  margin: 0;
   font-size: 0.78rem;
   color: var(--text-secondary);
   text-align: left;

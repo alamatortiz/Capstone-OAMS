@@ -676,6 +676,7 @@ body {
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: break-word;
+  text-align: justify;
   margin: 0 0 1.25rem 0;
 }
 

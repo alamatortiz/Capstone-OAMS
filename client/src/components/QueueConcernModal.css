@@ -75,7 +75,7 @@
   padding: 0.625rem 0.75rem;
   border-radius: 8px;
   border: 1px solid rgba(59, 130, 246, 0.25);
-  background: var(--input-bg, rgba(255, 255, 255, 0.03));
+  background: var(--input-background, rgba(255, 255, 255, 0.03));
   color: var(--text-primary, #f0fdf4);
   font-size: 0.875rem;
   font-family: inherit;
@@ -129,7 +129,7 @@
   padding: 0.625rem 2.25rem 0.625rem 0.875rem;
   border-radius: 0.75rem;
   border: 1px solid rgba(59, 130, 246, 0.25);
-  background: var(--input-bg, rgba(255, 255, 255, 0.03));
+  background: var(--input-background, rgba(255, 255, 255, 0.03));
   color: var(--text-primary, #f0fdf4);
   font-family: inherit;
   font-size: 0.875rem;
@@ -169,6 +169,7 @@
   color: var(--muted-foreground, #94a3b8);
   margin: 0;
   line-height: 1.5;
+  text-align: justify;
 }
 
 .qcm-hint-section > strong {
@@ -225,6 +226,7 @@
   color: var(--muted-foreground, #94a3b8);
   margin: 0.15rem 0 0;
   line-height: 1.4;
+  text-align: justify;
 }
 
 .qcm-step-list {

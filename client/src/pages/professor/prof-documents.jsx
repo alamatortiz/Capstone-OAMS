@@ -757,10 +757,10 @@ export default function ProfessorDocumentRequest() {
                           <p className="doc-card-college">{req.college}</p>
                         </div>
                         <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                           <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
                             {getDocStatusHubMeta(req.status).label}
                           </span>
-                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                         </div>
                       </div>
 
@@ -885,10 +885,10 @@ export default function ProfessorDocumentRequest() {
                           </div>
                         </div>
                         <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                           <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
                             {getDocStatusHubMeta(req.status).label}
                           </span>
-                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                         </div>
                       </div>
                     </div>
@@ -944,10 +944,10 @@ export default function ProfessorDocumentRequest() {
                           </div>
                         </div>
                         <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                           <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
                             {getDocStatusHubMeta(req.status).label}
                           </span>
-                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                         </div>
                       </div>
                     </div>
@@ -1003,10 +1003,10 @@ export default function ProfessorDocumentRequest() {
                           </div>
                         </div>
                         <div className="doc-card-header-right">
+                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                           <span className={`doc-badge ${getDocStatusHubMeta(req.status).cls}`}>
                             {getDocStatusHubMeta(req.status).label}
                           </span>
-                          <span className="doc-tracking-pill">{req.trackingNumber}</span>
                         </div>
                       </div>
                     </div>

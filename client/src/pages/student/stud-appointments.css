@@ -298,6 +298,16 @@ body {
   padding-right: 2.75rem;
 }
 
+.appointment-content .filter-select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .appointment-content .filter-select option {
+  background: white;
+  color: #1e293b;
+}
+
 /* ===== Professor Schedules Card ===== */
 
 .ab-prof-sched-card {
@@ -592,6 +602,28 @@ body {
 .slot-note-line { font-size: 0.82rem; color: var(--text-tertiary); word-break: break-word; transition: color 0.3s ease; }
 .slot-note-line a { color: #a855f7; text-decoration: underline; }
 
+.slot-note-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 0.6rem;
+}
+.slot-note-box .slot-note-line { color: var(--text-primary); }
+
+.slot-note-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #a855f7;
+}
+
 .book-btn {
   background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
   color: white;
@@ -662,8 +694,11 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 1.25rem;
-  max-width: 28rem;
+  max-width: 38rem;
   width: 100%;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0,0,0,0.4);
   animation: slideUp 0.3s ease;
   transition: all 0.3s ease;

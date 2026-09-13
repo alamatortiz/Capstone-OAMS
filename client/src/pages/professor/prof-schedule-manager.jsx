@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronLeft, CalendarClock, ChevronDown } from "lucide-react";
+import { ChevronLeft, CalendarClock, ChevronDown, StickyNote } from "lucide-react";
 import ProfessorSidebar from "../../components/ProfessorSidebar";
 import PageHeader from "../../components/PageHeader";
 import ActionConfirmModal from "../../components/ActionConfirmModal";
@@ -55,19 +55,25 @@ const PRESET_APPT_TYPES = [
 // Google Meet link) into a clickable link -- the field itself is just free
 // text, no markdown/rich-text support.
 const URL_RE = /^(https?:\/\/\S+)$/i;
-function SlotNoteLine({ note, className }) {
+function SlotNoteLine({ note, className, compact = false }) {
   if (!note) return null;
   const isLink = URL_RE.test(note.trim());
   return (
-    <p className={className}>
-      {isLink ? (
-        <a href={note.trim()} target="_blank" rel="noopener noreferrer">
-          {note.trim()}
-        </a>
-      ) : (
-        note
-      )}
-    </p>
+    <div className={`sa-note-block${compact ? " sa-note-block--compact" : ""}`}>
+      <div className="sa-note-header">
+        <StickyNote className="sa-note-icon" />
+        <span>Notes</span>
+      </div>
+      <p className={className}>
+        {isLink ? (
+          <a href={note.trim()} target="_blank" rel="noopener noreferrer">
+            {note.trim()}
+          </a>
+        ) : (
+          note
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -598,7 +604,7 @@ export default function ProfessorScheduleManager() {
                                   <ClockIcon />
                                   <span className="sa-slot-time">{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
                                 </div>
-                                <span className="sa-slot-count">{s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}</span>
+                                <span className="sa-slot-count">{`Students Slots: ${s.max_students ?? "—"}`}</span>
                                 <SlotNoteLine note={s.slot_note} className="sa-slot-note" />
                               </div>
                               <div className="sa-slot-actions">
@@ -676,9 +682,9 @@ export default function ProfessorScheduleManager() {
                                 <span>{fmt12(s.start_time)} – {fmt12(s.end_time)}</span>
                               </div>
                               <span className="sa-mini-slot-count">
-                                {s.max_students != null ? `Max ${s.max_students} students` : "Indefinite"}
+                                {`Students slots: ${s.max_students ?? "—"}`}
                               </span>
-                              <SlotNoteLine note={s.slot_note} className="sa-mini-slot-note" />
+                              <SlotNoteLine note={s.slot_note} className="sa-mini-slot-note" compact />
                             </div>
                           ))}
                         </div>

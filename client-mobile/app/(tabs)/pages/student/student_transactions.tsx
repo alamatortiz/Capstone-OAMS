@@ -19,6 +19,8 @@ import {
   Megaphone, Search, Users, ClipboardList,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
@@ -161,6 +163,10 @@ export default function StudentTransactionsScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState<TypeFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [selectField, setSelectField] = useState<SelectField>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txLoading, setTxLoading] = useState(true);
@@ -217,6 +223,8 @@ export default function StudentTransactionsScreen() {
           search: debouncedSearch || undefined,
           type: filterType !== 'all' ? filterType : undefined,
           status: filterStatus !== 'all' ? filterStatus : undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
           limit: 20,
           page: pageNum,
         },
@@ -257,7 +265,7 @@ export default function StudentTransactionsScreen() {
         setLoadingMore(false);
       }
     }
-  }, [debouncedSearch, filterType, filterStatus]);
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
 
   // Background refresh (socket/queue-events/poll, below) -- re-fetches every
   // page currently on screen and replaces the list in one shot, so it
@@ -274,6 +282,8 @@ export default function StudentTransactionsScreen() {
               search: debouncedSearch || undefined,
               type: filterType !== 'all' ? filterType : undefined,
               status: filterStatus !== 'all' ? filterStatus : undefined,
+              startDate: startDate || undefined,
+              endDate: endDate || undefined,
               limit: 20,
               page: i + 1,
             },
@@ -295,7 +305,7 @@ export default function StudentTransactionsScreen() {
       console.error('Failed to refresh transactions:', err);
       Toast.show({ type: 'error', text1: 'Could not refresh your transaction history.' });
     }
-  }, [debouncedSearch, filterType, filterStatus]);
+  }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
 
   useEffect(() => {
     fetchTransactions(1);
@@ -379,6 +389,8 @@ export default function StudentTransactionsScreen() {
         search: debouncedSearch || undefined,
         type: filterType !== 'all' ? filterType : undefined,
         status: filterStatus !== 'all' ? filterStatus : undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
         limit: 100,
         page: 1,
       },
@@ -412,7 +424,13 @@ export default function StudentTransactionsScreen() {
     try {
       const { header, rows } = await fetchExportRows();
       const fileName = `transactions-${new Date().toISOString().slice(0, 10)}.pdf`;
-      await exportRowsAsPdf({ title: 'Transaction History', subtitle: user?.name ?? 'Student', columns: header, rows, filename: fileName });
+      await exportRowsAsPdf({
+        title: 'Transaction History',
+        subtitle: `${user?.name ?? 'Student'} — ${dateRangeLabel}`,
+        columns: header,
+        rows,
+        filename: fileName,
+      });
     } catch (err) {
       console.error('Export transactions error:', err);
       Toast.show({ type: 'error', text1: 'Could not export your transaction history.' });
@@ -435,6 +453,7 @@ export default function StudentTransactionsScreen() {
   const selectCurrentValue = selectField === 'type' ? filterType : filterStatus;
   const typeLabel = TYPE_OPTIONS.find((o) => o.value === filterType)?.label ?? 'All Types';
   const statusLabel = STATUS_OPTIONS.find((o) => o.value === filterStatus)?.label ?? 'All Statuses';
+  const dateRangeLabel = startDate || endDate ? `${startDate || '…'} to ${endDate || '…'}` : 'All Time';
 
   const chooseOption = (value: string) => {
     if (selectField === 'type') setFilterType(value as TypeFilter);
@@ -546,6 +565,55 @@ export default function StudentTransactionsScreen() {
                 <Text style={styles.filterSelectText} numberOfLines={1}>{statusLabel}</Text>
                 <ChevronDown size={16} color={theme.primary} />
               </Pressable>
+            </View>
+
+            <View style={[styles.filterField, styles.dateSection]}>
+              <Text style={styles.filterLabel}>Date Range</Text>
+              <View style={styles.filterRow}>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowStartPicker(true)}>
+                  <Text style={startDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {startDate || 'From'}
+                  </Text>
+                  <Calendar size={16} color={theme.primary} />
+                </Pressable>
+                <Pressable style={[styles.filterSelect, styles.filterSelectHalf]} onPress={() => setShowEndPicker(true)}>
+                  <Text style={endDate ? styles.filterSelectText : styles.filterSelectPlaceholder} numberOfLines={1}>
+                    {endDate || 'To'}
+                  </Text>
+                  <Calendar size={16} color={theme.primary} />
+                </Pressable>
+                {(startDate || endDate) && (
+                  <Pressable
+                    style={styles.dateClearBtn}
+                    onPress={() => { setStartDate(''); setEndDate(''); }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={16} color={theme.tertiary} />
+                  </Pressable>
+                )}
+              </View>
+              {showStartPicker && (
+                <DateTimePicker
+                  value={startDate ? new Date(startDate) : new Date()}
+                  mode="date"
+                  maximumDate={fromLocalYMD(getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowStartPicker(false);
+                    if (event.type === 'set' && selectedDate) setStartDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDate ? new Date(endDate) : new Date()}
+                  mode="date"
+                  minimumDate={fromLocalYMD(getManilaDateString())}
+                  onChange={(event, selectedDate) => {
+                    setShowEndPicker(false);
+                    if (event.type === 'set' && selectedDate) setEndDate(toLocalYMD(selectedDate));
+                  }}
+                />
+              )}
             </View>
           </View>
 
@@ -920,6 +988,24 @@ function createStyles(theme: ThemePalette) {
       backgroundColor: theme.background,
     },
     filterSelectText: { fontSize: 13, color: theme.text, flex: 1, marginRight: 8 },
+    filterSelectPlaceholder: { fontSize: 13, color: theme.tertiary, flex: 1, marginRight: 8 },
+    filterRow: { flexDirection: 'row', gap: 10 },
+    filterSelectHalf: { flex: 1 },
+    dateClearBtn: {
+      width: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+    },
+    dateSection: {
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      marginTop: 4,
+      paddingTop: 14,
+    },
 
     loadMoreBtn: {
       alignItems: 'center',

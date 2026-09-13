@@ -26,6 +26,7 @@ export const NOTIFICATION_EVENTS = [
   "queue:no-show",
   "appointment:status-updated",
   "appointment:slot-updated",
+  "appointment:comment-updated",
   "document:status-updated",
   "announcement:changed",
 ];

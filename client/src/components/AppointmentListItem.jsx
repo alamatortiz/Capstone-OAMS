@@ -40,18 +40,16 @@ export default function AppointmentListItem({
           <Calendar style={{ width: "1.5rem", height: "1.5rem" }} />
         </div>
         <div className="apt-list-title-section">
-          <h3 className="apt-list-name">{appointment.person}</h3>
+          <div className="apt-list-name-row">
+            <h3 className="apt-list-name">{appointment.person}</h3>
+            {appointment.appointmentType && (
+              <span className="apt-list-appt-type-value">{appointment.appointmentType}</span>
+            )}
+          </div>
           <p className="apt-list-college">{appointment.college}</p>
         </div>
         <span className={`apt-badge ${cls}`}>{label}</span>
       </div>
-
-      {appointment.appointmentType && (
-        <div className="apt-list-appt-type">
-          <span className="apt-list-appt-type-label">Type:</span>
-          <span className="apt-list-appt-type-value">{appointment.appointmentType}</span>
-        </div>
-      )}
 
       <div className="apt-list-card-grid">
         <div className="apt-list-card-field">
@@ -77,6 +75,13 @@ export default function AppointmentListItem({
           </div>
         )}
       </div>
+
+      {appointment.sharedComment && (
+        <div className="apt-list-comment-box">
+          <p className="apt-list-comment-header">Comments</p>
+          <p className="apt-list-comment-text">{appointment.sharedComment}</p>
+        </div>
+      )}
 
       {showCancelButton && canCancel && (
         <button

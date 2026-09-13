@@ -54,6 +54,7 @@
   line-height: 1.6;
   animation: accordion-fade-in 0.2s ease;
   white-space: pre-wrap;
+  text-align: justify;
 }
 
 [data-theme="light"] .accordion-item-detail {

@@ -10,6 +10,8 @@ const {
   getManilaTimeString,
   formatTime12h: formatTime,
   formatRelativeTime,
+  manilaDayStartUTC,
+  manilaDayEndExclusiveUTC,
 } = require("../utils/dateTime");
 // const { createNotification } = require("../utils/notifications");
 const {
@@ -399,6 +401,7 @@ router.get(
         SELECT
           a.appointment_id, a.appointment_date, a.appointment_time,
           a.status, a.notes, a.created_at,
+          a.booking_year_program, a.course_code,
           a.shared_comment, a.comment_updated_by, a.comment_updated_at,
           s.first_name, s.last_name, s.student_number, s.course,
           svc.service_name AS appointment_type,
@@ -424,6 +427,8 @@ router.get(
           studentName: `${r.first_name} ${r.last_name}`,
           studentId: r.student_number,
           course: r.course,
+          bookingYearProgram: r.booking_year_program ?? null,
+          courseCode: r.course_code ?? null,
           appointmentType: r.appointment_type ?? null,
           purpose: r.notes || "No purpose specified",
           date:
@@ -633,7 +638,7 @@ router.patch(
 
     try {
       const [[appt]] = await pool.query(
-        `SELECT appointment_id, student_id, faculty_id, status, appointment_date
+        `SELECT appointment_id, student_id, faculty_id, department_id, status, appointment_date
          FROM appointments WHERE appointment_id = ? AND faculty_id = ?`,
         [id, facultyId],
       );
@@ -654,6 +659,9 @@ router.patch(
       );
 
       emitToUser(appt.student_id, "appointment:comment-updated", {
+        appointmentId: Number(id),
+      });
+      emitToDept(appt.department_id, "appointment:comment-updated", {
         appointmentId: Number(id),
       });
       createNotification(
@@ -694,7 +702,13 @@ router.get(
   authorizeRoles("faculty"),
   async (req, res) => {
     const facultyId = req.user.userId;
-    const { search = "", filterType = "all", filterStatus = "all" } = req.query;
+    const { search = "", filterType = "all", filterStatus = "all", startDate, endDate } = req.query;
+    // Date range narrows this list only -- /transactions/stats below stays
+    // intentionally full-history. Applied per-branch, same pattern as
+    // filterStatus/search below, since these three queries aren't a single
+    // UNION the way admin's/student's equivalent endpoints are.
+    const startUTC = manilaDayStartUTC(startDate);
+    const endExclusiveUTC = manilaDayEndExclusiveUTC(endDate);
     try {
       let rows = [];
 
@@ -722,6 +736,8 @@ router.get(
             " AND (s.first_name LIKE ? OR s.last_name LIKE ? OR s.student_number LIKE ?)";
           params.push(`%${search}%`, `%${search}%`, `%${search}%`);
         }
+        if (startUTC) { sql += " AND a.updated_at >= ?"; params.push(startUTC); }
+        if (endExclusiveUTC) { sql += " AND a.updated_at < ?"; params.push(endExclusiveUTC); }
         const [appts] = await pool.query(sql, params);
         rows = rows.concat(appts);
       }
@@ -751,6 +767,8 @@ router.get(
             " AND (ds.service_name LIKE ? OR fdr.purpose LIKE ? OR fdr.tracking_number LIKE ?)";
           params.push(`%${search}%`, `%${search}%`, `%${search}%`);
         }
+        if (startUTC) { sql += " AND fdr.updated_at >= ?"; params.push(startUTC); }
+        if (endExclusiveUTC) { sql += " AND fdr.updated_at < ?"; params.push(endExclusiveUTC); }
         const [docs] = await pool.query(sql, params);
         rows = rows.concat(docs);
       }
@@ -780,6 +798,8 @@ router.get(
           sql += " AND sub.title LIKE ?";
           params.push(`%${search}%`);
         }
+        if (startUTC) { sql += " AND sub.updated_at >= ?"; params.push(startUTC); }
+        if (endExclusiveUTC) { sql += " AND sub.updated_at < ?"; params.push(endExclusiveUTC); }
         const [subs] = await pool.query(sql, params);
         rows = rows.concat(subs);
       }
@@ -815,6 +835,7 @@ router.get(
       const [[row]] = await pool.query(
         `SELECT
            a.appointment_id, a.appointment_date, a.appointment_time, a.status, a.notes,
+           a.booking_year_program, a.course_code,
            COALESCE(a.window_start_snapshot, fa.start_time) AS window_start,
            COALESCE(a.window_end_snapshot,   fa.end_time)   AS window_end,
            COALESCE(a.location_snapshot,     fa.location)   AS location,
@@ -854,6 +875,8 @@ router.get(
         windowEnd: row.window_end ? String(row.window_end).slice(0, 5) : null,
         location: row.location ?? "TBA",
         purpose: row.notes ?? "",
+        bookingYearProgram: row.booking_year_program ?? null,
+        courseCode: row.course_code ?? null,
         status: row.status,
         departmentName: row.department_name,
         departmentAbbrev: row.department_abbreviation,

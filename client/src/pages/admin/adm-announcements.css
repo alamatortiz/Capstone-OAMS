@@ -1365,7 +1365,7 @@
   font-size: 0.875rem;
   line-height: 1.6;
   white-space: pre-wrap;
-  text-align: left;
+  text-align: justify;
   overflow-wrap: break-word;
   word-break: break-word;
 }

@@ -23,6 +23,7 @@ import { useLiveRefetch } from "../../hooks/useLiveRefetch";
 const APPOINTMENT_LIVE_EVENTS = [
   "appointment:slot-updated",
   "appointment:status-updated",
+  "appointment:comment-updated",
 ];
 
 // ── Icons (All SVG Components) ──────────────────────────────────────────────
@@ -67,6 +68,10 @@ const CANCELLED_BY_LABELS = {
   system: "System (schedule change)",
   system_expired: "System (expired, no response)",
 };
+
+// Detects a bare URL (e.g. a pasted Google Meet link) in a faculty note so it
+// renders as a clickable link, matching prof-appointments.jsx/stud-appointments.jsx.
+const NOTE_URL_RE = /^(https?:\/\/\S+)$/i;
 
 const TAB_ICON_MAP = {
   all: LayoutList,
@@ -383,6 +388,26 @@ export default function AdminAppointment() {
                         {selectedAppointment.location}
                       </span>
                     </div>
+                    {selectedAppointment.bookingYearProgram && (
+                      <div className="admin-appointment-modal-field">
+                        <span className="admin-appointment-modal-label">
+                          Year & Program
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {selectedAppointment.bookingYearProgram}
+                        </span>
+                      </div>
+                    )}
+                    {selectedAppointment.courseCode && (
+                      <div className="admin-appointment-modal-field">
+                        <span className="admin-appointment-modal-label">
+                          Course Code
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {selectedAppointment.courseCode}
+                        </span>
+                      </div>
+                    )}
                     {selectedAppointment.serviceName && (
                       <div className="admin-appointment-modal-field">
                         <span className="admin-appointment-modal-label">
@@ -391,6 +416,50 @@ export default function AdminAppointment() {
                         <span className="admin-appointment-modal-value">
                           {selectedAppointment.serviceName}
                         </span>
+                      </div>
+                    )}
+                    {selectedAppointment.slotNote && (
+                      <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                        <span className="admin-appointment-modal-label">
+                          Faculty Note
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {NOTE_URL_RE.test(selectedAppointment.slotNote.trim()) ? (
+                            <a
+                              href={selectedAppointment.slotNote.trim()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {selectedAppointment.slotNote.trim()}
+                            </a>
+                          ) : (
+                            selectedAppointment.slotNote
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {selectedAppointment.sharedComment && (
+                      <div className="admin-appointment-modal-field admin-appointment-modal-field--full">
+                        <span className="admin-appointment-modal-label">
+                          Comments
+                        </span>
+                        <span className="admin-appointment-modal-value">
+                          {selectedAppointment.sharedComment}
+                        </span>
+                        {selectedAppointment.commentUpdatedAt && (
+                          <span className="admin-appointment-modal-meta">
+                            Last updated by the{" "}
+                            {selectedAppointment.commentUpdatedBy === "student"
+                              ? "student"
+                              : "faculty member"}{" "}
+                            on{" "}
+                            {formatManilaDate(selectedAppointment.commentUpdatedAt, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        )}
                       </div>
                     )}
                     <div className="admin-appointment-modal-field admin-appointment-modal-field--full">

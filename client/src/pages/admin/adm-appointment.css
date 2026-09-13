@@ -257,6 +257,7 @@ body {
   color: #ffffff;
   margin: 0;
   line-height: 1.3;
+  text-align: justify;
 }
 
 .admin-appointment-modal-grid {
@@ -295,6 +296,14 @@ body {
   color: var(--text-primary);
   margin: 0;
   transition: color 0.3s ease;
+}
+
+.admin-appointment-modal-meta {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin-top: 0.3rem;
 }
 
 /* Student name + number badge row inside the modal (mirrors the base card) */
@@ -806,9 +815,9 @@ body {
 }
 
 .admin-appointment-badge-cancelled {
-  background: rgba(107, 114, 128, 0.2);
-  color: #6b7280;
-  border: 0.5px solid rgba(107, 114, 128, 0.4);
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
 }
 
 /* ===== Card Details ===== */

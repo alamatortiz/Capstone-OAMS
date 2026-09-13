@@ -1086,7 +1086,7 @@ export default function AdminQueueHosting() {
                         month: "numeric",
                         day: "numeric",
                       })}
-                      {" · "}Served {queue.servedCount} student(s), capacity{" "}
+                      {" · "}Served: {queue.servedCount} student(s), Capacity: {" "}
                       {queue.maxCapacity}
                     </p>
                   </div>

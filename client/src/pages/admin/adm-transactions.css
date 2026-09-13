@@ -397,7 +397,7 @@
 
 .admin-transaction-container .filters-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
 }
 
@@ -411,6 +411,12 @@
   .admin-transaction-container .filters-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.admin-transaction-container .filters-date-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--card-border);
 }
 
 .admin-transaction-container .filter-group {
@@ -498,6 +504,66 @@
 .admin-transaction-container .filter-select option {
   background: var(--card-bg);
   color: var(--text-primary);
+}
+
+.admin-transaction-container .filter-date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-transaction-container .filter-date-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  background: var(--input-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color-scheme: dark;
+}
+
+[data-theme="light"] .admin-transaction-container .filter-date-input {
+  color-scheme: light;
+}
+
+.admin-transaction-container .filter-date-input:hover { border-color: rgba(34, 197, 94, 0.3); }
+.admin-transaction-container .filter-date-input:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+}
+
+.admin-transaction-container .filter-date-sep {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.admin-transaction-container .filter-date-clear {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  color: var(--text-tertiary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-transaction-container .filter-date-clear:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
 }
 
 .admin-transaction-container .filter-chevron {

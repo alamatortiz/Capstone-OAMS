@@ -77,6 +77,8 @@ export async function exportAppointmentCertificate(data) {
   line("Student Name", data.studentName);
   line("Student Number", data.studentNumber);
   if (data.course) line("Program", `${data.course}${data.yearLevel ? ` — Year ${data.yearLevel}` : ""}`);
+  if (data.bookingYearProgram) line("Class/Section", data.bookingYearProgram);
+  if (data.courseCode) line("Course Code", data.courseCode);
   line("Faculty Member", `${data.facultyName} (${data.facultyRole})`);
   line("Appointment Type", data.serviceName);
   line("Date", data.date);

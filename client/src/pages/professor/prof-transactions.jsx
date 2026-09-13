@@ -5,6 +5,7 @@ import { ChevronLeft, FileText } from "lucide-react";
 import ProfessorPageShell from "../../components/ProfessorPageShell";
 import PageHeader from "../../components/PageHeader";
 import FilterSelect from "../../components/FilterSelect";
+import FilterDateRange from "../../components/FilterDateRange";
 import ExportMenu from "../../components/ExportMenu";
 import "./prof-dashboard.css";
 import "./prof-transactions.css";
@@ -80,6 +81,8 @@ export default function ProfessorTransactionsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [txError, setTxError] = useState(null);
@@ -132,6 +135,8 @@ export default function ProfessorTransactionsPage() {
       if (debouncedSearch) params.search = debouncedSearch;
       if (filterType !== "all") params.filterType = filterType;
       if (filterStatus !== "all") params.filterStatus = filterStatus;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
       const res = await api.get("/professor/transactions", { params });
       setTransactions(res.data.map((t) => ({
         ...t,
@@ -158,7 +163,7 @@ export default function ProfessorTransactionsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  useEffect(() => { fetchTransactions(); }, [debouncedSearch, filterType, filterStatus]);
+  useEffect(() => { fetchTransactions(); }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
 
   // Stats are fetched separately, over the faculty member's FULL unfiltered
   // history server-side -- so the stat cards never reflect whatever
@@ -225,7 +230,13 @@ export default function ProfessorTransactionsPage() {
     return `"${safe.replace(/"/g, '""')}"`;
   };
 
+  const dateRangeLabel =
+    startDate || endDate
+      ? `${startDate || "…"} to ${endDate || "…"}`
+      : "All Time";
+
   const summaryRows = [
+    ["Date Range", dateRangeLabel],
     ["Total", txStats.total],
     ["Completed", txStats.completed],
     ["Ongoing", txStats.ongoing],
@@ -248,7 +259,7 @@ export default function ProfessorTransactionsPage() {
   const handleExportPdf = () => {
     exportTransactionsPdf({
       title: "Transaction History",
-      subtitle: `${authUser?.name ?? "Professor"} — Generated ${getManilaDateString()}`,
+      subtitle: `${authUser?.name ?? "Professor"} — ${dateRangeLabel} — Generated ${getManilaDateString()}`,
       columns: exportHeader,
       rows: exportRows,
       filename: `transactions-${getManilaDateString()}.pdf`,
@@ -382,6 +393,17 @@ export default function ProfessorTransactionsPage() {
                   { value: "cancelled", label: "Cancelled" },
                 ]}
                 chevronIcon={<ChevronDownIcon className="filter-chevron" />}
+              />
+            </div>
+            <div className="filters-date-section">
+              <FilterDateRange
+                id="txn-filter-date-range"
+                label="Date Range"
+                startValue={startDate}
+                endValue={endDate}
+                onStartChange={(e) => setStartDate(e.target.value)}
+                onEndChange={(e) => setEndDate(e.target.value)}
+                onClear={() => { setStartDate(""); setEndDate(""); }}
               />
             </div>
           </div>
