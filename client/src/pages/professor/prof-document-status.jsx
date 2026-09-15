@@ -479,6 +479,7 @@ function DocumentDetail({ doc, onBack, onCancel, cancelling, onClaim, claiming, 
         open={!!preview}
         onClose={closePreview}
         blobUrl={preview?.blobUrl}
+        blob={preview?.blob}
         mimeType={preview?.mimeType}
         filename={preview?.filename}
         onDownload={downloadPreview}

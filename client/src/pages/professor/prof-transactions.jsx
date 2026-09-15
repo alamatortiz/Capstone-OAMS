@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -12,7 +12,6 @@ import "./prof-transactions.css";
 import api from "../../utils/api";
 import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
-import { exportAppointmentCertificate } from "../../utils/exportCertificate";
 import { useAuth } from "../../context/AuthContext";
 import { connectSocket } from "../../utils/socket";
 import { PROFESSOR_STATUSES_BY_TYPE, getStatusOptionsForType } from "../../data/transactionStatusOptions";
@@ -104,7 +103,6 @@ export default function ProfessorTransactionsPage() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [txError, setTxError] = useState(null);
-  const [txStats, setTxStats] = useState({ total: 0, completed: 0, ongoing: 0, thisMonth: 0 });
 
   // Mirrors `transactions` for the catch block below, without making
   // fetchTransactions depend on (and change identity with) the state itself.
@@ -183,22 +181,6 @@ export default function ProfessorTransactionsPage() {
 
   useEffect(() => { fetchTransactions(); }, [debouncedSearch, filterType, filterStatus, startDate, endDate]);
 
-  // Stats are fetched separately, over the faculty member's FULL unfiltered
-  // history server-side -- so the stat cards never reflect whatever
-  // search/type/status filter happens to be active (mirrors student's own
-  // stat-card behavior). Refetched on the same live-update events as the
-  // transaction list below.
-  const fetchStats = async () => {
-    try {
-      const res = await api.get("/professor/transactions/stats");
-      setTxStats(res.data);
-    } catch {
-      // silently fail — cards just keep their last known values
-    }
-  };
-
-  useEffect(() => { fetchStats(); }, []);
-
   // ── Live updates: refetches on socket events so activity elsewhere
   // (e.g. a document status change) shows up without the professor
   // needing to tweak a filter or reload.
@@ -215,16 +197,41 @@ export default function ProfessorTransactionsPage() {
       "queue:served",
       "queue:no-show",
     ];
-    const refetchAll = () => { fetchTransactions(); fetchStats(); };
-    events.forEach((event) => socket.on(event, refetchAll));
+    events.forEach((event) => socket.on(event, fetchTransactions));
     return () => {
-      events.forEach((event) => socket.off(event, refetchAll));
+      events.forEach((event) => socket.off(event, fetchTransactions));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, token]);
 
-  // Server already handles filtering; just use transactions directly
+  // Server already handles filtering (including search); just use
+  // transactions directly.
   const filtered = transactions;
+
+  // ── Statistics ─────────────────────────────────────────────────────────────
+  // Computed client-side from `filtered` -- the exact, already-filtered set
+  // on screen -- instead of a separate always-unfiltered stats endpoint.
+  // That older approach meant the cards (and the exported summary, which
+  // reads this same `txStats`) never moved when a search/type/status/date
+  // filter narrowed the list, which read as broken. Bucket/month semantics
+  // match GET /professor/transactions/stats exactly (still used by
+  // client-mobile, untouched) -- completed = completed/claimed, ongoing =
+  // ready/pending/approved/processing/generated/released, this-month is
+  // Manila-calendar-anchored.
+  const txStats = useMemo(() => {
+    const COMPLETED = new Set(["completed", "claimed"]);
+    const ONGOING = new Set(["ready", "pending", "approved", "processing", "generated", "released"]);
+    const thisManilaMonth = getManilaDateString().slice(0, 7);
+    let completed = 0;
+    let ongoing = 0;
+    let thisMonth = 0;
+    for (const t of filtered) {
+      if (COMPLETED.has(t.status)) completed++;
+      else if (ONGOING.has(t.status)) ongoing++;
+      if (t.date && getManilaDateString(new Date(t.date)).slice(0, 7) === thisManilaMonth) thisMonth++;
+    }
+    return { total: filtered.length, completed, ongoing, thisMonth };
+  }, [filtered]);
 
   // Exports exactly what's currently on screen (the server-filtered list
   // already held in state) — no new backend endpoint needed.
@@ -283,20 +290,6 @@ export default function ProfessorTransactionsPage() {
       filename: `transactions-${getManilaDateString()}.pdf`,
       summary: summaryRows.map(([label, value]) => ({ label, value })),
     });
-  };
-
-  // ── Official single-record certificate (one appointment at a time) ────────
-  const [generatingCertId, setGeneratingCertId] = useState(null);
-  const handleGenerateCertificate = async (txn) => {
-    setGeneratingCertId(txn.id);
-    try {
-      const { data } = await api.get(`/professor/appointments/${txn.id}/certificate-data`);
-      await exportAppointmentCertificate(data);
-    } catch (err) {
-      toast.error(err?.response?.data?.error ?? "Failed to generate the official document.");
-    } finally {
-      setGeneratingCertId(null);
-    }
   };
 
   return (
@@ -463,18 +456,6 @@ export default function ProfessorTransactionsPage() {
                           <span className="txn-student-id-badge">{txn.studentId}</span>
                         )}
                       </div>
-                    )}
-                    {txn.type === "appointment" && (
-                      <button
-                        type="button"
-                        className="txn-cert-btn"
-                        onClick={() => handleGenerateCertificate(txn)}
-                        disabled={generatingCertId === txn.id}
-                        title="Generate a formal one-page PDF of this appointment for school submission purposes"
-                      >
-                        <FileText />
-                        {generatingCertId === txn.id ? "Generating…" : "Official Document"}
-                      </button>
                     )}
                   </div>
                   <div className="txn-item-meta">

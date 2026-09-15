@@ -1872,10 +1872,6 @@ router.get(
             // both tables having a row with id 1) and produce duplicate React
             // keys on the frontend.
             id: `${r.type}-${r.requester_type}-${r.id}`,
-            // Raw numeric id, only meaningful for 'appointment' rows -- lets
-            // the client call the single-appointment certificate endpoint
-            // without parsing the composite `id` string above.
-            recordId: r.id,
             type: r.type,
             action: r.action,
             collegeAbbrev: r.college_abbrev,
@@ -1983,81 +1979,6 @@ router.get(
       });
     } catch (error) {
       sendServerError(res, error, "Admin transactions fetch error:");
-    }
-  },
-);
-
-// GET /api/admin/appointments/:appointmentId/certificate-data
-// Everything a single-record "official document" PDF needs (see
-// client/src/utils/exportCertificate.js) -- student, professor, service, and
-// college/department detail for one appointment. Scoped to the admin's own
-// department, same as every other admin appointment-touching endpoint.
-router.get(
-  "/appointments/:appointmentId/certificate-data",
-  authenticateToken,
-  authorizeRoles("admin"),
-  async (req, res) => {
-    const appointmentId = parseInt(req.params.appointmentId, 10);
-    if (!appointmentId || Number.isNaN(appointmentId)) {
-      return res.status(400).json({ error: "Invalid appointmentId" });
-    }
-    try {
-      const deptId = await getAdminDepartmentId(req.user.userId);
-      if (!deptId) {
-        return res.status(403).json({ error: "Admin has no department assigned" });
-      }
-
-      const [[row]] = await pool.query(
-        `SELECT
-           a.appointment_id, a.appointment_date, a.appointment_time, a.status, a.notes,
-           a.booking_year_program, a.course_code,
-           COALESCE(a.window_start_snapshot, fa.start_time) AS window_start,
-           COALESCE(a.window_end_snapshot,   fa.end_time)   AS window_end,
-           COALESCE(a.location_snapshot,     fa.location)   AS location,
-           st.first_name AS student_first_name, st.last_name AS student_last_name,
-           st.student_number, st.course, st.year_level,
-           CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
-           f.specialization AS faculty_role,
-           svc.service_name,
-           d.department_name, d.department_abbreviation
-         FROM appointments a
-         JOIN students st ON a.student_id = st.student_id
-         JOIN faculty f ON a.faculty_id = f.faculty_id
-         JOIN departments d ON a.department_id = d.department_id
-         LEFT JOIN faculty_availability fa ON a.availability_id = fa.availability_id
-         LEFT JOIN appointment_services svc ON a.service_id = svc.service_id
-         WHERE a.appointment_id = ? AND a.department_id = ?`,
-        [appointmentId, deptId],
-      );
-      if (!row) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-
-      res.json({
-        appointmentId: row.appointment_id,
-        studentName: `${row.student_first_name} ${row.student_last_name}`,
-        studentNumber: row.student_number,
-        course: row.course ?? null,
-        yearLevel: row.year_level ?? null,
-        facultyName: row.faculty_name,
-        facultyRole: row.faculty_role ?? "Faculty",
-        serviceName: row.service_name ?? "Consultation",
-        date:
-          row.appointment_date instanceof Date
-            ? getManilaDateString(row.appointment_date)
-            : String(row.appointment_date).split("T")[0],
-        windowStart: row.window_start ? String(row.window_start).slice(0, 5) : null,
-        windowEnd: row.window_end ? String(row.window_end).slice(0, 5) : null,
-        location: row.location ?? "TBA",
-        purpose: row.notes ?? "",
-        bookingYearProgram: row.booking_year_program ?? null,
-        courseCode: row.course_code ?? null,
-        status: row.status,
-        departmentName: row.department_name,
-        departmentAbbrev: row.department_abbreviation,
-      });
-    } catch (error) {
-      sendServerError(res, error, "Appointment certificate-data fetch error:");
     }
   },
 );

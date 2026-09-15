@@ -2827,9 +2827,6 @@ router.get(
         const likeTerm = `%${trimmedSearch}%`;
         filterParams.push(likeTerm, likeTerm);
       }
-      // Date range narrows the returned list only -- the stats query below
-      // stays intentionally full-history regardless of any filter, same as
-      // it already ignores type/status/search.
       const startUTC = manilaDayStartUTC(startDate);
       const endExclusiveUTC = manilaDayEndExclusiveUTC(endDate);
       if (startUTC) {
@@ -2844,9 +2841,10 @@ router.get(
         ? `WHERE ${filterClauses.join(" AND ")}`
         : "";
 
-      // Total count over the FILTERED (search/type/status) result set, used
-      // to compute totalPages -- distinct from the stats query below, which
-      // is always scoped to the student's unfiltered full history.
+      // Total count over the FILTERED (search/type/status/date) result set,
+      // used to compute totalPages. The stats query below reuses this same
+      // whereClause/filterParams so its counts match what's actually on
+      // screen, instead of always covering the student's unfiltered history.
       const [[{ total: filteredTotal }]] = await pool.query(
         `SELECT COUNT(*) AS total FROM (${unionSql}) AS combined ${whereClause}`,
         [studentId, studentId, studentId, studentId, ...filterParams],
@@ -2892,9 +2890,9 @@ router.get(
         };
       });
 
-      // Stats are always computed over the student's FULL history,
-      // ignoring search/type/status/pagination, so the stat tiles never
-      // show a partial count for whatever page happens to be loaded.
+      // Stats are computed over the same filtered (search/type/status/date)
+      // result set as the list above -- just unpaginated, so the tiles
+      // reflect the full filtered count, not only whatever page is loaded.
       const [manilaYear, manilaMonth] = getManilaDateString()
         .split("-")
         .map(Number);
@@ -2912,7 +2910,7 @@ router.get(
            COALESCE(SUM(raw_status IN (?)), 0) AS completed,
            COALESCE(SUM(raw_status IN (?)), 0) AS ongoing,
            COALESCE(SUM(event_time >= ?), 0) AS thisMonth
-         FROM (${unionSql}) AS combined`,
+         FROM (${unionSql}) AS combined ${whereClause}`,
         [
           STATUS_GROUPS.completed,
           STATUS_GROUPS.ongoing,
@@ -2921,6 +2919,7 @@ router.get(
           studentId,
           studentId,
           studentId,
+          ...filterParams,
         ],
       );
 

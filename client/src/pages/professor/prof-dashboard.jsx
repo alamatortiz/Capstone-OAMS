@@ -281,8 +281,7 @@ export default function ProfessorDashboard() {
       icon: CalendarClock,
       path: "/professor/schedule-manager",
       gradientIndex: 3,
-      // no badge — the professor's schedule doesn't have a single live count
-      // worth surfacing here the way pending appointments/documents do
+      badge: `${s?.scheduleSlots ?? 0} Slot${s?.scheduleSlots === 1 ? "" : "s"}`,
     },
     {
       label: "Appointments",

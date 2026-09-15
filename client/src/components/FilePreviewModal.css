@@ -105,6 +105,34 @@
   background: #fff;
 }
 
+/* .docx preview -- docx-preview renders into .fpm-docx-container as plain
+   white "paper" pages, so this wrapper (not .fpm-body, which centers
+   fixed-size image/PDF content) owns the scrolling: align-self: stretch +
+   its own overflow-y means a multi-page document scrolls top-to-bottom
+   starting at page 1, instead of the flex-centered viewport dropping you
+   into the middle of a tall document on open. */
+.fpm-docx-scroll {
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background: #525659; /* matches docx-preview's own default page-tray gray */
+  padding: 1.5rem 0;
+  box-sizing: border-box;
+}
+
+.fpm-docx-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* docx-preview's own root class (not CSS-modules-scoped -- this is a plain
+   stylesheet, so targeting it directly is correct here). */
+.fpm-docx-container .docx-wrapper {
+  background: transparent;
+}
+
 .fpm-fallback {
   text-align: center;
   color: var(--text-tertiary, #94a3b8);

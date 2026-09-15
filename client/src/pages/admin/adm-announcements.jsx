@@ -473,6 +473,7 @@ export default function AdminAnnouncements() {
             open={!!preview}
             onClose={closePreview}
             blobUrl={preview?.blobUrl}
+            blob={preview?.blob}
             mimeType={preview?.mimeType}
             filename={preview?.filename}
             onDownload={downloadPreview}

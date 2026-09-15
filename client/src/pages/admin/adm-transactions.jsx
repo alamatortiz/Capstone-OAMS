@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { ChevronLeft, FileText } from "lucide-react";
@@ -213,13 +213,6 @@ export default function AdminTransaction() {
 
   // ── Live transaction data (scoped server-side to admin's department) ─────
   const [transactions, setTransactions] = useState([]);
-  const [txnStats, setTxnStats] = useState({
-    total: 0,
-    queue: 0,
-    appointments: 0,
-    documents: 0,
-    adminActions: 0,
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -235,9 +228,6 @@ export default function AdminTransaction() {
         },
       });
       setTransactions(res.data.transactions ?? []);
-      setTxnStats(
-        res.data.stats ?? { total: 0, queue: 0, appointments: 0, documents: 0, adminActions: 0 },
-      );
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
       setError("Could not load transaction data.");
@@ -258,10 +248,6 @@ export default function AdminTransaction() {
   // eventual consistency, not per-second freshness. ──
   useLiveRefetch(TRANSACTION_LIVE_EVENTS, fetchTransactions);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-  // ── Statistics (computed server-side over the admin's full department) ───
-  const stats = txnStats;
-
   // ── Filter Transactions ───────────────────────────────────────────────────
   // type/status filters are applied server-side (re-fetched via fetchTransactions
   // whenever they change); search is applied client-side over the current page.
@@ -275,6 +261,27 @@ export default function AdminTransaction() {
       t.details?.toLowerCase().includes(q)
     );
   });
+
+  // ── Statistics ─────────────────────────────────────────────────────────────
+  // Computed client-side from filteredTransactions -- the exact set the page
+  // (and the export) actually shows -- instead of the server's separate
+  // "always the department total" stats object. That older approach meant
+  // the cards (and the exported summary, which reads this same `stats`)
+  // never moved when a type/status/search filter narrowed the list, which
+  // read as broken: "the analytics don't match what I'm looking at."
+  // Note: still bounded by /admin/transactions' own 200-row cap, so a
+  // department with more matching rows than that will under-count here too
+  // -- a pre-existing limit of that endpoint, not something this introduces.
+  const stats = useMemo(() => {
+    const total = filteredTransactions.length;
+    const queue = filteredTransactions.filter((t) => t.type === "queue").length;
+    const appointments = filteredTransactions.filter((t) => t.type === "appointment").length;
+    const documents = filteredTransactions.filter(
+      (t) => t.type === "document" || t.type === "submission",
+    ).length;
+    const adminActions = filteredTransactions.filter((t) => t.type === "admin_action").length;
+    return { total, queue, appointments, documents, adminActions };
+  }, [filteredTransactions]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -437,11 +444,6 @@ export default function AdminTransaction() {
       summary: summaryRows.map(([label, value]) => ({ label, value })),
     });
   };
-
-  // Official single-record certificate generation lives on the professor's
-  // own Transactions page (prof-transactions.jsx) since it's the faculty
-  // member's own appointment and the button doesn't fit this page's
-  // per-row layout.
 
   return (
     <AdminPageShell

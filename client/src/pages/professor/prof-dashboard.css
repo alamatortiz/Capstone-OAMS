@@ -1124,9 +1124,12 @@ body {
 
 /* Violet badge — Appointments (gradient-2) and Schedule Manager (gradient-3)
    share one violet theme. Values copied verbatim from stud-dashboard.css's
-   gradient-2/4 violet badge formula. Schedule Manager itself has no badge
-   (removed per an explicit request), but the selector stays combined so any
-   future violet-gradient tile automatically gets the right badge color. */
+   gradient-2/4 violet badge formula. Schedule Manager's badge shows its
+   configured slot count ("N Slots") -- without it, .action-body's
+   justify-content: space-between had nothing to occupy that first slot, so
+   the leftover vertical space (from the grid stretching this card to match
+   its taller badge-having siblings) all landed as an oversized gap between
+   the title and description instead. */
 .professor-dashboard .quick-action-card:has(.action-gradient-2) .action-badge,
 .professor-dashboard .quick-action-card:has(.action-gradient-3) .action-badge {
   background: rgba(168, 85, 247, 0.15);
