@@ -731,7 +731,10 @@ router.get(
             COALESCE(svc.service_name, a.notes, 'Consultation') AS description,
             CONCAT('Student Appointment - ', COALESCE(svc.service_name, a.notes, 'Consultation')) AS title,
             COALESCE(svc.service_name, a.notes, 'Consultation') AS details,
-            a.status, a.updated_at AS date, a.updated_at AS event_time
+            a.status, a.updated_at AS date, a.updated_at AS event_time,
+            a.shared_comment AS sharedComment,
+            a.comment_updated_by AS commentUpdatedBy,
+            a.comment_updated_at AS commentUpdatedAt
           FROM appointments a
           JOIN students s ON a.student_id = s.student_id
           LEFT JOIN appointment_services svc ON a.service_id = svc.service_id

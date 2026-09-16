@@ -457,6 +457,17 @@ export default function ProfessorTransactionsPage() {
                         )}
                       </div>
                     )}
+                    {txn.type === "appointment" && txn.sharedComment && (
+                      <div className="txn-item-comment">
+                        <p className="txn-item-comment-text">{txn.sharedComment}</p>
+                        {txn.commentUpdatedAt && (
+                          <span className="txn-item-comment-meta">
+                            — last updated by {txn.commentUpdatedBy === "faculty" ? "you" : "student"} on{" "}
+                            {formatManilaDate(txn.commentUpdatedAt)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="txn-item-meta">
                     <div className="txn-item-date">
