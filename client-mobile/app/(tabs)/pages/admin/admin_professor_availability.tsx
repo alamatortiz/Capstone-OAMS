@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  AlertCircle,
   Calendar,
   ChevronLeft,
   Clock,
@@ -26,6 +25,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-react-native';
+import Svg, { Circle, Line } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -40,6 +40,16 @@ const pncLogo = require('@/assets/Pnc-Logo.png');
 const oamsLogo = require('@/assets/oams_logo.png');
 const darkModeIcon = require('@/assets/darkmode_icon.png');
 const sunIcon = require('@/assets/sun_icon.png');
+
+// Local alert icon: lucide's dot is a zero-length line that react-native-svg
+// drops, so the exclamation point is drawn as a real filled circle.
+const AlertCircleIcon = ({ size = 16, color = '#ef4444' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} />
+    <Line x1="12" y1="7" x2="12" y2="13" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Circle cx="12" cy="16.5" r="1.1" fill={color} />
+  </Svg>
+);
 
 function OamsLogo({
   style,
@@ -394,7 +404,7 @@ export default function AdminProfessorAvailabilityScreen() {
                       <Text style={styles.scheduleLabel}>Consultation Hours</Text>
                       {isUnavailable ? (
                         <View style={styles.unavailableNotice}>
-                          <AlertCircle size={16} color="#ef4444" />
+                          <AlertCircleIcon size={16} color="#ef4444" />
                           <Text style={styles.unavailableNoticeText}>
                             This professor is currently unavailable and is not accepting
                             consultations right now.
