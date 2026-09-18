@@ -20,7 +20,7 @@ const EDGE_WIDTH = 24;
 const OPEN_THRESHOLD = 60;
 
 // Routes reachable without being logged in.
-const PUBLIC_SEGMENTS = new Set(['login', 'unauthorized']);
+const PUBLIC_SEGMENTS = new Set(['login', 'unauthorized', 'privacy-policy']);
 
 // Mirrors web's ProtectedRoute.tsx: unauthenticated -> /login, wrong-role -> /unauthorized.
 // Centralized here (rather than per-screen) since expo-router's file-based routes for

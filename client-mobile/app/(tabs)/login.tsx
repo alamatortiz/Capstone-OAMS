@@ -281,9 +281,14 @@ export default function LoginScreen() {
               </Pressable>
             </View>
 
-            <Text style={styles.footerCopy}>
-              © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights reserved.
-            </Text>
+            <View style={styles.footer}>
+              <Pressable onPress={() => router.push('/privacy-policy')} hitSlop={8}>
+                <Text style={styles.footerLink}>Privacy Policy</Text>
+              </Pressable>
+              <Text style={styles.footerCopy}>
+                © 2026 University of Cabuyao (Pamantasan ng Cabuyao). All rights reserved.
+              </Text>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -507,6 +512,15 @@ function createStyles(theme: ThemePalette) {
       fontWeight: '700',
     },
 
+    footer: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    footerLink: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#22c55e',
+    },
     footerCopy: {
       fontSize: 11,
       color: theme.hint,

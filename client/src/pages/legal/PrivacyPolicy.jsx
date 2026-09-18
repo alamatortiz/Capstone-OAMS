@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Sun, Moon } from "lucide-react";
 import { applyTheme, getSavedTheme } from "../../utils/theme";
+import pncLogo from "../../assets/Pnc-Logo.png";
 import oamsLogo from "../../assets/oams_logo.png";
 import "./legal.css";
 
@@ -47,7 +48,10 @@ export default function PrivacyPolicy() {
         </Link>
 
         <div className="legal-header">
-          <img src={oamsLogo} alt="OAMS" className="legal-logo" />
+          <div className="legal-logos">
+            <img src={pncLogo} alt="Pamantasan ng Cabuyao" className="legal-logo legal-logo--pnc" />
+            <img src={oamsLogo} alt="OAMS" className="legal-logo legal-logo--oams" />
+          </div>
           <div>
             <h1 className="legal-title">Privacy Policy</h1>
             <p className="legal-updated">Effective and last updated: September 12, 2026</p>

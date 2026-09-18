@@ -91,10 +91,38 @@ body.dark-mode .legal-back-link {
   border-bottom: 1px solid rgba(34, 197, 94, 0.15);
 }
 
+/* PNC seal sits to the left of the OAMS wordmark, same pairing/order the
+   navbar and error page use. Kept in their own flex row so the mobile
+   breakpoint below stacks the pair under the title without splitting it. */
+.legal-logos {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .legal-logo {
   height: 44px;
   width: auto;
-  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* PNC seal keeps the soft brand glow it has elsewhere in the app. */
+.legal-logo--pnc {
+  filter: drop-shadow(0 0 6px rgba(34, 197, 94, 0.18));
+}
+
+/* Crisp 1px white stroke -- same multi-layer, zero-blur technique as the
+   navbar and error page, so the dark wordmark stays legible on the dark
+   background. Every layer stays at 0 blur; a blurred shadow reads as a
+   washed-out halo instead of an outline. */
+.legal-logo--oams {
+  filter:
+    drop-shadow(0 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(-1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85));
 }
 
 .legal-title {
@@ -144,6 +172,15 @@ body.dark-mode .legal-body {
 :root[data-theme="dark"] .legal-body h2,
 body.dark-mode .legal-body h2 {
   color: #f0fdf4;
+}
+
+/* Justified so the prose reads as a formal document. hyphens keeps the
+   inter-word gaps from opening up on narrow viewports. */
+.legal-body p,
+.legal-body li {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
 }
 
 .legal-body p {
