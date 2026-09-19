@@ -181,6 +181,17 @@ html, body {
   background: rgba(34, 197, 94, 0.06);
 }
 
+.aum-sm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.aum-sm-btn:disabled:hover {
+  border-color: var(--card-border);
+  color: var(--text-secondary);
+  background: transparent;
+}
+
 .aum-filter-inputs {
   display: grid;
   grid-template-columns: 1fr;

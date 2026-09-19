@@ -220,7 +220,13 @@ export default function TransactionsPage() {
   // rather than plumbing a raise-the-cap/paginated-export path for it. Both
   // formats share this one fetch so a future column change only has to be
   // made once. ──────────────────────────────────────────────────────────
-  const header = ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
+  // Appointment-only exports get a "Comment" column (the shared
+  // student/faculty comment) instead of the plain columns above, since
+  // that's the thing actually worth recalling for a past appointment.
+  const isAppointmentOnlyExport = filterType === "appointment";
+  const header = isAppointmentOnlyExport
+    ? ["Type", "Title", "Details", "Status", "College", "Comment", "Date", "Time"]
+    : ["Type", "Title", "Details", "Status", "College", "Date", "Time"];
   const csvEscape = (value) => {
     const str = String(value ?? "");
     const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
@@ -239,9 +245,11 @@ export default function TransactionsPage() {
         page: 1,
       },
     });
-    return (res.data.transactions ?? []).map((t) => [
-      getTypeLabel(t.type), t.title, t.details, t.status, t.college, t.date, t.time,
-    ]);
+    return (res.data.transactions ?? []).map((t) =>
+      isAppointmentOnlyExport
+        ? [getTypeLabel(t.type), t.title, t.details, t.status, t.college, t.sharedComment ?? "", t.date, t.time]
+        : [getTypeLabel(t.type), t.title, t.details, t.status, t.college, t.date, t.time],
+    );
   };
 
   const dateRangeLabel =
@@ -593,6 +601,17 @@ export default function TransactionsPage() {
                       <p className="transaction-details">
                         Reason: {transaction.adminReason}
                       </p>
+                    )}
+                    {transaction.type === "appointment" && transaction.sharedComment && (
+                      <div className="transaction-comment">
+                        <p className="transaction-comment-text">{transaction.sharedComment}</p>
+                        {transaction.commentUpdatedAt && (
+                          <span className="transaction-comment-meta">
+                            — last updated by {transaction.commentUpdatedBy === "student" ? "you" : "faculty"} on{" "}
+                            {formatManilaDate(transaction.commentUpdatedAt)}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
 

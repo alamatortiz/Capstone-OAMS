@@ -2744,6 +2744,9 @@ router.get(
           q.notes AS details,
           CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS trackingNumber,
           q.admin_reason AS adminReason,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
+          CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
+          CAST(NULL AS DATETIME) AS commentUpdatedAt,
           q.updated_at AS event_time
         FROM queues q
         JOIN services s ON q.service_id = s.service_id
@@ -2761,6 +2764,9 @@ router.get(
           a.notes AS details,
           CAST(NULL AS CHAR(50) CHARACTER SET utf8mb4) AS trackingNumber,
           CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
+          a.shared_comment AS sharedComment,
+          a.comment_updated_by AS commentUpdatedBy,
+          a.comment_updated_at AS commentUpdatedAt,
           a.updated_at AS event_time
         FROM appointments a
         JOIN faculty f ON a.faculty_id = f.faculty_id
@@ -2778,6 +2784,9 @@ router.get(
           dr.purpose AS details,
           dr.tracking_number AS trackingNumber,
           CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
+          CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
+          CAST(NULL AS DATETIME) AS commentUpdatedAt,
           dr.updated_at AS event_time
         FROM document_requests dr
         JOIN document_services s ON dr.service_id = s.service_id
@@ -2795,6 +2804,9 @@ router.get(
           ds.purpose AS details,
           ds.tracking_number AS trackingNumber,
           CAST(NULL AS CHAR(255) CHARACTER SET utf8mb4) AS adminReason,
+          CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
+          CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
+          CAST(NULL AS DATETIME) AS commentUpdatedAt,
           ds.updated_at AS event_time
         FROM document_submissions ds
         JOIN departments d ON ds.department_id = d.department_id
@@ -2887,6 +2899,9 @@ router.get(
           details: row.details || "No additional details provided.",
           trackingNumber: row.trackingNumber || null,
           adminReason: row.adminReason || null,
+          sharedComment: row.sharedComment || null,
+          commentUpdatedBy: row.commentUpdatedBy || null,
+          commentUpdatedAt: row.commentUpdatedAt || null,
         };
       });
 

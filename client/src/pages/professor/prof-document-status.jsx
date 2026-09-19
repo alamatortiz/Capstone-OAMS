@@ -571,7 +571,7 @@ export default function ProfessorDocumentStatus() {
 
   // ── Live updates: refetch when a document's status changes ────────────────
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
+    const token = localStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);

@@ -19,12 +19,6 @@ function ScrollToTop() {
 import "./index.css";
 import App from "./App.jsx";
 import Login from "./pages/Login.jsx";
-const RegisterStudent = React.lazy(
-  () => import("./pages/RegisterStudent.jsx"),
-);
-const RegisterFaculty = React.lazy(
-  () => import("./pages/RegisterFaculty.jsx"),
-);
 const PrivacyPolicy = React.lazy(
   () => import("./pages/legal/PrivacyPolicy.jsx"),
 );
@@ -144,7 +138,11 @@ createRoot(document.getElementById("root")).render(
           <ScrollToTop />
           <Routes>
             {/* ─── Public Routes ─────────────────────────────────────────────── */}
-            <Route path="/" element={<App />} />
+            {/* Root URL is the student-facing entry point -- its Sign In
+                buttons scope straight to /login/student. Faculty/admin have
+                no link anywhere on this page; they're only reachable by
+                typing their own URL directly. */}
+            <Route path="/" element={<App loginAudience="student" />} />
             <Route
               path="/landingpage/student"
               element={<App loginAudience="student" />}
@@ -156,27 +154,15 @@ createRoot(document.getElementById("root")).render(
             <Route path="/login" element={<Login />} />
             <Route
               path="/login/student"
-              element={<Login registerAudience="student" />}
+              element={<Login expectedRole="student" />}
             />
             <Route
               path="/login/faculty"
-              element={<Login registerAudience="faculty" />}
+              element={<Login expectedRole="faculty" />}
             />
             <Route
-              path="/register/student"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <RegisterStudent />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/register/faculty"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <RegisterFaculty />
-                </Suspense>
-              }
+              path="/login/admin"
+              element={<Login expectedRole="admin" />}
             />
             <Route
               path="/privacy-policy"

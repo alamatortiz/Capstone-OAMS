@@ -5,9 +5,20 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import api from "../utils/api";
 import { disconnectSocket } from "../utils/socket";
+
+// Auth now persists in localStorage (shared across tabs) instead of
+// sessionStorage (private per tab) -- that's what used to make opening a
+// second tab always look logged out. To avoid a login staying valid
+// forever on a shared/lab computer, an inactivity timeout still logs the
+// user out client-side after this long with no real interaction, on top of
+// the JWT's own absolute server-side expiry.
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const ACTIVITY_THROTTLE_MS = 15 * 1000;
+const IDLE_CHECK_INTERVAL_MS = 60 * 1000;
 
 type Role = "student" | "faculty" | "admin" | "superadmin";
 
@@ -46,16 +57,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isAuthenticated = useMemo(() => !!user && !!token, [user, token]);
 
-  const saveAuthData = useCallback((user: UserData, token: string) => {
-    sessionStorage.setItem("oams_user", JSON.stringify(user));
-    sessionStorage.setItem("oams_token", token);
-    setUser(user);
-    setToken(token);
+  // Throttled so activity listeners firing on every mousemove/keydown don't
+  // hammer localStorage -- only the last-write time needs to be recent, not
+  // every single event.
+  const lastActiveWriteRef = useRef(0);
+  const touchLastActive = useCallback(() => {
+    const now = Date.now();
+    if (now - lastActiveWriteRef.current < ACTIVITY_THROTTLE_MS) return;
+    lastActiveWriteRef.current = now;
+    localStorage.setItem("oams_last_active", String(now));
   }, []);
 
+  const isIdleExpired = useCallback(() => {
+    const lastActive = Number(localStorage.getItem("oams_last_active") || 0);
+    return lastActive > 0 && Date.now() - lastActive > IDLE_TIMEOUT_MS;
+  }, []);
+
+  const saveAuthData = useCallback((user: UserData, token: string) => {
+    localStorage.setItem("oams_user", JSON.stringify(user));
+    localStorage.setItem("oams_token", token);
+    setUser(user);
+    setToken(token);
+    touchLastActive();
+  }, [touchLastActive]);
+
   const clearAuthData = useCallback(() => {
-    sessionStorage.removeItem("oams_user");
-    sessionStorage.removeItem("oams_token");
+    localStorage.removeItem("oams_user");
+    localStorage.removeItem("oams_token");
+    localStorage.removeItem("oams_last_active");
     setUser(null);
     setToken(null);
   }, []);
@@ -63,7 +92,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // On app load, check for existing token and fetch user data
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedToken = sessionStorage.getItem("oams_token");
+      const storedToken = localStorage.getItem("oams_token");
+      if (storedToken && isIdleExpired()) {
+        // Left signed in on a shared/lab computer past the idle window --
+        // don't resume, treat it the same as a manual logout.
+        clearAuthData();
+        setIsLoading(false);
+        return;
+      }
       if (storedToken) {
         setToken(storedToken);
         // Try to fetch user data with the stored token
@@ -101,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
     initializeAuth();
-  }, [saveAuthData, clearAuthData]);
+  }, [saveAuthData, clearAuthData, isIdleExpired]);
 
   const login = async (emailOrSchoolId: string, password: string) => {
     setIsLoading(true);
@@ -137,14 +173,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     // Capture the token BEFORE clearing storage. api.js's request interceptor
-    // reads the token from sessionStorage (about to be emptied) and runs
+    // reads the token from localStorage (about to be emptied) and runs
     // asynchronously, so it cannot re-attach it -- without passing it
     // explicitly here the /auth/logout request goes out unauthenticated and
     // the server never records the logout, leaving the JWT valid for its full
     // 24h lifetime. Also tear down the socket (mobile already does this).
-    const storedToken = sessionStorage.getItem("oams_token");
+    const storedToken = localStorage.getItem("oams_token");
     clearAuthData();
     disconnectSocket();
     api
@@ -156,7 +192,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : undefined,
       )
       .catch((error) => console.error("Logout error:", error));
-  };
+  }, [clearAuthData]);
+
+  // Idle-timeout enforcement while the app is open: real user activity
+  // (not just the tab being open) resets the clock, and it's checked
+  // periodically plus whenever the tab regains visibility -- covers both
+  // "walked away from an unlocked shared PC with the tab still open" and
+  // "closed the tab/browser and came back later than the idle window".
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const events: (keyof WindowEventMap)[] = ["mousedown", "keydown", "scroll", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, touchLastActive));
+
+    const checkIdle = () => {
+      if (isIdleExpired()) logout();
+    };
+    const intervalId = window.setInterval(checkIdle, IDLE_CHECK_INTERVAL_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") checkIdle();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, touchLastActive));
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [isAuthenticated, touchLastActive, isIdleExpired, logout]);
 
   const value = useMemo(
     () => ({ user, token, isLoading, login, logout, isAuthenticated }),

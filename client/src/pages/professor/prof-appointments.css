@@ -409,9 +409,9 @@ html, body {
   text-align: left;
 }
 
-/* Date/Time sits directly under the name/course, tightly stacked (no gap) --
-   moved out of the header row's flex layout entirely so its position is
-   never affected by the header-actions column's height. */
+/* Location/Date/Time sit directly under the name/course as one compact,
+   wrapping row -- moved out of the header row's flex layout entirely so its
+   position is never affected by the header-actions column's height. */
 .appt-card-datetime-row {
   display: flex;
   flex-wrap: wrap;
@@ -460,23 +460,6 @@ html, body {
   font-size: 0.8rem;
   color: var(--text-tertiary);
   margin: 0.25rem 0 0;
-  transition: color 0.3s ease;
-}
-
-.appt-card-location-sub {
-  font-size: 0.72rem;
-  color: var(--text-tertiary);
-  margin: 0.15rem 0 0;
-  transition: color 0.3s ease;
-}
-
-.appt-section-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-tertiary);
-  margin: 0.6rem 0 0;
   transition: color 0.3s ease;
 }
 
@@ -568,13 +551,7 @@ html, body {
   text-align: left;
 }
 
-.appt-info-field--full {
-  grid-column: 1 / -1;
-}
-
-/* Year & Program / Course Code sit side by side -- the parent is flex, not a
-   real grid, so .appt-info-field--full's grid-column is a no-op here; this
-   is the real side-by-side wrapper. */
+/* Year & Program, Course Code, and Purpose sit side by side on one row. */
 .appt-info-row {
   display: flex;
   gap: 1rem;
@@ -740,9 +717,9 @@ html, body {
 [data-theme="light"] .appt-btn-sm-approve, [data-theme="light"] .appt-btn-sm-complete { color: #065f46; }
 [data-theme="light"] .appt-btn-sm-reject, [data-theme="light"] .appt-btn-sm-cancel { color: #991b1b; }
 
-/* Date/Time pill styling -- used inside .appt-card-datetime-row, right
-   under the name/course (Location moved to its own labeled field below,
-   same pattern as Note/Purpose/Comment). */
+/* Location/Date/Time pill styling -- used inside .appt-card-datetime-row,
+   right under the name/course, all three fields on one compact wrapping
+   row instead of separate lines. */
 .appt-quick-meta-item {
   display: inline-flex;
   align-items: center;

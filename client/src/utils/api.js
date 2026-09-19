@@ -5,7 +5,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem("oams_token");
+  const token = localStorage.getItem("oams_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -36,7 +36,7 @@ api.interceptors.response.use(
     const status = error?.response?.status;
     const message = error?.response?.data?.error;
     const isAuthEndpoint = error?.config?.url?.includes("/auth/login");
-    const hadToken = !!sessionStorage.getItem("oams_token");
+    const hadToken = !!localStorage.getItem("oams_token");
 
     if (
       !isAuthEndpoint &&
@@ -44,8 +44,9 @@ api.interceptors.response.use(
       (status === 401 || status === 403) &&
       SESSION_DEAD_MESSAGES.includes(message)
     ) {
-      sessionStorage.removeItem("oams_token");
-      sessionStorage.removeItem("oams_user");
+      localStorage.removeItem("oams_token");
+      localStorage.removeItem("oams_user");
+      localStorage.removeItem("oams_last_active");
       sessionStorage.setItem("oams_session_expired", "1");
       window.location.href = "/login";
       return Promise.reject(error);

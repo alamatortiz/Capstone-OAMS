@@ -943,6 +943,35 @@ body {
   text-align: left;
 }
 
+/* ── Shared appointment comment (faculty/student consultation notes) ──── */
+.transaction-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.3rem;
+  padding: 0.5rem 0.625rem;
+  background: rgba(168, 85, 247, 0.06);
+  border-left: 2px solid rgba(168, 85, 247, 0.35);
+  border-radius: 0.375rem;
+}
+
+.transaction-comment-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+  text-align: left;
+  white-space: pre-wrap;
+  transition: color 0.3s ease;
+}
+
+.transaction-comment-meta {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
 .transaction-meta {
   display: flex;
   flex-direction: column;

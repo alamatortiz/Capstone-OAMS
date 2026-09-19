@@ -135,7 +135,7 @@ export default function ProfessorDashboard() {
 
   // ── Live updates: refetch when an appointment or document status changes ──
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
+    const token = localStorage.getItem("oams_token");
     if (!authUser || !token) return;
 
     const socket = connectSocket(token);
@@ -168,7 +168,7 @@ export default function ProfessorDashboard() {
   }, [authUser, fetchAnnouncements]);
 
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
+    const token = localStorage.getItem("oams_token");
     if (!authUser || !token) return;
 
     const socket = connectSocket(token);

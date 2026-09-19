@@ -398,7 +398,7 @@ export default function SuperadminUserManagement() {
               </div>
               <div className="aum-filter-actions">
                 <button className="aum-sm-btn" onClick={handleExport}><DownloadIcon /> Export</button>
-                <button className="aum-sm-btn" onClick={() => toast.info("Import feature coming soon")}><UploadIcon /> Import</button>
+                <button className="aum-sm-btn" disabled title="Coming soon"><UploadIcon /> Import</button>
                 <button className="aum-sm-btn" onClick={() => { fetchUsers(); toast.success("Data refreshed"); }}><RefreshIcon /> Refresh</button>
               </div>
             </div>

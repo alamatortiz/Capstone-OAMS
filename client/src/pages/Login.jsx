@@ -12,19 +12,31 @@ import "./Login.css";
 import pncLogo from "../assets/Pnc-Logo.png";
 import oamsLogo from "../assets/oams_logo.png";
 
-// `registerAudience` scopes the "Don't have an account yet?" hint to a
-// single role: pages reached at /login/student or /login/faculty pass
-// "student"/"faculty" so each audience only ever sees its own registration
-// link, never both together. The bare /login (no prop) shows no
-// registration hint at all -- it's the general entry point, not a link
-// meant to be handed out for self-registration.
-export default function Login({ registerAudience }) {
+const PORTAL_LABELS = {
+  student: "Student Portal",
+  faculty: "Faculty & Staff Portal",
+  admin: "Administrator Portal",
+};
+
+// `expectedRole` locks this page to one role: /login/student,
+// /login/faculty, and /login/admin each pass their own role so a login
+// that succeeds server-side (role is always server-determined, not
+// client-chosen) but belongs to a different role gets rejected client-side
+// instead of silently landing on the wrong dashboard. superadmin has no
+// dedicated login URL of its own (an intentionally hidden, SQL-provisioned
+// role), so it's allowed through the admin portal as an exception. The bare
+// /login (no expectedRole) stays fully ungated, unchanged.
+//
+// There is no self-registration -- student/faculty/admin accounts are
+// provisioned from the school's own records (Pinnacle Sync), not created
+// here, so this page never links out to a registration flow.
+export default function Login({ expectedRole }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getSavedTheme() === "dark");
   const [redirecting, setRedirecting] = useState(false);
-  const { login, isLoading } = useAuth();
+  const { login, logout, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -66,9 +78,22 @@ export default function Login({ registerAudience }) {
     try {
       await login(email, password);
 
-      const storedUser = sessionStorage.getItem("oams_user");
+      const storedUser = localStorage.getItem("oams_user");
       if (storedUser) {
         const userData = JSON.parse(storedUser);
+
+        const roleMatches =
+          !expectedRole ||
+          userData.role === expectedRole ||
+          (expectedRole === "admin" && userData.role === "superadmin");
+        if (!roleMatches) {
+          await logout();
+          toast.error(
+            `This page is for ${PORTAL_LABELS[expectedRole] ?? "a different account type"}. Please use the correct portal for your account.`,
+          );
+          return;
+        }
+
         toast.success(`Welcome back, ${userData.name}!`);
         setRedirecting(true);
         setTimeout(() => {
@@ -151,7 +176,9 @@ export default function Login({ registerAudience }) {
               Sign in with your @pnc.edu.ph email or School ID
             </p>
             <p className="login-card-hint">
-              Your account type will be automatically detected
+              {expectedRole
+                ? PORTAL_LABELS[expectedRole]
+                : "Your account type will be automatically detected"}
             </p>
           </div>
 
@@ -218,15 +245,6 @@ export default function Login({ registerAudience }) {
               )}
             </button>
           </form>
-
-          {registerAudience && (
-            <p className="login-register-hint">
-              Don't have an account yet?{" "}
-              <Link to={`/register/${registerAudience}`}>
-                Register as {registerAudience === "student" ? "Student" : "Faculty"}
-              </Link>
-            </p>
-          )}
         </div>
         {/* /login-card */}
       </main>

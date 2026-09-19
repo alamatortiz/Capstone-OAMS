@@ -23,6 +23,14 @@ const DOCUMENT_STATUS_LABELS = {
   claimed: "Claimed",
 };
 
+// scan.status itself stays lowercase ("valid"/"expired") since it also
+// drives the asd-status-${scan.status} CSS class name -- only the label
+// shown to the admin gets capitalized.
+const SCAN_STATUS_LABELS = {
+  valid: "Valid",
+  expired: "Expired",
+};
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -324,7 +332,7 @@ export default function AdminScanDocument() {
                       <span
                         className={`asd-status-badge asd-status-${verifiedDoc.status.toLowerCase()}`}
                       >
-                        {verifiedDoc.status}
+                        {SCAN_STATUS_LABELS[verifiedDoc.status.toLowerCase()] ?? verifiedDoc.status}
                       </span>
                     </div>
                     {verifiedDoc.documentStatus && (
@@ -636,7 +644,7 @@ export default function AdminScanDocument() {
                           <span
                             className={`asd-status-badge asd-status-${scan.status}`}
                           >
-                            {scan.status}
+                            {SCAN_STATUS_LABELS[scan.status] ?? scan.status}
                           </span>
                         </div>
                         <p className="asd-recent-doctype">{scan.docType}</p>

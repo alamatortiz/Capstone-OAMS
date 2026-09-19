@@ -235,7 +235,16 @@ export default function ProfessorTransactionsPage() {
 
   // Exports exactly what's currently on screen (the server-filtered list
   // already held in state) — no new backend endpoint needed.
-  const exportHeader = ["Type", "Title", "Details", "Status", "Student Name", "Student ID", "Tracking #", "Date", "Time"];
+  // "Tracking #" is meaningless on an appointment-only export (appointments
+  // never have one, so the column would just be blank down the whole
+  // sheet) -- swap it for the shared comment instead, since that's the
+  // thing actually worth recalling for an appointment.
+  const isAppointmentOnly = filterType === "appointment";
+  const exportHeader = [
+    "Type", "Title", "Details", "Status", "Student Name", "Student ID",
+    isAppointmentOnly ? "Comment" : "Tracking #",
+    "Date", "Time",
+  ];
   const exportRows = filtered.map((t) => [
     typeLabel(t.type),
     t.title,
@@ -243,7 +252,9 @@ export default function ProfessorTransactionsPage() {
     statusLabel(t.status),
     t.studentName ?? "",
     t.studentId ?? "",
-    (t.type === "document" || t.type === "submission") ? (t.trackingNumber ?? "") : "",
+    isAppointmentOnly
+      ? (t.sharedComment ?? "")
+      : (t.type === "document" || t.type === "submission") ? (t.trackingNumber ?? "") : "",
     t.dateLabel,
     t.timeLabel,
   ]);

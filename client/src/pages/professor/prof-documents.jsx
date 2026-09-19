@@ -202,7 +202,7 @@ export default function ProfessorDocumentRequest() {
 
   // ── Live updates: refetch when admin changes a request's status ───────────
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
+    const token = localStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);

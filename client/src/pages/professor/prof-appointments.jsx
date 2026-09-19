@@ -18,6 +18,7 @@ import { connectSocket } from "../../utils/socket";
 import {
   Calendar,
   Clock,
+  MapPin,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -65,6 +66,7 @@ const TAB_ICON_MAP = {
 };
 
 const ALL_RANGE_LABELS = {
+  today: "Today",
   week: "This Week",
   month: "This Month",
   all: "All Time",
@@ -240,9 +242,10 @@ function AppointmentCard({
           {appointment.course && (
             <p className="appt-card-sub">{appointment.course}</p>
           )}
-          <p className="appt-card-location-sub">{appointment.location}</p>
-          <p className="appt-section-title">Appointment Date and Time</p>
           <div className="appt-card-datetime-row">
+            <span className="appt-quick-meta-item">
+              <MapPin /> {appointment.location}
+            </span>
             <span className="appt-quick-meta-item">
               <Calendar /> {dateStr}
             </span>
@@ -250,10 +253,10 @@ function AppointmentCard({
               <Clock /> {appointment.time}
             </span>
           </div>
-          {/* Year & Program / Course Code, then Purpose, then the action
-              buttons at the very bottom of the left column. */}
+          {/* Year & Program, Course Code, and Purpose grouped on one row,
+              then the action buttons at the very bottom of the left column. */}
           <div className="appt-info-grid">
-            {(appointment.bookingYearProgram || appointment.courseCode) && (
+            {(appointment.bookingYearProgram || appointment.courseCode || appointment.purpose) && (
               <div className="appt-info-row">
                 {appointment.bookingYearProgram && (
                   <div className="appt-info-field">
@@ -267,12 +270,12 @@ function AppointmentCard({
                     <p>{appointment.courseCode}</p>
                   </div>
                 )}
-              </div>
-            )}
-            {appointment.purpose && (
-              <div className="appt-info-field appt-info-field--full">
-                <label>Purpose</label>
-                <p>{appointment.purpose}</p>
+                {appointment.purpose && (
+                  <div className="appt-info-field">
+                    <label>Purpose</label>
+                    <p>{appointment.purpose}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -346,7 +349,7 @@ function AppointmentCard({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ProfessorAppointmentsPage() {
   const [activeTab, setActiveTab] = useState("all");
-  const [allRange, setAllRange] = useState("all");
+  const [allRange, setAllRange] = useState("today");
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -379,7 +382,7 @@ export default function ProfessorAppointmentsPage() {
 
   // ── Live updates: refetch when a student books or cancels an appointment ──
   useEffect(() => {
-    const token = sessionStorage.getItem("oams_token");
+    const token = localStorage.getItem("oams_token");
     if (!token) return;
 
     const socket = connectSocket(token);
