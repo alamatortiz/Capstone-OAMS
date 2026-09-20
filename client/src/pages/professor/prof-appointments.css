@@ -622,7 +622,7 @@ html, body {
    buttons live in the left column (see .appt-info-grid/.appt-header-btn-row
    below, nested in .appt-card-title-section), so this right column is
    lightweight: just Requested-at, since Comments has its own section in
-   the left column below the action buttons. Shrink-to-fit width since
+   the left column above the action buttons. Shrink-to-fit width since
    there's no 100%-width child needing a stable column width to stretch
    into. */
 .appt-card-header-actions {
@@ -634,11 +634,12 @@ html, body {
   flex-shrink: 0;
 }
 
-/* Sits at the bottom of the left column (.appt-card-title-section), after
-   Location/Purpose -- left-aligned like everything else over there, not
-   right-aligned the way it was when it lived in the right column. Bordered
-   off from the info above it, the same way .appt-comment-section is
-   bordered off from the buttons below. */
+/* Sits at the very bottom of the left column (.appt-card-title-section),
+   after Comments and the Approved/Completed timeline -- left-aligned like
+   everything else over there, not right-aligned the way it was when it
+   lived in the right column. Bordered off from whatever's directly above
+   it (the timeline section when present, otherwise Comments), the same
+   separator pattern .appt-comment-section/.appt-timeline-section use. */
 .appt-header-btn-row {
   display: flex;
   gap: 0.35rem;
@@ -779,14 +780,58 @@ html, body {
 
 
 /* ─── Comments section ────────────────────────────────────────────────────── */
-/* Its own dedicated section at the bottom of the left column, below the
-   action buttons -- editing now happens in a popup (see CommentBlock's
-   QueueReasonModal usage) instead of inline, so this is display-only plus a
-   button that opens that popup. */
+/* Its own dedicated section in the left column, above the Approved/Completed
+   timeline and action buttons -- editing now happens in a popup (see
+   CommentBlock's QueueReasonModal usage) instead of inline, so this is
+   display-only plus a button that opens that popup. */
 .appt-comment-section {
   margin-top: 0.85rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--card-border);
+}
+
+.appt-timeline-section {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 1.5rem;
+}
+
+.appt-timeline-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.appt-timeline-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-tertiary);
+  min-width: 4.5rem;
+}
+
+.appt-timeline-date,
+.appt-timeline-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.appt-timeline-date svg,
+.appt-timeline-time svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
 }
 
 .appt-comment-section-header {

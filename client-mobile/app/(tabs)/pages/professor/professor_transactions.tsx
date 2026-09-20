@@ -20,7 +20,7 @@ import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
+import { toLocalYMD, fromLocalYMD, getManilaDateString, formatManilaDate, formatManilaTime } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
@@ -114,6 +114,8 @@ interface TransactionRecord {
   trackingNumber?: string;
   details: string;
   date: string;
+  approvedAtRaw?: string | null;
+  completedAtRaw?: string | null;
 }
 
 interface NavItem {
@@ -253,6 +255,8 @@ export default function ProfessorTransactionsScreen() {
           trackingNumber: t.trackingNumber,
           details: t.description ?? '',
           date: t.date,
+          approvedAtRaw: t.approvedAtRaw ?? null,
+          completedAtRaw: t.completedAtRaw ?? null,
         })),
       );
     } catch (err) {
@@ -608,6 +612,27 @@ export default function ProfessorTransactionsScreen() {
                     )}
 
                     {txn.details && <Text style={styles.txnDetails}>{txn.details}</Text>}
+
+                    {txn.type === 'appointment' && (txn.approvedAtRaw || txn.completedAtRaw) && (
+                      <View style={styles.txnTimelineRow}>
+                        {txn.approvedAtRaw && (
+                          <View style={styles.txnMetaItem}>
+                            <Ionicons name="checkmark-circle-outline" size={13} color={theme.tertiary} />
+                            <Text style={styles.txnMetaText}>
+                              Approved {formatManilaDate(txn.approvedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} · {formatManilaTime(txn.approvedAtRaw)}
+                            </Text>
+                          </View>
+                        )}
+                        {txn.completedAtRaw && (
+                          <View style={styles.txnMetaItem}>
+                            <Ionicons name="checkmark-done-outline" size={13} color={theme.tertiary} />
+                            <Text style={styles.txnMetaText}>
+                              Completed {formatManilaDate(txn.completedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} · {formatManilaTime(txn.completedAtRaw)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
 
                     <View style={styles.txnMetaRow}>
                       <View style={styles.txnMetaItem}>
@@ -972,6 +997,7 @@ function createStyles(theme: ThemePalette) {
     },
     txnMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     txnMetaText: { fontSize: 10.5, color: theme.tertiary, fontWeight: '600' },
+    txnTimelineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
 
     // Empty state
     emptyCard: {

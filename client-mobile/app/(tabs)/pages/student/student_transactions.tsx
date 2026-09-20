@@ -20,7 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { toLocalYMD, fromLocalYMD, getManilaDateString } from '@/utils/date';
+import { toLocalYMD, fromLocalYMD, getManilaDateString, formatManilaDate, formatManilaTime } from '@/utils/date';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useDrawerSwipeOpen } from '@/hooks/useDrawerSwipeOpen';
@@ -93,6 +93,8 @@ interface Transaction {
   time: string;
   status: TxStatus;
   details: string;
+  approvedAtRaw?: string | null;
+  completedAtRaw?: string | null;
 }
 
 const TYPE_META: Record<TxType, { label: string; icon: LucideIconType; bg: string; border: string; color: string }> = {
@@ -658,6 +660,27 @@ export default function StudentTransactionsScreen() {
                     <Text style={styles.txCollege}>{t.college}</Text>
                     <Text style={styles.txDetails}>{t.details}</Text>
 
+                    {t.type === 'appointment' && (t.approvedAtRaw || t.completedAtRaw) && (
+                      <View style={styles.txTimelineRow}>
+                        {t.approvedAtRaw && (
+                          <View style={styles.txMetaItem}>
+                            <CheckCircle size={13} color={theme.tertiary} />
+                            <Text style={styles.txMetaText}>
+                              Approved {formatManilaDate(t.approvedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} · {formatManilaTime(t.approvedAtRaw)}
+                            </Text>
+                          </View>
+                        )}
+                        {t.completedAtRaw && (
+                          <View style={styles.txMetaItem}>
+                            <CheckCircle size={13} color={theme.tertiary} />
+                            <Text style={styles.txMetaText}>
+                              Completed {formatManilaDate(t.completedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} · {formatManilaTime(t.completedAtRaw)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
                     <View style={styles.txMetaRow}>
                       <View style={styles.txMetaItem}>
                         <Calendar size={13} color={theme.tertiary} />
@@ -1061,6 +1084,7 @@ function createStyles(theme: ThemePalette) {
     },
     txMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     txMetaText: { fontSize: 10.5, color: theme.tertiary, fontWeight: '600' },
+    txTimelineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
 
     // Empty state
     emptyCard: {

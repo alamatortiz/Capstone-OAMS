@@ -972,6 +972,28 @@ body {
   transition: color 0.3s ease;
 }
 
+.transaction-timeline {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  column-gap: 0.75rem;
+  row-gap: 0.15rem;
+  margin-top: 0.3rem;
+}
+
+.transaction-timeline-row {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.transaction-timeline-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .transaction-meta {
   display: flex;
   flex-direction: column;

@@ -410,7 +410,7 @@ router.get(
       let sql = `
         SELECT
           a.appointment_id, a.appointment_date, a.appointment_time,
-          a.status, a.notes, a.created_at,
+          a.status, a.notes, a.created_at, a.approved_at, a.completed_at,
           a.booking_year_program, a.course_code,
           a.shared_comment, a.comment_updated_by, a.comment_updated_at,
           s.first_name, s.last_name, s.student_number, s.course,
@@ -429,7 +429,7 @@ router.get(
         sql += " AND a.status = ?";
         params.push(status);
       }
-      sql += " ORDER BY a.created_at DESC";
+      sql += " ORDER BY a.created_at ASC, a.appointment_id ASC";
       const [rows] = await pool.query(sql, params);
       res.json(
         rows.map((r) => ({
@@ -467,6 +467,8 @@ router.get(
           // Raw instant for the client to format itself (calendar/clock split) --
           // same interpretation as requestedAt above, which stays for older clients.
           requestedAtRaw: r.created_at,
+          approvedAtRaw: r.approved_at ?? null,
+          completedAtRaw: r.completed_at ?? null,
         })),
       );
     } catch (err) {
@@ -591,9 +593,11 @@ router.patch(
       await conn.query(
         `UPDATE appointments
          SET status = ?, cancelled_by = COALESCE(?, cancelled_by),
-             rejection_reason = ?
+             rejection_reason = ?,
+             approved_at = CASE WHEN ? = 'approved' AND approved_at IS NULL THEN NOW() ELSE approved_at END,
+             completed_at = CASE WHEN ? = 'completed' AND completed_at IS NULL THEN NOW() ELSE completed_at END
          WHERE appointment_id = ? AND faculty_id = ?`,
-        [status, cancelledBy, status === "rejected" ? trimmedReason : null, id, facultyId],
+        [status, cancelledBy, status === "rejected" ? trimmedReason : null, status, status, id, facultyId],
       );
 
       await conn.commit();
@@ -734,7 +738,8 @@ router.get(
             a.status, a.updated_at AS date, a.updated_at AS event_time,
             a.shared_comment AS sharedComment,
             a.comment_updated_by AS commentUpdatedBy,
-            a.comment_updated_at AS commentUpdatedAt
+            a.comment_updated_at AS commentUpdatedAt,
+            a.approved_at AS approvedAtRaw, a.completed_at AS completedAtRaw
           FROM appointments a
           JOIN students s ON a.student_id = s.student_id
           LEFT JOIN appointment_services svc ON a.service_id = svc.service_id

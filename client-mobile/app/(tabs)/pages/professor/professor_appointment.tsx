@@ -22,6 +22,7 @@ import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
 import { formatManilaDate, formatManilaTime } from '@/utils/date';
+import { filterByRange } from '@/utils/dateRange';
 import NotificationBell from '@/components/NotificationBell';
 import QueueReasonModal from '@/components/QueueReasonModal';
 import { PROFESSOR_NOTIFICATION_PATHS, PROFESSOR_NOTIFICATIONS_VIEW_ALL } from '@/utils/notificationRoutes';
@@ -97,6 +98,8 @@ interface Appointment {
   status: AppointmentStatus;
   requestedAt: string;
   requestedAtRaw: string | null;
+  approvedAtRaw?: string | null;
+  completedAtRaw?: string | null;
 }
 
 interface NavItem {
@@ -125,12 +128,13 @@ const TAB_ICON_MAP: Record<TabKey, IoniconName> = {
   cancelled: 'close-circle-outline',
 };
 
-const ALL_RANGES = ['week', 'month', 'all'] as const;
+const ALL_RANGES = ['today', 'week', 'nextWeek', 'all'] as const;
 type AllRange = (typeof ALL_RANGES)[number];
 
 const ALL_RANGE_LABELS: Record<AllRange, string> = {
+  today: 'Today',
   week: 'This Week',
-  month: 'This Month',
+  nextWeek: 'Next Week',
   all: 'All Time',
 };
 
@@ -189,25 +193,6 @@ const CONFIRM_META: Record<
   }),
 };
 
-// ─── Date helpers — mirrors getWeekRange/getMonthRange/isWithinRange in the
-// web prof-appointments.jsx (week starts Sunday, matching the booking calendar). ───
-function getWeekRange(now = new Date()) {
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
-  return { start, end };
-}
-
-function getMonthRange(now = new Date()) {
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  return { start, end };
-}
-
-function isWithinRange(dateStr: string, range: { start: Date; end: Date }) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  return d >= range.start && d <= range.end;
-}
-
 function formatDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return dateStr;
@@ -222,7 +207,7 @@ export default function ProfessorAppointmentScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
-  const [allRange, setAllRange] = useState<AllRange>('week');
+  const [allRange, setAllRange] = useState<AllRange>('today');
   const [rangeModalOpen, setRangeModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: ActionType; apt: Appointment } | null>(null);
   const [confirmSaving, setConfirmSaving] = useState(false);
@@ -325,10 +310,7 @@ export default function ProfessorAppointmentScreen() {
 
   // Governs every tab, not just "All" -- picking a range then switching tabs
   // should keep showing only that range's appointments for that status.
-  const rangeFiltered =
-    allRange === 'all'
-      ? appointments
-      : appointments.filter((a) => isWithinRange(a.date, allRange === 'week' ? getWeekRange() : getMonthRange()));
+  const rangeFiltered = filterByRange(appointments, allRange);
 
   const tabCounts: Record<TabKey, number> = {
     all: rangeFiltered.length,
@@ -631,14 +613,39 @@ export default function ProfessorAppointmentScreen() {
                           </Pressable>
                         </View>
                       )}
-                      <View style={styles.requestedMeta}>
-                        <Text style={styles.requestedLabel}>Requested</Text>
-                        {apt.requestedAtRaw ? (
-                          <>
+                      <View style={styles.timelineMetaGroup}>
+                        <View style={styles.requestedMeta}>
+                          <Text style={styles.requestedLabel}>Requested</Text>
+                          {apt.requestedAtRaw ? (
+                            <>
+                              <View style={styles.requestedRowItem}>
+                                <Ionicons name="calendar-outline" size={11} color={theme.tertiary} />
+                                <Text style={styles.requestedText}>
+                                  {formatManilaDate(apt.requestedAtRaw, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })}
+                                </Text>
+                              </View>
+                              <View style={styles.requestedRowItem}>
+                                <Ionicons name="time-outline" size={11} color={theme.tertiary} />
+                                <Text style={styles.requestedText}>
+                                  {formatManilaTime(apt.requestedAtRaw)}
+                                </Text>
+                              </View>
+                            </>
+                          ) : (
+                            <Text style={styles.requestedText}>{apt.requestedAt}</Text>
+                          )}
+                        </View>
+                        {apt.approvedAtRaw && (
+                          <View style={styles.requestedMeta}>
+                            <Text style={styles.requestedLabel}>Approved</Text>
                             <View style={styles.requestedRowItem}>
                               <Ionicons name="calendar-outline" size={11} color={theme.tertiary} />
                               <Text style={styles.requestedText}>
-                                {formatManilaDate(apt.requestedAtRaw, {
+                                {formatManilaDate(apt.approvedAtRaw, {
                                   month: 'short',
                                   day: 'numeric',
                                   year: 'numeric',
@@ -647,13 +654,28 @@ export default function ProfessorAppointmentScreen() {
                             </View>
                             <View style={styles.requestedRowItem}>
                               <Ionicons name="time-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>{formatManilaTime(apt.approvedAtRaw)}</Text>
+                            </View>
+                          </View>
+                        )}
+                        {apt.completedAtRaw && (
+                          <View style={styles.requestedMeta}>
+                            <Text style={styles.requestedLabel}>Completed</Text>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="calendar-outline" size={11} color={theme.tertiary} />
                               <Text style={styles.requestedText}>
-                                {formatManilaTime(apt.requestedAtRaw)}
+                                {formatManilaDate(apt.completedAtRaw, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
                               </Text>
                             </View>
-                          </>
-                        ) : (
-                          <Text style={styles.requestedText}>{apt.requestedAt}</Text>
+                            <View style={styles.requestedRowItem}>
+                              <Ionicons name="time-outline" size={11} color={theme.tertiary} />
+                              <Text style={styles.requestedText}>{formatManilaTime(apt.completedAtRaw)}</Text>
+                            </View>
+                          </View>
                         )}
                       </View>
                     </View>
@@ -1124,10 +1146,11 @@ function createStyles(theme: ThemePalette) {
     apptBtnCancel: { borderWidth: 1, borderColor: theme.border },
     apptBtnText: { fontSize: 11.5, fontWeight: '600', color: '#ffffff' },
     apptBtnCancelText: { fontSize: 11.5, fontWeight: '600', color: theme.text },
-    requestedMeta: { gap: 3, marginLeft: 'auto' },
+    requestedMeta: { gap: 3 },
     requestedLabel: { fontSize: 9, fontWeight: '600', color: theme.tertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
     requestedRowItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     requestedText: { fontSize: 10.5, color: theme.tertiary },
+    timelineMetaGroup: { flexDirection: 'column', alignItems: 'flex-end', gap: 8, marginLeft: 'auto' },
 
     // Range picker modal
     rangeModalCard: {

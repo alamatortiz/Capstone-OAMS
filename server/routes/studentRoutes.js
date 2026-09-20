@@ -2320,6 +2320,8 @@ router.get(
            a.comment_updated_by,
            a.comment_updated_at,
            a.created_at,
+           a.approved_at,
+           a.completed_at,
            f.faculty_id,
            CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
            d.department_name                       AS college,
@@ -2363,6 +2365,8 @@ router.get(
         commentUpdatedBy: row.comment_updated_by ?? null,
         commentUpdatedAt: row.comment_updated_at ?? null,
         createdAt: row.created_at ? getManilaDateString(row.created_at) : null,
+        approvedAtRaw: row.approved_at ?? null,
+        completedAtRaw: row.completed_at ?? null,
       }));
 
       res.json({ appointments: formatted });
@@ -2532,7 +2536,9 @@ router.patch(
       }
 
       const [result] = await conn.query(
-        `UPDATE appointments SET status = 'completed'
+        `UPDATE appointments
+         SET status = 'completed',
+             completed_at = CASE WHEN completed_at IS NULL THEN NOW() ELSE completed_at END
          WHERE appointment_id = ? AND status = 'approved'`,
         [appointmentId],
       );
@@ -2747,6 +2753,8 @@ router.get(
           CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
           CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
           CAST(NULL AS DATETIME) AS commentUpdatedAt,
+          CAST(NULL AS DATETIME) AS approvedAt,
+          CAST(NULL AS DATETIME) AS completedAt,
           q.updated_at AS event_time
         FROM queues q
         JOIN services s ON q.service_id = s.service_id
@@ -2767,6 +2775,8 @@ router.get(
           a.shared_comment AS sharedComment,
           a.comment_updated_by AS commentUpdatedBy,
           a.comment_updated_at AS commentUpdatedAt,
+          a.approved_at AS approvedAt,
+          a.completed_at AS completedAt,
           a.updated_at AS event_time
         FROM appointments a
         JOIN faculty f ON a.faculty_id = f.faculty_id
@@ -2787,6 +2797,8 @@ router.get(
           CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
           CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
           CAST(NULL AS DATETIME) AS commentUpdatedAt,
+          CAST(NULL AS DATETIME) AS approvedAt,
+          CAST(NULL AS DATETIME) AS completedAt,
           dr.updated_at AS event_time
         FROM document_requests dr
         JOIN document_services s ON dr.service_id = s.service_id
@@ -2807,6 +2819,8 @@ router.get(
           CAST(NULL AS CHAR(1000) CHARACTER SET utf8mb4) AS sharedComment,
           CAST(NULL AS CHAR(10) CHARACTER SET utf8mb4) AS commentUpdatedBy,
           CAST(NULL AS DATETIME) AS commentUpdatedAt,
+          CAST(NULL AS DATETIME) AS approvedAt,
+          CAST(NULL AS DATETIME) AS completedAt,
           ds.updated_at AS event_time
         FROM document_submissions ds
         JOIN departments d ON ds.department_id = d.department_id
@@ -2902,6 +2916,8 @@ router.get(
           sharedComment: row.sharedComment || null,
           commentUpdatedBy: row.commentUpdatedBy || null,
           commentUpdatedAt: row.commentUpdatedAt || null,
+          approvedAtRaw: row.approvedAt || null,
+          completedAtRaw: row.completedAt || null,
         };
       });
 

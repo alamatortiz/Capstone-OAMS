@@ -156,7 +156,10 @@ async function sweepStaleApproved() {
   let completedCount = 0;
   for (const row of stale) {
     const [result] = await pool.query(
-      `UPDATE appointments SET status = 'completed' WHERE appointment_id = ? AND status = 'approved'`,
+      `UPDATE appointments
+       SET status = 'completed',
+           completed_at = CASE WHEN completed_at IS NULL THEN NOW() ELSE completed_at END
+       WHERE appointment_id = ? AND status = 'approved'`,
       [row.appointment_id],
     );
     if (result.affectedRows === 0) continue;

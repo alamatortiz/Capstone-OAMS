@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 import "./stud-transactions.css";
 import api from "../../utils/api";
-import { formatManilaDate, getManilaDateString } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaTime, getManilaDateString } from "../../utils/dateTime";
 import { exportTransactionsPdf } from "../../utils/exportPdf";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
@@ -610,6 +610,22 @@ export default function TransactionsPage() {
                             — last updated by {transaction.commentUpdatedBy === "student" ? "you" : "faculty"} on{" "}
                             {formatManilaDate(transaction.commentUpdatedAt)}
                           </span>
+                        )}
+                      </div>
+                    )}
+                    {transaction.type === "appointment" && (transaction.approvedAtRaw || transaction.completedAtRaw) && (
+                      <div className="transaction-timeline">
+                        {transaction.approvedAtRaw && (
+                          <p className="transaction-timeline-row">
+                            <span className="transaction-timeline-label">Approved:</span>{" "}
+                            {formatManilaDate(transaction.approvedAtRaw, { month: "short", day: "numeric", year: "numeric" })} at {formatManilaTime(transaction.approvedAtRaw)}
+                          </p>
+                        )}
+                        {transaction.completedAtRaw && (
+                          <p className="transaction-timeline-row">
+                            <span className="transaction-timeline-label">Completed:</span>{" "}
+                            {formatManilaDate(transaction.completedAtRaw, { month: "short", day: "numeric", year: "numeric" })} at {formatManilaTime(transaction.completedAtRaw)}
+                          </p>
                         )}
                       </div>
                     )}

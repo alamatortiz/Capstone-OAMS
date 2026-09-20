@@ -479,6 +479,22 @@ export default function ProfessorTransactionsPage() {
                         )}
                       </div>
                     )}
+                    {txn.type === "appointment" && (txn.approvedAtRaw || txn.completedAtRaw) && (
+                      <div className="txn-item-timeline">
+                        {txn.approvedAtRaw && (
+                          <p className="txn-item-timeline-row">
+                            <span className="txn-item-timeline-label">Approved:</span>{" "}
+                            {formatManilaDate(txn.approvedAtRaw, { month: "short", day: "numeric", year: "numeric" })} at {formatManilaTime(txn.approvedAtRaw)}
+                          </p>
+                        )}
+                        {txn.completedAtRaw && (
+                          <p className="txn-item-timeline-row">
+                            <span className="txn-item-timeline-label">Completed:</span>{" "}
+                            {formatManilaDate(txn.completedAtRaw, { month: "short", day: "numeric", year: "numeric" })} at {formatManilaTime(txn.completedAtRaw)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="txn-item-meta">
                     <div className="txn-item-date">

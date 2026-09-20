@@ -20,7 +20,7 @@ import { getCollegeLogo } from "../../data/collegeLogo";
 import StudentPageShell from "../../components/StudentPageShell";
 import PageHeader from "../../components/PageHeader";
 import AppointmentListItem from "../../components/AppointmentListItem";
-import { formatManilaDate } from "../../utils/dateTime";
+import { formatManilaDate, formatManilaDateTime } from "../../utils/dateTime";
 import { filterByRange } from "../../utils/dateRange";
 import { connectSocket } from "../../utils/socket";
 import { useAuth } from "../../context/AuthContext";
@@ -185,9 +185,21 @@ function AppointmentDetail({ appt, onBack, onCancel, cancelling, onComplete, com
                 </div>
               )}
               {appt.createdAt && (
-                <div className="apst-detail-row" style={{ borderBottom: "none" }}>
+                <div className="apst-detail-row" style={(!appt.approvedAtRaw && !appt.completedAtRaw) ? { borderBottom: "none" } : undefined}>
                   <p className="apst-detail-label">Booked On</p>
                   <p className="apst-detail-value">{formatDateShort(appt.createdAt)}</p>
+                </div>
+              )}
+              {appt.approvedAtRaw && (
+                <div className="apst-detail-row" style={!appt.completedAtRaw ? { borderBottom: "none" } : undefined}>
+                  <p className="apst-detail-label">Approved On</p>
+                  <p className="apst-detail-value">{formatManilaDateTime(appt.approvedAtRaw)}</p>
+                </div>
+              )}
+              {appt.completedAtRaw && (
+                <div className="apst-detail-row" style={{ borderBottom: "none" }}>
+                  <p className="apst-detail-label">Completed On</p>
+                  <p className="apst-detail-value">{formatManilaDateTime(appt.completedAtRaw)}</p>
                 </div>
               )}
             </div>
@@ -321,7 +333,7 @@ export default function AppointmentStatusPage() {
   const [cancelling, setCancelling] = useState(null);
   const [completing, setCompleting] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
-  const [allRange, setAllRange] = useState("week");
+  const [allRange, setAllRange] = useState("today");
 
   // Mirrors `appointments` for the catch block below, without making
   // fetchAppointments depend on (and change identity with) the state itself.
@@ -422,8 +434,9 @@ export default function AppointmentStatusPage() {
     }
   };
 
-  // Defaults to "This Week" across every tab -- the range control below lets
-  // a student switch to "This Month"/"All Time" to see everything else.
+  // Defaults to "Today" across every tab -- the range control below lets a
+  // student switch to "This Week"/"Next Week"/"All Time" to see everything
+  // else.
   const rangeFilteredAppointments = filterByRange(appointments, allRange);
   const byStatus = (status) => rangeFilteredAppointments.filter((a) => a.status === status);
   const tabLists = {
@@ -435,7 +448,7 @@ export default function AppointmentStatusPage() {
     cancelled: byStatus("cancelled"),
   };
 
-  const RANGE_LABELS = { week: "This Week", month: "This Month", all: "All Time" };
+  const RANGE_LABELS = { today: "Today", week: "This Week", nextWeek: "Next Week", all: "All Time" };
 
   const TAB_ICON_MAP = {
     all:       LayoutList,
@@ -533,10 +546,11 @@ export default function AppointmentStatusPage() {
                     {TABS.map(({ key, label }) => {
                       const TabIcon = TAB_ICON_MAP[key];
 
-                      // The "All" tab doubles as the This Week/This Month/All
-                      // Time range control, governing every tab -- same
-                      // placement/pattern as prof-appointments.jsx's Appointment
-                      // Manager, so the two pages look and behave consistently.
+                      // The "All" tab doubles as the Today/This Week/Next
+                      // Week/All Time range control, governing every tab --
+                      // same placement/pattern as prof-appointments.jsx's
+                      // Appointment Manager, so the two pages look and behave
+                      // consistently.
                       if (key === "all") {
                         return (
                           <div

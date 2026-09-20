@@ -405,6 +405,23 @@ CREATE TABLE appointments (
     appointment_date    DATE         NOT NULL,
     appointment_time    TIME         NOT NULL,
     status              ENUM('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
+    -- Real-world instant the professor approved this request (PATCH
+    -- /professor/appointments/:id/status) -- separate from updated_at
+    -- (overwritten on every status change) so "approved at" survives a
+    -- later transition to completed. NULL until approved; never
+    -- overwritten afterward (see the write sites' "IS NULL" guards).
+    approved_at         TIMESTAMP    NULL DEFAULT NULL,
+    -- Real-world instant this appointment was first marked completed --
+    -- via the professor's own PATCH above, the student's self-service
+    -- PATCH /student/appointments/:appointmentId/complete, or
+    -- appointmentReminderSweeper.js's sweepStaleApproved() auto-complete.
+    -- Whichever of those three fires first wins; NULL until then. For the
+    -- sweeper specifically this is "when the sweeper noticed", not a
+    -- backdated reconstruction of the appointment window's end time (see
+    -- db.js's timezone comment) -- consistent with reminder_sent_at/
+    -- imminent_reminder_sent_at/pending_nudge_sent_at below, which are all
+    -- stamped the same "when noticed" way.
+    completed_at        TIMESTAMP    NULL DEFAULT NULL,
     -- 'system' = auto-cancelled because the availability slot it was booked
     -- against got edited/deleted out from under it.
     -- 'system_expired' = LEGACY. A pending request whose scheduled time passed

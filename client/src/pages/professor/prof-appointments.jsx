@@ -68,7 +68,7 @@ const TAB_ICON_MAP = {
 const ALL_RANGE_LABELS = {
   today: "Today",
   week: "This Week",
-  month: "This Month",
+  nextWeek: "Next Week",
   all: "All Time",
 };
 
@@ -279,6 +279,45 @@ function AppointmentCard({
               </div>
             )}
           </div>
+          <CommentBlock appointment={appointment} onSaved={onCommentSaved} />
+          {(appointment.approvedAtRaw || appointment.completedAtRaw) && (
+            <div className="appt-timeline-section">
+              {appointment.approvedAtRaw && (
+                <div className="appt-timeline-row">
+                  <span className="appt-timeline-label">Approved</span>
+                  <span className="appt-timeline-date">
+                    <Calendar />
+                    {formatManilaDate(appointment.approvedAtRaw, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span className="appt-timeline-time">
+                    <Clock />
+                    {formatManilaTime(appointment.approvedAtRaw)}
+                  </span>
+                </div>
+              )}
+              {appointment.completedAtRaw && (
+                <div className="appt-timeline-row">
+                  <span className="appt-timeline-label">Completed</span>
+                  <span className="appt-timeline-date">
+                    <Calendar />
+                    {formatManilaDate(appointment.completedAtRaw, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span className="appt-timeline-time">
+                    <Clock />
+                    {formatManilaTime(appointment.completedAtRaw)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           {appointment.status === "pending" && (
             <div className="appt-header-btn-row">
               <button
@@ -316,7 +355,6 @@ function AppointmentCard({
               </button>
             </div>
           )}
-          <CommentBlock appointment={appointment} onSaved={onCommentSaved} />
         </div>
         <div className="appt-card-header-actions">
           <div className="appt-requested-meta">
@@ -405,9 +443,10 @@ export default function ProfessorAppointmentsPage() {
     "cancelled",
   ];
 
-  // The This Week/This Month/All Time control governs every tab, not just
-  // "All" — otherwise a tab's badge count and its rendered list would come
-  // from two different-shaped arrays and visibly disagree with each other.
+  // The Today/This Week/Next Week/All Time control governs every tab, not
+  // just "All" — otherwise a tab's badge count and its rendered list would
+  // come from two different-shaped arrays and visibly disagree with each
+  // other.
   const rangeFilteredAppointments = filterByRange(appointments, allRange);
 
   const filteredAppointments =

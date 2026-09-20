@@ -29,6 +29,8 @@ import { STUDENT_NOTIFICATION_PATHS, STUDENT_NOTIFICATIONS_VIEW_ALL } from '@/ut
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { notify } from '@/utils/notifications';
+import { formatManilaDate, formatManilaTime } from '@/utils/date';
+import { filterByRange } from '@/utils/dateRange';
 
 // Mirrors web's CSS `spin 1s linear infinite` on Loader2 for loading states.
 function SpinningLoader({ size, color }: { size: number; color: string }) {
@@ -126,6 +128,8 @@ interface Appointment {
   createdAt: string;
   appointmentType?: string;
   rejectionReason?: string;
+  approvedAtRaw?: string | null;
+  completedAtRaw?: string | null;
 }
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -169,29 +173,14 @@ const navItems: NavItem[] = [
 ];
 
 type TabKey = 'all' | BookingStatus;
-type RangeKey = 'week' | 'month' | 'all';
+type RangeKey = 'today' | 'week' | 'nextWeek' | 'all';
 
-const RANGE_LABELS: Record<RangeKey, string> = { week: 'This Week', month: 'This Month', all: 'All Time' };
-
-// Mirrors client/src/utils/dateRange.js — week starts on Sunday, matching
-// the appointment booking calendar elsewhere in the app.
-function filterByRange<T extends { date: string }>(items: T[], rangeKey: RangeKey): T[] {
-  if (rangeKey === 'all') return items;
-  const now = new Date();
-  let start: Date;
-  let end: Date;
-  if (rangeKey === 'month') {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
-    end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  } else {
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
-  }
-  return items.filter((item) => {
-    const d = new Date(`${item.date}T00:00:00`);
-    return d >= start && d <= end;
-  });
-}
+const RANGE_LABELS: Record<RangeKey, string> = {
+  today: 'Today',
+  week: 'This Week',
+  nextWeek: 'Next Week',
+  all: 'All Time',
+};
 
 const TABS: { key: TabKey; label: string; icon: LucideIconType }[] = [
   { key: 'all', label: 'All', icon: LayoutList },
@@ -233,7 +222,7 @@ export default function StudentAppointmentStatusScreen() {
   const params = useLocalSearchParams<{ appointmentId?: string; fromBookings?: string }>();
   const [selectedId, setSelectedId] = useState<string | null>(params.appointmentId ?? null);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
-  const [allRange, setAllRange] = useState<RangeKey>('week');
+  const [allRange, setAllRange] = useState<RangeKey>('today');
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null);
@@ -272,6 +261,8 @@ export default function StudentAppointmentStatusScreen() {
           createdAt: a.createdAt,
           appointmentType: a.appointmentType ?? undefined,
           rejectionReason: a.rejectionReason ?? undefined,
+          approvedAtRaw: a.approvedAtRaw ?? null,
+          completedAtRaw: a.completedAtRaw ?? null,
         })),
       );
       setError(null);
@@ -326,8 +317,9 @@ export default function StudentAppointmentStatusScreen() {
   const handleLogout = () => { setMenuOpen(false); setLogoutModalVisible(true); };
   const confirmLogout = () => { setLogoutModalVisible(false); logout(); router.replace('/login'); };
 
-  // Defaults to "This Week" across every tab — the range control lets a
-  // student switch to "This Month"/"All Time" to see everything else.
+  // Defaults to "Today" across every tab — the range control lets a
+  // student switch to "This Week"/"Next Week"/"All Time" to see everything
+  // else.
   const rangeFilteredAppointments = filterByRange(appointments, allRange);
   const byStatus = (status: BookingStatus) => rangeFilteredAppointments.filter((a) => a.status === status);
   const tabLists: Record<TabKey, Appointment[]> = {
@@ -486,9 +478,25 @@ export default function StudentAppointmentStatusScreen() {
                     </View>
                   ) : null}
                   {selectedAppt.createdAt ? (
-                    <View style={[styles.detailRow, styles.detailRowLast]}>
+                    <View style={[styles.detailRow, (!selectedAppt.approvedAtRaw && !selectedAppt.completedAtRaw) ? styles.detailRowLast : null]}>
                       <Text style={styles.detailLabel}>Booked On</Text>
                       <Text style={styles.detailValue}>{formatDateShort(selectedAppt.createdAt)}</Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.approvedAtRaw ? (
+                    <View style={[styles.detailRow, !selectedAppt.completedAtRaw ? styles.detailRowLast : null]}>
+                      <Text style={styles.detailLabel}>Approved On</Text>
+                      <Text style={styles.detailValue}>
+                        {formatManilaDate(selectedAppt.approvedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} at {formatManilaTime(selectedAppt.approvedAtRaw)}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {selectedAppt.completedAtRaw ? (
+                    <View style={[styles.detailRow, styles.detailRowLast]}>
+                      <Text style={styles.detailLabel}>Completed On</Text>
+                      <Text style={styles.detailValue}>
+                        {formatManilaDate(selectedAppt.completedAtRaw, { month: 'short', day: 'numeric', year: 'numeric' })} at {formatManilaTime(selectedAppt.completedAtRaw)}
+                      </Text>
                     </View>
                   ) : null}
                 </View>
@@ -620,7 +628,7 @@ export default function StudentAppointmentStatusScreen() {
                 </View>
               </ScrollView>
 
-              {/* Date range — governs every tab, defaults to This Week */}
+              {/* Date range — governs every tab, defaults to Today */}
               <View style={styles.rangeRow}>
                 {(Object.keys(RANGE_LABELS) as RangeKey[]).map((key) => {
                   const active = allRange === key;
